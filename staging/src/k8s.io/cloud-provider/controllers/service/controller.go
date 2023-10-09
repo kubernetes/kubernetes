@@ -158,21 +158,7 @@ func New(
 				s.enqueueNode(cur)
 			},
 			UpdateFunc: func(old, cur interface{}) {
-				oldNode, ok := old.(*v1.Node)
-				if !ok {
-					return
-				}
-
-				curNode, ok := cur.(*v1.Node)
-				if !ok {
-					return
-				}
-
-				if !shouldSyncUpdatedNode(oldNode, curNode) {
-					return
-				}
-
-				s.enqueueNode(curNode)
+				s.enqueueNode(cur)
 			},
 			DeleteFunc: func(old interface{}) {
 				s.enqueueNode(old)
@@ -686,31 +672,6 @@ func loggableNodeNames(nodes []*v1.Node) []string {
 		return append(names, fmt.Sprintf("<%d more>", skipped))
 	}
 	return nodeNames(nodes).List()
-}
-
-func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
-	// Evaluate the individual node exclusion predicate before evaluating the
-	// compounded result of all predicates. We don't sync changes on the
-	// readiness condition for eTP:Local services or when
-	// StableLoadBalancerNodeSet is enabled, hence if a node remains NotReady
-	// and a user adds the exclusion label we will need to sync as to make sure
-	// this change is reflected correctly on ETP=local services. The sync
-	// function compares lastSyncedNodes with the new (existing) set of nodes
-	// for each service, so services which are synced with the same set of nodes
-	// should be skipped internally in the sync function. This is needed as to
-	// trigger a global sync for all services and make sure no service gets
-	// skipped due to a changing node predicate.
-	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
-		return true
-	}
-	// For the same reason as above, also check for any change to the providerID
-	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
-		return true
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
-		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
-	}
-	return false
 }
 
 // syncNodes handles updating the hosts pointed to by all load
