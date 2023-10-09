@@ -168,12 +168,20 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.proportionalZoneCPUHeuristic = topologyheuristics.NewProportionalZoneCPUHeuristic()
 		// Initialize all default available topology heuristics in the
 		// topologyHeuristicsManager.
-		topologyHeuristicsManager = topologyheuristics.NewManager(
+		allTopologies := []topologyheuristics.Heuristic{c.proportionalZoneCPUHeuristic}
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHintsPreferZoneHeuristic) {
+			allTopologies = append(allTopologies, topologyheuristics.NewPreferZoneHeuristic())
+		}
+		var err error
+		topologyHeuristicsManager, err = topologyheuristics.NewManager(
 			logger,
-			[]topologyheuristics.Heuristic{c.proportionalZoneCPUHeuristic},
+			allTopologies,
 			c.proportionalZoneCPUHeuristic.Name(), /* default heuristic */
 			[]string{},
 		)
+		if err != nil {
+			logger.Error(err, "Failed to initialize EndpointSlice topologyHeuristicsManager")
+		}
 	}
 
 	c.reconciler = endpointslicerec.NewReconciler(

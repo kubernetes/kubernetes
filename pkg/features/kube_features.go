@@ -842,6 +842,13 @@ const (
 	// Enables topology aware hints for EndpointSlices
 	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
 
+	// owner: @aojea, @robscott, @gauravkghildiyal
+	// kep: https://kep.k8s.io/2433
+	// alpha: v1.30
+	//
+	// Enables PreferZone topology heuristic in EndpointSlice controller.
+	TopologyAwareHintsPreferZoneHeuristic featuregate.Feature = "TopologyAwareHintsPreferZoneHeuristic"
+
 	// owner: @PiotrProkop
 	// kep: https://kep.k8s.io/3545
 	// alpha: v1.26
@@ -1187,6 +1194,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.Beta},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
+
+	TopologyAwareHintsPreferZoneHeuristic: {Default: false, PreRelease: featuregate.Alpha},
 
 	TopologyManagerPolicyAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 
