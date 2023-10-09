@@ -86,6 +86,9 @@ type Cloud struct {
 	ExternalIP    net.IP
 	Balancers     map[string]Balancer
 	UpdateCalls   []UpdateBalancerCall
+	EnsureCalls   []UpdateBalancerCall
+	EnsureCallCb  func(UpdateBalancerCall)
+	UpdateCallCb  func(UpdateBalancerCall)
 	RouteMap      map[string]*Route
 	Lock          sync.Mutex
 	Provider      string
@@ -200,6 +203,7 @@ func (f *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, ser
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
 func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	f.markEnsureCall(service, nodes)
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]Balancer)
@@ -222,13 +226,31 @@ func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 	return status, f.Err
 }
 
+func (f *Cloud) markUpdateCall(service *v1.Service, nodes []*v1.Node) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	update := UpdateBalancerCall{service, nodes}
+	f.UpdateCalls = append(f.UpdateCalls, update)
+	if f.UpdateCallCb != nil {
+		f.UpdateCallCb(update)
+	}
+}
+
+func (f *Cloud) markEnsureCall(service *v1.Service, nodes []*v1.Node) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	update := UpdateBalancerCall{service, nodes}
+	f.EnsureCalls = append(f.EnsureCalls, update)
+	if f.EnsureCallCb != nil {
+		f.EnsureCallCb(update)
+	}
+}
+
 // UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
 func (f *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	f.markUpdateCall(service, nodes)
 	f.addCall("update")
-	f.Lock.Lock()
-	defer f.Lock.Unlock()
-	f.UpdateCalls = append(f.UpdateCalls, UpdateBalancerCall{service, nodes})
 	return f.Err
 }
 
