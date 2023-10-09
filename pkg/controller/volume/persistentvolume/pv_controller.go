@@ -1000,7 +1000,7 @@ func (ctrl *PersistentVolumeController) assignDefaultVolumeAttributesClass(ctx c
 	if err != nil {
 		return false, err
 	} else if vac == nil {
-		logger.V(4).Info("Can not assign volume attributes class to PersistentVolumeClaim: default volume attributes class not found", "driverName", sc.Provisioner, "PVC", klog.KObj(claim))
+		logger.V(5).Info("Can not assign volume attributes class to PersistentVolumeClaim: default volume attributes class not found", "driverName", sc.Provisioner, "PVC", klog.KObj(claim))
 		return false, nil
 	}
 

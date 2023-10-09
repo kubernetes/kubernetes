@@ -2240,7 +2240,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	if spec.VolumeAttributesClassName != nil {
 		if opts.EnableVolumeAttributesClass {
 			if len(*spec.VolumeAttributesClassName) == 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeAttributesClassName"), "an empty string is disallowed"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("volumeAttributesClassName"), *spec.VolumeAttributesClassName, "an empty string is disallowed"))
 			} else {
 				for _, msg := range ValidateClassName(*spec.VolumeAttributesClassName, false) {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("volumeAttributesClassName"), *spec.VolumeAttributesClassName, msg))
