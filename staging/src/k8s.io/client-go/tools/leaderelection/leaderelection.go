@@ -19,13 +19,17 @@ limitations under the License.
 // election state. This implementation does not guarantee that only one
 // client is acting as a leader (a.k.a. fencing).
 //
-// A client only acts on timestamps captured locally to infer the state of the
-// leader election. The client does not consider timestamps in the leader
-// election record to be accurate because these timestamps may not have been
+// By default, a client only acts on timestamps captured locally to infer the
+// state of the leader election. The client does not consider timestamps in the
+// leader election record to be accurate because these timestamps may not have been
 // produced by a local clock. The implemention does not depend on their
 // accuracy and only uses their change to indicate that another client has
 // renewed the leader lease. Thus the implementation is tolerant to arbitrary
 // clock skew, but is not tolerant to arbitrary clock skew rate.
+//
+// In a scenario where the clock skew within candidates is bounded by a given threshold
+// `ClockSkewToleration`, it is possible to set `UseRenewTime` to decide if the
+// candidate should try to acquire the object.
 //
 // However the level of tolerance to skew rate can be configured by setting
 // RenewDeadline and LeaseDuration appropriately. The tolerance expressed as a
@@ -162,10 +166,14 @@ type LeaderElectionConfig struct {
 
 	// UseRenewTime should be set to true if the LeaderElection should consider
 	// timestamps in the leader election record. It should be set to `true` only
-	// if the clock skew of the different candidates is negligible. It
-	// can be used to speed up the first leader election, thus reduce initialization
+	// if the clock skew of the different candidates is bounded by `ClockSkewToleration`.
+	// It can be used to speed up the first leader election, thus reduce initialization
 	// time of services using leader election.
 	UseRenewTime bool
+
+	// `ClockSkewToleration` is used only when `UseRenewTime` is set and represents the
+	// maximum clock skew tolerated by the leader election.
+	ClockSkewToleration time.Duration
 }
 
 // LeaderCallbacks are callbacks that are triggered during certain
@@ -270,11 +278,12 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	return succeeded
 }
 
-// getConsideredTime returns the RenewTime of the last observed record if `UseRenewTime` is enabled.
-// otherwise it returns the time at which the last observed record was observed locally.
+// getConsideredTime returns the RenewTime of the last observed record + `ClockSkewToleration`
+// if `UseRenewTime is set to `true`. Otherwise it returns the time at which the last observed
+// record was observed locally.
 func (le *LeaderElector) getConsideredTime() time.Time {
 	if le.config.UseRenewTime {
-		return le.observedRecord.RenewTime.Time
+		return le.observedRecord.RenewTime.Time.Add(le.config.ClockSkewToleration)
 	}
 	return le.observedTime
 }
