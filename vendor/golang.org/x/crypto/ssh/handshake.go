@@ -58,11 +58,13 @@ type handshakeTransport struct {
 	incoming  chan []byte
 	readError error
 
-	mu             sync.Mutex
-	writeError     error
-	sentInitPacket []byte
-	sentInitMsg    *kexInitMsg
-	pendingPackets [][]byte // Used when a key exchange is in progress.
+	mu               sync.Mutex
+	writeError       error
+	sentInitPacket   []byte
+	sentInitMsg      *kexInitMsg
+	pendingPackets   [][]byte // Used when a key exchange is in progress.
+	writePacketsLeft uint32
+	writeBytesLeft   int64
 
 	// If the read loop wants to schedule a kex, it pings this
 	// channel, and the write loop will send out a kex
@@ -71,7 +73,8 @@ type handshakeTransport struct {
 
 	// If the other side requests or confirms a kex, its kexInit
 	// packet is sent here for the write loop to find it.
-	startKex chan *pendingKex
+	startKex    chan *pendingKex
+	kexLoopDone chan struct{} // closed (with writeError non-nil) when kexLoop exits
 
 	// data for host key checking
 	hostKeyCallback HostKeyCallback
@@ -86,11 +89,9 @@ type handshakeTransport struct {
 	// Algorithms agreed in the last key exchange.
 	algorithms *algorithms
 
+	// Counters exclusively owned by readLoop.
 	readPacketsLeft uint32
 	readBytesLeft   int64
-
-	writePacketsLeft uint32
-	writeBytesLeft   int64
 
 	// The session ID or nil if first kex did not complete yet.
 	sessionID []byte
@@ -108,7 +109,8 @@ func newHandshakeTransport(conn keyingTransport, config *Config, clientVersion, 
 		clientVersion: clientVersion,
 		incoming:      make(chan []byte, chanSize),
 		requestKex:    make(chan struct{}, 1),
-		startKex:      make(chan *pendingKex, 1),
+		startKex:      make(chan *pendingKex),
+		kexLoopDone:   make(chan struct{}),
 
 		config: config,
 	}
@@ -340,16 +342,17 @@ write:
 		t.mu.Unlock()
 	}
 
-	// drain startKex channel. We don't service t.requestKex
-	// because nobody does blocking sends there.
-	go func() {
-		for init := range t.startKex {
-			init.done <- t.writeError
-		}
-	}()
-
 	// Unblock reader.
 	t.conn.Close()
+
+	// drain startKex channel. We don't service t.requestKex
+	// because nobody does blocking sends there.
+	for request := range t.startKex {
+		request.done <- t.getWriteError()
+	}
+
+	// Mark that the loop is done so that Close can return.
+	close(t.kexLoopDone)
 }
 
 // The protocol uses uint32 for packet counters, so we can't let them
@@ -458,19 +461,24 @@ func (t *handshakeTransport) sendKexInit() error {
 	isServer := len(t.hostKeys) > 0
 	if isServer {
 		for _, k := range t.hostKeys {
-			// If k is an AlgorithmSigner, presume it supports all signature algorithms
-			// associated with the key format. (Ideally AlgorithmSigner would have a
-			// method to advertise supported algorithms, but it doesn't. This means that
-			// adding support for a new algorithm is a breaking change, as we will
-			// immediately negotiate it even if existing implementations don't support
-			// it. If that ever happens, we'll have to figure something out.)
-			// If k is not an AlgorithmSigner, we can only assume it only supports the
-			// algorithms that matches the key format. (This means that Sign can't pick
-			// a different default.)
+			// If k is a MultiAlgorithmSigner, we restrict the signature
+			// algorithms. If k is a AlgorithmSigner, presume it supports all
+			// signature algorithms associated with the key format. If k is not
+			// an AlgorithmSigner, we can only assume it only supports the
+			// algorithms that matches the key format. (This means that Sign
+			// can't pick a different default).
 			keyFormat := k.PublicKey().Type()
-			if _, ok := k.(AlgorithmSigner); ok {
+
+			switch s := k.(type) {
+			case MultiAlgorithmSigner:
+				for _, algo := range algorithmsForKeyFormat(keyFormat) {
+					if contains(s.Algorithms(), underlyingAlgo(algo)) {
+						msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, algo)
+					}
+				}
+			case AlgorithmSigner:
 				msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, algorithmsForKeyFormat(keyFormat)...)
-			} else {
+			default:
 				msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, keyFormat)
 			}
 		}
@@ -545,7 +553,16 @@ func (t *handshakeTransport) writePacket(p []byte) error {
 }
 
 func (t *handshakeTransport) Close() error {
-	return t.conn.Close()
+	// Close the connection. This should cause the readLoop goroutine to wake up
+	// and close t.startKex, which will shut down kexLoop if running.
+	err := t.conn.Close()
+
+	// Wait for the kexLoop goroutine to complete.
+	// At that point we know that the readLoop goroutine is complete too,
+	// because kexLoop itself waits for readLoop to close the startKex channel.
+	<-t.kexLoopDone
+
+	return err
 }
 
 func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
@@ -615,7 +632,8 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		return err
 	}
 
-	if t.sessionID == nil {
+	firstKeyExchange := t.sessionID == nil
+	if firstKeyExchange {
 		t.sessionID = result.H
 	}
 	result.SessionID = t.sessionID
@@ -626,6 +644,28 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 	if err = t.conn.writePacket([]byte{msgNewKeys}); err != nil {
 		return err
 	}
+
+	// On the server side, after the first SSH_MSG_NEWKEYS, send a SSH_MSG_EXT_INFO
+	// message with the server-sig-algs extension if the client supports it. See
+	// RFC 8308, Sections 2.4 and 3.1, and [PROTOCOL], Section 1.9.
+	if !isClient && firstKeyExchange && contains(clientInit.KexAlgos, "ext-info-c") {
+		extInfo := &extInfoMsg{
+			NumExtensions: 2,
+			Payload:       make([]byte, 0, 4+15+4+len(supportedPubKeyAuthAlgosList)+4+16+4+1),
+		}
+		extInfo.Payload = appendInt(extInfo.Payload, len("server-sig-algs"))
+		extInfo.Payload = append(extInfo.Payload, "server-sig-algs"...)
+		extInfo.Payload = appendInt(extInfo.Payload, len(supportedPubKeyAuthAlgosList))
+		extInfo.Payload = append(extInfo.Payload, supportedPubKeyAuthAlgosList...)
+		extInfo.Payload = appendInt(extInfo.Payload, len("ping@openssh.com"))
+		extInfo.Payload = append(extInfo.Payload, "ping@openssh.com"...)
+		extInfo.Payload = appendInt(extInfo.Payload, 1)
+		extInfo.Payload = append(extInfo.Payload, "0"...)
+		if err := t.conn.writePacket(Marshal(extInfo)); err != nil {
+			return err
+		}
+	}
+
 	if packet, err := t.conn.readPacket(); err != nil {
 		return err
 	} else if packet[0] != msgNewKeys {
@@ -654,9 +694,16 @@ func (a algorithmSignerWrapper) SignWithAlgorithm(rand io.Reader, data []byte, a
 
 func pickHostKey(hostKeys []Signer, algo string) AlgorithmSigner {
 	for _, k := range hostKeys {
+		if s, ok := k.(MultiAlgorithmSigner); ok {
+			if !contains(s.Algorithms(), underlyingAlgo(algo)) {
+				continue
+			}
+		}
+
 		if algo == k.PublicKey().Type() {
 			return algorithmSignerWrapper{k}
 		}
+
 		k, ok := k.(AlgorithmSigner)
 		if !ok {
 			continue
