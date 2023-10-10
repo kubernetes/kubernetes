@@ -37,10 +37,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/pointer"
+
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controlplane"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -84,7 +86,7 @@ func TestCreateLeaseOnStart(t *testing.T) {
 		leases, err := kubeclient.
 			CoordinationV1().
 			Leases(metav1.NamespaceSystem).
-			List(context.TODO(), metav1.ListOptions{LabelSelector: controlplane.KubeAPIServerIdentityLeaseLabelSelector})
+			List(context.TODO(), metav1.ListOptions{LabelSelector: controlplaneapiserver.IdentityLeaseComponentLabelKey + "=" + controlplane.KubeAPIServer})
 		if err != nil {
 			return false, err
 		}
@@ -113,20 +115,20 @@ func TestCreateLeaseOnStart(t *testing.T) {
 }
 
 func TestLeaseGarbageCollection(t *testing.T) {
-	oldIdentityLeaseDurationSeconds := controlplane.IdentityLeaseDurationSeconds
-	oldIdentityLeaseGCPeriod := controlplane.IdentityLeaseGCPeriod
-	oldIdentityLeaseRenewIntervalPeriod := controlplane.IdentityLeaseRenewIntervalPeriod
+	oldIdentityLeaseDurationSeconds := controlplaneapiserver.IdentityLeaseDurationSeconds
+	oldIdentityLeaseGCPeriod := controlplaneapiserver.IdentityLeaseGCPeriod
+	oldIdentityLeaseRenewIntervalPeriod := controlplaneapiserver.IdentityLeaseRenewIntervalPeriod
 	defer func() {
 		// reset the default values for leases after this test
-		controlplane.IdentityLeaseDurationSeconds = oldIdentityLeaseDurationSeconds
-		controlplane.IdentityLeaseGCPeriod = oldIdentityLeaseGCPeriod
-		controlplane.IdentityLeaseRenewIntervalPeriod = oldIdentityLeaseRenewIntervalPeriod
+		controlplaneapiserver.IdentityLeaseDurationSeconds = oldIdentityLeaseDurationSeconds
+		controlplaneapiserver.IdentityLeaseGCPeriod = oldIdentityLeaseGCPeriod
+		controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = oldIdentityLeaseRenewIntervalPeriod
 	}()
 
 	// Shorten lease parameters so GC behavior can be exercised in integration tests
-	controlplane.IdentityLeaseDurationSeconds = 1
-	controlplane.IdentityLeaseGCPeriod = time.Second
-	controlplane.IdentityLeaseRenewIntervalPeriod = time.Second
+	controlplaneapiserver.IdentityLeaseDurationSeconds = 1
+	controlplaneapiserver.IdentityLeaseGCPeriod = time.Second
+	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = time.Second
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
@@ -206,7 +208,7 @@ func newTestLease(acquireTime time.Time, namespace string) *coordinationv1.Lease
 			Name:      testLeaseName,
 			Namespace: namespace,
 			Labels: map[string]string{
-				controlplane.IdentityLeaseComponentLabelKey: controlplane.KubeAPIServer,
+				controlplaneapiserver.IdentityLeaseComponentLabelKey: controlplane.KubeAPIServer,
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{

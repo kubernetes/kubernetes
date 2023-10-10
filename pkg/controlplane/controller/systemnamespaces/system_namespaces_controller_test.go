@@ -31,8 +31,6 @@ import (
 
 // Test_Controller validates the garbage collection logic for the apiserverleasegc controller.
 func Test_Controller(t *testing.T) {
-	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, v1.NamespaceNodeLease}
-
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -108,7 +106,8 @@ func Test_Controller(t *testing.T) {
 				namespaceInformer.Informer().GetIndexer().Add(obj)
 			}
 
-			controller := NewController(clientset, namespaceInformer)
+			systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, v1.NamespaceNodeLease, metav1.NamespaceDefault}
+			controller := NewController(systemNamespaces, clientset, namespaceInformer)
 
 			clientset.PrependReactor("create", "namespaces", func(action k8stesting.Action) (bool, runtime.Object, error) {
 				create := action.(k8stesting.CreateAction)

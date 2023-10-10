@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,11 +38,11 @@ import (
 	"k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
-	"k8s.io/kubernetes/pkg/controlplane"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -131,9 +132,9 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	// set lease duration to 1s for serverA to ensure that storageversions for serverA are updated
 	// once it is shutdown
-	controlplane.IdentityLeaseDurationSeconds = 10
-	controlplane.IdentityLeaseGCPeriod = time.Second
-	controlplane.IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+	controlplaneapiserver.IdentityLeaseDurationSeconds = 10
+	controlplaneapiserver.IdentityLeaseGCPeriod = time.Second
+	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = 10 * time.Second
 
 	// start serverA with all APIs enabled
 	// override hostname to ensure unique ips
@@ -146,7 +147,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	setupStorageVersionGC(ctx, kubeClientSetA, informersA)
 	// reset lease duration to default value for serverB and serverC since we will not be
 	// shutting these down
-	controlplane.IdentityLeaseDurationSeconds = 3600
+	controlplaneapiserver.IdentityLeaseDurationSeconds = 3600
 
 	// start serverB with some api disabled
 	// override hostname to ensure unique ips
