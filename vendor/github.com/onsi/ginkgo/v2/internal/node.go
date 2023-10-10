@@ -597,12 +597,16 @@ func (n Node) IsZero() bool {
 /* Nodes */
 type Nodes []Node
 
+func (n Nodes) Clone() Nodes {
+	nodes := make(Nodes, len(n))
+	copy(nodes, n)
+	return nodes
+}
+
 func (n Nodes) CopyAppend(nodes ...Node) Nodes {
 	numN := len(n)
 	out := make(Nodes, numN+len(nodes))
-	for i, node := range n {
-		out[i] = node
-	}
+	copy(out, n)
 	for j, node := range nodes {
 		out[numN+j] = node
 	}
@@ -873,6 +877,15 @@ func (n Nodes) FirstNodeMarkedOrdered() Node {
 		}
 	}
 	return Node{}
+}
+
+func (n Nodes) IndexOfFirstNodeMarkedOrdered() int {
+	for i := range n {
+		if n[i].MarkedOrdered {
+			return i
+		}
+	}
+	return -1
 }
 
 func (n Nodes) GetMaxFlakeAttempts() int {

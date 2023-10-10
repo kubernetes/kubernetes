@@ -321,7 +321,10 @@ func (g *group) run(specs Specs) {
 		if !skip {
 			var maxAttempts = 1
 
-			if g.suite.currentSpecReport.MaxMustPassRepeatedly > 0 {
+			if g.suite.config.MustPassRepeatedly > 0 {
+				maxAttempts = g.suite.config.MustPassRepeatedly
+				g.suite.currentSpecReport.MaxMustPassRepeatedly = maxAttempts
+			} else if g.suite.currentSpecReport.MaxMustPassRepeatedly > 0 {
 				maxAttempts = max(1, spec.MustPassRepeatedly())
 			} else if g.suite.config.FlakeAttempts > 0 {
 				maxAttempts = g.suite.config.FlakeAttempts
