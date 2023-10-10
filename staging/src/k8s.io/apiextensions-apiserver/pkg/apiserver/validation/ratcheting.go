@@ -60,7 +60,7 @@ func (r *RatchetingSchemaValidator) Validate(new interface{}) *validate.Result {
 }
 
 func (r *RatchetingSchemaValidator) ValidateUpdate(new, old interface{}) *validate.Result {
-	return newRatchetingValueValidator(new, old, r.schemaArgs).Validate()
+	return newRatchetingValueValidator(new, old, r.schemaArgs).Validate(new)
 }
 
 // ratchetingValueValidator represents an invocation of SchemaValidator.ValidateUpdate
@@ -145,7 +145,7 @@ func (r *ratchetingValueValidator) getValidateOption() validate.Option {
 //
 // This call has a side-effect of populating it's `children` variable with
 // the explored nodes of the object tree.
-func (r *ratchetingValueValidator) Validate() *validate.Result {
+func (r *ratchetingValueValidator) Validate(new interface{}) *validate.Result {
 	opts := append([]validate.Option{
 		r.getValidateOption(),
 	}, r.options...)
@@ -177,29 +177,27 @@ func (r *ratchetingValueValidator) Validate() *validate.Result {
 // If the old value cannot be correlated, then default validation is used.
 func (r *ratchetingValueValidator) SubPropertyValidator(field string, schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, options ...validate.Option) validate.ValueValidator {
 	// Find correlated old value
-	asMap, ok := r.oldValue.(map[string]interface{})
-	if !ok {
+	oldAsMap, okOld := r.oldValue.(map[string]interface{})
+	newAsMap, okNew := r.value.(map[string]interface{})
+	if !okOld || !okNew {
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	oldValueForField, ok := asMap[field]
-	if !ok {
+	oldValueForField, okOld := oldAsMap[field]
+	newValueForField, okNew := newAsMap[field]
+	if !okOld || !okNew {
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	return inlineValidator(func(new interface{}) *validate.Result {
-		childNode := newRatchetingValueValidator(new, oldValueForField, schemaArgs{
-			schema:       schema,
-			root:         rootSchema,
-			path:         root,
-			knownFormats: formats,
-			options:      options,
-		})
-
-		r.children[field] = childNode
-		return childNode.Validate()
+	childNode := newRatchetingValueValidator(newValueForField, oldValueForField, schemaArgs{
+		schema:       schema,
+		root:         rootSchema,
+		path:         root,
+		knownFormats: formats,
+		options:      options,
 	})
-
+	r.children[field] = childNode
+	return childNode
 }
 
 // SubIndexValidator overrides the standard validator constructor for sub-indicies by
@@ -216,18 +214,21 @@ func (r *ratchetingValueValidator) SubIndexValidator(index int, schema *spec.Sch
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	return inlineValidator(func(new interface{}) *validate.Result {
-		childNode := newRatchetingValueValidator(new, oldValueForIndex, schemaArgs{
-			schema:       schema,
-			root:         rootSchema,
-			path:         root,
-			knownFormats: formats,
-			options:      options,
-		})
+	asList, ok := r.value.([]interface{})
+	if !ok || len(asList) <= index {
+		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
+	}
 
-		r.children[index] = childNode
-		return childNode.Validate()
+	childNode := newRatchetingValueValidator(asList[index], oldValueForIndex, schemaArgs{
+		schema:       schema,
+		root:         rootSchema,
+		path:         root,
+		knownFormats: formats,
+		options:      options,
 	})
+
+	r.children[index] = childNode
+	return childNode
 }
 
 // If oldValue is not a list, returns nil
@@ -383,26 +384,13 @@ func (r *ratchetingValueValidator) CachedDeepEqual() (res bool) {
 	return reflect.DeepEqual(r.oldValue, r.value)
 }
 
-// A validator which just calls a validate function, and advertises that it
-// validates anything
-//
-// In the future kube-openapi's ValueValidator interface can be simplified
-// to be closer to `currentValidator.Options.NewValidator(value, ...).Validate()`
-// so that a tree of "validation nodes" can be more formally encoded in the API.
-// In that case this class would not be necessary.
-type inlineValidator func(new interface{}) *validate.Result
+var _ validate.ValueValidator = (&ratchetingValueValidator{})
 
-var _ validate.ValueValidator = inlineValidator(nil)
-
-func (f inlineValidator) Validate(new interface{}) *validate.Result {
-	return f(new)
-}
-
-func (f inlineValidator) SetPath(path string) {
+func (f ratchetingValueValidator) SetPath(path string) {
 	// Do nothing
 	// Unused by kube-openapi
 }
 
-func (f inlineValidator) Applies(source interface{}, valueKind reflect.Kind) bool {
+func (f ratchetingValueValidator) Applies(source interface{}, valueKind reflect.Kind) bool {
 	return true
 }
