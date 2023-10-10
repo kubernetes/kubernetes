@@ -19,6 +19,8 @@ package common
 import (
 	"fmt"
 	"strings"
+
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 // MapList provides a "lookup by key" operation for lists (arrays) with x-kubernetes-list-type=map.
@@ -32,7 +34,7 @@ type MapList interface {
 type keyStrategy interface {
 	// CompositeKeyFor returns a composite key for the provided object, if possible, and a
 	// boolean that indicates whether or not a key could be generated for the provided object.
-	CompositeKeyFor(map[string]interface{}) (interface{}, bool)
+	CompositeKeyFor(value.Map) (interface{}, bool)
 }
 
 // singleKeyStrategy is a cheaper strategy for associative lists that have exactly one key.
@@ -42,15 +44,21 @@ type singleKeyStrategy struct {
 
 // CompositeKeyFor directly returns the value of the single key  to
 // use as a composite key.
-func (ks *singleKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interface{}, bool) {
-	v, ok := obj[ks.key]
+func (ks *singleKeyStrategy) CompositeKeyFor(obj value.Map) (interface{}, bool) {
+	v, ok := obj.Get(ks.key)
 	if !ok {
 		return nil, false
 	}
 
-	switch v.(type) {
-	case bool, float64, int64, string:
-		return v, true
+	switch {
+	case v.IsBool():
+		fallthrough
+	case v.IsFloat():
+		fallthrough
+	case v.IsInt():
+		fallthrough
+	case v.IsString():
+		return v.Unstructured(), true
 	default:
 		return nil, false // non-scalar
 	}
@@ -63,25 +71,25 @@ type multiKeyStrategy struct {
 
 // CompositeKeyFor returns a composite key computed from the values of all
 // keys.
-func (ks *multiKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interface{}, bool) {
+func (ks *multiKeyStrategy) CompositeKeyFor(obj value.Map) (interface{}, bool) {
 	const keyDelimiter = "\x00" // 0 byte should never appear in the composite key except as delimiter
 
 	var delimited strings.Builder
 	for _, key := range ks.sts.XListMapKeys() {
-		v, ok := obj[key]
+		v, ok := obj.Get(key)
 		if !ok {
 			return nil, false
 		}
 
-		switch v.(type) {
-		case bool:
-			fmt.Fprintf(&delimited, keyDelimiter+"%t", v)
-		case float64:
-			fmt.Fprintf(&delimited, keyDelimiter+"%f", v)
-		case int64:
-			fmt.Fprintf(&delimited, keyDelimiter+"%d", v)
-		case string:
-			fmt.Fprintf(&delimited, keyDelimiter+"%q", v)
+		switch {
+		case v.IsBool():
+			fmt.Fprintf(&delimited, keyDelimiter+"%t", v.AsBool())
+		case v.IsFloat():
+			fmt.Fprintf(&delimited, keyDelimiter+"%f", v.AsFloat())
+		case v.IsInt():
+			fmt.Fprintf(&delimited, keyDelimiter+"%d", v.AsInt())
+		case v.IsString():
+			fmt.Fprintf(&delimited, keyDelimiter+"%q", v.AsString())
 		default:
 			return nil, false // values must be scalars
 		}
@@ -102,15 +110,23 @@ type mapListImpl struct {
 	// keyedItems contains all lazily keyed map items
 	keyedItems map[interface{}]interface{}
 	// unkeyedItems contains all map items that have not yet been keyed
-	unkeyedItems []interface{}
+	unkeyedItems value.List
+	unkeyedIndex int
 }
 
 func (a *mapListImpl) Get(obj interface{}) interface{} {
-	mobj, ok := obj.(map[string]interface{})
-	if !ok {
+	var val value.Value
+	if asVal, ok := obj.(value.Value); ok {
+		val = asVal
+	} else {
+		val = value.NewValueInterface(obj)
+	}
+
+	if !val.IsMap() {
 		return nil
 	}
 
+	mobj := val.AsMap()
 	key, ok := a.ks.CompositeKeyFor(mobj)
 	if !ok {
 		return nil
@@ -119,16 +135,16 @@ func (a *mapListImpl) Get(obj interface{}) interface{} {
 		return match
 	}
 	// keep keying items until we either find a match or run out of unkeyed items
-	for len(a.unkeyedItems) > 0 {
+	for a.unkeyedItems.Length() > a.unkeyedIndex {
 		// dequeue an unkeyed item
-		item := a.unkeyedItems[0]
-		a.unkeyedItems = a.unkeyedItems[1:]
+		item := a.unkeyedItems.At(a.unkeyedIndex)
+		a.unkeyedIndex += 1
 
 		// key the item
-		mitem, ok := item.(map[string]interface{})
-		if !ok {
+		if !item.IsMap() {
 			continue
 		}
+		mitem := item.AsMap()
 		itemKey, ok := a.ks.CompositeKeyFor(mitem)
 		if !ok {
 			continue
@@ -139,7 +155,7 @@ func (a *mapListImpl) Get(obj interface{}) interface{} {
 
 		// if it matches, short-circuit
 		if itemKey == key {
-			return mitem
+			return item
 		}
 	}
 
@@ -172,6 +188,6 @@ func MakeMapList(sts Schema, items []interface{}) (rv MapList) {
 		sts:          sts,
 		ks:           ks,
 		keyedItems:   map[interface{}]interface{}{},
-		unkeyedItems: items,
+		unkeyedItems: value.NewValueInterface(items).AsList(),
 	}
 }
