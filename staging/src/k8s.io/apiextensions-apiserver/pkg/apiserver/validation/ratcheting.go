@@ -60,7 +60,11 @@ func (r *RatchetingSchemaValidator) Validate(new interface{}) *validate.Result {
 }
 
 func (r *RatchetingSchemaValidator) ValidateUpdate(new, old interface{}) *validate.Result {
-	return newRatchetingValueValidator(new, old, r.schemaArgs).Validate(new)
+	return newRatchetingValueValidator(&CorrelatedObject{
+		oldValue: old,
+		value:    new,
+		schema:   r.schema,
+	}, r.schemaArgs).Validate(new)
 }
 
 // ratchetingValueValidator represents an invocation of SchemaValidator.ValidateUpdate
@@ -80,12 +84,17 @@ type ratchetingValueValidator struct {
 	// schemaArgs provides the arguments to use in the temporary SchemaValidator
 	// that is created during a call to Validate.
 	schemaArgs
+	correlation *CorrelatedObject
+}
 
+type CorrelatedObject struct {
 	// Currently correlated old value during traversal of the schema/object
 	oldValue interface{}
 
 	// Value being validated
 	value interface{}
+
+	schema *spec.Schema
 
 	// Scratch space below, may change during validation
 
@@ -105,15 +114,13 @@ type ratchetingValueValidator struct {
 	//
 	// It should be expected to have an entry for either all of the children, or
 	// none of them.
-	children map[interface{}]*ratchetingValueValidator
+	children map[interface{}]*CorrelatedObject
 }
 
-func newRatchetingValueValidator(newValue, oldValue interface{}, args schemaArgs) *ratchetingValueValidator {
+func newRatchetingValueValidator(correlation *CorrelatedObject, args schemaArgs) *ratchetingValueValidator {
 	return &ratchetingValueValidator{
-		oldValue:   oldValue,
-		value:      newValue,
-		schemaArgs: args,
-		children:   map[interface{}]*ratchetingValueValidator{},
+		schemaArgs:  args,
+		correlation: correlation,
 	}
 }
 
@@ -152,14 +159,14 @@ func (r *ratchetingValueValidator) Validate(new interface{}) *validate.Result {
 
 	s := validate.NewSchemaValidator(r.schema, r.root, r.path, r.knownFormats, opts...)
 
-	res := s.Validate(r.value)
+	res := s.Validate(r.correlation.value)
 
 	if res.IsValid() {
 		return res
 	}
 
 	// Current ratcheting rule is to ratchet errors if DeepEqual(old, new) is true.
-	if r.CachedDeepEqual() {
+	if r.correlation.CachedDeepEqual() {
 		newRes := &validate.Result{}
 		newRes.MergeAsWarnings(res)
 		return newRes
@@ -177,8 +184,8 @@ func (r *ratchetingValueValidator) Validate(new interface{}) *validate.Result {
 // If the old value cannot be correlated, then default validation is used.
 func (r *ratchetingValueValidator) SubPropertyValidator(field string, schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, options ...validate.Option) validate.ValueValidator {
 	// Find correlated old value
-	oldAsMap, okOld := r.oldValue.(map[string]interface{})
-	newAsMap, okNew := r.value.(map[string]interface{})
+	oldAsMap, okOld := r.correlation.oldValue.(map[string]interface{})
+	newAsMap, okNew := r.correlation.value.(map[string]interface{})
 	if !okOld || !okNew {
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
@@ -189,15 +196,19 @@ func (r *ratchetingValueValidator) SubPropertyValidator(field string, schema *sp
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	childNode := newRatchetingValueValidator(newValueForField, oldValueForField, schemaArgs{
+	childNode := &CorrelatedObject{
+		oldValue: oldValueForField,
+		value:    newValueForField,
+		schema:   schema,
+	}
+	r.correlation.children[field] = childNode
+	return newRatchetingValueValidator(childNode, schemaArgs{
 		schema:       schema,
 		root:         rootSchema,
 		path:         root,
 		knownFormats: formats,
 		options:      options,
 	})
-	r.children[field] = childNode
-	return childNode
 }
 
 // SubIndexValidator overrides the standard validator constructor for sub-indicies by
@@ -208,27 +219,30 @@ func (r *ratchetingValueValidator) SubPropertyValidator(field string, schema *sp
 //
 // If the old value cannot be correlated, then default validation is used.
 func (r *ratchetingValueValidator) SubIndexValidator(index int, schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, options ...validate.Option) validate.ValueValidator {
-	oldValueForIndex := r.correlateOldValueForChildAtNewIndex(index)
+	oldValueForIndex := r.correlation.correlateOldValueForChildAtNewIndex(index)
 	if oldValueForIndex == nil {
 		// If correlation fails, default to non-ratcheting logic
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	asList, ok := r.value.([]interface{})
+	asList, ok := r.correlation.value.([]interface{})
 	if !ok || len(asList) <= index {
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	childNode := newRatchetingValueValidator(asList[index], oldValueForIndex, schemaArgs{
+	childNode := &CorrelatedObject{
+		oldValue: oldValueForIndex,
+		value:    asList[index],
+		schema:   schema,
+	}
+	r.correlation.children[index] = childNode
+	return newRatchetingValueValidator(childNode, schemaArgs{
 		schema:       schema,
 		root:         rootSchema,
 		path:         root,
 		knownFormats: formats,
 		options:      options,
 	})
-
-	r.children[index] = childNode
-	return childNode
 }
 
 // If oldValue is not a list, returns nil
@@ -237,7 +251,7 @@ func (r *ratchetingValueValidator) SubIndexValidator(index int, schema *spec.Sch
 //
 // If listType is map, creates a map representation of the list using the designated
 // map-keys and caches it for future calls.
-func (r *ratchetingValueValidator) correlateOldValueForChildAtNewIndex(index int) any {
+func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
 	oldAsList, ok := r.oldValue.([]interface{})
 	if !ok {
 		return nil
@@ -295,7 +309,7 @@ func (r *ratchetingValueValidator) correlateOldValueForChildAtNewIndex(index int
 // If a lazy computation could not be found for all children possibly due
 // to validation logic short circuiting and skipping the children, then
 // this function simply defers to reflect.DeepEqual.
-func (r *ratchetingValueValidator) CachedDeepEqual() (res bool) {
+func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 	if r.comparisonResult != nil {
 		return *r.comparisonResult
 	}
