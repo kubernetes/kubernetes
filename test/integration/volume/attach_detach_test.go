@@ -178,7 +178,7 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go informers.Core().V1().Nodes().Informer().Run(ctx.Done())
+
 	podInformer := informers.Core().V1().Pods().Informer()
 	// start the informer
 	informers.Start(ctx.Done())
@@ -192,19 +192,8 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	waitToObservePods(t, podInformer, 1)
 
 	// wait for volume to be attached
-	for i := 0; i < 10; i++ {
-		node, err = testClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to get the node : %v", err)
-		}
-		if len(node.Status.VolumesAttached) > 1 {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-	if len(node.Status.VolumesAttached) < 1 {
-		t.Logf("failed to attach volume for pod %s on node %s", pod.Name, node.Name)
-	}
+	waitForVolumeToBeAttached(t, testClient, nodeName, pod.Name)
+
 	// Patch the node to mark the volume in use as attach-detach controller verifies if safe to detach the volume
 	// based on that.
 	node.Status.VolumesInUse = append(node.Status.VolumesInUse, "kubernetes.io/mock-provisioner/fake-mount")
@@ -489,6 +478,21 @@ func waitForMetric(t *testing.T, m basemetric.CounterMetric, expectedCount float
 		return false, nil
 	}); err != nil {
 		t.Fatal(err, identifier)
+	}
+}
+
+func waitForVolumeToBeAttached(t *testing.T, testingClient *clientset.Clientset, nodeName, podName string) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 120*time.Second, false, func(context.Context) (bool, error) {
+		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if len(node.Status.VolumesAttached) > 1 {
+			return true, nil
+		}
+		if err != nil {
+			t.Fatalf("Failed to get the node : %v", err)
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("failed to attach volume for pod %s on node %s", podName, nodeName)
 	}
 }
 
