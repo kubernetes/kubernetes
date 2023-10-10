@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -259,7 +260,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			}
 			klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "timeout", timeout)
 			ctx, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
+			defer func() { cancel() }()
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
 				scope.err(err, w, req)
@@ -270,11 +271,26 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				scope.err(err, w, req)
 				return
 			}
-			requestInfo, _ := request.RequestInfoFrom(ctx)
-			metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-				defer watcher.Stop()
-				handler.ServeHTTP(w, req)
-			})
+			// Invalidate cancel() to defer until serve() is complete.
+			deferredCancel := cancel
+			cancel = func() {}
+
+			serve := func() {
+				defer deferredCancel()
+				requestInfo, _ := request.RequestInfoFrom(ctx)
+				metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
+					defer watcher.Stop()
+					handler.ServeHTTP(w, req)
+				})
+			}
+
+			// Run watch serving in a separate goroutine to allow freeing current stack memory
+			t := genericfilters.TaskFrom(req.Context())
+			if t != nil {
+				t.Func = serve
+			} else {
+				serve()
+			}
 			return
 		}
 
