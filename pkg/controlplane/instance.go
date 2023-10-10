@@ -575,11 +575,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
-			if err != nil {
-				return err
-			}
-
 			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 			// TODO: See if we can pass ctx to the current method
 			ctx := wait.ContextForChannel(hookContext.StopCh)
@@ -591,7 +586,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
 			controller := lease.NewController(
 				clock.RealClock{},
-				kubeClient,
+				clientset,
 				holderIdentity,
 				int32(IdentityLeaseDurationSeconds),
 				nil,
@@ -605,12 +600,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		})
 		// TODO: move this into generic apiserver and make the lease identity value configurable
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
-			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
-			if err != nil {
-				return err
-			}
 			go apiserverleasegc.NewAPIServerLeaseGC(
-				kubeClient,
+				clientset,
 				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				KubeAPIServerIdentityLeaseLabelSelector,
@@ -620,11 +611,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("start-legacy-token-tracking-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
-		if err != nil {
-			return err
-		}
-		go legacytokentracking.NewController(kubeClient).Run(hookContext.StopCh)
+		go legacytokentracking.NewController(clientset).Run(hookContext.StopCh)
 		return nil
 	})
 
