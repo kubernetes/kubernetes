@@ -115,6 +115,17 @@ type MutableFeatureGate interface {
 	GetAll() map[Feature]FeatureSpec
 	// AddMetrics adds feature enablement metrics
 	AddMetrics()
+	// OverrideDefault sets a local override for the registered default value of a named
+	// feature. If the feature has not been previously registered (e.g. by a call to Add), has a
+	// locked default, or if the gate has already registered itself with a FlagSet, a non-nil
+	// error is returned.
+	//
+	// When two or more components consume a common feature, one component can override its
+	// default at runtime in order to adopt new defaults before or after the other
+	// components. For example, a feature controlling client behavior can be evaluated by
+	// overriding its default to true for a limited number of components without simultaneously
+	// changing its default for clients in all components.
+	OverrideDefault(name Feature, override bool) error
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -291,6 +302,29 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 	}
 
 	// Persist updated state
+	f.known.Store(known)
+
+	return nil
+}
+
+func (f *featureGate) OverrideDefault(name Feature, override bool) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	known := map[Feature]FeatureSpec{}
+	for name, spec := range f.known.Load().(map[Feature]FeatureSpec) {
+		known[name] = spec
+	}
+
+	if spec, ok := known[name]; !ok {
+		return fmt.Errorf("cannot override default: feature %q is not registered", name)
+	} else if spec.LockToDefault && override != spec.Default {
+		return fmt.Errorf("cannot override default: feature %q default is locked to %t", name, spec.Default)
+	} else {
+		spec.Default = override
+		known[name] = spec
+	}
+
 	f.known.Store(known)
 
 	return nil
