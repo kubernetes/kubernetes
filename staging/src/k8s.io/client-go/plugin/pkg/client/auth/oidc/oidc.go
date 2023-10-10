@@ -40,6 +40,7 @@ const (
 	cfgClientSecret             = "client-secret"
 	cfgCertificateAuthority     = "idp-certificate-authority"
 	cfgCertificateAuthorityData = "idp-certificate-authority-data"
+	cfgInsecureSkipTLSVerify    = "idp-insecure-skip-tls-verify"
 	cfgIDToken                  = "id-token"
 	cfgRefreshToken             = "refresh-token"
 
@@ -140,8 +141,9 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 
 	clientConfig := restclient.Config{
 		TLSClientConfig: restclient.TLSClientConfig{
-			CAFile: cfg[cfgCertificateAuthority],
-			CAData: certAuthData,
+			CAFile:   cfg[cfgCertificateAuthority],
+			CAData:   certAuthData,
+			Insecure: cfg[cfgInsecureSkipTLSVerify] == "true",
 		},
 	}
 
