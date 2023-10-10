@@ -46,6 +46,7 @@ import (
 	resource "k8s.io/client-go/informers/resource"
 	scheduling "k8s.io/client-go/informers/scheduling"
 	storage "k8s.io/client-go/informers/storage"
+	storagemigration "k8s.io/client-go/informers/storagemigration"
 	kubernetes "k8s.io/client-go/kubernetes"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -290,6 +291,7 @@ type SharedInformerFactory interface {
 	Resource() resource.Interface
 	Scheduling() scheduling.Interface
 	Storage() storage.Interface
+	Storagemigration() storagemigration.Interface
 }
 
 func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
@@ -366,4 +368,8 @@ func (f *sharedInformerFactory) Scheduling() scheduling.Interface {
 
 func (f *sharedInformerFactory) Storage() storage.Interface {
 	return storage.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Storagemigration() storagemigration.Interface {
+	return storagemigration.New(f, f.namespace, f.tweakListOptions)
 }

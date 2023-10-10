@@ -1,3 +1,4 @@
+API rule violation: list_type_missing,k8s.io/api/storagemigration/v1alpha1,StorageVersionMigrationList,Items
 API rule violation: list_type_missing,k8s.io/cloud-provider/config/v1alpha1,WebhookConfiguration,Webhooks
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,LeaderMigrationConfiguration,ControllerLeaders
