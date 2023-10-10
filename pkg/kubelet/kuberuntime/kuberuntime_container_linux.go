@@ -96,11 +96,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 // generateLinuxContainerResources generates linux container resources config for runtime
 func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) *runtimeapi.LinuxContainerResources {
 	// set linux container resources
-	var cpuRequest *resource.Quantity
+	var cpuRequest, memoryRequest *resource.Quantity
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
-	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+	if _, memoryRequestExists := container.Resources.Requests[v1.ResourceMemory]; memoryRequestExists {
+		memoryRequest = container.Resources.Requests.Memory()
+	}
+	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), memoryRequest, container.Resources.Limits.Memory())
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
@@ -184,7 +187,7 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 }
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
-func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryRequest, memoryLimit *resource.Quantity) *runtimeapi.LinuxContainerResources {
 	resources := runtimeapi.LinuxContainerResources{}
 	var cpuShares int64
 
@@ -226,6 +229,11 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 			// See memory.oom.group in https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html for
 			// more info.
 			"memory.oom.group": "1",
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling) {
+			if memoryRequest != nil && memoryRequest.Value() != 0 {
+				resources.Unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest.Value(), 10)
+			}
 		}
 	}
 	return &resources

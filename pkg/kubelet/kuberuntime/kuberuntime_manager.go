@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -569,15 +570,20 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	}
 
 	desiredMemoryLimit := container.Resources.Limits.Memory().Value()
+	desiredMemoryReq := container.Resources.Requests.Memory().Value()
 	desiredCPULimit := container.Resources.Limits.Cpu().MilliValue()
 	desiredCPURequest := container.Resources.Requests.Cpu().MilliValue()
 	currentMemoryLimit := apiContainerStatus.Resources.Limits.Memory().Value()
+	currentMemoryReq := apiContainerStatus.Resources.Requests.Memory().Value()
 	currentCPULimit := apiContainerStatus.Resources.Limits.Cpu().MilliValue()
 	currentCPURequest := apiContainerStatus.Resources.Requests.Cpu().MilliValue()
 	// Runtime container status resources (from CRI), if set, supercedes v1(api) container status resrouces.
 	if kubeContainerStatus.Resources != nil {
 		if kubeContainerStatus.Resources.MemoryLimit != nil {
 			currentMemoryLimit = kubeContainerStatus.Resources.MemoryLimit.Value()
+		}
+		if kubeContainerStatus.Resources.MemoryRequest != nil {
+			currentMemoryReq = kubeContainerStatus.Resources.MemoryRequest.Value()
 		}
 		if kubeContainerStatus.Resources.CPULimit != nil {
 			currentCPULimit = kubeContainerStatus.Resources.CPULimit.MilliValue()
@@ -587,21 +593,19 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		}
 	}
 
-	// Note: cgroup doesn't support memory request today, so we don't compare that. If canAdmitPod called  during
-	// handlePodResourcesResize finds 'fit', then desiredMemoryRequest == currentMemoryRequest.
-	if desiredMemoryLimit == currentMemoryLimit && desiredCPULimit == currentCPULimit && desiredCPURequest == currentCPURequest {
+	if desiredMemoryLimit == currentMemoryLimit && desiredMemoryReq == currentMemoryReq && desiredCPULimit == currentCPULimit && desiredCPURequest == currentCPURequest {
 		return true
 	}
 
 	desiredResources := containerResources{
 		memoryLimit:   desiredMemoryLimit,
-		memoryRequest: apiContainerStatus.AllocatedResources.Memory().Value(),
+		memoryRequest: desiredMemoryReq,
 		cpuLimit:      desiredCPULimit,
 		cpuRequest:    desiredCPURequest,
 	}
 	currentResources := containerResources{
 		memoryLimit:   currentMemoryLimit,
-		memoryRequest: apiContainerStatus.Resources.Requests.Memory().Value(),
+		memoryRequest: currentMemoryReq,
 		cpuLimit:      currentCPULimit,
 		cpuRequest:    currentCPURequest,
 	}
@@ -636,10 +640,12 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 			changes.ContainersToUpdate[rName][0] = cUpdateInfo
 		}
 	}
+
 	resizeMemLim, restartMemLim := determineContainerResize(v1.ResourceMemory, desiredMemoryLimit, currentMemoryLimit)
+	resizeMemReq, restartMemReq := determineContainerResize(v1.ResourceMemory, desiredMemoryReq, currentMemoryReq)
 	resizeCPULim, restartCPULim := determineContainerResize(v1.ResourceCPU, desiredCPULimit, currentCPULimit)
 	resizeCPUReq, restartCPUReq := determineContainerResize(v1.ResourceCPU, desiredCPURequest, currentCPURequest)
-	if restartCPULim || restartCPUReq || restartMemLim {
+	if restartCPULim || restartCPUReq || restartMemLim || restartMemReq {
 		// resize policy requires this container to restart
 		changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
 			name:      kubeContainerStatus.Name,
@@ -652,6 +658,8 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	} else {
 		if resizeMemLim {
 			markContainerForUpdate(v1.ResourceMemory, desiredMemoryLimit, currentMemoryLimit)
+		} else if resizeMemReq {
+			markContainerForUpdate(v1.ResourceMemory, desiredMemoryReq, currentMemoryReq)
 		}
 		if resizeCPULim {
 			markContainerForUpdate(v1.ResourceCPU, desiredCPULimit, currentCPULimit)
@@ -745,7 +753,17 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			result.Fail(fmt.Errorf("Aborting attempt to set pod memory limit less than current memory usage for pod %s", pod.Name))
 			return
 		}
-		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
+		var currentMemoryReq, memoryReq int64
+		if podResources.Unified != nil && currentPodMemoryConfig.Unified != nil {
+			if memoryMin, memoryMinExists := podResources.Unified["memory.min"]; memoryMinExists {
+				memoryReq, _ = strconv.ParseInt(memoryMin, 10, 64)
+			}
+			if memoryMin, memoryMinExists := currentPodMemoryConfig.Unified["memory.min"]; memoryMinExists {
+				currentMemoryReq, _ = strconv.ParseInt(memoryMin, 10, 64)
+			}
+		}
+
+		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, currentMemoryReq, memoryReq); errResize != nil {
 			result.Fail(errResize)
 			return
 		}
