@@ -214,9 +214,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 		framework.ExpectNoError(err, "while getting node status")
 
 		ginkgo.By("Verifying that the node now supports huge pages with size 3Mi")
-		value, ok := node.Status.Capacity["hugepages-3Mi"]
-		framework.ExpectEqual(ok, true, "capacity should contain resource hugepages-3Mi")
-		framework.ExpectEqual(value.String(), "9Mi", "huge pages with size 3Mi should be supported")
+		gomega.Expect(node.Status.Capacity).To(gomega.HaveKeyWithValue("hugepages-3Mi", resource.MustParse("9Mi")), "capacity should contain resource hugepages-3Mi and huge pages with size 3Mi should be supported")
 
 		ginkgo.By("restarting the node and verifying that huge pages with size 3Mi are not supported")
 		restartKubelet(true)

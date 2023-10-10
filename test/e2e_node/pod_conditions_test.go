@@ -150,7 +150,9 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		if !isReady {
+			framework.Failf("pod %q should be ready", p.Name)
+		}
 
 		ginkgo.By("checking order of pod condition transitions for a pod with no container/sandbox restarts")
 

@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -139,7 +140,7 @@ func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.D
 		output := string(buf[:n])
 		proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 		match := proxyRegexp.FindStringSubmatch(output)
-		framework.ExpectEqual(len(match), 2)
+		gomega.Expect(match).To(gomega.HaveLen(2))
 		port, err := strconv.Atoi(match[1])
 		framework.ExpectNoError(err)
 		framework.Logf("http requesting node kubelet /configz")

@@ -146,7 +146,7 @@ var _ = common.SIGDescribe("Dual Stack Host IP [Feature:PodHostIPs]", func() {
 			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
 
 			// validate first ip in HostIPs is same as HostIP
-			framework.ExpectEqual(p.Status.HostIP, p.Status.HostIPs[0].IP)
+			gomega.Expect(p.Status.HostIP).Should(gomega.Equal(p.Status.HostIPs[0].IP))
 			if len(p.Status.HostIPs) > 1 {
 				// assert 2 host ips belong to different families
 				if netutils.IsIPv4String(p.Status.HostIPs[0].IP) == netutils.IsIPv4String(p.Status.HostIPs[1].IP) {
@@ -202,7 +202,7 @@ var _ = common.SIGDescribe("Dual Stack Host IP [Feature:PodHostIPs]", func() {
 			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
 
 			// validate first ip in HostIPs is same as HostIP
-			framework.ExpectEqual(p.Status.HostIP, p.Status.HostIPs[0].IP)
+			gomega.Expect(p.Status.HostIP).Should(gomega.Equal(p.Status.HostIPs[0].IP))
 			if len(p.Status.HostIPs) > 1 {
 				// assert 2 host ips belong to different families
 				if netutils.IsIPv4String(p.Status.HostIPs[0].IP) == netutils.IsIPv4String(p.Status.HostIPs[1].IP) {
