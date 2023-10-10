@@ -629,6 +629,55 @@ func TestDelegatingCRConverterConvertToVersion(t *testing.T) {
 			},
 		},
 		{
+			name: "adding missing metadata",
+			converter: CRConverterFunc(func(in *unstructured.UnstructuredList, targetGVK schema.GroupVersion) (*unstructured.UnstructuredList, error) {
+				ret, _ := NewNOPConverter().Convert(in.DeepCopy(), targetGVK)
+				ret.Items[0].SetLabels(map[string]string{"foo": "bar"})
+				ret.Items[0].SetAnnotations(map[string]string{"foo": "bar"})
+				return ret, nil
+			}),
+			args: args{
+				in: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "example.com/v1",
+						"kind":       "Foo",
+						"spec":       map[string]interface{}{},
+					},
+				},
+				target: schema.GroupVersion{Group: "example.com", Version: "v2"},
+			},
+			want: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "example.com/v2",
+					"kind":       "Foo",
+					"metadata": map[string]interface{}{
+						"labels":      map[string]interface{}{"foo": "bar"},
+						"annotations": map[string]interface{}{"foo": "bar"},
+					},
+					"spec": map[string]interface{}{},
+				},
+			},
+		},
+		{
+			name: "adding missing metadata with invalid field",
+			converter: CRConverterFunc(func(in *unstructured.UnstructuredList, targetGVK schema.GroupVersion) (*unstructured.UnstructuredList, error) {
+				ret, _ := NewNOPConverter().Convert(in.DeepCopy(), targetGVK)
+				ret.Items[0].SetName("foo")
+				return ret, nil
+			}),
+			args: args{
+				in: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "example.com/v1",
+						"kind":       "Foo",
+						"spec":       map[string]interface{}{},
+					},
+				},
+				target: schema.GroupVersion{Group: "example.com", Version: "v2"},
+			},
+			wantErr: true,
+		},
+		{
 			name: "convertor error",
 			converter: CRConverterFunc(func(in *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
 				return nil, fmt.Errorf("boom")
