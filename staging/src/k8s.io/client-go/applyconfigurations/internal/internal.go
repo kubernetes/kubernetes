@@ -8852,6 +8852,334 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: maxUnavailable
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
+- name: io.k8s.api.flowcontrol.v1.ExemptPriorityLevelConfiguration
+  map:
+    fields:
+    - name: lendablePercent
+      type:
+        scalar: numeric
+    - name: nominalConcurrencyShares
+      type:
+        scalar: numeric
+- name: io.k8s.api.flowcontrol.v1.FlowDistinguisherMethod
+  map:
+    fields:
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1.FlowSchema
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.FlowSchemaSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.FlowSchemaStatus
+      default: {}
+- name: io.k8s.api.flowcontrol.v1.FlowSchemaCondition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        scalar: string
+    - name: type
+      type:
+        scalar: string
+- name: io.k8s.api.flowcontrol.v1.FlowSchemaSpec
+  map:
+    fields:
+    - name: distinguisherMethod
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.FlowDistinguisherMethod
+    - name: matchingPrecedence
+      type:
+        scalar: numeric
+      default: 0
+    - name: priorityLevelConfiguration
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationReference
+      default: {}
+    - name: rules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1.PolicyRulesWithSubjects
+          elementRelationship: atomic
+- name: io.k8s.api.flowcontrol.v1.FlowSchemaStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1.FlowSchemaCondition
+          elementRelationship: associative
+          keys:
+          - type
+- name: io.k8s.api.flowcontrol.v1.GroupSubject
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1.LimitResponse
+  map:
+    fields:
+    - name: queuing
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.QueuingConfiguration
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: type
+      fields:
+      - fieldName: queuing
+        discriminatorValue: Queuing
+- name: io.k8s.api.flowcontrol.v1.LimitedPriorityLevelConfiguration
+  map:
+    fields:
+    - name: borrowingLimitPercent
+      type:
+        scalar: numeric
+    - name: lendablePercent
+      type:
+        scalar: numeric
+    - name: limitResponse
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.LimitResponse
+      default: {}
+    - name: nominalConcurrencyShares
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.flowcontrol.v1.NonResourcePolicyRule
+  map:
+    fields:
+    - name: nonResourceURLs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: verbs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+- name: io.k8s.api.flowcontrol.v1.PolicyRulesWithSubjects
+  map:
+    fields:
+    - name: nonResourceRules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1.NonResourcePolicyRule
+          elementRelationship: atomic
+    - name: resourceRules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1.ResourcePolicyRule
+          elementRelationship: atomic
+    - name: subjects
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1.Subject
+          elementRelationship: atomic
+- name: io.k8s.api.flowcontrol.v1.PriorityLevelConfiguration
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationStatus
+      default: {}
+- name: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationCondition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        scalar: string
+    - name: type
+      type:
+        scalar: string
+- name: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationSpec
+  map:
+    fields:
+    - name: exempt
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.ExemptPriorityLevelConfiguration
+    - name: limited
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.LimitedPriorityLevelConfiguration
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: type
+      fields:
+      - fieldName: exempt
+        discriminatorValue: Exempt
+      - fieldName: limited
+        discriminatorValue: Limited
+- name: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationCondition
+          elementRelationship: associative
+          keys:
+          - type
+- name: io.k8s.api.flowcontrol.v1.QueuingConfiguration
+  map:
+    fields:
+    - name: handSize
+      type:
+        scalar: numeric
+      default: 0
+    - name: queueLengthLimit
+      type:
+        scalar: numeric
+      default: 0
+    - name: queues
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.flowcontrol.v1.ResourcePolicyRule
+  map:
+    fields:
+    - name: apiGroups
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: clusterScope
+      type:
+        scalar: boolean
+    - name: namespaces
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: resources
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: verbs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+- name: io.k8s.api.flowcontrol.v1.ServiceAccountSubject
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: namespace
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1.Subject
+  map:
+    fields:
+    - name: group
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.GroupSubject
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: serviceAccount
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.ServiceAccountSubject
+    - name: user
+      type:
+        namedType: io.k8s.api.flowcontrol.v1.UserSubject
+    unions:
+    - discriminator: kind
+      fields:
+      - fieldName: group
+        discriminatorValue: Group
+      - fieldName: serviceAccount
+        discriminatorValue: ServiceAccount
+      - fieldName: user
+        discriminatorValue: User
+- name: io.k8s.api.flowcontrol.v1.UserSubject
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1beta1.ExemptPriorityLevelConfiguration
   map:
     fields:
