@@ -60,7 +60,10 @@ func (r *RatchetingSchemaValidator) Validate(new interface{}) *validate.Result {
 }
 
 func (r *RatchetingSchemaValidator) ValidateUpdate(new, old interface{}) *validate.Result {
-	return newRatchetingValueValidator(NewCorrelatedObject(new, old, r.schema), r.schemaArgs).Validate(new)
+	return newRatchetingValueValidator(
+		NewCorrelatedObject(new, old, &celopenapi.Schema{Schema: r.schemaArgs.schema}),
+		r.schemaArgs,
+	).Validate(new)
 }
 
 // ratchetingValueValidator represents an invocation of SchemaValidator.ValidateUpdate
@@ -90,7 +93,7 @@ type CorrelatedObject struct {
 	// Value being validated
 	Value interface{}
 
-	Schema *spec.Schema
+	Schema common.Schema
 
 	// Scratch space below, may change during validation
 
@@ -113,7 +116,7 @@ type CorrelatedObject struct {
 	children map[interface{}]*CorrelatedObject
 }
 
-func NewCorrelatedObject(new, old interface{}, schema *spec.Schema) *CorrelatedObject {
+func NewCorrelatedObject(new, old interface{}, schema common.Schema) *CorrelatedObject {
 	return &CorrelatedObject{
 		OldValue: old,
 		Value:    new,
@@ -243,7 +246,7 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
 		return nil
 	}
 
-	listType, _ := r.Schema.Extensions.GetString("x-kubernetes-list-type")
+	listType := r.Schema.XListType()
 	switch listType {
 	case "map":
 		// Look up keys for this index in current object
@@ -251,7 +254,7 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
 
 		oldList := r.mapList
 		if oldList == nil {
-			oldList = celopenapi.MakeMapList(r.Schema, oldAsList)
+			oldList = common.MakeMapList(r.Schema, oldAsList)
 			r.mapList = oldList
 		}
 		return oldList.Get(currentElement)
@@ -411,11 +414,11 @@ func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
 		return nil
 	}
 
-	var propertySchema *spec.Schema
-	if prop, exists := l.Schema.Properties[field]; exists {
-		propertySchema = &prop
-	} else if addP := l.Schema.AdditionalProperties; addP != nil && addP.Schema != nil {
-		propertySchema = addP.Schema
+	var propertySchema common.Schema
+	if prop, exists := l.Schema.Properties()[field]; exists {
+		propertySchema = prop
+	} else if addP := l.Schema.AdditionalProperties(); addP != nil && addP.Schema() != nil {
+		propertySchema = addP.Schema()
 	} else {
 		return nil
 	}
@@ -449,9 +452,9 @@ func (l *CorrelatedObject) Index(i int) *CorrelatedObject {
 	if oldValueForIndex == nil {
 		return nil
 	}
-	var itemSchema *spec.Schema
-	if i := l.Schema.Items; i != nil && i.Schema != nil {
-		itemSchema = i.Schema
+	var itemSchema common.Schema
+	if i := l.Schema.Items(); i != nil {
+		itemSchema = i
 	} else {
 		return nil
 	}
