@@ -18,14 +18,17 @@ package podgc
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -40,7 +43,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 )
 
 func alwaysReady() bool { return true }
@@ -655,6 +660,128 @@ func TestGCTerminating(t *testing.T) {
 	}
 	// deletingPodsTotal is 7 in this test
 	testDeletingPodsMetrics(t, 7)
+}
+
+func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		pod                  *v1.Pod
+		expectedPatchedPod   *v1.Pod
+		expectedDeleteAction *clienttesting.DeleteActionImpl
+	}{
+		{
+			name: "orphaned pod should have DisruptionTarget condition added before deletion",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "testPod",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "deletedNode",
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedPatchedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "testPod",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "deletedNode",
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodFailed,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:    v1.DisruptionTarget,
+							Status:  v1.ConditionTrue,
+							Reason:  "DeletionByPodGC",
+							Message: "PodGC: node no longer exists",
+						},
+					},
+				},
+			},
+			expectedDeleteAction: &clienttesting.DeleteActionImpl{
+				Name:          "testPod",
+				DeleteOptions: metav1.DeleteOptions{GracePeriodSeconds: pointer.Int64(0)},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, true)()
+
+			pods := []*v1.Pod{test.pod}
+
+			client := setupNewSimpleClient(nil, pods)
+			gcc, podInformer, _ := NewFromClient(client, -1)
+			gcc.quarantineTime = time.Duration(-1)
+			podInformer.Informer().GetStore().Add(test.pod)
+			gcc.gc(ctx)
+
+			actions := client.Actions()
+
+			var patchAction clienttesting.PatchAction
+			var deleteAction clienttesting.DeleteAction
+
+			for _, action := range actions {
+				if action.GetVerb() == "patch" {
+					patchAction = action.(clienttesting.PatchAction)
+				}
+
+				if action.GetVerb() == "delete" {
+					deleteAction = action.(clienttesting.DeleteAction)
+				}
+			}
+
+			if patchAction != nil && test.expectedPatchedPod == nil {
+				t.Fatalf("Pod was pactched but expectedPatchedPod is nil")
+			}
+			if test.expectedPatchedPod != nil {
+				patchedPodBytes := patchAction.GetPatch()
+				originalPod, err := json.Marshal(test.pod)
+				if err != nil {
+					t.Fatalf("Failed to marshal original pod %#v: %v", originalPod, err)
+				}
+				updated, err := strategicpatch.StrategicMergePatch(originalPod, patchedPodBytes, v1.Pod{})
+				if err != nil {
+					t.Fatalf("Failed to apply strategic merge patch %q on pod %#v: %v", patchedPodBytes, originalPod, err)
+				}
+
+				updatedPod := &v1.Pod{}
+				if err := json.Unmarshal(updated, updatedPod); err != nil {
+					t.Fatalf("Failed to unmarshal updated pod %q: %v", updated, err)
+				}
+
+				if diff := cmp.Diff(test.expectedPatchedPod, updatedPod, cmpopts.IgnoreFields(v1.Pod{}, "TypeMeta"), cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime")); diff != "" {
+					t.Fatalf("Unexpected diff on pod (-want,+got):\n%s", diff)
+				}
+			}
+
+			if deleteAction != nil && test.expectedDeleteAction == nil {
+				t.Fatalf("Pod was deleted but expectedDeleteAction is nil")
+			}
+			if test.expectedDeleteAction != nil {
+				if diff := cmp.Diff(*test.expectedDeleteAction, deleteAction, cmpopts.IgnoreFields(clienttesting.DeleteActionImpl{}, "ActionImpl")); diff != "" {
+					t.Fatalf("Unexpected diff on deleteAction (-want,+got):\n%s", diff)
+				}
+			}
+		})
+	}
 }
 
 func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDeletedPodNames, wantPatchedPodNames sets.String) {
