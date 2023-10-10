@@ -273,9 +273,12 @@ type VolumeAttributesClass struct {
 	// Name of the csi driver
 	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
 
-	// parameters holds the mutable attributes of volumes for the csi driver that should
-	// create and update volumes of this volume attributes class. And these parameters are
-	// immutable.
+	// Parameters holds mutable volume attributes for the csi dirver. i.e. iops,
+	// throughput and etc. But the field itself is immutable to the system.
+	// These values are opaque to the system and are passed directly to the csi driver.
+	// The csi driver will use those parameters to modify attributes of a volume.
+	// The only validation done on keys is that they are not empty. The maximum number
+	// of parameters is 512, with a cumulative max size of 256K.
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 }

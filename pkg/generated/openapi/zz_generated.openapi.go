@@ -23309,7 +23309,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 					},
 					"volumeAttributesClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim. If specified, the csi-driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. Different with storageClassName, it can be changed after the claim is created but an empty string value is disallowed. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
+							Description: "volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim. If specified, the csi-driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. Different with storageClassName, it can be changed after the claim is created but an empty string value is disallowed. If unspecified, the default VolumeAttributesClass will be retroactively used if it exists. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23432,10 +23432,10 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 					},
 					"volumeAttributesModifyStatus": {
 						SchemaProps: spec.SchemaProps{
-							Description: "volumeAttributesModifyStatus stores status of modification operation. VolumeAttributesModifyStatus is not set by default but when modification is complete, volumeAttributesModifyStatus is set to empty string by the modify volume controller. This is an alpha field and requires enabling VolumeAttributesClass feature.\n\nPossible enum values:\n - `\"\"` When volume modification is complete, the empty string is set by modify volume controller.\n - `\"ControllerModifyVolumeFailed\"` State set when modify volume has failed in modify volume controller with a terminal error. Transient errors such as timeout should not set this status and should leave VolumeAttributesModifyStatus unmodified, so as modify volume controller can resume the volume modification.\n - `\"ControllerModifyVolumeInProgress\"` State set when modify volume controller starts modifying the volume in control-plane\n - `\"ControllerModifyVolumePending\"` State set when modify volume controller finds that volumeAttributesClassName is specified but the corresponding VolumeAttributesClass is not found.",
+							Description: "VolumeAttributesModifyStatus stores status of modification operation. It can be in any of following states:\n - PersistentVolumeClaimControllerModifyVolumeInProgress\n   State set when modify volume controller starts modifying the volume in control-plane.\n - PersistentVolumeClaimControllerModifyVolumeFailed\n   State set when modify volume has failed in modify volume controller with a terminal error.\n   Transient errors such as timeout should not set this status and should leave VolumeAttributesModifyStatus\n   unmodified, so as modify volume controller can resume the volume modification.\nFor example: if modifying a PVC's volume attributes, this field can be one of the following states:\n  - pvc.status.volumeAttributesModifyStatus = \"ControllerModifyVolumeInProgress\"\n  - pvc.status.volumeAttributesModifyStatus = \"ControllerModifyVolumeFailed\"\nWhen this field is not set, it means that no volume attributes modification operation is in progress for the given PVC.\n\nThis is an alpha field and requires enabling VolumeAttributesClass feature.\n\nPossible enum values:\n - `\"ControllerModifyVolumeFailed\"` State set when modify volume has failed in modify volume controller with a terminal error. Transient errors such as timeout should not set this status and should leave VolumeAttributesModifyStatus unmodified, so as modify volume controller can resume the volume modification.\n - `\"ControllerModifyVolumeInProgress\"` State set when modify volume controller starts modifying the volume in control-plane",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"", "ControllerModifyVolumeFailed", "ControllerModifyVolumeInProgress", "ControllerModifyVolumePending"},
+							Enum:        []interface{}{"ControllerModifyVolumeFailed", "ControllerModifyVolumeInProgress"},
 						},
 					},
 				},
@@ -43705,7 +43705,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.Referenc
 					},
 					"parameters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "parameters holds the mutable attributes of volumes for the csi driver that should create and update volumes of this volume attributes class. And these parameters are immutable.",
+							Description: "Parameters holds mutable volume attributes for the csi dirver. i.e. iops, throughput and etc. But the field itself is immutable to the system. These values are opaque to the system and are passed directly to the csi driver. The csi driver will use those parameters to modify attributes of a volume. The only validation done on keys is that they are not empty. The maximum number of parameters is 512, with a cumulative max size of 256K.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,

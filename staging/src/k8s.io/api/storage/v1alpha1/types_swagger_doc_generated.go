@@ -107,7 +107,7 @@ var map_VolumeAttributesClass = map[string]string{
 	"":           "VolumeAttributesClass represents a class of volume attributes. It holds the mutable attributes of volumes for the provisioner that should create and update volumes.\n\nVolumeAttributesClasses are non-namespaced; the name of the volume attributes class according to etcd is in ObjectMeta.Name.",
 	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"driverName": "Name of the csi driver",
-	"parameters": "parameters holds the mutable attributes of volumes for the csi driver that should create and update volumes of this volume attributes class. And these parameters are immutable.",
+	"parameters": "Parameters holds mutable volume attributes for the csi dirver. i.e. iops, throughput and etc. But the field itself is immutable to the system. These values are opaque to the system and are passed directly to the csi driver. The csi driver will use those parameters to modify attributes of a volume. The only validation done on keys is that they are not empty. The maximum number of parameters is 512, with a cumulative max size of 256K.",
 }
 
 func (VolumeAttributesClass) SwaggerDoc() map[string]string {
