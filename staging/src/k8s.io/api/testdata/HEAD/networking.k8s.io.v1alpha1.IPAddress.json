@@ -48,8 +48,7 @@
       "group": "groupValue",
       "resource": "resourceValue",
       "namespace": "namespaceValue",
-      "name": "nameValue",
-      "uid": "uidValue"
+      "name": "nameValue"
     }
   }
 }

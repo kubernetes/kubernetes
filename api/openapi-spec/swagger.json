@@ -13277,10 +13277,6 @@
         "resource": {
           "description": "Resource is the resource of the object being referenced.",
           "type": "string"
-        },
-        "uid": {
-          "description": "UID is the uid of the object being referenced.",
-          "type": "string"
         }
       },
       "type": "object"
