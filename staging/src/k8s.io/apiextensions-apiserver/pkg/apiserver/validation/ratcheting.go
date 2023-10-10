@@ -183,25 +183,11 @@ func (r *ratchetingValueValidator) Validate(new interface{}) *validate.Result {
 //
 // If the old value cannot be correlated, then default validation is used.
 func (r *ratchetingValueValidator) SubPropertyValidator(field string, schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, options ...validate.Option) validate.ValueValidator {
-	// Find correlated old value
-	oldAsMap, okOld := r.correlation.oldValue.(map[string]interface{})
-	newAsMap, okNew := r.correlation.value.(map[string]interface{})
-	if !okOld || !okNew {
+	childNode := r.correlation.Key(field)
+	if childNode == nil {
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	oldValueForField, okOld := oldAsMap[field]
-	newValueForField, okNew := newAsMap[field]
-	if !okOld || !okNew {
-		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
-	}
-
-	childNode := &CorrelatedObject{
-		oldValue: oldValueForField,
-		value:    newValueForField,
-		schema:   schema,
-	}
-	r.correlation.children[field] = childNode
 	return newRatchetingValueValidator(childNode, schemaArgs{
 		schema:       schema,
 		root:         rootSchema,
@@ -219,23 +205,11 @@ func (r *ratchetingValueValidator) SubPropertyValidator(field string, schema *sp
 //
 // If the old value cannot be correlated, then default validation is used.
 func (r *ratchetingValueValidator) SubIndexValidator(index int, schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, options ...validate.Option) validate.ValueValidator {
-	oldValueForIndex := r.correlation.correlateOldValueForChildAtNewIndex(index)
-	if oldValueForIndex == nil {
-		// If correlation fails, default to non-ratcheting logic
+	childNode := r.correlation.Index(index)
+	if childNode == nil {
 		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
 	}
 
-	asList, ok := r.correlation.value.([]interface{})
-	if !ok || len(asList) <= index {
-		return validate.NewSchemaValidator(schema, rootSchema, root, formats, options...)
-	}
-
-	childNode := &CorrelatedObject{
-		oldValue: oldValueForIndex,
-		value:    asList[index],
-		schema:   schema,
-	}
-	r.correlation.children[index] = childNode
 	return newRatchetingValueValidator(childNode, schemaArgs{
 		schema:       schema,
 		root:         rootSchema,
@@ -407,4 +381,88 @@ func (f ratchetingValueValidator) SetPath(path string) {
 
 func (f ratchetingValueValidator) Applies(source interface{}, valueKind reflect.Kind) bool {
 	return true
+}
+
+// Key returns the child of the reciever with the given name.
+// Returns nil if the given name is does not exist in the new object, or its
+// value is not correlatable to an old value.
+// If receiver is nil or if the new value is not an object/map, returns nil.
+func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
+	if l == nil || l.schema == nil {
+		return nil
+	} else if existing, exists := l.children[field]; exists {
+		return existing
+	}
+
+	// Find correlated old value
+	oldAsMap, okOld := l.oldValue.(map[string]interface{})
+	newAsMap, okNew := l.value.(map[string]interface{})
+	if !okOld || !okNew {
+		return nil
+	}
+
+	oldValueForField, okOld := oldAsMap[field]
+	newValueForField, okNew := newAsMap[field]
+	if !okOld || !okNew {
+		return nil
+	}
+
+	var propertySchema *spec.Schema
+	if prop, exists := l.schema.Properties[field]; exists {
+		propertySchema = &prop
+	} else if addP := l.schema.AdditionalProperties; addP != nil && addP.Schema != nil {
+		propertySchema = addP.Schema
+	} else {
+		return nil
+	}
+
+	res := &CorrelatedObject{
+		oldValue: oldValueForField,
+		value:    newValueForField,
+		schema:   propertySchema,
+	}
+	if l.children == nil {
+		l.children = make(map[interface{}]*CorrelatedObject, len(newAsMap))
+	}
+	l.children[field] = res
+	return res
+}
+
+// Index returns the child of the reciever at the given index.
+// Returns nil if the given index is out of bounds, or its value is not
+// correlatable to an old value.
+// If receiver is nil or if the new value is not an array, returns nil.
+func (l *CorrelatedObject) Index(i int) *CorrelatedObject {
+	if l == nil || l.schema == nil {
+		return nil
+	} else if existing, exists := l.children[i]; exists {
+		return existing
+	}
+
+	asList, ok := l.value.([]interface{})
+	if !ok || len(asList) <= i {
+		return nil
+	}
+
+	oldValueForIndex := l.correlateOldValueForChildAtNewIndex(i)
+	if oldValueForIndex == nil {
+		return nil
+	}
+	var itemSchema *spec.Schema
+	if i := l.schema.Items; i != nil && i.Schema != nil {
+		itemSchema = i.Schema
+	} else {
+		return nil
+	}
+
+	res := &CorrelatedObject{
+		oldValue: oldValueForIndex,
+		value:    asList[i],
+		schema:   itemSchema,
+	}
+	if l.children == nil {
+		l.children = make(map[interface{}]*CorrelatedObject, len(asList))
+	}
+	l.children[i] = res
+	return res
 }
