@@ -1002,6 +1002,7 @@ var (
 	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
+		nodeReadyPredicate,
 	}
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeNotDeletedPredicate,
