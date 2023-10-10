@@ -576,7 +576,16 @@ userAuthLoop:
 				if !ok || len(payload) > 0 {
 					return nil, parseError(msgUserAuthRequest)
 				}
-
+				// Ensure the declared public key algo is compatible with the
+				// decoded one. This check will ensure we don't accept e.g.
+				// ssh-rsa-cert-v01@openssh.com algorithm with ssh-rsa public
+				// key type. The algorithm and public key type must be
+				// consistent: both must be certificate algorithms, or neither.
+				if !contains(algorithmsForKeyFormat(pubKey.Type()), algo) {
+					authErr = fmt.Errorf("ssh: public key type %q not compatible with selected algorithm %q",
+						pubKey.Type(), algo)
+					break
+				}
 				// Ensure the public key algo and signature algo
 				// are supported.  Compare the private key
 				// algorithm name that corresponds to algo with
