@@ -729,7 +729,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("verifying the validating webhook match conditions")
 		validatingWebhookConfiguration, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(validatingWebhookConfiguration.Webhooks[0].MatchConditions, initalMatchConditions, "verifying that match conditions are created")
+		gomega.Expect(validatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(initalMatchConditions), "verifying that match conditions are created")
 		defer func() {
 			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, validatingWebhookConfiguration.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "deleting mutating webhook configuration")
@@ -753,7 +753,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("verifying the validating webhook match conditions")
 		validatingWebhookConfiguration, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(validatingWebhookConfiguration.Webhooks[0].MatchConditions, updatedMatchConditions, "verifying that match conditions are updated")
+		gomega.Expect(validatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(updatedMatchConditions), "verifying that match conditions are updated")
 	})
 
 	/*
@@ -780,7 +780,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("verifying the mutating webhook match conditions")
 		mutatingWebhookConfiguration, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(mutatingWebhookConfiguration.Webhooks[0].MatchConditions, initalMatchConditions, "verifying that match conditions are created")
+		gomega.Expect(mutatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(initalMatchConditions), "verifying that match conditions are created")
 		defer func() {
 			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, mutatingWebhookConfiguration.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "deleting mutating webhook configuration")
@@ -804,7 +804,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("verifying the mutating webhook match conditions")
 		mutatingWebhookConfiguration, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(mutatingWebhookConfiguration.Webhooks[0].MatchConditions, updatedMatchConditions, "verifying that match conditions are updated")
+		gomega.Expect(mutatingWebhookConfiguration.Webhooks[0].MatchConditions).To(gomega.Equal(updatedMatchConditions), "verifying that match conditions are updated")
 	})
 
 	/*
