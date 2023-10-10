@@ -60,11 +60,7 @@ func (r *RatchetingSchemaValidator) Validate(new interface{}) *validate.Result {
 }
 
 func (r *RatchetingSchemaValidator) ValidateUpdate(new, old interface{}) *validate.Result {
-	return newRatchetingValueValidator(&CorrelatedObject{
-		oldValue: old,
-		value:    new,
-		schema:   r.schema,
-	}, r.schemaArgs).Validate(new)
+	return newRatchetingValueValidator(NewCorrelatedObject(new, old, r.schema), r.schemaArgs).Validate(new)
 }
 
 // ratchetingValueValidator represents an invocation of SchemaValidator.ValidateUpdate
@@ -89,12 +85,12 @@ type ratchetingValueValidator struct {
 
 type CorrelatedObject struct {
 	// Currently correlated old value during traversal of the schema/object
-	oldValue interface{}
+	OldValue interface{}
 
 	// Value being validated
-	value interface{}
+	Value interface{}
 
-	schema *spec.Schema
+	Schema *spec.Schema
 
 	// Scratch space below, may change during validation
 
@@ -115,6 +111,14 @@ type CorrelatedObject struct {
 	// It should be expected to have an entry for either all of the children, or
 	// none of them.
 	children map[interface{}]*CorrelatedObject
+}
+
+func NewCorrelatedObject(new, old interface{}, schema *spec.Schema) *CorrelatedObject {
+	return &CorrelatedObject{
+		OldValue: old,
+		Value:    new,
+		Schema:   schema,
+	}
 }
 
 func newRatchetingValueValidator(correlation *CorrelatedObject, args schemaArgs) *ratchetingValueValidator {
@@ -159,7 +163,7 @@ func (r *ratchetingValueValidator) Validate(new interface{}) *validate.Result {
 
 	s := validate.NewSchemaValidator(r.schema, r.root, r.path, r.knownFormats, opts...)
 
-	res := s.Validate(r.correlation.value)
+	res := s.Validate(r.correlation.Value)
 
 	if res.IsValid() {
 		return res
@@ -226,12 +230,12 @@ func (r *ratchetingValueValidator) SubIndexValidator(index int, schema *spec.Sch
 // If listType is map, creates a map representation of the list using the designated
 // map-keys and caches it for future calls.
 func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
-	oldAsList, ok := r.oldValue.([]interface{})
+	oldAsList, ok := r.OldValue.([]interface{})
 	if !ok {
 		return nil
 	}
 
-	asList, ok := r.value.([]interface{})
+	asList, ok := r.Value.([]interface{})
 	if !ok {
 		return nil
 	} else if len(asList) <= index {
@@ -239,7 +243,7 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
 		return nil
 	}
 
-	listType, _ := r.schema.Extensions.GetString("x-kubernetes-list-type")
+	listType, _ := r.Schema.Extensions.GetString("x-kubernetes-list-type")
 	switch listType {
 	case "map":
 		// Look up keys for this index in current object
@@ -247,7 +251,7 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
 
 		oldList := r.mapList
 		if oldList == nil {
-			oldList = celopenapi.MakeMapList(r.schema, oldAsList)
+			oldList = celopenapi.MakeMapList(r.Schema, oldAsList)
 			r.mapList = oldList
 		}
 		return oldList.Get(currentElement)
@@ -292,14 +296,14 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 		r.comparisonResult = &res
 	}()
 
-	if r.value == nil && r.oldValue == nil {
+	if r.Value == nil && r.OldValue == nil {
 		return true
-	} else if r.value == nil || r.oldValue == nil {
+	} else if r.Value == nil || r.OldValue == nil {
 		return false
 	}
 
-	oldAsArray, oldIsArray := r.oldValue.([]interface{})
-	newAsArray, newIsArray := r.value.([]interface{})
+	oldAsArray, oldIsArray := r.OldValue.([]interface{})
+	newAsArray, newIsArray := r.Value.([]interface{})
 
 	if oldIsArray != newIsArray {
 		return false
@@ -335,8 +339,8 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 		return true
 	}
 
-	oldAsMap, oldIsMap := r.oldValue.(map[string]interface{})
-	newAsMap, newIsMap := r.value.(map[string]interface{})
+	oldAsMap, oldIsMap := r.OldValue.(map[string]interface{})
+	newAsMap, newIsMap := r.Value.(map[string]interface{})
 
 	if oldIsMap != newIsMap {
 		return false
@@ -369,7 +373,7 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 		return true
 	}
 
-	return reflect.DeepEqual(r.oldValue, r.value)
+	return reflect.DeepEqual(r.OldValue, r.Value)
 }
 
 var _ validate.ValueValidator = (&ratchetingValueValidator{})
@@ -388,15 +392,15 @@ func (f ratchetingValueValidator) Applies(source interface{}, valueKind reflect.
 // value is not correlatable to an old value.
 // If receiver is nil or if the new value is not an object/map, returns nil.
 func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
-	if l == nil || l.schema == nil {
+	if l == nil || l.Schema == nil {
 		return nil
 	} else if existing, exists := l.children[field]; exists {
 		return existing
 	}
 
 	// Find correlated old value
-	oldAsMap, okOld := l.oldValue.(map[string]interface{})
-	newAsMap, okNew := l.value.(map[string]interface{})
+	oldAsMap, okOld := l.OldValue.(map[string]interface{})
+	newAsMap, okNew := l.Value.(map[string]interface{})
 	if !okOld || !okNew {
 		return nil
 	}
@@ -408,22 +412,19 @@ func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
 	}
 
 	var propertySchema *spec.Schema
-	if prop, exists := l.schema.Properties[field]; exists {
+	if prop, exists := l.Schema.Properties[field]; exists {
 		propertySchema = &prop
-	} else if addP := l.schema.AdditionalProperties; addP != nil && addP.Schema != nil {
+	} else if addP := l.Schema.AdditionalProperties; addP != nil && addP.Schema != nil {
 		propertySchema = addP.Schema
 	} else {
 		return nil
 	}
 
-	res := &CorrelatedObject{
-		oldValue: oldValueForField,
-		value:    newValueForField,
-		schema:   propertySchema,
-	}
 	if l.children == nil {
 		l.children = make(map[interface{}]*CorrelatedObject, len(newAsMap))
 	}
+
+	res := NewCorrelatedObject(newValueForField, oldValueForField, propertySchema)
 	l.children[field] = res
 	return res
 }
@@ -433,13 +434,13 @@ func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
 // correlatable to an old value.
 // If receiver is nil or if the new value is not an array, returns nil.
 func (l *CorrelatedObject) Index(i int) *CorrelatedObject {
-	if l == nil || l.schema == nil {
+	if l == nil || l.Schema == nil {
 		return nil
 	} else if existing, exists := l.children[i]; exists {
 		return existing
 	}
 
-	asList, ok := l.value.([]interface{})
+	asList, ok := l.Value.([]interface{})
 	if !ok || len(asList) <= i {
 		return nil
 	}
@@ -449,20 +450,17 @@ func (l *CorrelatedObject) Index(i int) *CorrelatedObject {
 		return nil
 	}
 	var itemSchema *spec.Schema
-	if i := l.schema.Items; i != nil && i.Schema != nil {
+	if i := l.Schema.Items; i != nil && i.Schema != nil {
 		itemSchema = i.Schema
 	} else {
 		return nil
 	}
 
-	res := &CorrelatedObject{
-		oldValue: oldValueForIndex,
-		value:    asList[i],
-		schema:   itemSchema,
-	}
 	if l.children == nil {
 		l.children = make(map[interface{}]*CorrelatedObject, len(asList))
 	}
+
+	res := NewCorrelatedObject(asList[i], oldValueForIndex, itemSchema)
 	l.children[i] = res
 	return res
 }
