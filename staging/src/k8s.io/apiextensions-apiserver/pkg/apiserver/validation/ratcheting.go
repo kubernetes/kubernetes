@@ -121,12 +121,8 @@ func newRatchetingValueValidator(newValue, oldValue interface{}, args schemaArgs
 // that injects a ratchetingValueValidator to be used for all subkeys and subindices
 func (r *ratchetingValueValidator) getValidateOption() validate.Option {
 	return func(svo *validate.SchemaValidatorOptions) {
-		svo.NewValidatorForField = func(field string, schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, opts ...validate.Option) validate.ValueValidator {
-			return r.SubPropertyValidator(field, schema, rootSchema, root, formats, opts...)
-		}
-		svo.NewValidatorForIndex = func(index int, schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, opts ...validate.Option) validate.ValueValidator {
-			return r.SubIndexValidator(index, schema, rootSchema, root, formats, opts...)
-		}
+		svo.NewValidatorForField = r.SubPropertyValidator
+		svo.NewValidatorForIndex = r.SubIndexValidator
 	}
 }
 
