@@ -94,7 +94,6 @@ var map_ParentReference = map[string]string{
 	"resource":  "Resource is the resource of the object being referenced.",
 	"namespace": "Namespace is the namespace of the object being referenced.",
 	"name":      "Name is the name of the object being referenced.",
-	"uid":       "UID is the uid of the object being referenced.",
 }
 
 func (ParentReference) SwaggerDoc() map[string]string {

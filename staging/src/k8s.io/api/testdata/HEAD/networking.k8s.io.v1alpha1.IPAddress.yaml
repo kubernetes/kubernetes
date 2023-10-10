@@ -38,4 +38,3 @@ spec:
     name: nameValue
     namespace: namespaceValue
     resource: resourceValue
-    uid: uidValue
