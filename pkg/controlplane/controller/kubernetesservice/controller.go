@@ -34,6 +34,7 @@ import (
 	v1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
@@ -51,6 +52,7 @@ type Controller struct {
 	Config
 
 	client        kubernetes.Interface
+	restClient    rest.Interface
 	serviceLister v1listers.ServiceLister
 	serviceSynced cache.InformerSynced
 
@@ -76,6 +78,7 @@ func New(config Config, client kubernetes.Interface, serviceInformer v1informers
 	return &Controller{
 		Config:        config,
 		client:        client,
+		restClient:    client.CoreV1().RESTClient(),
 		serviceLister: serviceInformer.Lister(),
 		serviceSynced: serviceInformer.Informer().HasSynced,
 		stopCh:        make(chan struct{}),
@@ -147,7 +150,7 @@ func (c *Controller) Run(ch <-chan struct{}) {
 	// wait until process is ready
 	wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
 		var code int
-		c.client.CoreV1().RESTClient().Get().AbsPath("/readyz").Do(context.TODO()).StatusCode(&code)
+		c.restClient.Get().AbsPath("/readyz").Do(context.TODO()).StatusCode(&code)
 		return code == http.StatusOK, nil
 	}, ch)
 
@@ -169,10 +172,19 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
-	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
-		return err
+
+	var code int
+	var err error
+	result := c.restClient.Get().AbsPath("/readyz").Do(context.TODO())
+	result.StatusCode(&code)
+	// add the endpoint if it is ready, otherwise remove it
+	if result.Error() == nil && code == http.StatusOK {
+		err = c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile)
+	} else {
+		err = c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts)
+		klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
 	}
-	return nil
+	return err
 }
 
 // createPortAndServiceSpec creates an array of service ports.
