@@ -4615,6 +4615,10 @@
             ],
             "description": "storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://examples.k8s.io/volumes/storageos/README.md"
           },
+          "volumeAttributesClassName": {
+            "description": "Name of VolumeAttributesClass to which this persistent volume belongs. Empty value is not allowed. Use nil to indicate that this volume does not belong to any VolumeAttributesClass. This is an alpha field and requires enabling VolumeAttributesClass feature.",
+            "type": "string"
+          },
           "volumeMode": {
             "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec.",
             "type": "string"

@@ -39,6 +39,11 @@ func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Per
 			pvSpec.CSI.NodeExpandSecretRef = nil
 		}
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if oldPVSpec == nil || oldPVSpec.VolumeAttributesClassName == nil {
+			pvSpec.VolumeAttributesClassName = nil
+		}
+	}
 }
 
 // DropDisabledStatusFields removes disabled fields from the pv status.

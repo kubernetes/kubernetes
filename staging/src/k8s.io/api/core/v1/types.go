@@ -363,6 +363,13 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
+	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+	// is not allowed. Use nil to indicate that this volume does not belong to any
+	// VolumeAttributesClass.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClassName
+	// +optional
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,10,opt,name=volumeAttributesClassName"`
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.

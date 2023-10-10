@@ -23927,6 +23927,13 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 							Ref:         ref("k8s.io/api/core/v1.VolumeNodeAffinity"),
 						},
 					},
+					"volumeAttributesClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of VolumeAttributesClass to which this persistent volume belongs. Empty value is not allowed. Use nil to indicate that this volume does not belong to any VolumeAttributesClass. This is an alpha field and requires enabling VolumeAttributesClass feature.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

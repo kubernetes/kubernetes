@@ -3369,6 +3369,11 @@ func (in *PersistentVolumeSpec) DeepCopyInto(out *PersistentVolumeSpec) {
 		*out = new(VolumeNodeAffinity)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.VolumeAttributesClassName != nil {
+		in, out := &in.VolumeAttributesClassName, &out.VolumeAttributesClassName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

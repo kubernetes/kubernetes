@@ -1442,6 +1442,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"mountOptions":                  "mountOptions is the list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
 	"volumeMode":                    "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec.",
 	"nodeAffinity":                  "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
+	"volumeAttributesClassName":     "Name of VolumeAttributesClass to which this persistent volume belongs. Empty value is not allowed. Use nil to indicate that this volume does not belong to any VolumeAttributesClass. This is an alpha field and requires enabling VolumeAttributesClass feature.",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {

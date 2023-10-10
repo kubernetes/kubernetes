@@ -6251,6 +6251,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageos
       type:
         namedType: io.k8s.api.core.v1.StorageOSPersistentVolumeSource
+    - name: volumeAttributesClassName
+      type:
+        scalar: string
     - name: volumeMode
       type:
         scalar: string

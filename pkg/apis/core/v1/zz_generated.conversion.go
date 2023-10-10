@@ -5568,6 +5568,7 @@ func autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.Per
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.NodeAffinity = (*core.VolumeNodeAffinity)(unsafe.Pointer(in.NodeAffinity))
+	out.VolumeAttributesClassName = (*string)(unsafe.Pointer(in.VolumeAttributesClassName))
 	return nil
 }
 
@@ -5583,6 +5584,7 @@ func autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.P
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.NodeAffinity = (*v1.VolumeNodeAffinity)(unsafe.Pointer(in.NodeAffinity))
+	out.VolumeAttributesClassName = (*string)(unsafe.Pointer(in.VolumeAttributesClassName))
 	return nil
 }
 

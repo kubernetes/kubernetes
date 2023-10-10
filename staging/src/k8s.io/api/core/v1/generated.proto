@@ -3206,6 +3206,14 @@ message PersistentVolumeSpec {
   // This field influences the scheduling of pods that use this volume.
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
+
+  // Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+  // is not allowed. Use nil to indicate that this volume does not belong to any
+  // VolumeAttributesClass.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClassName
+  // +optional
+  optional string volumeAttributesClassName = 10;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.

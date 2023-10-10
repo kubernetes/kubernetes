@@ -306,6 +306,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Status", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["phase"]},
 		{Name: "Claim", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["claimRef"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pv"},
+		{Name: "VolumeAttributesClass", Type: "string", Description: "VolumeAttributesClass of the pv"},
 		{Name: "Reason", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["reason"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "VolumeMode", Type: "string", Priority: 1, Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["volumeMode"]},
@@ -1906,8 +1907,13 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.GenerateO
 		volumeMode = string(*obj.Spec.VolumeMode)
 	}
 
+	volumeAttributeClass := "<unset>"
+	if obj.Spec.VolumeAttributesClassName != nil {
+		volumeAttributeClass = *obj.Spec.VolumeAttributesClassName
+	}
+
 	row.Cells = append(row.Cells, obj.Name, aSize, modesStr, reclaimPolicyStr,
-		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj),
+		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj), volumeAttributeClass,
 		obj.Status.Reason, translateTimestampSince(obj.CreationTimestamp), volumeMode)
 	return []metav1.TableRow{row}, nil
 }

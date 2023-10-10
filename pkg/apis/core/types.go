@@ -335,6 +335,13 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity
+	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+	// is not allowed. Use nil to indicate that this volume does not belong to any
+	// VolumeAttributesClass.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClassName
+	// +optional
+	VolumeAttributesClassName *string
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.

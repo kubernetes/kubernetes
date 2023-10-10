@@ -28,6 +28,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func TestDropDisabledFields(t *testing.T) {
@@ -35,6 +36,7 @@ func TestDropDisabledFields(t *testing.T) {
 		Name:      "expansion-secret",
 		Namespace: "default",
 	}
+	vacName := ptr.To("vac")
 
 	tests := map[string]struct {
 		oldSpec             *api.PersistentVolumeSpec
@@ -42,6 +44,7 @@ func TestDropDisabledFields(t *testing.T) {
 		expectOldSpec       *api.PersistentVolumeSpec
 		expectNewSpec       *api.PersistentVolumeSpec
 		csiExpansionEnabled bool
+		vacEnabled          bool
 	}{
 		"disabled csi expansion clears secrets": {
 			csiExpansionEnabled: false,
@@ -85,11 +88,54 @@ func TestDropDisabledFields(t *testing.T) {
 			oldSpec:             specWithCSISecrets(nil),
 			expectOldSpec:       specWithCSISecrets(nil),
 		},
+		"disabled vac clears volume attributes class name": {
+			vacEnabled:    false,
+			newSpec:       specWithVACName(vacName),
+			expectNewSpec: specWithVACName(nil),
+			oldSpec:       nil,
+			expectOldSpec: nil,
+		},
+		"enabled vac preserve volume attributes class name": {
+			vacEnabled:    true,
+			newSpec:       specWithVACName(vacName),
+			expectNewSpec: specWithVACName(vacName),
+			oldSpec:       nil,
+			expectOldSpec: nil,
+		},
+		"enabled vac preserve volume attributes class name when both old and new have it": {
+			vacEnabled:    true,
+			newSpec:       specWithVACName(vacName),
+			expectNewSpec: specWithVACName(vacName),
+			oldSpec:       specWithVACName(vacName),
+			expectOldSpec: specWithVACName(vacName),
+		},
+		"disabled vac old pv had volume attributes class name": {
+			vacEnabled:    false,
+			newSpec:       specWithVACName(vacName),
+			expectNewSpec: specWithVACName(vacName),
+			oldSpec:       specWithVACName(vacName),
+			expectOldSpec: specWithVACName(vacName),
+		},
+		"enabled vac preserves volume attributes class name when old pv did not had it": {
+			vacEnabled:    true,
+			newSpec:       specWithVACName(vacName),
+			expectNewSpec: specWithVACName(vacName),
+			oldSpec:       specWithVACName(nil),
+			expectOldSpec: specWithVACName(nil),
+		},
+		"disabled vac neither new pv nor old pv had volume attributes class name": {
+			vacEnabled:    false,
+			newSpec:       specWithVACName(nil),
+			expectNewSpec: specWithVACName(nil),
+			oldSpec:       specWithVACName(nil),
+			expectOldSpec: specWithVACName(nil),
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeExpandSecret, tc.csiExpansionEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.vacEnabled)()
 
 			DropDisabledSpecFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
@@ -114,6 +160,22 @@ func specWithCSISecrets(secret *api.SecretReference) *api.PersistentVolumeSpec {
 
 	if secret != nil {
 		pvSpec.CSI.NodeExpandSecretRef = secret
+	}
+	return pvSpec
+}
+
+func specWithVACName(vacName *string) *api.PersistentVolumeSpec {
+	pvSpec := &api.PersistentVolumeSpec{
+		PersistentVolumeSource: api.PersistentVolumeSource{
+			CSI: &api.CSIPersistentVolumeSource{
+				Driver:       "com.google.gcepd",
+				VolumeHandle: "foobar",
+			},
+		},
+	}
+
+	if vacName != nil {
+		pvSpec.VolumeAttributesClassName = vacName
 	}
 	return pvSpec
 }
