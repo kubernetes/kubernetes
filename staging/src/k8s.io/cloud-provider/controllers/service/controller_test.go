@@ -650,6 +650,8 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 				},
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
 				{Service: service3, Hosts: []*v1.Node{node1, node3}},
 			},
 		},
@@ -690,6 +692,8 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 				},
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
 				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
 			},
 		},
