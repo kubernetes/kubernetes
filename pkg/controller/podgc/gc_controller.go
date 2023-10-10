@@ -30,15 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -48,9 +49,6 @@ const (
 	// quarantineTime defines how long Orphaned GC waits for nodes to show up
 	// in an informer before issuing a GET call to check if they are truly gone
 	quarantineTime = 40 * time.Second
-
-	// field manager used to add pod failure condition and change the pod phase
-	fieldManager = "PodGC"
 )
 
 type PodGCController struct {
@@ -245,12 +243,12 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 			continue
 		}
 		klog.V(2).InfoS("Found orphaned Pod assigned to the Node, deleting.", "pod", klog.KObj(pod), "node", pod.Spec.NodeName)
-		condition := corev1apply.PodCondition().
-			WithType(v1.DisruptionTarget).
-			WithStatus(v1.ConditionTrue).
-			WithReason("DeletionByPodGC").
-			WithMessage("PodGC: node no longer exists").
-			WithLastTransitionTime(metav1.Now())
+		condition := &v1.PodCondition{
+			Type:    v1.DisruptionTarget,
+			Status:  v1.ConditionTrue,
+			Reason:  "DeletionByPodGC",
+			Message: "PodGC: node no longer exists",
+		}
 		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
 			utilruntime.HandleError(err)
 		} else {
@@ -325,7 +323,7 @@ func (gcc *PodGCController) markFailedAndDeletePod(ctx context.Context, pod *v1.
 	return gcc.markFailedAndDeletePodWithCondition(ctx, pod, nil)
 }
 
-func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Context, pod *v1.Pod, condition *corev1apply.PodConditionApplyConfiguration) error {
+func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Context, pod *v1.Pod, condition *v1.PodCondition) error {
 	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(pod.Namespace, pod.Name))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 
@@ -333,17 +331,12 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 		// is orphaned, in which case the pod would remain in the Running phase
 		// forever as there is no kubelet running to change the phase.
 		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-			podApply := corev1apply.Pod(pod.Name, pod.Namespace).WithStatus(corev1apply.PodStatus())
-			// we don't need to extract the pod apply configuration and can send
-			// only phase and the DisruptionTarget condition as PodGC would not
-			// own other fields. If the DisruptionTarget condition is owned by
-			// PodGC it means that it is in the Failed phase, so sending the
-			// condition will not be re-attempted.
-			podApply.Status.WithPhase(v1.PodFailed)
+			newStatus := pod.Status.DeepCopy()
+			newStatus.Phase = v1.PodFailed
 			if condition != nil {
-				podApply.Status.WithConditions(condition)
+				apipod.UpdatePodCondition(newStatus, condition)
 			}
-			if _, err := gcc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+			if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
 				return err
 			}
 		}
