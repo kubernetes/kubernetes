@@ -61,7 +61,7 @@ func (r *RatchetingSchemaValidator) Validate(new interface{}) *validate.Result {
 
 func (r *RatchetingSchemaValidator) ValidateUpdate(new, old interface{}) *validate.Result {
 	return newRatchetingValueValidator(
-		NewCorrelatedObject(new, old, &celopenapi.Schema{Schema: r.schemaArgs.schema}),
+		common.NewCorrelatedObject(new, old, &celopenapi.Schema{Schema: r.schemaArgs.schema}),
 		r.schemaArgs,
 	).Validate(new)
 }
@@ -83,48 +83,10 @@ type ratchetingValueValidator struct {
 	// schemaArgs provides the arguments to use in the temporary SchemaValidator
 	// that is created during a call to Validate.
 	schemaArgs
-	correlation *CorrelatedObject
+	correlation *common.CorrelatedObject
 }
 
-type CorrelatedObject struct {
-	// Currently correlated old value during traversal of the schema/object
-	OldValue interface{}
-
-	// Value being validated
-	Value interface{}
-
-	Schema common.Schema
-
-	// Scratch space below, may change during validation
-
-	// Cached comparison result of DeepEqual of `value` and `thunk.oldValue`
-	comparisonResult *bool
-
-	// Cached map representation of a map-type list, or nil if not map-type list
-	mapList common.MapList
-
-	// Children spawned by a call to `Validate` on this object
-	// key is either a string or an index, depending upon whether `value` is
-	// a map or a list, respectively.
-	//
-	// The list of children may be incomplete depending upon if the internal
-	// logic of kube-openapi's SchemaValidator short-circuited before
-	// reaching all of the children.
-	//
-	// It should be expected to have an entry for either all of the children, or
-	// none of them.
-	children map[interface{}]*CorrelatedObject
-}
-
-func NewCorrelatedObject(new, old interface{}, schema common.Schema) *CorrelatedObject {
-	return &CorrelatedObject{
-		OldValue: old,
-		Value:    new,
-		Schema:   schema,
-	}
-}
-
-func newRatchetingValueValidator(correlation *CorrelatedObject, args schemaArgs) *ratchetingValueValidator {
+func newRatchetingValueValidator(correlation *common.CorrelatedObject, args schemaArgs) *ratchetingValueValidator {
 	return &ratchetingValueValidator{
 		schemaArgs:  args,
 		correlation: correlation,
@@ -226,144 +188,6 @@ func (r *ratchetingValueValidator) SubIndexValidator(index int, schema *spec.Sch
 	})
 }
 
-// If oldValue is not a list, returns nil
-// If oldValue is a list takes mapType into account and attempts to find the
-// old value with the same index or key, depending upon the mapType.
-//
-// If listType is map, creates a map representation of the list using the designated
-// map-keys and caches it for future calls.
-func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
-	oldAsList, ok := r.OldValue.([]interface{})
-	if !ok {
-		return nil
-	}
-
-	asList, ok := r.Value.([]interface{})
-	if !ok {
-		return nil
-	} else if len(asList) <= index {
-		// Cannot correlate out of bounds index
-		return nil
-	}
-
-	listType := r.Schema.XListType()
-	switch listType {
-	case "map":
-		// Look up keys for this index in current object
-		currentElement := asList[index]
-
-		oldList := r.mapList
-		if oldList == nil {
-			oldList = common.MakeMapList(r.Schema, oldAsList)
-			r.mapList = oldList
-		}
-		return oldList.Get(currentElement)
-
-	case "set":
-		// Are sets correlatable? Only if the old value equals the current value.
-		// We might be able to support this, but do not currently see a lot
-		// of value
-		// (would allow you to add/remove items from sets with ratcheting but not change them)
-		return nil
-	case "atomic":
-		// Atomic lists are not correlatable by item
-		// Ratcheting is not available on a per-index basis
-		return nil
-	default:
-		// Correlate by-index by default.
-		//
-		// Cannot correlate an out-of-bounds index
-		if len(oldAsList) <= index {
-			return nil
-		}
-
-		return oldAsList[index]
-	}
-}
-
-// CachedDeepEqual is equivalent to reflect.DeepEqual, but caches the
-// results in the tree of ratchetInvocationScratch objects on the way:
-//
-// For objects and arrays, this function will make a best effort to make
-// use of past DeepEqual checks performed by this Node's children, if available.
-//
-// If a lazy computation could not be found for all children possibly due
-// to validation logic short circuiting and skipping the children, then
-// this function simply defers to reflect.DeepEqual.
-func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
-	if r.comparisonResult != nil {
-		return *r.comparisonResult
-	}
-
-	defer func() {
-		r.comparisonResult = &res
-	}()
-
-	if r.Value == nil && r.OldValue == nil {
-		return true
-	} else if r.Value == nil || r.OldValue == nil {
-		return false
-	}
-
-	oldAsArray, oldIsArray := r.OldValue.([]interface{})
-	newAsArray, newIsArray := r.Value.([]interface{})
-
-	if oldIsArray != newIsArray {
-		return false
-	} else if oldIsArray {
-		if len(oldAsArray) != len(newAsArray) {
-			return false
-		}
-
-		for i := range newAsArray {
-			child := r.Index(i)
-			if child == nil {
-				if r.mapList == nil {
-					// Treat non-correlatable array as a unit with reflect.DeepEqual
-					return reflect.DeepEqual(oldAsArray, newAsArray)
-				}
-
-				// If array is correlatable, but old not found. Just short circuit
-				// comparison
-				return false
-
-			} else if !child.CachedDeepEqual() {
-				// If one child is not equal the entire object is not equal
-				return false
-			}
-		}
-
-		return true
-	}
-
-	oldAsMap, oldIsMap := r.OldValue.(map[string]interface{})
-	newAsMap, newIsMap := r.Value.(map[string]interface{})
-
-	if oldIsMap != newIsMap {
-		return false
-	} else if oldIsMap {
-		if len(oldAsMap) != len(newAsMap) {
-			return false
-		}
-
-		for k := range newAsMap {
-			child := r.Key(k)
-			if child == nil {
-				// Un-correlatable child due to key change.
-				// Objects are not equal.
-				return false
-			} else if !child.CachedDeepEqual() {
-				// If one child is not equal the entire object is not equal
-				return false
-			}
-		}
-
-		return true
-	}
-
-	return reflect.DeepEqual(r.OldValue, r.Value)
-}
-
 var _ validate.ValueValidator = (&ratchetingValueValidator{})
 
 func (f ratchetingValueValidator) SetPath(path string) {
@@ -373,82 +197,4 @@ func (f ratchetingValueValidator) SetPath(path string) {
 
 func (f ratchetingValueValidator) Applies(source interface{}, valueKind reflect.Kind) bool {
 	return true
-}
-
-// Key returns the child of the reciever with the given name.
-// Returns nil if the given name is does not exist in the new object, or its
-// value is not correlatable to an old value.
-// If receiver is nil or if the new value is not an object/map, returns nil.
-func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
-	if l == nil || l.Schema == nil {
-		return nil
-	} else if existing, exists := l.children[field]; exists {
-		return existing
-	}
-
-	// Find correlated old value
-	oldAsMap, okOld := l.OldValue.(map[string]interface{})
-	newAsMap, okNew := l.Value.(map[string]interface{})
-	if !okOld || !okNew {
-		return nil
-	}
-
-	oldValueForField, okOld := oldAsMap[field]
-	newValueForField, okNew := newAsMap[field]
-	if !okOld || !okNew {
-		return nil
-	}
-
-	var propertySchema common.Schema
-	if prop, exists := l.Schema.Properties()[field]; exists {
-		propertySchema = prop
-	} else if addP := l.Schema.AdditionalProperties(); addP != nil && addP.Schema() != nil {
-		propertySchema = addP.Schema()
-	} else {
-		return nil
-	}
-
-	if l.children == nil {
-		l.children = make(map[interface{}]*CorrelatedObject, len(newAsMap))
-	}
-
-	res := NewCorrelatedObject(newValueForField, oldValueForField, propertySchema)
-	l.children[field] = res
-	return res
-}
-
-// Index returns the child of the reciever at the given index.
-// Returns nil if the given index is out of bounds, or its value is not
-// correlatable to an old value.
-// If receiver is nil or if the new value is not an array, returns nil.
-func (l *CorrelatedObject) Index(i int) *CorrelatedObject {
-	if l == nil || l.Schema == nil {
-		return nil
-	} else if existing, exists := l.children[i]; exists {
-		return existing
-	}
-
-	asList, ok := l.Value.([]interface{})
-	if !ok || len(asList) <= i {
-		return nil
-	}
-
-	oldValueForIndex := l.correlateOldValueForChildAtNewIndex(i)
-	if oldValueForIndex == nil {
-		return nil
-	}
-	var itemSchema common.Schema
-	if i := l.Schema.Items(); i != nil {
-		itemSchema = i
-	} else {
-		return nil
-	}
-
-	if l.children == nil {
-		l.children = make(map[interface{}]*CorrelatedObject, len(asList))
-	}
-
-	res := NewCorrelatedObject(asList[i], oldValueForIndex, itemSchema)
-	l.children[i] = res
-	return res
 }
