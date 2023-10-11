@@ -222,7 +222,7 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -288,7 +288,7 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -370,7 +370,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
+				Port:     ptr.To(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -381,7 +381,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName2.Port),
-				Port:     pointer.Int32(int32(svcPort2)),
+				Port:     ptr.To(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -429,7 +429,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName2.Port),
-				Port:     pointer.Int32(int32(svcPort2)),
+				Port:     ptr.To(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -514,7 +514,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
+				Port:     ptr.To(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -525,7 +525,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName2.Port),
-				Port:     pointer.Int32(int32(svcPort2)),
+				Port:     ptr.To(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -584,7 +584,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
+				Port:     ptr.To(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -595,7 +595,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
+				Port:     ptr.To(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			},
 				{
@@ -669,7 +669,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -733,7 +733,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -813,7 +813,7 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),

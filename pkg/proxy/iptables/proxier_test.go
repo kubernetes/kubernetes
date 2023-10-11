@@ -2314,7 +2314,7 @@ func TestLoadBalancer(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2836,7 +2836,7 @@ func TestExternalTrafficPolicyLocal(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2953,7 +2953,7 @@ func TestExternalTrafficPolicyCluster(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -4415,7 +4415,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -4438,7 +4438,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -4528,7 +4528,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),

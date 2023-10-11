@@ -272,7 +272,7 @@ func TestCleanupLeftovers(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1813,7 +1813,7 @@ func TestExternalIPs(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -1892,7 +1892,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1966,7 +1966,7 @@ func TestLoadBalancer(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -2059,7 +2059,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2229,7 +2229,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2416,7 +2416,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     ptr.To(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),

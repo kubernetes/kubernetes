@@ -372,7 +372,7 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 		Endpoints:   []discovery.Endpoint{},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(fmt.Sprintf("%d", epPort)),
-			Port:     pointer.Int32(int32(epPort)),
+			Port:     ptr.To(int32(epPort)),
 			Protocol: &tcpProtocol,
 		}},
 	}
