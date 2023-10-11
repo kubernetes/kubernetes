@@ -886,7 +886,7 @@ func TestEndpointSlice(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     &svcPortName.Port,
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,

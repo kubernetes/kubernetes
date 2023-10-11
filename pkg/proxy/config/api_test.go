@@ -93,7 +93,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 			},
 		}},
 		Ports: []discoveryv1.EndpointPort{{
-			Port:     utilpointer.Int32(8080),
+			Port:     ptr.To[int32](8080),
 			Protocol: &tcp,
 		}},
 	}
@@ -107,7 +107,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 			},
 		}},
 		Ports: []discoveryv1.EndpointPort{{
-			Port:     utilpointer.Int32(8080),
+			Port:     ptr.To[int32](8080),
 			Protocol: &tcp,
 		}},
 	}
@@ -120,7 +120,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 			},
 		}},
 		Ports: []discoveryv1.EndpointPort{{
-			Port:     utilpointer.Int32(8080),
+			Port:     ptr.To[int32](8080),
 			Protocol: &tcp,
 		}},
 	}

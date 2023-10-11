@@ -130,7 +130,7 @@ func NewHollowProxyOrDie(
 			Config: &proxyconfigapi.KubeProxyConfiguration{
 				Mode:             proxyconfigapi.ProxyMode("fake"),
 				ConfigSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-				OOMScoreAdj:      utilpointer.Int32Ptr(0),
+				OOMScoreAdj:      ptr.To[int32](0),
 			},
 
 			Client:      client,

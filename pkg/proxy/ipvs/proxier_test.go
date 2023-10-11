@@ -469,7 +469,7 @@ func TestNodePortIPv4(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -480,7 +480,7 @@ func TestNodePortIPv4(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -558,7 +558,7 @@ func TestNodePortIPv4(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &udpProtocol,
 					}}
 				}),
@@ -713,7 +713,7 @@ func TestNodePortIPv4(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &sctpProtocol,
 					}}
 				}),
@@ -867,7 +867,7 @@ func TestNodePortIPv4(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &sctpProtocol,
 					}}
 				}),
@@ -1023,7 +1023,7 @@ func TestNodePortIPv6(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -1034,7 +1034,7 @@ func TestNodePortIPv6(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -1114,7 +1114,7 @@ func TestNodePortIPv6(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &udpProtocol,
 					}}
 				}),
@@ -1207,7 +1207,7 @@ func TestNodePortIPv6(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &sctpProtocol,
 					}}
 				}),
@@ -1355,7 +1355,7 @@ func Test_syncEndpoint_updateWeightsOnRestart(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p80"),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}}
 	})
@@ -1450,7 +1450,7 @@ func TestIPv4Proxier(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -1461,7 +1461,7 @@ func TestIPv4Proxier(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p8080"),
-						Port:     pointer.Int32(8080),
+						Port:     ptr.To[int32](8080),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -1588,7 +1588,7 @@ func TestIPv6Proxier(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -1599,7 +1599,7 @@ func TestIPv6Proxier(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p8080"),
-						Port:     pointer.Int32(8080),
+						Port:     ptr.To[int32](8080),
 						Protocol: &tcpProtocol,
 					}}
 				}),
@@ -2342,7 +2342,7 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p80"),
-					Port:     pointer.Int32(80),
+					Port:     ptr.To[int32](80),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -2828,7 +2828,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -2839,7 +2839,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -2853,7 +2853,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
-					Port:     pointer.Int32(11),
+					Port:     ptr.To[int32](11),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -2870,7 +2870,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11-2"),
-					Port:     pointer.Int32(11),
+					Port:     ptr.To[int32](11),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -2884,7 +2884,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
-					Port:     pointer.Int32(22),
+					Port:     ptr.To[int32](22),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -2901,11 +2901,11 @@ func Test_updateEndpointsMap(t *testing.T) {
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
-					Port:     pointer.Int32(11),
+					Port:     ptr.To[int32](11),
 					Protocol: &udpProtocol,
 				}, {
 					Name:     ptr.To("p12"),
-					Port:     pointer.Int32(12),
+					Port:     ptr.To[int32](12),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -2922,7 +2922,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -2938,11 +2938,11 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udpProtocol,
 		}, {
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -2953,7 +2953,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
-			Port:     pointer.Int32(13),
+			Port:     ptr.To[int32](13),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -2971,11 +2971,11 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udpProtocol,
 		}, {
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -2989,11 +2989,11 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
-			Port:     pointer.Int32(13),
+			Port:     ptr.To[int32](13),
 			Protocol: &udpProtocol,
 		}, {
 			Name:     ptr.To("p14"),
-			Port:     pointer.Int32(14),
+			Port:     ptr.To[int32](14),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3007,11 +3007,11 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
-			Port:     pointer.Int32(21),
+			Port:     ptr.To[int32](21),
 			Protocol: &udpProtocol,
 		}, {
 			Name:     ptr.To("p22"),
-			Port:     pointer.Int32(22),
+			Port:     ptr.To[int32](22),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3031,7 +3031,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
-			Port:     pointer.Int32(22),
+			Port:     ptr.To[int32](22),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3043,7 +3043,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
-			Port:     pointer.Int32(23),
+			Port:     ptr.To[int32](23),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3058,7 +3058,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
-			Port:     pointer.Int32(44),
+			Port:     ptr.To[int32](44),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3070,7 +3070,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
-			Port:     pointer.Int32(45),
+			Port:     ptr.To[int32](45),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3083,7 +3083,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3094,11 +3094,11 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udpProtocol,
 		}, {
 			Name:     ptr.To("p122"),
-			Port:     pointer.Int32(122),
+			Port:     ptr.To[int32](122),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3109,7 +3109,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p33"),
-			Port:     pointer.Int32(33),
+			Port:     ptr.To[int32](33),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3121,7 +3121,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
-			Port:     pointer.Int32(44),
+			Port:     ptr.To[int32](44),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4392,7 +4392,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
@@ -4532,7 +4532,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
@@ -4570,7 +4570,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
@@ -4790,7 +4790,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			},
 			Ports: []discovery.EndpointPort{{
 				Name:     ptr.To(""),
-				Port:     pointer.Int32(80),
+				Port:     ptr.To[int32](80),
 				Protocol: &tcpProtocol,
 			}},
 			AddressType: discovery.AddressTypeIPv4,
@@ -4897,7 +4897,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
@@ -5073,7 +5073,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
@@ -5248,7 +5248,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
@@ -5423,7 +5423,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(80),
+			Port:     ptr.To[int32](80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
@@ -5765,7 +5765,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 			Ports: []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
-				Port:     pointer.Int32(80),
+				Port:     ptr.To[int32](80),
 				Protocol: &tcpProtocol,
 			}},
 			AddressType: discovery.AddressTypeIPv4,
@@ -5944,7 +5944,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
-						Port:     pointer.Int32(80),
+						Port:     ptr.To[int32](80),
 						Protocol: &tcpProtocol,
 					}}
 				}),

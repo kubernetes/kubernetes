@@ -196,7 +196,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -211,7 +211,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -226,7 +226,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -237,7 +237,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -248,7 +248,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -258,7 +258,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -268,7 +268,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11-2"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -278,7 +278,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(22),
+			Port:     ptr.To[int32](22),
 			Protocol: &udp,
 		}}
 	}
@@ -291,11 +291,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}, {
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udp,
 		}}
 	}
@@ -305,7 +305,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -315,7 +315,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udp,
 		}}
 	}
@@ -325,7 +325,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -336,7 +336,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udp,
 		}}
 	}
@@ -347,11 +347,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}, {
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udp,
 		}}
 	}
@@ -361,7 +361,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
-			Port:     pointer.Int32(13),
+			Port:     ptr.To[int32](13),
 			Protocol: &udp,
 		}}
 	}
@@ -374,11 +374,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}, {
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udp,
 		}}
 	}
@@ -391,11 +391,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
-			Port:     pointer.Int32(13),
+			Port:     ptr.To[int32](13),
 			Protocol: &udp,
 		}, {
 			Name:     ptr.To("p14"),
-			Port:     pointer.Int32(14),
+			Port:     ptr.To[int32](14),
 			Protocol: &udp,
 		}}
 	}
@@ -408,11 +408,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
-			Port:     pointer.Int32(21),
+			Port:     ptr.To[int32](21),
 			Protocol: &udp,
 		}, {
 			Name:     ptr.To("p22"),
-			Port:     pointer.Int32(22),
+			Port:     ptr.To[int32](22),
 			Protocol: &udp,
 		}}
 	}
@@ -422,7 +422,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -436,7 +436,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
-			Port:     pointer.Int32(22),
+			Port:     ptr.To[int32](22),
 			Protocol: &udp,
 		}}
 	}
@@ -447,7 +447,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
-			Port:     pointer.Int32(23),
+			Port:     ptr.To[int32](23),
 			Protocol: &udp,
 		}}
 	}
@@ -461,7 +461,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
-			Port:     pointer.Int32(44),
+			Port:     ptr.To[int32](44),
 			Protocol: &udp,
 		}}
 	}
@@ -472,7 +472,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
-			Port:     pointer.Int32(45),
+			Port:     ptr.To[int32](45),
 			Protocol: &udp,
 		}}
 	}
@@ -484,7 +484,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
-			Port:     pointer.Int32(11),
+			Port:     ptr.To[int32](11),
 			Protocol: &udp,
 		}}
 	}
@@ -494,11 +494,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
-			Port:     pointer.Int32(12),
+			Port:     ptr.To[int32](12),
 			Protocol: &udp,
 		}, {
 			Name:     ptr.To("p122"),
-			Port:     pointer.Int32(122),
+			Port:     ptr.To[int32](122),
 			Protocol: &udp,
 		}}
 	}
@@ -508,7 +508,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p33"),
-			Port:     pointer.Int32(33),
+			Port:     ptr.To[int32](33),
 			Protocol: &udp,
 		}}
 	}
@@ -519,7 +519,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
-			Port:     pointer.Int32(44),
+			Port:     ptr.To[int32](44),
 			Protocol: &udp,
 		}}
 	}
@@ -1217,7 +1217,7 @@ func TestLastChangeTriggerTime(t *testing.T) {
 			}},
 			Ports: []discovery.EndpointPort{{
 				Name:     ptr.To("p11"),
-				Port:     pointer.Int32(11),
+				Port:     ptr.To[int32](11),
 				Protocol: &tcp,
 			}},
 		}
@@ -1335,7 +1335,7 @@ func TestLastChangeTriggerTime(t *testing.T) {
 }
 
 func TestEndpointSliceUpdate(t *testing.T) {
-	fqdnSlice := generateEndpointSlice("svc1", "ns1", 2, 5, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)})
+	fqdnSlice := generateEndpointSlice("svc1", "ns1", 2, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)})
 	fqdnSlice.AddressType = discovery.AddressTypeFQDN
 
 	testCases := map[string]struct {
@@ -1353,7 +1353,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices:         []*discovery.EndpointSlice{},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1373,11 +1373,11 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// test no modification to state - current change should be nil as nothing changes
 		"add the same slice that already exists": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker:   NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:           types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:       generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:       generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:         false,
 			expectedReturnVal:        false,
 			expectedCurrentChange:    nil,
@@ -1386,7 +1386,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// ensure that only valide address types are processed
 		"add an FQDN slice (invalid address type)": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker:   NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:           types.NamespacedName{Name: "svc1", Namespace: "ns1"},
@@ -1399,12 +1399,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// test additions to existing state
 		"add a slice that overlaps with existing state": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
-				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1432,12 +1432,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// test additions to existing state with partially overlapping slices and ports
 		"add a slice that overlaps with existing state and partial ports": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
-				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSliceWithOffset("svc1", "ns1", 3, 1, 5, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80)}),
+			paramEndpointSlice:     generateEndpointSliceWithOffset("svc1", "ns1", 3, 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)}),
 			paramRemoveSlice:       false,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1463,12 +1463,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// test deletions from existing state with partially overlapping slices and ports
 		"remove a slice that overlaps with existing state": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
-				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       true,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1486,12 +1486,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// ensure a removal that has no effect turns into a no-op
 		"remove a slice that doesn't even exist in current state": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
-				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker:   NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:           types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:       generateEndpointSlice("svc1", "ns1", 3, 5, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:       generateEndpointSlice("svc1", "ns1", 3, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:         true,
 			expectedReturnVal:        false,
 			expectedCurrentChange:    nil,
@@ -1500,11 +1500,11 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// start with all endpoints ready, transition to no endpoints ready
 		"transition all endpoints to unready state": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 1, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 1, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1524,11 +1524,11 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// start with no endpoints ready, transition to all endpoints ready
 		"transition all endpoints to ready state": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 2, 1, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 2, 1, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 2, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 2, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1546,12 +1546,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// start with some endpoints ready, transition to more endpoints ready
 		"transition some endpoints to ready state": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 2, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
-				generateEndpointSlice("svc1", "ns1", 2, 2, 2, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 2, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 2, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 3, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 3, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1575,12 +1575,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// start with some endpoints ready, transition to some terminating
 		"transition some endpoints to terminating state": {
 			startingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 2, 2, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
-				generateEndpointSlice("svc1", "ns1", 2, 2, 2, 2, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 2, 2, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 2, 2, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 3, 2, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 3, 2, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
 			expectedReturnVal:      true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
@@ -1663,7 +1663,7 @@ func TestCheckoutChanges(t *testing.T) {
 			}},
 			appliedSlices: []*discovery.EndpointSlice{},
 			pendingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 3, 2, []string{"host1"}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 3, 2, []string{"host1"}, []*int32{ptr.To[int32](80)}),
 			},
 		},
 		"removing port in update": {
@@ -1690,10 +1690,10 @@ func TestCheckoutChanges(t *testing.T) {
 				},
 			}},
 			appliedSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 3, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 3, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			pendingSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 3, 999, []string{"host1"}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 3, 999, []string{"host1"}, []*int32{ptr.To[int32](80)}),
 			},
 		},
 	}

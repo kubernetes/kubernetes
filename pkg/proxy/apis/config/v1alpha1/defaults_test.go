@@ -53,7 +53,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Burst:       10,
 				},
 				IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
-					MasqueradeBit:      pointer.Int32(14),
+					MasqueradeBit:      ptr.To[int32](14),
 					MasqueradeAll:      false,
 					LocalhostNodePorts: ptr.To(true),
 					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
@@ -93,7 +93,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Burst:       10,
 				},
 				IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
-					MasqueradeBit:      pointer.Int32(14),
+					MasqueradeBit:      ptr.To[int32](14),
 					MasqueradeAll:      false,
 					LocalhostNodePorts: ptr.To(true),
 					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
