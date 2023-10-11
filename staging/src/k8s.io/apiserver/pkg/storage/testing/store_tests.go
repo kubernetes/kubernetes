@@ -1364,6 +1364,19 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 			},
 		},
 		expectedOut: []example.Pod{},
+	}, {
+		name: "existing key, resourceVersion=current, with not matching pod name",
+		key:  key,
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*example.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
+		},
+		expectedOut: []example.Pod{},
+		rv:          fmt.Sprintf("%d", currentRV),
 	}}
 
 	for _, tt := range tests {
@@ -1443,12 +1456,14 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		},
 	}
 
+	var currentRV string
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
+		currentRV = preset[i].storedObj.ResourceVersion
 	}
 
 	// test continuations
@@ -1477,6 +1492,9 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		t.Fatalf("No continuation token set")
 	}
 	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
+	if out.ResourceVersion != currentRV {
+		t.Errorf("Expect output.ResourceVersion = %s, but got %s", currentRV, out.ResourceVersion)
+	}
 	if validation != nil {
 		validation(t, 1, 1)
 	}
@@ -1499,6 +1517,9 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods")
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
+	if out.ResourceVersion != currentRV {
+		t.Errorf("Expect output.ResourceVersion = %s, but got %s", currentRV, out.ResourceVersion)
+	}
 	if validation != nil {
 		validation(t, 0, 2)
 	}
@@ -1517,6 +1538,9 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		t.Fatalf("No continuation token set")
 	}
 	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
+	if out.ResourceVersion != currentRV {
+		t.Errorf("Expect output.ResourceVersion = %s, but got %s", currentRV, out.ResourceVersion)
+	}
 	if validation != nil {
 		validation(t, 1, 1)
 	}
@@ -1536,6 +1560,9 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		t.Fatalf("Unexpected continuation token set")
 	}
 	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
+	if out.ResourceVersion != currentRV {
+		t.Errorf("Expect output.ResourceVersion = %s, but got %s", currentRV, out.ResourceVersion)
+	}
 	if validation != nil {
 		validation(t, 1, 1)
 	}
@@ -1610,12 +1637,14 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		},
 	}
 
+	var currentRV string
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
+		currentRV = preset[i].storedObj.ResourceVersion
 	}
 
 	// the first list call should try to get 2 items from etcd (and only those items should be returned)
@@ -1647,6 +1676,9 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		t.Errorf("No continuation token set")
 	}
 	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
+	if out.ResourceVersion != currentRV {
+		t.Errorf("Expect output.ResourceVersion = %s, but got %s", currentRV, out.ResourceVersion)
+	}
 	if validation != nil {
 		validation(t, 2, 3)
 	}
@@ -1674,6 +1706,9 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		t.Errorf("Unexpected continuation token set")
 	}
 	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[3].storedObj}, out.Items)
+	if out.ResourceVersion != currentRV {
+		t.Errorf("Expect output.ResourceVersion = %s, but got %s", currentRV, out.ResourceVersion)
+	}
 	if validation != nil {
 		validation(t, 2, 1)
 	}
