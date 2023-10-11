@@ -109,9 +109,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 	validMode := core.PersistentVolumeFilesystem
 	invalidMode := core.PersistentVolumeMode("fakeVolumeMode")
 	scenarios := map[string]struct {
-		isExpectedFailure      bool
-		enableReadWriteOncePod bool
-		volume                 *core.PersistentVolume
+		isExpectedFailure bool
+		volume            *core.PersistentVolume
 	}{
 		"good-volume": {
 			isExpectedFailure: false,
@@ -253,9 +252,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				VolumeMode: &invalidMode,
 			}),
 		},
-		"with-read-write-once-pod-feature-gate-enabled": {
-			isExpectedFailure:      false,
-			enableReadWriteOncePod: true,
+		"with-read-write-once-pod": {
+			isExpectedFailure: false,
 			volume: testVolume("foo", "", core.PersistentVolumeSpec{
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
@@ -269,25 +267,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 			}),
 		},
-		"with-read-write-once-pod-feature-gate-disabled": {
-			isExpectedFailure:      true,
-			enableReadWriteOncePod: false,
-			volume: testVolume("foo", "", core.PersistentVolumeSpec{
-				Capacity: core.ResourceList{
-					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-				},
-				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
-				PersistentVolumeSource: core.PersistentVolumeSource{
-					HostPath: &core.HostPathVolumeSource{
-						Path: "/foo",
-						Type: newHostPathType(string(core.HostPathDirectory)),
-					},
-				},
-			}),
-		},
-		"with-read-write-once-pod-and-others-feature-gate-enabled": {
-			isExpectedFailure:      true,
-			enableReadWriteOncePod: true,
+		"with-read-write-once-pod-and-others": {
+			isExpectedFailure: true,
 			volume: testVolume("foo", "", core.PersistentVolumeSpec{
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
@@ -501,8 +482,6 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, scenario.enableReadWriteOncePod)()
-
 			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
 			errs := ValidatePersistentVolume(scenario.volume, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
@@ -903,51 +882,17 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 
 func TestValidationOptionsForPersistentVolume(t *testing.T) {
 	tests := map[string]struct {
-		oldPv                  *core.PersistentVolume
-		enableReadWriteOncePod bool
-		expectValidationOpts   PersistentVolumeSpecValidationOptions
+		oldPv                *core.PersistentVolume
+		expectValidationOpts PersistentVolumeSpecValidationOptions
 	}{
 		"nil old pv": {
-			oldPv:                  nil,
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
-		},
-		"rwop allowed because feature enabled": {
-			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
-		},
-		"rwop not allowed because not used and feature disabled": {
-			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
-			enableReadWriteOncePod: false,
-			expectValidationOpts: PersistentVolumeSpecValidationOptions{
-				AllowReadWriteOncePod: false,
-			},
-		},
-		"rwop allowed because used and feature enabled": {
-			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
-		},
-		"rwop allowed because used and feature disabled": {
-			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
-			enableReadWriteOncePod: false,
-			expectValidationOpts: PersistentVolumeSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
+			oldPv:                nil,
+			expectValidationOpts: PersistentVolumeSpecValidationOptions{},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
-
 			opts := ValidationOptionsForPersistentVolume(nil, tc.oldPv)
 			if opts != tc.expectValidationOpts {
 				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)
@@ -972,29 +917,6 @@ func getCSIVolumeWithSecret(pv *core.PersistentVolume, secret *core.SecretRefere
 	}
 
 	return pvCopy
-}
-func pvWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolume {
-	return &core.PersistentVolume{
-		Spec: core.PersistentVolumeSpec{
-			AccessModes: accessModes,
-		},
-	}
-}
-
-func pvcWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolumeClaim {
-	return &core.PersistentVolumeClaim{
-		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: accessModes,
-		},
-	}
-}
-
-func pvcTemplateWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolumeClaimTemplate {
-	return &core.PersistentVolumeClaimTemplate{
-		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: accessModes,
-		},
-	}
 }
 
 func pvcWithDataSource(dataSource *core.TypedLocalObjectReference) *core.PersistentVolumeClaim {
@@ -1594,9 +1516,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 	ten := int64(10)
 
 	scenarios := map[string]struct {
-		isExpectedFailure      bool
-		enableReadWriteOncePod bool
-		claim                  *core.PersistentVolumeClaim
+		isExpectedFailure bool
+		claim             *core.PersistentVolumeClaim
 	}{
 		"good-claim": {
 			isExpectedFailure: false,
@@ -1734,9 +1655,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				return claim
 			}(),
 		},
-		"with-read-write-once-pod-feature-gate-enabled": {
-			isExpectedFailure:      false,
-			enableReadWriteOncePod: true,
+		"with-read-write-once-pod": {
+			isExpectedFailure: false,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
 				Resources: core.VolumeResourceRequirements{
@@ -1746,21 +1666,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"with-read-write-once-pod-feature-gate-disabled": {
-			isExpectedFailure:      true,
-			enableReadWriteOncePod: false,
-			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
-				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
-				Resources: core.VolumeResourceRequirements{
-					Requests: core.ResourceList{
-						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-					},
-				},
-			}),
-		},
-		"with-read-write-once-pod-and-others-feature-gate-enabled": {
-			isExpectedFailure:      true,
-			enableReadWriteOncePod: true,
+		"with-read-write-once-pod-and-others": {
+			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod", "ReadWriteMany"},
 				Resources: core.VolumeResourceRequirements{
@@ -1991,8 +1898,6 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, scenario.enableReadWriteOncePod)()
-
 			var errs field.ErrorList
 			if ephemeral {
 				volumes := []core.Volume{{
@@ -2754,47 +2659,12 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 	invaildAPIGroup := "^invalid"
 
 	tests := map[string]struct {
-		oldPvc                 *core.PersistentVolumeClaim
-		enableReadWriteOncePod bool
-		expectValidationOpts   PersistentVolumeClaimSpecValidationOptions
+		oldPvc               *core.PersistentVolumeClaim
+		expectValidationOpts PersistentVolumeClaimSpecValidationOptions
 	}{
 		"nil pv": {
-			oldPvc:                 nil,
-			enableReadWriteOncePod: true,
+			oldPvc: nil,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
-			},
-		},
-		"rwop allowed because feature enabled": {
-			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
-			},
-		},
-		"rwop not allowed because not used and feature disabled": {
-			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
-			enableReadWriteOncePod: false,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             false,
-				EnableRecoverFromExpansionFailure: false,
-			},
-		},
-		"rwop allowed because used and feature enabled": {
-			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
-			},
-		},
-		"rwop allowed because used and feature disabled": {
-			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
-			enableReadWriteOncePod: false,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2814,8 +2684,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
-
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
 			if opts != tc.expectValidationOpts {
 				t.Errorf("Expected opts: %+v, received: %+v", tc.expectValidationOpts, opts)
@@ -2826,51 +2694,17 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 	tests := map[string]struct {
-		oldPvcTemplate         *core.PersistentVolumeClaimTemplate
-		enableReadWriteOncePod bool
-		expectValidationOpts   PersistentVolumeClaimSpecValidationOptions
+		oldPvcTemplate       *core.PersistentVolumeClaimTemplate
+		expectValidationOpts PersistentVolumeClaimSpecValidationOptions
 	}{
 		"nil pv": {
-			oldPvcTemplate:         nil,
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
-		},
-		"rwop allowed because feature enabled": {
-			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
-		},
-		"rwop not allowed because not used and feature disabled": {
-			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
-			enableReadWriteOncePod: false,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: false,
-			},
-		},
-		"rwop allowed because used and feature enabled": {
-			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
-			enableReadWriteOncePod: true,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
-		},
-		"rwop allowed because used and feature disabled": {
-			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
-			enableReadWriteOncePod: false,
-			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
-			},
+			oldPvcTemplate:       nil,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
-
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
 			if opts != tc.expectValidationOpts {
 				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)

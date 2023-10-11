@@ -1554,11 +1554,10 @@ var (
 
 func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 	tests := []struct {
-		name                   string
-		init                   func(kubernetes.Interface, string) error
-		pod                    *testutils.PausePodConfig
-		update                 func(kubernetes.Interface, string) error
-		enableReadWriteOncePod bool
+		name   string
+		init   func(kubernetes.Interface, string) error
+		pod    *testutils.PausePodConfig
+		update func(kubernetes.Interface, string) error
 	}{
 		{
 			name: "node gets added",
@@ -1765,13 +1764,10 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			update: func(cs kubernetes.Interface, ns string) error {
 				return deletePod(cs, "pod-to-be-deleted", ns)
 			},
-			enableReadWriteOncePod: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tt.enableReadWriteOncePod)()
-
 			testCtx := initTest(t, "scheduler-informer")
 
 			if tt.init != nil {

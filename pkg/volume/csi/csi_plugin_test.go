@@ -370,7 +370,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.seLinuxMountEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, tc.seLinuxMountEnabled)()
 
 			mounter, err := plug.NewMounter(
