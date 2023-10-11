@@ -31,7 +31,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/apihelpers"
@@ -251,7 +251,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 // createPriorityLevel creates a priority level with the provided assured
 // concurrency share.
 func createPriorityLevel(ctx context.Context, f *framework.Framework, priorityLevelName string, nominalConcurrencyShares int32) *flowcontrol.PriorityLevelConfiguration {
-	createdPriorityLevel, err := f.ClientSet.FlowcontrolV1beta3().PriorityLevelConfigurations().Create(
+	createdPriorityLevel, err := f.ClientSet.FlowcontrolV1().PriorityLevelConfigurations().Create(
 		ctx,
 		&flowcontrol.PriorityLevelConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
@@ -269,7 +269,7 @@ func createPriorityLevel(ctx context.Context, f *framework.Framework, priorityLe
 		},
 		metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	ginkgo.DeferCleanup(f.ClientSet.FlowcontrolV1beta3().PriorityLevelConfigurations().Delete, priorityLevelName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(f.ClientSet.FlowcontrolV1().PriorityLevelConfigurations().Delete, priorityLevelName, metav1.DeleteOptions{})
 	return createdPriorityLevel
 }
 
@@ -318,7 +318,7 @@ func createFlowSchema(ctx context.Context, f *framework.Framework, flowSchemaNam
 		})
 	}
 
-	createdFlowSchema, err := f.ClientSet.FlowcontrolV1beta3().FlowSchemas().Create(
+	createdFlowSchema, err := f.ClientSet.FlowcontrolV1().FlowSchemas().Create(
 		ctx,
 		&flowcontrol.FlowSchema{
 			ObjectMeta: metav1.ObjectMeta{
@@ -347,7 +347,7 @@ func createFlowSchema(ctx context.Context, f *framework.Framework, flowSchemaNam
 		},
 		metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	ginkgo.DeferCleanup(f.ClientSet.FlowcontrolV1beta3().FlowSchemas().Delete, flowSchemaName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(f.ClientSet.FlowcontrolV1().FlowSchemas().Delete, flowSchemaName, metav1.DeleteOptions{})
 	return createdFlowSchema
 }
 
@@ -357,7 +357,7 @@ func createFlowSchema(ctx context.Context, f *framework.Framework, flowSchemaNam
 // schema status, and (2) metrics. The function times out after 30 seconds.
 func waitForSteadyState(ctx context.Context, f *framework.Framework, flowSchemaName string, priorityLevelName string) {
 	framework.ExpectNoError(wait.PollWithContext(ctx, time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
-		fs, err := f.ClientSet.FlowcontrolV1beta3().FlowSchemas().Get(ctx, flowSchemaName, metav1.GetOptions{})
+		fs, err := f.ClientSet.FlowcontrolV1().FlowSchemas().Get(ctx, flowSchemaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

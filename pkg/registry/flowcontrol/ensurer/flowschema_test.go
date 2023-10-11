@@ -21,15 +21,15 @@ import (
 	"reflect"
 	"testing"
 
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
-	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
+	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1"
 	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -42,29 +42,29 @@ func init() {
 func TestEnsureFlowSchema(t *testing.T) {
 	tests := []struct {
 		name      string
-		strategy  func() EnsureStrategy[*flowcontrolv1beta3.FlowSchema]
-		current   *flowcontrolv1beta3.FlowSchema
-		bootstrap *flowcontrolv1beta3.FlowSchema
-		expected  *flowcontrolv1beta3.FlowSchema
+		strategy  func() EnsureStrategy[*flowcontrolv1.FlowSchema]
+		current   *flowcontrolv1.FlowSchema
+		bootstrap *flowcontrolv1.FlowSchema
+		expected  *flowcontrolv1.FlowSchema
 	}{
 		// for suggested configurations
 		{
 			name:      "suggested flow schema does not exist - the object should always be re-created",
-			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.FlowSchema],
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1.FlowSchema],
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   nil,
 			expected:  newFlowSchema("fs1", "pl1", 100).Object(),
 		},
 		{
 			name:      "suggested flow schema exists, auto update is enabled, spec does not match - current object should be updated",
-			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.FlowSchema],
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1.FlowSchema],
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("true").Object(),
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
 			name:      "suggested flow schema exists, auto update is disabled, spec does not match - current object should not be updated",
-			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.FlowSchema],
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1.FlowSchema],
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("false").Object(),
 			expected:  newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("false").Object(),
@@ -73,21 +73,21 @@ func TestEnsureFlowSchema(t *testing.T) {
 		// for mandatory configurations
 		{
 			name:      "mandatory flow schema does not exist - new object should be created",
-			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.FlowSchema],
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1.FlowSchema],
 			bootstrap: newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 			current:   nil,
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
 			name:      "mandatory flow schema exists, annotation is missing - annotation should be added",
-			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.FlowSchema],
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1.FlowSchema],
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 100).Object(),
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
 			name:      "mandatory flow schema exists, auto update is disabled, spec does not match - current object should be updated",
-			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.FlowSchema],
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1.FlowSchema],
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("false").Object(),
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
@@ -96,7 +96,7 @@ func TestEnsureFlowSchema(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset().FlowcontrolV1beta3().FlowSchemas()
+			client := fake.NewSimpleClientset().FlowcontrolV1().FlowSchemas()
 			indexer := toolscache.NewIndexer(toolscache.MetaNamespaceKeyFunc, toolscache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
@@ -104,7 +104,7 @@ func TestEnsureFlowSchema(t *testing.T) {
 			}
 
 			ops := NewFlowSchemaOps(client, flowcontrollisters.NewFlowSchemaLister(indexer))
-			boots := []*flowcontrolv1beta3.FlowSchema{test.bootstrap}
+			boots := []*flowcontrolv1.FlowSchema{test.bootstrap}
 			strategy := test.strategy()
 			err := EnsureConfigurations(context.Background(), ops, boots, strategy)
 			if err != nil {
@@ -131,9 +131,9 @@ func TestEnsureFlowSchema(t *testing.T) {
 func TestSuggestedFSEnsureStrategy_ShouldUpdate(t *testing.T) {
 	tests := []struct {
 		name              string
-		current           *flowcontrolv1beta3.FlowSchema
-		bootstrap         *flowcontrolv1beta3.FlowSchema
-		newObjectExpected *flowcontrolv1beta3.FlowSchema
+		current           *flowcontrolv1.FlowSchema
+		bootstrap         *flowcontrolv1.FlowSchema
+		newObjectExpected *flowcontrolv1.FlowSchema
 	}{
 		{
 			name:              "auto update is enabled, first generation, spec does not match - spec update expected",
@@ -212,7 +212,7 @@ func TestSuggestedFSEnsureStrategy_ShouldUpdate(t *testing.T) {
 	ops := NewFlowSchemaOps(nil, nil)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			strategy := NewSuggestedEnsureStrategy[*flowcontrolv1beta3.FlowSchema]()
+			strategy := NewSuggestedEnsureStrategy[*flowcontrolv1.FlowSchema]()
 			updatableGot, updateGot, err := strategy.ReviseIfNeeded(ops, test.current, test.bootstrap)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
@@ -238,23 +238,23 @@ func TestSuggestedFSEnsureStrategy_ShouldUpdate(t *testing.T) {
 }
 
 func TestFlowSchemaSpecChanged(t *testing.T) {
-	fs1 := &flowcontrolv1beta3.FlowSchema{
-		Spec: flowcontrolv1beta3.FlowSchemaSpec{},
+	fs1 := &flowcontrolv1.FlowSchema{
+		Spec: flowcontrolv1.FlowSchemaSpec{},
 	}
-	fs2 := &flowcontrolv1beta3.FlowSchema{
-		Spec: flowcontrolv1beta3.FlowSchemaSpec{
+	fs2 := &flowcontrolv1.FlowSchema{
+		Spec: flowcontrolv1.FlowSchemaSpec{
 			MatchingPrecedence: 1,
 		},
 	}
-	fs1Defaulted := &flowcontrolv1beta3.FlowSchema{
-		Spec: flowcontrolv1beta3.FlowSchemaSpec{
-			MatchingPrecedence: flowcontrolapisv1beta3.FlowSchemaDefaultMatchingPrecedence,
+	fs1Defaulted := &flowcontrolv1.FlowSchema{
+		Spec: flowcontrolv1.FlowSchemaSpec{
+			MatchingPrecedence: flowcontrolapisv1.FlowSchemaDefaultMatchingPrecedence,
 		},
 	}
 	testCases := []struct {
 		name        string
-		expected    *flowcontrolv1beta3.FlowSchema
-		actual      *flowcontrolv1beta3.FlowSchema
+		expected    *flowcontrolv1.FlowSchema
+		actual      *flowcontrolv1.FlowSchema
 		specChanged bool
 	}{
 		{
@@ -287,7 +287,7 @@ func TestFlowSchemaSpecChanged(t *testing.T) {
 func TestRemoveFlowSchema(t *testing.T) {
 	tests := []struct {
 		name           string
-		current        *flowcontrolv1beta3.FlowSchema
+		current        *flowcontrolv1.FlowSchema
 		bootstrapName  string
 		removeExpected bool
 	}{
@@ -336,7 +336,7 @@ func TestRemoveFlowSchema(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset().FlowcontrolV1beta3().FlowSchemas()
+			client := fake.NewSimpleClientset().FlowcontrolV1().FlowSchemas()
 			indexer := toolscache.NewIndexer(toolscache.MetaNamespaceKeyFunc, toolscache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
@@ -344,7 +344,7 @@ func TestRemoveFlowSchema(t *testing.T) {
 			}
 			bootFS := newFlowSchema(test.bootstrapName, "pl", 100).Object()
 			ops := NewFlowSchemaOps(client, flowcontrollisters.NewFlowSchemaLister(indexer))
-			boots := []*flowcontrolv1beta3.FlowSchema{bootFS}
+			boots := []*flowcontrolv1.FlowSchema{bootFS}
 			err := RemoveUnwantedObjects(context.Background(), ops, boots)
 
 			if err != nil {
@@ -370,17 +370,17 @@ func TestRemoveFlowSchema(t *testing.T) {
 }
 
 type fsBuilder struct {
-	object *flowcontrolv1beta3.FlowSchema
+	object *flowcontrolv1.FlowSchema
 }
 
 func newFlowSchema(name, plName string, matchingPrecedence int32) *fsBuilder {
 	return &fsBuilder{
-		object: &flowcontrolv1beta3.FlowSchema{
+		object: &flowcontrolv1.FlowSchema{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
-			Spec: flowcontrolv1beta3.FlowSchemaSpec{
-				PriorityLevelConfiguration: flowcontrolv1beta3.PriorityLevelConfigurationReference{
+			Spec: flowcontrolv1.FlowSchemaSpec{
+				PriorityLevelConfiguration: flowcontrolv1.PriorityLevelConfigurationReference{
 					Name: plName,
 				},
 				MatchingPrecedence: matchingPrecedence,
@@ -389,7 +389,7 @@ func newFlowSchema(name, plName string, matchingPrecedence int32) *fsBuilder {
 	}
 }
 
-func (b *fsBuilder) Object() *flowcontrolv1beta3.FlowSchema {
+func (b *fsBuilder) Object() *flowcontrolv1.FlowSchema {
 	return b.object
 }
 
@@ -408,5 +408,5 @@ func setAnnotation(accessor metav1.Object, value string) {
 		accessor.SetAnnotations(map[string]string{})
 	}
 
-	accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey] = value
+	accessor.GetAnnotations()[flowcontrolv1.AutoUpdateAnnotationKey] = value
 }

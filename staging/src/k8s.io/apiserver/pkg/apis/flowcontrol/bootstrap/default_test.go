@@ -19,7 +19,7 @@ package bootstrap
 import (
 	"testing"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 )
 
 func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {

@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -133,7 +133,7 @@ func TestBorrowing(t *testing.T) {
 			}
 			clientset := clientsetfake.NewSimpleClientset(cfgObjs...)
 			informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
-			flowcontrolClient := clientset.FlowcontrolV1beta3()
+			flowcontrolClient := clientset.FlowcontrolV1()
 			clk := eventclock.Real{}
 			controller := newTestableController(TestableConfig{
 				Name:                   "Controller",

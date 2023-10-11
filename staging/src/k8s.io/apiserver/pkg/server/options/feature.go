@@ -79,7 +79,7 @@ func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interfac
 		}
 		c.FlowControl = utilflowcontrol.New(
 			informers,
-			clientset.FlowcontrolV1beta3(),
+			clientset.FlowcontrolV1(),
 			c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight,
 		)
 	}

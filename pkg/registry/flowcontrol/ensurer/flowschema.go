@@ -17,25 +17,25 @@ limitations under the License.
 package ensurer
 
 import (
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
-	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
-	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
+	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1"
+	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 )
 
-func NewFlowSchemaOps(client flowcontrolclient.FlowSchemaInterface, cache flowcontrollisters.FlowSchemaLister) ObjectOps[*flowcontrolv1beta3.FlowSchema] {
-	return NewObjectOps[*flowcontrolv1beta3.FlowSchema](client, cache, (*flowcontrolv1beta3.FlowSchema).DeepCopy, flowSchemaReplaceSpec, flowSchemaSpecEqual)
+func NewFlowSchemaOps(client flowcontrolclient.FlowSchemaInterface, cache flowcontrollisters.FlowSchemaLister) ObjectOps[*flowcontrolv1.FlowSchema] {
+	return NewObjectOps[*flowcontrolv1.FlowSchema](client, cache, (*flowcontrolv1.FlowSchema).DeepCopy, flowSchemaReplaceSpec, flowSchemaSpecEqual)
 }
 
-func flowSchemaReplaceSpec(into, from *flowcontrolv1beta3.FlowSchema) *flowcontrolv1beta3.FlowSchema {
+func flowSchemaReplaceSpec(into, from *flowcontrolv1.FlowSchema) *flowcontrolv1.FlowSchema {
 	copy := into.DeepCopy()
 	copy.Spec = *from.Spec.DeepCopy()
 	return copy
 }
 
-func flowSchemaSpecEqual(expected, actual *flowcontrolv1beta3.FlowSchema) bool {
+func flowSchemaSpecEqual(expected, actual *flowcontrolv1.FlowSchema) bool {
 	copiedExpectedSpec := expected.Spec.DeepCopy()
-	flowcontrolapisv1beta3.SetDefaults_FlowSchemaSpec(copiedExpectedSpec)
+	flowcontrolapisv1.SetDefaults_FlowSchemaSpec(copiedExpectedSpec)
 	return equality.Semantic.DeepEqual(copiedExpectedSpec, &actual.Spec)
 }
