@@ -366,7 +366,6 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 			}
 			if _, err := gcc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 				klog.Info("PodGC could not apply status to Pod, continuing with force deleting Pod", "status", v1.PodFailed, "pod", klog.KObj(pod))
-
 			}
 		}
 	}
