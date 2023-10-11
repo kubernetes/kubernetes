@@ -184,8 +184,6 @@ func makeTestEndpointSlice(namespace, name string, slice int, epsFunc func(*disc
 }
 
 func TestUpdateEndpointsMap(t *testing.T) {
-	var nodeName = testHostname
-
 	emptyEndpoint := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{}
 	}
@@ -232,7 +230,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	unnamedPortLocal := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
@@ -243,7 +241,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	namedPortLocal := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -286,7 +284,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}, {
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -331,7 +329,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	multipleSubsetsWithLocal_s2 := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -342,7 +340,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	multipleSubsetsMultiplePortsLocal_s1 := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -369,7 +367,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}, {
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -386,7 +384,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.3"},
 		}, {
 			Addresses: []string{"1.1.1.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
@@ -403,7 +401,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"2.2.2.1"},
 		}, {
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
@@ -428,10 +426,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	complexBefore2_s1 := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}, {
 			Addresses: []string{"2.2.2.22"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
@@ -442,7 +440,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	complexBefore2_s2 := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.3"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
@@ -453,10 +451,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	complexBefore4_s1 := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}, {
 			Addresses: []string{"4.4.4.5"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -467,7 +465,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	complexBefore4_s2 := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.6"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
@@ -514,7 +512,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	complexAfter4 := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -1111,7 +1109,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	for tci, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
-			fp.hostname = nodeName
+			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
 			// the fp.previousEndpointsMap is as we expect.

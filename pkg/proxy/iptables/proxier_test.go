@@ -3390,8 +3390,6 @@ func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap,
 }
 
 func TestUpdateEndpointsMap(t *testing.T) {
-	var nodeName = testHostname
-
 	emptyEndpointSlices := []*discovery.EndpointSlice{
 		makeTestEndpointSlice("ns1", "ep1", 1, func(*discovery.EndpointSlice) {}),
 	}
@@ -3423,7 +3421,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"10.1.1.1"},
-					NodeName:  &nodeName,
+					NodeName:  ptr.To(testHostname),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -3471,7 +3469,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 					Addresses: []string{"10.1.1.1"},
 				}, {
 					Addresses: []string{"10.1.1.2"},
-					NodeName:  &nodeName,
+					NodeName:  ptr.To(testHostname),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -3492,7 +3490,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -3508,7 +3506,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.1"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -3541,7 +3539,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.1"},
 		}, {
 			Addresses: []string{"10.1.1.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -3559,7 +3557,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.3"},
 		}, {
 			Addresses: []string{"10.1.1.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
@@ -3577,7 +3575,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.2.2.1"},
 		}, {
 			Addresses: []string{"10.2.2.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
@@ -3598,10 +3596,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.2.2.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}, {
 			Addresses: []string{"10.2.2.22"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
@@ -3613,7 +3611,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.2.2.3"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
@@ -3625,10 +3623,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.4.4.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}, {
 			Addresses: []string{"10.4.4.5"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3640,7 +3638,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.4.4.6"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
@@ -3691,7 +3689,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.4.4.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -4153,7 +4151,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ipt := iptablestest.NewFake()
 			fp := NewFakeProxier(ipt)
-			fp.hostname = nodeName
+			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
 			// the fp.oldEndpoints is as we expect.

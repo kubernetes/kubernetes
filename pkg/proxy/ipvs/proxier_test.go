@@ -2029,18 +2029,16 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 
 	epIP := "10.180.0.1"
 	epIP1 := "10.180.1.1"
-	thisHostname := testHostname
-	otherHostname := "other-hostname"
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
-				NodeName:  &thisHostname,
+				NodeName:  ptr.To(testHostname),
 			}, {
 				Addresses: []string{epIP1},
-				NodeName:  &otherHostname,
+				NodeName:  ptr.To("other-hostname"),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2381,8 +2379,6 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 
 	epIP := "10.180.0.1"
 	epIP1 := "10.180.1.1"
-	thisHostname := testHostname
-	otherHostname := "other-hostname"
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -2390,11 +2386,11 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{
 				{ // **local** endpoint address, should be added as RS
 					Addresses: []string{epIP},
-					NodeName:  &thisHostname,
+					NodeName:  ptr.To(testHostname),
 				},
 				{ // **remote** endpoint address, should not be added as RS
 					Addresses: []string{epIP1},
-					NodeName:  &otherHostname,
+					NodeName:  ptr.To("other-hostname"),
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2797,8 +2793,6 @@ func makeServicePortName(ns, name, port string, protocol v1.Protocol) proxy.Serv
 }
 
 func Test_updateEndpointsMap(t *testing.T) {
-	var nodeName = testHostname
-
 	emptyEndpointSlices := []*discovery.EndpointSlice{
 		makeTestEndpointSlice("ns1", "ep1", 1, func(*discovery.EndpointSlice) {}),
 	}
@@ -2830,7 +2824,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"1.1.1.1"},
-					NodeName:  &nodeName,
+					NodeName:  ptr.To(testHostname),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -2878,7 +2872,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 					Addresses: []string{"1.1.1.1"},
 				}, {
 					Addresses: []string{"1.1.1.2"},
-					NodeName:  &nodeName,
+					NodeName:  ptr.To(testHostname),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -2899,7 +2893,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -2915,7 +2909,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -2948,7 +2942,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}, {
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -2966,7 +2960,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.3"},
 		}, {
 			Addresses: []string{"1.1.1.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
@@ -2984,7 +2978,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"2.2.2.1"},
 		}, {
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
@@ -3005,10 +2999,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}, {
 			Addresses: []string{"2.2.2.22"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
@@ -3020,7 +3014,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.3"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
@@ -3032,10 +3026,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}, {
 			Addresses: []string{"4.4.4.5"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3047,7 +3041,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.6"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
@@ -3098,7 +3092,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  &nodeName,
+			NodeName:  ptr.To(testHostname),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3562,7 +3556,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
 			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-			fp.hostname = nodeName
+			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
 			// the fp.oldEndpoints is as we expect.
