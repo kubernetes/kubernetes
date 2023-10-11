@@ -313,26 +313,20 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 	} else if oldIsArray {
 		if len(oldAsArray) != len(newAsArray) {
 			return false
-		} else if len(r.children) != len(oldAsArray) {
-			// kube-openapi validator is written to always visit all
-			// children of a slice, so this case is only possible if
-			// one of the children could not be correlated. In that case,
-			// we know the objects are not equal.
-			//
-			return false
 		}
 
-		// Correctly considers map-type lists due to fact that index here
-		// is only used for numbering. The correlation is stored in the
-		// childInvocation itself
-		//
-		// NOTE: This does not consider sets, since we don't correlate them.
 		for i := range newAsArray {
-			// Query for child
-			child, ok := r.children[i]
-			if !ok {
-				// This should not happen
+			child := r.Index(i)
+			if child == nil {
+				if r.mapList == nil {
+					// Treat non-correlatable array as a unit with reflect.DeepEqual
+					return reflect.DeepEqual(oldAsArray, newAsArray)
+				}
+
+				// If array is correlatable, but old not found. Just short circuit
+				// comparison
 				return false
+
 			} else if !child.CachedDeepEqual() {
 				// If one child is not equal the entire object is not equal
 				return false
@@ -350,21 +344,12 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 	} else if oldIsMap {
 		if len(oldAsMap) != len(newAsMap) {
 			return false
-		} else if len(oldAsMap) == 0 && len(newAsMap) == 0 {
-			// Both empty
-			return true
-		} else if len(r.children) != len(oldAsMap) {
-			// If we are missing a key it is because the old value could not
-			// be correlated to the new, so the objects are not equal.
-			//
-			return false
 		}
 
-		for k := range oldAsMap {
-			// Check to see if this child was explored during validation
-			child, ok := r.children[k]
-			if !ok {
-				// Child from old missing in new due to key change
+		for k := range newAsMap {
+			child := r.Key(k)
+			if child == nil {
+				// Un-correlatable child due to key change.
 				// Objects are not equal.
 				return false
 			} else if !child.CachedDeepEqual() {
