@@ -4662,6 +4662,7 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 :KUBE-PROXY-FIREWALL - [0:0]
 :KUBE-SOURCE-RANGES-FIREWALL - [0:0]
 :KUBE-IPVS-FILTER - [0:0]
+:KUBE-IPVS-OUT-FILTER - [0:0]
 `
 	assert.Equal(t, expectedNATChains, fp.natChains.String())
 	assert.Equal(t, expectedFilterChains, fp.filterChains.String())
