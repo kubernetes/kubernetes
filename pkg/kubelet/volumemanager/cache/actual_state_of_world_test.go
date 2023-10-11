@@ -877,7 +877,6 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 // Verifies volume/pod combo exist using PodExistsInVolume()
 func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	// Arrange
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -956,7 +955,6 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 // Verifies newly added volume exists in GetGloballyMountedVolumes()
 func Test_MarkDeviceAsMounted_Positive_SELinux(t *testing.T) {
 	// Arrange
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
