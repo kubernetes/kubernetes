@@ -200,16 +200,16 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 // Returns nil if the given name is does not exist in the new object, or its
 // value is not correlatable to an old value.
 // If receiver is nil or if the new value is not an object/map, returns nil.
-func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
-	if l == nil || l.Schema == nil {
+func (r *CorrelatedObject) Key(field string) *CorrelatedObject {
+	if r == nil || r.Schema == nil {
 		return nil
-	} else if existing, exists := l.children[field]; exists {
+	} else if existing, exists := r.children[field]; exists {
 		return existing
 	}
 
 	// Find correlated old value
-	oldAsMap, okOld := l.OldValue.(map[string]interface{})
-	newAsMap, okNew := l.Value.(map[string]interface{})
+	oldAsMap, okOld := r.OldValue.(map[string]interface{})
+	newAsMap, okNew := r.Value.(map[string]interface{})
 	if !okOld || !okNew {
 		return nil
 	}
@@ -221,20 +221,20 @@ func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
 	}
 
 	var propertySchema Schema
-	if prop, exists := l.Schema.Properties()[field]; exists {
+	if prop, exists := r.Schema.Properties()[field]; exists {
 		propertySchema = prop
-	} else if addP := l.Schema.AdditionalProperties(); addP != nil && addP.Schema() != nil {
+	} else if addP := r.Schema.AdditionalProperties(); addP != nil && addP.Schema() != nil {
 		propertySchema = addP.Schema()
 	} else {
 		return nil
 	}
 
-	if l.children == nil {
-		l.children = make(map[interface{}]*CorrelatedObject, len(newAsMap))
+	if r.children == nil {
+		r.children = make(map[interface{}]*CorrelatedObject, len(newAsMap))
 	}
 
 	res := NewCorrelatedObject(newValueForField, oldValueForField, propertySchema)
-	l.children[field] = res
+	r.children[field] = res
 	return res
 }
 
@@ -242,34 +242,34 @@ func (l *CorrelatedObject) Key(field string) *CorrelatedObject {
 // Returns nil if the given index is out of bounds, or its value is not
 // correlatable to an old value.
 // If receiver is nil or if the new value is not an array, returns nil.
-func (l *CorrelatedObject) Index(i int) *CorrelatedObject {
-	if l == nil || l.Schema == nil {
+func (r *CorrelatedObject) Index(i int) *CorrelatedObject {
+	if r == nil || r.Schema == nil {
 		return nil
-	} else if existing, exists := l.children[i]; exists {
+	} else if existing, exists := r.children[i]; exists {
 		return existing
 	}
 
-	asList, ok := l.Value.([]interface{})
+	asList, ok := r.Value.([]interface{})
 	if !ok || len(asList) <= i {
 		return nil
 	}
 
-	oldValueForIndex := l.correlateOldValueForChildAtNewIndex(i)
+	oldValueForIndex := r.correlateOldValueForChildAtNewIndex(i)
 	if oldValueForIndex == nil {
 		return nil
 	}
 	var itemSchema Schema
-	if i := l.Schema.Items(); i != nil {
+	if i := r.Schema.Items(); i != nil {
 		itemSchema = i
 	} else {
 		return nil
 	}
 
-	if l.children == nil {
-		l.children = make(map[interface{}]*CorrelatedObject, len(asList))
+	if r.children == nil {
+		r.children = make(map[interface{}]*CorrelatedObject, len(asList))
 	}
 
 	res := NewCorrelatedObject(asList[i], oldValueForIndex, itemSchema)
-	l.children[i] = res
+	r.children[i] = res
 	return res
 }

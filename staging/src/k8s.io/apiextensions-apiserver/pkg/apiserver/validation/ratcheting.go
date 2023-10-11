@@ -190,11 +190,11 @@ func (r *ratchetingValueValidator) SubIndexValidator(index int, schema *spec.Sch
 
 var _ validate.ValueValidator = (&ratchetingValueValidator{})
 
-func (f ratchetingValueValidator) SetPath(path string) {
+func (r ratchetingValueValidator) SetPath(path string) {
 	// Do nothing
 	// Unused by kube-openapi
 }
 
-func (f ratchetingValueValidator) Applies(source interface{}, valueKind reflect.Kind) bool {
+func (r ratchetingValueValidator) Applies(source interface{}, valueKind reflect.Kind) bool {
 	return true
 }
