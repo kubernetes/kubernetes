@@ -141,9 +141,24 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, store)
 }
 
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, store)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, store)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, store)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
