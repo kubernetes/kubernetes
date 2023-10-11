@@ -302,7 +302,9 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
-	cfg, err := configutil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg, initOptions.skipCRIDetect)
+	cfg, err := configutil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg, configutil.LoadOrDefaultConfigurationOptions{
+		SkipCRIDetect: initOptions.skipCRIDetect,
+	})
 	if err != nil {
 		return nil, err
 	}

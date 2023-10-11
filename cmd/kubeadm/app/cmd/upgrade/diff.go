@@ -111,7 +111,7 @@ func runDiff(flags *diffFlags, args []string) error {
 	var err error
 	var cfg *kubeadmapi.InitConfiguration
 	if flags.cfgPath != "" {
-		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath, false)
+		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath, configutil.LoadOrDefaultConfigurationOptions{})
 	} else {
 		var client *client.Clientset
 		client, err = kubeconfigutil.ClientSetFromFile(flags.kubeConfigPath)

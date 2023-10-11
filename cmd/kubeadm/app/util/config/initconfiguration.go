@@ -256,7 +256,7 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1.InitConfiguration
 }
 
 // LoadInitConfigurationFromFile loads a supported versioned InitConfiguration from a file, converts it into internal config, defaults it and verifies it.
-func LoadInitConfigurationFromFile(cfgPath string, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
+func LoadInitConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.InitConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
 	b, err := os.ReadFile(cfgPath)
@@ -264,7 +264,7 @@ func LoadInitConfigurationFromFile(cfgPath string, skipCRIDetect bool) (*kubeadm
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
-	return BytesToInitConfiguration(b, skipCRIDetect)
+	return BytesToInitConfiguration(b, opts.SkipCRIDetect)
 }
 
 // LoadOrDefaultInitConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
@@ -272,14 +272,14 @@ func LoadInitConfigurationFromFile(cfgPath string, skipCRIDetect bool) (*kubeadm
 // The external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1.InitConfiguration, versionedClusterCfg *kubeadmapiv1.ClusterConfiguration, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
+func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1.InitConfiguration, versionedClusterCfg *kubeadmapiv1.ClusterConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.InitConfiguration, error) {
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags
-		return LoadInitConfigurationFromFile(cfgPath, skipCRIDetect)
+		return LoadInitConfigurationFromFile(cfgPath, opts)
 	}
 
-	return DefaultedInitConfiguration(versionedInitCfg, versionedClusterCfg, skipCRIDetect)
+	return DefaultedInitConfiguration(versionedInitCfg, versionedClusterCfg, opts.SkipCRIDetect)
 }
 
 // BytesToInitConfiguration converts a byte slice to an internal, defaulted and validated InitConfiguration object.
