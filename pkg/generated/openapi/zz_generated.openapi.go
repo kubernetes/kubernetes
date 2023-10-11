@@ -51996,7 +51996,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachController
 					},
 					"ReconcilerSyncLoopPeriod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop wait between successive executions. Is set to 5 sec by default.",
+							Description: "ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop wait between successive executions. Is set to 60 sec by default.",
 							Default:     0,
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
