@@ -199,7 +199,7 @@ func (s *strategy[ObjectType]) ReviseIfNeeded(objectOps objectLocalOps[ObjectTyp
 // shouldUpdateSpec inspects the auto-update annotation key and generation field to determine
 // whether the config object should be auto-updated.
 func shouldUpdateSpec(accessor metav1.Object) bool {
-	value, _ := accessor.GetAnnotations()[flowcontrolv1.AutoUpdateAnnotationKey]
+	value := accessor.GetAnnotations()[flowcontrolv1.AutoUpdateAnnotationKey]
 	if autoUpdate, err := strconv.ParseBool(value); err == nil {
 		return autoUpdate
 	}

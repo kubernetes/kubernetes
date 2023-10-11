@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
@@ -1290,9 +1291,7 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 		concurrencyShares: 0,
 		errExpected:       errExpectedFn("nominalConcurrencyShares"),
 	}, {
-		// let's simulate a post v1beta3 version, we expect the
-		// error to return the new field introduced in v1beta3.
-		requestVersion:    schema.GroupVersion{Group: flowcontrolv1beta3.GroupName, Version: "v1"},
+		requestVersion:    flowcontrolv1.SchemeGroupVersion,
 		concurrencyShares: 0,
 		errExpected:       errExpectedFn("nominalConcurrencyShares"),
 	}, {
@@ -1395,7 +1394,7 @@ func TestValidateLimitedPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 			}
 			specPath := field.NewPath("spec").Child("limited")
 
-			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, flowcontrolv1beta3.SchemeGroupVersion, specPath)
+			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, flowcontrolv1.SchemeGroupVersion, specPath)
 			if !cmp.Equal(test.errExpected, errGot) {
 				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
 			}

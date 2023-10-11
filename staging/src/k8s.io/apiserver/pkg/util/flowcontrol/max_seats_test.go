@@ -129,7 +129,9 @@ func Test_GetMaxSeats(t *testing.T) {
 					},
 				},
 			}
-			c.digestConfigObjects([]*flowcontrolv1.PriorityLevelConfiguration{testPriorityLevel}, nil)
+			if _, err := c.digestConfigObjects([]*flowcontrolv1.PriorityLevelConfiguration{testPriorityLevel}, nil); err != nil {
+				t.Errorf("unexpected error from digestConfigObjects: %v", err)
+			}
 			maxSeats := c.GetMaxSeats("test-pl")
 			if maxSeats != testcase.expectedMaxSeats {
 				t.Errorf("unexpected max seats, got=%d, want=%d", maxSeats, testcase.expectedMaxSeats)
