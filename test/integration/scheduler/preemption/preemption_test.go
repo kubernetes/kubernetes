@@ -1648,8 +1648,6 @@ func TestPreferNominatedNode(t *testing.T) {
 // TestReadWriteOncePodPreemption tests preemption scenarios for pods with
 // ReadWriteOncePod PVCs.
 func TestReadWriteOncePodPreemption(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
-
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),

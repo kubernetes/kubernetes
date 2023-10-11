@@ -1653,33 +1653,20 @@ var allowedTemplateObjectMetaFields = map[string]bool{
 
 // PersistentVolumeSpecValidationOptions contains the different settings for PeristentVolume validation
 type PersistentVolumeSpecValidationOptions struct {
-	// Allow spec to contain the "ReadWiteOncePod" access mode
-	AllowReadWriteOncePod bool
 }
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = apimachineryvalidation.NameIsDNSSubdomain
 
-var supportedAccessModes = sets.NewString(string(core.ReadWriteOnce), string(core.ReadOnlyMany), string(core.ReadWriteMany))
+var supportedAccessModes = sets.NewString(string(core.ReadWriteOnce), string(core.ReadOnlyMany), string(core.ReadWriteMany), string(core.ReadWriteOncePod))
 
 var supportedReclaimPolicy = sets.NewString(string(core.PersistentVolumeReclaimDelete), string(core.PersistentVolumeReclaimRecycle), string(core.PersistentVolumeReclaimRetain))
 
 var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), string(core.PersistentVolumeFilesystem))
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
-	opts := PersistentVolumeSpecValidationOptions{
-		AllowReadWriteOncePod: utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
-	}
-	if oldPv == nil {
-		// If there's no old PV, use the options based solely on feature enablement
-		return opts
-	}
-	if helper.ContainsAccessMode(oldPv.Spec.AccessModes, core.ReadWriteOncePod) {
-		// If the old object allowed "ReadWriteOncePod", continue to allow it in the new object
-		opts.AllowReadWriteOncePod = true
-	}
-	return opts
+	return PersistentVolumeSpecValidationOptions{}
 }
 
 func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName string, validateInlinePersistentVolumeSpec bool, fldPath *field.Path, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
@@ -1701,15 +1688,10 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 		allErrs = append(allErrs, field.Required(fldPath.Child("accessModes"), ""))
 	}
 
-	expandedSupportedAccessModes := sets.StringKeySet(supportedAccessModes)
-	if opts.AllowReadWriteOncePod {
-		expandedSupportedAccessModes.Insert(string(core.ReadWriteOncePod))
-	}
-
 	foundReadWriteOncePod, foundNonReadWriteOncePod := false, false
 	for _, mode := range pvSpec.AccessModes {
-		if !expandedSupportedAccessModes.Has(string(mode)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, expandedSupportedAccessModes.List()))
+		if !supportedAccessModes.Has(string(mode)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, supportedAccessModes.List()))
 		}
 
 		if mode == core.ReadWriteOncePod {
@@ -2016,8 +1998,6 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) f
 }
 
 type PersistentVolumeClaimSpecValidationOptions struct {
-	// Allow spec to contain the "ReadWiteOncePod" access mode
-	AllowReadWriteOncePod bool
 	// Allow users to recover from previously failing expansion operation
 	EnableRecoverFromExpansionFailure bool
 	// Allow to validate the label value of the label selector
@@ -2028,7 +2008,6 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
-		AllowReadWriteOncePod:             utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 		AllowInvalidLabelValueInSelector:  false,
 	}
@@ -2048,11 +2027,6 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 		opts.AllowInvalidLabelValueInSelector = true
 	}
 
-	if helper.ContainsAccessMode(oldPvc.Spec.AccessModes, core.ReadWriteOncePod) {
-		// If the old object allowed "ReadWriteOncePod", continue to allow it in the new object
-		opts.AllowReadWriteOncePod = true
-	}
-
 	if helper.ClaimContainsAllocatedResources(oldPvc) ||
 		helper.ClaimContainsAllocatedResourceStatus(oldPvc) {
 		opts.EnableRecoverFromExpansionFailure = true
@@ -2062,7 +2036,6 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 
 func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTemplate *core.PersistentVolumeClaimTemplate) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
-		AllowReadWriteOncePod:            utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		AllowInvalidLabelValueInSelector: false,
 	}
 	if oldClaimTemplate == nil {
@@ -2075,10 +2048,6 @@ func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTe
 	if len(unversionedvalidation.ValidateLabelSelector(oldClaimTemplate.Spec.Selector, labelSelectorValidationOpts, nil)) > 0 {
 		// If the old object had an invalid label selector, continue to allow it in the new object
 		opts.AllowInvalidLabelValueInSelector = true
-	}
-	if helper.ContainsAccessMode(oldClaimTemplate.Spec.AccessModes, core.ReadWriteOncePod) {
-		// If the old object allowed "ReadWriteOncePod", continue to allow it in the new object
-		opts.AllowReadWriteOncePod = true
 	}
 	return opts
 }
@@ -2172,15 +2141,10 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
 	}
 
-	expandedSupportedAccessModes := sets.StringKeySet(supportedAccessModes)
-	if opts.AllowReadWriteOncePod {
-		expandedSupportedAccessModes.Insert(string(core.ReadWriteOncePod))
-	}
-
 	foundReadWriteOncePod, foundNonReadWriteOncePod := false, false
 	for _, mode := range spec.AccessModes {
-		if !expandedSupportedAccessModes.Has(string(mode)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, expandedSupportedAccessModes.List()))
+		if !supportedAccessModes.Has(string(mode)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, supportedAccessModes.List()))
 		}
 
 		if mode == core.ReadWriteOncePod {
