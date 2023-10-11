@@ -1,6 +1,6 @@
 ### Version 9.1.8 (Tue September 19 2023 Sertac Ozercan <sozercan@gmail.com>)
 - Update kubectl to v1.28.2.
-- Update base image to debian-base:v2.0.0.
+- Update base image to debian-base:bookworm-v1.0.0.
 
 ### Version 9.1.7 (Thu May 15 2023 Paco Xu <paco.xu@daocloud.io>)
 - Update kubectl to v1.27.1.
