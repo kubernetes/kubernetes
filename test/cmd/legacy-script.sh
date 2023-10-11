@@ -519,6 +519,14 @@ runTests() {
   fi
 
   #########################
+  # Ambiguous short name  #
+  #########################
+
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+    record_command run_ambiguous_shortname_tests
+  fi
+
+  #########################
   # Assert categories     #
   #########################
 
