@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 type osDescriptionProvider func() (string, error)
@@ -63,7 +63,7 @@ func (osDescriptionDetector) Detect(ctx context.Context) (*Resource, error) {
 
 	return NewWithAttributes(
 		semconv.SchemaURL,
-		semconv.OSDescriptionKey.String(description),
+		semconv.OSDescription(description),
 	), nil
 }
 

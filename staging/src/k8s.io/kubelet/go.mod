@@ -7,8 +7,8 @@ go 1.20
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/gogo/protobuf v1.3.2
-	github.com/stretchr/testify v1.8.2
-	google.golang.org/grpc v1.54.0
+	github.com/stretchr/testify v1.8.3
+	google.golang.org/grpc v1.55.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
