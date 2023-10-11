@@ -4650,9 +4650,6 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		hostname string
 	}
 
-	cluster := v1.ServiceInternalTrafficPolicyCluster
-	local := v1.ServiceInternalTrafficPolicyLocal
-
 	testCases := []struct {
 		name                     string
 		internalTrafficPolicy    *v1.ServiceInternalTrafficPolicy
@@ -4664,7 +4661,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 	}{
 		{
 			name:                  "internalTrafficPolicy is cluster with non-zero local endpoints",
-			internalTrafficPolicy: &cluster,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -4681,7 +4678,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		},
 		{
 			name:                  "internalTrafficPolicy is cluster with zero local endpoints",
-			internalTrafficPolicy: &cluster,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
 				{"10.0.1.2", "host1"},
@@ -4698,7 +4695,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		},
 		{
 			name:                  "internalTrafficPolicy is local with non-zero local endpoints",
-			internalTrafficPolicy: &local,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -4713,7 +4710,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		},
 		{
 			name:                  "internalTrafficPolicy is local with zero local endpoints",
-			internalTrafficPolicy: &local,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
 				{"10.0.1.2", "host1"},
@@ -4831,8 +4828,6 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
 
-	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
-
 	serviceName := "svc1"
 	// Add initial service
 	namespaceName := "ns1"
@@ -4843,7 +4838,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
-			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
+			InternalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			ExternalIPs: []string{
 				"1.2.3.4",
 			},
@@ -5006,8 +5001,6 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
 
-	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
-
 	serviceName := "svc1"
 	// Add initial service
 	namespaceName := "ns1"
@@ -5018,7 +5011,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
-			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
+			InternalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			ExternalIPs: []string{
 				"1.2.3.4",
 			},
@@ -5180,8 +5173,6 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
 
-	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
-
 	// Add initial service
 	serviceName := "svc1"
 	namespaceName := "ns1"
@@ -5192,7 +5183,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
-			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
+			InternalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			ExternalIPs: []string{
 				"1.2.3.4",
 			},
@@ -5354,8 +5345,6 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
 
-	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
-
 	// Add initial service
 	serviceName := "svc1"
 	namespaceName := "ns1"
@@ -5366,7 +5355,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
-			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
+			InternalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			ExternalIPs: []string{
 				"1.2.3.4",
 			},
@@ -5610,8 +5599,6 @@ func TestNoEndpointsMetric(t *testing.T) {
 		hostname string
 	}
 
-	internalTrafficPolicyLocal := v1.ServiceInternalTrafficPolicyLocal
-	externalTrafficPolicyLocal := v1.ServiceExternalTrafficPolicyLocal
 	metrics.RegisterMetrics()
 
 	testCases := []struct {
@@ -5624,7 +5611,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 	}{
 		{
 			name:                  "internalTrafficPolicy is set and there are local endpoints",
-			internalTrafficPolicy: &internalTrafficPolicyLocal,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -5633,7 +5620,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		},
 		{
 			name:                  "externalTrafficPolicy is set and there are local endpoints",
-			externalTrafficPolicy: externalTrafficPolicyLocal,
+			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -5642,8 +5629,8 @@ func TestNoEndpointsMetric(t *testing.T) {
 		},
 		{
 			name:                  "both policies are set and there are local endpoints",
-			internalTrafficPolicy: &internalTrafficPolicyLocal,
-			externalTrafficPolicy: externalTrafficPolicyLocal,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
+			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -5652,7 +5639,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		},
 		{
 			name:                  "internalTrafficPolicy is set and there are no local endpoints",
-			internalTrafficPolicy: &internalTrafficPolicyLocal,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
 				{"10.0.1.2", "host1"},
@@ -5662,7 +5649,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		},
 		{
 			name:                  "externalTrafficPolicy is set and there are no local endpoints",
-			externalTrafficPolicy: externalTrafficPolicyLocal,
+			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
 				{"10.0.1.2", "host1"},
@@ -5672,8 +5659,8 @@ func TestNoEndpointsMetric(t *testing.T) {
 		},
 		{
 			name:                  "Both policies are set and there are no local endpoints",
-			internalTrafficPolicy: &internalTrafficPolicyLocal,
-			externalTrafficPolicy: externalTrafficPolicyLocal,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
+			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
 				{"10.0.1.2", "host1"},
@@ -5684,8 +5671,8 @@ func TestNoEndpointsMetric(t *testing.T) {
 		},
 		{
 			name:                  "Both policies are set and there are no endpoints at all",
-			internalTrafficPolicy: &internalTrafficPolicyLocal,
-			externalTrafficPolicy: externalTrafficPolicyLocal,
+			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
+			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints:             []endpoint{},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 0,
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 0,
