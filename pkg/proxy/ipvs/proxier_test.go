@@ -5797,9 +5797,6 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 }
 
 func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
-	ipModeProxy := v1.LoadBalancerIPModeProxy
-	ipModeVIP := v1.LoadBalancerIPModeVIP
-
 	testCases := []struct {
 		name             string
 		ipModeEnabled    bool
@@ -5814,7 +5811,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 			ipModeEnabled:    false,
 			svcIP:            "10.20.30.41",
 			svcLBIP:          "1.2.3.4",
-			ipMode:           &ipModeProxy,
+			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
 			expectedServices: 2,
 		},
 		{
@@ -5822,7 +5819,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 			ipModeEnabled:    false,
 			svcIP:            "10.20.30.42",
 			svcLBIP:          "1.2.3.5",
-			ipMode:           &ipModeVIP,
+			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
 			expectedServices: 2,
 		},
 		{
@@ -5839,7 +5836,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 			ipModeEnabled:    true,
 			svcIP:            "10.20.30.41",
 			svcLBIP:          "1.2.3.4",
-			ipMode:           &ipModeProxy,
+			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
 			expectedServices: 1,
 		},
 		{
@@ -5847,7 +5844,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 			ipModeEnabled:    true,
 			svcIP:            "10.20.30.42",
 			svcLBIP:          "1.2.3.5",
-			ipMode:           &ipModeVIP,
+			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
 			expectedServices: 2,
 		},
 		{
