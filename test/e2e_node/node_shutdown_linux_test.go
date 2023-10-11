@@ -134,7 +134,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			})
 
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			list, err = e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
 				FieldSelector: nodeSelector,
@@ -142,7 +142,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			if err != nil {
 				framework.Failf("Failed to start batch pod: %q", err)
 			}
-			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			for _, pod := range list.Items {
 				framework.Logf("Pod (%v/%v) status conditions: %q", pod.Namespace, pod.Name, &pod.Status.Conditions)
@@ -168,7 +168,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				if err != nil {
 					return err
 				}
-				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+				gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
 					if !isPodShutdown(&pod) {
@@ -236,7 +236,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				FieldSelector: nodeSelector,
 			})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -286,7 +286,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				if err != nil {
 					return err
 				}
-				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+				gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
 					if kubelettypes.IsCriticalPod(&pod) {
@@ -313,7 +313,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				if err != nil {
 					return err
 				}
-				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+				gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
 					if !isPodShutdown(&pod) {
@@ -514,7 +514,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				FieldSelector: nodeSelector,
 			})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			ginkgo.By("Verifying batch pods are running")
 			for _, pod := range list.Items {
@@ -537,7 +537,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 					if err != nil {
 						return err
 					}
-					framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+					gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 					for _, pod := range list.Items {
 						shouldShutdown := false
 						for _, podName := range step {
@@ -628,10 +628,14 @@ func getGracePeriodOverrideTestPod(name string, node string, gracePeriod int64, 
 			kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 		}
 		pod.Spec.PriorityClassName = priorityClassName
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
+		if !kubelettypes.IsCriticalPod(pod) {
+			framework.Failf("pod %q should be a critical pod", pod.Name)
+		}
 	} else {
 		pod.Spec.PriorityClassName = priorityClassName
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
+		if kubelettypes.IsCriticalPod(pod) {
+			framework.Failf("pod %q should not be a critical pod", pod.Name)
+		}
 	}
 	return pod
 }
@@ -650,7 +654,7 @@ func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	framework.ExpectEqual(len(nodeList.Items), 1)
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
 	return isNodeReady(&nodeList.Items[0])
 }
 

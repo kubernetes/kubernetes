@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -128,7 +129,7 @@ done`, testCmd)
 
 	// Verify Pod affinity colocated the Pods.
 	loader := getRunningLoaderPod(ctx, nsName, clientset)
-	framework.ExpectEqual(pod.Spec.NodeName, loader.Spec.NodeName)
+	gomega.Expect(pod.Spec.NodeName).To(gomega.Equal(loader.Spec.NodeName))
 
 	return pod
 }

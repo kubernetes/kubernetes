@@ -293,13 +293,6 @@ func (f *FailureError) backtrace() {
 //	}
 var ErrFailure error = FailureError{}
 
-// ExpectEqual expects the specified two are the same, otherwise an exception raises
-//
-// Deprecated: use gomega.Expect().To(gomega.Equal())
-func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
-}
-
 // ExpectNotEqual expects the specified two are not the same, otherwise an exception raises
 //
 // Deprecated: use gomega.Expect().ToNot(gomega.Equal())

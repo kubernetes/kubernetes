@@ -280,7 +280,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		currentNUMANodeIDs, err := cpuset.Parse(strings.Trim(output, "\n"))
 		framework.ExpectNoError(err)
 
-		framework.ExpectEqual(numaNodeIDs, currentNUMANodeIDs.List())
+		gomega.Expect(numaNodeIDs).To(gomega.Equal(currentNUMANodeIDs.List()))
 	}
 
 	waitingForHugepages := func(ctx context.Context, hugepagesCount int) {
@@ -394,16 +394,16 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			framework.ExpectNoError(err)
 
 			stateAllocatableMemory := getAllocatableMemoryFromStateFile(stateData)
-			framework.ExpectEqual(len(resp.Memory), len(stateAllocatableMemory))
+			gomega.Expect(resp.Memory).To(gomega.HaveLen(len(stateAllocatableMemory)))
 
 			for _, containerMemory := range resp.Memory {
 				gomega.Expect(containerMemory.Topology).NotTo(gomega.BeNil())
-				framework.ExpectEqual(len(containerMemory.Topology.Nodes), 1)
+				gomega.Expect(containerMemory.Topology.Nodes).To(gomega.HaveLen(1))
 				gomega.Expect(containerMemory.Topology.Nodes[0]).NotTo(gomega.BeNil())
 
 				numaNodeID := int(containerMemory.Topology.Nodes[0].ID)
 				for _, numaStateMemory := range stateAllocatableMemory {
-					framework.ExpectEqual(len(numaStateMemory.NUMAAffinity), 1)
+					gomega.Expect(numaStateMemory.NUMAAffinity).To(gomega.HaveLen(1))
 					if numaNodeID != numaStateMemory.NUMAAffinity[0] {
 						continue
 					}
