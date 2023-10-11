@@ -115,6 +115,8 @@ func (in *KubeProxyConntrackConfiguration) DeepCopyInto(out *KubeProxyConntrackC
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	out.UDPTimeout = in.UDPTimeout
+	out.UDPStreamTimeout = in.UDPStreamTimeout
 	return
 }
 
