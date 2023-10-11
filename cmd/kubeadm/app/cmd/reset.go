@@ -108,7 +108,10 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 	var initCfg *kubeadmapi.InitConfiguration
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal ResetConfiguration and validates cfg.
-	resetCfg, err := configutil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalcfg, allowExperimental, opts.skipCRIDetect)
+	resetCfg, err := configutil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalcfg, configutil.LoadOrDefaultConfigurationOptions{
+		AllowExperimental: allowExperimental,
+		SkipCRIDetect:     opts.skipCRIDetect,
+	})
 	if err != nil {
 		return nil, err
 	}

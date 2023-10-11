@@ -90,7 +90,11 @@ kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), certDir, const
 				return
 			}
 
-			obj, err := LoadInitConfigurationFromFile(cfgPath, true)
+			opts := LoadOrDefaultConfigurationOptions{
+				SkipCRIDetect: true,
+			}
+
+			obj, err := LoadInitConfigurationFromFile(cfgPath, opts)
 			if rt.expectErr {
 				if err == nil {
 					t.Error("Unexpected success")

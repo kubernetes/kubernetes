@@ -242,7 +242,9 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
 
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg, true /* skipCRIDetect */)
+	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg, configutil.LoadOrDefaultConfigurationOptions{
+		SkipCRIDetect: true,
+	})
 	if err != nil {
 		return err
 	}

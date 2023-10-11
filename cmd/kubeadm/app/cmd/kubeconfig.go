@@ -82,7 +82,9 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 		Example: userKubeconfigExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// This call returns the ready-to-use configuration based on the defaults populated by flags
-			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg, true /* skipCRIDetect */)
+			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg, configutil.LoadOrDefaultConfigurationOptions{
+				SkipCRIDetect: true,
+			})
 			if err != nil {
 				return err
 			}
