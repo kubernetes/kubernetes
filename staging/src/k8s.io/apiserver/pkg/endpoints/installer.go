@@ -886,7 +886,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", producedObject).
 				// Patch can return 201 when a server side apply is requested
 				Returns(http.StatusCreated, "Created", producedObject).
-				Reads(metav1.Patch{}).
+				Reads(defaultVersionedObject).
 				Writes(producedObject)
 			if err := AddObjectParams(ws, route, versionedPatchOptions); err != nil {
 				return nil, nil, err
