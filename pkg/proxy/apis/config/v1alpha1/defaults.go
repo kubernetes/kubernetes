@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {

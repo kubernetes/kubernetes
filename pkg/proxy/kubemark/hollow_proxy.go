@@ -38,7 +38,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )

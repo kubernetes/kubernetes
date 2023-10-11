@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 

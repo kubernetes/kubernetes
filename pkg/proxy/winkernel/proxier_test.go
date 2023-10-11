@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	fakehcn "k8s.io/kubernetes/pkg/proxy/winkernel/testing"
 	netutils "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
