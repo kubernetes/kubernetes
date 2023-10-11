@@ -195,7 +195,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String(""),
+			Name:     ptr.To(""),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -204,13 +204,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
 			Conditions: discovery.EndpointConditions{
-				Ready:       pointer.Bool(true),
-				Serving:     pointer.Bool(true),
-				Terminating: pointer.Bool(false),
+				Ready:       ptr.To(true),
+				Serving:     ptr.To(true),
+				Terminating: ptr.To(false),
 			},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String(""),
+			Name:     ptr.To(""),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -219,13 +219,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
 			Conditions: discovery.EndpointConditions{
-				Ready:       pointer.Bool(false),
-				Serving:     pointer.Bool(true),
-				Terminating: pointer.Bool(true),
+				Ready:       ptr.To(false),
+				Serving:     ptr.To(true),
+				Terminating: ptr.To(true),
 			},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String(""),
+			Name:     ptr.To(""),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -236,7 +236,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String(""),
+			Name:     ptr.To(""),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -247,7 +247,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -257,7 +257,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -267,7 +267,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11-2"),
+			Name:     ptr.To("p11-2"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -277,7 +277,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(22),
 			Protocol: &udp,
 		}}
@@ -290,11 +290,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}, {
-			Name:     pointer.String("p12"),
+			Name:     ptr.To("p12"),
 			Port:     pointer.Int32(12),
 			Protocol: &udp,
 		}}
@@ -304,7 +304,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -314,7 +314,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.2"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p12"),
+			Name:     ptr.To("p12"),
 			Port:     pointer.Int32(12),
 			Protocol: &udp,
 		}}
@@ -324,7 +324,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -335,7 +335,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p12"),
+			Name:     ptr.To("p12"),
 			Port:     pointer.Int32(12),
 			Protocol: &udp,
 		}}
@@ -346,11 +346,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}, {
-			Name:     pointer.String("p12"),
+			Name:     ptr.To("p12"),
 			Port:     pointer.Int32(12),
 			Protocol: &udp,
 		}}
@@ -360,7 +360,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.3"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p13"),
+			Name:     ptr.To("p13"),
 			Port:     pointer.Int32(13),
 			Protocol: &udp,
 		}}
@@ -373,11 +373,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}, {
-			Name:     pointer.String("p12"),
+			Name:     ptr.To("p12"),
 			Port:     pointer.Int32(12),
 			Protocol: &udp,
 		}}
@@ -390,11 +390,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p13"),
+			Name:     ptr.To("p13"),
 			Port:     pointer.Int32(13),
 			Protocol: &udp,
 		}, {
-			Name:     pointer.String("p14"),
+			Name:     ptr.To("p14"),
 			Port:     pointer.Int32(14),
 			Protocol: &udp,
 		}}
@@ -407,11 +407,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p21"),
+			Name:     ptr.To("p21"),
 			Port:     pointer.Int32(21),
 			Protocol: &udp,
 		}, {
-			Name:     pointer.String("p22"),
+			Name:     ptr.To("p22"),
 			Port:     pointer.Int32(22),
 			Protocol: &udp,
 		}}
@@ -421,7 +421,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -435,7 +435,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p22"),
+			Name:     ptr.To("p22"),
 			Port:     pointer.Int32(22),
 			Protocol: &udp,
 		}}
@@ -446,7 +446,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p23"),
+			Name:     ptr.To("p23"),
 			Port:     pointer.Int32(23),
 			Protocol: &udp,
 		}}
@@ -460,7 +460,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p44"),
+			Name:     ptr.To("p44"),
 			Port:     pointer.Int32(44),
 			Protocol: &udp,
 		}}
@@ -471,7 +471,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p45"),
+			Name:     ptr.To("p45"),
 			Port:     pointer.Int32(45),
 			Protocol: &udp,
 		}}
@@ -483,7 +483,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.11"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p11"),
+			Name:     ptr.To("p11"),
 			Port:     pointer.Int32(11),
 			Protocol: &udp,
 		}}
@@ -493,11 +493,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.2"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p12"),
+			Name:     ptr.To("p12"),
 			Port:     pointer.Int32(12),
 			Protocol: &udp,
 		}, {
-			Name:     pointer.String("p122"),
+			Name:     ptr.To("p122"),
 			Port:     pointer.Int32(122),
 			Protocol: &udp,
 		}}
@@ -507,7 +507,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"3.3.3.3"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p33"),
+			Name:     ptr.To("p33"),
 			Port:     pointer.Int32(33),
 			Protocol: &udp,
 		}}
@@ -518,7 +518,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     pointer.String("p44"),
+			Name:     ptr.To("p44"),
 			Port:     pointer.Int32(44),
 			Protocol: &udp,
 		}}
@@ -1216,7 +1216,7 @@ func TestLastChangeTriggerTime(t *testing.T) {
 				Addresses: []string{"1.1.1.1"},
 			}},
 			Ports: []discovery.EndpointPort{{
-				Name:     pointer.String("p11"),
+				Name:     ptr.To("p11"),
 				Port:     pointer.Int32(11),
 				Protocol: &tcp,
 			}},

@@ -371,7 +371,7 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints:   []discovery.Endpoint{},
 		Ports: []discovery.EndpointPort{{
-			Name:     pointer.String(fmt.Sprintf("%d", epPort)),
+			Name:     ptr.To(fmt.Sprintf("%d", epPort)),
 			Port:     pointer.Int32(int32(epPort)),
 			Protocol: &tcpProtocol,
 		}},

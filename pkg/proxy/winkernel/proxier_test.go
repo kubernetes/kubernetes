@@ -221,7 +221,7 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
+				Name:     ptr.To(svcPortName.Port),
 				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -287,7 +287,7 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
+				Name:     ptr.To(svcPortName.Port),
 				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -369,7 +369,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
+				Name:     ptr.To(svcPortName1.Port),
 				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
@@ -380,7 +380,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName2.Port),
+				Name:     ptr.To(svcPortName2.Port),
 				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
@@ -428,7 +428,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName2.Port),
+				Name:     ptr.To(svcPortName2.Port),
 				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
@@ -513,7 +513,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
+				Name:     ptr.To(svcPortName1.Port),
 				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
@@ -524,7 +524,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName2.Port),
+				Name:     ptr.To(svcPortName2.Port),
 				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
@@ -583,7 +583,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
+				Name:     ptr.To(svcPortName1.Port),
 				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
@@ -594,12 +594,12 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
+				Name:     ptr.To(svcPortName1.Port),
 				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			},
 				{
-					Name:     pointer.String("p443"),
+					Name:     ptr.To("p443"),
 					Port:     pointer.Int32(int32(443)),
 					Protocol: &tcpProtocol,
 				}}
@@ -668,7 +668,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
+				Name:     ptr.To(svcPortName.Port),
 				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -729,10 +729,10 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIpAddressRemote},
-				NodeName:  pointer.String("testhost"),
+				NodeName:  ptr.To("testhost"),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
+				Name:     ptr.To(svcPortName.Port),
 				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -809,10 +809,10 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIpAddressRemote},
-				NodeName:  pointer.StringPtr("testhost2"), // This will make this endpoint as a remote endpoint
+				NodeName:  ptr.To("testhost2"), // This will make this endpoint as a remote endpoint
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.StringPtr(svcPortName.Port),
+				Name:     ptr.To(svcPortName.Port),
 				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -892,8 +892,8 @@ func TestEndpointSlice(t *testing.T) {
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"192.168.2.3"},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-			NodeName:   pointer.String("testhost2"),
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+			NodeName:   ptr.To("testhost2"),
 		}},
 	}
 

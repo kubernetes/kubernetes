@@ -318,8 +318,8 @@ func TestEsInfoChanged(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
 	tcpProto := v1.ProtocolTCP
-	port80 := discovery.EndpointPort{Port: &p80, Name: pointer.String("http"), Protocol: &tcpProto}
-	port443 := discovery.EndpointPort{Port: &p443, Name: pointer.String("https"), Protocol: &tcpProto}
+	port80 := discovery.EndpointPort{Port: &p80, Name: ptr.To("http"), Protocol: &tcpProto}
+	port443 := discovery.EndpointPort{Port: &p443, Name: ptr.To("https"), Protocol: &tcpProto}
 	endpoint1 := discovery.Endpoint{Addresses: []string{"10.0.1.0"}}
 	endpoint2 := discovery.Endpoint{Addresses: []string{"10.0.1.1"}}
 
@@ -469,7 +469,7 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 
 	for i, portNum := range portNums {
 		endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-			Name:     pointer.String(fmt.Sprintf("port-%d", i)),
+			Name:     ptr.To(fmt.Sprintf("port-%d", i)),
 			Port:     portNum,
 			Protocol: &tcpProtocol,
 		})
@@ -479,9 +479,9 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 		readyCondition := i%unreadyMod != 0
 		terminatingCondition := i%terminatingMod == 0
 
-		ready := pointer.Bool(readyCondition && !terminatingCondition)
-		serving := pointer.Bool(readyCondition)
-		terminating := pointer.Bool(terminatingCondition)
+		ready := ptr.To(readyCondition && !terminatingCondition)
+		serving := ptr.To(readyCondition)
+		terminating := ptr.To(terminatingCondition)
 
 		endpoint := discovery.Endpoint{
 			Addresses: []string{fmt.Sprintf("10.0.%d.%d", offset, i)},

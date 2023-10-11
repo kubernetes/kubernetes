@@ -66,7 +66,7 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 		obj.IPTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
 	}
 	if obj.IPTables.LocalhostNodePorts == nil {
-		obj.IPTables.LocalhostNodePorts = pointer.Bool(true)
+		obj.IPTables.LocalhostNodePorts = ptr.To(true)
 	}
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
