@@ -185,7 +185,6 @@ func makeTestEndpointSlice(namespace, name string, slice int, epsFunc func(*disc
 
 func TestUpdateEndpointsMap(t *testing.T) {
 	var nodeName = testHostname
-	udp := v1.ProtocolUDP
 
 	emptyEndpoint := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{}
@@ -197,7 +196,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	unnamedPortReady := func(eps *discovery.EndpointSlice) {
@@ -212,7 +211,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	unnamedPortTerminating := func(eps *discovery.EndpointSlice) {
@@ -227,7 +226,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	unnamedPortLocal := func(eps *discovery.EndpointSlice) {
@@ -238,7 +237,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To(""),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	namedPortLocal := func(eps *discovery.EndpointSlice) {
@@ -249,7 +248,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	namedPort := func(eps *discovery.EndpointSlice) {
@@ -259,7 +258,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	namedPortRenamed := func(eps *discovery.EndpointSlice) {
@@ -269,7 +268,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11-2"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	namedPortRenumbered := func(eps *discovery.EndpointSlice) {
@@ -279,7 +278,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](22),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	namedPortsLocalNoLocal := func(eps *discovery.EndpointSlice) {
@@ -292,11 +291,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsets_s1 := func(eps *discovery.EndpointSlice) {
@@ -306,7 +305,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsets_s2 := func(eps *discovery.EndpointSlice) {
@@ -316,7 +315,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsWithLocal_s1 := func(eps *discovery.EndpointSlice) {
@@ -326,7 +325,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsWithLocal_s2 := func(eps *discovery.EndpointSlice) {
@@ -337,7 +336,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsMultiplePortsLocal_s1 := func(eps *discovery.EndpointSlice) {
@@ -348,11 +347,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsMultiplePortsLocal_s2 := func(eps *discovery.EndpointSlice) {
@@ -362,7 +361,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
 			Port:     ptr.To[int32](13),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsIPsPorts1_s1 := func(eps *discovery.EndpointSlice) {
@@ -375,11 +374,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsIPsPorts1_s2 := func(eps *discovery.EndpointSlice) {
@@ -392,11 +391,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
 			Port:     ptr.To[int32](13),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p14"),
 			Port:     ptr.To[int32](14),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsIPsPorts2 := func(eps *discovery.EndpointSlice) {
@@ -409,11 +408,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
 			Port:     ptr.To[int32](21),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p22"),
 			Port:     ptr.To[int32](22),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexBefore1 := func(eps *discovery.EndpointSlice) {
@@ -423,7 +422,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexBefore2_s1 := func(eps *discovery.EndpointSlice) {
@@ -437,7 +436,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
 			Port:     ptr.To[int32](22),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexBefore2_s2 := func(eps *discovery.EndpointSlice) {
@@ -448,7 +447,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
 			Port:     ptr.To[int32](23),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexBefore4_s1 := func(eps *discovery.EndpointSlice) {
@@ -462,7 +461,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
 			Port:     ptr.To[int32](44),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexBefore4_s2 := func(eps *discovery.EndpointSlice) {
@@ -473,7 +472,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
 			Port:     ptr.To[int32](45),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexAfter1_s1 := func(eps *discovery.EndpointSlice) {
@@ -485,7 +484,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexAfter1_s2 := func(eps *discovery.EndpointSlice) {
@@ -495,11 +494,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p122"),
 			Port:     ptr.To[int32](122),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexAfter3 := func(eps *discovery.EndpointSlice) {
@@ -509,7 +508,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p33"),
 			Port:     ptr.To[int32](33),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexAfter4 := func(eps *discovery.EndpointSlice) {
@@ -520,7 +519,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
 			Port:     ptr.To[int32](44),
-			Protocol: &udp,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 
@@ -1199,7 +1198,6 @@ func TestLastChangeTriggerTime(t *testing.T) {
 	t3 := t2.Add(time.Second)
 
 	createEndpoints := func(namespace, name string, triggerTime time.Time) *discovery.EndpointSlice {
-		tcp := v1.ProtocolTCP
 		return &discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -1218,7 +1216,7 @@ func TestLastChangeTriggerTime(t *testing.T) {
 			Ports: []discovery.EndpointPort{{
 				Name:     ptr.To("p11"),
 				Port:     ptr.To[int32](11),
-				Protocol: &tcp,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}},
 		}
 	}

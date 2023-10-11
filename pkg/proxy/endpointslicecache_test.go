@@ -317,9 +317,8 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 func TestEsInfoChanged(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
-	tcpProto := v1.ProtocolTCP
-	port80 := discovery.EndpointPort{Port: &p80, Name: ptr.To("http"), Protocol: &tcpProto}
-	port443 := discovery.EndpointPort{Port: &p443, Name: ptr.To("https"), Protocol: &tcpProto}
+	port80 := discovery.EndpointPort{Port: &p80, Name: ptr.To("http"), Protocol: ptr.To(v1.ProtocolTCP)}
+	port443 := discovery.EndpointPort{Port: &p443, Name: ptr.To("https"), Protocol: ptr.To(v1.ProtocolTCP)}
 	endpoint1 := discovery.Endpoint{Addresses: []string{"10.0.1.0"}}
 	endpoint2 := discovery.Endpoint{Addresses: []string{"10.0.1.1"}}
 
@@ -454,8 +453,6 @@ func TestEsInfoChanged(t *testing.T) {
 }
 
 func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, offset, numEndpoints, unreadyMod int, terminatingMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
-	tcpProtocol := v1.ProtocolTCP
-
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%d", serviceName, sliceNum),
@@ -471,7 +468,7 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 		endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
 			Name:     ptr.To(fmt.Sprintf("port-%d", i)),
 			Port:     portNum,
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		})
 	}
 

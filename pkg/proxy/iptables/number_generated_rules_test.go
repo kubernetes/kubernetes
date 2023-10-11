@@ -361,8 +361,6 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 	baseEp := netutils.BigForIP(netutils.ParseIPSloppy("172.16.0.1"))
 	epPort := 8080
 
-	tcpProtocol := v1.ProtocolTCP
-
 	eps := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ep",
@@ -373,7 +371,7 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(fmt.Sprintf("%d", epPort)),
 			Port:     ptr.To(int32(epPort)),
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 	}
 

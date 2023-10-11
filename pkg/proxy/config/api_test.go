@@ -83,7 +83,6 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
-	tcp := v1.ProtocolTCP
 	endpoints1v1 := &discoveryv1.EndpointSlice{
 		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
 		AddressType: discoveryv1.AddressTypeIPv4,
@@ -94,7 +93,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 		}},
 		Ports: []discoveryv1.EndpointPort{{
 			Port:     ptr.To[int32](8080),
-			Protocol: &tcp,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 	}
 	endpoints1v2 := &discoveryv1.EndpointSlice{
@@ -108,7 +107,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 		}},
 		Ports: []discoveryv1.EndpointPort{{
 			Port:     ptr.To[int32](8080),
-			Protocol: &tcp,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 	}
 	endpoints2 := &discoveryv1.EndpointSlice{
@@ -121,7 +120,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 		}},
 		Ports: []discoveryv1.EndpointPort{{
 			Port:     ptr.To[int32](8080),
-			Protocol: &tcp,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 	}
 

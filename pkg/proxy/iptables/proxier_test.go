@@ -60,12 +60,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// (Note that we don't use UDP ports in most of the tests here, because if you create UDP
-// services you have to deal with setting up the FakeExec correctly for the conntrack
-// cleanup calls.)
-var tcpProtocol = v1.ProtocolTCP
-var sctpProtocol = v1.ProtocolSCTP
-
 func TestDeleteEndpointConnections(t *testing.T) {
 	const (
 		UDP  = v1.ProtocolUDP
@@ -221,7 +215,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p80"),
 					Port:     ptr.To[int32](80),
-					Protocol: &tc.protocol,
+					Protocol: ptr.To(tc.protocol),
 				}}
 			})
 
@@ -1855,7 +1849,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		// create Local LoadBalancer endpoints. Note that since we aren't setting
@@ -1868,7 +1862,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		// create NodePort service endpoints
@@ -1880,7 +1874,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		// create ExternalIP service endpoints
@@ -1895,7 +1889,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		// create Cluster LoadBalancer endpoints
@@ -1907,7 +1901,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -2157,7 +2151,7 @@ func TestClusterIPGeneral(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("http"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
@@ -2176,22 +2170,22 @@ func TestClusterIPGeneral(t *testing.T) {
 				{
 					Name:     ptr.To("http"),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				},
 				{
 					Name:     ptr.To("https"),
 					Port:     ptr.To[int32](8443),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				},
 				{
 					Name:     ptr.To("dns-sctp"),
 					Port:     ptr.To[int32](53),
-					Protocol: &sctpProtocol,
+					Protocol: ptr.To(v1.ProtocolSCTP),
 				},
 				{
 					Name:     ptr.To("dns-tcp"),
 					Port:     ptr.To[int32](5353),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				},
 			}
 		}),
@@ -2315,7 +2309,7 @@ func TestLoadBalancer(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -2572,7 +2566,7 @@ func TestNodePorts(t *testing.T) {
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
 						Port:     ptr.To[int32](80),
-						Protocol: &tcpProtocol,
+						Protocol: ptr.To(v1.ProtocolTCP),
 					}}
 				}),
 			)
@@ -2837,7 +2831,7 @@ func TestExternalTrafficPolicyLocal(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -2954,7 +2948,7 @@ func TestExternalTrafficPolicyCluster(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -3397,7 +3391,6 @@ func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap,
 
 func TestUpdateEndpointsMap(t *testing.T) {
 	var nodeName = testHostname
-	udpProtocol := v1.ProtocolUDP
 
 	emptyEndpointSlices := []*discovery.EndpointSlice{
 		makeTestEndpointSlice("ns1", "ep1", 1, func(*discovery.EndpointSlice) {}),
@@ -3410,7 +3403,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	subset2 := func(eps *discovery.EndpointSlice) {
@@ -3421,7 +3414,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	namedPortLocal := []*discovery.EndpointSlice{
@@ -3435,7 +3428,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
 					Port:     ptr.To[int32](11),
-					Protocol: &udpProtocol,
+					Protocol: ptr.To(v1.ProtocolUDP),
 				}}
 			}),
 	}
@@ -3452,7 +3445,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11-2"),
 					Port:     ptr.To[int32](11),
-					Protocol: &udpProtocol,
+					Protocol: ptr.To(v1.ProtocolUDP),
 				}}
 			}),
 	}
@@ -3466,7 +3459,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
 					Port:     ptr.To[int32](22),
-					Protocol: &udpProtocol,
+					Protocol: ptr.To(v1.ProtocolUDP),
 				}}
 			}),
 	}
@@ -3483,11 +3476,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
 					Port:     ptr.To[int32](11),
-					Protocol: &udpProtocol,
+					Protocol: ptr.To(v1.ProtocolUDP),
 				}, {
 					Name:     ptr.To("p12"),
 					Port:     ptr.To[int32](12),
-					Protocol: &udpProtocol,
+					Protocol: ptr.To(v1.ProtocolUDP),
 				}}
 			}),
 	}
@@ -3504,7 +3497,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsWithLocal := []*discovery.EndpointSlice{
@@ -3520,11 +3513,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	subset3 := func(eps *discovery.EndpointSlice) {
@@ -3535,7 +3528,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
 			Port:     ptr.To[int32](13),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsMultiplePortsLocal := []*discovery.EndpointSlice{
@@ -3553,11 +3546,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	subsetMultipleIPsPorts2 := func(eps *discovery.EndpointSlice) {
@@ -3571,11 +3564,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
 			Port:     ptr.To[int32](13),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p14"),
 			Port:     ptr.To[int32](14),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	subsetMultipleIPsPorts3 := func(eps *discovery.EndpointSlice) {
@@ -3589,11 +3582,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
 			Port:     ptr.To[int32](21),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p22"),
 			Port:     ptr.To[int32](22),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	multipleSubsetsIPsPorts := []*discovery.EndpointSlice{
@@ -3613,7 +3606,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
 			Port:     ptr.To[int32](22),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexSubset2 := func(eps *discovery.EndpointSlice) {
@@ -3625,7 +3618,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
 			Port:     ptr.To[int32](23),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexSubset3 := func(eps *discovery.EndpointSlice) {
@@ -3640,7 +3633,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
 			Port:     ptr.To[int32](44),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexSubset4 := func(eps *discovery.EndpointSlice) {
@@ -3652,7 +3645,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
 			Port:     ptr.To[int32](45),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexSubset5 := func(eps *discovery.EndpointSlice) {
@@ -3665,7 +3658,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
 			Port:     ptr.To[int32](11),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexSubset6 := func(eps *discovery.EndpointSlice) {
@@ -3676,11 +3669,11 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
 			Port:     ptr.To[int32](12),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}, {
 			Name:     ptr.To("p122"),
 			Port:     ptr.To[int32](122),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexSubset7 := func(eps *discovery.EndpointSlice) {
@@ -3691,7 +3684,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p33"),
 			Port:     ptr.To[int32](33),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexSubset8 := func(eps *discovery.EndpointSlice) {
@@ -3703,7 +3696,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
 			Port:     ptr.To[int32](44),
-			Protocol: &udpProtocol,
+			Protocol: ptr.To(v1.ProtocolUDP),
 		}}
 	}
 	complexBefore := []*discovery.EndpointSlice{
@@ -4256,7 +4249,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
 			Port:     ptr.To[int32](80),
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
@@ -4295,7 +4288,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 		Ports: []discovery.EndpointPort{{
 			Name:     ptr.To(""),
 			Port:     ptr.To[int32](80),
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
@@ -4403,7 +4396,6 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	}
 
 	epIP := "10.180.0.1"
-	udpProtocol := v1.ProtocolUDP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -4416,7 +4408,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &udpProtocol,
+				Protocol: ptr.To(v1.ProtocolUDP),
 			}}
 		}),
 	)
@@ -4439,7 +4431,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &udpProtocol,
+				Protocol: ptr.To(v1.ProtocolUDP),
 			}}
 		}),
 	)
@@ -4529,7 +4521,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -4686,7 +4678,7 @@ func TestInternalTrafficPolicy(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 			}
@@ -4763,7 +4755,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -4848,7 +4840,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -4925,7 +4917,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -4971,7 +4963,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -5097,7 +5089,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -5181,7 +5173,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -5258,7 +5250,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -5304,7 +5296,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{
@@ -5454,7 +5446,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p80"),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}}
 			}),
 			makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
@@ -5472,7 +5464,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p80"),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}}
 			}),
 			makeTestEndpointSlice("ns3", "svc3", 1, func(eps *discovery.EndpointSlice) {
@@ -5490,7 +5482,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p80"),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}}
 			}),
 		)
@@ -6020,7 +6012,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
@@ -6032,7 +6024,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p8080"),
 				Port:     ptr.To[int32](8080),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -6061,7 +6053,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p8081"),
 			Port:     ptr.To[int32](8081),
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}}
 	}))
 	fp.syncProxyRules()
@@ -6113,7 +6105,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p8082"),
 			Port:     ptr.To[int32](8082),
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}}
 	}))
 	fp.syncProxyRules()
@@ -6199,7 +6191,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
@@ -6210,7 +6202,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p8080"),
 				Port:     ptr.To[int32](8080),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -6294,7 +6286,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -6469,7 +6461,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
 				Port:     ptr.To[int32](80),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -6925,7 +6917,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 				Ports: []discovery.EndpointPort{{
 					Name:     ptr.To(""),
 					Port:     ptr.To[int32](80),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}},
 				AddressType: discovery.AddressTypeIPv4,
 			}
@@ -7054,7 +7046,6 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 				}),
 			)
 
-			tcpProtocol := v1.ProtocolTCP
 			populateEndpointSlices(fp,
 				makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 					eps.AddressType = discovery.AddressTypeIPv4
@@ -7064,7 +7055,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
 						Port:     ptr.To[int32](80),
-						Protocol: &tcpProtocol,
+						Protocol: ptr.To(v1.ProtocolTCP),
 					}}
 				}),
 			)

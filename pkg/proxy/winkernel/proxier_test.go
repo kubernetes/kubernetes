@@ -200,7 +200,6 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 		Port:           "p80",
 		Protocol:       v1.ProtocolTCP,
 	}
-	tcpProtocol := v1.ProtocolTCP
 
 	makeServiceMap(proxier,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
@@ -223,7 +222,7 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -258,14 +257,13 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 		t.Error()
 	}
 
-	tcpProtocol := v1.ProtocolTCP
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
-		Protocol:       tcpProtocol,
+		Protocol:       v1.ProtocolTCP,
 	}
 
 	makeServiceMap(proxier,
@@ -275,7 +273,7 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
 				Port:     int32(svcPort),
-				Protocol: tcpProtocol,
+				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
 		}),
@@ -289,7 +287,7 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -316,7 +314,6 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 }
 func TestSharedRemoteEndpointDelete(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	tcpProtocol := v1.ProtocolTCP
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
 	if proxier == nil {
 		t.Error()
@@ -371,7 +368,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
 				Port:     ptr.To(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -382,7 +379,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName2.Port),
 				Port:     ptr.To(int32(svcPort2)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -430,7 +427,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName2.Port),
 				Port:     ptr.To(int32(svcPort2)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -505,7 +502,6 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 		}),
 	)
 
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(proxier,
 		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -515,7 +511,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
 				Port:     ptr.To(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -526,7 +522,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName2.Port),
 				Port:     ptr.To(int32(svcPort2)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -585,7 +581,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
 				Port:     ptr.To(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -596,12 +592,12 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName1.Port),
 				Port:     ptr.To(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			},
 				{
 					Name:     ptr.To("p443"),
 					Port:     ptr.To[int32](443),
-					Protocol: &tcpProtocol,
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}}
 		}))
 
@@ -634,7 +630,6 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 }
 func TestCreateLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	tcpProtocol := v1.ProtocolTCP
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
 	if proxier == nil {
 		t.Error()
@@ -670,7 +665,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -723,7 +718,6 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			}}
 		}),
 	)
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(proxier,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -734,7 +728,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -803,7 +797,6 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 			}}
 		}),
 	)
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(proxier,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -814,7 +807,7 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
 				Port:     ptr.To(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -877,7 +870,6 @@ func TestEndpointSlice(t *testing.T) {
 	})
 
 	// Add initial endpoint slice
-	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-1", svcPortName.Name),
@@ -887,7 +879,7 @@ func TestEndpointSlice(t *testing.T) {
 		Ports: []discovery.EndpointPort{{
 			Name:     &svcPortName.Port,
 			Port:     ptr.To[int32](80),
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
