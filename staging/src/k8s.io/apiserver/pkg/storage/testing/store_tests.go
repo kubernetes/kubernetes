@@ -44,30 +44,45 @@ import (
 type KeyValidation func(ctx context.Context, t *testing.T, key string)
 
 func RunTestCreate(ctx context.Context, t *testing.T, store storage.Interface, validation KeyValidation) {
-	out := &example.Pod{}
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", SelfLink: "testlink"}}
+	tests := []struct {
+		name          string
+		inputObj      *example.Pod
+		expectedError error
+	}{{
+		name:     "successful create",
+		inputObj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}},
+	}, {
+		name:          "create with ResourceVersion set",
+		inputObj:      &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test-ns", ResourceVersion: "1"}},
+		expectedError: storage.ErrResourceVersionSetOnCreate,
+	}}
 
-	// verify that kv pair is empty before set
-	key := computePodKey(obj)
-	if err := store.Get(ctx, key, storage.GetOptions{}, out); !storage.IsNotFound(err) {
-		t.Fatalf("expecting empty result on key %s, got %v", key, err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &example.Pod{} // reset
+			// verify that kv pair is empty before set
+			key := computePodKey(tt.inputObj)
+			if err := store.Get(ctx, key, storage.GetOptions{}, out); !storage.IsNotFound(err) {
+				t.Fatalf("expecting empty result on key %s, got %v", key, err)
+			}
 
-	if err := store.Create(ctx, key, obj, out, 0); err != nil {
-		t.Fatalf("Set failed: %v", err)
+			err := store.Create(ctx, key, tt.inputObj, out, 0)
+			if !errors.Is(err, tt.expectedError) {
+				t.Errorf("expecting error %v, but get: %v", tt.expectedError, err)
+			}
+			if err != nil {
+				return
+			}
+			// basic tests of the output
+			if tt.inputObj.ObjectMeta.Name != out.ObjectMeta.Name {
+				t.Errorf("pod name want=%s, get=%s", tt.inputObj.ObjectMeta.Name, out.ObjectMeta.Name)
+			}
+			if out.ResourceVersion == "" {
+				t.Errorf("output should have non-empty resource version")
+			}
+			validation(ctx, t, key)
+		})
 	}
-	// basic tests of the output
-	if obj.ObjectMeta.Name != out.ObjectMeta.Name {
-		t.Errorf("pod name want=%s, get=%s", obj.ObjectMeta.Name, out.ObjectMeta.Name)
-	}
-	if out.ResourceVersion == "" {
-		t.Errorf("output should have non-empty resource version")
-	}
-	if out.SelfLink != "" {
-		t.Errorf("output should have empty selfLink")
-	}
-
-	validation(ctx, t, key)
 }
 
 func RunTestCreateWithTTL(ctx context.Context, t *testing.T, store storage.Interface) {

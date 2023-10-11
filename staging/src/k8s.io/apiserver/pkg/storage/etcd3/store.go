@@ -199,7 +199,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	)
 	defer span.End(500 * time.Millisecond)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
-		return errors.New("resourceVersion should not be set on objects to be created")
+		return storage.ErrResourceVersionSetOnCreate
 	}
 	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
 		return fmt.Errorf("PrepareObjectForStorage failed: %v", err)
