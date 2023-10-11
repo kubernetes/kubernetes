@@ -808,7 +808,7 @@ retriesLoop:
 		if errs.Len() > 0 {
 			Failf("Unexpected error(s): %v", strings.Join(errs.List(), "\n - "))
 		}
-		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
+		gomega.Expect(expectedWatchEvents).To(gomega.HaveLen(totalValidWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
 		break retriesLoop
 	}
 }

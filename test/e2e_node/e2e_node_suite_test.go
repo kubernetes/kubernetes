@@ -359,7 +359,7 @@ func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil")
 	}
-	framework.ExpectEqual(len(nodes.Items) > 1, false, "the number of nodes is more than 1.")
+	gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically("<=", 1), "the number of nodes is more than 1.")
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("empty node list: %+v", nodes)
 	}
