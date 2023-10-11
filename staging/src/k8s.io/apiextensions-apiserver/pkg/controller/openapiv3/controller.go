@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/spec3"
 
@@ -54,7 +55,12 @@ type Controller struct {
 
 	// specs per version and per CRD name
 	lock             sync.Mutex
-	specsByGVandName map[schema.GroupVersion]map[string]*spec3.OpenAPI
+	specsByGVandName map[schema.GroupVersion]map[string]*crdCache
+}
+
+type crdCache struct {
+	crd        cached.LastSuccess[*apiextensionsv1.CustomResourceDefinition]
+	crdOpenAPI cached.Value[*spec3.OpenAPI]
 }
 
 // NewController creates a new Controller with input CustomResourceDefinition informer
@@ -63,7 +69,7 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 		crdLister:        crdInformer.Lister(),
 		crdsSynced:       crdInformer.Informer().HasSynced,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_openapi_v3_controller"),
-		specsByGVandName: map[schema.GroupVersion]map[string]*spec3.OpenAPI{},
+		specsByGVandName: map[schema.GroupVersion]map[string]*crdCache{},
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -147,6 +153,7 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 func (c *Controller) sync(name string) error {
+	// controller single threaded so lock is technically unnecessary.
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -190,17 +197,25 @@ func (c *Controller) updateGroupVersion(gv schema.GroupVersion) error {
 		return nil
 	}
 
-	var specs []*spec3.OpenAPI
-	for _, spec := range c.specsByGVandName[gv] {
-		specs = append(specs, spec)
+	specList := make([]cached.Value[*spec.Swagger], 0, len(c.specsByGVandName[gv]))
+	for crd := range c.specsByGVandName[gv] {
+		specList = append(specList, c.specsByGVandName[gv][crd].crdOpenAPI)
 	}
 
-	mergedSpec, err := builder.MergeSpecsV3(specs...)
-	if err != nil {
-		return fmt.Errorf("failed to merge specs: %v", err)
-	}
-
-	c.openAPIV3Service.UpdateGroupVersion(groupVersionToOpenAPIV3Path(gv), mergedSpec)
+	cache := cached.MergeList(func(results []cached.Result[*spec3.OpenAPI]) (*spec3.OpenAPI, string, error) {
+		localCRDSpec := make([]*spec3.OpenAIP, 0, len(results))
+		for k := range results {
+			if results[k].Err == nil {
+				localCRDSpec = append(localCRDSpec, results[k].Value)
+			}
+		}
+		mergedSpec, err := builder.MergeSpecsV3(specs...)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to merge specs: %v", err)
+		}
+		return mergedSpec, uuid.New().String(), nil
+	})
+	c.openAPIV3Service.UpdateGroupVersionLazy(groupVersionToOpenAPIV3Path(gv), mergedSpec)
 	return nil
 }
 
@@ -227,6 +242,19 @@ func (c *Controller) updateCRDSpec(crd *apiextensionsv1.CustomResourceDefinition
 	c.specsByGVandName[gv][name] = v3
 	regenerationCounter.With(map[string]string{"crd": name, "group": gv.Group, "version": gv.Version, "reason": reason})
 	return c.updateGroupVersion(gv)
+}
+
+func (c *Controller) buildCRDCache(crd *apiextensionsv1.CustomResourceDefinition, name, versionName, string) {
+	crdcache := &crdCache{}
+	crdcache.crd.Store(crd)
+	crdcache.crdOpenAPI = cached.Transform[*apiextensionsv1.CustomResourceDefinition](func(crd *apiextensionsv1.CustomResourceDefinition, etag string, err error) (*spec3.OpenAPI, string, error) {
+		v3, err := builder.BuildOpenAPIV3(crd, versionName, builder.Options{V2: false})
+		return v3, generateCRDHash(crd),
+	}, &crdcache.crd)
+}
+
+func generateCRDHash(*apiextensionsv1.CustomResourceDefinition) string {
+	return ""
 }
 
 func (c *Controller) buildV3Spec(crd *apiextensionsv1.CustomResourceDefinition, name, versionName string) error {
