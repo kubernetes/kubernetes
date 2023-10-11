@@ -1821,10 +1821,11 @@ func TestOverallIPTablesRules(t *testing.T) {
 			// in a crash, for backward compatibility.
 			svc.Spec.LoadBalancerSourceRanges = []string{" 203.0.113.0/25"}
 
-			svcSessionAffinityTimeout := int32(10800)
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
-				ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
+				ClientIP: &v1.ClientIPConfig{
+					TimeoutSeconds: ptr.To[int32](10800),
+				},
 			}
 		}),
 		// create ClusterIP service with no endpoints

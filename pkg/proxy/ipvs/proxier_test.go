@@ -2749,7 +2749,6 @@ func TestSessionAffinity(t *testing.T) {
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
 	}
-	timeoutSeconds := v1.DefaultClientIPServiceAffinitySeconds
 
 	makeServiceMap(fp,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
@@ -2759,7 +2758,7 @@ func TestSessionAffinity(t *testing.T) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 				ClientIP: &v1.ClientIPConfig{
-					TimeoutSeconds: &timeoutSeconds,
+					TimeoutSeconds: ptr.To[int32](v1.DefaultClientIPServiceAffinitySeconds),
 				},
 			}
 			svc.Spec.Ports = []v1.ServicePort{{
