@@ -769,7 +769,7 @@ const (
 	ElasticIndexedJob featuregate.Feature = "ElasticIndexedJob"
 
 	// owner: @sanposhiho
-	// kep: http://kep.k8s.io/3063
+	// kep: http://kep.k8s.io/4247
 	// beta: v1.28
 	//
 	// Enables the scheduler's enhancement called QueueingHints,
