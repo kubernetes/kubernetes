@@ -239,6 +239,64 @@ func TestCorrelation(t *testing.T) {
 			OldValue: "oldB",
 		},
 		{
+			Name: "Replaced Key In Old Object",
+			RootObject: map[string]interface{}{
+				"a": "b",
+			},
+			RootOldObject: map[string]interface{}{
+				"b": "a",
+			},
+			Schema: mustSchema(`
+                properties:
+                  a: { type: string }
+            `),
+			KeyPath:  []interface{}{},
+			NewValue: map[string]interface{}{"a": "b"},
+			OldValue: map[string]interface{}{"b": "a"},
+		},
+		{
+			Name: "Added Key In Old Object",
+			RootObject: map[string]interface{}{
+				"a": "b",
+			},
+			RootOldObject: map[string]interface{}{},
+			Schema: mustSchema(`
+                properties:
+                  a: { type: string }
+            `),
+			KeyPath:  []interface{}{},
+			NewValue: map[string]interface{}{"a": "b"},
+			OldValue: map[string]interface{}{},
+		},
+		{
+			Name: "Changed list to map",
+			RootObject: map[string]interface{}{
+				"a": "b",
+			},
+			RootOldObject: []interface{}{"a", "b"},
+			Schema: mustSchema(`
+                properties:
+                  a: { type: string }
+            `),
+			KeyPath:  []interface{}{},
+			NewValue: map[string]interface{}{"a": "b"},
+			OldValue: []interface{}{"a", "b"},
+		},
+		{
+			Name: "Changed string to map",
+			RootObject: map[string]interface{}{
+				"a": "b",
+			},
+			RootOldObject: "a string",
+			Schema: mustSchema(`
+                properties:
+                  a: { type: string }
+            `),
+			KeyPath:  []interface{}{},
+			NewValue: map[string]interface{}{"a": "b"},
+			OldValue: "a string",
+		},
+		{
 			Name: "Map list type",
 			RootObject: mustUnstructured(`
                 foo:
