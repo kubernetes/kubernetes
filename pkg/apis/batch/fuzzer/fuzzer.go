@@ -45,11 +45,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.Completions = &completions
 			j.Parallelism = &parallelism
 			j.BackoffLimit = &backoffLimit
-			if c.Rand.Int31()%2 == 0 {
-				j.ManualSelector = pointer.Bool(true)
-			} else {
-				j.ManualSelector = nil
-			}
+			j.ManualSelector = pointer.Bool(c.RandBool())
 			mode := batch.NonIndexedCompletion
 			if c.RandBool() {
 				mode = batch.IndexedCompletion
