@@ -272,15 +272,7 @@ func (s *store) Delete(
 func (s *store) conditionalDelete(
 	ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions,
 	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
-	getCurrentState := func() (*objState, error) {
-		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
-		if err != nil {
-			return nil, err
-		}
-		return s.getState(ctx, getResp, key, v, false)
-	}
+	getCurrentState := s.getCurrentState(ctx, key, v, false)
 
 	var origState *objState
 	var err error
@@ -408,15 +400,7 @@ func (s *store) GuaranteedUpdate(
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
 
-	getCurrentState := func() (*objState, error) {
-		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, preparedKey)
-		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
-		if err != nil {
-			return nil, err
-		}
-		return s.getState(ctx, getResp, preparedKey, v, ignoreNotFound)
-	}
+	getCurrentState := s.getCurrentState(ctx, preparedKey, v, ignoreNotFound)
 
 	var origState *objState
 	var origStateIsCurrent bool
@@ -877,6 +861,18 @@ func (s *store) watchContext(ctx context.Context) context.Context {
 	// hard killed, other servers will take an election timeout to realize
 	// leader lost and start campaign.
 	return clientv3.WithRequireLeader(ctx)
+}
+
+func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value, ignoreNotFound bool) func() (*objState, error) {
+	return func() (*objState, error) {
+		startTime := time.Now()
+		getResp, err := s.client.KV.Get(ctx, key)
+		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
+		if err != nil {
+			return nil, err
+		}
+		return s.getState(ctx, getResp, key, v, ignoreNotFound)
+	}
 }
 
 func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
