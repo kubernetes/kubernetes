@@ -600,7 +600,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			},
 				{
 					Name:     ptr.To("p443"),
-					Port:     pointer.Int32(int32(443)),
+					Port:     ptr.To[int32](443),
 					Protocol: &tcpProtocol,
 				}}
 		}))
