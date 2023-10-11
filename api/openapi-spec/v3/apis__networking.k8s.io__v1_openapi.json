@@ -1506,10 +1506,6 @@
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.Patch": {
-        "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
-        "type": "object"
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions": {
         "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
         "properties": {
@@ -2658,22 +2654,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressClass"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressClass"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressClass"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressClass"
               }
             }
           }
@@ -3637,22 +3633,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             }
           }
@@ -3924,22 +3920,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
               }
             }
           }
@@ -4752,22 +4748,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicy"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicy"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicy"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicy"
               }
             }
           }

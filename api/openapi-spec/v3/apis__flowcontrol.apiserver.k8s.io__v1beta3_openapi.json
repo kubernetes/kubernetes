@@ -1392,10 +1392,6 @@
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.Patch": {
-        "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
-        "type": "object"
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions": {
         "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
         "properties": {
@@ -2532,22 +2528,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             }
           }
@@ -2809,22 +2805,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             }
           }
@@ -3617,22 +3613,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             }
           }
@@ -3894,22 +3890,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             }
           }

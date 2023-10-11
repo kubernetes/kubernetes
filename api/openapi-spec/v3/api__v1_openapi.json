@@ -8899,10 +8899,6 @@
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.Patch": {
-        "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
-        "type": "object"
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions": {
         "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
         "properties": {
@@ -11293,22 +11289,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ConfigMap"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ConfigMap"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ConfigMap"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ConfigMap"
               }
             }
           }
@@ -12121,22 +12117,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Endpoints"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Endpoints"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Endpoints"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Endpoints"
               }
             }
           }
@@ -12949,22 +12945,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Event"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Event"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Event"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Event"
               }
             }
           }
@@ -13777,22 +13773,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.LimitRange"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.LimitRange"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.LimitRange"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.LimitRange"
               }
             }
           }
@@ -14605,22 +14601,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             }
           }
@@ -14892,22 +14888,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             }
           }
@@ -15720,22 +15716,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             }
           }
@@ -16279,22 +16275,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             }
           }
@@ -17552,22 +17548,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             }
           }
@@ -18380,22 +18376,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PodTemplate"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PodTemplate"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PodTemplate"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PodTemplate"
               }
             }
           }
@@ -19208,22 +19204,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             }
           }
@@ -19495,22 +19491,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.Scale"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.Scale"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.Scale"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.Scale"
               }
             }
           }
@@ -19782,22 +19778,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             }
           }
@@ -20610,22 +20606,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             }
           }
@@ -20897,22 +20893,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             }
           }
@@ -21725,22 +21721,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Secret"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Secret"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Secret"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Secret"
               }
             }
           }
@@ -22553,22 +22549,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ServiceAccount"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ServiceAccount"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ServiceAccount"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ServiceAccount"
               }
             }
           }
@@ -23528,22 +23524,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             }
           }
@@ -24283,22 +24279,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             }
           }
@@ -24665,22 +24661,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             }
           }
@@ -25059,22 +25055,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             }
           }
@@ -25867,22 +25863,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             }
           }
@@ -26592,22 +26588,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             }
           }
@@ -27551,22 +27547,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             }
           }
@@ -27828,22 +27824,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             }
           }

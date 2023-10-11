@@ -1397,10 +1397,6 @@
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.Patch": {
-        "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
-        "type": "object"
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions": {
         "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
         "properties": {
@@ -2557,22 +2553,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             }
           }
@@ -2844,22 +2840,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             }
           }
@@ -3672,22 +3668,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             }
           }
@@ -3959,22 +3955,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             }
           }
@@ -4787,22 +4783,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
               }
             }
           }
@@ -6048,22 +6044,22 @@
           "content": {
             "application/apply-patch+yaml": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClass"
               }
             },
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClass"
               }
             },
             "application/merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClass"
               }
             },
             "application/strategic-merge-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClass"
               }
             }
           }

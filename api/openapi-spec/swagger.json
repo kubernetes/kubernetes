@@ -16657,10 +16657,6 @@
       "type": "object",
       "x-kubernetes-map-type": "atomic"
     },
-    "io.k8s.apimachinery.pkg.apis.meta.v1.Patch": {
-      "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
-      "type": "object"
-    },
     "io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions": {
       "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
       "properties": {
@@ -17354,14 +17350,6 @@
       "name": "body",
       "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
-      }
-    },
-    "body-78PwaGsr": {
-      "in": "body",
-      "name": "body",
-      "required": true,
-      "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
       }
     },
     "command-Py3eQybp": {
@@ -18767,7 +18755,12 @@
         "operationId": "patchCoreV1NamespacedConfigMap",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -19252,7 +19245,12 @@
         "operationId": "patchCoreV1NamespacedEndpoints",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Endpoints"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -19737,7 +19735,12 @@
         "operationId": "patchCoreV1NamespacedEvent",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Event"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -20222,7 +20225,12 @@
         "operationId": "patchCoreV1NamespacedLimitRange",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.LimitRange"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -20707,7 +20715,12 @@
         "operationId": "patchCoreV1NamespacedPersistentVolumeClaim",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -20897,7 +20910,12 @@
         "operationId": "patchCoreV1NamespacedPersistentVolumeClaimStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -21382,7 +21400,12 @@
         "operationId": "patchCoreV1NamespacedPod",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -21760,7 +21783,12 @@
         "operationId": "patchCoreV1NamespacedPodEphemeralcontainers",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -22804,7 +22832,12 @@
         "operationId": "patchCoreV1NamespacedPodStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -23289,7 +23322,12 @@
         "operationId": "patchCoreV1NamespacedPodTemplate",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplate"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -23774,7 +23812,12 @@
         "operationId": "patchCoreV1NamespacedReplicationController",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -23964,7 +24007,12 @@
         "operationId": "patchCoreV1NamespacedReplicationControllerScale",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v1.Scale"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -24154,7 +24202,12 @@
         "operationId": "patchCoreV1NamespacedReplicationControllerStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -24639,7 +24692,12 @@
         "operationId": "patchCoreV1NamespacedResourceQuota",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -24829,7 +24887,12 @@
         "operationId": "patchCoreV1NamespacedResourceQuotaStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -25314,7 +25377,12 @@
         "operationId": "patchCoreV1NamespacedSecret",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -25799,7 +25867,12 @@
         "operationId": "patchCoreV1NamespacedServiceAccount",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccount"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -26376,7 +26449,12 @@
         "operationId": "patchCoreV1NamespacedService",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -27067,7 +27145,12 @@
         "operationId": "patchCoreV1NamespacedServiceStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -27316,7 +27399,12 @@
         "operationId": "patchCoreV1Namespace",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -27586,7 +27674,12 @@
         "operationId": "patchCoreV1NamespaceStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -28065,7 +28158,12 @@
         "operationId": "patchCoreV1Node",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -28747,7 +28845,12 @@
         "operationId": "patchCoreV1NodeStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -29300,7 +29403,12 @@
         "operationId": "patchCoreV1PersistentVolume",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -29487,7 +29595,12 @@
         "operationId": "patchCoreV1PersistentVolumeStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -33883,7 +33996,12 @@
         "operationId": "patchAdmissionregistrationV1MutatingWebhookConfiguration",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.MutatingWebhookConfiguration"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -34362,7 +34480,12 @@
         "operationId": "patchAdmissionregistrationV1ValidatingWebhookConfiguration",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -35186,7 +35309,12 @@
         "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -35373,7 +35501,12 @@
         "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -35852,7 +35985,12 @@
         "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -36676,7 +36814,12 @@
         "operationId": "patchAdmissionregistrationV1beta1ValidatingAdmissionPolicy",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicy"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -36863,7 +37006,12 @@
         "operationId": "patchAdmissionregistrationV1beta1ValidatingAdmissionPolicyStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicy"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -37342,7 +37490,12 @@
         "operationId": "patchAdmissionregistrationV1beta1ValidatingAdmissionPolicyBinding",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicyBinding"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -38199,7 +38352,12 @@
         "operationId": "patchApiextensionsV1CustomResourceDefinition",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -38386,7 +38544,12 @@
         "operationId": "patchApiextensionsV1CustomResourceDefinitionStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -39087,7 +39250,12 @@
         "operationId": "patchApiregistrationV1APIService",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -39274,7 +39442,12 @@
         "operationId": "patchApiregistrationV1APIServiceStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -40203,7 +40376,12 @@
         "operationId": "patchAppsV1NamespacedControllerRevision",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.ControllerRevision"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -40688,7 +40866,12 @@
         "operationId": "patchAppsV1NamespacedDaemonSet",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.DaemonSet"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -40878,7 +41061,12 @@
         "operationId": "patchAppsV1NamespacedDaemonSetStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.DaemonSet"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -41363,7 +41551,12 @@
         "operationId": "patchAppsV1NamespacedDeployment",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.Deployment"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -41553,7 +41746,12 @@
         "operationId": "patchAppsV1NamespacedDeploymentScale",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v1.Scale"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -41743,7 +41941,12 @@
         "operationId": "patchAppsV1NamespacedDeploymentStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.Deployment"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -42228,7 +42431,12 @@
         "operationId": "patchAppsV1NamespacedReplicaSet",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.ReplicaSet"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -42418,7 +42626,12 @@
         "operationId": "patchAppsV1NamespacedReplicaSetScale",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v1.Scale"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -42608,7 +42821,12 @@
         "operationId": "patchAppsV1NamespacedReplicaSetStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.ReplicaSet"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -43093,7 +43311,12 @@
         "operationId": "patchAppsV1NamespacedStatefulSet",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.StatefulSet"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -43283,7 +43506,12 @@
         "operationId": "patchAppsV1NamespacedStatefulSetScale",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v1.Scale"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -43473,7 +43701,12 @@
         "operationId": "patchAppsV1NamespacedStatefulSetStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apps.v1.StatefulSet"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -46275,7 +46508,12 @@
         "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscaler",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -46465,7 +46703,12 @@
         "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -47293,7 +47536,12 @@
         "operationId": "patchAutoscalingV2NamespacedHorizontalPodAutoscaler",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v2.HorizontalPodAutoscaler"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -47483,7 +47731,12 @@
         "operationId": "patchAutoscalingV2NamespacedHorizontalPodAutoscalerStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v2.HorizontalPodAutoscaler"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -48418,7 +48671,12 @@
         "operationId": "patchBatchV1NamespacedCronJob",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.batch.v1.CronJob"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -48608,7 +48866,12 @@
         "operationId": "patchBatchV1NamespacedCronJobStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.batch.v1.CronJob"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -49093,7 +49356,12 @@
         "operationId": "patchBatchV1NamespacedJob",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -49283,7 +49551,12 @@
         "operationId": "patchBatchV1NamespacedJobStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -50300,7 +50573,12 @@
         "operationId": "patchCertificatesV1CertificateSigningRequest",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.certificates.v1.CertificateSigningRequest"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -50487,7 +50765,12 @@
         "operationId": "patchCertificatesV1CertificateSigningRequestApproval",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.certificates.v1.CertificateSigningRequest"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -50674,7 +50957,12 @@
         "operationId": "patchCertificatesV1CertificateSigningRequestStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.certificates.v1.CertificateSigningRequest"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -51342,7 +51630,12 @@
         "operationId": "patchCertificatesV1alpha1ClusterTrustBundle",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.certificates.v1alpha1.ClusterTrustBundle"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -52123,7 +52416,12 @@
         "operationId": "patchCoordinationV1NamespacedLease",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.coordination.v1.Lease"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -52984,7 +53282,12 @@
         "operationId": "patchDiscoveryV1NamespacedEndpointSlice",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.discovery.v1.EndpointSlice"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -53845,7 +54148,12 @@
         "operationId": "patchEventsV1NamespacedEvent",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.events.v1.Event"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -54626,7 +54934,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta2FlowSchema",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta2.FlowSchema"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -54813,7 +55126,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta2FlowSchemaStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta2.FlowSchema"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -55292,7 +55610,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta2PriorityLevelConfiguration",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta2.PriorityLevelConfiguration"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -55479,7 +55802,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta2PriorityLevelConfigurationStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta2.PriorityLevelConfiguration"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -56303,7 +56631,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta3FlowSchema",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -56490,7 +56823,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta3FlowSchemaStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -56969,7 +57307,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -57156,7 +57499,12 @@
         "operationId": "patchFlowcontrolApiserverV1beta3PriorityLevelConfigurationStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -58013,7 +58361,12 @@
         "operationId": "patchInternalApiserverV1alpha1StorageVersion",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -58200,7 +58553,12 @@
         "operationId": "patchInternalApiserverV1alpha1StorageVersionStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -58901,7 +59259,12 @@
         "operationId": "patchNetworkingV1IngressClass",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.networking.v1.IngressClass"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -59460,7 +59823,12 @@
         "operationId": "patchNetworkingV1NamespacedIngress",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.networking.v1.Ingress"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -59650,7 +60018,12 @@
         "operationId": "patchNetworkingV1NamespacedIngressStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.networking.v1.Ingress"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -60135,7 +60508,12 @@
         "operationId": "patchNetworkingV1NamespacedNetworkPolicy",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.networking.v1.NetworkPolicy"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -61349,7 +61727,12 @@
         "operationId": "patchNetworkingV1alpha1ClusterCIDR",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -61828,7 +62211,12 @@
         "operationId": "patchNetworkingV1alpha1IPAddress",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.networking.v1alpha1.IPAddress"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -62685,7 +63073,12 @@
         "operationId": "patchNodeV1RuntimeClass",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.node.v1.RuntimeClass"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -63392,7 +63785,12 @@
         "operationId": "patchPolicyV1NamespacedPodDisruptionBudget",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.policy.v1.PodDisruptionBudget"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -63582,7 +63980,12 @@
         "operationId": "patchPolicyV1NamespacedPodDisruptionBudgetStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.policy.v1.PodDisruptionBudget"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -64437,7 +64840,12 @@
         "operationId": "patchRbacAuthorizationV1ClusterRoleBinding",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRoleBinding"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -64916,7 +65324,12 @@
         "operationId": "patchRbacAuthorizationV1ClusterRole",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRole"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -65401,7 +65814,12 @@
         "operationId": "patchRbacAuthorizationV1NamespacedRoleBinding",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleBinding"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -65886,7 +66304,12 @@
         "operationId": "patchRbacAuthorizationV1NamespacedRole",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.rbac.v1.Role"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -67369,7 +67792,12 @@
         "operationId": "patchResourceV1alpha2NamespacedPodSchedulingContext",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -67559,7 +67987,12 @@
         "operationId": "patchResourceV1alpha2NamespacedPodSchedulingContextStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -68044,7 +68477,12 @@
         "operationId": "patchResourceV1alpha2NamespacedResourceClaim",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -68234,7 +68672,12 @@
         "operationId": "patchResourceV1alpha2NamespacedResourceClaimStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -68719,7 +69162,12 @@
         "operationId": "patchResourceV1alpha2NamespacedResourceClaimTemplate",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -69420,7 +69868,12 @@
         "operationId": "patchResourceV1alpha2ResourceClass",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -70829,7 +71282,12 @@
         "operationId": "patchSchedulingV1PriorityClass",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1.PriorityClass"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -71530,7 +71988,12 @@
         "operationId": "patchStorageV1CSIDriver",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.storage.v1.CSIDriver"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -72009,7 +72472,12 @@
         "operationId": "patchStorageV1CSINode",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.storage.v1.CSINode"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -72568,7 +73036,12 @@
         "operationId": "patchStorageV1NamespacedCSIStorageCapacity",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.storage.v1.CSIStorageCapacity"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -73047,7 +73520,12 @@
         "operationId": "patchStorageV1StorageClass",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.storage.v1.StorageClass"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -73526,7 +74004,12 @@
         "operationId": "patchStorageV1VolumeAttachment",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.storage.v1.VolumeAttachment"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -73713,7 +74196,12 @@
         "operationId": "patchStorageV1VolumeAttachmentStatus",
         "parameters": [
           {
-            "$ref": "#/parameters/body-78PwaGsr"
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.storage.v1.VolumeAttachment"
+            }
           },
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
