@@ -2902,6 +2902,7 @@ func TestParallelScale(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			set := burst(newStatefulSet(0))
+			set.Spec.VolumeClaimTemplates[0].ObjectMeta.Labels = map[string]string{"test": "test"}
 			parallelScale(t, set, tc.replicas, tc.desiredReplicas, assertBurstInvariants)
 		})
 	}
