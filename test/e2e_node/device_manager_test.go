@@ -176,7 +176,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			sd := setupSRIOVConfigOrFail(ctx, f, configMap)
 			waitForSRIOVResources(ctx, f, sd)
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
 			framework.ExpectNoError(err)
 
 			resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
@@ -260,7 +260,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 			compareSRIOVResources(sd, sd2)
 
-			cli, conn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			cli, conn, err = podresources.WaitForReady(podresources.GetClient(endpoint))
 			framework.ExpectNoError(err)
 			defer conn.Close()
 

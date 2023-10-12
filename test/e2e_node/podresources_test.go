@@ -667,8 +667,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+					cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+					framework.ExpectNoError(err, "GetClient() failed err: %v", err)
 					defer conn.Close()
 
 					waitForSRIOVResources(ctx, f, sd)
@@ -696,8 +696,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+				cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+				framework.ExpectNoError(err, "GetClient() failed err: %v", err)
 				defer conn.Close()
 
 				waitForSRIOVResources(ctx, f, sd)
@@ -749,8 +749,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+					cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+					framework.ExpectNoError(err, "GetClient() failed err: %v", err)
 					defer conn.Close()
 
 					podresourcesListTests(ctx, f, cli, nil)
@@ -786,8 +786,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+				cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+				framework.ExpectNoError(err, "GetClient() failed err: %v", err)
 				defer conn.Close()
 
 				// intentionally passing empty cpuset instead of onlineCPUs because with none policy
@@ -802,8 +802,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err, "LocalEndpoint() faild err %v", err)
 
-				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
+				cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+				framework.ExpectNoError(err, "GetClient() failed err %v", err)
 				defer conn.Close()
 
 				ginkgo.By("checking Get fail if the feature gate is not enabled")
@@ -848,8 +848,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+					cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+					framework.ExpectNoError(err, "GetClient() failed err: %v", err)
 					defer conn.Close()
 
 					ginkgo.By("checking List and resources topology unaware resource should be without topology")
@@ -904,8 +904,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err, "LocalEndpoint() failed err %v", err)
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
+			cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+			framework.ExpectNoError(err, "GetClient() failed err %v", err)
 			defer conn.Close()
 
 			_, err = cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
@@ -969,8 +969,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			framework.ExpectNoError(err, "LocalEndpoint() failed err %v", err)
 
 			ginkgo.By("Connecting to the kubelet endpoint")
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
+			cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
+			framework.ExpectNoError(err, "GetClient() failed err %v", err)
 			defer conn.Close()
 
 			tries := podresourcesgrpc.DefaultQPS * 2 // This should also be greater than DefaultBurstTokens

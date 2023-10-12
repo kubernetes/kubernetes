@@ -32,6 +32,11 @@ import (
 // Note: Consumers of the pod resources API should not be importing this package.
 // They should copy paste the function in their project.
 
+const (
+	DefaultTimeout    = 10 * time.Second
+	DefaultMaxMsgSize = 1024 * 1024 * 16 // 16 MiB
+)
+
 // GetV1alpha1Client returns a client for the PodResourcesLister grpc service
 // Note: This is deprecated
 func GetV1alpha1Client(socket string, connectionTimeout time.Duration, maxMsgSize int) (v1alpha1.PodResourcesListerClient, *grpc.ClientConn, error) {
@@ -69,4 +74,30 @@ func GetV1Client(socket string, connectionTimeout time.Duration, maxMsgSize int)
 		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
 	}
 	return v1.NewPodResourcesListerClient(conn), conn, nil
+}
+
+// GetClient returns a client for the recommended version of the PodResourcesLister grpc service with the recommended settings
+func GetClient(endpoint string) (v1.PodResourcesListerClient, *grpc.ClientConn, error) {
+	return GetV1Client(endpoint, DefaultTimeout, DefaultMaxMsgSize)
+}
+
+// WaitForReady ensures the communication has been established.
+// We provide a composable WaitForReady instead of setting flags in the Dialing function to enable client code flexibility.
+// In general, using `grpc.Dial` with the blocking flag enabled is an anti-pattern https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md
+// But things are a bit different in the very narrow case we use here, over local UNIX domain socket. The transport is very stable and lossless,
+// and the most common cause for failures bubbling up is for kubelet not yet ready, which is very common in the e2e tests but much less
+// in the expected normal operation.
+func WaitForReady(cli v1.PodResourcesListerClient, conn *grpc.ClientConn, err error) (v1.PodResourcesListerClient, *grpc.ClientConn, error) {
+	if err != nil {
+		return cli, conn, err
+	}
+	// we use List because it's the oldest endpoint and the one guaranteed to be available.
+	// Note we only set WaitForReady explicitly here effectively triggering eager connection. This way we force the connection to happen
+	// (or fail critically) without forcing the client code to use `grpc.WaitForReady` in their code everywhere.
+	// TODO: evaluate more lightweight option like GetAllocatableResources - we will discard the return value anyway.
+	_, listErr := cli.List(context.Background(), &v1.ListPodResourcesRequest{}, grpc.WaitForReady(true))
+	if listErr != nil {
+		return cli, conn, fmt.Errorf("WaitForReady failed: %w", listErr)
+	}
+	return cli, conn, nil
 }
