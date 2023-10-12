@@ -204,7 +204,7 @@ type ActualStateOfWorldMounterUpdater interface {
 	GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState
 
 	// GetVolumeMountState returns mount state of the volume for the Pod
-	GetVolumeMountState(volumName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState
+	GetVolumeMountState(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState
 
 	// IsVolumeMountedElsewhere returns whether the supplied volume is mounted in a Pod other than the supplied one
 	IsVolumeMountedElsewhere(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
