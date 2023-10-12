@@ -289,6 +289,9 @@ type EncryptResponse struct {
 	KeyId string `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
 	// Additional metadata to be stored with the encrypted data.
 	// This data is stored in plaintext in etcd. KMS plugin implementations are responsible for pre-encrypting any sensitive data.
+	// Annotations must satisfy the following constraints:
+	//  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+	//  2. The size of annotations keys + values is less than 32 kB.
 	Annotations          map[string][]byte `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
