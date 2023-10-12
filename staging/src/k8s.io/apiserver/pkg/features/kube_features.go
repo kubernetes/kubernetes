@@ -293,7 +293,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
 
-	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
+	UnauthenticatedHTTP2DOSMitigation: {Default: false, PreRelease: featuregate.Beta},
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
