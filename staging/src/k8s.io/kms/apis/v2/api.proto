@@ -74,5 +74,8 @@ message EncryptResponse {
     string key_id = 2;
     // Additional metadata to be stored with the encrypted data.
     // This data is stored in plaintext in etcd. KMS plugin implementations are responsible for pre-encrypting any sensitive data.
+    // Annotations must satisfy the following constraints:
+    //  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+    //  2. The size of annotations keys + values is less than 32 kB.
     map<string, bytes> annotations = 3;
 }
