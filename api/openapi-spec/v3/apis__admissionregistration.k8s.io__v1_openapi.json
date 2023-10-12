@@ -2061,7 +2061,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1.MutatingWebhookConfiguration"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2367,7 +2368,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2463,7 +2465,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1.MutatingWebhookConfiguration"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2869,7 +2872,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3175,7 +3179,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3271,7 +3276,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

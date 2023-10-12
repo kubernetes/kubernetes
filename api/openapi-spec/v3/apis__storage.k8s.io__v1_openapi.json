@@ -3502,7 +3502,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIDriver"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3808,7 +3809,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3904,7 +3906,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIDriver"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4310,7 +4313,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSINode"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4616,7 +4620,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4712,7 +4717,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSINode"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -5279,7 +5285,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIStorageCapacity"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -5595,7 +5602,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -5691,7 +5699,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIStorageCapacity"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -6097,7 +6106,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.StorageClass"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -6403,7 +6413,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -6499,7 +6510,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.StorageClass"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -6905,7 +6917,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.VolumeAttachment"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -7211,7 +7224,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -7307,7 +7321,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.VolumeAttachment"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -7488,7 +7503,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -7584,7 +7600,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.storage.v1.VolumeAttachment"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

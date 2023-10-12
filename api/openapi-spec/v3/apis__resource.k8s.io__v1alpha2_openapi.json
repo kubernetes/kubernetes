@@ -2259,7 +2259,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2575,7 +2576,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2671,7 +2673,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2862,7 +2865,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2958,7 +2962,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3374,7 +3379,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3690,7 +3696,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3786,7 +3793,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3977,7 +3985,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4073,7 +4082,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaim"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4489,7 +4499,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4805,7 +4816,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4901,7 +4913,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -5760,7 +5773,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClass"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -6066,7 +6080,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -6162,7 +6177,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.ResourceClass"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

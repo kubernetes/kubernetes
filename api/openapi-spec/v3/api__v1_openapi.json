@@ -10422,7 +10422,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -10559,7 +10560,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Binding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -10995,7 +10997,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ConfigMap"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -11311,7 +11314,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -11407,7 +11411,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ConfigMap"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -11823,7 +11828,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Endpoints"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -12139,7 +12145,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -12235,7 +12242,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Endpoints"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -12651,7 +12659,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Event"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -12967,7 +12976,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -13063,7 +13073,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Event"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -13479,7 +13490,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.LimitRange"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -13795,7 +13807,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -13891,7 +13904,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.LimitRange"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -14307,7 +14321,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -14623,7 +14638,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -14719,7 +14735,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -14910,7 +14927,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -15006,7 +15024,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolumeClaim"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -15422,7 +15441,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -15738,7 +15758,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -15834,7 +15855,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -16086,7 +16108,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Binding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -16297,7 +16320,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -16393,7 +16417,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -16520,7 +16545,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1.Eviction"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -17570,7 +17596,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -17666,7 +17693,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -18082,7 +18110,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodTemplate"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -18398,7 +18427,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -18494,7 +18524,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodTemplate"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -18910,7 +18941,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -19226,7 +19258,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -19322,7 +19355,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -19513,7 +19547,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -19609,7 +19644,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.Scale"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -19800,7 +19836,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -19896,7 +19933,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationController"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -20312,7 +20350,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -20628,7 +20667,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -20724,7 +20764,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -20915,7 +20956,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -21011,7 +21053,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceQuota"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -21427,7 +21470,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Secret"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -21743,7 +21787,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -21839,7 +21884,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Secret"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -22255,7 +22301,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ServiceAccount"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -22571,7 +22618,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -22667,7 +22715,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ServiceAccount"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -22794,7 +22843,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -23230,7 +23280,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -23546,7 +23597,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -23642,7 +23694,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -24301,7 +24354,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -24397,7 +24451,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Service"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -24683,7 +24738,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -24779,7 +24835,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -24896,7 +24953,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -25077,7 +25135,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -25173,7 +25232,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Namespace"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -25579,7 +25639,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -25885,7 +25946,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -25981,7 +26043,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -26610,7 +26673,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -26706,7 +26770,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Node"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -27263,7 +27328,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -27569,7 +27635,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -27665,7 +27732,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -27846,7 +27914,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -27942,7 +28011,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PersistentVolume"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

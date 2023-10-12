@@ -1731,7 +1731,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2037,7 +2038,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2133,7 +2135,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2314,7 +2317,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2410,7 +2414,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

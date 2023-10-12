@@ -22,3 +22,4 @@ var UseOptimizedJSONUnmarshalingV3 bool = true
 
 // Used by tests to selectively disable experimental JSON marshaler
 var UseOptimizedJSONMarshaling bool = true
+var UseOptimizedJSONMarshalingV3 bool = true
