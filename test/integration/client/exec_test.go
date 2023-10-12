@@ -608,7 +608,7 @@ func (is *informerSpy) waitForEvents(t *testing.T, wantEvents bool) {
 			t.Fatalf("wanted events, but got error: %v", err)
 		}
 	} else {
-		if !errors.Is(err, wait.ErrWaitTimeout) {
+		if !errors.Is(err, wait.ErrorInterrupted(errors.New("timed out waiting for the condition"))) {
 			if err != nil {
 				t.Fatalf("wanted no events, but got error: %v", err)
 			} else {
