@@ -732,7 +732,7 @@ func TestUpdateVeryLargeObject(t *testing.T) {
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		t.Errorf("unable to update configMap: %v", updateErr)
 	}
 

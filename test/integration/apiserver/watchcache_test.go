@@ -160,7 +160,7 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 			return false, nil
 		}
 		return res.ResourceVersion == se.ResourceVersion, nil
-	}); err == nil || err != wait.ErrWaitTimeout {
+	}); err == nil || !wait.Interrupted(err) {
 		t.Errorf("Events watchcache unexpected synced: %v", err)
 	}
 }
