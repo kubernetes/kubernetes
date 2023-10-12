@@ -657,6 +657,16 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: KeepTerminationLogFile
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.33"
 - name: KMSv1
   versionedSpecs:
   - default: true
