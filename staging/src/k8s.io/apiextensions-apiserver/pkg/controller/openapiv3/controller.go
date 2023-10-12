@@ -18,10 +18,10 @@ package openapiv3
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,12 +54,13 @@ type Controller struct {
 	openAPIV3Service *handler3.OpenAPIService
 
 	// specs per version and per CRD name
-	lock             sync.Mutex
-	specsByGVandName map[schema.GroupVersion]map[string]*crdCache
+	lock sync.Mutex
+	// specsByGVandName map[schema.GroupVersion]map[string]*crdCache
+	cacheByNameandGV map[string]map[schema.GroupVersion]*crdCache
 }
 
 type crdCache struct {
-	crd        cached.LastSuccess[*apiextensionsv1.CustomResourceDefinition]
+	crd        cached.Atomic[*apiextensionsv1.CustomResourceDefinition]
 	crdOpenAPI cached.Value[*spec3.OpenAPI]
 }
 
@@ -69,7 +70,7 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 		crdLister:        crdInformer.Lister(),
 		crdsSynced:       crdInformer.Informer().HasSynced,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_openapi_v3_controller"),
-		specsByGVandName: map[schema.GroupVersion]map[string]*crdCache{},
+		cacheByNameandGV: map[string]map[schema.GroupVersion]*crdCache{},
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -106,18 +107,112 @@ func (c *Controller) Run(openAPIV3Service *handler3.OpenAPIService, stopCh <-cha
 		if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
 			continue
 		}
+		versions := []string{}
 		for _, v := range crd.Spec.Versions {
 			if !v.Served {
 				continue
 			}
-			c.buildV3Spec(crd, crd.Name, v.Name)
+			versions = append(versions, v.Name)
 		}
+		c.addUpdateCRD(crd, crd.Name, versions)
 	}
 
 	// only start one worker thread since its a slow moving API
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
 	<-stopCh
+}
+
+func (c *Controller) sync(name string) error {
+	// controller single threaded so lock is technically unnecessary.
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	crd, err := c.crdLister.Get(name)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
+		// c.deleteCRD(name)
+		return nil
+	}
+
+	versions := []string{}
+	for _, v := range crd.Spec.Versions {
+		if !v.Served {
+			continue
+		}
+		versions = append(versions, v.Name)
+	}
+	c.addUpdateCRD(crd, crd.Name, versions)
+
+	return nil
+}
+
+func (c *Controller) addUpdateCRD(crd *apiextensionsv1.CustomResourceDefinition, crdName string, versions []string) {
+	crdSpecs, ok := c.cacheByNameandGV[crdName]
+	if !ok {
+		crdSpecs = make(map[schema.GroupVersion]*crdCache)
+	}
+	for _, version := range versions {
+		gv := schema.GroupVersion{Group: crd.Spec.Group, Version: version}
+		if _, ok := crdSpecs[gv]; ok {
+			crdSpecs[gv].crd.Store(cached.Static(crd, generateCRDHash(crd)))
+			return
+		}
+		crdSpecs[gv] = c.buildCRDCache(crd, crdName, version)
+		c.updateGroupVersion(gv)
+	}
+}
+
+// func (c *Controller) deleteCRD(name string) {
+// 	for gv, crdListForGV := range c.specsByGVandName {
+// 		_, needOpenAPIUpdate := crdListForGV[name]
+// 		if needOpenAPIUpdate {
+// 			delete(crdListForGV, name)
+// 			if len(crdListForGV) == 0 {
+// 				delete(c.specsByGVandName, gv)
+// 			}
+// 			regenerationCounter.With(map[string]string{"group": gv.Group, "version": gv.Version, "crd": name, "reason": "remove"})
+// 			c.updateGroupVersion(gv)
+// 		}
+// 	}
+// }
+
+func (c *Controller) updateGroupVersion(gv schema.GroupVersion) error {
+	// delete if not needed?
+	specList := []cached.Value[*spec3.OpenAPI]{}
+	for crd := range c.cacheByNameandGV {
+		if _, ok := c.cacheByNameandGV[crd][gv]; ok {
+			specList = append(specList, c.cacheByNameandGV[crd][gv].crdOpenAPI)
+		}
+	}
+	cache := cached.MergeList(func(results []cached.Result[*spec3.OpenAPI]) (*spec3.OpenAPI, string, error) {
+		localCRDSpec := make([]*spec3.OpenAPI, 0, len(results))
+		for k := range results {
+			if results[k].Err == nil {
+				localCRDSpec = append(localCRDSpec, results[k].Value)
+			}
+		}
+		mergedSpec, err := builder.MergeSpecsV3(localCRDSpec...)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to merge specs: %v", err)
+		}
+		return mergedSpec, uuid.New().String(), nil
+	}, specList)
+	c.openAPIV3Service.UpdateGroupVersionLazy(groupVersionToOpenAPIV3Path(gv), cache)
+	return nil
+}
+
+func (c *Controller) buildCRDCache(crd *apiextensionsv1.CustomResourceDefinition, name, versionName string) *crdCache {
+	crdcache := &crdCache{}
+	crdcache.crd.Store(cached.Static(crd, generateCRDHash(crd)))
+	crdcache.crdOpenAPI = cached.Transform[*apiextensionsv1.CustomResourceDefinition](func(crd *apiextensionsv1.CustomResourceDefinition, etag string, err error) (*spec3.OpenAPI, string, error) {
+		v3, err := builder.BuildOpenAPIV3(crd, versionName, builder.Options{V2: false})
+		return v3, generateCRDHash(crd), err
+	}, &crdcache.crd)
+	return crdcache
 }
 
 func (c *Controller) runWorker() {
@@ -132,15 +227,6 @@ func (c *Controller) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	// log slow aggregations
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		if elapsed > time.Second {
-			klog.Warningf("slow openapi aggregation of %q: %s", key.(string), elapsed)
-		}
-	}()
-
 	err := c.syncFn(key.(string))
 	if err == nil {
 		c.queue.Forget(key)
@@ -150,122 +236,6 @@ func (c *Controller) processNextWorkItem() bool {
 	utilruntime.HandleError(fmt.Errorf("%v failed with: %v", key, err))
 	c.queue.AddRateLimited(key)
 	return true
-}
-
-func (c *Controller) sync(name string) error {
-	// controller single threaded so lock is technically unnecessary.
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	crd, err := c.crdLister.Get(name)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
-		c.deleteCRD(name)
-		return nil
-	}
-
-	for _, v := range crd.Spec.Versions {
-		if !v.Served {
-			continue
-		}
-		c.buildV3Spec(crd, name, v.Name)
-	}
-
-	return nil
-}
-
-func (c *Controller) deleteCRD(name string) {
-	for gv, crdListForGV := range c.specsByGVandName {
-		_, needOpenAPIUpdate := crdListForGV[name]
-		if needOpenAPIUpdate {
-			delete(crdListForGV, name)
-			if len(crdListForGV) == 0 {
-				delete(c.specsByGVandName, gv)
-			}
-			regenerationCounter.With(map[string]string{"group": gv.Group, "version": gv.Version, "crd": name, "reason": "remove"})
-			c.updateGroupVersion(gv)
-		}
-	}
-}
-
-func (c *Controller) updateGroupVersion(gv schema.GroupVersion) error {
-	if _, ok := c.specsByGVandName[gv]; !ok {
-		c.openAPIV3Service.DeleteGroupVersion(groupVersionToOpenAPIV3Path(gv))
-		return nil
-	}
-
-	specList := make([]cached.Value[*spec.Swagger], 0, len(c.specsByGVandName[gv]))
-	for crd := range c.specsByGVandName[gv] {
-		specList = append(specList, c.specsByGVandName[gv][crd].crdOpenAPI)
-	}
-
-	cache := cached.MergeList(func(results []cached.Result[*spec3.OpenAPI]) (*spec3.OpenAPI, string, error) {
-		localCRDSpec := make([]*spec3.OpenAIP, 0, len(results))
-		for k := range results {
-			if results[k].Err == nil {
-				localCRDSpec = append(localCRDSpec, results[k].Value)
-			}
-		}
-		mergedSpec, err := builder.MergeSpecsV3(specs...)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to merge specs: %v", err)
-		}
-		return mergedSpec, uuid.New().String(), nil
-	})
-	c.openAPIV3Service.UpdateGroupVersionLazy(groupVersionToOpenAPIV3Path(gv), mergedSpec)
-	return nil
-}
-
-func (c *Controller) updateCRDSpec(crd *apiextensionsv1.CustomResourceDefinition, name, versionName string, v3 *spec3.OpenAPI) error {
-	gv := schema.GroupVersion{
-		Group:   crd.Spec.Group,
-		Version: versionName,
-	}
-
-	_, ok := c.specsByGVandName[gv]
-	reason := "update"
-	if !ok {
-		reason = "add"
-		c.specsByGVandName[gv] = map[string]*spec3.OpenAPI{}
-	}
-
-	oldSpec, ok := c.specsByGVandName[gv][name]
-	if ok {
-		if reflect.DeepEqual(oldSpec, v3) {
-			// no changes to CRD
-			return nil
-		}
-	}
-	c.specsByGVandName[gv][name] = v3
-	regenerationCounter.With(map[string]string{"crd": name, "group": gv.Group, "version": gv.Version, "reason": reason})
-	return c.updateGroupVersion(gv)
-}
-
-func (c *Controller) buildCRDCache(crd *apiextensionsv1.CustomResourceDefinition, name, versionName, string) {
-	crdcache := &crdCache{}
-	crdcache.crd.Store(crd)
-	crdcache.crdOpenAPI = cached.Transform[*apiextensionsv1.CustomResourceDefinition](func(crd *apiextensionsv1.CustomResourceDefinition, etag string, err error) (*spec3.OpenAPI, string, error) {
-		v3, err := builder.BuildOpenAPIV3(crd, versionName, builder.Options{V2: false})
-		return v3, generateCRDHash(crd),
-	}, &crdcache.crd)
-}
-
-func generateCRDHash(*apiextensionsv1.CustomResourceDefinition) string {
-	return ""
-}
-
-func (c *Controller) buildV3Spec(crd *apiextensionsv1.CustomResourceDefinition, name, versionName string) error {
-	v3, err := builder.BuildOpenAPIV3(crd, versionName, builder.Options{V2: false})
-
-	if err != nil {
-		return err
-	}
-
-	c.updateCRDSpec(crd, name, versionName, v3)
-	return nil
 }
 
 func (c *Controller) addCustomResourceDefinition(obj interface{}) {
@@ -300,4 +270,8 @@ func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
 
 func (c *Controller) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
 	c.queue.Add(obj.Name)
+}
+
+func generateCRDHash(crd *apiextensionsv1.CustomResourceDefinition) string {
+	return fmt.Sprintf("%s,%d", crd.UID, crd.Generation)
 }
