@@ -99,13 +99,14 @@ var (
 // Test suite authors can use framework/viper to make all command line
 // parameters also configurable via a configuration file.
 type TestContextType struct {
-	KubeConfig         string
-	KubeContext        string
-	KubeAPIContentType string
-	KubeletRootDir     string
-	CertDir            string
-	Host               string
-	BearerToken        string `datapolicy:"token"`
+	KubeConfig             string
+	KubeContext            string
+	KubeAPIContentType     string
+	KubeletRootDir         string
+	KubeletConfigDropinDir string
+	CertDir                string
+	Host                   string
+	BearerToken            string `datapolicy:"token"`
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot string
 	// ListImages will list off all images that are used then quit
