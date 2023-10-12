@@ -247,12 +247,12 @@ func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, podStatus *kubecont
 	// fresh sandbox and configure networking for the sandbox.
 	if !newSandboxNeeded {
 		return v1.PodCondition{
-			Type:   kubetypes.PodReadyToStartContainers,
+			Type:   v1.PodReadyToStartContainers,
 			Status: v1.ConditionTrue,
 		}
 	}
 	return v1.PodCondition{
-		Type:   kubetypes.PodReadyToStartContainers,
+		Type:   v1.PodReadyToStartContainers,
 		Status: v1.ConditionFalse,
 	}
 }
