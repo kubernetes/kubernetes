@@ -247,6 +247,7 @@ const (
 	PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY = 0x00020007
 	PROC_THREAD_ATTRIBUTE_UMS_THREAD        = 0x00030006
 	PROC_THREAD_ATTRIBUTE_PROTECTION_LEVEL  = 0x0002000b
+	PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE     = 0x00020016
 )
 
 const (
@@ -2139,6 +2140,12 @@ const (
 	ENABLE_LVB_GRID_WORLDWIDE          = 0x10
 )
 
+// Pseudo console related constants used for the flags parameter to
+// CreatePseudoConsole. See: https://learn.microsoft.com/en-us/windows/console/createpseudoconsole
+const (
+	PSEUDOCONSOLE_INHERIT_CURSOR = 0x1
+)
+
 type Coord struct {
 	X int16
 	Y int16
@@ -2220,19 +2227,23 @@ type JOBOBJECT_BASIC_UI_RESTRICTIONS struct {
 }
 
 const (
-	// JobObjectInformationClass
+	// JobObjectInformationClass for QueryInformationJobObject and SetInformationJobObject
 	JobObjectAssociateCompletionPortInformation = 7
+	JobObjectBasicAccountingInformation         = 1
+	JobObjectBasicAndIoAccountingInformation    = 8
 	JobObjectBasicLimitInformation              = 2
+	JobObjectBasicProcessIdList                 = 3
 	JobObjectBasicUIRestrictions                = 4
 	JobObjectCpuRateControlInformation          = 15
 	JobObjectEndOfJobTimeInformation            = 6
 	JobObjectExtendedLimitInformation           = 9
 	JobObjectGroupInformation                   = 11
 	JobObjectGroupInformationEx                 = 14
-	JobObjectLimitViolationInformation2         = 35
+	JobObjectLimitViolationInformation          = 13
+	JobObjectLimitViolationInformation2         = 34
 	JobObjectNetRateControlInformation          = 32
 	JobObjectNotificationLimitInformation       = 12
-	JobObjectNotificationLimitInformation2      = 34
+	JobObjectNotificationLimitInformation2      = 33
 	JobObjectSecurityLimitInformation           = 5
 )
 
