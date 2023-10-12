@@ -464,7 +464,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	register(names.PersistentVolumeBinderController, startPersistentVolumeBinderController)
 	register(names.PersistentVolumeAttachDetachController, startAttachDetachController)
 	register(names.PersistentVolumeExpanderController, startVolumeExpandController)
-	register(names.ClusterRoleAggregationController, startClusterRoleAggregrationController)
+	register(names.ClusterRoleAggregationController, startClusterRoleAggegrationController)
 	register(names.PersistentVolumeClaimProtectionController, startPVCProtectionController)
 	register(names.PersistentVolumeProtectionController, startPVProtectionController)
 	register(names.TTLAfterFinishedController, startTTLAfterFinishedController)

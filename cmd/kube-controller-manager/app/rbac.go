@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
 
-func startClusterRoleAggregrationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func startClusterRoleAggegrationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		controllerContext.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
