@@ -240,8 +240,8 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 
 	var potentialVictims []*v1.Pod
 
-	removePod := func(rp *v1.Pod) {
-		nodeInfoCopy.RemovePod(logger, rp)
+	removePod := func(rp *v1.Pod) error {
+		return nodeInfoCopy.RemovePod(logger, rp)
 	}
 	addPod := func(ap *v1.Pod) {
 		nodeInfoCopy.AddPod(ap)
@@ -252,7 +252,9 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 	for _, p := range nodeInfoCopy.Pods {
 		if corev1helpers.PodPriority(p.Pod) < podPriority {
 			potentialVictims = append(potentialVictims, p.Pod)
-			removePod(p.Pod)
+			if err := removePod(p.Pod); err != nil {
+				return nil, 0, false, err
+			}
 		}
 	}
 	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i], potentialVictims[j]) })
@@ -279,7 +281,9 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 		addPod(p)
 		status := f.runPredicate(pod, nodeInfoCopy.Node())
 		if !status.IsSuccess() {
-			removePod(p)
+			if err := removePod(p); err != nil {
+				return false
+			}
 			victims = append(victims, p)
 		}
 		return status.IsSuccess()

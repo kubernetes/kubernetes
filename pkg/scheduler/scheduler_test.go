@@ -282,8 +282,13 @@ func TestFailureHandler(t *testing.T) {
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
-			queue.Add(logger, testPod)
-			queue.Pop(logger)
+			if err := queue.Add(logger, testPod); err != nil {
+				t.Fatalf("Add failed: %v", err)
+			}
+
+			if _, err := queue.Pop(logger); err != nil {
+				t.Fatalf("Pop failed: %v", err)
+			}
 
 			if tt.podUpdatedDuringScheduling {
 				podInformer.Informer().GetStore().Update(testPodUpdated)
