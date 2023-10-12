@@ -360,8 +360,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 			pods.Items[0] = *pod0
 
-			defer func() {
-				err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			removeFinalizer := func() {
+				err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					ginkgo.By("REMOVING FINALIZER to POD0 - trying")
 					pod0, err := c.CoreV1().Pods(ss.Namespace).Get(ctx, pod0.Name, metav1.GetOptions{})
 					if err != nil {
@@ -376,33 +376,37 @@ var _ = SIGDescribe("StatefulSet", func() {
 					return err
 				})
 				framework.ExpectNoError(err)
-			}()
-
-			w := &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					options.LabelSelector = labelSelector
-					return c.AppsV1().StatefulSets(ns).Watch(ctx, options)
-				},
 			}
-			ginkgo.By("Setting watch on the StatefulSet")
-			ssList, err := c.AppsV1().StatefulSets(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-			framework.ExpectNoError(err, "failed to list StatefulSets")
+
+			defer removeFinalizer()
+
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
+				w := &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						options.LabelSelector = labelSelector
+						return c.AppsV1().StatefulSets(ns).Watch(ctx, options)
+					},
+				}
+				ginkgo.By("Setting watch on the StatefulSet")
+				ssList, err := c.AppsV1().StatefulSets(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+				framework.ExpectNoError(err, "failed to list StatefulSets")
+
 				_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 					if e, ok := event.Object.(*appsv1.StatefulSet); ok {
+						ginkgo.By(fmt.Sprintf("EVENT RECEIVED: %v", event.Type))
 						found := e.ObjectMeta.Name == ss.ObjectMeta.Name &&
 							e.ObjectMeta.Namespace == ss.ObjectMeta.Namespace
 						if !found {
 							framework.Logf("Observed Statefulset %v in namespace %v with annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.Annotations, ss.Status.Conditions)
 							return false, nil
 						}
-						ginkgo.By(fmt.Sprintf("StatefulSet status fields: CurrentReplicas=%v, UpdatedReplicas=%v, CurrentRevision=%v, UpdateRevision=%v", e.Status.CurrentReplicas, e.Status.UpdatedReplicas, e.Status.CurrentRevision, e.Status.UpdateRevision))
-						if e.Status.UpdatedReplicas == 2 && e.Status.Replicas == 3 {
+						ginkgo.By(fmt.Sprintf("StatefulSet status fields: CurrentReplicas=%v, UpdatedReplicas=%v, CurrentRevision=%v, UpdateRevision=%v, ReadyReplicas=%v", e.Status.CurrentReplicas, e.Status.UpdatedReplicas, e.Status.CurrentRevision, e.Status.UpdateRevision, e.Status.ReadyReplicas))
+						if e.Status.UpdatedReplicas == 2 && e.Status.Replicas == 3 && e.Status.ReadyReplicas == 3 {
 							ginkgo.By("Marking pod0 as Failed")
 							pod0 := pods.Items[0]
 							pod0name := pod0.Name
@@ -416,10 +420,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 								pod0, err = c.CoreV1().Pods(ss.Namespace).UpdateStatus(ctx, pod0, metav1.UpdateOptions{})
 								return err
 							})
-							return false, nil
+							return false, err
 						}
 						if e.Status.UpdatedReplicas == 3 && priorRevision != updateRevision {
 							ginkgo.By("Rolling Updated completed")
+							return true, nil
+						}
+						if e.Status.CurrentReplicas == 0 {
+							ginkgo.By("Deleted already_______________")
+							removeFinalizer()
 							return true, nil
 						}
 					}
