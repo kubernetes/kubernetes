@@ -2866,6 +2866,9 @@ const (
 	// DisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
 	DisruptionTarget PodConditionType = "DisruptionTarget"
+	// PodReadyToStartContainers pod sandbox is successfully configured and
+	// the pod is ready to launch containers.
+	PodReadyToStartContainers PodConditionType = "PodReadyToStartContainers"
 )
 
 // These are reasons for a pod's transition to a condition.

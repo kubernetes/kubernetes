@@ -634,7 +634,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	updateLastTransitionTime(&status, &oldStatus, v1.PodInitialized)
 
 	// Set PodReadyToStartContainersCondition.LastTransitionTime.
-	updateLastTransitionTime(&status, &oldStatus, kubetypes.PodReadyToStartContainers)
+	updateLastTransitionTime(&status, &oldStatus, v1.PodReadyToStartContainers)
 
 	// Set PodScheduledCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodScheduled)

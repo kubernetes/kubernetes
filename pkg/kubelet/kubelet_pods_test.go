@@ -3367,7 +3367,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				LastTransitionTime: normalized_now,
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -3408,7 +3408,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -3448,7 +3448,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -3489,7 +3489,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionFalse,
 			},
 		},
@@ -3536,7 +3536,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Message: "test",
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionFalse,
 			},
 		},
@@ -3590,7 +3590,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Message: "test",
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionFalse,
 			},
 		},
@@ -3631,7 +3631,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -3687,7 +3687,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -3747,7 +3747,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   kubetypes.PodReadyToStartContainers,
+				Type:   v1.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
