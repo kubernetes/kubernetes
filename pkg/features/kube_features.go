@@ -674,8 +674,9 @@ const (
 	// Set pod completion index as a pod label for Indexed Jobs.
 	PodIndexLabel featuregate.Feature = "PodIndexLabel"
 
-	// owner: @ddebroy
+	// owner: @ddebroy, @kannon92
 	// alpha: v1.25
+	// beta: v1.29
 	//
 	// Enables reporting of PodReadyToStartContainersCondition condition in pod status after pod
 	// sandbox creation and network configuration completes successfully
@@ -1132,7 +1133,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodDisruptionConditions: {Default: true, PreRelease: featuregate.Beta},
 
-	PodReadyToStartContainersCondition: {Default: false, PreRelease: featuregate.Alpha},
+	PodReadyToStartContainersCondition: {Default: true, PreRelease: featuregate.Beta},
 
 	PodHostIPs: {Default: false, PreRelease: featuregate.Alpha},
 
