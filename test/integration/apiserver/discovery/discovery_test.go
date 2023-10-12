@@ -55,14 +55,14 @@ import (
 
 type kubeClientSet = kubernetes.Interface
 
-type aggegatorClientSet = aggregator.Interface
+type aggregatorClientSet = aggregator.Interface
 
 type apiextensionsClientSet = apiextensions.Interface
 
 type dynamicClientset = dynamic.Interface
 type testClientSet struct {
 	kubeClientSet
-	aggegatorClientSet
+	aggregatorClientSet
 	apiextensionsClientSet
 	dynamicClientset
 }
@@ -153,7 +153,7 @@ func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 	kubeClientSet, err := kubernetes.NewForConfig(server.ClientConfig)
 	require.NoError(t, err)
 
-	aggegatorClientSet, err := aggregator.NewForConfig(server.ClientConfig)
+	aggregatorClientSet, err := aggregator.NewForConfig(server.ClientConfig)
 	require.NoError(t, err)
 
 	apiextensionsClientSet, err := apiextensions.NewForConfig(server.ClientConfig)
@@ -164,7 +164,7 @@ func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 
 	client := testClientSet{
 		kubeClientSet:          kubeClientSet,
-		aggegatorClientSet:     aggegatorClientSet,
+		aggregatorClientSet:     aggregatorClientSet,
 		apiextensionsClientSet: apiextensionsClientSet,
 		dynamicClientset:       dynamicClientset,
 	}

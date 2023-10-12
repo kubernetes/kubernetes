@@ -163,7 +163,7 @@ func TestFetchingOpenAPIBeforeReady(t *testing.T) {
 // and should be consolidated.
 type kubeClientSet = kubernetes.Interface
 
-type aggegatorClientSet = aggregator.Interface
+type aggregatorClientSet = aggregator.Interface
 
 type apiextensionsClientSet = apiextensions.Interface
 
@@ -171,7 +171,7 @@ type dynamicClientset = dynamic.Interface
 
 type testClientSet struct {
 	kubeClientSet
-	aggegatorClientSet
+	aggregatorClientSet
 	apiextensionsClientSet
 	dynamicClientset
 }
@@ -193,7 +193,7 @@ func generateTestClient(t *testing.T, server *kubeapiservertesting.TestServer) t
 	kubeClientSet, err := kubernetes.NewForConfig(server.ClientConfig)
 	require.NoError(t, err)
 
-	aggegatorClientSet, err := aggregator.NewForConfig(server.ClientConfig)
+	aggregatorClientSet, err := aggregator.NewForConfig(server.ClientConfig)
 	require.NoError(t, err)
 
 	apiextensionsClientSet, err := apiextensions.NewForConfig(server.ClientConfig)
@@ -204,7 +204,7 @@ func generateTestClient(t *testing.T, server *kubeapiservertesting.TestServer) t
 
 	client := testClientSet{
 		kubeClientSet:          kubeClientSet,
-		aggegatorClientSet:     aggegatorClientSet,
+		aggregatorClientSet:     aggregatorClientSet,
 		apiextensionsClientSet: apiextensionsClientSet,
 		dynamicClientset:       dynamicClientset,
 	}
