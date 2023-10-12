@@ -370,6 +370,25 @@ func gssExchangeToken(gssapiConfig *GSSAPIWithMICConfig, firstToken []byte, s *c
 	return authErr, perms, nil
 }
 
+// isAlgoCompatible checks if the signature format is compatible with the
+// selected algorithm taking into account edge cases that occur with old
+// clients.
+func isAlgoCompatible(algo, sigFormat string) bool {
+	// Compatibility for old clients.
+	//
+	// For certificate authentication with OpenSSH 7.2-7.7 signature format can
+	// be rsa-sha2-256 or rsa-sha2-512 for the algorithm
+	// ssh-rsa-cert-v01@openssh.com.
+	//
+	// With gpg-agent < 2.2.6 the algorithm can be rsa-sha2-256 or rsa-sha2-512
+	// for signature format ssh-rsa.
+	if isRSA(algo) && isRSA(sigFormat) {
+		return true
+	}
+	// Standard case: the underlying algorithm must match the signature format.
+	return underlyingAlgo(algo) == sigFormat
+}
+
 // ServerAuthError represents server authentication errors and is
 // sometimes returned by NewServerConn. It appends any authentication
 // errors that may occur, and is returned if all of the authentication
@@ -557,7 +576,16 @@ userAuthLoop:
 				if !ok || len(payload) > 0 {
 					return nil, parseError(msgUserAuthRequest)
 				}
-
+				// Ensure the declared public key algo is compatible with the
+				// decoded one. This check will ensure we don't accept e.g.
+				// ssh-rsa-cert-v01@openssh.com algorithm with ssh-rsa public
+				// key type. The algorithm and public key type must be
+				// consistent: both must be certificate algorithms, or neither.
+				if !contains(algorithmsForKeyFormat(pubKey.Type()), algo) {
+					authErr = fmt.Errorf("ssh: public key type %q not compatible with selected algorithm %q",
+						pubKey.Type(), algo)
+					break
+				}
 				// Ensure the public key algo and signature algo
 				// are supported.  Compare the private key
 				// algorithm name that corresponds to algo with
@@ -567,7 +595,7 @@ userAuthLoop:
 					authErr = fmt.Errorf("ssh: algorithm %q not accepted", sig.Format)
 					break
 				}
-				if underlyingAlgo(algo) != sig.Format {
+				if !isAlgoCompatible(algo, sig.Format) {
 					authErr = fmt.Errorf("ssh: signature %q not compatible with selected algorithm %q", sig.Format, algo)
 					break
 				}
