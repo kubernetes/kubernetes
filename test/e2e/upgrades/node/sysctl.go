@@ -69,7 +69,7 @@ func (t *SysctlUpgradeTest) Test(ctx context.Context, f *framework.Framework, do
 		framework.ExpectNoError(err)
 	}
 	if err == nil {
-		framework.ExpectNotEqual(pod.Status.Phase, v1.PodRunning)
+		gomega.Expect(pod.Status.Phase).NotTo(gomega.Equal(v1.PodRunning))
 	}
 
 	t.verifySafeSysctlWork(ctx, f)
