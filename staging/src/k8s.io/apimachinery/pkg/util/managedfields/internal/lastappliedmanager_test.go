@@ -512,7 +512,7 @@ spec:
 		{
 			fieldManager: "kubectl",
 			lastApplied: []byte(`
-apiVerison: foo
+apiVersion: foo
 kind: bar
 spec: expect conflict due to invalid object
 `),
