@@ -196,12 +196,12 @@ func TestIndexOfCost(t *testing.T) {
 func TestURLsCost(t *testing.T) {
 	cases := []struct {
 		ops                []string
-		expectEsimatedCost checker.CostEstimate
+		expectEstimatedCost checker.CostEstimate
 		expectRuntimeCost  uint64
 	}{
 		{
 			ops:                []string{".getScheme()", ".getHostname()", ".getHost()", ".getPort()", ".getEscapedPath()", ".getQuery()"},
-			expectEsimatedCost: checker.CostEstimate{Min: 4, Max: 4},
+			expectEstimatedCost: checker.CostEstimate{Min: 4, Max: 4},
 			expectRuntimeCost:  4,
 		},
 	}
@@ -209,7 +209,7 @@ func TestURLsCost(t *testing.T) {
 	for _, tc := range cases {
 		for _, op := range tc.ops {
 			t.Run("url."+op, func(t *testing.T) {
-				testCost(t, "url('https:://kubernetes.io/')"+op, tc.expectEsimatedCost, tc.expectRuntimeCost)
+				testCost(t, "url('https:://kubernetes.io/')"+op, tc.expectEstimatedCost, tc.expectRuntimeCost)
 			})
 		}
 	}
@@ -219,134 +219,134 @@ func TestStringLibrary(t *testing.T) {
 	cases := []struct {
 		name               string
 		expr               string
-		expectEsimatedCost checker.CostEstimate
+		expectEstimatedCost checker.CostEstimate
 		expectRuntimeCost  uint64
 	}{
 		{
 			name:               "lowerAscii",
 			expr:               "'ABCDEFGHIJ abcdefghij'.lowerAscii()",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "lowerAsciiEquals",
 			expr:               "'ABCDEFGHIJ abcdefghij'.lowerAscii() == 'abcdefghij ABCDEFGHIJ'.lowerAscii()",
-			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 9},
+			expectEstimatedCost: checker.CostEstimate{Min: 7, Max: 9},
 			expectRuntimeCost:  9,
 		},
 		{
 			name:               "upperAscii",
 			expr:               "'ABCDEFGHIJ abcdefghij'.upperAscii()",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "upperAsciiEquals",
 			expr:               "'ABCDEFGHIJ abcdefghij'.upperAscii() == 'abcdefghij ABCDEFGHIJ'.upperAscii()",
-			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 9},
+			expectEstimatedCost: checker.CostEstimate{Min: 7, Max: 9},
 			expectRuntimeCost:  9,
 		},
 		{
 			name:               "quote",
 			expr:               "strings.quote('ABCDEFGHIJ abcdefghij')",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "quoteEquals",
 			expr:               "strings.quote('ABCDEFGHIJ abcdefghij') == strings.quote('ABCDEFGHIJ abcdefghij')",
-			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 11},
+			expectEstimatedCost: checker.CostEstimate{Min: 7, Max: 11},
 			expectRuntimeCost:  9,
 		},
 		{
 			name:               "replace",
 			expr:               "'abc 123 def 123'.replace('123', '456')",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "replace between all chars",
 			expr:               "'abc 123 def 123'.replace('', 'x')",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "replace with empty",
 			expr:               "'abc 123 def 123'.replace('123', '')",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "replace with limit",
 			expr:               "'abc 123 def 123'.replace('123', '456', 1)",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "split",
 			expr:               "'abc 123 def 123'.split(' ')",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "split with limit",
 			expr:               "'abc 123 def 123'.split(' ', 1)",
-			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
 			name:               "substring",
 			expr:               "'abc 123 def 123'.substring(5)",
-			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
 			expectRuntimeCost:  2,
 		},
 		{
 			name:               "substring with end",
 			expr:               "'abc 123 def 123'.substring(5, 8)",
-			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
 			expectRuntimeCost:  2,
 		},
 		{
 			name:               "trim",
 			expr:               "'  abc 123 def 123  '.trim()",
-			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
 			expectRuntimeCost:  2,
 		},
 		{
 			name:               "join with separator",
 			expr:               "['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join(' ')",
-			expectEsimatedCost: checker.CostEstimate{Min: 11, Max: 23},
+			expectEstimatedCost: checker.CostEstimate{Min: 11, Max: 23},
 			expectRuntimeCost:  15,
 		},
 		{
 			name:               "join",
 			expr:               "['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join()",
-			expectEsimatedCost: checker.CostEstimate{Min: 10, Max: 22},
+			expectEstimatedCost: checker.CostEstimate{Min: 10, Max: 22},
 			expectRuntimeCost:  13,
 		},
 		{
 			name:               "find",
 			expr:               "'abc 123 def 123'.find('123')",
-			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
 			expectRuntimeCost:  2,
 		},
 		{
 			name:               "findAll",
 			expr:               "'abc 123 def 123'.findAll('123')",
-			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
 			expectRuntimeCost:  2,
 		},
 		{
 			name:               "findAll with limit",
 			expr:               "'abc 123 def 123'.findAll('123', 1)",
-			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
 			expectRuntimeCost:  2,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			testCost(t, tc.expr, tc.expectEsimatedCost, tc.expectRuntimeCost)
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
 		})
 	}
 }
@@ -409,7 +409,7 @@ func TestAuthzLibrary(t *testing.T) {
 	}
 }
 
-func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
+func testCost(t *testing.T, expr string, expectEstimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
 		ext.Strings(ext.StringsVersion(2)),
@@ -433,8 +433,8 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if estCost.Min != expectEsimatedCost.Min || estCost.Max != expectEsimatedCost.Max {
-		t.Errorf("Expected estimated cost of %d..%d but got %d..%d", expectEsimatedCost.Min, expectEsimatedCost.Max, estCost.Min, estCost.Max)
+	if estCost.Min != expectEstimatedCost.Min || estCost.Max != expectEstimatedCost.Max {
+		t.Errorf("Expected estimated cost of %d..%d but got %d..%d", expectEstimatedCost.Min, expectEstimatedCost.Max, estCost.Min, estCost.Max)
 	}
 	prog, err := env.Program(compiled, cel.CostTracking(est))
 	if err != nil {
