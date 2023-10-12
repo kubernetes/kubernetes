@@ -69,7 +69,7 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
 		{
-			name:                     "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=failing",
+			name:                     "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, resize_op=failing",
 			pvc:                      getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", &nodeResizePending),
 			pv:                       getTestPV(volumetesting.AlwaysFailNodeExpansion, "2G"),
 			expectError:              true,
