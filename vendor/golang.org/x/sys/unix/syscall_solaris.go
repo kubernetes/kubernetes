@@ -545,24 +545,24 @@ func Minor(dev uint64) uint32 {
  * Expose the ioctl function
  */
 
-//sys	ioctlRet(fd int, req uint, arg uintptr) (ret int, err error) = libc.ioctl
-//sys	ioctlPtrRet(fd int, req uint, arg unsafe.Pointer) (ret int, err error) = libc.ioctl
+//sys	ioctlRet(fd int, req int, arg uintptr) (ret int, err error) = libc.ioctl
+//sys	ioctlPtrRet(fd int, req int, arg unsafe.Pointer) (ret int, err error) = libc.ioctl
 
-func ioctl(fd int, req uint, arg uintptr) (err error) {
+func ioctl(fd int, req int, arg uintptr) (err error) {
 	_, err = ioctlRet(fd, req, arg)
 	return err
 }
 
-func ioctlPtr(fd int, req uint, arg unsafe.Pointer) (err error) {
+func ioctlPtr(fd int, req int, arg unsafe.Pointer) (err error) {
 	_, err = ioctlPtrRet(fd, req, arg)
 	return err
 }
 
-func IoctlSetTermio(fd int, req uint, value *Termio) error {
+func IoctlSetTermio(fd int, req int, value *Termio) error {
 	return ioctlPtr(fd, req, unsafe.Pointer(value))
 }
 
-func IoctlGetTermio(fd int, req uint) (*Termio, error) {
+func IoctlGetTermio(fd int, req int) (*Termio, error) {
 	var value Termio
 	err := ioctlPtr(fd, req, unsafe.Pointer(&value))
 	return &value, err
@@ -665,7 +665,6 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sys	Setpriority(which int, who int, prio int) (err error)
 //sysnb	Setregid(rgid int, egid int) (err error)
 //sysnb	Setreuid(ruid int, euid int) (err error)
-//sysnb	Setrlimit(which int, lim *Rlimit) (err error)
 //sysnb	Setsid() (pid int, err error)
 //sysnb	Setuid(uid int) (err error)
 //sys	Shutdown(s int, how int) (err error) = libsocket.shutdown
@@ -698,38 +697,6 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sysnb	getpeername(fd int, rsa *RawSockaddrAny, addrlen *_Socklen) (err error) = libsocket.getpeername
 //sys	setsockopt(s int, level int, name int, val unsafe.Pointer, vallen uintptr) (err error) = libsocket.setsockopt
 //sys	recvfrom(fd int, p []byte, flags int, from *RawSockaddrAny, fromlen *_Socklen) (n int, err error) = libsocket.recvfrom
-
-func readlen(fd int, buf *byte, nbuf int) (n int, err error) {
-	r0, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procread)), 3, uintptr(fd), uintptr(unsafe.Pointer(buf)), uintptr(nbuf), 0, 0, 0)
-	n = int(r0)
-	if e1 != 0 {
-		err = e1
-	}
-	return
-}
-
-func writelen(fd int, buf *byte, nbuf int) (n int, err error) {
-	r0, _, e1 := sysvicall6(uintptr(unsafe.Pointer(&procwrite)), 3, uintptr(fd), uintptr(unsafe.Pointer(buf)), uintptr(nbuf), 0, 0, 0)
-	n = int(r0)
-	if e1 != 0 {
-		err = e1
-	}
-	return
-}
-
-var mapper = &mmapper{
-	active: make(map[*byte][]byte),
-	mmap:   mmap,
-	munmap: munmap,
-}
-
-func Mmap(fd int, offset int64, length int, prot int, flags int) (data []byte, err error) {
-	return mapper.Mmap(fd, offset, length, prot, flags)
-}
-
-func Munmap(b []byte) (err error) {
-	return mapper.Munmap(b)
-}
 
 // Event Ports
 
@@ -1080,11 +1047,11 @@ func Getmsg(fd int, cl []byte, data []byte) (retCl []byte, retData []byte, flags
 	return retCl, retData, flags, nil
 }
 
-func IoctlSetIntRetInt(fd int, req uint, arg int) (int, error) {
+func IoctlSetIntRetInt(fd int, req int, arg int) (int, error) {
 	return ioctlRet(fd, req, uintptr(arg))
 }
 
-func IoctlSetString(fd int, req uint, val string) error {
+func IoctlSetString(fd int, req int, val string) error {
 	bs := make([]byte, len(val)+1)
 	copy(bs[:len(bs)-1], val)
 	err := ioctlPtr(fd, req, unsafe.Pointer(&bs[0]))
@@ -1120,7 +1087,7 @@ func (l *Lifreq) GetLifruUint() uint {
 	return *(*uint)(unsafe.Pointer(&l.Lifru[0]))
 }
 
-func IoctlLifreq(fd int, req uint, l *Lifreq) error {
+func IoctlLifreq(fd int, req int, l *Lifreq) error {
 	return ioctlPtr(fd, req, unsafe.Pointer(l))
 }
 
@@ -1131,6 +1098,6 @@ func (s *Strioctl) SetInt(i int) {
 	s.Dp = (*int8)(unsafe.Pointer(&i))
 }
 
-func IoctlSetStrioctlRetInt(fd int, req uint, s *Strioctl) (int, error) {
+func IoctlSetStrioctlRetInt(fd int, req int, s *Strioctl) (int, error) {
 	return ioctlPtrRet(fd, req, unsafe.Pointer(s))
 }
