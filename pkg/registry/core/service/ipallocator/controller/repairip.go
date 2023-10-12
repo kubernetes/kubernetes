@@ -552,7 +552,6 @@ func serviceToRef(svc *v1.Service) *networkingv1alpha1.ParentReference {
 		Resource:  "services",
 		Namespace: svc.Namespace,
 		Name:      svc.Name,
-		UID:       svc.UID,
 	}
 }
 

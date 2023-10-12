@@ -37418,13 +37418,6 @@ func schema_k8sio_api_networking_v1alpha1_ParentReference(ref common.ReferenceCa
 							Format:      "",
 						},
 					},
-					"uid": {
-						SchemaProps: spec.SchemaProps{
-							Description: "UID is the uid of the object being referenced.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 				},
 			},
 		},

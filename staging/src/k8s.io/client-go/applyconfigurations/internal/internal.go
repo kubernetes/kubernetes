@@ -10325,9 +10325,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: resource
       type:
         scalar: string
-    - name: uid
-      type:
-        scalar: string
 - name: io.k8s.api.networking.v1beta1.HTTPIngressPath
   map:
     fields:

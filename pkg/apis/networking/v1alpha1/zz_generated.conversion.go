@@ -28,7 +28,6 @@ import (
 	v1alpha1 "k8s.io/api/networking/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
@@ -260,7 +259,6 @@ func autoConvert_v1alpha1_ParentReference_To_networking_ParentReference(in *v1al
 	out.Resource = in.Resource
 	out.Namespace = in.Namespace
 	out.Name = in.Name
-	out.UID = types.UID(in.UID)
 	return nil
 }
 
@@ -274,7 +272,6 @@ func autoConvert_networking_ParentReference_To_v1alpha1_ParentReference(in *netw
 	out.Resource = in.Resource
 	out.Namespace = in.Namespace
 	out.Name = in.Name
-	out.UID = types.UID(in.UID)
 	return nil
 }
 
