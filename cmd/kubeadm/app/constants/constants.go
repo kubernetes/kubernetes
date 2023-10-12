@@ -453,7 +453,7 @@ var (
 	MinimumControlPlaneVersion = getSkewedKubernetesVersion(-1)
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = getSkewedKubernetesVersion(-1)
+	MinimumKubeletVersion = getSkewedKubernetesVersion(-3)
 
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
 	CurrentKubernetesVersion = getSkewedKubernetesVersion(0)
