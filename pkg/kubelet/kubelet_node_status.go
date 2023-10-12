@@ -298,6 +298,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 				kubeletapis.LabelOS:   goruntime.GOOS,
 				kubeletapis.LabelArch: goruntime.GOARCH,
 			},
+			Annotations: kl.nodeAnnotation,
 		},
 		Spec: v1.NodeSpec{
 			Unschedulable: !kl.registerSchedulable,

@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -108,6 +109,8 @@ type KubeletFlags struct {
 	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
 	// Node Labels are the node labels to add when registering the node in the cluster
 	NodeLabels map[string]string
+	// Node Annotations are the node annotations to add when registering the node in the cluster
+	NodeAnnotation map[string]string
 	// lockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
@@ -149,6 +152,7 @@ func NewKubeletFlags() *KubeletFlags {
 		MinimumGCAge:            metav1.Duration{Duration: 0},
 		RegisterSchedulable:     true,
 		NodeLabels:              make(map[string]string),
+		NodeAnnotation:          make(map[string]string),
 	}
 }
 
@@ -156,8 +160,10 @@ func NewKubeletFlags() *KubeletFlags {
 func ValidateKubeletFlags(f *KubeletFlags) error {
 	unknownLabels := sets.NewString()
 	invalidLabelErrs := make(map[string][]string)
+	unexpectedAnnotation := sets.NewString()
+	invalidAnnotationsErrs := make(map[string][]string)
 	for k, v := range f.NodeLabels {
-		if isKubernetesLabel(k) && !kubeletapis.IsKubeletLabel(k) {
+		if isKubernetesReserved(k) && !kubeletapis.IsKubeletLabel(k) {
 			unknownLabels.Insert(k)
 		}
 
@@ -171,17 +177,49 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	if len(unknownLabels) > 0 {
 		return fmt.Errorf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
 	}
-	if len(invalidLabelErrs) > 0 {
+
+	if len(f.NodeAnnotation) > 1 {
+		return fmt.Errorf("expected only one annotation set on the node object, got %d", len(f.NodeAnnotation))
+	}
+	for k := range f.NodeAnnotation {
+		if isKubernetesReserved(k) {
+			unexpectedAnnotation.Insert(k)
+		}
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			invalidAnnotationsErrs[k] = append(invalidAnnotationsErrs[k], errs...)
+		}
+		if err := apimachineryvalidation.ValidateAnnotationsSize(f.NodeAnnotation); err != nil {
+			invalidAnnotationsErrs[k] = append(invalidAnnotationsErrs[k], err.Error())
+		}
+	}
+	if len(unexpectedAnnotation) > 0 {
+		return fmt.Errorf("unexpected 'kubernetes.io' or 'k8s.io' annotations specified with --node-annotations: %v\n--node-annotations in the core components namespace are not allowed", unexpectedAnnotation.List())
+	}
+
+	if len(invalidLabelErrs) > 0 || len(invalidAnnotationsErrs) > 0 {
+		errs := []string{}
 		labelErrs := []string{}
+		annotaionErrs := []string{}
 		for k, v := range invalidLabelErrs {
 			labelErrs = append(labelErrs, fmt.Sprintf("'%s' - %s", k, strings.Join(v, ", ")))
 		}
-		return fmt.Errorf("invalid node labels: %s", strings.Join(labelErrs, "; "))
+		if len(labelErrs) > 0 {
+			errs = append(errs, fmt.Sprintf("invalid node labels: %s", strings.Join(labelErrs, "; ")))
+		}
+
+		for k, v := range invalidAnnotationsErrs {
+			annotaionErrs = append(annotaionErrs, fmt.Sprintf("'%s' - %s", k, strings.Join(v, ", ")))
+		}
+		if len(annotaionErrs) > 0 {
+			errs = append(errs, fmt.Sprintf("invalid node annotaion: %s", strings.Join(annotaionErrs, "; ")))
+		}
+
+		return fmt.Errorf(strings.Join(errs, ", "))
 	}
 	return nil
 }
 
-func isKubernetesLabel(key string) bool {
+func isKubernetesReserved(key string) bool {
 	namespace := getLabelNamespace(key)
 	if namespace == "kubernetes.io" || strings.HasSuffix(namespace, ".kubernetes.io") {
 		return true
@@ -306,6 +344,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	// EXPERIMENTAL FLAGS
 	bindableNodeLabels := cliflag.ConfigurationMap(f.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", fmt.Sprintf("<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','. Labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", ")))
+	fs.Var(cliflag.NewMapStringStringNoSplit(&f.NodeAnnotation), "node-annotation", "<Warning: Alpha feature> Annotation to add when registering the node in the cluster.  Annotation must be a key=value pair.")
 	fs.StringVar(&f.LockFilePath, "lock-file", f.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.BoolVar(&f.ExitOnLockContention, "exit-on-lock-contention", f.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 

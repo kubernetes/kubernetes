@@ -3002,6 +3002,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		true,
 		true,
 		map[string]string{},
+		map[string]string{},
 		1024,
 		false,
 	)

@@ -144,35 +144,79 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 
 func TestValidateKubeletFlags(t *testing.T) {
 	tests := []struct {
-		name   string
-		error  bool
-		labels map[string]string
+		error       bool
+		errorString string
+		name        string
+		labels      map[string]string
+		annotaitons map[string]string
 	}{
 		{
-			name:  "Invalid kubernetes.io label",
-			error: true,
+			name:        "Invalid kubernetes.io label",
+			errorString: "unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: [beta.kubernetes.io/metadata-proxy-ready]\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (kubelet.kubernetes.io, node.kubernetes.io) or be in the specifically allowed set (beta.kubernetes.io/arch, beta.kubernetes.io/instance-type, beta.kubernetes.io/os, failure-domain.beta.kubernetes.io/region, failure-domain.beta.kubernetes.io/zone, kubernetes.io/arch, kubernetes.io/hostname, kubernetes.io/os, node.kubernetes.io/instance-type, topology.kubernetes.io/region, topology.kubernetes.io/zone)",
+			error:       true,
+			annotaitons: map[string]string{},
 			labels: map[string]string{
 				"beta.kubernetes.io/metadata-proxy-ready": "true",
 			},
 		},
 		{
-			name:  "Valid label outside of kubernetes.io and k8s.io",
-			error: false,
+			name:        "Valid label outside of kubernetes.io and k8s.io",
+			error:       false,
+			annotaitons: map[string]string{},
 			labels: map[string]string{
 				"cloud.google.com/metadata-proxy-ready": "true",
 			},
 		},
 		{
-			name:   "Empty label list",
-			error:  false,
-			labels: map[string]string{},
+			name:        "Empty label and annotation list",
+			error:       false,
+			annotaitons: map[string]string{},
+			labels:      map[string]string{},
 		},
 		{
-			name:  "Invalid label",
-			error: true,
+			name:        "Invalid label",
+			error:       true,
+			errorString: "invalid node labels: 'kubernetes/kubernetes' - a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')",
+			annotaitons: map[string]string{},
 			labels: map[string]string{
 				"cloud.google.com/repository": "kubernetes/kubernetes",
 			},
+		},
+		{
+			name:        "Invalid annotaiton",
+			error:       true,
+			errorString: "invalid node annotaion: 'invalid annotation' - name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')",
+			annotaitons: map[string]string{
+				"invalid annotation": "",
+			},
+			labels: map[string]string{},
+		},
+		{
+			name:        "Multiple annotaitons",
+			error:       true,
+			errorString: "expected only one annotation set on the node object, got 2",
+			annotaitons: map[string]string{
+				"annotation1": "",
+				"annotation2": "",
+			},
+			labels: map[string]string{},
+		},
+		{
+			name:        "Disallowed annotaiton",
+			errorString: "unexpected 'kubernetes.io' or 'k8s.io' annotations specified with --node-annotations: [beta.kubernetes.io/metadata-proxy-ready]\n--node-annotations in the core components namespace are not allowed",
+			error:       true,
+			annotaitons: map[string]string{
+				"beta.kubernetes.io/metadata-proxy-ready": "true",
+			},
+			labels: map[string]string{},
+		},
+		{
+			name:  "Valid annotaiton outside of kubernetes.io and k8s.io",
+			error: false,
+			annotaitons: map[string]string{
+				"some.storage.io/default-node-tags": "[\"storage\",\"select\"]",
+			},
+			labels: map[string]string{},
 		},
 	}
 
@@ -181,14 +225,18 @@ func TestValidateKubeletFlags(t *testing.T) {
 			err := ValidateKubeletFlags(&KubeletFlags{
 				ContainerRuntimeOptions: config.ContainerRuntimeOptions{},
 				NodeLabels:              tt.labels,
+				NodeAnnotation:          tt.annotaitons,
 			})
 
 			if tt.error && err == nil {
-				t.Errorf("ValidateKubeletFlags should have failed with labels: %+v", tt.labels)
+				t.Errorf("ValidateKubeletFlags should have failed with values: labels=%+v annotations=%+v, causing error: %s, got: %#v", tt.labels, tt.annotaitons, tt.errorString, err)
+			}
+			if tt.error && err != nil && err.Error() != tt.errorString {
+				t.Errorf("ValidateKubeletFlags should have failed with values: labels=%+v annotations=%+v, causing error: %s, got: %#v", tt.labels, tt.annotaitons, tt.errorString, err)
 			}
 
 			if !tt.error && err != nil {
-				t.Errorf("ValidateKubeletFlags should not have failed with labels: %+v", tt.labels)
+				t.Errorf("ValidateKubeletFlags should not have failed with values: labels=%+v annotations=%+v, failed with: %#v", tt.labels, tt.annotaitons, err)
 			}
 		})
 	}

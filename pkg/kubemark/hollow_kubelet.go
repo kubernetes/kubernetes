@@ -144,6 +144,7 @@ type HollowKubeletOptions struct {
 	MaxPods             int
 	PodsPerCore         int
 	NodeLabels          map[string]string
+	NodeAnnotation      map[string]string
 	RegisterWithTaints  []v1.Taint
 }
 
@@ -162,6 +163,7 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
+	f.NodeAnnotation = opt.NodeAnnotation
 	f.RegisterSchedulable = true
 
 	// Config struct

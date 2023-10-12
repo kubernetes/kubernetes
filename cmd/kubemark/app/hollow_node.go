@@ -71,6 +71,7 @@ type hollowNodeConfig struct {
 	ProxierSyncPeriod       time.Duration
 	ProxierMinSyncPeriod    time.Duration
 	NodeLabels              map[string]string
+	NodeAnnotation          map[string]string
 	RegisterWithTaints      []v1.Taint
 	MaxPods                 int
 	ExtendedResources       map[string]string
@@ -101,6 +102,7 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
 	bindableNodeLabels := cliflag.ConfigurationMap(c.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "Additional node labels")
+	fs.Var(cliflag.NewMapStringStringNoSplit(&c.NodeAnnotation), "node-annotation", "Additional node annotation")
 	fs.Var(utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
 	fs.IntVar(&c.MaxPods, "max-pods", maxPods, "Number of pods that can run on this Kubelet.")
 	bindableExtendedResources := cliflag.ConfigurationMap(c.ExtendedResources)
@@ -138,6 +140,7 @@ func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubeletO
 		MaxPods:             c.MaxPods,
 		PodsPerCore:         podsPerCore,
 		NodeLabels:          c.NodeLabels,
+		NodeAnnotation:      c.NodeAnnotation,
 		RegisterWithTaints:  c.RegisterWithTaints,
 	}
 }
@@ -146,6 +149,7 @@ func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubeletO
 func NewHollowNodeCommand() *cobra.Command {
 	s := &hollowNodeConfig{
 		NodeLabels:        make(map[string]string),
+		NodeAnnotation:    make(map[string]string),
 		ExtendedResources: make(map[string]string),
 	}
 
