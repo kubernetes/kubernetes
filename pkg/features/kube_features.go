@@ -795,6 +795,10 @@ const (
 	// Requires stricter validation of IP addresses and CIDR values in API objects.
 	StrictIPCIDRValidation featuregate.Feature = "StrictIPCIDRValidation"
 
+	// owner: @chaunceyctx
+	// Keep termination log file when container has been removed.
+	KeepTerminationLogFile featuregate.Feature = "KeepTerminationLogFile"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	//
@@ -1796,6 +1800,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	StrictIPCIDRValidation: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	KeepTerminationLogFile: {
+		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
 	TopologyAwareHints: {
