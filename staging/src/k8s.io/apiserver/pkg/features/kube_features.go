@@ -225,5 +225,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
 	OpenAPIV3:                           {Default: true, PreRelease: featuregate.Beta},
 	ServerSideFieldValidation:           {Default: false, PreRelease: featuregate.Alpha},
-	UnauthenticatedHTTP2DOSMitigation:   {Default: true, PreRelease: featuregate.Beta},
+	UnauthenticatedHTTP2DOSMitigation:   {Default: false, PreRelease: featuregate.Beta},
 }
