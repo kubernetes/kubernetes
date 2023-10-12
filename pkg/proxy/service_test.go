@@ -595,7 +595,7 @@ func TestServiceToServiceMap(t *testing.T) {
 }
 
 type FakeProxier struct {
-	endpointsChanges *EndpointChangeTracker
+	endpointsChanges *EndpointsChangeTracker
 	serviceChanges   *ServiceChangeTracker
 	svcPortMap       ServicePortMap
 	endpointsMap     EndpointsMap
@@ -607,7 +607,7 @@ func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
 		svcPortMap:     make(ServicePortMap),
 		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
 		endpointsMap:   make(EndpointsMap),
-		endpointsChanges: &EndpointChangeTracker{
+		endpointsChanges: &EndpointsChangeTracker{
 			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 			trackerStartTime:          t,
 			processEndpointsMapChange: nil,
