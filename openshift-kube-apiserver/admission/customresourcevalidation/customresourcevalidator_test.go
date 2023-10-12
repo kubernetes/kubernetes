@@ -157,7 +157,7 @@ func TestCustomResourceValidator(t *testing.T) {
 				},
 				map[schema.GroupVersionKind]ObjectValidator{
 					{Group: testGroup, Version: testVersion, Kind: testKind}: testValidator{
-						validateCreate: func(obj runtime.Object) field.ErrorList {
+						validateCreate: func(_ context.Context, obj runtime.Object) field.ErrorList {
 							createFuncCalled = true
 							if tc.validateFuncErr {
 								return field.ErrorList{field.InternalError(field.NewPath("test"), errors.New("TEST Error"))}
@@ -165,7 +165,7 @@ func TestCustomResourceValidator(t *testing.T) {
 							funcArgObject = obj
 							return nil
 						},
-						validateUpdate: func(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+						validateUpdate: func(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
 							if tc.validateFuncErr {
 								return field.ErrorList{field.InternalError(field.NewPath("test"), errors.New("TEST Error"))}
 							}
@@ -174,7 +174,7 @@ func TestCustomResourceValidator(t *testing.T) {
 							funcArgOldObject = oldObj
 							return nil
 						},
-						validateStatusUpdate: func(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+						validateStatusUpdate: func(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
 							updateStatusFuncCalled = true
 							if tc.validateFuncErr {
 								return field.ErrorList{field.InternalError(field.NewPath("test"), errors.New("TEST Error"))}
@@ -259,20 +259,20 @@ func TestCustomResourceValidator(t *testing.T) {
 }
 
 type testValidator struct {
-	validateCreate       func(uncastObj runtime.Object) field.ErrorList
-	validateUpdate       func(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList
-	validateStatusUpdate func(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList
+	validateCreate       func(_ context.Context, uncastObj runtime.Object) field.ErrorList
+	validateUpdate       func(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList
+	validateStatusUpdate func(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList
 }
 
-func (v testValidator) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
-	return v.validateCreate(uncastObj)
+func (v testValidator) ValidateCreate(ctx context.Context, uncastObj runtime.Object) field.ErrorList {
+	return v.validateCreate(ctx, uncastObj)
 }
 
-func (v testValidator) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
-	return v.validateUpdate(uncastObj, uncastOldObj)
+func (v testValidator) ValidateUpdate(ctx context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+	return v.validateUpdate(ctx, uncastObj, uncastOldObj)
 
 }
 
-func (v testValidator) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
-	return v.validateStatusUpdate(uncastObj, uncastOldObj)
+func (v testValidator) ValidateStatusUpdate(ctx context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+	return v.validateStatusUpdate(ctx, uncastObj, uncastOldObj)
 }

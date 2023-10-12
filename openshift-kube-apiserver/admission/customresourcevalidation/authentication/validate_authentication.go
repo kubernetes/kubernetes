@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -47,7 +48,7 @@ func toAuthenticationV1(uncastObj runtime.Object) (*configv1.Authentication, fie
 
 type authenticationV1 struct{}
 
-func (authenticationV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (authenticationV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, errs := toAuthenticationV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -59,7 +60,7 @@ func (authenticationV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList
 	return errs
 }
 
-func (authenticationV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (authenticationV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toAuthenticationV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -75,7 +76,7 @@ func (authenticationV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj ru
 	return errs
 }
 
-func (authenticationV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (authenticationV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toAuthenticationV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

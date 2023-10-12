@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -77,7 +78,7 @@ func validateConfigNodeForExtremeLatencyProfile(obj, oldObj *configv1.Node) *fie
 	return nil
 }
 
-func (configNodeV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (configNodeV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, allErrs := toConfigNodeV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -88,7 +89,7 @@ func (configNodeV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return allErrs
 }
 
-func (configNodeV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (configNodeV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, allErrs := toConfigNodeV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -106,7 +107,7 @@ func (configNodeV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtim
 	return allErrs
 }
 
-func (configNodeV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (configNodeV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toConfigNodeV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

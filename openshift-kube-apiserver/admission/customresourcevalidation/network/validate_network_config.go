@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -81,7 +82,7 @@ func validateNetworkServiceNodePortRangeUpdate(obj, oldObj *configv1.Network) *f
 	return nil
 }
 
-func (networkV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (networkV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, allErrs := toNetworkV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -92,7 +93,7 @@ func (networkV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return allErrs
 }
 
-func (networkV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (networkV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, allErrs := toNetworkV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -110,7 +111,7 @@ func (networkV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.O
 	return allErrs
 }
 
-func (networkV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (networkV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toNetworkV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

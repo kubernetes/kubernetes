@@ -1,6 +1,7 @@
 package apirequestcount
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -48,7 +49,7 @@ func toAPIRequestCountV1(uncastObj runtime.Object) (*apiv1.APIRequestCount, fiel
 	return obj, nil
 }
 
-func (a apiRequestCountV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (a apiRequestCountV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, errs := toAPIRequestCountV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -81,7 +82,7 @@ func NameToResource(name string) (schema.GroupVersionResource, error) {
 	return result, nil
 }
 
-func (a apiRequestCountV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (a apiRequestCountV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toAPIRequestCountV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -94,7 +95,7 @@ func (a apiRequestCountV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj
 	return errs
 }
 
-func (a apiRequestCountV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (a apiRequestCountV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toAPIRequestCountV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

@@ -1,6 +1,7 @@
 package console
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -48,7 +49,7 @@ func toConsoleV1(uncastObj runtime.Object) (*configv1.Console, field.ErrorList) 
 
 type consoleV1 struct{}
 
-func (consoleV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (consoleV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, errs := toConsoleV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -60,7 +61,7 @@ func (consoleV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return errs
 }
 
-func (consoleV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (consoleV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toConsoleV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -76,7 +77,7 @@ func (consoleV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.O
 	return errs
 }
 
-func (consoleV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (consoleV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toConsoleV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

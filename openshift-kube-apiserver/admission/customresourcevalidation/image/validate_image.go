@@ -1,6 +1,7 @@
 package image
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -49,7 +50,7 @@ func toImageV1(uncastObj runtime.Object) (*configv1.Image, field.ErrorList) {
 type imageV1 struct {
 }
 
-func (imageV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (imageV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, errs := toImageV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -61,7 +62,7 @@ func (imageV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return errs
 }
 
-func (imageV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (imageV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toImageV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -77,7 +78,7 @@ func (imageV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Obj
 	return errs
 }
 
-func (imageV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (imageV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toImageV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

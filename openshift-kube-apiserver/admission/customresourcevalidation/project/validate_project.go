@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -66,7 +67,7 @@ func validateProjectSpec(spec configv1.ProjectSpec) field.ErrorList {
 	return allErrs
 }
 
-func (projectV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (projectV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, allErrs := toProjectV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -78,7 +79,7 @@ func (projectV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return allErrs
 }
 
-func (projectV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (projectV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, allErrs := toProjectV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -94,7 +95,7 @@ func (projectV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.O
 	return allErrs
 }
 
-func (projectV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (projectV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toProjectV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

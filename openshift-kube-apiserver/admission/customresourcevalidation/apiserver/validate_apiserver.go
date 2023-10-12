@@ -38,7 +38,7 @@ type apiserverV1 struct {
 	infrastructureGetter func() configv1client.InfrastructuresGetter
 }
 
-func (a apiserverV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (a apiserverV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, errs := toAPIServerV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -83,7 +83,7 @@ func (a apiserverV1) validateSNINames(obj *configv1.APIServer) field.ErrorList {
 	return errs
 }
 
-func (a apiserverV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (a apiserverV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toAPIServerV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -100,7 +100,7 @@ func (a apiserverV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runti
 	return errs
 }
 
-func (apiserverV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (apiserverV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toAPIServerV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

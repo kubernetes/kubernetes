@@ -1,6 +1,7 @@
 package clusterresourcequota
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -50,7 +51,7 @@ func toClusterResourceQuota(uncastObj runtime.Object) (*quotav1.ClusterResourceQ
 type clusterResourceQuotaV1 struct {
 }
 
-func (clusterResourceQuotaV1) ValidateCreate(obj runtime.Object) field.ErrorList {
+func (clusterResourceQuotaV1) ValidateCreate(_ context.Context, obj runtime.Object) field.ErrorList {
 	clusterResourceQuotaObj, errs := toClusterResourceQuota(obj)
 	if len(errs) > 0 {
 		return errs
@@ -62,7 +63,7 @@ func (clusterResourceQuotaV1) ValidateCreate(obj runtime.Object) field.ErrorList
 	return errs
 }
 
-func (clusterResourceQuotaV1) ValidateUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+func (clusterResourceQuotaV1) ValidateUpdate(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
 	clusterResourceQuotaObj, errs := toClusterResourceQuota(obj)
 	if len(errs) > 0 {
 		return errs
@@ -78,6 +79,6 @@ func (clusterResourceQuotaV1) ValidateUpdate(obj runtime.Object, oldObj runtime.
 	return errs
 }
 
-func (c clusterResourceQuotaV1) ValidateStatusUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
-	return c.ValidateUpdate(obj, oldObj)
+func (c clusterResourceQuotaV1) ValidateStatusUpdate(ctx context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+	return c.ValidateUpdate(ctx, obj, oldObj)
 }
