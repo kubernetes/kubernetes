@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,12 +56,13 @@ type Controller struct {
 
 	// specs per version and per CRD name
 	lock sync.Mutex
-	// specsByGVandName map[schema.GroupVersion]map[string]*crdCache
+
+	// cacheByNameandGV is a graph of cached.Value items that build the OpenAPI V3
 	cacheByNameandGV map[string]map[schema.GroupVersion]*crdCache
 }
 
 type crdCache struct {
-	crd        cached.Atomic[*apiextensionsv1.CustomResourceDefinition]
+	crd        cached.LastSuccess[*apiextensionsv1.CustomResourceDefinition]
 	crdOpenAPI cached.Value[*spec3.OpenAPI]
 }
 
@@ -134,7 +136,7 @@ func (c *Controller) sync(name string) error {
 	}
 
 	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
-		// c.deleteCRD(name)
+		c.cleanCRD(name, []string{})
 		return nil
 	}
 
@@ -150,6 +152,21 @@ func (c *Controller) sync(name string) error {
 	return nil
 }
 
+func (c *Controller) cleanCRD(name string, versionsRemaining []string) {
+	crdSpecs, ok := c.cacheByNameandGV[name]
+	if !ok {
+		return
+	}
+	for gv := range crdSpecs {
+		if !slices.Contains(versionsRemaining, gv.Version) {
+			delete(crdSpecs, gv)
+			c.updateGroupVersion(gv)
+		}
+	}
+	if len(crdSpecs) == 0 {
+		delete(c.cacheByNameandGV, name)
+	}
+}
 func (c *Controller) addUpdateCRD(crd *apiextensionsv1.CustomResourceDefinition, crdName string, versions []string) {
 	crdSpecs, ok := c.cacheByNameandGV[crdName]
 	if !ok {
@@ -159,26 +176,13 @@ func (c *Controller) addUpdateCRD(crd *apiextensionsv1.CustomResourceDefinition,
 		gv := schema.GroupVersion{Group: crd.Spec.Group, Version: version}
 		if _, ok := crdSpecs[gv]; ok {
 			crdSpecs[gv].crd.Store(cached.Static(crd, generateCRDHash(crd)))
-			return
+			continue
 		}
 		crdSpecs[gv] = c.buildCRDCache(crd, crdName, version)
 		c.updateGroupVersion(gv)
 	}
+	c.cleanCRD(crdName, versions)
 }
-
-// func (c *Controller) deleteCRD(name string) {
-// 	for gv, crdListForGV := range c.specsByGVandName {
-// 		_, needOpenAPIUpdate := crdListForGV[name]
-// 		if needOpenAPIUpdate {
-// 			delete(crdListForGV, name)
-// 			if len(crdListForGV) == 0 {
-// 				delete(c.specsByGVandName, gv)
-// 			}
-// 			regenerationCounter.With(map[string]string{"group": gv.Group, "version": gv.Version, "crd": name, "reason": "remove"})
-// 			c.updateGroupVersion(gv)
-// 		}
-// 	}
-// }
 
 func (c *Controller) updateGroupVersion(gv schema.GroupVersion) error {
 	// delete if not needed?
