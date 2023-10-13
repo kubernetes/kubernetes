@@ -119,7 +119,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		})
 
 		ginkgo.It("should conform to Ingress spec", func(ctx context.Context) {
-			conformanceTests = e2eingress.CreateIngressComformanceTests(ctx, jig, ns, map[string]string{})
+			conformanceTests = e2eingress.CreateIngressConformanceTests(ctx, jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				ginkgo.By(t.EntryLog)
 				t.Execute()
@@ -165,7 +165,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should conform to Ingress spec", func(ctx context.Context) {
 			jig.PollInterval = 5 * time.Second
-			conformanceTests = e2eingress.CreateIngressComformanceTests(ctx, jig, ns, map[string]string{
+			conformanceTests = e2eingress.CreateIngressConformanceTests(ctx, jig, ns, map[string]string{
 				e2eingress.NEGAnnotation: `{"ingress": true}`,
 			})
 			for _, t := range conformanceTests {
