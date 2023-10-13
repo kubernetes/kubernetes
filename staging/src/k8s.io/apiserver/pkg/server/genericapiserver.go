@@ -41,12 +41,15 @@ import (
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/schemavalidation"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/features"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -739,6 +742,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, typeConverter managedfields.TypeConverter) error {
 	var resourceInfos []*storageversion.ResourceInfo
+	var validatorFactory schemavalidation.ValidatorFactory
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
 			klog.Warningf("Skipping API %v because it has no resources.", groupVersion)
@@ -783,6 +787,69 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 						Resources: discoveryAPIResources,
 					},
 				)
+			}
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+			// Install the models from the OpenAPIConfig into the strategies that
+			// opted into schema-based validation.
+			//
+			// There is a separate storage for each external version of each
+			// resource.
+			for resource, storage := range apiGroupVersion.Storage {
+				generic, ok := storage.(genericregistry.GenericStore)
+				if !ok {
+					continue
+				}
+
+				wrappedCreate, createEnabled := generic.GetCreateStrategy().(schemavalidation.DeclarativeValidationStrategy)
+				wrappedUpdate, updateEnabled := generic.GetUpdateStrategy().(schemavalidation.DeclarativeValidationStrategy)
+
+				if !createEnabled && !updateEnabled {
+					continue
+				}
+
+				var subResource string
+
+				// Subresources are denoted with a slash
+				resource, subResource, _ = strings.Cut(resource, "/")
+
+				// Does not yet handle subresources which are also in the storage
+				gvr := schema.GroupVersionResource{
+					Group:    groupVersion.Group,
+					Version:  groupVersion.Version,
+					Resource: resource,
+				}
+				gvk := apiGroupVersion.EquivalentResourceRegistry.KindFor(gvr, subResource)
+
+				if gvk.Empty() {
+					// This should never happen, but if it does, it's a programming error.
+					return fmt.Errorf("unable to find GVK for %v", gvr)
+				}
+
+				if validatorFactory == nil {
+					// Not optimal to re-create and scan the definitions for
+					// GVKs; but the feature is not yet enabled for many
+					// resources, and doing this way reduces ripple for now.
+					// This should be improved in the future.
+					validatorFactory, err = schemavalidation.NewFactory(resolver.NewDefinitionsSchemaResolverFromNamer(s.openAPIV3Config.GetDefinitionName, s.openAPIV3Config.GetDefinitions))
+					if err != nil {
+						return err
+					}
+				}
+
+				validator, err := validatorFactory.ForGroupVersionKind(gvk, apiGroupInfo.Scheme)
+				if err != nil {
+					return err
+				}
+
+				if createEnabled {
+					wrappedCreate.SetValidator(validator)
+				}
+
+				if updateEnabled {
+					wrappedUpdate.SetValidator(validator)
+				}
 			}
 		}
 

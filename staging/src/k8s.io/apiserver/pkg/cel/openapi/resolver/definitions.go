@@ -33,18 +33,14 @@ type DefinitionsSchemaResolver struct {
 	gvkToSchema map[schema.GroupVersionKind]*spec.Schema
 }
 
-// NewDefinitionsSchemaResolver creates a new DefinitionsSchemaResolver.
-// An example working setup:
-// scheme         = "k8s.io/client-go/kubernetes/scheme".Scheme
-// getDefinitions = "k8s.io/kubernetes/pkg/generated/openapi".GetOpenAPIDefinitions
-func NewDefinitionsSchemaResolver(scheme *runtime.Scheme, getDefinitions common.GetOpenAPIDefinitions) *DefinitionsSchemaResolver {
+func NewDefinitionsSchemaResolverFromNamer(namer func(name string) (string, spec.Extensions), getDefinitions common.GetOpenAPIDefinitions) *DefinitionsSchemaResolver {
 	gvkToSchema := make(map[schema.GroupVersionKind]*spec.Schema)
-	namer := openapi.NewDefinitionNamer(scheme)
+
 	defs := getDefinitions(func(path string) spec.Ref {
 		return spec.MustCreateRef(path)
 	})
 	for name, def := range defs {
-		_, e := namer.GetDefinitionName(name)
+		_, e := namer(name)
 		gvks := extensionsToGVKs(e)
 		s := def.Schema // map value not addressable, make copy
 		for _, gvk := range gvks {
@@ -55,6 +51,15 @@ func NewDefinitionsSchemaResolver(scheme *runtime.Scheme, getDefinitions common.
 		gvkToSchema: gvkToSchema,
 		defs:        defs,
 	}
+}
+
+// NewDefinitionsSchemaResolver creates a new DefinitionsSchemaResolver.
+// An example working setup:
+// scheme         = "k8s.io/client-go/kubernetes/scheme".Scheme
+// getDefinitions = "k8s.io/kubernetes/pkg/generated/openapi".GetOpenAPIDefinitions
+func NewDefinitionsSchemaResolver(scheme *runtime.Scheme, getDefinitions common.GetOpenAPIDefinitions) *DefinitionsSchemaResolver {
+	namer := openapi.NewDefinitionNamer(scheme)
+	return NewDefinitionsSchemaResolverFromNamer(namer.GetDefinitionName, getDefinitions)
 }
 
 func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.Schema, error) {
