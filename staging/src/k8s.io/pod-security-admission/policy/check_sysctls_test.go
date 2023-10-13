@@ -42,7 +42,7 @@ func TestSysctls(t *testing.T) {
 			expectDetail: `a, b`,
 		},
 		{
-			name: "new supported sysctls not supported",
+			name: "new supported sysctls not supported: net.ipv4.ip_local_reserved_ports",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				SecurityContext: &corev1.PodSecurityContext{
 					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"}},
@@ -52,11 +52,22 @@ func TestSysctls(t *testing.T) {
 			expectReason: `forbidden sysctls`,
 			expectDetail: `net.ipv4.ip_local_reserved_ports`,
 		},
+		{
+			name: "new supported sysctls not supported: net.ipv4.tcp_keepalive_time",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_keepalive_time", Value: "7200"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `net.ipv4.tcp_keepalive_time`,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := sysctls_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := sysctlsV1Dot0(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if !tc.allowed {
 				if result.Allowed {
 					t.Fatal("expected disallowed")
@@ -67,10 +78,8 @@ func TestSysctls(t *testing.T) {
 				if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
 					t.Errorf("expected\n%s\ngot\n%s", e, a)
 				}
-			} else {
-				if !result.Allowed {
-					t.Fatal("expected allowed")
-				}
+			} else if !result.Allowed {
+				t.Fatal("expected allowed")
 			}
 		})
 	}
@@ -108,7 +117,7 @@ func TestSysctls_1_27(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := sysctls_1_27(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := sysctlsV1Dot27(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if !tc.allowed {
 				if result.Allowed {
 					t.Fatal("expected disallowed")
@@ -119,10 +128,58 @@ func TestSysctls_1_27(t *testing.T) {
 				if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
 					t.Errorf("expected\n%s\ngot\n%s", e, a)
 				}
-			} else {
-				if !result.Allowed {
-					t.Fatal("expected allowed")
+			} else if !result.Allowed {
+				t.Fatal("expected allowed")
+			}
+		})
+	}
+}
+
+func TestSysctls_1_29(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *corev1.Pod
+		allowed      bool
+		expectReason string
+		expectDetail string
+	}{
+		{
+			name: "forbidden sysctls",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "a"}, {Name: "b"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `a, b`,
+		},
+		{
+			name: "new supported sysctls",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_keepalive_time", Value: "7200"}},
+				},
+			}},
+			allowed: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := sysctlsV1Dot29(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			if !tc.allowed {
+				if result.Allowed {
+					t.Fatal("expected disallowed")
 				}
+				if e, a := tc.expectReason, result.ForbiddenReason; e != a {
+					t.Errorf("expected\n%s\ngot\n%s", e, a)
+				}
+				if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
+					t.Errorf("expected\n%s\ngot\n%s", e, a)
+				}
+			} else if !result.Allowed {
+				t.Fatal("expected allowed")
 			}
 		})
 	}
