@@ -25,6 +25,10 @@ import (
 // traversal of the new value. It is also used to cache the results of
 // DeepEqual comparisons between the old and new values of objects.
 //
+// All receiver functions support being called on `nil` to support ergonomic
+// recursive descent. The nil `CorrelatedObject` represents an uncorrelatable
+// node in the tree.
+//
 // CorrelatedObject is not thread-safe. It is the responsibility of the caller
 // to handle concurrency, if any.
 type CorrelatedObject struct {
@@ -135,7 +139,10 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) interf
 // to validation logic short circuiting and skipping the children, then
 // this function simply defers to reflect.DeepEqual.
 func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
-	if r.comparisonResult != nil {
+	if r == nil {
+		// Uncorrelatable node is not considered equal to its old value
+		return false
+	} else if r.comparisonResult != nil {
 		return *r.comparisonResult
 	}
 
