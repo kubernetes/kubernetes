@@ -114,10 +114,11 @@ func TestInt64AmountMul(t *testing.T) {
 	} {
 		c := test.a
 		ok := c.Mul(test.b)
-		if ok != test.ok {
-			t.Errorf("%v: unexpected ok: %t", test, ok)
-		}
-		if ok {
+		if ok && !test.ok {
+			t.Errorf("unextected success: %v", c)
+		} else if !ok && test.ok {
+			t.Errorf("unexpeted failure: %v", c)
+		} else if ok {
 			if c != test.c {
 				t.Errorf("%v: unexpected result: %d", test, c)
 			}
