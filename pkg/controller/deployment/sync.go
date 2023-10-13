@@ -27,9 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -189,9 +191,13 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 	newRSTemplate := *d.Spec.Template.DeepCopy()
 	podTemplateSpecHash := controller.ComputeHash(&newRSTemplate, d.Status.CollisionCount)
 	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(d.Spec.Template.Labels, apps.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
-	newRSTemplate.Labels[apps.DeploymentUniqueLabelKey] = podTemplateSpecHash
 	// Add podTemplateHash label to selector.
-	newRSSelector := labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, apps.DeploymentUniqueLabelKey, podTemplateSpecHash)
+	newRSSelector := labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, apps.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentUniqueLabelKey) {
+		newRSTemplate.Labels[apps.DeploymentUniqueLabelKey] = podTemplateSpecHash
+		newRSSelector = labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, apps.DeploymentUniqueLabelKey, podTemplateSpecHash)
+	}
 
 	// Create new ReplicaSet
 	newRS := apps.ReplicaSet{

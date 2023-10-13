@@ -362,12 +362,10 @@ func TestReentrantRollback(t *testing.T) {
 	one := int64(1)
 	rs1.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 	rs1.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
-	rs1.Spec.Selector.MatchLabels[apps.DeploymentUniqueLabelKey] = "hash"
 
 	rs2 := newReplicaSet(d, "deploymentrs-new", 1)
 	rs2.Annotations = map[string]string{util.RevisionAnnotation: "2"}
 	rs2.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
-	rs2.Spec.Selector.MatchLabels[apps.DeploymentUniqueLabelKey] = "hash"
 
 	f.rsLister = append(f.rsLister, rs1, rs2)
 	f.objects = append(f.objects, d, rs1, rs2)

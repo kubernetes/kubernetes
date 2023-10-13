@@ -620,7 +620,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.Logf("Deployment %s has a patched status", dName)
 	})
 
-	ginkgo.It("test pod-template-hash label is backwards compatible", func(ctx context.Context) {
+	ginkgo.It("test pod-template-hash label is backwards compatible [Feature:DeploymentUniqueLabelKey]", func(ctx context.Context) {
 		testPodTemplateHashCompatible(ctx, f)
 	})
 })

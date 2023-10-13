@@ -502,21 +502,9 @@ func TestDeploymentHashCollision(t *testing.T) {
 }
 
 func checkRSHashLabels(rs *apps.ReplicaSet) (string, error) {
-	oldHash := rs.Labels[apps.DefaultDeploymentUniqueLabelKey]
-	hash := rs.Labels[apps.DeploymentUniqueLabelKey]
-	if oldHash != hash {
-		return "", fmt.Errorf("rs has two inconsistent hash values, %s=%s, %s=%s", apps.DefaultDeploymentUniqueLabelKey, oldHash,
-			apps.DeploymentUniqueLabelKey, hash)
-	}
-
-	selectorHash := rs.Spec.Selector.MatchLabels[apps.DeploymentUniqueLabelKey]
-
-	oldTemplateLabelHash := rs.Spec.Template.Labels[apps.DefaultDeploymentUniqueLabelKey]
-	templateLabelHash := rs.Spec.Template.Labels[apps.DeploymentUniqueLabelKey]
-	if oldTemplateLabelHash != templateLabelHash {
-		return "", fmt.Errorf("rs has two inconsistent hash values, %s=%s, %s=%s", apps.DefaultDeploymentUniqueLabelKey, oldTemplateLabelHash,
-			apps.DeploymentUniqueLabelKey, templateLabelHash)
-	}
+	hash := rs.Labels[apps.DefaultDeploymentUniqueLabelKey]
+	selectorHash := rs.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey]
+	templateLabelHash := rs.Spec.Template.Labels[apps.DefaultDeploymentUniqueLabelKey]
 
 	if hash != selectorHash || selectorHash != templateLabelHash {
 		return "", fmt.Errorf("mismatching hash value found in replicaset %s: %#v", rs.Name, rs)
@@ -538,18 +526,9 @@ func checkPodsHashLabel(pods *v1.PodList) (string, error) {
 	}
 	var hash string
 	for _, pod := range pods.Items {
-		// The deprecated label must be present for backward compatibility purpose.
-		oldPodHash := pod.Labels[apps.DefaultDeploymentUniqueLabelKey]
-		if len(oldPodHash) == 0 {
-			return "", fmt.Errorf("found pod %s missing %s label: %#v", pod.Name, apps.DefaultDeploymentUniqueLabelKey, pods)
-		}
-		podHash := pod.Labels[apps.DeploymentUniqueLabelKey]
+		podHash := pod.Labels[apps.DefaultDeploymentUniqueLabelKey]
 		if len(podHash) == 0 {
-			return "", fmt.Errorf("found pod %s missing %s label: %#v", pod.Name, apps.DeploymentUniqueLabelKey, pods)
-		}
-		if podHash != oldPodHash {
-			return "", fmt.Errorf("pod has two inconsistent hash values, %s=%s, %s=%s", apps.DefaultDeploymentUniqueLabelKey, oldPodHash,
-				apps.DeploymentUniqueLabelKey, podHash)
+			return "", fmt.Errorf("found pod %s missing pod-template-hash label: %#v", pod.Name, pods)
 		}
 		// Save the first valid hash
 		if len(hash) == 0 {
