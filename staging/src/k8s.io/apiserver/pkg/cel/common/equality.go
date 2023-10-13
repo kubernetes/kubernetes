@@ -73,7 +73,7 @@ func NewCorrelatedObject(new, old interface{}, schema Schema) *CorrelatedObject 
 //
 // If listType is map, creates a map representation of the list using the designated
 // map-keys and caches it for future calls.
-func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) any {
+func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) interface{} {
 	oldAsList, ok := r.OldValue.([]interface{})
 	if !ok {
 		return nil
