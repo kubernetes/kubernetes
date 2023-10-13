@@ -133,6 +133,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - pods/ephemeralcontainers
+    verbs:
+    - patch
+  - apiGroups:
+    - ""
+    resources:
     - configmaps
     - events
     - persistentvolumeclaims
