@@ -104,6 +104,17 @@ const (
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
 
+	// owner: @alexzielenski
+	// kep: https://kep.k8s.io/4153
+	// alpha: v1.29
+	//
+	// Exposes following new `x-kubernetes` extensions in OpenAPI schema for
+	// native types:
+	//	- x-kubernetes-validations
+	//  - more may be added during alpha/beta as native types are ported and
+	//		problem space explored
+	DeclarativeValidationsInOpenAPI featuregate.Feature = "DeclarativeValidationsInOpenAPI"
+
 	// alpha: v1.20
 	// beta: v1.21
 	// GA: v1.24
@@ -285,6 +296,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
+
+	DeclarativeValidationsInOpenAPI: {Default: false, PreRelease: featuregate.Alpha},
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

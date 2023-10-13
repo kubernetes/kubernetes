@@ -61,11 +61,15 @@ func restoreDefinitions(defs map[string]common.OpenAPIDefinition) {
 var whitelistedExtensions sets.String = func() sets.String {
 	res := sets.NewString(
 		"x-kubernetes-list-type",
-		"x-kubernetes-map-keys",
+		"x-kubernetes-list-map-keys",
 		"x-kubernetes-map-type",
 		"x-kubernetes-patch-strategy",
 		"x-kubernetes-patch-merge-key",
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.DeclarativeValidationsInOpenAPI) {
+		res.Insert("x-kubernetes-validations")
+	}
 
 	return res
 }()
