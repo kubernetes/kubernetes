@@ -467,6 +467,107 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	}
 }
 
+func TestAuthorizerEphemeralContainers(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node1",
+			Containers: []corev1.Container{
+				{
+					Name: "container1",
+					EnvFrom: []corev1.EnvFromSource{
+						{
+							SecretRef: &corev1.SecretEnvSource{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "secret1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	node1 := &user.DefaultInfo{Name: "system:node:node1", Groups: []string{"system:nodes"}}
+
+	testcases := []struct {
+		User               user.Info
+		ephemeralContainer *corev1.EphemeralContainer
+		Secret             string
+		Decision           authorizer.Decision
+	}{
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "secret1"},
+		{User: node1, Decision: authorizer.DecisionNoOpinion, Secret: "secret2"},
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "secret1", ephemeralContainer: &corev1.EphemeralContainer{
+			TargetContainerName: "container1",
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+				Name: "test1",
+				EnvFrom: []corev1.EnvFromSource{
+					{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "secret1",
+							},
+						},
+					},
+				},
+			},
+		}},
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "secret2", ephemeralContainer: &corev1.EphemeralContainer{
+			TargetContainerName: "container1",
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+				Name: "test1",
+				EnvFrom: []corev1.EnvFromSource{
+					{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "secret2",
+							},
+						},
+					},
+				},
+			},
+		}},
+	}
+
+	for i, tc := range testcases {
+		var (
+			decision authorizer.Decision
+			err      error
+		)
+
+		g := NewGraph()
+		p := &graphPopulator{}
+		p.graph = g
+		identifier := nodeidentifier.NewDefaultNodeIdentifier()
+		authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+
+		p.addPod(pod)
+		if tc.ephemeralContainer != nil {
+			// update ephemeral container
+			pod1 := pod.DeepCopy()
+			pod1.Spec.EphemeralContainers = []corev1.EphemeralContainer{*tc.ephemeralContainer}
+			p.updatePod(pod, pod1)
+		}
+
+		decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+
+		if decision != tc.Decision {
+			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
+		}
+
+	}
+
+}
+
 type sampleDataOpts struct {
 	nodes       int
 	namespaces  int

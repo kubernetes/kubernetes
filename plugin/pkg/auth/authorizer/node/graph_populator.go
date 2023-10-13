@@ -79,8 +79,9 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 	}
 	if oldPod, ok := oldObj.(*corev1.Pod); ok && oldPod != nil {
 		if (pod.Spec.NodeName == oldPod.Spec.NodeName) && (pod.UID == oldPod.UID) &&
-			resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, pod.Status.ResourceClaimStatuses) {
-			// Node and uid are unchanged, all object references in the pod spec are immutable respectively unmodified (claim statuses).
+			resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, pod.Status.ResourceClaimStatuses) &&
+			len(pod.Spec.EphemeralContainers) == len(oldPod.Spec.EphemeralContainers) {
+			// Node, ephemeralContainers and uid are unchanged, all object references in the pod spec are immutable respectively unmodified (claim statuses).
 			klog.V(5).Infof("updatePod %s/%s, node unchanged", pod.Namespace, pod.Name)
 			return
 		}
