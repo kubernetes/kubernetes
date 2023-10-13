@@ -114,19 +114,15 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) interf
 		// of value
 		// (would allow you to add/remove items from sets with ratcheting but not change them)
 		return nil
+	case "":
+		fallthrough
 	case "atomic":
-		// Atomic lists are not correlatable by item
+		// Atomic lists are the default are not correlatable by item
 		// Ratcheting is not available on a per-index basis
 		return nil
 	default:
-		// Correlate by-index by default.
-		//
-		// Cannot correlate an out-of-bounds index
-		if len(oldAsList) <= index {
-			return nil
-		}
-
-		return oldAsList[index]
+		// Unrecognized list type. Assume non-correlatable.
+		return nil
 	}
 }
 

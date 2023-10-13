@@ -142,16 +142,14 @@ func TestCorrelation(t *testing.T) {
 			OldValue: "b",
 		},
 		{
-			Name:          "Basic Index",
+			Name:          "Atomic Array not correlatable",
 			RootObject:    mustUnstructured(`[a, b]`),
 			RootOldObject: mustUnstructured(`[a, b]`),
 			Schema: mustSchema(`
                 items:
                   type: string
             `),
-			KeyPath:  []interface{}{1},
-			NewValue: "b",
-			OldValue: "b",
+			KeyPath: []interface{}{1},
 		},
 		{
 			Name: "Added Key Not In Old Object",
@@ -187,7 +185,7 @@ func TestCorrelation(t *testing.T) {
 			KeyPath: []interface{}{2},
 		},
 		{
-			Name: "Changed Index In Old Object",
+			Name: "Changed Index In Old Object not correlatable",
 			RootObject: []interface{}{
 				"a",
 				"b",
@@ -200,9 +198,7 @@ func TestCorrelation(t *testing.T) {
                 items:
                     type: string
             `),
-			KeyPath:  []interface{}{1},
-			NewValue: "b",
-			OldValue: "oldB",
+			KeyPath: []interface{}{1},
 		},
 		{
 			Name: "Changed Index In Nested Old Object",
