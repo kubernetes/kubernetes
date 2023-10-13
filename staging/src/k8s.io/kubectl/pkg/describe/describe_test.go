@@ -5932,64 +5932,6 @@ Events:         <none>` + "\n",
 	}
 }
 
-func TestDescribeClusterCIDR(t *testing.T) {
-
-	testcases := map[string]struct {
-		input  *fake.Clientset
-		output string
-	}{
-		"ClusterCIDR v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ClusterCIDR{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo.123",
-				},
-				Spec: networkingv1alpha1.ClusterCIDRSpec{
-					PerNodeHostBits: int32(8),
-					IPv4:            "10.1.0.0/16",
-					IPv6:            "fd00:1:1::/64",
-					NodeSelector: &corev1.NodeSelector{
-						NodeSelectorTerms: []corev1.NodeSelectorTerm{
-							{
-								MatchExpressions: []corev1.NodeSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: "In",
-										Values:   []string{"bar"}},
-								},
-							},
-						},
-					},
-				},
-			}),
-
-			output: `Name:         foo.123
-Labels:       <none>
-Annotations:  <none>
-NodeSelector:
-  NodeSelector Terms:
-    Term 0:       foo in [bar]
-PerNodeHostBits:  8
-IPv4:             10.1.0.0/16
-IPv6:             fd00:1:1::/64
-Events:           <none>` + "\n",
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
-			d := ClusterCIDRDescriber{c}
-			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if out != tc.output {
-				t.Errorf("expected :\n%s\nbut got output:\n%s diff:\n%s", tc.output, out, cmp.Diff(tc.output, out))
-			}
-		})
-	}
-}
-
 func TestDescribeIPAddress(t *testing.T) {
 
 	testcases := map[string]struct {
