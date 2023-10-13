@@ -82,7 +82,7 @@ func getSafeSysctlAllowlist(getVersion func() (*version.Version, error)) []strin
 		if kernelVersion != nil && kernelVersion.AtLeast(version.MustParseGeneric(sc.kernel)) {
 			safeSysctlAllowlist = append(safeSysctlAllowlist, sc.name)
 		} else {
-			klog.ErrorS(nil, "kernel version is too small, dropping the sysctl from safe sysctl list", "kernelVersion", kernelVersion, "sysctl", sc.name)
+			klog.InfoS("kernel version is too old, dropping the sysctl from safe sysctl list", "kernelVersion", kernelVersion, "sysctl", sc.name)
 		}
 	}
 	return safeSysctlAllowlist
