@@ -75,7 +75,12 @@ func TestLoadResetConfigurationFromFile(t *testing.T) {
 				return
 			}
 
-			obj, err := LoadResetConfigurationFromFile(cfgPath, true, true)
+			opts := LoadOrDefaultConfigurationOptions{
+				AllowExperimental: true,
+				SkipCRIDetect:     true,
+			}
+
+			obj, err := LoadResetConfigurationFromFile(cfgPath, opts)
 			if rt.expectErr {
 				if err == nil {
 					t.Error("Unexpected success")

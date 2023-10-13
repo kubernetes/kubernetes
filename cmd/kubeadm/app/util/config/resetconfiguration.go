@@ -65,17 +65,17 @@ func SetResetDynamicDefaults(cfg *kubeadmapi.ResetConfiguration, skipCRIDetect b
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values
 // Lastly, the internal config is validated and returned.
-func LoadOrDefaultResetConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1.ResetConfiguration, allowExperimental, skipCRIDetect bool) (*kubeadmapi.ResetConfiguration, error) {
+func LoadOrDefaultResetConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1.ResetConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.ResetConfiguration, error) {
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
-		return LoadResetConfigurationFromFile(cfgPath, allowExperimental, skipCRIDetect)
+		return LoadResetConfigurationFromFile(cfgPath, opts)
 	}
 
-	return DefaultedResetConfiguration(defaultversionedcfg, skipCRIDetect)
+	return DefaultedResetConfiguration(defaultversionedcfg, opts)
 }
 
 // LoadResetConfigurationFromFile loads versioned ResetConfiguration from file, converts it to internal, defaults and validates it
-func LoadResetConfigurationFromFile(cfgPath string, allowExperimental, skipCRIDetect bool) (*kubeadmapi.ResetConfiguration, error) {
+func LoadResetConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.ResetConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
 	b, err := os.ReadFile(cfgPath)
@@ -88,7 +88,7 @@ func LoadResetConfigurationFromFile(cfgPath string, allowExperimental, skipCRIDe
 		return nil, err
 	}
 
-	return documentMapToResetConfiguration(gvkmap, false, allowExperimental, false, skipCRIDetect)
+	return documentMapToResetConfiguration(gvkmap, false, opts.AllowExperimental, false, opts.SkipCRIDetect)
 }
 
 // documentMapToResetConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
@@ -140,7 +140,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 }
 
 // DefaultedResetConfiguration takes a versioned ResetConfiguration (usually filled in by command line parameters), defaults it, converts it to internal and validates it
-func DefaultedResetConfiguration(defaultversionedcfg *kubeadmapiv1.ResetConfiguration, skipCRIDetect bool) (*kubeadmapi.ResetConfiguration, error) {
+func DefaultedResetConfiguration(defaultversionedcfg *kubeadmapiv1.ResetConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.ResetConfiguration, error) {
 	internalcfg := &kubeadmapi.ResetConfiguration{}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
@@ -151,7 +151,7 @@ func DefaultedResetConfiguration(defaultversionedcfg *kubeadmapiv1.ResetConfigur
 	}
 
 	// Applies dynamic defaults to settings not provided with flags
-	if err := SetResetDynamicDefaults(internalcfg, skipCRIDetect); err != nil {
+	if err := SetResetDynamicDefaults(internalcfg, opts.SkipCRIDetect); err != nil {
 		return nil, err
 	}
 	// Validates cfg

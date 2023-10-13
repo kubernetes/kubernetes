@@ -44,6 +44,14 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
+// LoadOrDefaultConfigurationOptions holds the common LoadOrDefaultConfiguration options.
+type LoadOrDefaultConfigurationOptions struct {
+	// AllowExperimental indicates whether the experimental / work in progress APIs can be used.
+	AllowExperimental bool
+	// SkipCRIDetect indicates whether to skip the CRI socket detection when no CRI socket is provided.
+	SkipCRIDetect bool
+}
+
 // MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration or ClusterConfiguration, some extra logic is run
 func MarshalKubeadmConfigObject(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
 	switch internalcfg := obj.(type) {
