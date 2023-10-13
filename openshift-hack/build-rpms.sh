@@ -31,7 +31,8 @@ fi
 os::build::rpm::get_nvra_vars
 
 OS_RPM_SPECFILE="$( find "${OS_ROOT}" -name '*.spec' )"
-OS_RPM_NAME="$( rpmspec -q --qf '%{name}\n' "${OS_RPM_SPECFILE}" | head -1 )"
+OS_RPM_SPECQUERY="$( rpmspec -q --qf '%{name}\n' "${OS_RPM_SPECFILE}" )"
+OS_RPM_NAME="$( head -1  <<< "${OS_RPM_SPECQUERY}" )"
 
 os::log::info "Building release RPMs for ${OS_RPM_SPECFILE} ..."
 
