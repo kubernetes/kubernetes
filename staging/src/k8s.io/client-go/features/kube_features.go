@@ -15,8 +15,29 @@ package features
 
 import (
 	"sync/atomic"
+)
 
-	"k8s.io/component-base/featuregate"
+type Feature string
+
+type FeatureSpec struct {
+	// Default is the default enablement state for the feature
+	Default bool
+	// LockToDefault indicates that the feature is locked to its default and cannot be changed
+	LockToDefault bool
+	// PreRelease indicates the maturity level of the feature
+	PreRelease prerelease
+}
+
+type prerelease string
+
+const (
+	// Values for PreRelease.
+	Alpha = prerelease("ALPHA")
+	Beta  = prerelease("BETA")
+	GA    = prerelease("")
+
+	// Deprecated
+	Deprecated = prerelease("DEPRECATED")
 )
 
 const (
@@ -36,7 +57,7 @@ const (
 	// beta: v1.29
 	//
 	// Allow the API server to stream individual items instead of chunking
-	WatchList featuregate.Feature = "WatchListClient"
+	WatchList Feature = "WatchListClient"
 )
 
 // DefaultFeatureGates returns the feature gates exposed by this library.
@@ -54,11 +75,15 @@ func DefaultFeatureGates() Reader {
 	return featureGates.Load().(Reader)
 }
 
+type FeatureRegistry interface {
+	Add(map[Feature]FeatureSpec) error
+}
+
 // AddFeaturesToExistingFeatureGates adds the default feature gates to the provided set.
 // Usually this function is combined with SetFeatureGates to take control of the
 // features exposed by this library.
-func AddFeaturesToExistingFeatureGates(mutableFeatureGates featuregate.MutableFeatureGate) error {
-	return mutableFeatureGates.Add(defaultKubernetesFeatureGates)
+func AddFeaturesToExistingFeatureGates(featureRegistry FeatureRegistry) error {
+	return featureRegistry.Add(defaultKubernetesFeatureGates)
 }
 
 // SetFeatureGates overwrites the default implementation of the feature gate
@@ -96,6 +121,6 @@ var (
 //
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	WatchList: {Default: false, PreRelease: featuregate.Beta},
+var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
+	WatchList: {Default: false, PreRelease: Beta},
 }

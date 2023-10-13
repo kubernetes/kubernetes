@@ -17,24 +17,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"k8s.io/component-base/featuregate"
 )
 
-// TestDriveSetFeatureGatesMultipleImplementations ensures that
-// we can store multiple implementations in a global var.
-func TestDriveSetFeatureGatesMultipleImplementations(t *testing.T) {
-	featureGateA := &fakeFeatureGate{}
-	SetFeatureGates(featureGateA)
-
-	realFeatureGate := featuregate.NewFeatureGate()
-	SetFeatureGates(realFeatureGate)
+// TestDriveSetFeatureGates tests that we can store multiple implementations in a global var.
+func TestDriveSetFeatureGates(t *testing.T) {
+	SetFeatureGates(&fakeReader{})
+	DefaultFeatureGates().Enabled("Foobar")
 }
 
 // TestDriveAddFeaturesToExistingFeatureGates ensures that
 // the defaultKubernetesFeatureGates are added to a feature gate.
 func TestDriveAddFeaturesToExistingFeatureGates(t *testing.T) {
-	defaultKubernetesFeatureGates["MyFeature"] = featuregate.FeatureSpec{
+	defaultKubernetesFeatureGates["MyFeature"] = FeatureSpec{
 		Default:       true,
 		LockToDefault: true,
 		PreRelease:    "GA",
@@ -43,14 +37,23 @@ func TestDriveAddFeaturesToExistingFeatureGates(t *testing.T) {
 		delete(defaultKubernetesFeatureGates, "MyFeature")
 	}()
 
-	realFeatureGate := featuregate.NewFeatureGate()
+	realFeatureGate := &fakeRegistry{}
 	require.NoError(t, AddFeaturesToExistingFeatureGates(realFeatureGate))
 
-	require.True(t, realFeatureGate.Enabled("MyFeature"))
+	require.Equal(t, defaultKubernetesFeatureGates, realFeatureGate.specs)
 }
 
-type fakeFeatureGate struct{}
+type fakeReader struct{}
 
-func (f *fakeFeatureGate) Enabled(key featuregate.Feature) bool {
-	return key == "FakeFeatureGate"
+func (f *fakeReader) Enabled(key Feature) bool {
+	return true
+}
+
+type fakeRegistry struct {
+	specs map[Feature]FeatureSpec
+}
+
+func (f *fakeRegistry) Add(specs map[Feature]FeatureSpec) error {
+	f.specs = specs
+	return nil
 }

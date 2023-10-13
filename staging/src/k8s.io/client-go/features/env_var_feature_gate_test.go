@@ -21,11 +21,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/component-base/featuregate"
 )
 
 func TestEnvVarFeatureGate(t *testing.T) {
-	defaultTestFeatures := map[featuregate.Feature]featuregate.FeatureSpec{
+	defaultTestFeatures := map[Feature]FeatureSpec{
 		"TestAlpha": {
 			Default:       false,
 			LockToDefault: false,
@@ -37,10 +36,10 @@ func TestEnvVarFeatureGate(t *testing.T) {
 			PreRelease:    "Beta",
 		},
 	}
-	expectedDefaultFeaturesState := map[featuregate.Feature]bool{"TestAlpha": false, "TestBeta": true}
+	expectedDefaultFeaturesState := map[Feature]bool{"TestAlpha": false, "TestBeta": true}
 
-	copyExpectedStateMap := func(toCopy map[featuregate.Feature]bool) map[featuregate.Feature]bool {
-		m := map[featuregate.Feature]bool{}
+	copyExpectedStateMap := func(toCopy map[Feature]bool) map[Feature]bool {
+		m := map[Feature]bool{}
 		for k, v := range toCopy {
 			m[k] = v
 		}
@@ -49,10 +48,10 @@ func TestEnvVarFeatureGate(t *testing.T) {
 
 	scenarios := []struct {
 		name                                string
-		features                            map[featuregate.Feature]featuregate.FeatureSpec
+		features                            map[Feature]FeatureSpec
 		envVariables                        map[string]string
-		expectedFeaturesState               map[featuregate.Feature]bool
-		expectedInternalEnabledFeatureState map[featuregate.Feature]bool
+		expectedFeaturesState               map[Feature]bool
+		expectedInternalEnabledFeatureState map[Feature]bool
 	}{
 		{
 			name: "can add empty features",
@@ -72,12 +71,12 @@ func TestEnvVarFeatureGate(t *testing.T) {
 			name:         "correct env var changes the feature gets state",
 			features:     defaultTestFeatures,
 			envVariables: map[string]string{"KUBE_FEATURE_TestAlpha": "true"},
-			expectedFeaturesState: func() map[featuregate.Feature]bool {
+			expectedFeaturesState: func() map[Feature]bool {
 				expectedDefaultFeaturesStateCopy := copyExpectedStateMap(expectedDefaultFeaturesState)
 				expectedDefaultFeaturesStateCopy["TestAlpha"] = true
 				return expectedDefaultFeaturesStateCopy
 			}(),
-			expectedInternalEnabledFeatureState: map[featuregate.Feature]bool{"TestAlpha": true},
+			expectedInternalEnabledFeatureState: map[Feature]bool{"TestAlpha": true},
 		},
 		{
 			name:                  "incorrect env var value gets ignored",
@@ -93,7 +92,7 @@ func TestEnvVarFeatureGate(t *testing.T) {
 		},
 		{
 			name: "a feature LockToDefault wins",
-			features: map[featuregate.Feature]featuregate.FeatureSpec{
+			features: map[Feature]FeatureSpec{
 				"TestAlpha": {
 					Default:       true,
 					LockToDefault: true,
@@ -101,11 +100,11 @@ func TestEnvVarFeatureGate(t *testing.T) {
 				},
 			},
 			envVariables:          map[string]string{"KUBE_FEATURE_TestAlpha": "False"},
-			expectedFeaturesState: map[featuregate.Feature]bool{"TestAlpha": true},
+			expectedFeaturesState: map[Feature]bool{"TestAlpha": true},
 		},
 		{
 			name: "setting a feature to LockToDefault changes the internal state",
-			features: map[featuregate.Feature]featuregate.FeatureSpec{
+			features: map[Feature]FeatureSpec{
 				"TestAlpha": {
 					Default:       true,
 					LockToDefault: true,
@@ -113,8 +112,8 @@ func TestEnvVarFeatureGate(t *testing.T) {
 				},
 			},
 			envVariables:                        map[string]string{"KUBE_FEATURE_TestAlpha": "True"},
-			expectedFeaturesState:               map[featuregate.Feature]bool{"TestAlpha": true},
-			expectedInternalEnabledFeatureState: map[featuregate.Feature]bool{"TestAlpha": true},
+			expectedFeaturesState:               map[Feature]bool{"TestAlpha": true},
+			expectedInternalEnabledFeatureState: map[Feature]bool{"TestAlpha": true},
 		},
 	}
 	for _, scenario := range scenarios {
@@ -134,7 +133,7 @@ func TestEnvVarFeatureGate(t *testing.T) {
 				require.Equal(t, actualValue, expectedValue, "expected feature=%v, to be=%v, not=%v", expectedFeature, expectedValue, actualValue)
 			}
 
-			enabledInternalMap := target.enabled.Load().(map[featuregate.Feature]bool)
+			enabledInternalMap := target.enabled.Load().(map[Feature]bool)
 			require.Len(t, enabledInternalMap, len(scenario.expectedInternalEnabledFeatureState))
 
 			for expectedFeature, expectedInternalPresence := range scenario.expectedInternalEnabledFeatureState {

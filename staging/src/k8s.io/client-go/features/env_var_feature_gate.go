@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/component-base/featuregate"
 )
 
 // internalPackages are packages that ignored when creating a name for featureGates. These packages are in the common
@@ -35,7 +34,7 @@ var internalPackages = []string{"k8s.io/client-go/features/env_var_feature_gate.
 // Reader indicates whether a given feature is enabled or not.
 type Reader interface {
 	// Enabled returns true if the key is enabled.
-	Enabled(key featuregate.Feature) bool
+	Enabled(key Feature) bool
 }
 
 var _ Reader = &envVarFeatureGate{}
@@ -52,12 +51,12 @@ var _ Reader = &envVarFeatureGate{}
 //
 // Please note that environmental variables can only be set to a boolean type.
 // Incorrect values will be ignored and logged.
-func newEnvVarFeatureGate(features map[featuregate.Feature]featuregate.FeatureSpec) *envVarFeatureGate {
-	enabled := map[featuregate.Feature]bool{}
+func newEnvVarFeatureGate(features map[Feature]FeatureSpec) *envVarFeatureGate {
+	enabled := map[Feature]bool{}
 	enabledValue := &atomic.Value{}
 	enabledValue.Store(enabled)
 
-	known := map[featuregate.Feature]featuregate.FeatureSpec{}
+	known := map[Feature]FeatureSpec{}
 	for name, spec := range features {
 		known[name] = spec
 	}
@@ -79,7 +78,7 @@ type envVarFeatureGate struct {
 	readEnvVarsOnce sync.Once
 
 	// known holds known feature gates
-	known map[featuregate.Feature]featuregate.FeatureSpec
+	known map[Feature]FeatureSpec
 
 	// enabled holds a map[Feature]bool
 	// with values explicitly set via env var
@@ -87,7 +86,7 @@ type envVarFeatureGate struct {
 }
 
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
-func (f *envVarFeatureGate) Enabled(key featuregate.Feature) bool {
+func (f *envVarFeatureGate) Enabled(key Feature) bool {
 	if v, ok := f.getEnabledMapFromEnvVar()[key]; ok {
 		return v
 	}
@@ -100,9 +99,9 @@ func (f *envVarFeatureGate) Enabled(key featuregate.Feature) bool {
 // getEnabledMapFromEnvVar will fill the enabled map on the first call.
 // This is the only time a known feature can be set to a value
 // read from the corresponding environmental variable.
-func (f *envVarFeatureGate) getEnabledMapFromEnvVar() map[featuregate.Feature]bool {
+func (f *envVarFeatureGate) getEnabledMapFromEnvVar() map[Feature]bool {
 	f.readEnvVarsOnce.Do(func() {
-		featureGateState := map[featuregate.Feature]bool{}
+		featureGateState := map[Feature]bool{}
 		for feature, featureSpec := range f.known {
 			featureState, featureStateSet := os.LookupEnv(fmt.Sprintf("KUBE_FEATURE_%s", feature))
 			if !featureStateSet {
@@ -124,5 +123,5 @@ func (f *envVarFeatureGate) getEnabledMapFromEnvVar() map[featuregate.Feature]bo
 		}
 		f.enabled.Store(featureGateState)
 	})
-	return f.enabled.Load().(map[featuregate.Feature]bool)
+	return f.enabled.Load().(map[Feature]bool)
 }

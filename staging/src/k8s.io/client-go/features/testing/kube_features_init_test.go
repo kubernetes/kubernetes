@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/client-go/features"
-	"k8s.io/component-base/featuregate"
 )
 
 func TestDriveInitDefaultFeatureGates(t *testing.T) {
@@ -36,6 +35,6 @@ func TestDriveInitDefaultFeatureGates(t *testing.T) {
 
 type fakeReader struct{}
 
-func (f *fakeReader) Enabled(featuregate.Feature) bool {
+func (f *fakeReader) Enabled(features.Feature) bool {
 	return true
 }
