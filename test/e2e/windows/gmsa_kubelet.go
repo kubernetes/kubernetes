@@ -39,7 +39,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
+var _ = sigDescribe("[Feature:Windows] GMSA Kubelet [Slow]", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("gmsa-kubelet-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -133,7 +133,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 			})
 		})
 	})
-})
+}))
 
 func generateDummyCredSpecs(domain string) *string {
 	shortName := strings.ToUpper(strings.Split(domain, ".")[0])

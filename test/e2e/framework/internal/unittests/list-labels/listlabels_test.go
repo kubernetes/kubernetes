@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,9 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package network
+package listlabels
 
-import "k8s.io/kubernetes/test/e2e/framework"
+import (
+	"testing"
 
-// SIGDescribe annotates the test with the SIG label.
-var SIGDescribe = framework.SIGDescribe("network")
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/internal/unittests"
+	"k8s.io/kubernetes/test/e2e/framework/internal/unittests/bugs"
+)
+
+func TestListTests(t *testing.T) {
+	bugs.Describe()
+	framework.CheckForBugs = false
+	output, code := unittests.GetFrameworkOutput(t, map[string]string{"list-labels": "true"})
+	assert.Equal(t, 0, code)
+	assert.Equal(t, bugs.ListLabelsOutput, output)
+}

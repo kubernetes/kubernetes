@@ -36,7 +36,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Services", func() {
+var _ = sigDescribe("Services", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("services")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -85,5 +85,4 @@ var _ = SIGDescribe("Services", func() {
 		assertConsistentConnectivity(ctx, f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s", net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))))
 
 	})
-
-})
+}))

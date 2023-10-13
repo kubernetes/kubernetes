@@ -40,7 +40,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
+var _ = sigDescribe("[Feature:Windows] Density [Serial] [Slow]", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("density-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -72,7 +72,7 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 		}
 	})
 
-})
+}))
 
 type densityTest struct {
 	// number of pods

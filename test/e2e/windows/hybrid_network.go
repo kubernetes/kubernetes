@@ -44,7 +44,7 @@ var (
 	linuxBusyBoxImage   = imageutils.GetE2EImage(imageutils.Nginx)
 )
 
-var _ = SIGDescribe("Hybrid cluster network", func() {
+var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("hybrid-network")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -99,7 +99,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 		})
 
 	})
-})
+}))
 
 var (
 	warmUpDuration = "30s"

@@ -35,7 +35,7 @@ var (
 	WindowsHyperVContainerRuntimeClass = "runhcs-wcow-hypervisor"
 )
 
-var _ = SIGDescribe("[Feature:WindowsHyperVContainers] HyperV containers", func() {
+var _ = sigDescribe("[Feature:WindowsHyperVContainers] HyperV containers", skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
@@ -143,4 +143,4 @@ var _ = SIGDescribe("[Feature:WindowsHyperVContainers] HyperV containers", func(
 
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod should have succeeded")
 	})
-})
+}))

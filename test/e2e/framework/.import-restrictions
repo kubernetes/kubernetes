@@ -4,7 +4,7 @@ rules:
   # The following packages are okay to use:
   #
   # public API
-  - selectorRegexp: ^k8s[.]io/(api|apimachinery|client-go|component-base|klog|pod-security-admission|utils)/|^[a-z]+(/|$)|github.com/onsi/(ginkgo|gomega)|^k8s[.]io/kubernetes/test/(e2e/framework/internal/|utils)
+  - selectorRegexp: ^k8s[.]io/(api|apimachinery|client-go|component-base|klog|pod-security-admission|utils)
     allowedPrefixes: [ "" ]
 
   # stdlib
@@ -16,7 +16,7 @@ rules:
     allowedPrefixes: [ "" ]
 
   # Ginkgo + Gomega
-  - selectorRegexp: github.com/onsi/(ginkgo|gomega)|^k8s[.]io/kubernetes/test/(e2e/framework/internal/|utils)
+  - selectorRegexp: ^github.com/onsi/(ginkgo|gomega)
     allowedPrefixes: [ "" ]
 
   # kube-openapi
@@ -33,8 +33,10 @@ rules:
 
   # Third party deps
   - selectorRegexp: ^github.com/|^gopkg.in
-    allowedPrefixes: [ 
+    allowedPrefixes: [
       "gopkg.in/inf.v0",
+      "gopkg.in/yaml.v2",
+      "github.com/blang/semver/",
       "github.com/davecgh/go-spew/spew",
       "github.com/evanphx/json-patch",
       "github.com/go-logr/logr",
@@ -48,6 +50,10 @@ rules:
       "github.com/google/gofuzz",
       "github.com/google/uuid",
       "github.com/imdario/mergo",
+      "github.com/prometheus/client_golang/",
+      "github.com/prometheus/client_model/",
+      "github.com/prometheus/common/",
+      "github.com/prometheus/procfs",
       "github.com/spf13/cobra",
       "github.com/spf13/pflag",
       "github.com/stretchr/testify/assert",

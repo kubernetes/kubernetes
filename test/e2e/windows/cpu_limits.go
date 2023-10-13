@@ -35,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
+var _ = sigDescribe("[Feature:Windows] Cpu Resources [Serial]", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -100,7 +100,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 			}
 		})
 	})
-})
+}))
 
 // newCPUBurnPods creates a list of pods (specification) with a workload that will consume all available CPU resources up to container limit
 func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memoryLimit string) []*v1.Pod {

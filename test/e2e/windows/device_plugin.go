@@ -39,7 +39,7 @@ const (
 	testSlowMultiplier = 60
 )
 
-var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
+var _ = sigDescribe("[Feature:GPUDevicePlugin] Device Plugin", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("device-plugin")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -132,4 +132,4 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 		_, envVarDirectxGpuNameErr := e2eoutput.LookForStringInPodExec(defaultNs, windowsPod.Name, envVarCommand, envVarDirectxGpuName, time.Minute)
 		framework.ExpectNoError(envVarDirectxGpuNameErr, "failed: didn't find expected environment variable.")
 	})
-})
+}))

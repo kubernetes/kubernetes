@@ -37,7 +37,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
+var _ = sigDescribe("[Feature:Windows] Kubelet-Stats [Serial]", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows-serial")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -113,8 +113,9 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 			})
 		})
 	})
-})
-var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
+}))
+
+var _ = sigDescribe("[Feature:Windows] Kubelet-Stats", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -204,7 +205,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 			})
 		})
 	})
-})
+}))
 
 // findWindowsNode finds a Windows node that is Ready and Schedulable
 func findWindowsNode(ctx context.Context, f *framework.Framework) (v1.Node, error) {
