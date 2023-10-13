@@ -19,6 +19,7 @@ package openapi
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-openapi/pkg/common"
@@ -45,12 +46,51 @@ func restoreDefinitions(defs map[string]common.OpenAPIDefinition) {
 	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIEnums) {
 		for gvk, def := range defs {
 			orig := &def.Schema
-			if ret := pruneEnums(orig); ret != orig {
+
+			ret := pruneEnums(orig)
+			ret = pruneUnrecognizedExtensions(ret)
+
+			if ret != orig {
 				def.Schema = *ret
 				defs[gvk] = def
 			}
 		}
 	}
+}
+
+var whitelistedExtensions sets.String = func() sets.String {
+	res := sets.NewString(
+		"x-kubernetes-list-type",
+		"x-kubernetes-map-keys",
+		"x-kubernetes-map-type",
+		"x-kubernetes-patch-strategy",
+		"x-kubernetes-patch-merge-key",
+	)
+
+	return res
+}()
+
+func pruneUnrecognizedExtensions(schema *spec.Schema) *spec.Schema {
+	walker := schemamutation.Walker{
+		SchemaCallback: func(schema *spec.Schema) *spec.Schema {
+			newExtensions := spec.Extensions{}
+			for k, v := range schema.Extensions {
+				if whitelistedExtensions.Has(k) {
+					newExtensions[k] = v
+				}
+			}
+
+			if len(newExtensions) == len(schema.Extensions) {
+				return schema
+			}
+
+			cloned := *schema
+			cloned.VendorExtensible = spec.VendorExtensible{Extensions: newExtensions}
+			return &cloned
+		},
+		RefCallback: schemamutation.RefCallbackNoop,
+	}
+	return walker.WalkSchema(schema)
 }
 
 func pruneEnums(schema *spec.Schema) *spec.Schema {
