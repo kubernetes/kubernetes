@@ -1293,10 +1293,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.ServiceBackendPortApplyConfiguration{}
 
 		// Group=networking.k8s.io, Version=v1alpha1
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ClusterCIDR"):
-		return &applyconfigurationsnetworkingv1alpha1.ClusterCIDRApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ClusterCIDRSpec"):
-		return &applyconfigurationsnetworkingv1alpha1.ClusterCIDRSpecApplyConfiguration{}
 	case networkingv1alpha1.SchemeGroupVersion.WithKind("IPAddress"):
 		return &applyconfigurationsnetworkingv1alpha1.IPAddressApplyConfiguration{}
 	case networkingv1alpha1.SchemeGroupVersion.WithKind("IPAddressSpec"):

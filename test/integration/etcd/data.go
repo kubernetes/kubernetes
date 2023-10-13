@@ -204,13 +204,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/networking/v1alpha1
-		gvr("networking.k8s.io", "v1alpha1", "clustercidrs"): {
-			Stub:             `{"metadata": {"name": "clustercidr1"}, "spec": {"perNodeHostBits": 8, "ipv4": "192.168.4.0/24", "ipv6": "fd00:1::/120", "nodeSelector": null}}`,
-			ExpectedEtcdPath: "/registry/clustercidrs/clustercidr1",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/networking/v1alpha1
 		gvr("networking.k8s.io", "v1alpha1", "ipaddresses"): {
 			Stub:             `{"metadata": {"name": "192.168.1.2"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
 			ExpectedEtcdPath: "/registry/ipaddresses/192.168.1.2",

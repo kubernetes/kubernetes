@@ -584,13 +584,6 @@ const (
 	// Enables new performance-improving code in kube-proxy iptables mode
 	MinimizeIPTablesRestore featuregate.Feature = "MinimizeIPTablesRestore"
 
-	// owner: @sarveshr7
-	// kep: https://kep.k8s.io/2593
-	// alpha: v1.25
-	//
-	// Enables the MultiCIDR Range allocator.
-	MultiCIDRRangeAllocator featuregate.Feature = "MultiCIDRRangeAllocator"
-
 	// owner: @aojea
 	// kep: https://kep.k8s.io/1880
 	// alpha: v1.27
@@ -1110,8 +1103,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MinDomainsInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
 	MinimizeIPTablesRestore: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
-
-	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
 

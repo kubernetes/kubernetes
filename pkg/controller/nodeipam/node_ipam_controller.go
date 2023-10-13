@@ -24,7 +24,6 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	networkinginformers "k8s.io/client-go/informers/networking/v1alpha1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -83,7 +82,6 @@ type Controller struct {
 func NewNodeIpamController(
 	ctx context.Context,
 	nodeInformer coreinformers.NodeInformer,
-	clusterCIDRInformer networkinginformers.ClusterCIDRInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
@@ -139,7 +137,7 @@ func NewNodeIpamController(
 			NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
 		}
 
-		ic.cidrAllocator, err = ipam.New(ctx, kubeClient, cloud, nodeInformer, clusterCIDRInformer, ic.allocatorType, allocatorParams)
+		ic.cidrAllocator, err = ipam.New(ctx, kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
 		if err != nil {
 			return nil, err
 		}

@@ -26,8 +26,6 @@ import (
 	"net"
 	"strings"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers/networking/v1alpha1"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
@@ -38,7 +36,6 @@ import (
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -128,14 +125,9 @@ func startNodeIpamController(ctx context.Context, initContext app.ControllerInit
 		return nil, false, err
 	}
 
-	var clusterCIDRInformer v1alpha1.ClusterCIDRInformer
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRRangeAllocator) {
-		clusterCIDRInformer = controllerCtx.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
-	}
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx,
 		controllerCtx.InformerFactory.Core().V1().Nodes(),
-		clusterCIDRInformer,
 		cloud,
 		controllerCtx.ClientBuilder.ClientOrDie(initContext.ClientName),
 		clusterCIDRs,
