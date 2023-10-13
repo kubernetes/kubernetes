@@ -220,6 +220,12 @@ const (
 	// (e.g. in a Deployment), which is the historical default.
 	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
 
+	// owner: @AxeZhan
+	// deprecated: v1.29
+	//
+	// Add kubernetes.io prefix to pod-template-hash label
+	DeploymentUniqueLabelKey featuregate.Feature = "DeploymentUniqueLabelKey"
+
 	// owner: @elezar
 	// kep: http://kep.k8s.io/4009
 	// alpha: v1.28
@@ -1018,6 +1024,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 
 	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
+
+	DeploymentUniqueLabelKey: {Default: false, PreRelease: featuregate.Alpha},
 
 	DevicePluginCDIDevices: {Default: false, PreRelease: featuregate.Alpha},
 
