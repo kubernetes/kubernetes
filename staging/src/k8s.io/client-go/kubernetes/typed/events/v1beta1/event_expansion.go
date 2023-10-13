@@ -44,11 +44,11 @@ type EventExpansion interface {
 // it must either match this event client's namespace, or this event client must
 // have been created with the "" namespace.
 func (e *events) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
-	if e.ns != "" && event.Namespace != e.ns {
-		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
+	if e.Namespace != "" && event.Namespace != e.Namespace {
+		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.Namespace)
 	}
 	result := &v1beta1.Event{}
-	err := e.client.Post().
+	err := e.Client.Post().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
@@ -64,11 +64,11 @@ func (e *events) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event,
 // created with the "" namespace.
 // Update also requires the ResourceVersion to be set in the event object.
 func (e *events) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
-	if e.ns != "" && event.Namespace != e.ns {
-		return nil, fmt.Errorf("can't update an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
+	if e.Namespace != "" && event.Namespace != e.Namespace {
+		return nil, fmt.Errorf("can't update an event with namespace '%v' in namespace '%v'", event.Namespace, e.Namespace)
 	}
 	result := &v1beta1.Event{}
-	err := e.client.Put().
+	err := e.Client.Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Name(event.Name).
@@ -84,11 +84,11 @@ func (e *events) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event,
 // The namespace must either match this event client's namespace, or this event client must
 // have been created with the "" namespace.
 func (e *events) PatchWithEventNamespace(event *v1beta1.Event, data []byte) (*v1beta1.Event, error) {
-	if e.ns != "" && event.Namespace != e.ns {
-		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
+	if e.Namespace != "" && event.Namespace != e.Namespace {
+		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", event.Namespace, e.Namespace)
 	}
 	result := &v1beta1.Event{}
-	err := e.client.Patch(types.StrategicMergePatchType).
+	err := e.Client.Patch(types.StrategicMergePatchType).
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Name(event.Name).
