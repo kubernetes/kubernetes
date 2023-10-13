@@ -24,7 +24,9 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestHandleCrash(t *testing.T) {
@@ -155,4 +157,28 @@ func captureStderr(f func()) (string, error) {
 	w.Close()
 
 	return <-resultCh, nil
+}
+
+func Test_rudimentaryErrorBackoff_OnError_ParallelSleep(t *testing.T) {
+	r := &rudimentaryErrorBackoff{
+		minPeriod: time.Second,
+	}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < 30; i++ {
+		wg.Add(1)
+		go func() {
+			<-start
+			r.OnError(nil) // input error is ignored
+			wg.Done()
+		}()
+	}
+	st := time.Now()
+	close(start)
+	wg.Wait()
+
+	if since := time.Since(st); since > 5*time.Second {
+		t.Errorf("OnError slept for too long: %s", since)
+	}
 }

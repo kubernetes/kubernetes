@@ -18,20 +18,31 @@ package filters
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/http2"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/request/anonymous"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/scheme"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestAuthenticateRequestWithAud(t *testing.T) {
@@ -462,6 +473,195 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 			if diff := cmp.Diff(want, testcase.requestHeaders); len(diff) > 0 {
 				t.Errorf("unexpected final headers (-want +got):\n%s", diff)
 			}
+		})
+	}
+}
+
+func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
+	s := httptest.NewUnstartedServer(WithAuthentication(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) }),
+		authenticator.RequestFunc(func(r *http.Request) (*authenticator.Response, bool, error) {
+			switch r.Header.Get("Authorization") {
+			case "known":
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "panda"}}, true, nil
+			case "error":
+				return nil, false, errors.New("authn err")
+			case "anonymous":
+				return anonymous.NewAuthenticator().AuthenticateRequest(r)
+			case "anonymous_group":
+				return &authenticator.Response{User: &user.DefaultInfo{Groups: []string{user.AllUnauthenticated}}}, true, nil
+			default:
+				return nil, false, nil
+			}
+		}),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r = r.WithContext(genericapirequest.WithRequestInfo(r.Context(), &genericapirequest.RequestInfo{}))
+			Unauthorized(scheme.Codecs).ServeHTTP(w, r)
+		}),
+		nil,
+		nil,
+	))
+
+	http2Options := &http2.Server{}
+
+	if err := http2.ConfigureServer(s.Config, http2Options); err != nil {
+		t.Fatal(err)
+	}
+
+	s.TLS = s.Config.TLSConfig
+
+	s.StartTLS()
+	t.Cleanup(s.Close)
+
+	const reqs = 4
+
+	cases := []struct {
+		name                   string
+		authorizationHeader    string
+		skipHTTP2DOSMitigation bool
+		expectConnections      uint64
+	}{
+		{
+			name:                   "known",
+			authorizationHeader:    "known",
+			skipHTTP2DOSMitigation: false,
+			expectConnections:      1,
+		},
+		{
+			name:                   "error",
+			authorizationHeader:    "error",
+			skipHTTP2DOSMitigation: false,
+			expectConnections:      reqs,
+		},
+		{
+			name:                   "anonymous",
+			authorizationHeader:    "anonymous",
+			skipHTTP2DOSMitigation: false,
+			expectConnections:      reqs,
+		},
+		{
+			name:                   "anonymous_group",
+			authorizationHeader:    "anonymous_group",
+			skipHTTP2DOSMitigation: false,
+			expectConnections:      reqs,
+		},
+		{
+			name:                   "other",
+			authorizationHeader:    "other",
+			skipHTTP2DOSMitigation: false,
+			expectConnections:      reqs,
+		},
+
+		{
+			name:                   "known skip=true",
+			authorizationHeader:    "known",
+			skipHTTP2DOSMitigation: true,
+			expectConnections:      1,
+		},
+		{
+			name:                   "error skip=true",
+			authorizationHeader:    "error",
+			skipHTTP2DOSMitigation: true,
+			expectConnections:      1,
+		},
+		{
+			name:                   "anonymous skip=true",
+			authorizationHeader:    "anonymous",
+			skipHTTP2DOSMitigation: true,
+			expectConnections:      1,
+		},
+		{
+			name:                   "anonymous_group skip=true",
+			authorizationHeader:    "anonymous_group",
+			skipHTTP2DOSMitigation: true,
+			expectConnections:      1,
+		},
+		{
+			name:                   "other skip=true",
+			authorizationHeader:    "other",
+			skipHTTP2DOSMitigation: true,
+			expectConnections:      1,
+		},
+	}
+
+	rootCAs := x509.NewCertPool()
+	rootCAs.AddCert(s.Certificate())
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := func(t *testing.T, nextProto string, expectConnections uint64) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnauthenticatedHTTP2DOSMitigation, !tc.skipHTTP2DOSMitigation)()
+
+				var localAddrs atomic.Uint64 // indicates how many TCP connection set up
+
+				tlsConfig := &tls.Config{
+					RootCAs:    rootCAs,
+					NextProtos: []string{nextProto},
+				}
+
+				dailer := tls.Dialer{
+					Config: tlsConfig,
+				}
+
+				tr := &http.Transport{
+					TLSHandshakeTimeout: 10 * time.Second,
+					TLSClientConfig:     tlsConfig,
+					DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						conn, err := dailer.DialContext(ctx, network, addr)
+						if err != nil {
+							return nil, err
+						}
+
+						localAddrs.Add(1)
+
+						return conn, nil
+					},
+				}
+
+				tr.MaxIdleConnsPerHost = 1 // allow http1 to have keep alive connections open
+				if nextProto == http2.NextProtoTLS {
+					// Disable connection pooling to avoid additional connections
+					// that cause the test to flake
+					tr.MaxIdleConnsPerHost = -1
+					if err := http2.ConfigureTransport(tr); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				client := &http.Client{
+					Transport: tr,
+				}
+
+				for i := 0; i < reqs; i++ {
+					req, err := http.NewRequest(http.MethodGet, s.URL, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(tc.authorizationHeader) > 0 {
+						req.Header.Set("Authorization", tc.authorizationHeader)
+					}
+
+					resp, err := client.Do(req)
+					if err != nil {
+						t.Fatal(err)
+					}
+					_, _ = io.Copy(io.Discard, resp.Body)
+					_ = resp.Body.Close()
+				}
+
+				if expectConnections != localAddrs.Load() {
+					t.Fatalf("expect TCP connection: %d, actual: %d", expectConnections, localAddrs.Load())
+				}
+			}
+
+			t.Run(http2.NextProtoTLS, func(t *testing.T) {
+				f(t, http2.NextProtoTLS, tc.expectConnections)
+			})
+
+			// http1 connection reuse occasionally flakes on CI, skipping for now
+			// t.Run("http/1.1", func(t *testing.T) {
+			// 	f(t, "http/1.1", 1)
+			// })
 		})
 	}
 }
