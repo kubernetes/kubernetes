@@ -71,15 +71,16 @@ func NewCorrelatedObject(new, old interface{}, schema Schema) *CorrelatedObject 
 	}
 }
 
-// If oldValue is not a list, returns nil
-// If oldValue is a list, this function takes mapType into account and attempts
-// to find the old value with the same index or key
+// If OldValue or Value is not a list, or the index is out of bounds of the
+// Value list, returns nil
+// If oldValue is a list, this considers the x-list-type to decide how to
+// correlate old values:
 //
 // If listType is map, creates a map representation of the list using the designated
 // map-keys, caches it for future calls, and returns the map value, or nil if
 // the correlated key is not in the old map
 //
-// If the list type is not correlatable this funcion returns nil.
+// Otherwise, if the list type is not correlatable this funcion returns nil.
 func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) interface{} {
 	oldAsList, ok := r.OldValue.([]interface{})
 	if !ok {
