@@ -243,7 +243,7 @@ function New-ProfileFromSID {
         }
         elseif($result -eq '-2147024809')
         {
-            $staus = "$username Not Found"
+            $status = "$username Not Found"
             write-verbose "$username creation result: $result"
         }
        elseif($result -eq 0)
