@@ -1115,6 +1115,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
+	genericfeatures.DeclarativeValidation: {Default: false, PreRelease: featuregate.Alpha},
+
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},

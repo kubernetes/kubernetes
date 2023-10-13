@@ -104,6 +104,20 @@ const (
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
 
+	// owner: @alexzielenski
+	// kep: https://kep.k8s.io/4153
+	// alpha: v1.29
+	//
+	// Employes OpenAPI schemas for validation of builtin resources, when
+	// available. This feature gate is intended to be used in conjunction with
+	// the DeclarativeValidationsInOpenAPI feature gate.
+	//
+	// Only resources opted into Declarative Validation will be validated using
+	// OpenAPI schemas. Resources that have opted in will implement the
+	// DeclarativeValidationStrategy interface for their Create and Update
+	// strategies.
+	DeclarativeValidation featuregate.Feature = "DeclarativeValidation"
+
 	// alpha: v1.20
 	// beta: v1.21
 	// GA: v1.24
@@ -283,6 +297,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
+
+	DeclarativeValidation: {Default: false, PreRelease: featuregate.Alpha},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
