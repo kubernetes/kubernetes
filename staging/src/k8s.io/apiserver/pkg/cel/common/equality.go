@@ -159,9 +159,18 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 	oldAsArray, oldIsArray := r.OldValue.([]interface{})
 	newAsArray, newIsArray := r.Value.([]interface{})
 
-	if oldIsArray != newIsArray {
+	oldAsMap, oldIsMap := r.OldValue.(map[string]interface{})
+	newAsMap, newIsMap := r.Value.(map[string]interface{})
+
+	// If old and new are not the same type, they are not equal
+	if (oldIsArray != newIsArray) || oldIsMap != newIsMap {
 		return false
-	} else if oldIsArray {
+	}
+
+	// Objects are known to be same type of (map, slice, or primitive)
+	switch {
+	case oldIsArray:
+		// Both arrays case. oldIsArray == newIsArray
 		if len(oldAsArray) != len(newAsArray) {
 			return false
 		}
@@ -185,14 +194,8 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 		}
 
 		return true
-	}
-
-	oldAsMap, oldIsMap := r.OldValue.(map[string]interface{})
-	newAsMap, newIsMap := r.Value.(map[string]interface{})
-
-	if oldIsMap != newIsMap {
-		return false
-	} else if oldIsMap {
+	case oldIsMap:
+		// Both maps case. oldIsMap == newIsMap
 		if len(oldAsMap) != len(newAsMap) {
 			return false
 		}
@@ -210,9 +213,11 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 		}
 
 		return true
-	}
 
-	return reflect.DeepEqual(r.OldValue, r.Value)
+	default:
+		// Primitive: use reflect.DeepEqual
+		return reflect.DeepEqual(r.OldValue, r.Value)
+	}
 }
 
 // Key returns the child of the receiver with the given name.
