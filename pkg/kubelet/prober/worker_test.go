@@ -268,6 +268,48 @@ func TestSuccessThreshold(t *testing.T) {
 	}
 }
 
+func TestStartupProbeSuccessThreshold(t *testing.T) {
+	ctx := context.Background()
+	m := newTestManager()
+	successThreshold := 1
+	failureThreshold := 3
+	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	m.statusManager.SetPodStatus(w.pod, getTestNotRunningStatus())
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+
+	for i := 0; i < successThreshold+1; i++ {
+		msg := fmt.Sprintf("%d success", successThreshold)
+		expectContinue(t, w, w.doProbe(ctx), msg)
+		expectResult(t, w, results.Success, msg)
+		expectResultRun(t, w, 0, msg)
+	}
+}
+
+func TestStartupProbeFailureThreshold(t *testing.T) {
+	ctx := context.Background()
+	m := newTestManager()
+	successThreshold := 1
+	failureThreshold := 3
+	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	m.statusManager.SetPodStatus(w.pod, getTestNotRunningStatus())
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	for i := 0; i < failureThreshold+1; i++ {
+		msg := fmt.Sprintf("%d failure", i+1)
+		expectContinue(t, w, w.doProbe(ctx), msg)
+		if i < failureThreshold-1 {
+			expectResult(t, w, results.Unknown, msg)
+			expectResultRun(t, w, i+1, msg)
+		} else {
+			msg := fmt.Sprintf("%d failure", failureThreshold)
+			expectResult(t, w, results.Failure, msg)
+			expectResultRun(t, w, 0, msg)
+		}
+	}
+}
+
 func TestCleanUp(t *testing.T) {
 	m := newTestManager()
 
@@ -312,6 +354,13 @@ func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg st
 	} else if result != expectedResult {
 		t.Errorf("[%s - %s] Expected result to be %v, but was %v",
 			w.probeType, msg, expectedResult, result)
+	}
+}
+
+func expectResultRun(t *testing.T, w *worker, expectedResultRun int, msg string) {
+	if w.resultRun != expectedResultRun {
+		t.Errorf("[%s - %s] Expected result to be %v, but was %v",
+			w.probeType, msg, expectedResultRun, w.resultRun)
 	}
 }
 
@@ -366,8 +415,10 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 		msg = "hold lifted"
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Success, msg)
-		if w.onHold {
+		if probeType == liveness && w.onHold {
 			t.Errorf("Prober should not be on hold anymore")
+		} else if probeType == startup && !w.onHold {
+			t.Errorf("Prober should be on hold due to %s check success", probeType)
 		}
 	}
 }
