@@ -156,12 +156,16 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 		return nil, fmt.Errorf("Error getting gRPC client: %w", err)
 	}
 	defer conn.Close()
+	framework.Logf("podresources gRPC client available")
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	resp, err := client.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("%v.Get(_) = _, %v", client, err)
 	}
+	framework.Logf("podresources List call done (%d entries)", len(resp.PodResources))
+
 	return resp, nil
 }
 
