@@ -52,7 +52,21 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 		e2eskipper.SkipUnlessMultizone(ctx, c)
 	})
 
-	ginkgo.It("should distribute endpoints evenly", func(ctx context.Context) {
+	const (
+		proportionalCPUTopology = "Auto"
+		preferZoneTopology      = "PreferZone"
+	)
+
+	// runTopologyTest runs topology tests for `topologyName` by creating a
+	// service which uses the desired topology.
+	runTopologyTest := func(ctx context.Context, topologyName string) {
+
+		////////////////////////////////////////////////////////////////////////////
+		// Step 1: Create a DaemonSet to create pods in all nodes (and zones, as an
+		// implication.). Expose the pods through a Service using the desired
+		// topology.
+		////////////////////////////////////////////////////////////////////////////
+
 		portNum := int32(9376)
 		thLabels := map[string]string{labelKey: clientLabelValue}
 		img := imageutils.GetE2EImage(imageutils.Agnhost)
@@ -65,7 +79,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "topology-hints",
 				Annotations: map[string]string{
-					v1.AnnotationTopologyMode: "Auto",
+					v1.AnnotationTopologyMode: topologyName, // Parameter to configure topology
 				},
 			},
 			Spec: v1.ServiceSpec{
@@ -85,7 +99,10 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 		})
 		framework.ExpectNoError(err, "timed out waiting for DaemonSets to be ready")
 
-		// All Nodes should have same allocatable CPUs. If not, then skip the test.
+		////////////////////////////////////////////////////////////////////////////
+		// Step 2: Aggregate all nodes where the DaemonSet pods got scheduled.
+		////////////////////////////////////////////////////////////////////////////
+
 		schedulableNodes := map[string]*v1.Node{}
 		for _, nodeName := range e2edaemonset.SchedulableNodes(ctx, c, ds) {
 			schedulableNodes[nodeName] = nil
@@ -102,6 +119,14 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			}
 			schedulableNodes[node.Name] = &node
 
+			if topologyName == preferZoneTopology {
+				continue
+			}
+
+			// In case of proportionalCPUTopology, all Nodes should have same
+			// allocatable CPUs. This allows us to use the invariant that such a case
+			// would result in endpoints being distributed evenly across zones (since
+			// there is no difference in allocatable CPUs)
 			nodeCPU, found := node.Status.Allocatable[v1.ResourceCPU]
 			if !found {
 				framework.Failf("Error when getting allocatable CPU of Node '%s'", node.Name)
@@ -114,6 +139,11 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 					node.Name, nodeCPU.Value(), lastNodeCPU.Value())
 			}
 		}
+
+		////////////////////////////////////////////////////////////////////////////
+		// Step 3: Wait for endpoint slices to be updated with endpoints and their
+		// zone hints.
+		////////////////////////////////////////////////////////////////////////////
 
 		framework.Logf("Waiting for %d endpoints to be tracked in EndpointSlices", len(schedulableNodes))
 
@@ -156,26 +186,31 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			}
 		}
 
-		nodesByZone := map[string]string{}
-		zonesWithNode := map[string]string{}
+		////////////////////////////////////////////////////////////////////////////
+		// Step 4: Make requests from each zone (which the DaemonSet spans) and
+		// ensure that requests stay in the same zone.
+		////////////////////////////////////////////////////////////////////////////
+
+		zoneByNode := map[string]string{}
+		nodeByZone := map[string]string{}
 		for _, node := range schedulableNodes {
 			if zone, ok := node.Labels[v1.LabelTopologyZone]; ok {
-				nodesByZone[node.Name] = zone
-				zonesWithNode[zone] = node.Name
+				zoneByNode[node.Name] = zone
+				nodeByZone[zone] = node.Name
 			}
 		}
 
 		podList, err := c.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		podsByZone := map[string]string{}
+		zoneByPod := map[string]string{}
 		for _, pod := range podList.Items {
-			if zone, ok := nodesByZone[pod.Spec.NodeName]; ok {
-				podsByZone[pod.Name] = zone
+			if zone, ok := zoneByNode[pod.Spec.NodeName]; ok {
+				zoneByPod[pod.Name] = zone
 			}
 		}
 
 		ginkgo.By("keeping requests in the same zone")
-		for fromZone, nodeName := range zonesWithNode {
+		for fromZone, nodeName := range nodeByZone {
 			ginkgo.By("creating a client pod for probing the service from " + fromZone)
 			podName := "curl-from-" + fromZone
 			clientPod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil, "serve-hostname")
@@ -207,7 +242,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 					if logLines[i] == "" || strings.HasPrefix(logLines[i], "Date:") {
 						continue
 					}
-					destZone, ok := podsByZone[logLines[i]]
+					destZone, ok := zoneByPod[logLines[i]]
 					if !ok {
 						framework.Logf("could not determine dest zone from log line: %s", logLines[i])
 						return false, nil
@@ -227,5 +262,12 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 				framework.Failf("expected 5 consecutive requests from %s to stay in zone %s within %v, stdout: %v", clientPod.Name, fromZone, e2eservice.KubeProxyLagTimeout, logs)
 			}
 		}
+	}
+
+	ginkgo.It(fmt.Sprintf("should distribute endpoints correctly when [topology=%v]", proportionalCPUTopology), func(ctx context.Context) {
+		runTopologyTest(ctx, proportionalCPUTopology)
+	})
+	ginkgo.It(fmt.Sprintf("should distribute endpoints correctly when [topology=%v]", preferZoneTopology), func(ctx context.Context) {
+		runTopologyTest(ctx, preferZoneTopology)
 	})
 })
