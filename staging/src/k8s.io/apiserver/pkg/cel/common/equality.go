@@ -20,6 +20,13 @@ import (
 	"reflect"
 )
 
+// CorrelatedObject represents a node in a tree of objects that are being
+// validated. It is used to keep track of the old value of an object during
+// traversal of the new value. It is also used to cache the results of
+// DeepEqual comparisons between the old and new values of objects.
+//
+// CorrelatedObject is not thread-safe. It is the responsibility of the caller
+// to handle concurrency, if any.
 type CorrelatedObject struct {
 	// Currently correlated old value during traversal of the schema/object
 	OldValue interface{}
@@ -27,6 +34,8 @@ type CorrelatedObject struct {
 	// Value being validated
 	Value interface{}
 
+	// Schema used for validation of this value. The schema is also used
+	// to determine how to correlate the old object.
 	Schema Schema
 
 	// Scratch space below, may change during validation
