@@ -102,6 +102,7 @@ func TestInt64AmountMul(t *testing.T) {
 		{int64Amount{value: 1, scale: -100}, 10, int64Amount{value: 1, scale: -100}, false},
 		{int64Amount{value: -5, scale: 2}, 500, int64Amount{value: -2500, scale: 2}, true},
 		{int64Amount{value: -5, scale: -2}, 500, int64Amount{value: -2500, scale: -2}, true},
+		{int64Amount{value: 0, scale: 1}, 0, int64Amount{value: 0, scale: 1}, true},
 
 		{int64Amount{value: mostPositive, scale: -1}, 10, int64Amount{value: mostPositive, scale: -1}, false},
 		{int64Amount{value: mostPositive, scale: -1}, 0, int64Amount{value: 0, scale: 0}, true},
