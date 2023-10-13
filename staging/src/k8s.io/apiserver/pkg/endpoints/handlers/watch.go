@@ -222,7 +222,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder)
+	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer)
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -249,7 +249,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
 
-			if err := watchEncoder.Encode(event, framer); err != nil {
+			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleError(err)
 				// client disconnect.
 				return
