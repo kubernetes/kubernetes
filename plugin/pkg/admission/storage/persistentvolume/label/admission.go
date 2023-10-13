@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -44,10 +46,16 @@ const (
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		persistentVolumeLabelAdmission := newPersistentVolumeLabel()
-		return persistentVolumeLabelAdmission, nil
-	})
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
+		plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
+			persistentVolumeLabelAdmission := newPersistentVolumeLabel()
+			return persistentVolumeLabelAdmission, nil
+		})
+	} else {
+		klog.Errorf("%s plugin is only available when %s feature is set to false",
+			PluginName,
+			features.DisableCloudProviders)
+	}
 }
 
 var _ = admission.Interface(&persistentVolumeLabel{})
