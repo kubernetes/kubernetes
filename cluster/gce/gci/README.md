@@ -79,7 +79,7 @@ following guidelines are proposed for image choice in E2E testing.
     'image' should be used to specify the image.
 
   * To integrate continuously with other container
-    related technologies like runc, containerd, docker and kubernertes, the
+    related technologies like runc, containerd, docker and kubernetes, the
     latest LTS or stable images are preferred. 'image_family' should be used to
     specify the image.
 
