@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	cadvisormemory "github.com/google/cadvisor/cache/memory"
 	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"google.golang.org/grpc/codes"
@@ -442,7 +443,9 @@ func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cad
 	fsInfo, err := p.cadvisor.GetDirFsInfo(mountpoint)
 	if err != nil {
 		msg := "Failed to get the info of the filesystem with mountpoint"
-		if err == cadvisorfs.ErrNoSuchDevice {
+		if errors.Is(err, cadvisorfs.ErrNoSuchDevice) ||
+			errors.Is(err, cadvisorfs.ErrDeviceNotInPartitionsMap) ||
+			errors.Is(err, cadvisormemory.ErrDataNotFound) {
 			klog.V(2).InfoS(msg, "mountpoint", mountpoint, "err", err)
 		} else {
 			klog.ErrorS(err, msg, "mountpoint", mountpoint)
