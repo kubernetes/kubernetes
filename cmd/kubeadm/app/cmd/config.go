@@ -223,9 +223,6 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},
-		NodeRegistration: kubeadmapiv1old.NodeRegistrationOptions{
-			CRISocket: constants.DefaultCRISocket, // avoid CRI detection
-		},
 	}, opts)
 	if err != nil {
 		return []byte{}, err
@@ -238,9 +235,7 @@ func getDefaultResetConfigBytes() ([]byte, error) {
 	opts := configutil.LoadOrDefaultConfigurationOptions{
 		SkipCRIDetect: true,
 	}
-	internalcfg, err := configutil.DefaultedResetConfiguration(&kubeadmapiv1.ResetConfiguration{
-		CRISocket: constants.DefaultCRISocket, // avoid CRI detection
-	}, opts)
+	internalcfg, err := configutil.DefaultedResetConfiguration(&kubeadmapiv1.ResetConfiguration{}, opts)
 	if err != nil {
 		return []byte{}, err
 	}
