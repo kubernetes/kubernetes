@@ -40,8 +40,8 @@ func SetResetDynamicDefaults(cfg *kubeadmapi.ResetConfiguration, skipCRIDetect b
 	var err error
 	if cfg.CRISocket == "" {
 		if skipCRIDetect {
-			klog.V(4).Infof("skip CRI socket detection, fill with placeholder %s", constants.UnknownCRISocket)
-			cfg.CRISocket = constants.UnknownCRISocket // set a value to pass the ValidateSocketPath
+			klog.V(4).Infof("skip CRI socket detection, fill with the default CRI socket %s", constants.DefaultCRISocket)
+			cfg.CRISocket = constants.DefaultCRISocket
 			return nil
 		}
 		cfg.CRISocket, err = kubeadmruntime.DetectCRISocket()

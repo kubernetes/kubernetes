@@ -111,8 +111,8 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 
 	if cfg.CRISocket == "" {
 		if skipCRIDetect {
-			klog.V(4).Infof("skip CRI socket detection, fill with placeholder %s", kubeadmconstants.UnknownCRISocket)
-			cfg.CRISocket = kubeadmconstants.UnknownCRISocket // set a value to pass the ValidateSocketPath
+			klog.V(4).Infof("skip CRI socket detection, fill with the default CRI socket %s", kubeadmconstants.DefaultCRISocket)
+			cfg.CRISocket = kubeadmconstants.DefaultCRISocket
 			return nil
 		}
 		cfg.CRISocket, err = kubeadmruntime.DetectCRISocket()
