@@ -697,7 +697,7 @@ func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exi
 	if err != nil {
 		if exiterr, ok := err.(clientexec.ExitError); ok {
 			actualExitCode := exiterr.ExitStatus()
-			framework.ExpectEqual(actualExitCode, exitCode,
+			gomega.Expect(actualExitCode).To(gomega.Equal(exitCode),
 				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
 				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
 		} else {
