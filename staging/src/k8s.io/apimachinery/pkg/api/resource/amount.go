@@ -203,6 +203,44 @@ func (a *int64Amount) Sub(b int64Amount) bool {
 	return a.Add(int64Amount{value: -b.value, scale: b.scale})
 }
 
+// Mul multiplies the provided b to the current amount, or
+// returns false if overflow or underflow would result.
+func (a *int64Amount) Mul(b int64) bool {
+	switch {
+	case a.value == 0:
+		return true
+	case b == 0:
+		a.value = 0
+		a.scale = 0
+		return true
+	case a.scale == 0:
+		c, ok := int64Multiply(a.value, b)
+		if !ok {
+			return false
+		}
+		a.value = c
+	case a.scale > 0:
+		c, ok := int64Multiply(a.value, b)
+		if !ok {
+			return false
+		}
+		if _, ok = positiveScaleInt64(c, a.scale); !ok {
+			return false
+		}
+		a.value = c
+	default:
+		c, ok := int64Multiply(a.value, b)
+		if !ok {
+			return false
+		}
+		if _, ok = negativeScaleInt64(c, -a.scale); !ok {
+			return false
+		}
+		a.value = c
+	}
+	return true
+}
+
 // AsScale adjusts this amount to set a minimum scale, rounding up, and returns true iff no precision
 // was lost. (1.1e5).AsScale(5) would return 1.1e5, but (1.1e5).AsScale(6) would return 1e6.
 func (a int64Amount) AsScale(scale Scale) (int64Amount, bool) {
