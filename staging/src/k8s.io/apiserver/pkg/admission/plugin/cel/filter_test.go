@@ -137,12 +137,20 @@ func TestFilter(t *testing.T) {
 		Object: map[string]interface{}{
 			"spec": map[string]interface{}{
 				"testSize": 10,
+				"escape-test": []interface{}{
+					map[string]interface{}{
+						"test": "test",
+					},
+				},
 			},
 		},
 	}
 	podObject := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
+			Labels: map[string]string{
+				"helm.sh/chart": "other",
+			},
 		},
 		Spec: corev1.PodSpec{
 			NodeName: "testnode",
@@ -183,6 +191,37 @@ func TestFilter(t *testing.T) {
 		testPerCallLimit uint64
 		namespaceObject  *corev1.Namespace
 	}{
+		{
+			name: "test escaping",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "object.metadata.labels.helm__dot__sh__slash__chart == 'other'",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			hasParamKind: false,
+		},
+		{
+			name: "test escaping",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "params.spec.escape__dash__test[0].test == 'test'",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			hasParamKind: true,
+			params:       crdParams,
+		},
 		{
 			name: "valid syntax for object",
 			validations: []ExpressionAccessor{
