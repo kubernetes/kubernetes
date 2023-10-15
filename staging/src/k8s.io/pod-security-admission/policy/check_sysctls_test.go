@@ -63,6 +63,39 @@ func TestSysctls(t *testing.T) {
 			expectReason: `forbidden sysctls`,
 			expectDetail: `net.ipv4.tcp_keepalive_time`,
 		},
+		{
+			name: "new supported sysctls not supported: net.ipv4.tcp_fin_timeout",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_fin_timeout", Value: "60"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `net.ipv4.tcp_fin_timeout`,
+		},
+		{
+			name: "new supported sysctls not supported: net.ipv4.tcp_keepalive_intvl",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_keepalive_intvl", Value: "75"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `net.ipv4.tcp_keepalive_intvl`,
+		},
+		{
+			name: "new supported sysctls not supported: net.ipv4.tcp_keepalive_probes",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_keepalive_probes", Value: "9"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `net.ipv4.tcp_keepalive_probes`,
+		},
 	}
 
 	for _, tc := range tests {
@@ -155,10 +188,37 @@ func TestSysctls_1_29(t *testing.T) {
 			expectDetail: `a, b`,
 		},
 		{
-			name: "new supported sysctls",
+			name: "new supported sysctls: net.ipv4.tcp_keepalive_time",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				SecurityContext: &corev1.PodSecurityContext{
 					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_keepalive_time", Value: "7200"}},
+				},
+			}},
+			allowed: true,
+		},
+		{
+			name: "new supported sysctls: net.ipv4.tcp_fin_timeout",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_fin_timeout", Value: "60"}},
+				},
+			}},
+			allowed: true,
+		},
+		{
+			name: "new supported sysctls: net.ipv4.tcp_keepalive_intvl",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_keepalive_intvl", Value: "75"}},
+				},
+			}},
+			allowed: true,
+		},
+		{
+			name: "new supported sysctls: net.ipv4.tcp_keepalive_probes",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_keepalive_probes", Value: "9"}},
 				},
 			}},
 			allowed: true,

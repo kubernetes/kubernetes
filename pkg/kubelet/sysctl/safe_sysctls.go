@@ -51,6 +51,20 @@ var safeSysctls = []sysctl{
 		name: "net.ipv4.tcp_keepalive_time",
 		// refer to https://github.com/torvalds/linux/commit/13b287e8d1cad951634389f85b8c9b816bd3bb1e.
 		kernel: "4.5",
+	}, {
+		// refer to https://github.com/torvalds/linux/commit/1e579caa18b96f9eb18f4f5416658cd15f37c062.
+		name:   "net.ipv4.tcp_fin_timeout",
+		kernel: "4.6",
+	},
+	{
+		// refer to https://github.com/torvalds/linux/commit/b840d15d39128d08ed4486085e5507d2617b9ae1.
+		name:   "net.ipv4.tcp_keepalive_intvl",
+		kernel: "4.5",
+	},
+	{
+		// refer to https://github.com/torvalds/linux/commit/9bd6861bd4326e3afd3f14a9ec8a723771fb20bb.
+		name:   "net.ipv4.tcp_keepalive_probes",
+		kernel: "4.5",
 	},
 }
 

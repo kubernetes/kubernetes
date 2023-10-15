@@ -133,6 +133,9 @@ func init() {
 						{Name: "net.ipv4.ip_unprivileged_port_start", Value: "1024"},
 						{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"},
 						{Name: "net.ipv4.tcp_keepalive_time", Value: "7200"},
+						{Name: "net.ipv4.tcp_fin_timeout", Value: "60"},
+						{Name: "net.ipv4.tcp_keepalive_intvl", Value: "75"},
+						{Name: "net.ipv4.tcp_keepalive_probes", Value: "9"},
 					}
 				}),
 			}
