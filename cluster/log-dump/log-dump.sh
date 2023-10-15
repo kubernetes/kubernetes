@@ -139,7 +139,10 @@ function copy-logs-from-node() {
     if [[ "${gcloud_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
       # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
       gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
-      gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
+      # FIXME(dims): bug in gcloud prevents multiple source files specified using curly braces, so we just loop through for now
+      for single_file in "${files[@]}"; do
+        gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${single_file}" "${dir}" > /dev/null || true
+      done
     elif  [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
       local ip
       ip=$(get_ssh_hostname "${node}")
