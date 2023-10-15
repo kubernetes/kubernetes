@@ -38,3 +38,9 @@ spec:
       value: 1024-4999
     - name: net.ipv4.tcp_keepalive_time
       value: "7200"
+    - name: net.ipv4.tcp_fin_timeout
+      value: "60"
+    - name: net.ipv4.tcp_keepalive_intvl
+      value: "75"
+    - name: net.ipv4.tcp_keepalive_probes
+      value: "9"

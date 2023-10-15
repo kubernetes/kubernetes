@@ -59,7 +59,7 @@ func Test_getSafeSysctlAllowlist(t *testing.T) {
 			},
 		},
 		{
-			name: "kernelVersion is 5.15.0, return safeSysctls with no kernelVersion limit and net.ipv4.ip_local_reserved_ports and net.ipv4.tcp_keepalive_time",
+			name: "kernelVersion is 5.15.0, return safeSysctls with no kernelVersion limit and kernelVersion below 5.15.0",
 			getVersion: func() (*version.Version, error) {
 				kernelVersionStr := "5.15.0-75-generic"
 				return version.ParseGeneric(kernelVersionStr)
@@ -72,6 +72,9 @@ func Test_getSafeSysctlAllowlist(t *testing.T) {
 				"net.ipv4.ip_unprivileged_port_start",
 				"net.ipv4.ip_local_reserved_ports",
 				"net.ipv4.tcp_keepalive_time",
+				"net.ipv4.tcp_fin_timeout",
+				"net.ipv4.tcp_keepalive_intvl",
+				"net.ipv4.tcp_keepalive_probes",
 			},
 		},
 	}
