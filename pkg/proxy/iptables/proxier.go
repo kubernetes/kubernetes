@@ -152,6 +152,9 @@ func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
+	// ipFamily defines the IP family which this proxier is tracking.
+	ipFamily v1.IPFamily
+
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since iptables was synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
@@ -185,7 +188,7 @@ type Proxier struct {
 	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
-	healthzServer       healthcheck.ProxierHealthUpdater
+	healthzServer       *healthcheck.ProxierHealthServer
 
 	// Since converting probabilities (floats) to strings is expensive
 	// and we are using only probabilities in the format of 1/n, we are
@@ -237,7 +240,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	nodePortAddressStrings []string,
 ) (*Proxier, error) {
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
@@ -269,6 +272,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	proxier := &Proxier{
+		ipFamily:                 ipFamily,
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
@@ -330,7 +334,7 @@ func NewDualStackProxier(
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
@@ -492,7 +496,7 @@ func (proxier *Proxier) probability(n int) string {
 // Sync is called to synchronize the proxier state to iptables as soon as possible.
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.QueuedUpdate()
+		proxier.healthzServer.QueuedUpdate(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	proxier.syncRunner.Run()
@@ -502,7 +506,7 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 
 	// synthesize "last change queued" time as the informers are syncing.
@@ -1537,7 +1541,7 @@ func (proxier *Proxier) syncProxyRules() {
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal").Set(float64(serviceNoLocalEndpointsTotalInternal))
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(serviceNoLocalEndpointsTotalExternal))
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
 

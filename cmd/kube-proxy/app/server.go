@@ -527,7 +527,7 @@ type ProxyServer struct {
 	Broadcaster     events.EventBroadcaster
 	Recorder        events.EventRecorder
 	NodeRef         *v1.ObjectReference
-	HealthzServer   healthcheck.ProxierHealthUpdater
+	HealthzServer   *healthcheck.ProxierHealthServer
 	Hostname        string
 	PrimaryIPFamily v1.IPFamily
 	NodeIPs         map[v1.IPFamily]net.IP
@@ -735,7 +735,7 @@ func createClient(config componentbaseconfig.ClientConnectionConfiguration, mast
 	return client, nil
 }
 
-func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
+func serveHealthz(hz *healthcheck.ProxierHealthServer, errCh chan error) {
 	if hz == nil {
 		return
 	}
