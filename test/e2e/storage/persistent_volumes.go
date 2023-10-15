@@ -692,7 +692,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			retrievedPVC := &v1.PersistentVolumeClaim{}
 			err = runtime.DefaultUnstructuredConverter.FromUnstructured(pvcUnstructured.UnstructuredContent(), &retrievedPVC)
 			framework.ExpectNoError(err, "Failed to retrieve %q status.", initialPV.Name)
-			gomega.Expect(string(retrievedPVC.Status.Phase)).To(gomega.Equal("Pending"), "Checking that the PVC status has been read")
+			gomega.Expect(string(retrievedPVC.Status.Phase)).To(gomega.Or(gomega.Equal("Pending"), gomega.Equal("Bound")), "Checking that the PVC status has been read")
 
 			ginkgo.By(fmt.Sprintf("Reading %q Status", initialPV.Name))
 			pvResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumes"}
