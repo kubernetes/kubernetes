@@ -47,6 +47,7 @@
       "github.com/hashicorp/serf": "MPL license not in CNCF allowlist",
       "github.com/influxdata/influxdb1-client": "db/datastore clients should not be required",
       "github.com/json-iterator/go": "refer to #105030",
+      "github.com/mailru/easyjson": "unmaintained",
       "github.com/miekg/dns": "no dns client/server should be required",
       "github.com/mindprince/gonvml": "depends on nvml.h that does not appear to permit modification, redistribution",
       "github.com/mitchellh/cli": "MPL license not in CNCF allowlist",
@@ -167,6 +168,13 @@
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
       ],
+      "github.com/mailru/easyjson": [
+        "github.com/go-openapi/swag",
+        "k8s.io/kube-openapi",
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v5",
+        "sigs.k8s.io/kustomize/kyaml"
+      ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hcsshim",
         "github.com/aws/aws-sdk-go",
@@ -253,6 +261,7 @@
       "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/grpc-ecosystem/grpc-gateway",
       "github.com/json-iterator/go",
+      "github.com/mailru/easyjson",
       "github.com/pkg/errors",
       "github.com/rubiojr/go-vhd",
       "go.opencensus.io",
