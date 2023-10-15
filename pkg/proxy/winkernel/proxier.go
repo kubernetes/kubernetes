@@ -623,7 +623,7 @@ type Proxier struct {
 	recorder    events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
-	healthzServer       healthcheck.ProxierHealthUpdater
+	healthzServer       *healthcheck.ProxierHealthServer
 
 	hns               HostNetworkService
 	hcn               HcnService
@@ -679,7 +679,7 @@ func NewProxier(
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	config config.KubeProxyWinkernelConfiguration,
 	healthzPort int,
 ) (*Proxier, error) {
@@ -815,7 +815,7 @@ func NewDualStackProxier(
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	config config.KubeProxyWinkernelConfiguration,
 	healthzPort int,
 ) (proxy.Provider, error) {
@@ -933,7 +933,7 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(mapStaleLoadbalancer map[st
 // Sync is called to synchronize the proxier state to hns as soon as possible.
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.QueuedUpdate()
+		proxier.healthzServer.QueuedUpdate(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	proxier.syncRunner.Run()
@@ -943,7 +943,7 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 	// synthesize "last change queued" time as the informers are syncing.
 	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
@@ -1583,7 +1583,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
 
