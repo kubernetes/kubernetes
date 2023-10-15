@@ -215,7 +215,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                          &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
-		{Group: networkingv1alpha1.GroupName, Kind: "ClusterCIDR"}:                &ClusterCIDRDescriber{c},
 		{Group: networkingv1alpha1.GroupName, Kind: "IPAddress"}:                  &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
@@ -2838,63 +2837,6 @@ func (i *IngressClassDescriber) describeIngressClassV1(ic *networkingv1.IngressC
 			w.Write(LEVEL_1, "Kind:\t%v\n", ic.Spec.Parameters.Kind)
 			w.Write(LEVEL_1, "Name:\t%v\n", ic.Spec.Parameters.Name)
 		}
-		if events != nil {
-			DescribeEvents(events, w)
-		}
-		return nil
-	})
-}
-
-// ClusterCIDRDescriber generates information about a ClusterCIDR.
-type ClusterCIDRDescriber struct {
-	client clientset.Interface
-}
-
-func (c *ClusterCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	var events *corev1.EventList
-
-	ccV1alpha1, err := c.client.NetworkingV1alpha1().ClusterCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), ccV1alpha1, describerSettings.ChunkSize)
-		}
-		return c.describeClusterCIDRV1alpha1(ccV1alpha1, events)
-	}
-	return "", err
-}
-
-func (c *ClusterCIDRDescriber) describeClusterCIDRV1alpha1(cc *networkingv1alpha1.ClusterCIDR, events *corev1.EventList) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%v\n", cc.Name)
-		printLabelsMultiline(w, "Labels", cc.Labels)
-		printAnnotationsMultiline(w, "Annotations", cc.Annotations)
-
-		w.Write(LEVEL_0, "NodeSelector:\n")
-		if cc.Spec.NodeSelector != nil {
-			w.Write(LEVEL_1, "NodeSelector Terms:")
-			if len(cc.Spec.NodeSelector.NodeSelectorTerms) == 0 {
-				w.WriteLine("<none>")
-			} else {
-				w.WriteLine("")
-				for i, term := range cc.Spec.NodeSelector.NodeSelectorTerms {
-					printNodeSelectorTermsMultilineWithIndent(w, LEVEL_2, fmt.Sprintf("Term %v", i), "\t", term.MatchExpressions)
-				}
-			}
-		}
-
-		if cc.Spec.PerNodeHostBits != 0 {
-			w.Write(LEVEL_0, "PerNodeHostBits:\t%s\n", fmt.Sprint(cc.Spec.PerNodeHostBits))
-		}
-
-		if cc.Spec.IPv4 != "" {
-			w.Write(LEVEL_0, "IPv4:\t%s\n", cc.Spec.IPv4)
-		}
-
-		if cc.Spec.IPv6 != "" {
-			w.Write(LEVEL_0, "IPv6:\t%s\n", cc.Spec.IPv6)
-		}
-
 		if events != nil {
 			DescribeEvents(events, w)
 		}

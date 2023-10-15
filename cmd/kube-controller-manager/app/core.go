@@ -27,9 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/informers/networking/v1alpha1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -150,15 +148,9 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		return nil, false, err
 	}
 
-	var clusterCIDRInformer v1alpha1.ClusterCIDRInformer
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRRangeAllocator) {
-		clusterCIDRInformer = controllerContext.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
-	}
-
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Nodes(),
-		clusterCIDRInformer,
 		controllerContext.Cloud,
 		controllerContext.ClientBuilder.ClientOrDie("node-controller"),
 		clusterCIDRs,

@@ -854,29 +854,6 @@
           "freshness": "Current",
           "resources": [
             {
-              "resource": "clustercidrs",
-              "responseKind": {
-                "group": "",
-                "kind": "ClusterCIDR",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "shortNames": [
-                "cc"
-              ],
-              "singularResource": "clustercidr",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
               "resource": "ipaddresses",
               "responseKind": {
                 "group": "",
