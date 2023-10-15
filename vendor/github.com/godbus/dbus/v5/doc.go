@@ -10,8 +10,10 @@ value.
 Conversion Rules
 
 For outgoing messages, Go types are automatically converted to the
-corresponding D-Bus types. The following types are directly encoded as their
-respective D-Bus equivalents:
+corresponding D-Bus types. See the official specification at
+https://dbus.freedesktop.org/doc/dbus-specification.html#type-system for more
+information on the D-Bus type system. The following types are directly encoded
+as their respective D-Bus equivalents:
 
      Go type     | D-Bus type
      ------------+-----------
@@ -39,8 +41,8 @@ Maps encode as DICTs, provided that their key type can be used as a key for
 a DICT.
 
 Structs other than Variant and Signature encode as a STRUCT containing their
-exported fields. Fields whose tags contain `dbus:"-"` and unexported fields will
-be skipped.
+exported fields in order. Fields whose tags contain `dbus:"-"` and unexported
+fields will be skipped.
 
 Pointers encode as the value they're pointed to.
 
