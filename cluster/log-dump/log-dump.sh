@@ -235,6 +235,9 @@ function save-logs() {
     echo 'Changing logfiles to be world-readable for download'
     log-dump-ssh "${node_name}" "sudo chmod -R a+r /var/log" || true
 
+    echo 'find files in /var/log/containers'
+    log-dump-ssh "${node_name}" "sudo find /var/log/containers" || true
+
     echo "Copying '${files[*]}' from ${node_name}"
     copy-logs-from-node "${node_name}" "${dir}" "${files[@]}"
 }
