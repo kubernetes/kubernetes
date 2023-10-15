@@ -237,7 +237,7 @@ func TestStructInput(t *testing.T) {
 			{"green", 20.01, false},
 		},
 		Labels: map[string]int{
-			"engieer":  10,
+			"engineer":  10,
 			"web/html": 15,
 			"k8s-app":  20,
 		},
@@ -253,7 +253,7 @@ func TestStructInput(t *testing.T) {
 		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3", false},
 		{"quote", `{"{"}`, nil, "{", false},
 		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4", false},
-		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday", false},
+		{"array", "{[0:2]}", []string{"Monday", "Tuesday"}, "Monday Tuesday", false},
 		{"variable", "hello {.Name}", storeData, "hello jsonpath", false},
 		{"dict/", "{$.Labels.web/html}", storeData, "15", false},
 		{"dict/", "{$.Employees.jason}", storeData, "manager", false},
@@ -374,7 +374,7 @@ func TestKubernetes(t *testing.T) {
 	nodesTests := []jsonpathTest{
 		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List", false},
 		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t", false},
-		{"range addresss", `{.items[*].status.addresses[*].address}`, nodesData,
+		{"range address", `{.items[*].status.addresses[*].address}`, nodesData,
 			"127.0.0.1 127.0.0.2 127.0.0.3", false},
 		{"double range", `{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}`, nodesData,
 			"127.0.0.1, 127.0.0.2, 127.0.0.3, ", false},

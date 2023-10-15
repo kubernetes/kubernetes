@@ -338,7 +338,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 				},
 			},
 			stDefaultCPUSet: cpuset.New(1, 25, 13, 38, 2, 9, 11, 35, 23, 48, 12, 51, 53, 173, 113, 233, 54, 61),
-			pod:             makePod("fakePod", "fakeCcontainer5", "12000m", "12000m"),
+			pod:             makePod("fakePod", "fakeContainer5", "12000m", "12000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 25, 13, 38, 11, 35, 23, 48, 53, 173, 113, 233),

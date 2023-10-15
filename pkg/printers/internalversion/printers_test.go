@@ -2520,7 +2520,7 @@ func TestPrintJob(t *testing.T) {
 							},
 						},
 					},
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-lable-value"}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-label-value"}},
 				},
 				Status: batch.JobStatus{
 					Succeeded: 1,
@@ -2664,7 +2664,7 @@ func TestPrintJobList(t *testing.T) {
 							},
 						},
 					},
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-lable-value"}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-label-value"}},
 				},
 				Status: batch.JobStatus{
 					Succeeded: 1,
@@ -2691,7 +2691,7 @@ func TestPrintJobList(t *testing.T) {
 							},
 						},
 					},
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-lable-value"}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-label-value"}},
 				},
 				Status: batch.JobStatus{
 					Succeeded: 2,

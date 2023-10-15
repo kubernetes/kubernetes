@@ -75,7 +75,7 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 		{
 			name:                   "init container",
 			oomTargetContainerName: "oomkill-target-init-container",
-			podSpec: getInitContainerOOMTargetPod("initcontinar-oomkill-target-pod", "oomkill-target-init-container",
+			podSpec: getInitContainerOOMTargetPod("initcontainer-oomkill-target-pod", "oomkill-target-init-container",
 				getOOMTargetContainer),
 		},
 	}
