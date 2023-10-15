@@ -103,6 +103,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		)
 	} else {
 		proxier, err = winkernel.NewProxier(
+			s.PrimaryIPFamily,
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
 			config.ClusterCIDR,
