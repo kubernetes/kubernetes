@@ -650,7 +650,18 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			framework.ExpectNoError(err, "Timeout while waiting to confirm PV %q deletion", retrievedPV.Name)
 		})
 
-		ginkgo.It("should apply changes to a pv/pvc status", func(ctx context.Context) {
+		/*
+			Release: v1.29
+			Testname: PersistentVolumes(Claims), apply changes to a pv/pvc status
+			Description: Creating PV and PVC MUST succeed. Listing PVs with a labelSelector
+			 MUST succeed. Listing PVCs in a namespace MUST succeed. Reading PVC status MUST
+			 succeed with a valid phase found. Reading PV status MUST succeed with a valid
+			 phase found. Patching the PVC status MUST succeed with its new condition found.
+			 Patching the PV status MUST succeed with the new reason/message found. Updating
+			 the PVC status MUST succeed with its new condition found. Updating the PV status
+			 MUST succeed with the new reason/message found.
+		*/
+		framework.ConformanceIt("should apply changes to a pv/pvc status", func(ctx context.Context) {
 
 			pvClient := c.CoreV1().PersistentVolumes()
 			pvcClient := c.CoreV1().PersistentVolumeClaims(ns)
