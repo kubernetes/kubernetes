@@ -30,35 +30,35 @@ func TestCleanBackingFilePath(t *testing.T) {
 	testCases := []struct {
 		name          string
 		input         string
-		expectedOuput string
+		expectedOutput string
 	}{
 		{
 			name:          "regular path",
 			input:         defaultPath,
-			expectedOuput: defaultPath,
+			expectedOutput: defaultPath,
 		},
 		{
 			name:          "path is suffixed with whitespaces",
 			input:         fmt.Sprintf("%s\r\t\n ", defaultPath),
-			expectedOuput: defaultPath,
+			expectedOutput: defaultPath,
 		},
 		{
 			name:          "path is suffixed with \"(deleted)\"",
 			input:         pathWithSuffix("(deleted)"),
-			expectedOuput: defaultPath,
+			expectedOutput: defaultPath,
 		},
 		{
 			name:          "path is suffixed with \"(deleted)\" and whitespaces",
 			input:         pathWithSuffix(" (deleted)\t"),
-			expectedOuput: defaultPath,
+			expectedOutput: defaultPath,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			output := cleanBackingFilePath(tc.input)
-			if output != tc.expectedOuput {
-				t.Fatalf("expected %q, got %q", tc.expectedOuput, output)
+			if output != tc.expectedOutput {
+				t.Fatalf("expected %q, got %q", tc.expectedOutput, output)
 			}
 		})
 	}

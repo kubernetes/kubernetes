@@ -108,8 +108,8 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func getPeerTypeFor(context *generator.Context, t *types.Type, potenialPeerPkgs []string) *types.Type {
-	for _, ppp := range potenialPeerPkgs {
+func getPeerTypeFor(context *generator.Context, t *types.Type, potentialPeerPkgs []string) *types.Type {
+	for _, ppp := range potentialPeerPkgs {
 		p := context.Universe.Package(ppp)
 		if p == nil {
 			continue

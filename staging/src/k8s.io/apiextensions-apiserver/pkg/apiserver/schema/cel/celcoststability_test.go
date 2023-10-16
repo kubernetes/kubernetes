@@ -1138,11 +1138,11 @@ func TestCelCostStability(t *testing.T) {
 						t.Fatal("expected non nil validator")
 					}
 					ctx := context.TODO()
-					errs, remainingBudegt := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
 					}
-					rtCost := celconfig.RuntimeCELCostBudget - remainingBudegt
+					rtCost := celconfig.RuntimeCELCostBudget - remainingBudget
 					if rtCost != expectedCost {
 						t.Fatalf("runtime cost %d does not match expected runtime cost %d", rtCost, expectedCost)
 					}

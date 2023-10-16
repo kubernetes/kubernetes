@@ -947,7 +947,7 @@ func TestBackoffLimitPerIndex_JobPodsCreatedWithExponentialBackoff(t *testing.T)
 		if err != nil {
 			t.Fatalf("Failed to list job %q pods for index %v, error: %v", klog.KObj(jobObj), index, err)
 		}
-		validateExpotentialBackoffDelay(t, jobcontroller.DefaultJobPodFailureBackOff, podsForIndex)
+		validateExponentialBackoffDelay(t, jobcontroller.DefaultJobPodFailureBackOff, podsForIndex)
 	}
 }
 
@@ -2204,10 +2204,10 @@ func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
 	if len(jobPods) != 3 {
 		t.Fatalf("Expected to get %v pods, received %v", 4, len(jobPods))
 	}
-	validateExpotentialBackoffDelay(t, jobcontroller.DefaultJobPodFailureBackOff, jobPods)
+	validateExponentialBackoffDelay(t, jobcontroller.DefaultJobPodFailureBackOff, jobPods)
 }
 
-func validateExpotentialBackoffDelay(t *testing.T, defaultPodFailureBackoff time.Duration, pods []*v1.Pod) {
+func validateExponentialBackoffDelay(t *testing.T, defaultPodFailureBackoff time.Duration, pods []*v1.Pod) {
 	t.Helper()
 	creationTime := []time.Time{}
 	finishTime := []time.Time{}

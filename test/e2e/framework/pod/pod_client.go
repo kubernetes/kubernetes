@@ -265,11 +265,11 @@ func (c *PodClient) WaitForFinish(ctx context.Context, name string, timeout time
 func (c *PodClient) WaitForErrorEventOrSuccess(ctx context.Context, pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
 	err := wait.PollWithContext(ctx, framework.Poll, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
-		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
+		events, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %w", err)
 		}
-		for _, e := range evnts.Items {
+		for _, e := range events.Items {
 			switch e.Reason {
 			case killingContainer, failedToCreateContainer, forbiddenReason:
 				ev = &e

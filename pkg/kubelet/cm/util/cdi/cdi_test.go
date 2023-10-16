@@ -27,7 +27,7 @@ func TestGenerateAnnotations(t *testing.T) {
 	testCases := []struct {
 		description         string
 		deviceIDs           []string
-		expecteError        error
+		expectedError        error
 		expectedAnnotations []container.Annotation
 	}{
 		{
@@ -45,7 +45,7 @@ func TestGenerateAnnotations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			annotations, err := GenerateAnnotations("test-claim-uid", "test-driver-name", tc.deviceIDs)
-			as.ErrorIs(err, tc.expecteError)
+			as.ErrorIs(err, tc.expectedError)
 			as.Equal(tc.expectedAnnotations, annotations)
 		})
 	}

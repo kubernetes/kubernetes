@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
-	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -75,8 +75,8 @@ type LimitRanger struct {
 var _ admission.MutationInterface = &LimitRanger{}
 var _ admission.ValidationInterface = &LimitRanger{}
 
-var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &LimitRanger{}
-var _ genericadmissioninitailizer.WantsExternalKubeClientSet = &LimitRanger{}
+var _ genericadmissioninitializer.WantsExternalKubeInformerFactory = &LimitRanger{}
+var _ genericadmissioninitializer.WantsExternalKubeClientSet = &LimitRanger{}
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -586,7 +586,7 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 		addResourceList(reqs, containerReqs)
 	}
 
-	restartableInitCotnainerReqs := api.ResourceList{}
+	restartableInitContainerReqs := api.ResourceList{}
 	initContainerReqs := api.ResourceList{}
 	// init containers define the minimum of any resource
 	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
@@ -598,12 +598,12 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 			addResourceList(reqs, containerReqs)
 
 			// track our cumulative restartable init container resources
-			addResourceList(restartableInitCotnainerReqs, containerReqs)
-			containerReqs = restartableInitCotnainerReqs
+			addResourceList(restartableInitContainerReqs, containerReqs)
+			containerReqs = restartableInitContainerReqs
 		} else {
 			tmp := api.ResourceList{}
 			addResourceList(tmp, containerReqs)
-			addResourceList(tmp, restartableInitCotnainerReqs)
+			addResourceList(tmp, restartableInitContainerReqs)
 			containerReqs = tmp
 		}
 

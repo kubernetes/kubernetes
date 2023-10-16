@@ -654,7 +654,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 		name                 string
 		initAttached         bool
 		finalAttached        bool
-		trigerWatchEventTime time.Duration
+		triggerWatchEventTime time.Duration
 		initAttachErr        *storage.VolumeError
 		finalAttachErr       *storage.VolumeError
 		timeout              time.Duration
@@ -677,7 +677,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			name:                 "attach success at watch",
 			initAttached:         false,
 			finalAttached:        true,
-			trigerWatchEventTime: 5 * time.Millisecond,
+			triggerWatchEventTime: 5 * time.Millisecond,
 			timeout:              50 * time.Millisecond,
 			shouldFail:           false,
 		},
@@ -686,7 +686,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			initAttached:         false,
 			finalAttached:        false,
 			finalAttachErr:       &storage.VolumeError{Message: "missing volume"},
-			trigerWatchEventTime: 5 * time.Millisecond,
+			triggerWatchEventTime: 5 * time.Millisecond,
 			timeout:              30 * time.Millisecond,
 			shouldFail:           true,
 		},
@@ -694,7 +694,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			name:                 "time ran out",
 			initAttached:         false,
 			finalAttached:        true,
-			trigerWatchEventTime: 100 * time.Millisecond,
+			triggerWatchEventTime: 100 * time.Millisecond,
 			timeout:              50 * time.Millisecond,
 			shouldFail:           true,
 		},
@@ -727,16 +727,16 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 				t.Fatalf("failed to attach: %v", err)
 			}
 
-			trigerWatchEventTime := tc.trigerWatchEventTime
+			triggerWatchEventTime := tc.triggerWatchEventTime
 			finalAttached := tc.finalAttached
 			finalAttachErr := tc.finalAttachErr
 			var wg sync.WaitGroup
 			// after timeout, fakeWatcher will be closed by csiAttacher.waitForVolumeAttachment
-			if tc.trigerWatchEventTime > 0 && tc.trigerWatchEventTime < tc.timeout {
+			if tc.triggerWatchEventTime > 0 && tc.triggerWatchEventTime < tc.timeout {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					time.Sleep(trigerWatchEventTime)
+					time.Sleep(triggerWatchEventTime)
 					attachment := makeTestAttachment(attachID, nodeName, pvName)
 					attachment.Status.Attached = finalAttached
 					attachment.Status.AttachError = finalAttachErr

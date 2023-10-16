@@ -238,7 +238,7 @@ func rowForHeaders(headers []string) string {
 }
 
 func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bool, waitingRequests, executingRequests int,
-	dispatchedReqeusts, rejectedRequests, timedoutRequests, cancelledRequests int) string {
+	dispatchedRequests, rejectedRequests, timedoutRequests, cancelledRequests int) string {
 	return row(
 		plName,
 		strconv.Itoa(activeQueues),
@@ -246,7 +246,7 @@ func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bo
 		strconv.FormatBool(isQuiescing),
 		strconv.Itoa(waitingRequests),
 		strconv.Itoa(executingRequests),
-		strconv.Itoa(dispatchedReqeusts),
+		strconv.Itoa(dispatchedRequests),
 		strconv.Itoa(rejectedRequests),
 		strconv.Itoa(timedoutRequests),
 		strconv.Itoa(cancelledRequests),

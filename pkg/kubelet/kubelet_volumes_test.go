@@ -87,8 +87,8 @@ func TestListVolumesForPod(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	volumesToReturn, volumeExsit := kubelet.ListVolumesForPod(types.UID(podName))
-	assert.True(t, volumeExsit, "expected to find volumes for pod %q", podName)
+	volumesToReturn, volumeExist := kubelet.ListVolumesForPod(types.UID(podName))
+	assert.True(t, volumeExist, "expected to find volumes for pod %q", podName)
 
 	outerVolumeSpecName1 := "vol1"
 	assert.NotNil(t, volumesToReturn[outerVolumeSpecName1], "key %s", outerVolumeSpecName1)

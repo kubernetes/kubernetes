@@ -233,8 +233,8 @@ func TestCreateUsedPVCSet(t *testing.T) {
 func TestNewSnapshot(t *testing.T) {
 	podWithAnnotations := st.MakePod().Name("foo").Namespace("ns").Node("node-1").Annotations(map[string]string{"custom": "annotation"}).Obj()
 	podWithPort := st.MakePod().Name("foo").Namespace("foo").Node("node-0").ContainerPort([]v1.ContainerPort{{HostPort: 8080}}).Obj()
-	podWithAntiAffitiny := st.MakePod().Name("baz").Namespace("ns").PodAntiAffinity("another", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Node("node-0").Obj()
-	podsWithAffitiny := []*v1.Pod{
+	podWithAntiAffinity := st.MakePod().Name("baz").Namespace("ns").PodAntiAffinity("another", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Node("node-0").Obj()
+	podsWithAffinity := []*v1.Pod{
 		st.MakePod().Name("bar").Namespace("ns").PodAffinity("baz", &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "qux"}}, st.PodAffinityWithRequiredReq).Node("node-2").Obj(),
 		st.MakePod().Name("bar").Namespace("ns").PodAffinity("key", &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}, st.PodAffinityWithRequiredReq).Node("node-0").Obj(),
 	}
@@ -307,7 +307,7 @@ func TestNewSnapshot(t *testing.T) {
 			name: "multiple nodes, pod with affinity",
 			pods: []*v1.Pod{
 				podWithAnnotations,
-				podsWithAffitiny[0],
+				podsWithAffinity[0],
 			},
 			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "node-0"}},
@@ -326,7 +326,7 @@ func TestNewSnapshot(t *testing.T) {
 				{
 					Pods: []*framework.PodInfo{
 						{
-							Pod: podsWithAffitiny[0],
+							Pod: podsWithAffinity[0],
 							RequiredAffinityTerms: []framework.AffinityTerm{
 								{
 									Namespaces:        sets.New("ns"),
@@ -345,8 +345,8 @@ func TestNewSnapshot(t *testing.T) {
 		{
 			name: "multiple nodes, pod with affinity, pod with anti-affinity",
 			pods: []*v1.Pod{
-				podsWithAffitiny[1],
-				podWithAntiAffitiny,
+				podsWithAffinity[1],
+				podWithAntiAffinity,
 			},
 			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "node-0", Labels: map[string]string{"key": "value"}}},
@@ -356,7 +356,7 @@ func TestNewSnapshot(t *testing.T) {
 				{
 					Pods: []*framework.PodInfo{
 						{
-							Pod: podsWithAffitiny[1],
+							Pod: podsWithAffinity[1],
 							RequiredAffinityTerms: []framework.AffinityTerm{
 								{
 									Namespaces:        sets.New("ns"),
@@ -367,7 +367,7 @@ func TestNewSnapshot(t *testing.T) {
 							},
 						},
 						{
-							Pod: podWithAntiAffitiny,
+							Pod: podWithAntiAffinity,
 							RequiredAntiAffinityTerms: []framework.AffinityTerm{
 								{
 									Namespaces:        sets.New("ns"),

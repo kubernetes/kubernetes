@@ -245,7 +245,7 @@ func getPod(podName string, ownerReferences []metav1.OwnerReference) *v1.Pod {
 	}
 }
 
-func serilizeOrDie(t *testing.T, object interface{}) []byte {
+func serializeOrDie(t *testing.T, object interface{}) []byte {
 	data, err := json.Marshal(object)
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestAttemptToDeleteItem(t *testing.T) {
 			},
 			"GET" + "/api/v1/namespaces/ns1/pods/ToBeDeletedPod": {
 				200,
-				serilizeOrDie(t, pod),
+				serializeOrDie(t, pod),
 			},
 		},
 	}
@@ -530,19 +530,19 @@ func TestAbsentOwnerCache(t *testing.T) {
 		response: map[string]FakeResponse{
 			"GET" + "/api/v1/namespaces/ns1/pods/rc1Pod1": {
 				200,
-				serilizeOrDie(t, rc1Pod1),
+				serializeOrDie(t, rc1Pod1),
 			},
 			"GET" + "/api/v1/namespaces/ns1/pods/rc1Pod2": {
 				200,
-				serilizeOrDie(t, rc1Pod2),
+				serializeOrDie(t, rc1Pod2),
 			},
 			"GET" + "/api/v1/namespaces/ns1/pods/rc2Pod1": {
 				200,
-				serilizeOrDie(t, rc2Pod1),
+				serializeOrDie(t, rc2Pod1),
 			},
 			"GET" + "/api/v1/namespaces/ns1/pods/rc3Pod1": {
 				200,
-				serilizeOrDie(t, rc3Pod1),
+				serializeOrDie(t, rc3Pod1),
 			},
 			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/rc1": {
 				404,
@@ -602,7 +602,7 @@ func TestDeleteOwnerRefPatch(t *testing.T) {
 			},
 		},
 	}
-	originalData := serilizeOrDie(t, original)
+	originalData := serializeOrDie(t, original)
 	expected := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "100",
@@ -641,7 +641,7 @@ func TestUnblockOwnerReference(t *testing.T) {
 			},
 		},
 	}
-	originalData := serilizeOrDie(t, original)
+	originalData := serializeOrDie(t, original)
 	expected := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "100",

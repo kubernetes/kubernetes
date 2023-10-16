@@ -905,7 +905,7 @@ type wheel struct {
 
 type unicycle struct {
 	primaryWheel   *wheel
-	licencePlateID string
+	licensePlateID string
 	tags           map[string]string
 }
 
@@ -915,9 +915,9 @@ func TestDeepObjectPointer(t *testing.T) {
 	wheel2 := wheel{radius: 22}
 	wheel3 := wheel{radius: 17}
 
-	myUni1 := unicycle{licencePlateID: "blah", primaryWheel: &wheel1, tags: map[string]string{"color": "blue", "name": "john"}}
-	myUni2 := unicycle{licencePlateID: "blah", primaryWheel: &wheel2, tags: map[string]string{"color": "blue", "name": "john"}}
-	myUni3 := unicycle{licencePlateID: "blah", primaryWheel: &wheel3, tags: map[string]string{"color": "blue", "name": "john"}}
+	myUni1 := unicycle{licensePlateID: "blah", primaryWheel: &wheel1, tags: map[string]string{"color": "blue", "name": "john"}}
+	myUni2 := unicycle{licensePlateID: "blah", primaryWheel: &wheel2, tags: map[string]string{"color": "blue", "name": "john"}}
+	myUni3 := unicycle{licensePlateID: "blah", primaryWheel: &wheel3, tags: map[string]string{"color": "blue", "name": "john"}}
 
 	// Run it more than once to verify determinism of hasher.
 	for i := 0; i < 100; i++ {

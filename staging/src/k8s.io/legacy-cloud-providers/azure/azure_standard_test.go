@@ -859,7 +859,7 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 		Name: pointer.String("vm1"),
 		ID:   pointer.String("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1"),
 	}
-	invalidResouceID := "/subscriptions/subscription/resourceGroups/rg/Microsoft.Compute/virtualMachines/vm4"
+	invalidResourceID := "/subscriptions/subscription/resourceGroups/rg/Microsoft.Compute/virtualMachines/vm4"
 	testcases := []struct {
 		name           string
 		nodeName       string
@@ -884,7 +884,7 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 		{
 			name:           "GetInstanceIDByNodeName should report error if ResourceID is invalid",
 			nodeName:       "vm4",
-			expectedErrMsg: fmt.Errorf("%q isn't in Azure resource ID format %q", invalidResouceID, azureResourceGroupNameRE.String()),
+			expectedErrMsg: fmt.Errorf("%q isn't in Azure resource ID format %q", invalidResourceID, azureResourceGroupNameRE.String()),
 		},
 	}
 	for _, test := range testcases {
@@ -897,7 +897,7 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 		}).AnyTimes()
 		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm4", gomock.Any()).Return(compute.VirtualMachine{
 			Name: pointer.String("vm4"),
-			ID:   pointer.String(invalidResouceID),
+			ID:   pointer.String(invalidResourceID),
 		}, nil).AnyTimes()
 
 		instanceID, err := cloud.VMSet.GetInstanceIDByNodeName(test.nodeName)

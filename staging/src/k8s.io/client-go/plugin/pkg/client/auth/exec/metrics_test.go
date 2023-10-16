@@ -194,8 +194,8 @@ func TestCallsMetric(t *testing.T) {
 	callsMetricComparer := cmp.Comparer(func(a, b mockCallsMetric) bool {
 		return a.exitCode == b.exitCode && a.errorType == b.errorType
 	})
-	actuallCallsMetrics := callsMetricCounter.calls
-	if diff := cmp.Diff(wantCallsMetrics, actuallCallsMetrics, callsMetricComparer); diff != "" {
+	actualCallsMetrics := callsMetricCounter.calls
+	if diff := cmp.Diff(wantCallsMetrics, actualCallsMetrics, callsMetricComparer); diff != "" {
 		t.Fatalf("got unexpected metrics calls; -want, +got:\n%s", diff)
 	}
 }

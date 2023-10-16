@@ -219,7 +219,7 @@ func (t *Tester) TestDeleteGraceful(valid runtime.Object, createFn CreateFunc, g
 func (t *Tester) TestGet(valid runtime.Object) {
 	t.testGetFound(valid.DeepCopyObject())
 	t.testGetNotFound(valid.DeepCopyObject())
-	t.testGetMimatchedNamespace(valid.DeepCopyObject())
+	t.testGetMismatchedNamespace(valid.DeepCopyObject())
 	if !t.clusterScope {
 		t.testGetDifferentNamespace(valid.DeepCopyObject())
 	}
@@ -1224,7 +1224,7 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 	}
 }
 
-func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
+func (t *Tester) testGetMismatchedNamespace(obj runtime.Object) {
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar1")
 	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar2")
 	objMeta := t.getObjectMetaOrFail(obj)

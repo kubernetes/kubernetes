@@ -453,7 +453,7 @@ func (a *ApplySet) updateParent(mode ApplySetUpdateMode, dryRun cmdutil.DryRunSt
 	return nil
 }
 
-func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrategy, validation string, forceConficts bool) error {
+func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrategy, validation string, forceConflicts bool) error {
 	if dryRun == cmdutil.DryRunClient {
 		return nil
 	}
@@ -463,7 +463,7 @@ func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrat
 		WithFieldValidation(validation)
 
 	options := metav1.PatchOptions{
-		Force: &forceConficts,
+		Force: &forceConflicts,
 	}
 	_, err := helper.Patch(
 		a.parentRef.Namespace,

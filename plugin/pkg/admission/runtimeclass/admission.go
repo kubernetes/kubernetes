@@ -31,7 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	nodev1client "k8s.io/client-go/kubernetes/typed/node/v1"
@@ -65,8 +65,8 @@ type RuntimeClass struct {
 var _ admission.MutationInterface = &RuntimeClass{}
 var _ admission.ValidationInterface = &RuntimeClass{}
 
-var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &RuntimeClass{}
-var _ genericadmissioninitailizer.WantsExternalKubeClientSet = &RuntimeClass{}
+var _ genericadmissioninitializer.WantsExternalKubeInformerFactory = &RuntimeClass{}
+var _ genericadmissioninitializer.WantsExternalKubeClientSet = &RuntimeClass{}
 
 // SetExternalKubeClientSet sets the client for the plugin
 func (r *RuntimeClass) SetExternalKubeClientSet(client kubernetes.Interface) {

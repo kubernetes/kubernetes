@@ -52,10 +52,10 @@ func verifyPodSecurityContext(t *testing.T, pod *v1.Pod, wantRunAsUser, wantRunA
 	}
 }
 
-func verifyContainerSecurityContext(t *testing.T, container v1.Container, addCaps, dropCaps []v1.Capability, allowPrivielege *bool) {
+func verifyContainerSecurityContext(t *testing.T, container v1.Container, addCaps, dropCaps []v1.Capability, allowPrivilege *bool) {
 	t.Helper()
 	wantContainerSecurityContext := &v1.SecurityContext{
-		AllowPrivilegeEscalation: allowPrivielege,
+		AllowPrivilegeEscalation: allowPrivilege,
 		Capabilities: &v1.Capabilities{
 			Add:  addCaps,
 			Drop: dropCaps,

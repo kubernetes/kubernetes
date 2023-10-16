@@ -817,15 +817,15 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 			t.Fatalf("Unxpected error: %v", err)
 		}
 
-		if overridenServer := tc.overrides.ClusterInfo.Server; len(overridenServer) > 0 {
-			expectedServer = overridenServer
+		if overriddenServer := tc.overrides.ClusterInfo.Server; len(overriddenServer) > 0 {
+			expectedServer = overriddenServer
 		}
 		if len(tc.overrides.AuthInfo.Token) > 0 || len(tc.overrides.AuthInfo.TokenFile) > 0 {
 			expectedToken = tc.overrides.AuthInfo.Token
 			expectedTokenFile = tc.overrides.AuthInfo.TokenFile
 		}
-		if overridenCAFile := tc.overrides.ClusterInfo.CertificateAuthority; len(overridenCAFile) > 0 {
-			expectedCAFile = overridenCAFile
+		if overriddenCAFile := tc.overrides.ClusterInfo.CertificateAuthority; len(overriddenCAFile) > 0 {
+			expectedCAFile = overriddenCAFile
 		}
 
 		if clientConfig.Host != expectedServer {

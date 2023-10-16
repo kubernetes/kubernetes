@@ -268,13 +268,13 @@ func (resizefs *ResizeFs) parseBtrfsInfoOutput(cmdOutput string, blockSizeKey st
 	return blockSize, blockCount, err
 }
 
-func (resizefs *ResizeFs) parseFsInfoOutput(cmdOutput string, spliter string, blockSizeKey string, blockCountKey string) (uint64, uint64, error) {
+func (resizefs *ResizeFs) parseFsInfoOutput(cmdOutput string, splitter string, blockSizeKey string, blockCountKey string) (uint64, uint64, error) {
 	lines := strings.Split(cmdOutput, "\n")
 	var blockSize, blockCount uint64
 	var err error
 
 	for _, line := range lines {
-		tokens := strings.Split(line, spliter)
+		tokens := strings.Split(line, splitter)
 		if len(tokens) != 2 {
 			continue
 		}

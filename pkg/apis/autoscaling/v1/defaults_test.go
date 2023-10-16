@@ -117,15 +117,15 @@ func TestHorizontalPodAutoscalerAnnotations(t *testing.T) {
 
 	for _, test := range tests {
 		hpa := &test.hpa
-		hpaBeforeMuatate := *hpa.DeepCopy()
+		hpaBeforeMutate := *hpa.DeepCopy()
 		obj := roundTrip(t, runtime.Object(hpa))
 		final_obj, ok := obj.(*autoscalingv1.HorizontalPodAutoscaler)
 		if !ok {
 			t.Fatalf("unexpected object: %v", obj)
 		}
-		if !reflect.DeepEqual(*hpa, hpaBeforeMuatate) {
-			t.Errorf("diff: %v", cmp.Diff(*hpa, hpaBeforeMuatate))
-			t.Errorf("expected: %#v\n actual:   %#v", *hpa, hpaBeforeMuatate)
+		if !reflect.DeepEqual(*hpa, hpaBeforeMutate) {
+			t.Errorf("diff: %v", cmp.Diff(*hpa, hpaBeforeMutate))
+			t.Errorf("expected: %#v\n actual:   %#v", *hpa, hpaBeforeMutate)
 		}
 
 		if len(final_obj.ObjectMeta.Annotations) != 0 {
