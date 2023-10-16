@@ -657,7 +657,7 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 			}
 
 			if !proxierCalled {
-				t.Fatal("xpected to use a proxy but proxier in SpdyRoundTripper wasn't called")
+				t.Fatal("expected to use a proxy but proxier in SpdyRoundTripper wasn't called")
 			}
 
 			serverURL, err := url.Parse(server.URL)

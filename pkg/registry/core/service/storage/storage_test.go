@@ -11371,7 +11371,7 @@ func TestFeatureInternalTrafficPolicy(t *testing.T) {
 				if want == "" {
 					want = "nil"
 				}
-				t.Errorf("wrong internalTrafficPoilcy: expected %s, got %s", want, *got)
+				t.Errorf("wrong internalTrafficPolicy: expected %s, got %s", want, *got)
 			}
 		}
 	}

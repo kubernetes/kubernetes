@@ -615,7 +615,7 @@ func TestCheckUmountError(t *testing.T) {
 	command := exec.Command("uname", "-r") // dummy command return status 0
 
 	if err := command.Run(); err != nil {
-		t.Errorf("Faild to exec dummy command. err: %s", err)
+		t.Errorf("Failed to exec dummy command. err: %s", err)
 	}
 
 	testcases := []struct {

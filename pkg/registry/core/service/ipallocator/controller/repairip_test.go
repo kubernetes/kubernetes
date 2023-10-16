@@ -64,7 +64,7 @@ func newFakeRepair() (*fake.Clientset, *fakeRepair) {
 	}))
 	fakeClient.PrependReactor("update", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		ip := action.(k8stesting.UpdateAction).GetObject().(*networkingv1alpha1.IPAddress)
-		return false, ip, fmt.Errorf("IPAddress is inmutable after creation")
+		return false, ip, fmt.Errorf("IPAddress is immutable after creation")
 	}))
 	fakeClient.PrependReactor("delete", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		ip := action.(k8stesting.DeleteAction).GetName()

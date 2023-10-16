@@ -123,7 +123,7 @@ func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CP
 	if opts.AlignBySocket {
 		// Not compatible with topology manager single-numa-node policy option.
 		if topologyManager.GetPolicy().Name() == topologymanager.PolicySingleNumaNode {
-			return fmt.Errorf("Topolgy manager %s policy is incompatible with CPUManager %s policy option", topologymanager.PolicySingleNumaNode, AlignBySocketOption)
+			return fmt.Errorf("Topology manager %s policy is incompatible with CPUManager %s policy option", topologymanager.PolicySingleNumaNode, AlignBySocketOption)
 		}
 		// Not compatible with topology when number of sockets are more than number of NUMA nodes.
 		if topology.NumSockets > topology.NumNUMANodes {

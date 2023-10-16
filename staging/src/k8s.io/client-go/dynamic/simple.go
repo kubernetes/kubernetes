@@ -374,7 +374,7 @@ func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *uns
 	managedFields := accessor.GetManagedFields()
 	if len(managedFields) > 0 {
 		return nil, fmt.Errorf(`cannot apply an object with managed fields already set.
-		Use the client-go/applyconfigurations "UnstructructuredExtractor" to obtain the unstructured ApplyConfiguration for the given field manager that you can use/modify here to apply`)
+		Use the client-go/applyconfigurations "UnstructuredExtractor" to obtain the unstructured ApplyConfiguration for the given field manager that you can use/modify here to apply`)
 	}
 	patchOpts := opts.ToPatchOptions()
 

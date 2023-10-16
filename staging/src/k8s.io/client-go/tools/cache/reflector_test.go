@@ -805,7 +805,7 @@ func TestReflectorResyncWithResourceVersion(t *testing.T) {
 
 	expectedRVs := []string{"0", "10"}
 	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
-		t.Errorf("Expected series of list calls with resource versiosn of %v but got: %v", expectedRVs, listCallRVs)
+		t.Errorf("Expected series of list calls with resource versions of %v but got: %v", expectedRVs, listCallRVs)
 	}
 }
 
@@ -867,7 +867,7 @@ func TestReflectorExpiredExactResourceVersion(t *testing.T) {
 
 	expectedRVs := []string{"0", "10", ""}
 	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
-		t.Errorf("Expected series of list calls with resource versiosn of %v but got: %v", expectedRVs, listCallRVs)
+		t.Errorf("Expected series of list calls with resource versions of %v but got: %v", expectedRVs, listCallRVs)
 	}
 }
 
@@ -938,7 +938,7 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 
 	expectedRVs := []string{"0", "10", "", "10"}
 	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
-		t.Errorf("Expected series of list calls with resource versiosn of %#v but got: %#v", expectedRVs, listCallRVs)
+		t.Errorf("Expected series of list calls with resource versions of %#v but got: %#v", expectedRVs, listCallRVs)
 	}
 }
 

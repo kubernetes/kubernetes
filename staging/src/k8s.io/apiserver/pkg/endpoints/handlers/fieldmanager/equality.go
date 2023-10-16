@@ -46,7 +46,7 @@ func getAvoidTimestampEqualities() conversion.Equalities {
 				// leave avoidTimestampEqualities empty.
 				return
 			} else {
-				klog.Errorf("failed to parse envar KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES: %v", err)
+				klog.Errorf("failed to parse envvar KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES: %v", err)
 			}
 		}
 

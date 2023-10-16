@@ -276,7 +276,7 @@ func TestValidateWebhookDuration(ts *testing.T) {
 				t.Errorf("expected admit duration to be equal to 0 got %q", wd.MutatingWebhookTracker.GetLatency())
 			}
 			if wd.ValidatingWebhookTracker.GetLatency() < test.ExpectedDurationMax {
-				t.Errorf("expected validate duraion to be greater or equal to %q got %q", test.ExpectedDurationMax, wd.ValidatingWebhookTracker.GetLatency())
+				t.Errorf("expected validate duration to be greater or equal to %q got %q", test.ExpectedDurationMax, wd.ValidatingWebhookTracker.GetLatency())
 			}
 		})
 	}

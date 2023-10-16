@@ -129,7 +129,7 @@ func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
 		Data: map[string][]byte{"foo": {'f', 'o', 'o'}},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("error creating sercet: %v", err)
+		t.Fatalf("error creating secret: %v", err)
 	}
 	return client
 }

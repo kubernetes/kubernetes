@@ -872,10 +872,10 @@ func TestRenewCertsByComponent(t *testing.T) {
 				}
 
 				if shouldBeRenewed && oldSerial.Cmp(newCert.SerialNumber) == 0 {
-					t.Errorf("certifitate %v was not reissued when expected", kubeCert.Name)
+					t.Errorf("certificate %v was not reissued when expected", kubeCert.Name)
 				}
 				if !shouldBeRenewed && oldSerial.Cmp(newCert.SerialNumber) != 0 {
-					t.Errorf("certifitate %v was reissued when not expected", kubeCert.Name)
+					t.Errorf("certificate %v was reissued when not expected", kubeCert.Name)
 				}
 			}
 
@@ -887,7 +887,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 				}
 				oldSerial := certMaps[kubeConfig]
 				if oldSerial.Cmp(newCerts[0].SerialNumber) == 0 {
-					t.Errorf("certifitate %v was not reissued", kubeConfig)
+					t.Errorf("certificate %v was not reissued", kubeConfig)
 				}
 			}
 		})

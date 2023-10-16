@@ -50,7 +50,7 @@ func TestLinter(t *testing.T) {
 			}
 
 			if len(problems) == 0 {
-				t.Fatalf("expecte a problem but got none")
+				t.Fatalf("expected a problem but got none")
 			}
 
 			if problems[0].Text != tc.expect {

@@ -55,7 +55,7 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 
 	// Executes getKubeConfigSpecs
 	if _, err := getKubeConfigSpecs(cfg); err == nil {
-		t.Error("getKubeConfigSpecs didnt failed when expected")
+		t.Error("getKubeConfigSpecs didn't failed when expected")
 	}
 }
 

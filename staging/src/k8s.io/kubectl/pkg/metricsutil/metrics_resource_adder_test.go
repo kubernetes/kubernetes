@@ -112,7 +112,7 @@ func TestAddPodMetrics(t *testing.T) {
 				t.Errorf("expecting cpu usage %s but getting %s", test.expectedCpuUsage.String(), cpuUsage.String())
 			}
 			if !test.expectedMemUsage.Equal(memUsage) {
-				t.Errorf("expecting memeory usage %s but getting %s", test.expectedMemUsage.String(), memUsage.String())
+				t.Errorf("expecting memory usage %s but getting %s", test.expectedMemUsage.String(), memUsage.String())
 			}
 		})
 	}

@@ -128,7 +128,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 		t.Errorf("Got unexpected pod path: %s, expected %s", devicePath, expectedPodPath)
 	}
 	if volumeName != testVolumePath {
-		t.Errorf("Got unexpected volNamne: %s, expected %s", volumeName, testVolumePath)
+		t.Errorf("Got unexpected volName: %s, expected %s", volumeName, testVolumePath)
 	}
 }
 

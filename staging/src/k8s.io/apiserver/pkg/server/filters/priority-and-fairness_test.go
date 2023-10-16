@@ -495,7 +495,7 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 	fakeFilter := newFakeWatchApfFilter(0)
 
 	onExecuteFunc := func() {
-		t.Errorf("Request unexepectedly executing")
+		t.Errorf("Request unexpectedly executing")
 	}
 	postExecuteFunc := func() {}
 
@@ -1148,7 +1148,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 		return true, nil
 	})
 	if pollErr != nil {
-		t.Fatalf("expected the apf controller to sync the priotity level configuration object: %s", plName)
+		t.Fatalf("expected the apf controller to sync the priority level configuration object: %s", plName)
 	}
 
 	return controller, controllerCompletedCh

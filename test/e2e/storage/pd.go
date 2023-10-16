@@ -499,7 +499,7 @@ func verifyPDContentsViaContainer(namespace string, f *framework.Framework, podN
 		framework.ExpectNoError(err, "Error reading file %s via container %s", filePath, containerName)
 		framework.Logf("Read file %q with content: %v", filePath, v)
 		if strings.TrimSpace(v) != strings.TrimSpace(expectedContents) {
-			framework.Failf("Read content <%q> does not match execpted content <%q>.", v, expectedContents)
+			framework.Failf("Read content <%q> does not match expected content <%q>.", v, expectedContents)
 		}
 	}
 }

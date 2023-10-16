@@ -309,7 +309,7 @@ func TestDealer_DealIntoHand(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			h := dealer.DealIntoHand(0, test.hand)
 			if len(h) != test.expectedSize {
-				t.Errorf("test %s fails: expetced size %d but got %d", test.name, test.expectedSize, len(h))
+				t.Errorf("test %s fails: expected size %d but got %d", test.name, test.expectedSize, len(h))
 				return
 			}
 		})

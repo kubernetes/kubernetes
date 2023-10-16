@@ -144,7 +144,7 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 
 	_, err = tc.CoreV1().Pods("nsA").Create(context.TODO(), testPod("nsB", "pod-2"), metav1.CreateOptions{})
 	if err == nil {
-		t.Fatalf("Expected Pods.Create to fail with bad request from namespace mismtach")
+		t.Fatalf("Expected Pods.Create to fail with bad request from namespace mismatch")
 	}
 	if err.Error() != `request namespace does not match object namespace, request: "nsA" object: "nsB"` {
 		t.Fatalf("Expected Pods.Create error to provide object and request namespaces, got %q", err)

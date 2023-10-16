@@ -59,7 +59,7 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 	}
 
 	if service.Spec.InternalTrafficPolicy != nil {
-		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+		t.Errorf("service internalTrafficPolicy should be dropped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 
 	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
@@ -68,7 +68,7 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 	}
 
 	if service.Spec.InternalTrafficPolicy != nil {
-		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+		t.Errorf("service internalTrafficPolicy should be dropped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 }
 
@@ -105,7 +105,7 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 	}
 
 	if service.Spec.InternalTrafficPolicy != nil {
-		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+		t.Errorf("service internalTrafficPolicy should be dropped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 
 	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
@@ -114,7 +114,7 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 	}
 
 	if service.Spec.InternalTrafficPolicy != nil {
-		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+		t.Errorf("service internalTrafficPolicy should be dropped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 }
 
@@ -168,7 +168,7 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 	}
 
 	if service.Spec.InternalTrafficPolicy != nil {
-		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+		t.Errorf("service internalTrafficPolicy should be dropped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 
 	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
@@ -177,7 +177,7 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 	}
 
 	if service.Spec.InternalTrafficPolicy != nil {
-		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+		t.Errorf("service internalTrafficPolicy should be dropped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 }
 
@@ -230,7 +230,7 @@ func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *t
 	}
 
 	if service.Spec.ExternalTrafficPolicy != "" {
-		t.Errorf("service externalTrafficPolicy should be droppped but is set: %v", service.Spec.ExternalTrafficPolicy)
+		t.Errorf("service externalTrafficPolicy should be dropped but is set: %v", service.Spec.ExternalTrafficPolicy)
 	}
 
 	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
@@ -239,7 +239,7 @@ func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *t
 	}
 
 	if service.Spec.ExternalTrafficPolicy != "" {
-		t.Errorf("service externalTrafficPolicy should be droppped but is set: %v", service.Spec.ExternalTrafficPolicy)
+		t.Errorf("service externalTrafficPolicy should be dropped but is set: %v", service.Spec.ExternalTrafficPolicy)
 	}
 
 	// externalTrafficPolicy should be set after adding externalIPs again.

@@ -235,7 +235,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 			// still get deleted before we list them below.
 			max++
 		default:
-			framework.Failf("CSIStorageCapacitity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", csc)
+			framework.Failf("CSIStorageCapacity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", csc)
 		}
 		cscs, err = cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)

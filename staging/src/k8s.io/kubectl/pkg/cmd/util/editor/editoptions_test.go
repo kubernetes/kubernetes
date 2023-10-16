@@ -253,7 +253,7 @@ func TestManagedFieldsExtractAndRestore(t *testing.T) {
 				meta.EachListItem(objCopy, func(obj runtime.Object) error {
 					metaObjs, _ := meta.Accessor(obj)
 					if metaObjs.GetManagedFields() != nil {
-						t.Errorf("unexpected managedFileds after extraction")
+						t.Errorf("unexpected managedFields after extraction")
 					}
 					infos = append(infos, &resource.Info{Object: obj})
 					return nil
@@ -261,7 +261,7 @@ func TestManagedFieldsExtractAndRestore(t *testing.T) {
 			} else {
 				metaObjs, _ := meta.Accessor(objCopy)
 				if metaObjs.GetManagedFields() != nil {
-					t.Errorf("unexpected managedFileds after extraction")
+					t.Errorf("unexpected managedFields after extraction")
 				}
 				infos = []*resource.Info{{Object: objCopy}}
 			}

@@ -144,11 +144,11 @@ fi
 
 
 if [[ ${#packages_flagged[@]} -gt 0 ]]; then
-	kube::log::error "[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
+	kube::log::error "[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please refer to the CNCF's approved license list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
 	awk '{ printf "%-100s :  %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/notapproved_licenses.dump
 	exit_code=1
 elif [[ "${exit_code}" -eq 1 ]]; then
-	kube::log::status "[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
+	kube::log::status "[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved license list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
 else
 	kube::log::status "[SUCCESS] Scan complete! All go-packages under the project are using current CNCF approved licenses!"
 fi

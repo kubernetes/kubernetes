@@ -1158,7 +1158,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	}
 
 	if len(externalNameSvc.Spec.ClusterIPs) > 0 || len(externalNameSvc.Spec.ClusterIP) > 0 || len(externalNameSvc.Spec.IPFamilies) > 0 {
-		t.Fatalf("unpexpected externalname service with ClusterIPs %v or ClusterIP %v or IPFamilies %v", externalNameSvc.Spec.ClusterIPs, externalNameSvc.Spec.ClusterIP, externalNameSvc.Spec.IPFamilies)
+		t.Fatalf("unexpected externalname service with ClusterIPs %v or ClusterIP %v or IPFamilies %v", externalNameSvc.Spec.ClusterIPs, externalNameSvc.Spec.ClusterIP, externalNameSvc.Spec.IPFamilies)
 	}
 
 	// convert to a ClusterIP service

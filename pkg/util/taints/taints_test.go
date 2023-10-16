@@ -740,7 +740,7 @@ func TestParseTaints(t *testing.T) {
 			t.Errorf("[%s] expected no error for spec %s, but got: %v", c.name, c.spec, err)
 		}
 		if !reflect.DeepEqual(c.expectedTaints, taints) {
-			t.Errorf("[%s] expected returen taints as %v, but got: %v", c.name, c.expectedTaints, taints)
+			t.Errorf("[%s] expected return taints as %v, but got: %v", c.name, c.expectedTaints, taints)
 		}
 		if !reflect.DeepEqual(c.expectedTaintsToRemove, taintsToRemove) {
 			t.Errorf("[%s] expected return taints to be removed as %v, but got: %v", c.name, c.expectedTaintsToRemove, taintsToRemove)

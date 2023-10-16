@@ -457,7 +457,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 							t.Fatal("csiTest.VolumeAll reconstruction of ephemeral volumeSpec missing CSI Volume source")
 						}
 						if volSpec.Volume.CSI.Driver == "" {
-							t.Fatal("csiTest.VolumeAll reconstruction ephemral volume missing driver name")
+							t.Fatal("csiTest.VolumeAll reconstruction ephemeral volume missing driver name")
 						}
 					} else {
 						if volSpec.PersistentVolume == nil || volSpec.PersistentVolume.Spec.CSI == nil {

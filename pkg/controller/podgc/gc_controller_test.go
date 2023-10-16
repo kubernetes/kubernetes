@@ -763,7 +763,7 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 			}
 
 			if patchAction != nil && test.expectedPatchedPod == nil {
-				t.Fatalf("Pod was pactched but expectedPatchedPod is nil")
+				t.Fatalf("Pod was patched but expectedPatchedPod is nil")
 			}
 			if test.expectedPatchedPod != nil {
 				patchedPodBytes := patchAction.GetPatch()

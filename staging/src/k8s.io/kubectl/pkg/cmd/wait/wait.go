@@ -333,7 +333,7 @@ func (o *WaitOptions) RunWait() error {
 			return nil
 		}
 		if err == nil {
-			return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
+			return fmt.Errorf("%v unsatisfied for unknown reason", finalObject)
 		}
 		return err
 	}

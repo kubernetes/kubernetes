@@ -1313,7 +1313,7 @@ func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictO
 	}
 
 	if len(events) != len(actualEvents) {
-		t.Fatalf("unexpected number of events: %d, expected: %d, acutalEvents: %#v, expectedEvents:%#v", len(actualEvents), len(events), actualEvents, events)
+		t.Fatalf("unexpected number of events: %d, expected: %d, actualEvents: %#v, expectedEvents:%#v", len(actualEvents), len(events), actualEvents, events)
 	}
 
 	if strictOrder {
@@ -1476,7 +1476,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 			select {
 			case event = <-w.ResultChan():
 			case <-time.After(wait.ForeverTestTimeout):
-				t.Fatalf("timeout watiching for the event")
+				t.Fatalf("timeout watching for the event")
 			}
 
 			var object runtime.Object

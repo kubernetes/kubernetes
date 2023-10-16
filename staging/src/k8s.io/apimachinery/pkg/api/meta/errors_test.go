@@ -65,7 +65,7 @@ func TestErrorMatching(t *testing.T) {
 			if !errors.Is(tc.input, tc.new()) {
 				t.Error("error doesn't match itself directly")
 			}
-			if !errors.Is(fmt.Errorf("wrapepd: %w", tc.input), tc.new()) {
+			if !errors.Is(fmt.Errorf("wrapped: %w", tc.input), tc.new()) {
 				t.Error("error doesn't match itself when wrapped")
 			}
 			if !tc.matcherFunc(tc.input) {

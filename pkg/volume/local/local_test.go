@@ -437,7 +437,7 @@ func TestMapUnmap(t *testing.T) {
 		t.Errorf("Got unexpected pod path: %s, expected %s", podPath, expectedPodPath)
 	}
 	if volName != testPVName {
-		t.Errorf("Got unexpected volNamne: %s, expected %s", volName, testPVName)
+		t.Errorf("Got unexpected volName: %s, expected %s", volName, testPVName)
 	}
 	var devPath string
 

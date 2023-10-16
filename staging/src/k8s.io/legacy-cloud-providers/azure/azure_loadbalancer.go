@@ -1444,7 +1444,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 				existingLBs, err := az.ListLB(service)
 				if err != nil {
-					klog.Errorf("reconcileLoadBalancer: failed to list load balancer for servcie %q: %s", serviceName, err.Error())
+					klog.Errorf("reconcileLoadBalancer: failed to list load balancer for service %q: %s", serviceName, err.Error())
 					return nil, err
 				}
 

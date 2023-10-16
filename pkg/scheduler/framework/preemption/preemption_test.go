@@ -180,7 +180,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			}
 			nodes, _ := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
 			if len(tt.expected) != len(nodes) {
-				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
+				t.Errorf("number of nodes is not the same as expected. expected: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
 			}
 			for _, node := range nodes {
 				name := node.Node().Name

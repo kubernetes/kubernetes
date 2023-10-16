@@ -1185,7 +1185,7 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 			if !ok {
 				// Make sure we have received a bookmark event
 				if !bookmarkReceived {
-					t.Fatalf("Unpexected error, we did not received a bookmark event")
+					t.Fatalf("Unexpected error, we did not received a bookmark event")
 				}
 				return
 			}

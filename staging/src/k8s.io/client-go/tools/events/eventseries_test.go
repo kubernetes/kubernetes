@@ -223,7 +223,7 @@ func TestEventSeriesWithEventSinkImplRace(t *testing.T) {
 		return true, nil
 	})
 	if err != nil {
-		t.Fatal("expected that 2 identical Eventf calls would result in the creation of an Event with a Serie")
+		t.Fatal("expected that 2 identical Eventf calls would result in the creation of an Event with a Series")
 	}
 }
 

@@ -63,7 +63,7 @@ func (r *reinvoker) Admit(ctx context.Context, a admission.Attributes, o admissi
 	}
 	for i := 1; i < len(outputs); i++ {
 		if !apiequality.Semantic.DeepEqual(outputs[0], outputs[i]) {
-			r.t.Errorf("expected mutating admission plugin to be idempontent, but got different results on reinvocation, diff:\n%s", cmp.Diff(outputs[0], outputs[i]))
+			r.t.Errorf("expected mutating admission plugin to be idempotent, but got different results on reinvocation, diff:\n%s", cmp.Diff(outputs[0], outputs[i]))
 		}
 	}
 	return nil

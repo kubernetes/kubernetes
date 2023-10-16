@@ -199,7 +199,7 @@ func TestGetOriginal(t *testing.T) {
 
 				originalGot := GetOriginal(wrapped)
 				if originalExpected != originalGot {
-					t.Errorf("Expected to get tehe original http.ResponseWriter object")
+					t.Errorf("Expected to get the original http.ResponseWriter object")
 				}
 			}()
 		})

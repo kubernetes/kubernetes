@@ -484,7 +484,7 @@ func TestUpdate(t *testing.T) {
 
 			content := r.Header.Get("Content-Type")
 			if content != runtime.ContentTypeJSON {
-				t.Errorf("Uppdate(%q) got Content-Type %s. wanted %s", tc.name, content, runtime.ContentTypeJSON)
+				t.Errorf("Update(%q) got Content-Type %s. wanted %s", tc.name, content, runtime.ContentTypeJSON)
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)

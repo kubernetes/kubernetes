@@ -489,7 +489,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	// Initialization should successfully finish.
 	fakeClock.Step(30 * time.Second)
 	if err := wait.Poll(10*time.Millisecond, time.Second, reflectorInitialized); err != nil {
-		t.Errorf("reflector didn't iniailize correctly")
+		t.Errorf("reflector didn't initialize correctly")
 	}
 
 	// recycling shouldn't stop the reflector because it was accessed within last minute.

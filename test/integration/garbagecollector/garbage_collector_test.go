@@ -965,7 +965,7 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 		}
 		return true, nil
 	}); err != nil {
-		t.Fatalf("Failed waiting for pod to have only one filanizer at step 1, error: %v", err)
+		t.Fatalf("Failed waiting for pod to have only one finalizer at step 1, error: %v", err)
 	}
 
 	// step 2: deletes the pod one more time and checks if there's only the custom finalizer left
@@ -983,7 +983,7 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 		}
 		return true, nil
 	}); err != nil {
-		t.Fatalf("Failed waiting for pod to have only one finalizer at step 2, gc hasn't removed its finalzier?, error: %v", err)
+		t.Fatalf("Failed waiting for pod to have only one finalizer at step 2, gc hasn't removed its finalizer?, error: %v", err)
 	}
 
 	// step 3: removes the custom finalizer and checks if the pod was removed

@@ -104,7 +104,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	t.Logf("Checking that we still see the NetworkPolicy")
 	_, err = kubeclient.NetworkingV1().NetworkPolicies(nwPolicy.Namespace).Get(context.TODO(), nwPolicy.Name, metav1.GetOptions{})
 	if err != nil {
-		t.Errorf("Failed to get NetworkPolocy: %v", err)
+		t.Errorf("Failed to get NetworkPolicy: %v", err)
 	}
 
 	t.Logf("Checking that crd resource does not show up in networking group")

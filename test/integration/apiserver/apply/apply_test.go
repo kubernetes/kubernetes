@@ -3654,7 +3654,7 @@ func TestApplyFormerlyAtomicFields(t *testing.T) {
 
 	err = json.Unmarshal(expectedManagedFieldsString, &expectedManagedFields)
 	if err != nil {
-		t.Fatalf("unexpectly failed to decode expected managed fields")
+		t.Fatalf("unexpectedly failed to decode expected managed fields")
 	}
 
 	// Wipe timestamps before comparison

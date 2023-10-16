@@ -173,7 +173,7 @@ func TestAllocateIPAllocator(t *testing.T) {
 			for _, outOfRange := range tc.outOfRange {
 				err = r.Allocate(netutils.ParseIPSloppy(outOfRange))
 				if err == nil {
-					t.Fatalf("unexpacted allocating of %s", outOfRange)
+					t.Fatalf("unexpected allocating of %s", outOfRange)
 				}
 			}
 			if err := r.Allocate(netutils.ParseIPSloppy(tc.alreadyAllocated)); err == nil {

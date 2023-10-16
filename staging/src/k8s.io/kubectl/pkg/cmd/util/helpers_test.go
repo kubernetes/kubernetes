@@ -582,7 +582,7 @@ func TestGetValidationDirective(t *testing.T) {
 			}
 		} else {
 			if err != nil {
-				t.Errorf("expecte no error, but got: %v", err)
+				t.Errorf("expected no error, but got: %v", err)
 			}
 		}
 

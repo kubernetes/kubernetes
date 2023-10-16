@@ -800,7 +800,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 			ginkgo.It("should return the expected error with the feature gate disabled", func(ctx context.Context) {
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err, "LocalEndpoint() faild err %v", err)
+				framework.ExpectNoError(err, "LocalEndpoint() failed err %v", err)
 
 				cli, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
 				framework.ExpectNoError(err, "GetClient() failed err %v", err)

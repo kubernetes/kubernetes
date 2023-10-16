@@ -2714,7 +2714,7 @@ func TestRequestWithRetry(t *testing.T) {
 				}
 			case len(test.errContains) > 0:
 				if !strings.Contains(err.Error(), test.errContains) {
-					t.Errorf("Expected error message to caontain: %q, but got: %q", test.errContains, err.Error())
+					t.Errorf("Expected error message to contain: %q, but got: %q", test.errContains, err.Error())
 				}
 			}
 		})

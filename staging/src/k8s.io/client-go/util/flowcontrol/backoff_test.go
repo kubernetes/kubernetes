@@ -234,7 +234,7 @@ func TestBackoffWithJitter(t *testing.T) {
 	}
 
 	if got := b.Get(id); got != 0 {
-		t.Errorf("expected a zero wait durtion, but got: %s", got)
+		t.Errorf("expected a zero wait duration, but got: %s", got)
 	}
 
 	delayGot := next()

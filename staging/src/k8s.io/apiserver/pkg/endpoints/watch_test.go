@@ -744,7 +744,7 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 
 	// check for leaks
 	if !watcher.IsStopped() {
-		t.Errorf("Leaked watcher goruntine after request done")
+		t.Errorf("Leaked watcher goruntime after request done")
 	}
 }
 

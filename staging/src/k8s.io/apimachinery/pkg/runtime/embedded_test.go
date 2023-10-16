@@ -212,7 +212,7 @@ func TestNestedObject(t *testing.T) {
 	var decodedViaJSON runtimetesting.EmbeddedTest
 	err = json.Unmarshal(wire, &decodedViaJSON)
 	if err == nil {
-		t.Fatal("Expeceted decode error")
+		t.Fatal("Expected decode error")
 	}
 	if _, ok := err.(*json.UnmarshalTypeError); !ok {
 		t.Fatalf("Unexpected decode error: %v", err)

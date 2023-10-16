@@ -368,7 +368,7 @@ func TestShouldNotRecreateLBWhenNetworkTiersMismatch(t *testing.T) {
 		status, err := gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
 		if tc.expectError {
 			if err == nil {
-				t.Errorf("for test case %q, expect errror != nil, but got %v", tc.desc, err)
+				t.Errorf("for test case %q, expect error != nil, but got %v", tc.desc, err)
 			}
 		} else {
 			assert.NoError(t, err)

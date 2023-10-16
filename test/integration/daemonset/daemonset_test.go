@@ -1031,7 +1031,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 			return false, fmt.Errorf("failed to list controllerrevision: %v", err)
 		}
 		if revs.Size() == 0 {
-			return false, fmt.Errorf("no avaialable controllerrevision")
+			return false, fmt.Errorf("no available controllerrevision")
 		}
 
 		for _, rev := range revs.Items {

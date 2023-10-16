@@ -323,12 +323,12 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 		}
 
 		if !strings.EqualFold(*lb.Name, expectedLBName) {
-			t.Errorf("lb name should be the default LB name Extected (%s) Fouund (%s)", expectedLBName, *lb.Name)
+			t.Errorf("lb name should be the default LB name Expected (%s) Found (%s)", expectedLBName, *lb.Name)
 		}
 
 		ruleCount := len(*lb.LoadBalancingRules)
 		if ruleCount != index {
-			t.Errorf("lb rule count should be equal to nuber of services deployed, expected (%d) Found (%d)", index, ruleCount)
+			t.Errorf("lb rule count should be equal to number of services deployed, expected (%d) Found (%d)", index, ruleCount)
 		}
 	}
 }
@@ -1863,7 +1863,7 @@ func TestSecurityRulePriorityPicksNextAvailablePriority(t *testing.T) {
 
 	priority, err := getNextAvailablePriority(rules)
 	if err != nil {
-		t.Errorf("Unexpectected error: %q", err)
+		t.Errorf("Unexpected error: %q", err)
 	}
 
 	if priority != expectedPriority {

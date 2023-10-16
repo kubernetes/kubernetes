@@ -97,7 +97,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 	}
 
 	if err = testClientBuilder(dymClient, ns, saName); err != nil {
-		t.Fatalf("dynamic client get resources failed befroe deleting sa: %v", err)
+		t.Fatalf("dynamic client get resources failed before deleting sa: %v", err)
 	}
 
 	// We want to trigger token rotation here by deleting service account

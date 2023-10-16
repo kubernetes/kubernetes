@@ -29,7 +29,7 @@ func TestFindField(t *testing.T) {
 		Kind:    "OneKind",
 	})
 	if schema == nil {
-		t.Fatal("Counldn't find schema v1.OneKind")
+		t.Fatal("Couldn't find schema v1.OneKind")
 	}
 
 	tests := []struct {

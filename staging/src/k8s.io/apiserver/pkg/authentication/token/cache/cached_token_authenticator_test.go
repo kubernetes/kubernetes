@@ -271,7 +271,7 @@ func TestSharedLookup(t *testing.T) {
 		a := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 			auds, _ := authenticator.AudiencesFrom(ctx)
 			if got, want := auds, []string{"a"}; cmp.Equal(got, want) {
-				t.Fatalf("unexpeced audiences: %v", cmp.Diff(got, want))
+				t.Fatalf("unexpected audiences: %v", cmp.Diff(got, want))
 			}
 			return nil, false, nil
 		}), true, time.Minute, 0)
