@@ -94,7 +94,7 @@ func TestWarnWordSepNormalizeFunc(t *testing.T) {
 		{
 			flagName:         "foo_bar",
 			expectedFlagName: "foo-bar",
-			expectedWarning:  "using an underscore in a flag name is not supported. foo_bar has been converted to foo-bar.\n",
+			expectedWarning:  "using an underscore in a flag name is not supported. foo_bar has been converted to foo-bar.",
 		},
 	}
 	for _, tc := range cases {

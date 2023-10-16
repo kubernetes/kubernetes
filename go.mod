@@ -33,7 +33,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.3.0
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
@@ -112,7 +112,7 @@ require (
 	k8s.io/dynamic-resource-allocation v0.0.0
 	k8s.io/endpointslice v0.0.0
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
-	k8s.io/klog/v2 v2.100.1
+	k8s.io/klog/v2 v2.110.1
 	k8s.io/kms v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
