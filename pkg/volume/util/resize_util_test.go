@@ -178,7 +178,7 @@ func TestResizeFunctions(t *testing.T) {
 			pvc:         basePVC.get(),
 			expectedPVC: basePVC.withStorageResourceStatus(v1.PersistentVolumeClaimControllerResizeInProgress).get(),
 			testFunc: func(pvc *v1.PersistentVolumeClaim, i clientset.Interface, q resource.Quantity) (*v1.PersistentVolumeClaim, error) {
-				return MarkControllerReisizeInProgress(pvc, "foobar", q, i)
+				return MarkControllerResizeInProgress(pvc, "foobar", q, i)
 			},
 		},
 		{

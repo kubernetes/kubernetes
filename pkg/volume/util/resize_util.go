@@ -145,7 +145,7 @@ func MarkResizeInProgressWithResizer(
 	return PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
 }
 
-func MarkControllerReisizeInProgress(pvc *v1.PersistentVolumeClaim, resizerName string, newSize resource.Quantity, kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+func MarkControllerResizeInProgress(pvc *v1.PersistentVolumeClaim, resizerName string, newSize resource.Quantity, kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 	// Mark PVC as Resize Started
 	progressCondition := v1.PersistentVolumeClaimCondition{
 		Type:               v1.PersistentVolumeClaimResizing,

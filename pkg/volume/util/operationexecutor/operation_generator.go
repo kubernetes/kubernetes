@@ -1856,7 +1856,7 @@ func (og *operationGenerator) expandAndRecoverFunction(resizeOpts inTreeResizeOp
 		}
 	}
 
-	pvc, err = util.MarkControllerReisizeInProgress(pvc, resizerName, newSize, og.kubeClient)
+	pvc, err = util.MarkControllerResizeInProgress(pvc, resizerName, newSize, og.kubeClient)
 	if err != nil {
 		msg := fmt.Errorf("error updating pvc %s with resize in progress: %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
 		resizeResponse.err = msg
