@@ -221,6 +221,13 @@ No changes
 - [Expose commit memory used in WindowsMemoryUsage struct](https://github.com/kubernetes/kubernetes/pull/119238)
   - Added the `commit_memory_bytes` field to type `WindowsMemoryUsage`
 
+### v1.29
+
+`git diff v1.28.0 v1.29.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+- [Add runtime handler field to ImageSpec struct](https://github.com/kubernetes/kubernetes/pull/121121)
+  - Added `runtime_handler` field to type `ImageSpec`
+
 ## Community, discussion, contribution, and support
 
 Learn how to engage with the Kubernetes community on the [community
