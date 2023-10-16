@@ -1596,6 +1596,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						atomic.AddInt32(&active, -1)
 						errCh <- err
 					}
+					recordJobPodsCreationTotal(job)
 				}()
 			}
 			wait.Wait()
@@ -1910,4 +1911,19 @@ func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
 			jm.enqueueOrphanPod(pod)
 		}
 	}
+}
+
+func recordJobPodsCreationTotal(job *batch.Job) {
+	trigger := metrics.New
+	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+		podsTerminating := job.Status.Terminating != nil && *job.Status.Terminating > 0
+		isRecreateAction := podsTerminating || job.Status.Failed > 0
+		if isRecreateAction {
+			trigger = metrics.RecreateTerminatingOrFailed
+			if *job.Spec.PodReplacementPolicy == batch.Failed {
+				trigger = metrics.RecreateFailed
+			}
+		}
+	}
+	metrics.JobPodsCreationTotal.WithLabelValues(trigger).Inc()
 }

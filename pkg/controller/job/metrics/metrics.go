@@ -125,6 +125,20 @@ The event label can be "add" or "delete".`,
 			backoffLimit label are: "perIndex" and "global"`,
 		},
 		[]string{"status", "backoffLimit"})
+
+	// JobPodsCreationTotal records the number of pods created by the job controller
+	// based on the event which triggered their creation (i.e. if PodReplacementPolicy was specified).
+	// Possible label values:
+	//   event: new, recreate_terminating_or_failed, recreate_terminated
+	JobPodsCreationTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "job_pods_creation_total",
+			Help: `The number of Pods created by the Job controller labelled with a trigger
+which caused the Pod creation. This metric also distinguishes between Pods created using
+different PodReplacementPolicy settings. Possible values of the trigger label are:
+"new", "recreate_terminating_or_failed", "recreate_terminated".`,
+		}, []string{"event"})
 )
 
 const (
@@ -156,6 +170,12 @@ const (
 	// metric.
 	Add    = "add"
 	Delete = "delete"
+
+	// Possible values for "event" label in the job_pods_creation_total metric.
+
+	New                         = "new"
+	RecreateTerminatingOrFailed = "recreate_terminating_or_failed"
+	RecreateFailed              = "recreate_failed"
 )
 
 var registerMetrics sync.Once
@@ -170,5 +190,6 @@ func Register() {
 		legacyregistry.MustRegister(PodFailuresHandledByFailurePolicy)
 		legacyregistry.MustRegister(TerminatedPodsTrackingFinalizerTotal)
 		legacyregistry.MustRegister(JobFinishedIndexesTotal)
+		legacyregistry.MustRegister(JobPodsCreationTotal)
 	})
 }
