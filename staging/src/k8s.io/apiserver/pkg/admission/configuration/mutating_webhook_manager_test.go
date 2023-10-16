@@ -177,7 +177,7 @@ func TestGetMutatingWebhookConfigSmartReload(t *testing.T) {
 			finalNumberOfWebhookAccessors: 3,
 		},
 		{
-			name: "create configuration and update moar of them",
+			name: "create configuration and update more of them",
 			args: args{
 				[]*v1.MutatingWebhookConfiguration{
 					{

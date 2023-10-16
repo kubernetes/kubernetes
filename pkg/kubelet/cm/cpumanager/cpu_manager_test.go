@@ -906,7 +906,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "fakeContainerName",
 		},
 		{
-			description: "cpu manager reconclie - cpuset is empty",
+			description: "cpu manager reconcile - cpuset is empty",
 			policy:      testPolicy,
 			activePods: []*v1.Pod{
 				{

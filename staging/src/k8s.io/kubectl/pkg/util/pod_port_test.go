@@ -53,7 +53,7 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 			err:      false,
 		},
 		{
-			name: "test faulure 1",
+			name: "test failure 1",
 			pod: v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{

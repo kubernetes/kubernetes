@@ -60,7 +60,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 				deployClusterRegistrar: true,
 			},
 			{
-				name:                   "should require VolumeAttach for ephemermal volume and drivers with attachment",
+				name:                   "should require VolumeAttach for ephemeral volume and drivers with attachment",
 				deployClusterRegistrar: true,
 				volumeType:             genericEphemeral,
 			},

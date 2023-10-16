@@ -1487,7 +1487,7 @@ func TestCostEstimation(t *testing.T) {
 			expectedSetCost:  2,
 		},
 		{
-			name:             "index of array of array of numnbers",
+			name:             "index of array of array of numbers",
 			schemaGenerator:  genArrayOfArraysWithRule("number", "self[0][0] == -1.0"),
 			expectedCalcCost: 3,
 			setMaxElements:   51,

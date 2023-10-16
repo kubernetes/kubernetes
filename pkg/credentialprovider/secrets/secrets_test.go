@@ -156,7 +156,7 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			found:       false,
 		},
 		{
-			name:  "with not matcing .dockerconfigjson and default keyring",
+			name:  "with not matching .dockerconfigjson and default keyring",
 			image: "test.registry.io",
 			defaultKeyring: &fakeKeyring{
 				auth: []credentialprovider.AuthConfig{

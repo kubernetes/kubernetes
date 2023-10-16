@@ -433,7 +433,7 @@ func TestCRD(t *testing.T) {
 		{
 			// Show that if CRD and a builtin share a group version,
 			// the builtin takes precedence in both versions of discovery
-			Name: "CRDBuiltinOverlapPrecence",
+			Name: "CRDBuiltinOverlapPresence",
 			Actions: []testAction{
 				// Create CRD that overrides a builtin
 				applyCRD(makeCRDSpec("apiextensions.k8s.io", "Bar", true, []string{"v1", "v2", "vfake"})),
@@ -627,7 +627,7 @@ func TestFreshness(t *testing.T) {
 
 // Shows a group for which multiple APIServices specify a GroupPriorityMinimum,
 // it is sorted the same in both versions of discovery
-func TestGroupPriorty(t *testing.T) {
+func TestGroupPriority(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)()
 
 	makeApiServiceSpec := func(gv metav1.GroupVersion, groupPriorityMin, versionPriority int) apiregistrationv1.APIServiceSpec {

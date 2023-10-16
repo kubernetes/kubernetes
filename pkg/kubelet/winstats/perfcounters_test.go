@@ -36,7 +36,7 @@ func TestPerfCounter(t *testing.T) {
 		"CPU Query": {
 			counter: cpuQuery,
 		},
-		"Memory Prvate Working Set Query": {
+		"Memory Private Working Set Query": {
 			counter: memoryPrivWorkingSetQuery,
 		},
 		"Memory Committed Bytes Query": {

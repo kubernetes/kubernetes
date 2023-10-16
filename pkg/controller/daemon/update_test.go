@@ -117,7 +117,7 @@ func TestDaemonSetUpdatesPodsWithMaxSurge(t *testing.T) {
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 }
 
-func TestDaemonSetUpdatesPodsNotMatchTainstWithMaxSurge(t *testing.T) {
+func TestDaemonSetUpdatesPodsNotMatchTaintsWithMaxSurge(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
 	ds := newDaemonSet("foo")

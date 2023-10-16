@@ -577,7 +577,7 @@ func TestBaseline(t *testing.T) {
 	}.exercise(t)
 }
 
-func TestExampt(t *testing.T) {
+func TestExempt(t *testing.T) {
 	metrics.Register()
 	for concurrencyLimit := 0; concurrencyLimit <= 2; concurrencyLimit += 2 {
 		t.Run(fmt.Sprintf("concurrency=%d", concurrencyLimit), func(t *testing.T) {

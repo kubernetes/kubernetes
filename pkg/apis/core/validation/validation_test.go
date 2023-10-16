@@ -634,7 +634,7 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 			},
 		},
-		"inline-pvspec-with-missing-acess-modes": {
+		"inline-pvspec-with-missing-access-modes": {
 			isExpectedFailure: true,
 			isInlineSpec:      true,
 			pvSpec: &core.PersistentVolumeSpec{
@@ -1950,7 +1950,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source": {
+		"invalid-apigroup-in-data-source": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -1968,7 +1968,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source-ref": {
+		"invalid-apigroup-in-data-source-ref": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2109,7 +2109,7 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	validClaim := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
@@ -2492,7 +2492,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSource: &core.TypedLocalObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -2510,7 +2510,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSourceRef: &core.TypedObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -2750,7 +2750,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 }
 
 func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	tests := map[string]struct {
 		oldPvc                 *core.PersistentVolumeClaim
@@ -2797,14 +2797,14 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
-		"invaild apiGroup in dataSource allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSource allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
-		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSourceRef allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
@@ -18698,7 +18698,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	})
 
-	noStoraegeClaimStatus := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+	noStorageClaimStatus := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
@@ -18893,40 +18893,40 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		"status-update-with-no-storage-update": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
-			newClaim:                   noStoraegeClaimStatus,
+			newClaim:                   noStorageClaimStatus,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-controller-resize-failed": {
+		"status-update-with-controller-resize-failed": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validResizeStatusControllerResizeFailed,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-node-resize-pending": {
+		"status-update-with-node-resize-pending": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validNodeResizePending,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-node-resize-inprogress": {
+		"status-update-with-node-resize-inprogress": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validNodeResizeInProgress,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-node-resize-failed": {
+		"status-update-with-node-resize-failed": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validNodeResizeFailed,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-invalid-native-resource-status-key": {
+		"status-update-with-invalid-native-resource-status-key": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   invalidNativeResizeStatusPVC,
 			enableRecoverFromExpansion: true,
 		},
-		"staus-update-with-valid-external-resource-status-key": {
+		"status-update-with-valid-external-resource-status-key": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validExternalResizeStatusPVC,
@@ -19912,7 +19912,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 			errorDetail: dnsLabelErrMsg,
 		},
 		"invalid name": {
-			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
+			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invalid^&Characters", Namespace: "namespace"}},
 			errorType:   "FieldValueInvalid",
 			errorDetail: dnsSubdomainLabelErrMsg,
 		},
@@ -22844,7 +22844,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 			}},
 		},
 	}, {
-		name:            "Spec with feature enabled, pod-wide HostProcess=ture, and HostNetwork set should validate",
+		name:            "Spec with feature enabled, pod-wide HostProcess=true, and HostNetwork set should validate",
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
@@ -23035,7 +23035,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 			}},
 		},
 	}, {
-		name:            "Spec with feature enabled, pod-wide HostProcess=false, some contaienrs setting HostProccess=true should not validate",
+		name:            "Spec with feature enabled, pod-wide HostProcess=false, some containers setting HostProccess=true should not validate",
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{

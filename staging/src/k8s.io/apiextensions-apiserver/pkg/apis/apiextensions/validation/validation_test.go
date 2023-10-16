@@ -4525,7 +4525,7 @@ func TestValidateFieldPath(t *testing.T) {
 			errMsg:          "expected single quoted string but got 1",
 		},
 		{
-			name:            "Unsopported .list.a",
+			name:            "Unsupported .list.a",
 			fieldPath:       ".list.a",
 			pathOfFieldPath: path,
 			schema:          &schema,
@@ -6644,7 +6644,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 			errors: nil,
 		},
 		{
-			name: "reject nullable items in list of type set if not pre-exisiting",
+			name: "reject nullable items in list of type set if not pre-existing",
 			old: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
 				Spec: apiextensions.CustomResourceDefinitionSpec{

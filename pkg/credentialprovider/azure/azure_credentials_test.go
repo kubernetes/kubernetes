@@ -108,7 +108,7 @@ func TestProvide(t *testing.T) {
 			expectedCredsLength: 5,
 		},
 		{
-			desc:  "retuen 0 credential for non-ACR image using Managed Identity",
+			desc:  "return 0 credential for non-ACR image using Managed Identity",
 			image: "busybox",
 			configStr: `
     {

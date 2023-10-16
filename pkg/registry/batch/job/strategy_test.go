@@ -1994,7 +1994,7 @@ func TestJobStrategy_GetAttrs(t *testing.T) {
 	}
 }
 
-func TestJobToSelectiableFields(t *testing.T) {
+func TestJobToSelectableFields(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"batch/v1",
 		"Job",

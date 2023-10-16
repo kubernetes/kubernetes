@@ -259,7 +259,7 @@ func TestKindForWithNewCRDs(t *testing.T) {
 	}
 }
 
-func TestWarnAmbigious(t *testing.T) {
+func TestWarnAmbiguous(t *testing.T) {
 	tests := []struct {
 		name                string
 		arg                 string

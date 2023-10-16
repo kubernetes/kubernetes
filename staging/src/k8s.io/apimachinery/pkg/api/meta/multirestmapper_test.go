@@ -283,7 +283,7 @@ func TestMultiRESTMapperRESTMappings(t *testing.T) {
 			err:       &NoKindMatchError{GroupKind: schema.GroupKind{Kind: "Foo"}, SearchedVersions: []string{"v1beta"}},
 		},
 		{
-			name:      "empty with multi(two) vesions",
+			name:      "empty with multi(two) versions",
 			mapper:    MultiRESTMapper{},
 			groupKind: schema.GroupKind{Kind: "Foo"},
 			versions:  []string{"v1beta", "v2"},

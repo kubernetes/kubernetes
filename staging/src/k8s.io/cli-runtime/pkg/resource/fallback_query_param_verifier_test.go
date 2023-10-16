@@ -107,7 +107,7 @@ func TestFallbackQueryParamVerifier_PrimaryNoFallback(t *testing.T) {
 			queryParam:       QueryParamFieldValidation,
 			expectedSupports: false,
 		},
-		"List GVK is specifically unsupported in primary verfier": {
+		"List GVK is specifically unsupported in primary verifier": {
 			crds: []schema.GroupKind{},
 			gvk: schema.GroupVersionKind{
 				Group:   "",

@@ -253,7 +253,7 @@ func TestFuncs(t *testing.T) {
 			Expect:   `{"key1":null,"key2":"val2"}`,
 		},
 		{
-			Name:     "OverwriteKeyWithLefover",
+			Name:     "OverwriteKeyWithLeftover",
 			FuncName: "set",
 			Source:   `{{set (dict "key1" "val1" "key2" "val2" "key3" "val3") "key1" nil | toJson}}`,
 			Expect:   `{"key1":null,"key2":"val2","key3":"val3"}`,

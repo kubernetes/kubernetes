@@ -815,7 +815,7 @@ func TestEventualConsistency(t *testing.T) {
 			expectDelete: true,
 		},
 		{
-			description: "new pod2 with tait toleration created on tainted Node",
+			description: "new pod2 with taint toleration created on tainted Node",
 			pods: []v1.Pod{
 				*testutil.NewPod("pod1", "node1"),
 			},

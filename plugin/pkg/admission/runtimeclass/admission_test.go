@@ -449,7 +449,7 @@ func TestValidate(t *testing.T) {
 		expectError  bool
 	}{
 		{
-			name: "No Overhead in RunntimeClass, Overhead set in pod",
+			name: "No Overhead in RuntimeClass, Overhead set in pod",
 			runtimeClass: &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Handler:    "bar",

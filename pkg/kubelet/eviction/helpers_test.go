@@ -2125,7 +2125,7 @@ func (s1 thresholdList) Equal(s2 thresholdList) bool {
 	return true
 }
 
-func TestEvictonMessageWithResourceResize(t *testing.T) {
+func TestEvictionMessageWithResourceResize(t *testing.T) {
 	testpod := newPod("testpod", 1, []v1.Container{
 		newContainer("testcontainer", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
 	}, nil)

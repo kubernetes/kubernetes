@@ -183,8 +183,8 @@ func TestQuantitySubZeroPreservesSuffix(t *testing.T) {
 	}
 }
 
-// TestQuantityCanocicalizeZero verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
-func TestQuantityCanocicalizeZero(t *testing.T) {
+// TestQuantityCanonicalizeZero verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
+func TestQuantityCanonicalizeZero(t *testing.T) {
 	val := MustParse("1000m")
 	val.i.Sub(int64Amount{value: 1})
 	zero := Quantity{i: val.i, Format: DecimalSI}

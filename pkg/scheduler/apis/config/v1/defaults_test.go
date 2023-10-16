@@ -366,7 +366,7 @@ func TestSchedulerDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "Prallelism with no port",
+			name: "Parallelism with no port",
 			config: &configv1.KubeSchedulerConfiguration{
 				Parallelism: ptr.To[int32](16),
 			},

@@ -817,7 +817,7 @@ func TestHasWindowsHostProcessContainer(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			name: "containers with hostproces=mixed",
+			name: "containers with hostprocess=mixed",
 			podSpec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{

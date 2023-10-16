@@ -6596,7 +6596,7 @@ func TestNumberConversion(t *testing.T) {
 
 var replaceRawExtensionPatchTestCases = []StrategicMergePatchRawTestCase{
 	{
-		Description: "replace RawExtension field, rest unchanched",
+		Description: "replace RawExtension field, rest unchanged",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
 name: my-object

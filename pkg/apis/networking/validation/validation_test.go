@@ -1915,7 +1915,7 @@ func TestValidateIPAddress(t *testing.T) {
 				},
 			},
 		},
-		"non-canonica-ipv6address": {
+		"non-canonical-ipv6address": {
 			expectedErrors: 1,
 			ipAddress: &networking.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{

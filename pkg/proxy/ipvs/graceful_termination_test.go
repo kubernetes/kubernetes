@@ -40,7 +40,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 		err          error
 	}{
 		{
-			name: "graceful delete, no connections results in deleting the real server immediatetly",
+			name: "graceful delete, no connections results in deleting the real server immediately",
 			vs: &utilipvs.VirtualServer{
 				Address:  netutils.ParseIPSloppy("1.1.1.1"),
 				Protocol: "tcp",

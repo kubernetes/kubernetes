@@ -828,7 +828,7 @@ func TestIsZeroCIDR(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "invalide cidr",
+			name:     "invalid cidr",
 			input:    "",
 			expected: false,
 		},
