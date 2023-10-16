@@ -81,6 +81,7 @@ func validateClusterIPFlags(options Extra) []error {
 	return errs
 }
 
+// Validates if the given CIDR range fits within the maximum allowed CIDR bits.
 func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) error {
 	// Should be smallish sized cidr, this thing is kept in etcd
 	// bigger cidr (specially those offered by IPv6) will add no value
@@ -93,6 +94,7 @@ func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) erro
 	return nil
 }
 
+// Validates the provided Kubernetes service node port against allowed port ranges.
 func validateServiceNodePort(options Extra) []error {
 	var errs []error
 
@@ -106,6 +108,7 @@ func validateServiceNodePort(options Extra) []error {
 	return errs
 }
 
+// Validates that the service cluster IP range matches the public IP family if reconciling is required.
 func validatePublicIPServiceClusterIPRangeIPFamilies(extra Extra, generic genericoptions.ServerRunOptions) []error {
 	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
 	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must

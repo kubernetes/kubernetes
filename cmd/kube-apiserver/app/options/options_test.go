@@ -44,6 +44,7 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+// TestAddFlags checks if command-line args populate ServerRunOptions correctly.
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
 	s := NewServerRunOptions()

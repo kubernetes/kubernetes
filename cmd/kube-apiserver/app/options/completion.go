@@ -93,6 +93,7 @@ func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
 	}, nil
 }
 
+// getServiceIPAndRanges parses and returns service IP ranges and the API server IP from a string input.
 func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, net.IPNet, error) {
 	serviceClusterIPRangeList := []string{}
 	if serviceClusterIPRanges != "" {

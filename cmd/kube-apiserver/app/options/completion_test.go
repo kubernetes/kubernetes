@@ -20,6 +20,8 @@ import (
 	"testing"
 )
 
+// TestGetServiceIPAndRanges tests the retrieval of service IP
+// and IP ranges based on different input scenarios.
 func TestGetServiceIPAndRanges(t *testing.T) {
 	tests := []struct {
 		body                    string

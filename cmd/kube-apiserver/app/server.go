@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+// init initializes the feature gates for logs API.
 func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
@@ -363,6 +364,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	return config, serviceResolver, pluginInitializers, nil
 }
 
+// validateCloudProviderOptions validates the provided cloud provider options based on feature gates.
 func validateCloudProviderOptions(opts *kubeoptions.CloudProviderOptions) error {
 	if opts.CloudProvider == "" {
 		return nil
@@ -407,6 +409,7 @@ func SetServiceResolverForTests(resolver webhook.ServiceResolver) func() {
 	}
 }
 
+// buildServiceResolver constructs a ServiceResolver based on aggregator routing and the provided hostname.
 func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) webhook.ServiceResolver {
 	if testServiceResolver != nil {
 		return testServiceResolver

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
+// Entry point to run the API server command and exit with the returned status code.
 func main() {
 	command := app.NewAPIServerCommand()
 	code := cli.Run(command)

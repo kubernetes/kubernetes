@@ -62,6 +62,7 @@ import (
 	testutil "k8s.io/kubernetes/test/utils"
 )
 
+// Initializes logging settings to ignore unchanged log configurations.
 func init() {
 	// If instantiated more than once or together with other servers, the
 	// servers would try to modify the global logging state. This must get
@@ -475,6 +476,7 @@ func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, 
 	return nil
 }
 
+// Creates a localhost TCP listener on a free port and returns the listener and its port.
 func createLocalhostListenerOnFreePort() (net.Listener, int, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
