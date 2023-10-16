@@ -715,15 +715,6 @@ const (
 	// which benefits to reduce the useless requeueing.
 	SchedulerQueueingHints featuregate.Feature = "SchedulerQueueingHints"
 
-	// owner: @saschagrunert
-	// kep: https://kep.k8s.io/2413
-	// alpha: v1.22
-	// beta: v1.25
-	// ga: v1.27
-	//
-	// Enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
-	SeccompDefault featuregate.Feature = "SeccompDefault"
-
 	// owner: @mtardy
 	// alpha: v1.0
 	//
@@ -1082,8 +1073,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ElasticIndexedJob: {Default: true, PreRelease: featuregate.Beta},
 
 	SchedulerQueueingHints: {Default: true, PreRelease: featuregate.Beta},
-
-	SeccompDefault: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
