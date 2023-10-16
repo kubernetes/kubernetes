@@ -146,7 +146,7 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		}
 
 		if featureSpec.PreRelease == featuregate.Deprecated {
-			klog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
+			klog.Warningf("Setting deprecated feature gate %s=%s. It will be removed in a future release.", k, v)
 		}
 
 		boolValue, err := strconv.ParseBool(v)
