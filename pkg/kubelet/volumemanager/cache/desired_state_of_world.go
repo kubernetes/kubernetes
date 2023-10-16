@@ -304,7 +304,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	}
 	klog.V(4).InfoS("expected volume SELinux label context", "volume", volumeSpec.Name(), "label", seLinuxFileLabel)
 
-	if vol, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
+	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
 		var sizeLimit *resource.Quantity
 		if volumeSpec.Volume != nil {
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
@@ -348,24 +348,27 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			}
 		}
 		dsw.volumesToMount[volumeName] = vmt
-	} else {
-		// volume exists
-		if pluginSupportsSELinuxContextMount {
-			if seLinuxFileLabel != vol.originalSELinuxLabel {
-				// TODO: update the error message after tests, e.g. add at least the conflicting pod names.
-				fullErr := fmt.Errorf("conflicting SELinux labels of volume %s: %q and %q", volumeSpec.Name(), vol.originalSELinuxLabel, seLinuxFileLabel)
-				supported := util.VolumeSupportsSELinuxMount(volumeSpec)
-				if err := handleSELinuxMetricError(fullErr, supported, seLinuxVolumeContextMismatchWarnings, seLinuxVolumeContextMismatchErrors); err != nil {
-					return "", err
-				}
-			}
-		}
 	}
 
 	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
 	mountRequestTime := time.Now()
 	if ok && !volumePlugin.RequiresRemount(volumeSpec) {
 		mountRequestTime = oldPodMount.mountRequestTime
+	}
+
+	if !ok {
+		// The volume exists, but not with this pod.
+		// It will be added below as podToMount, now just report SELinux metric.
+		if pluginSupportsSELinuxContextMount {
+			existingVolume := dsw.volumesToMount[volumeName]
+			if seLinuxFileLabel != existingVolume.originalSELinuxLabel {
+				fullErr := fmt.Errorf("conflicting SELinux labels of volume %s: %q and %q", volumeSpec.Name(), existingVolume.originalSELinuxLabel, seLinuxFileLabel)
+				supported := util.VolumeSupportsSELinuxMount(volumeSpec)
+				if err := handleSELinuxMetricError(fullErr, supported, seLinuxVolumeContextMismatchWarnings, seLinuxVolumeContextMismatchErrors); err != nil {
+					return "", err
+				}
+			}
+		}
 	}
 
 	// Create new podToMount object. If it already exists, it is refreshed with
