@@ -32,7 +32,8 @@ import (
 
 // OpenAPI installs spec endpoints for each web service.
 type OpenAPI struct {
-	Config *common.Config
+	Config   *common.Config
+	V3Config *common.OpenAPIV3Config
 }
 
 // Install adds the SwaggerUI webservice to the given mux.
@@ -65,7 +66,7 @@ func (oa OpenAPI) InstallV3(c *restful.Container, mux *mux.PathRecorderMux) *han
 	}
 
 	for gv, ws := range grouped {
-		spec, err := builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(ws), oa.Config)
+		spec, err := builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(ws), oa.V3Config)
 		if err != nil {
 			klog.Errorf("Failed to build OpenAPI v3 for group %s, %q", gv, err)
 

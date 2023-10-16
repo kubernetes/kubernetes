@@ -158,7 +158,7 @@ type GenericAPIServer struct {
 	openAPIConfig *openapicommon.Config
 
 	// Enable swagger and/or OpenAPI V3 if these configs are non-nil.
-	openAPIV3Config *openapicommon.Config
+	openAPIV3Config *openapicommon.OpenAPIV3Config
 
 	// SkipOpenAPIInstallation indicates not to install the OpenAPI handler
 	// during PrepareRun.
@@ -432,7 +432,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
 		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
 			s.OpenAPIV3VersionedService = routes.OpenAPI{
-				Config: s.openAPIV3Config,
+				V3Config: s.openAPIV3Config,
 			}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 		}
 	}
