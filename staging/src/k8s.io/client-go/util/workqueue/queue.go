@@ -59,14 +59,6 @@ func NewWithConfig(config QueueConfig) *Type {
 	return newQueueWithConfig(config, defaultUnfinishedWorkUpdatePeriod)
 }
 
-// NewNamed creates a new named queue.
-// Deprecated: Use NewWithConfig instead.
-func NewNamed(name string) *Type {
-	return NewWithConfig(QueueConfig{
-		Name: name,
-	})
-}
-
 // newQueueWithConfig constructs a new named workqueue
 // with the ability to customize different properties for testing purposes
 func newQueueWithConfig(config QueueConfig, updatePeriod time.Duration) *Type {
