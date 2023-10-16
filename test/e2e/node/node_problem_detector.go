@@ -380,7 +380,7 @@ func getNpdPodStat(ctx context.Context, f *framework.Framework, nodeName string)
 
 	hasNpdPod := false
 	for _, pod := range summary.Pods {
-		if !strings.HasPrefix(pod.PodRef.Name, "npd") {
+		if !strings.HasPrefix(pod.PodRef.Name, "node-problem-detector") {
 			continue
 		}
 		cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
