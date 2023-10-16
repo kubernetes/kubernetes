@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -486,6 +487,151 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDeletingPodForRollingUpdatePartition(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
+
+	labelMap := labelMap()
+	sts := newSTS("sts", ns.Name, 2)
+	sts.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
+		Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
+			return &appsv1.RollingUpdateStatefulSetStrategy{
+				Partition: ptr.To[int32](1),
+			}
+		}(),
+	}
+	stss := createSTSs(t, c, []*appsv1.StatefulSet{sts})
+	sts = stss[0]
+	waitSTSStable(t, c, sts)
+
+	// Verify STS creates 2 pods
+	podClient := c.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap)
+	if len(pods.Items) != 2 {
+		t.Fatalf("len(pods) = %d, want %d", len(pods.Items), sts.Spec.Replicas)
+	}
+	// Setting all pods in Running, Ready, and Available
+	// by setting LastTransitionTime to more than 3600 seconds ago
+	setPodsReadyCondition(t, c, &v1.PodList{Items: pods.Items}, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
+
+	// 1. Roll out a new image.
+	oldImage := sts.Spec.Template.Spec.Containers[0].Image
+	newImage := "new-image"
+	if oldImage == newImage {
+		t.Fatalf("bad test setup, statefulSet %s roll out with the same image", sts.Name)
+	}
+
+	// Set finalizers for the pod to trigger pod recreation failure while the status UpdateRevision is bumped
+	pod0 := &pods.Items[0]
+	updatePod(t, podClient, pod0.Name, func(pod *v1.Pod) {
+		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
+	})
+
+	// Set the new image on the stateful set
+	stsClient := c.AppsV1().StatefulSets(ns.Name)
+	_ = updateSTS(t, stsClient, sts.Name, func(sts *appsv1.StatefulSet) {
+		sts.Spec.Template.Spec.Containers[0].Image = newImage
+	})
+
+	// Await for the pods 1 and 2 to be recreated, while pod0 remains running
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
+		ss, err := stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		pods := getPods(t, podClient, labelMap)
+		recreatedPods := v1.PodList{}
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodPending {
+				recreatedPods.Items = append(recreatedPods.Items, pod)
+			}
+		}
+		setPodsReadyCondition(t, c, &v1.PodList{Items: recreatedPods.Items}, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
+		return ss.Status.UpdatedReplicas == *ss.Spec.Replicas-1 && ss.Status.Replicas == *ss.Spec.Replicas && ss.Status.ReadyReplicas == *ss.Spec.Replicas, nil
+	}); err != nil {
+		t.Fatalf("failed to verify .Spec.Template.Spec.Containers[0].Image is updated for sts %s: %v", sts.Name, err)
+	}
+
+	// mark pod0 as terminal and not ready
+	updatePodStatus(t, podClient, pod0.Name, func(pod *v1.Pod) {
+		pod.Status.Phase = v1.PodFailed
+		_, condition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
+		if condition != nil {
+			condition.Status = v1.ConditionFalse
+			condition.LastTransitionTime = metav1.Now()
+		}
+	})
+
+	// make sure pod0 gets deletion timestamp so that it is recreated
+	err := podClient.Delete(ctx, pod0.Name, *&metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Failed to delete the pod0: %v", err)
+	}
+
+	// await for pod0 to be not ready
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
+		ss, err := stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return ss.Status.ReadyReplicas == *ss.Spec.Replicas-1, nil
+	}); err != nil {
+		t.Fatalf("failed to verify .Spec.Template.Spec.Containers[0].Image is updated for sts %s: %v", sts.Name, err)
+	}
+
+	// remove the finalizer to allow recreation
+	updatePod(t, podClient, pod0.Name, func(pod *v1.Pod) {
+		pod.Finalizers = []string{}
+	})
+
+	// await for pod0 to be recreated and make it running
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
+		pods := getPods(t, podClient, labelMap)
+		recreatedPods := v1.PodList{}
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodPending {
+				recreatedPods.Items = append(recreatedPods.Items, pod)
+			}
+		}
+		setPodsReadyCondition(t, c, &v1.PodList{Items: recreatedPods.Items}, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
+		return len(recreatedPods.Items) > 0, nil
+	}); err != nil {
+		t.Fatalf("failed to verify .Spec.Template.Spec.Containers[0].Image is updated for sts %s: %v", sts.Name, err)
+	}
+
+	// await for all stateful set status to record all replicas as ready
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
+		ss, err := stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return ss.Status.ReadyReplicas == *ss.Spec.Replicas, nil
+	}); err != nil {
+		t.Fatalf("failed to verify .Spec.Template.Spec.Containers[0].Image is updated for sts %s: %v", sts.Name, err)
+	}
+
+	// Verify 3 pods exist
+	pods = getPods(t, podClient, labelMap)
+	if len(pods.Items) != int(*sts.Spec.Replicas) {
+		t.Fatalf("Unexpected number of pods")
+	}
+	// Verify pod[1] image is changed to newImage
+	if pods.Items[1].Spec.Containers[0].Image != newImage {
+		t.Fatalf("Unexpected image for pod 1, it should be new image")
+	}
+	// Verify pod[1] image is not changed to newImage
+	// Immediately return false with an error if pods.Items[0] image is changed
+	if pods.Items[0].Spec.Containers[0].Image == newImage {
+		t.Fatalf("Unexpected image for pod 0, it should be old image")
 	}
 }
 
