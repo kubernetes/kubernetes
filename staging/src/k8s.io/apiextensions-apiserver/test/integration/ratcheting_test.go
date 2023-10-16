@@ -1175,7 +1175,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 			},
 		},
 		{
-			Name: "ArrayItems correlate by index",
+			Name: "ArrayItems do not correlate by index",
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type: "object",
@@ -1246,9 +1246,9 @@ func TestRatchetingFunctionality(t *testing.T) {
 						},
 						"otherField": "hello world",
 					}},
-				// (This test shows an array can be correlated by index with its old value)
-				applyPatchOperation{
-					"add new, valid fields to elements of the array, ratcheting unchanged old fields within the array elements by correlating by index",
+				// (This test shows an array cannpt be correlated by index with its old value)
+				expectError{applyPatchOperation{
+					"add new, valid fields to elements of the array, failing to ratchet unchanged old fields within the array elements by correlating by index due to atomic list",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": []interface{}{
 							map[string]interface{}{
@@ -1261,7 +1261,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 								"key2": "valid value",
 							},
 						},
-					}},
+					}}},
 				expectError{
 					applyPatchOperation{
 						"reorder the array, preventing index correlation",
