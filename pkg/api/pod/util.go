@@ -558,6 +558,64 @@ func dropDisabledFields(
 		}
 		// For other types of containers, validateContainers will handle them.
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) && !podLifecycleSleepActionInUse(oldPodSpec) {
+		for i := range podSpec.Containers {
+			if podSpec.Containers[i].Lifecycle == nil {
+				continue
+			}
+			if podSpec.Containers[i].Lifecycle.PreStop != nil {
+				podSpec.Containers[i].Lifecycle.PreStop.Sleep = nil
+			}
+			if podSpec.Containers[i].Lifecycle.PostStart != nil {
+				podSpec.Containers[i].Lifecycle.PostStart.Sleep = nil
+			}
+		}
+		for i := range podSpec.InitContainers {
+			if podSpec.InitContainers[i].Lifecycle == nil {
+				continue
+			}
+			if podSpec.InitContainers[i].Lifecycle.PreStop != nil {
+				podSpec.InitContainers[i].Lifecycle.PreStop.Sleep = nil
+			}
+			if podSpec.InitContainers[i].Lifecycle.PostStart != nil {
+				podSpec.InitContainers[i].Lifecycle.PostStart.Sleep = nil
+			}
+		}
+		for i := range podSpec.EphemeralContainers {
+			if podSpec.EphemeralContainers[i].Lifecycle == nil {
+				continue
+			}
+			if podSpec.EphemeralContainers[i].Lifecycle.PreStop != nil {
+				podSpec.EphemeralContainers[i].Lifecycle.PreStop.Sleep = nil
+			}
+			if podSpec.EphemeralContainers[i].Lifecycle.PostStart != nil {
+				podSpec.EphemeralContainers[i].Lifecycle.PostStart.Sleep = nil
+			}
+		}
+	}
+}
+
+func podLifecycleSleepActionInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.Lifecycle == nil {
+			return true
+		}
+		if c.Lifecycle.PreStop != nil && c.Lifecycle.PreStop.Sleep != nil {
+			inUse = true
+			return false
+		}
+		if c.Lifecycle.PostStart != nil && c.Lifecycle.PostStart.Sleep != nil {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
 }
 
 // dropDisabledPodStatusFields removes disabled fields from the pod status

@@ -7006,6 +7006,10 @@
           "$ref": "#/definitions/io.k8s.api.core.v1.HTTPGetAction",
           "description": "HTTPGet specifies the http request to perform."
         },
+        "sleep": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.SleepAction",
+          "description": "Sleep represents the duration that the container should sleep before being terminated."
+        },
         "tcpSocket": {
           "$ref": "#/definitions/io.k8s.api.core.v1.TCPSocketAction",
           "description": "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified."
@@ -10433,6 +10437,20 @@
           "description": "clientIP contains the configurations of Client IP based session affinity."
         }
       },
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.SleepAction": {
+      "description": "SleepAction describes a \"sleep\" action.",
+      "properties": {
+        "seconds": {
+          "description": "Seconds is the number of seconds to sleep.",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seconds"
+      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.StorageOSPersistentVolumeSource": {

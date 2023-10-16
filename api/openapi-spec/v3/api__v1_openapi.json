@@ -2901,6 +2901,14 @@
             ],
             "description": "HTTPGet specifies the http request to perform."
           },
+          "sleep": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.SleepAction"
+              }
+            ],
+            "description": "Sleep represents the duration that the container should sleep before being terminated."
+          },
           "tcpSocket": {
             "allOf": [
               {
@@ -7355,6 +7363,21 @@
             "description": "clientIP contains the configurations of Client IP based session affinity."
           }
         },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.SleepAction": {
+        "description": "SleepAction describes a \"sleep\" action.",
+        "properties": {
+          "seconds": {
+            "default": 0,
+            "description": "Seconds is the number of seconds to sleep.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seconds"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.StorageOSPersistentVolumeSource": {

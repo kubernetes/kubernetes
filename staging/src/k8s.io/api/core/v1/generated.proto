@@ -2088,6 +2088,11 @@ message LifecycleHandler {
   // lifecycle hooks will fail in runtime when tcp handler is specified.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
+
+  // Sleep represents the duration that the container should sleep before being terminated.
+  // +featureGate=PodLifecycleSleepAction
+  // +optional
+  optional SleepAction sleep = 4;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -5560,6 +5565,12 @@ message SessionAffinityConfig {
   // clientIP contains the configurations of Client IP based session affinity.
   // +optional
   optional ClientIPConfig clientIP = 1;
+}
+
+// SleepAction describes a "sleep" action.
+message SleepAction {
+  // Seconds is the number of seconds to sleep.
+  optional int64 seconds = 1;
 }
 
 // Represents a StorageOS persistent volume resource.
