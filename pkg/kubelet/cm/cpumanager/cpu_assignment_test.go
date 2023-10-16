@@ -522,7 +522,7 @@ func commonTakeByTopologyTestCases(t *testing.T) []takeByTopologyTestCase {
 			topoSingleSocketHT,
 			cpuset.New(0, 2, 4, 6),
 			5,
-			"not enough cpus available to satisfy request",
+			"not enough cpus available to satisfy request: requested=5, available=4",
 			cpuset.New(),
 		},
 		{
