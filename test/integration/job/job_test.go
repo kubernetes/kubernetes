@@ -1681,6 +1681,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	}
 	cases := map[string]struct {
 		podReplacementPolicyEnabled bool
+		failPodsInsteadOfDeletion   bool
 		wantTerminating             *int32
 		wantFailed                  int
 		wantActive                  int
@@ -1716,7 +1717,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			wantTerminating: pointer.Int32(podCount),
+			failPodsInsteadOfDeletion: true,
+			wantActive:                int(podCount),
+			wantFailed:                int(podCount),
+			wantTerminating:           pointer.Int32(0),
 		},
 		"feature flag true with NonIndexedJob, delete pods, verify terminating status and recreate once failed": {
 			podReplacementPolicyEnabled: true,
@@ -1726,7 +1730,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			wantTerminating: pointer.Int32(podCount),
+			failPodsInsteadOfDeletion: true,
+			wantActive:                int(podCount),
+			wantFailed:                int(podCount),
+			wantTerminating:           pointer.Int32(0),
 		},
 		"feature flag false, podFailurePolicy enabled, delete pods, verify terminating status and recreate once failed": {
 			podReplacementPolicyEnabled: false,
@@ -1776,7 +1783,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				if err != nil {
 					return false, err
 				}
-				if job.Status.Active == int32(podCount) {
+				if job.Status.Active == podCount {
 					return true, nil
 				}
 				return false, nil
@@ -1784,30 +1791,13 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error waiting for Job pods to become active: %v", err)
 			}
-			pods, errList := clientSet.CoreV1().Pods(ns.Namespace).List(ctx, metav1.ListOptions{})
-			if errList != nil {
-				t.Fatalf("Failed to list pods: %v", errList)
-			}
-			updatePod(t, clientSet, pods.Items, func(pod *v1.Pod) {
-				pod.Finalizers = append(pod.Finalizers, "fake.example.com/blockDeletion")
-			})
-			err = clientSet.CoreV1().Pods(ns.Name).DeleteCollection(ctx,
-				metav1.DeleteOptions{},
-				metav1.ListOptions{
-					Limit: 1000,
-				})
-			if err != nil {
-				t.Fatalf("Failed to cleanup Pods: %v", err)
-			}
-
-			podsDelete, errList2 := clientSet.CoreV1().Pods(ns.Namespace).List(ctx, metav1.ListOptions{})
-			if errList != nil {
-				t.Fatalf("Failed to list pods: %v", errList2)
-			}
-			for _, val := range podsDelete.Items {
-				if val.DeletionTimestamp == nil {
-					t.Fatalf("Deletion not registered.")
+			if tc.failPodsInsteadOfDeletion {
+				err, _ = setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, int(podCount))
+				if err != nil {
+					t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 				}
+			} else {
+				addFinalizerAndDeletePods(ctx, t, clientSet, ns.Name)
 			}
 
 			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
@@ -2984,4 +2974,33 @@ func updateJob(ctx context.Context, jobClient typedv1.JobInterface, jobName stri
 		return err
 	})
 	return job, err
+}
+
+func addFinalizerAndDeletePods(ctx context.Context, t *testing.T, clientSet clientset.Interface, namespace string) {
+	t.Helper()
+	pods, errList := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if errList != nil {
+		t.Fatalf("Failed to list pods: %v", errList)
+	}
+	updatePod(t, clientSet, pods.Items, func(pod *v1.Pod) {
+		pod.Finalizers = append(pod.Finalizers, "fake.example.com/blockDeletion")
+	})
+	err := clientSet.CoreV1().Pods(namespace).DeleteCollection(ctx,
+		metav1.DeleteOptions{},
+		metav1.ListOptions{
+			Limit: 1000,
+		})
+	if err != nil {
+		t.Fatalf("Failed to cleanup Pods: %v", err)
+	}
+
+	podsDelete, errList2 := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if errList2 != nil {
+		t.Fatalf("Failed to list pods: %v", errList2)
+	}
+	for _, val := range podsDelete.Items {
+		if val.DeletionTimestamp == nil {
+			t.Fatalf("Deletion not registered.")
+		}
+	}
 }
