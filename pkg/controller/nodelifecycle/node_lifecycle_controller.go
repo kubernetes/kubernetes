@@ -344,7 +344,7 @@ func NewNodeLifecycleController(
 		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
-		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
+		nodeUpdateQueue:             workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "node_lifecycle_controller"}),
 		podUpdateQueue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node_lifecycle_controller_pods"),
 	}
 
