@@ -611,6 +611,26 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			setHTTPProbe(ss)
+			ss.Spec.Template.Spec.Containers = append(ss.Spec.Template.Spec.Containers, v1.Container{
+				Name:    "sleep-exit-with-1",
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+				Command: []string{"sh", "-c"},
+				Args: []string{`
+					sleep 9999999 &
+					PID=$!
+					_term () {
+						kill $PID
+						echo "Caught SIGTERM!"
+					}
+					trap _term SIGTERM
+					wait $PID
+					trap - TERM
+					# Wait for the long running sleep to exit
+					wait $PID
+					exit 1
+					`,
+				},
+			})
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
