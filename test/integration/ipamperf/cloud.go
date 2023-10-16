@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/test/integration/util"
 )
 
-// implemntation note:
+// implementation note:
 // ------------------
 // cloud.go implements hooks and handler functions for the MockGCE cloud in order to meet expectations
 // of cloud behavior from the IPAM controllers. The key constraint is that the IPAM code is spread
@@ -44,7 +44,7 @@ import (
 // and their pre-assigned ip-alias ranges (if needed). We then create GetHook for GA and Beta GetInstance
 // calls as closures over this betaInstanceList that can lookup base instance data.
 //
-// This has the advantage that once the Get hook pouplates the GCEMock with the base data, we then let the
+// This has the advantage that once the Get hook populates the GCEMock with the base data, we then let the
 // rest of the mock code run as is.
 
 // baseInstance tracks basic instance data needed by the IPAM controllers

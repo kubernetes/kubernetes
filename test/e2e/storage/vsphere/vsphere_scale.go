@@ -187,7 +187,7 @@ func getClaimsForPod(pod *v1.Pod, volumesPerPod int) []string {
 	return pvcClaimList
 }
 
-// VolumeCreateAndAttach peforms create and attach operations of vSphere persistent volumes at scale
+// VolumeCreateAndAttach performs create and attach operations of vSphere persistent volumes at scale
 func VolumeCreateAndAttach(ctx context.Context, f *framework.Framework, sc []*storagev1.StorageClass, volumeCountPerInstance int, volumesPerPod int, nodeSelectorList []*NodeSelector, nodeVolumeMapChan chan map[string][]string) {
 	defer ginkgo.GinkgoRecover()
 	client := f.ClientSet

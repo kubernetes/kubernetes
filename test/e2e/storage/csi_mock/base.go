@@ -948,7 +948,7 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 		}
 		for _, c := range pod.Status.Conditions {
 			// Conformance tests cannot rely on specific output of optional fields (e.g., Reason
-			// and Message) because these fields are not suject to the deprecation policy.
+			// and Message) because these fields are not subject to the deprecation policy.
 			if c.Type == v1.PodScheduled && c.Status == v1.ConditionFalse && c.Reason != "" && c.Message != "" {
 				return true, nil
 			}

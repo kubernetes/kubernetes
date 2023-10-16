@@ -175,7 +175,7 @@ func (t *DeploymentUpgradeTest) Teardown(ctx context.Context, f *framework.Frame
 	// rely on the namespace deletion to clean up everything
 }
 
-// waitForDeploymentRevision waits for becoming the target revision of a delopyment.
+// waitForDeploymentRevision waits for becoming the target revision of a deployment.
 func waitForDeploymentRevision(ctx context.Context, c clientset.Interface, d *appsv1.Deployment, targetRevision string) error {
 	err := wait.PollImmediate(poll, pollLongTimeout, func() (bool, error) {
 		deployment, err := c.AppsV1().Deployments(d.Namespace).Get(ctx, d.Name, metav1.GetOptions{})

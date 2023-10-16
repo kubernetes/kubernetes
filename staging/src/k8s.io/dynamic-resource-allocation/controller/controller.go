@@ -94,7 +94,7 @@ type Driver interface {
 	// If selectedNode is set, the driver must attempt to allocate for that
 	// node. If that is not possible, it must return an error. The
 	// controller will call UnsuitableNodes and pass the new information to
-	// the scheduler, which then will lead to selecting a diffent node
+	// the scheduler, which then will lead to selecting a different node
 	// if the current one is not suitable.
 	//
 	// The Claim, ClaimParameters, Class, ClassParameters fields of "claims" parameter

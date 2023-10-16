@@ -1,6 +1,6 @@
 # Test failures do not block the apply for valid resources.
 # pod-a and pod-c should apply, while POD-B is invalid
-# because of the capitialization.
+# because of the capitalization.
 apiVersion: v1
 kind: Pod
 metadata:

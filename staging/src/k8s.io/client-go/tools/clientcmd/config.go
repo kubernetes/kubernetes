@@ -61,7 +61,7 @@ type PathOptions struct {
 var (
 	// UseModifyConfigLock ensures that access to kubeconfig file using ModifyConfig method
 	// is being guarded by a lock file.
-	// This variable is intentionaly made public so other consumers of this library
+	// This variable is intentionally made public so other consumers of this library
 	// can modify its default behavior, but be caution when disabling it since
 	// this will make your code not threadsafe.
 	UseModifyConfigLock = true

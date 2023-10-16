@@ -544,7 +544,7 @@ const (
 	// JobReasonBackOffLimitExceeded reason indicates that pods within a job have failed a number of
 	// times higher than backOffLimit times.
 	JobReasonBackoffLimitExceeded string = "BackoffLimitExceeded"
-	// JobReasponDeadlineExceeded means job duration is past ActiveDeadline
+	// JobReasonDeadlineExceeded means job duration is past ActiveDeadline
 	JobReasonDeadlineExceeded string = "DeadlineExceeded"
 )
 

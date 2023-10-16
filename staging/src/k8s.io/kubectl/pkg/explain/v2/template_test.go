@@ -23,7 +23,7 @@ import (
 	"testing"
 )
 
-// Ensure that the templates are embededd correctly.
+// Ensure that the templates are embedded correctly.
 func TestRegisterBuitinTemplates(t *testing.T) {
 	myGenerator := NewGenerator().(*generator)
 	err := registerBuiltinTemplates(myGenerator)

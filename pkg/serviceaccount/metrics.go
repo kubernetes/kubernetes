@@ -47,7 +47,7 @@ var (
 		},
 	)
 
-	// mauallyCreatedTokensTotal is the number of manually created secret-based long lived tokens.
+	// manuallyCreatedTokensTotal is the number of manually created secret-based long lived tokens.
 	manuallyCreatedTokensTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      kubeServiceAccountSubsystem,

@@ -162,7 +162,7 @@ func getTestStorageClasses(ctx context.Context, client clientset.Interface, poli
 	return scArrays
 }
 
-// invokeVolumeLifeCyclePerformance peforms full volume life cycle management and records latency for each operation
+// invokeVolumeLifeCyclePerformance performs full volume life cycle management and records latency for each operation
 func invokeVolumeLifeCyclePerformance(ctx context.Context, f *framework.Framework, client clientset.Interface, namespace string, sc []*storagev1.StorageClass, volumesPerPod int, volumeCount int, nodeSelectorList []*NodeSelector) (latency map[string]float64) {
 	var (
 		totalpvclaims [][]*v1.PersistentVolumeClaim

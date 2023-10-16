@@ -458,7 +458,7 @@ func (config *ReplicaSetConfig) create() error {
 	return nil
 }
 
-// RunJob baunches (and verifies correctness) of a Job
+// RunJob launches (and verifies correctness) of a Job
 // and will wait for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling Cleanup).

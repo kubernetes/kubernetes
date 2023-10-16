@@ -401,7 +401,7 @@ func (rp *ReservePlugin) Name() string {
 	return rp.name
 }
 
-// Reserve is a test function that increments an intenral counter and returns
+// Reserve is a test function that increments an internal counter and returns
 // an error or nil, depending on the value of "failReserve".
 func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	rp.numReserveCalled++

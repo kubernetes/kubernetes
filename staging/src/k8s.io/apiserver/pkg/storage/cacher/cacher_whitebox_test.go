@@ -930,7 +930,7 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	}
 
 	// Create one more pod, to ensure that current RV is higher and thus
-	// bookmarks will be delievere (events are delivered for RV higher
+	// bookmarks will be delivered (events are delivered for RV higher
 	// than the max from init events).
 	if err := cacher.watchCache.Add(makePod(1)); err != nil {
 		t.Fatalf("failed to add a pod: %v", err)

@@ -89,7 +89,7 @@ func TestFindOwners(t *testing.T) {
 			Expectation: []string{"kubectl-client-side-apply"},
 		},
 		{
-			// Search for an operaiton/fieldpath combination that is not found on both
+			// Search for an operation/fieldpath combination that is not found on both
 			// axes
 			Name: "NotFound",
 			ManagedFieldsYAML: `
@@ -239,7 +239,7 @@ func TestFindOwners(t *testing.T) {
 			Expectation: []string{"kubectl-client-side-apply"},
 		},
 		{
-			// Test with multiplle fields but the manager is missing one of the fields
+			// Test with multiple fields but the manager is missing one of the fields
 			// requested so it does not match
 			Name: "MissingOneField",
 			ManagedFieldsYAML: `

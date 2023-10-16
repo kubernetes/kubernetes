@@ -129,7 +129,7 @@ type Controller struct {
 
 	clock clock.WithTicker
 
-	// Store with information to compute the expotential backoff delay for pod
+	// Store with information to compute the exponential backoff delay for pod
 	// recreation in case of pod failures.
 	podBackoffStore *backoffStore
 }

@@ -1151,7 +1151,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.NodePort() != 0 {
 			if hasEndpoints {
 				// Jump to the external destination chain.  For better or for
-				// worse, nodeports are not subect to loadBalancerSourceRanges,
+				// worse, nodeports are not subject to loadBalancerSourceRanges,
 				// and we can't change that.
 				natRules.Write(
 					"-A", string(kubeNodePortsChain),

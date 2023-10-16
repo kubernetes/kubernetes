@@ -591,7 +591,7 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 	// Extract out the keys of the map in order to not hold
 	// the evictorLock for the entire function and hold it
-	// only when nescessary.
+	// only when necessary.
 	var zoneNoExecuteTainterKeys []string
 	func() {
 		nc.evictorLock.Lock()

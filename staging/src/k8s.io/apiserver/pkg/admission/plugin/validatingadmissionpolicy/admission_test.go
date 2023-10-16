@@ -682,7 +682,7 @@ func waitForReconcile(ctx context.Context, controller *celAdmissionController, o
 	})
 }
 
-// Waits for the admissoin controller to have no knowledge of the objects
+// Waits for the admission controller to have no knowledge of the objects
 // with the given GVKs and namespace/names
 func waitForReconcileDeletion(ctx context.Context, controller *celAdmissionController, objects ...runtime.Object) error {
 	return wait.PollWithContext(ctx, 200*time.Millisecond, 3*time.Hour, func(ctx context.Context) (done bool, err error) {
@@ -2160,7 +2160,7 @@ func TestParamRef(t *testing.T) {
 						}
 
 						t.Run(name, func(t *testing.T) {
-							// Test creating a policy with a cluster or namesapce-scoped param
+							// Test creating a policy with a cluster or namespace-scoped param
 							// and binding with the provided configuration. Test will ensure
 							// that the provided configuration is capable of matching
 							// params as expected, and not matching params when not expected.
@@ -2430,7 +2430,7 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 	}
 
 	for _, p := range expectedParamsForClusterScopedRequest {
-		// Tracker.Delete docs says it wont raise error for not found, but its implmenetation
+		// Tracker.Delete docs says it wont raise error for not found, but its implementation
 		// pretty plainly does...
 		rsrsc := "paramsconfigs"
 		if paramIsClusterScoped {
@@ -2445,7 +2445,7 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 
 	controller.refreshPolicies()
 
-	// Check that NotFound is working correctly for both namespaeed & non-namespaced
+	// Check that NotFound is working correctly for both namespaced & non-namespaced
 	// request object
 	err = handler.Validate(context.TODO(), attributeRecord(nil, namespacedRequestObject, admission.Create), &admission.RuntimeObjectInterfaces{})
 	if denyNotFound {

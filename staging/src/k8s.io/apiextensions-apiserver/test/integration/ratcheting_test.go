@@ -1551,7 +1551,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 						},
 					}},
 				// Can remove dups to make valid
-				//! Normally this woud be valid, but SSA is unable to interpret
+				//! Normally this would be valid, but SSA is unable to interpret
 				// the `liveObj` in the new schema, so fails. Changing
 				// x-kubernetes-list-type from anything to a set is unsupported by SSA.
 				applyPatchOperation{

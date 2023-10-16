@@ -120,7 +120,7 @@ type ContainerManager interface {
 	// PrepareDynamicResource prepares dynamic pod resources
 	PrepareDynamicResources(*v1.Pod) error
 
-	// UnrepareDynamicResources unprepares dynamic pod resources
+	// UnprepareDynamicResources unprepares dynamic pod resources
 	UnprepareDynamicResources(*v1.Pod) error
 
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID

@@ -112,7 +112,7 @@ func TestRateLimitedSafeWaitGroup(t *testing.T) {
 		t.Errorf("expected no call to rate limiter before Wait is called, but got: %d", invoked)
 	}
 
-	// make sure all requetss in the second group (n2) have started using the
+	// make sure all requests in the second group (n2) have started using the
 	// waitgroup (Add invoked) but no request is done using the waitgroup yet.
 	n2BeforeWaitWG.Wait()
 

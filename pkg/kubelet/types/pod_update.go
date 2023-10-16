@@ -54,7 +54,7 @@ const (
 
 // These constants identify the sources of pods.
 const (
-	// Filesource idenitified updates from a file.
+	// Filesource identified updates from a file.
 	FileSource = "file"
 	// HTTPSource identifies updates from querying a web page.
 	HTTPSource = "http"

@@ -112,7 +112,7 @@ type RawExtension struct {
 // to deal with the API objects from a plug-in. Unknown objects still have functioning
 // TypeMeta features-- kind, version, etc.
 // TODO: Make this object have easy access to field based accessors and settors for
-// metadata and field mutatation.
+// metadata and field mutation.
 //
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

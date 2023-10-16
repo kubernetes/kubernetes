@@ -37,7 +37,7 @@ import (
 func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType discovery.AddressType) discovery.Endpoint {
 	serving := endpointutil.IsPodReady(pod)
 	terminating := pod.DeletionTimestamp != nil
-	// For compatibility reasons, "ready" should never be "true" if a pod is terminatng, unless
+	// For compatibility reasons, "ready" should never be "true" if a pod is terminating, unless
 	// publishNotReadyAddresses was set.
 	ready := service.Spec.PublishNotReadyAddresses || (serving && !terminating)
 	ep := discovery.Endpoint{

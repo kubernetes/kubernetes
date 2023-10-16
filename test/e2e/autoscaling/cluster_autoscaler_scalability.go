@@ -491,7 +491,7 @@ type podBatch struct {
 	podsPerNode int
 }
 
-// distributeLoad distributes the pods in the way described by podDostribution,
+// distributeLoad distributes the pods in the way described by podDistribution,
 // assuming all pods will have the same memory reservation and all nodes the same
 // memory capacity. This allows us generate the load on the cluster in the exact
 // way that we want.

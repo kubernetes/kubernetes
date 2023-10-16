@@ -215,7 +215,7 @@ func TestPrintEvent(t *testing.T) {
 			// Columns: Last Seen, Type, Reason, Object, Subobject, Message, First Seen, Count, Name
 			expected: []metav1.TableRow{{Cells: []interface{}{"3d", "Warning", "Event Reason", "deployment/Deployment Name", "spec.containers{foo}", "kubelet, Node1", "Message Data", "3d", int64(1), "event5"}}},
 		},
-		// Basic event serie, w/o FirstTimestamp, LastTimestamp and Count set
+		// Basic event series, w/o FirstTimestamp, LastTimestamp and Count set
 		{
 			event: api.Event{
 				Source: api.EventSource{

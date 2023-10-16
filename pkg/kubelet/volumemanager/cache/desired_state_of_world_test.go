@@ -125,7 +125,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 
 // Call AddPodToVolume() on different pods for different kinds of volumes
 // Verities generated names are same for different pods if volume is device mountable or attachable
-// Verities generated names are different for different pods if volume is not device mountble and attachable
+// Verities generated names are different for different pods if volume is not device mountable and attachable
 func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *testing.T) {
 	// Arrange
 	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,

@@ -1017,7 +1017,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		// from it justifies increased memory usage, so for now we drop the cached
 		// serializations after dispatching this event.
 		//
-		// Given that CachingObject is just wrapping the object and not perfoming
+		// Given that CachingObject is just wrapping the object and not performing
 		// deep-copying (until some field is explicitly being modified), we create
 		// it unconditionally to ensure safety and reduce deep-copying.
 		//

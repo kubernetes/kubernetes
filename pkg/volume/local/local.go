@@ -568,7 +568,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	}
 
 	if runtime.GOOS != "windows" {
-		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_wiondows.go
+		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_windows.go
 		if err := os.MkdirAll(dir, 0750); err != nil {
 			klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 			return err

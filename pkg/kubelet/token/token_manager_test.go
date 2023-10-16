@@ -572,7 +572,7 @@ func TestKeyFunc(t *testing.T) {
 			for _, tru := range c.trus {
 				mgr.set(getKeyFunc(tru), &authenticationv1.TokenRequest{
 					Status: authenticationv1.TokenRequestStatus{
-						//make sure the token cache would not be cleaned by token manager clenaup func
+						//make sure the token cache would not be cleaned by token manager cleanup func
 						ExpirationTimestamp: metav1.Time{Time: mgr.clock.Now().Add(50 * time.Minute)},
 					},
 				})

@@ -964,7 +964,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Feature:SidecarContain
 
 	/*
 		Release: v1.28
-		Testname: Pod restartalbe init container liveness probe, container exec timeout, restart
+		Testname: Pod restartable init container liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the
 		Pod. If the liveness probe call does not return within the timeout
 		specified, liveness probe MUST restart the Pod. When ExecProbeTimeout

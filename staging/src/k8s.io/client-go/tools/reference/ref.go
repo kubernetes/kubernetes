@@ -71,7 +71,7 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReferen
 			return nil, fmt.Errorf("unexpected gvks registered for object %T: %v", obj, gvks)
 		}
 		// TODO: The same object can be registered for multiple group versions
-		// (although in practise this doesn't seem to be used).
+		// (although in practice this doesn't seem to be used).
 		// In such case, the version set may not be correct.
 		gvk = gvks[0]
 	}

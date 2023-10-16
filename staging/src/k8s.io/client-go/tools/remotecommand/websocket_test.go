@@ -1070,7 +1070,7 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 	}
 	defer client.Close()
 	// Create a heartbeat using the client websocket connection, and start it.
-	// "period" is less than "deadline", so ping/pong heartbeat will succceed.
+	// "period" is less than "deadline", so ping/pong heartbeat will succeed.
 	var expectedMsg = "test heartbeat message"
 	var period = 100 * time.Millisecond
 	var deadline = 200 * time.Millisecond

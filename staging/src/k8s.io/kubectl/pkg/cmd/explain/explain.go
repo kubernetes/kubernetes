@@ -174,7 +174,7 @@ func (o *ExplainOptions) Run() error {
 	case plaintextOpenAPIV2TemplateName:
 		return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
 	case plaintextTemplateName:
-		// Check whether the server reponds to OpenAPIV3.
+		// Check whether the server responds to OpenAPIV3.
 		if _, err := o.OpenAPIV3Client.Paths(); err != nil {
 			// Use v2 renderer if server does not support v3
 			return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)

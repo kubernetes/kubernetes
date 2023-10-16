@@ -79,7 +79,7 @@ type cloudCIDRAllocator struct {
 	broadcaster       record.EventBroadcaster
 	recorder          record.EventRecorder
 
-	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
+	// Keep a set of nodes that are correctly being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
 	nodesInProcessing map[string]*nodeProcessingInfo
 }

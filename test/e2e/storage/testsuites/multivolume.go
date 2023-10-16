@@ -133,7 +133,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	//          /    \      <- same volume mode                   /    \
 	//   [volume1]  [volume2]                              [volume1]  [volume2]
 	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on the same node", func(ctx context.Context) {
-		// Currently, multiple volumes are not generally available for pre-provisoined volume,
+		// Currently, multiple volumes are not generally available for pre-provisioned volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
 		if pattern.VolType == storageframework.PreprovisionedPV {
@@ -162,7 +162,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	//          /    \      <- same volume mode                   /    \
 	//   [volume1]  [volume2]                              [volume1]  [volume2]
 	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on different node", func(ctx context.Context) {
-		// Currently, multiple volumes are not generally available for pre-provisoined volume,
+		// Currently, multiple volumes are not generally available for pre-provisioned volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
 		if pattern.VolType == storageframework.PreprovisionedPV {
@@ -207,7 +207,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 			e2eskipper.Skipf("Filesystem volume case should be covered by block volume case -- skipping")
 		}
 
-		// Currently, multiple volumes are not generally available for pre-provisoined volume,
+		// Currently, multiple volumes are not generally available for pre-provisioned volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
 		if pattern.VolType == storageframework.PreprovisionedPV {
@@ -246,7 +246,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 			e2eskipper.Skipf("Filesystem volume case should be covered by block volume case -- skipping")
 		}
 
-		// Currently, multiple volumes are not generally available for pre-provisoined volume,
+		// Currently, multiple volumes are not generally available for pre-provisioned volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
 		if pattern.VolType == storageframework.PreprovisionedPV {
@@ -456,7 +456,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
-		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
+		// For multi-node tests there must be enough nodes with the same topology to schedule the pods
 		if err := ensureTopologyRequirements(ctx, &l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
 			framework.Failf("Error setting topology requirements: %v", err)
 		}

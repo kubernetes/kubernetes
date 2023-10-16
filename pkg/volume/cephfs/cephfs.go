@@ -104,7 +104,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 	}
 	secret := ""
 	if len(secretName) > 0 && len(secretNs) > 0 {
-		// if secret is provideded, retrieve it
+		// if secret is provided, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
 			return nil, fmt.Errorf("cannot get kube client")

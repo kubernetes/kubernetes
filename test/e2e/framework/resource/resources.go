@@ -40,7 +40,7 @@ import (
 
 const (
 	// Number of objects that gc can delete in a second.
-	// GC issues 2 requestes for single delete.
+	// GC issues 2 requests for single delete.
 	gcThroughput = 10
 )
 
@@ -85,7 +85,7 @@ func DeleteResourceAndWaitForGC(ctx context.Context, c clientset.Interface, kind
 }
 
 // DeleteCustomResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
-// Enables to provide a custom resourece client, e.g. to fetch a CRD object.
+// Enables to provide a custom resource client, e.g. to fetch a CRD object.
 func DeleteCustomResourceAndWaitForGC(ctx context.Context, c clientset.Interface, dynamicClient dynamic.Interface, scaleClient scaleclient.ScalesGetter, gvr schema.GroupVersionResource, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", gvr, name, ns))
 	resourceClient := dynamicClient.Resource(gvr).Namespace(ns)
@@ -194,7 +194,7 @@ func waitForPodsGone(ctx context.Context, ps *testutils.PodStore, interval, time
 // waitForPodsInactive waits until there are no active pods left in the PodStore.
 // This is to make a fair comparison of deletion time between DeleteRCAndPods
 // and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
-// when the pod is inactvie.
+// when the pod is inactive.
 func waitForPodsInactive(ctx context.Context, ps *testutils.PodStore, interval, timeout time.Duration) error {
 	var activePods []*v1.Pod
 	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {

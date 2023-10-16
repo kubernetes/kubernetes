@@ -472,7 +472,7 @@ type genConversion struct {
 	typesPackage string
 	// the package that the conversion funcs are going to be output to
 	outputPackage string
-	// packages that contain the peer of types in typesPacakge
+	// packages that contain the peer of types in typesPackage
 	peerPackages        []string
 	manualConversions   conversionFuncMap
 	imports             namer.ImportTracker

@@ -58,7 +58,7 @@ func getTestTaint() v1.Taint {
 }
 
 // Create a default pod for this test, with argument saying if the Pod should have
-// toleration for Taits used in this test.
+// toleration for Taints used in this test.
 func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, podLabel, ns string) *v1.Pod {
 	grace := int64(1)
 	if !hasToleration {

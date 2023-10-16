@@ -44,7 +44,7 @@ type GroupVersioner interface {
 }
 
 // Identifier represents an identifier.
-// Identitier of two different objects should be equal if and only if for every
+// Identifier of two different objects should be equal if and only if for every
 // input the output they produce is exactly the same.
 type Identifier string
 

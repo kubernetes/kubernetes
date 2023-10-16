@@ -111,7 +111,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 1)},
 					ImageID: imageID(1),
-					// The image filed is not set to simulate a no-name image
+					// The image field is not set to simulate a no-name image
 				},
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 2)},

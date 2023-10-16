@@ -39,7 +39,7 @@ import (
 
 var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 
-// TestJobStrategy_PrepareForUpdate tests various scenearios for PrepareForUpdate
+// TestJobStrategy_PrepareForUpdate tests various scenarios for PrepareForUpdate
 func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 	validSelector := getValidLabelSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForSelector(validSelector)

@@ -401,7 +401,7 @@ func (s *stream) Identifier() uint32 {
 	return uint32(s.id)
 }
 
-// heartbeat encasulates data necessary for the websocket ping/pong heartbeat. This
+// heartbeat encapsulates data necessary for the websocket ping/pong heartbeat. This
 // heartbeat works by setting a read deadline on the websocket connection, then
 // pushing this deadline into the future for every successful heartbeat. If the
 // heartbeat "pong" fails to respond within the deadline, then the "NextReader()" call
@@ -459,7 +459,7 @@ func (h *heartbeat) setMessage(msg string) {
 	h.message = []byte(msg)
 }
 
-// start the heartbeat by setting up necesssary handlers and looping by sending "ping"
+// start the heartbeat by setting up necessary handlers and looping by sending "ping"
 // message every "period" until the "closer" channel is closed.
 func (h *heartbeat) start() {
 	// Loop to continually send "ping" message through websocket connection every "period".

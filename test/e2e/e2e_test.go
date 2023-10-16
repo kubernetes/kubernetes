@@ -160,7 +160,7 @@ var _ = ginkgo.ReportBeforeSuite(func(report ginkgo.Report) {
 
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
 	var err error
-	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
+	// The DetailsReporter will output details about every test (name, files, lines, etc) which helps
 	// when documenting our tests.
 	if len(framework.TestContext.SpecSummaryOutput) <= 0 {
 		return

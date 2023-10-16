@@ -838,7 +838,7 @@ func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
 }
 
 // TestBackoffLimitPerIndex_JobPodsCreatedWithExponentialBackoff tests that the
-// pods are recreated with expotential backoff delay computed independently
+// pods are recreated with exponential backoff delay computed independently
 // per index. Scenario:
 // - fail index 0
 // - fail index 0

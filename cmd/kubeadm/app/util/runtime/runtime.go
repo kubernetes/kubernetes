@@ -87,7 +87,7 @@ func (runtime *CRIRuntime) IsRunning() error {
 // ListKubeContainers lists running k8s CRI pods
 func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 	// Disable debug mode regardless how the crictl is configured so that the debug info won't be
-	// iterpreted to the Pod ID.
+	// interpreted to the Pod ID.
 	args := []string{"-D=false", "pods", "-q"}
 	out, err := runtime.crictl(args...).CombinedOutput()
 	if err != nil {

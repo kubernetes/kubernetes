@@ -46,7 +46,7 @@ func TestOperationExecutor_RegisterPlugin_ConcurrentRegisterPlugin(t *testing.T)
 	ch, quit, oe := setup()
 	for i := 0; i < numPluginsToRegister; i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
-		oe.RegisterPlugin(socketPath, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+		oe.RegisterPlugin(socketPath, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updater */)
 	}
 	if !isOperationRunConcurrently(ch, quit, numPluginsToRegister) {
 		t.Fatalf("Unable to start register operations in Concurrent for plugins")

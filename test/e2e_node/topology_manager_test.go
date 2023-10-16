@@ -302,7 +302,7 @@ func validatePodAlignment(ctx context.Context, f *framework.Framework, pod *v1.P
 	}
 }
 
-// validatePodAligmentWithPodScope validates whether all pod's CPUs are affined to the same NUMA node.
+// validatePodAlignmentWithPodScope validates whether all pod's CPUs are affined to the same NUMA node.
 func validatePodAlignmentWithPodScope(ctx context.Context, f *framework.Framework, pod *v1.Pod, envInfo *testEnvInfo) error {
 	// Mapping between CPU IDs and NUMA node IDs.
 	podsNUMA := make(map[int]int)
@@ -381,7 +381,7 @@ func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework,
 	}
 
 	// per https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/693-topology-manager/README.md#multi-numa-systems-tests
-	// we can do a menaingful validation only when using the single-numa node policy
+	// we can do a meaningful validation only when using the single-numa node policy
 	if envInfo.policy == topologymanager.PolicySingleNumaNode {
 		for _, pod := range podMap {
 			validatePodAlignment(ctx, f, pod, envInfo)

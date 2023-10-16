@@ -1261,7 +1261,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	}, nil
 }
 
-// GenerateUnmapVolumeFunc marks volume as unmonuted based on following steps.
+// GenerateUnmapVolumeFunc marks volume as unmounted based on following steps.
 // Remove symbolic links from pod device map path dir and  global map path dir.
 // Once those cleanups are done, remove pod device map path dir.
 // If all steps are completed, the volume is marked as unmounted.

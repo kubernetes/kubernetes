@@ -109,7 +109,7 @@ func (s *PluginsStore) Delete(pluginName string) {
 }
 
 // Clear deletes all entries in the store.
-// This methiod is protected by a mutex.
+// This method is protected by a mutex.
 func (s *PluginsStore) Clear() {
 	s.Lock()
 	defer s.Unlock()

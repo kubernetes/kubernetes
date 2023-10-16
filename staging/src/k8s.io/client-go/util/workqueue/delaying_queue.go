@@ -114,7 +114,7 @@ func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider
 	return ret
 }
 
-// delayingType wraps an Interface and provides delayed re-enquing
+// delayingType wraps an Interface and provides delayed re-enqueuing
 type delayingType struct {
 	Interface
 

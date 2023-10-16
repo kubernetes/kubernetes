@@ -901,7 +901,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
 
 	// validate that namespaces starting with "secret-" are allowed
 	// and namespaces starting with "configmap-" are disallowed
-	// wait loop is required here since ConfigMaps were previousy allowed and we need to wait for the new policy
+	// wait loop is required here since ConfigMaps were previously allowed and we need to wait for the new policy
 	// to be enforced
 	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
 		disallowedNamespace = &v1.Namespace{
@@ -1175,7 +1175,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamResource(t *testing.T) {
 		t.Error(err)
 	}
 
-	// Update the param resource to use "test-2" as the new allwoed prefix
+	// Update the param resource to use "test-2" as the new allowed prefix
 	paramConfigMapCopy := paramConfigMap.DeepCopy()
 	paramConfigMapCopy.Data = map[string]string{
 		"prefix": "test-2",

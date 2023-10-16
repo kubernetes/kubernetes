@@ -3420,7 +3420,7 @@ func TestSubresourceField(t *testing.T) {
 // the fields' management again as granular.
 func TestApplyFormerlyAtomicFields(t *testing.T) {
 	// Start server with our populated ObjectReference. Since it is atomic its
-	// ownership changed when XX popualted the UID after the user specified the
+	// ownership changed when XX populated the UID after the user specified the
 	// GVKN.
 
 	// 1. Create PersistentVolume with its claimRef owned by
@@ -3428,7 +3428,7 @@ func TestApplyFormerlyAtomicFields(t *testing.T) {
 	// 2. Attempt to re-apply the original PersistentVolume which does not
 	//		include uid.
 	// 3. Check that:
-	//		a.) The operaiton was successfu;
+	//		a.) The operation was successful;
 	//		b.) The uid is unchanged
 
 	client, closeFn := setup(t)

@@ -819,7 +819,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 			nodeName := "fakeNode"
 
 			var specs []*volume.Spec
-			// create and save volume attchments
+			// create and save volume attachments
 			for _, attachedSpec := range tc.attachedSpecs {
 				specs = append(specs, attachedSpec.spec)
 				attachID := getAttachmentName(attachedSpec.volName, testDriver, nodeName)
@@ -890,7 +890,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 			nodeName := "fakeNode"
 
 			var specs []*volume.Spec
-			// create and save volume attchments
+			// create and save volume attachments
 			for _, attachedSpec := range tc.attachedSpecs {
 				specs = append(specs, attachedSpec.spec)
 				attachID := getAttachmentName(attachedSpec.volName, testDriver, nodeName)

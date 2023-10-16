@@ -336,7 +336,7 @@ func Test_InFlightPods(t *testing.T) {
 			queueingHintMap: QueueingHintMapPerProfile{
 				"": {
 					// fooPlugin1 has a queueing hint function for AssignedPodAdd,
-					// but hint fn tells that this event doesn't make a Pod scheudlable.
+					// but hint fn tells that this event doesn't make a Pod schedulable.
 					AssignedPodAdd: {
 						{
 							PluginName:     "fooPlugin1",
@@ -410,7 +410,7 @@ func Test_InFlightPods(t *testing.T) {
 			queueingHintMap: QueueingHintMapPerProfile{
 				"": {
 					// fooPlugin1 has a queueing hint function for AssignedPodAdd,
-					// but hint fn tells that this event doesn't make a Pod scheudlable.
+					// but hint fn tells that this event doesn't make a Pod schedulable.
 					AssignedPodAdd: {
 						{
 							PluginName:     "fooPlugin1",

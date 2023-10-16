@@ -33,7 +33,7 @@ type setContextTest struct {
 	config         clientcmdapi.Config //initiate kubectl config
 	args           []string            //kubectl set-context args
 	flags          []string            //kubectl set-context flags
-	expected       string              //expectd out
+	expected       string              //expected out
 	expectedConfig clientcmdapi.Config //expect kubectl config
 }
 

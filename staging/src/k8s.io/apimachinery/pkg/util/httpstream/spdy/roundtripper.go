@@ -52,7 +52,7 @@ type SpdyRoundTripper struct {
 	/* TODO according to http://golang.org/pkg/net/http/#RoundTripper, a RoundTripper
 	   must be safe for use by multiple concurrent goroutines. If this is absolutely
 	   necessary, we could keep a map from http.Request to net.Conn. In practice,
-	   a client will create an http.Client, set the transport to a new insteace of
+	   a client will create an http.Client, set the transport to a new instance of
 	   SpdyRoundTripper, and use it a single time, so this hopefully won't be an issue.
 	*/
 	// conn is the underlying network connection to the remote server.

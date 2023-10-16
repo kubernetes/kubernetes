@@ -99,7 +99,7 @@ func NewNamespaceController(
 }
 
 // nsControllerRateLimiter is tuned for a faster than normal recycle time with default backoff speed and default overall
-// requeing speed.  We do this so that namespace cleanup is reliably faster and we know that the number of namespaces being
+// requeuing speed.  We do this so that namespace cleanup is reliably faster and we know that the number of namespaces being
 // deleted is smaller than total number of other namespace scoped resources in a cluster.
 func nsControllerRateLimiter() workqueue.RateLimiter {
 	return workqueue.NewMaxOfRateLimiter(

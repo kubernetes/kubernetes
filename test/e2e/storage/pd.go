@@ -347,7 +347,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 			disruptOp := t.disruptOp
 			ginkgo.It(fmt.Sprintf("when %s", t.descr), func(ctx context.Context) {
 				e2eskipper.SkipUnlessProviderIs("gce")
-				origNodeCnt := len(nodes.Items) // healhy nodes running kubelet
+				origNodeCnt := len(nodes.Items) // healthy nodes running kubelet
 
 				ginkgo.By("creating a pd")
 				diskName, err := e2epv.CreatePDWithRetry(ctx)

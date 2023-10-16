@@ -69,7 +69,7 @@ func validateScheduling(s *node.Scheduling, fldPath *field.Path) field.ErrorList
 
 func validateTolerations(tolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrs := corevalidation.ValidateTolerations(tolerations, fldPath.Child("tolerations"))
-	// Ensure uniquenes of tolerations.
+	// Ensure uniqueness of tolerations.
 	tolerationSet := map[core.Toleration]bool{}
 	for i, t := range tolerations {
 		// listKey includes the toleration fields identified as listKeys in the API.

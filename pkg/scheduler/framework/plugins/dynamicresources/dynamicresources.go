@@ -611,7 +611,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 				// If the class cannot be retrieved, allocation cannot proceed.
 				if apierrors.IsNotFound(err) {
 					// Here we mark the pod as "unschedulable", so it'll sleep in
-					// the unscheduleable queue until a ResourceClass event occurs.
+					// the unschedulable queue until a ResourceClass event occurs.
 					return nil, statusUnschedulable(logger, fmt.Sprintf("resource class %s does not exist", claim.Spec.ResourceClassName))
 				}
 				// Other error, retry with backoff.

@@ -2291,7 +2291,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating service-headless in namespace " + ns)
 		svcHeadless := getServeHostnameService("service-headless")
 		svcHeadless.ObjectMeta.Labels = serviceHeadlessLabels
-		// This should be improved, as we do not want a Headlesss Service to contain an IP...
+		// This should be improved, as we do not want a Headless Service to contain an IP...
 		_, svcHeadlessIP, err := StartServeHostnameService(ctx, cs, svcHeadless, ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
 
@@ -3873,7 +3873,7 @@ var _ = common.SIGDescribe("Services", func() {
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
 // affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created and a short timeout will be configured so
-// session affinity must change after the timeout expirese.
+// session affinity must change after the timeout expires.
 func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
 	ns := f.Namespace.Name
 	numPods, servicePort, serviceName := 3, defaultServeHostnameServicePort, svc.ObjectMeta.Name

@@ -457,7 +457,7 @@ run_pod_tests() {
   # Pre-condition: no services and no rcs exist
   kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
-  ## kubectl create --edit can update the label filed of multiple resources. tmp-editor.sh is a fake editor
+  ## kubectl create --edit can update the label field of multiple resources. tmp-editor.sh is a fake editor
   TEMP=$(mktemp /tmp/tmp-editor-XXXXXXXX.sh)
   echo -e "#!/usr/bin/env bash\n${SED} -i \"s/mock/modified/g\" \$1" > "${TEMP}"
   chmod +x "${TEMP}"

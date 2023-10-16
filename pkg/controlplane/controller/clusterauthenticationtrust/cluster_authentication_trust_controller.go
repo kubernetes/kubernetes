@@ -81,7 +81,7 @@ type ClusterAuthenticationInfo struct {
 	RequestHeaderGroupHeaders headerrequest.StringSliceProvider
 	// RequestHeaderExtraHeaderPrefixes are the headers used by this kube-apiserver to determine user.extra
 	RequestHeaderExtraHeaderPrefixes headerrequest.StringSliceProvider
-	// RequestHeaderAllowedNames are the sujbects allowed to act as a front proxy
+	// RequestHeaderAllowedNames are the subjects allowed to act as a front proxy
 	RequestHeaderAllowedNames headerrequest.StringSliceProvider
 	// RequestHeaderCA is the CA that can be used to verify the front proxy
 	RequestHeaderCA dynamiccertificates.CAContentProvider

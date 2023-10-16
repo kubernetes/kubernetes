@@ -1453,7 +1453,7 @@ func VerifyZeroSetUpCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 	return nil
 }
 
-// VerifyTearDownCallCount ensures that at least one of the Unounters for this
+// VerifyTearDownCallCount ensures that at least one of the Unmounters for this
 // plugin has the expectedTearDownCallCount number of calls. Otherwise it
 // returns an error.
 func VerifyTearDownCallCount(

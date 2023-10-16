@@ -39,7 +39,7 @@ const (
 //	└---------------------------┘
 type ready struct {
 	state       status        // represent the state of the variable
-	generation  int           // represent the number of times we have transtioned to ready
+	generation  int           // represent the number of times we have transitioned to ready
 	lock        sync.RWMutex  // protect the state and generation variables
 	restartLock sync.Mutex    // protect the transition from ready to pending where the channel is recreated
 	waitCh      chan struct{} // blocks until is ready or stopped

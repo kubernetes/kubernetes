@@ -406,7 +406,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	return nil
 }
 
-// Spwans a goroutune which waits for added/updated apiservices and updates
+// Spawns a goroutine which waits for added/updated apiservices and updates
 // the discovery document accordingly
 func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 	klog.Info("Starting ResourceDiscoveryManager")

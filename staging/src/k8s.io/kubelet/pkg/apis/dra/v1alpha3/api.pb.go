@@ -482,7 +482,7 @@ const _ = grpc.SupportPackageIsVersion4
 type NodeClient interface {
 	// NodePrepareResources prepares several ResourceClaims
 	// for use on the node. If an error is returned, the
-	// response is ignored. Failures for individidual claims
+	// response is ignored. Failures for individual claims
 	// can be reported inside NodePrepareResourcesResponse.
 	NodePrepareResources(ctx context.Context, in *NodePrepareResourcesRequest, opts ...grpc.CallOption) (*NodePrepareResourcesResponse, error)
 	// NodeUnprepareResources is the opposite of NodePrepareResources.
@@ -520,7 +520,7 @@ func (c *nodeClient) NodeUnprepareResources(ctx context.Context, in *NodeUnprepa
 type NodeServer interface {
 	// NodePrepareResources prepares several ResourceClaims
 	// for use on the node. If an error is returned, the
-	// response is ignored. Failures for individidual claims
+	// response is ignored. Failures for individual claims
 	// can be reported inside NodePrepareResourcesResponse.
 	NodePrepareResources(context.Context, *NodePrepareResourcesRequest) (*NodePrepareResourcesResponse, error)
 	// NodeUnprepareResources is the opposite of NodePrepareResources.

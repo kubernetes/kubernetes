@@ -33,7 +33,7 @@ var _ Store = &UndeltaStore{}
 
 // Add inserts an object into the store and sends complete state by calling PushFunc.
 // Note about thread safety.  The Store implementation (cache.cache) uses a lock for all methods.
-// In the functions below, the lock gets released and reacquired betweend the {Add,Delete,etc}
+// In the functions below, the lock gets released and reacquired between the {Add,Delete,etc}
 // and the List.  So, the following can happen, resulting in two identical calls to PushFunc.
 // time            thread 1                  thread 2
 // 0               UndeltaStore.Add(a)

@@ -271,7 +271,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 			step(ctx, AddNodes, zones[i])
 		}
 
-		// Add master repilcas.
+		// Add master replicas.
 		//
 		// If numAdditionalReplicas is larger then the number of remaining zones in the region,
 		// we create a few masters in the same zone and zone entry is repeated in additionalReplicaZones.
@@ -279,7 +279,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 			step(ctx, AddReplica, zones[i%len(zones)])
 		}
 
-		// Remove master repilcas.
+		// Remove master replicas.
 		for i := 0; i < numAdditionalReplicas; i++ {
 			step(ctx, RemoveReplica, zones[i%len(zones)])
 		}

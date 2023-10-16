@@ -56,7 +56,7 @@ type BaseEndpointInfo struct {
 	// true since only ready endpoints are read from Endpoints.
 	// TODO: Ready can be inferred from Serving and Terminating below when enabled by default.
 	Ready bool
-	// Serving indiciates whether this endpoint is ready regardless of its terminating state.
+	// Serving indicates whether this endpoint is ready regardless of its terminating state.
 	// For pods this is true if it has a ready status regardless of its deletion timestamp.
 	// This is only set when watching EndpointSlices. If using Endpoints, this is always
 	// true since only ready endpoints are read from Endpoints.

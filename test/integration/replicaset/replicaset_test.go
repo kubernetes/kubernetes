@@ -678,7 +678,7 @@ func TestPodDeletionCost(t *testing.T) {
 				})
 			}
 
-			// Change RS's number of replics to 1
+			// Change RS's number of replicas to 1
 			rsClient := c.AppsV1().ReplicaSets(ns.Name)
 			updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
 				rs.Spec.Replicas = pointer.Int32(1)

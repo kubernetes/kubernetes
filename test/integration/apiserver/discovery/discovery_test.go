@@ -337,7 +337,7 @@ func TestCRD(t *testing.T) {
 			// Show that if CRD and APIService share a groupversion, and the
 			// APIService is deleted, and CRD updated, the APIService remains in
 			// discovery.
-			// This test simulates a resync of CRD controler to show that eventually
+			// This test simulates a resync of CRD controller to show that eventually
 			// APIService is recreated
 			Name: "CRDAPIServiceOverlap",
 			Actions: []testAction{
@@ -382,7 +382,7 @@ func TestCRD(t *testing.T) {
 			},
 		},
 		{
-			// Show that if CRD and Aggregated APIservice share a groupversiom,
+			// Show that if CRD and Aggregated APIservice share a groupversion,
 			// The aggregated apiservice's discovery information is shown in both
 			// v1 and v2 discovery
 			Name: "CRDAPIServiceSameGroupDifferentVersions",
@@ -412,7 +412,7 @@ func TestCRD(t *testing.T) {
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1}),
 
 				// The CRD group-versions not served by the aggregated
-				// apiservice should still be availablee
+				// apiservice should still be available
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 

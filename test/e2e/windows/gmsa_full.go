@@ -77,7 +77,7 @@ const (
 	// defined at gmsaCrdManifestPath
 	gmsaCustomResourceName = "gmsa-e2e"
 
-	// gmsaWebhookDeployScriptURL is the URL of the deploy script for the GMSA webook
+	// gmsaWebhookDeployScriptURL is the URL of the deploy script for the GMSA webbook
 	gmsaWebhookDeployScriptURL = "https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/admission-webhook/deploy/deploy-gmsa-webhook.sh"
 
 	// output from the nltest /query command should have this in it

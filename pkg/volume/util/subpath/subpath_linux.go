@@ -332,7 +332,7 @@ func cleanSubPath(mounter mount.Interface, subpath Subpath) error {
 		return err
 	}
 
-	// Recusively remove directories if empty
+	// Recursively remove directories if empty
 	if err := removeEmptyDirs(subpath.PodDir, containerDir); err != nil {
 		return err
 	}

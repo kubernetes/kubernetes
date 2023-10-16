@@ -376,7 +376,7 @@ func TestStoreCreate(t *testing.T) {
 		t.Fatalf("Expected 'already exists' error from storage, but got %v", err)
 	}
 
-	// check the 'alredy exists' msg was edited
+	// check the 'already exists' msg was edited
 	msg := &err.(*errors.StatusError).ErrStatus.Message
 	if !strings.Contains(*msg, "object is being deleted:") {
 		t.Errorf("Unexpected error without the 'object is being deleted:' in message: %v", err)
@@ -1563,7 +1563,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	// defaultDeleteStrategy doesn't implement rest.GarbageCollectionDeleteStrategy.
 	defaultDeleteStrategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 	// orphanDeleteStrategy indicates the default garbage collection policy is
-	// to orphan dependentes.
+	// to orphan dependents.
 	orphanDeleteStrategy := &testOrphanDeleteStrategy{defaultDeleteStrategy}
 
 	testcases := []struct {
@@ -1573,7 +1573,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		expectNotFound    bool
 		updatedFinalizers []string
 	}{
-		// cases run with DeleteOptions.OrphanDedependents=true
+		// cases run with DeleteOptions.OrphanDependents=true
 		{
 			podWithOrphanFinalizer("pod1"),
 			orphanOptions,
@@ -1602,8 +1602,8 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			false,
 			[]string{metav1.FinalizerOrphanDependents},
 		},
-		// cases run with DeleteOptions.OrphanDedependents=false
-		// these cases all have oprhanDeleteStrategy, which should be ignored
+		// cases run with DeleteOptions.OrphanDependents=false
+		// these cases all have orphanDeleteStrategy, which should be ignored
 		// because DeleteOptions has the highest priority.
 		{
 			podWithOrphanFinalizer("pod5"),
@@ -2917,7 +2917,7 @@ func TestStoreCreateGenerateNameConflict(t *testing.T) {
 		t.Errorf("Unexpected error: %+v", err)
 	}
 
-	// check the 'alraedy exists' msg correspond to the generated name
+	// check the 'already exists' msg correspond to the generated name
 	msg := &err.(*errors.StatusError).ErrStatus.Message
 	if !strings.Contains(*msg, "already exists, the server was not able to generate a unique name for the object") {
 		t.Errorf("Unexpected error without the 'was not able to generate a unique name' in message: %v", err)
