@@ -3171,7 +3171,7 @@ msgstr "kubectl 控制 Kubernetes 集群管理器"
 #~ "The name of the generator to use for creating a service.  Only used if --"
 #~ "expose is true"
 #~ msgstr ""
-#~ "使用 gnerator 的名称创建一个 service.  只有在 --expose 为 true 的时候使用"
+#~ "使用 generator 的名称创建一个 service.  只有在 --expose 为 true 的时候使用"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L121
 #~ msgid ""

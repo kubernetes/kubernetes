@@ -117,7 +117,7 @@ func TestCRDExponentialRecursionBug(t *testing.T) {
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
-				"name": "instanceame",
+				"name": "instancename",
 			},
 			"spec": map[string]interface{}{},
 		},

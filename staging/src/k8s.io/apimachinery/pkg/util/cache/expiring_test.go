@@ -235,13 +235,13 @@ func TestGarbageCollection(t *testing.T) {
 }
 
 func BenchmarkExpiringCacheContention(b *testing.B) {
-	b.Run("evict_probablility=100%", func(b *testing.B) {
+	b.Run("evict_probability=100%", func(b *testing.B) {
 		benchmarkExpiringCacheContention(b, 1)
 	})
-	b.Run("evict_probablility=10%", func(b *testing.B) {
+	b.Run("evict_probability=10%", func(b *testing.B) {
 		benchmarkExpiringCacheContention(b, 0.1)
 	})
-	b.Run("evict_probablility=1%", func(b *testing.B) {
+	b.Run("evict_probability=1%", func(b *testing.B) {
 		benchmarkExpiringCacheContention(b, 0.01)
 	})
 }

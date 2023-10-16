@@ -59,7 +59,7 @@ func TestV3SupportsQueryParamBatchV1(t *testing.T) {
 			gvk: schema.GroupVersionKind{
 				Group:   "bad",
 				Version: "v1",
-				Kind:    "Uknown",
+				Kind:    "Unknown",
 			},
 			queryParam:       QueryParamFieldValidation,
 			expectedSupports: false,

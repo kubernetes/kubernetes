@@ -759,7 +759,7 @@ spec:
     - controller
     image: some.registry/app:latest
     name: doJob
-  nodeName: definetlyControlPlane
+  nodeName: definitelyControlPlane
   nodeSelector:
     node-role.kubernetes.io/master: ""
 `),
@@ -799,7 +799,7 @@ spec:
     - controller
     image: some.registry/app:latest
     name: doJob
-  nodeName: definetlyControlPlane
+  nodeName: definitelyControlPlane
   nodeSelector:
     node-role.kubernetes.io/master: ""
 `),
@@ -819,7 +819,7 @@ spec:
     - controller
     image: some.registry/app:latest
     name: doJob
-  nodeName: definetlyControlPlane
+  nodeName: definitelyControlPlane
   nodeSelector:
     node-role.kubernetes.io/master: ""
     otherNodeType: ""
@@ -844,7 +844,7 @@ spec:
     - controller
     image: some.registry/app:latest
     name: doJob
-  nodeName: definetlyControlPlane
+  nodeName: definitelyControlPlane
   nodeSelector:
     node-role.kubernetes.io/master: ""
 `),
@@ -888,7 +888,7 @@ spec:
     - controller
     image: some.registry/app:latest
     name: doJob
-  nodeName: definetlyControlPlane
+  nodeName: definitelyControlPlane
   nodeSelector:
     node-role.kubernetes.io/master: ""
 `),

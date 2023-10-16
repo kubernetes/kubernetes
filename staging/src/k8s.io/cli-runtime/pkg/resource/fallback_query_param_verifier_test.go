@@ -60,7 +60,7 @@ func TestFallbackQueryParamVerifier_PrimaryNoFallback(t *testing.T) {
 			gvk: schema.GroupVersionKind{
 				Group:   "bad",
 				Version: "v1",
-				Kind:    "Uknown",
+				Kind:    "Unknown",
 			},
 			queryParam:       QueryParamFieldValidation,
 			expectedSupports: false,
@@ -193,7 +193,7 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 			gvk: schema.GroupVersionKind{
 				Group:   "bad",
 				Version: "v1",
-				Kind:    "Uknown",
+				Kind:    "Unknown",
 			},
 			queryParam:       QueryParamFieldValidation,
 			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
@@ -204,7 +204,7 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 			gvk: schema.GroupVersionKind{
 				Group:   "bad",
 				Version: "v1",
-				Kind:    "Uknown",
+				Kind:    "Unknown",
 			},
 			queryParam:       QueryParamFieldValidation,
 			primaryError:     fmt.Errorf("Invalid OpenAPI V3 document"),
