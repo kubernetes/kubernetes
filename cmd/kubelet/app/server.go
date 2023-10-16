@@ -801,7 +801,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
 					KubeReservedCgroupName:   s.KubeReservedCgroup,
 					SystemReservedCgroupName: s.SystemReservedCgroup,
-					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
+					EnforceNodeAllocatable:   sets.New(s.EnforceNodeAllocatable...),
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
 					ReservedSystemCPUs:       reservedSystemCPUs,
