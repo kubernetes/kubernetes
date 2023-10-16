@@ -935,6 +935,7 @@ var map_LifecycleHandler = map[string]string{
 	"exec":      "Exec specifies the action to take.",
 	"httpGet":   "HTTPGet specifies the http request to perform.",
 	"tcpSocket": "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.",
+	"sleep":     "Sleep represents the duration that the container should sleep before being terminated.",
 }
 
 func (LifecycleHandler) SwaggerDoc() map[string]string {
@@ -2389,6 +2390,15 @@ var map_SessionAffinityConfig = map[string]string{
 
 func (SessionAffinityConfig) SwaggerDoc() map[string]string {
 	return map_SessionAffinityConfig
+}
+
+var map_SleepAction = map[string]string{
+	"":        "SleepAction describes a \"sleep\" action.",
+	"seconds": "Seconds is the number of seconds to sleep.",
+}
+
+func (SleepAction) SwaggerDoc() map[string]string {
+	return map_SleepAction
 }
 
 var map_StorageOSPersistentVolumeSource = map[string]string{
