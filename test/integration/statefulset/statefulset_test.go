@@ -572,7 +572,7 @@ func TestDeletingPodForRollingUpdatePartition(t *testing.T) {
 	})
 
 	// make sure pod0 gets deletion timestamp so that it is recreated
-	err := podClient.Delete(ctx, pod0.Name, *&metav1.DeleteOptions{})
+	err := podClient.Delete(ctx, pod0.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete the pod0: %v", err)
 	}
