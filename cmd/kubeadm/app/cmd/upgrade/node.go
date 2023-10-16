@@ -153,7 +153,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(cfg.FeatureGates, options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
 		return nil, err
 	}

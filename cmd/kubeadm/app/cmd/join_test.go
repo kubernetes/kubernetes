@@ -289,7 +289,7 @@ func TestNewJoinData(t *testing.T) {
 				options.CfgPath:               configFilePath,
 				options.IgnorePreflightErrors: "a,b",
 			},
-			validate: expectedJoinIgnorePreflightErrors(sets.New("a", "b", "c", "d")),
+			validate: expectedJoinIgnorePreflightErrors(sets.New("a", "b")),
 		},
 		{
 			name: "warn if --control-plane flag is not set",
@@ -335,7 +335,7 @@ func TestNewJoinData(t *testing.T) {
 			}
 
 			// test newJoinData method
-			data, err := newJoinData(cmd, tc.args, joinOptions, nil, kubeconfigFilePath)
+			data, err := newJoinData(cmd, tc.args, joinOptions, nil, kubeconfigFilePath, true)
 			klog.Flush()
 			msg := "WARNING: --control-plane is also required when passing control-plane"
 			if tc.expectWarn {

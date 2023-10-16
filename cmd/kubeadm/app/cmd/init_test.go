@@ -181,7 +181,7 @@ func TestNewInitData(t *testing.T) {
 				options.CfgPath:               configFilePath,
 				options.IgnorePreflightErrors: "a,b",
 			},
-			validate: expectedInitIgnorePreflightErrors("a", "b", "c", "d"),
+			validate: expectedInitIgnorePreflightErrors("a", "b"),
 		},
 	}
 	for _, tc := range testCases {

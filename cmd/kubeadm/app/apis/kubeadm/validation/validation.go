@@ -650,15 +650,21 @@ func ValidateCertificateKey(certificateKey string, fldPath *field.Path) field.Er
 // ValidateIgnorePreflightErrors validates duplicates in:
 // - ignore-preflight-errors flag and
 // - ignorePreflightErrors field in {Init,Join}Configuration files.
-func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.Set[string], error) {
+// and make sure ignore "all" cannot configured with individual checks.
+func ValidateIgnorePreflightErrors(featureList map[string]bool, ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.Set[string], error) {
 	ignoreErrors := sets.New[string]()
 	allErrs := field.ErrorList{}
+	ignorePreflightErr := ignorePreflightErrorsFromConfigFile
 
-	for _, item := range ignorePreflightErrorsFromConfigFile {
-		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
+	if ignorePreflightErrorsFromCLI != nil {
+		if features.Enabled(featureList, features.MergeCLIArgumentsWithConfig) {
+			ignorePreflightErr = append(ignorePreflightErr, ignorePreflightErrorsFromCLI...)
+		} else {
+			ignorePreflightErr = ignorePreflightErrorsFromCLI
+		}
 	}
 
-	for _, item := range ignorePreflightErrorsFromCLI {
+	for _, item := range ignorePreflightErr {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
 

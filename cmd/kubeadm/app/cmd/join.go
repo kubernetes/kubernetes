@@ -226,7 +226,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
 			joinOptions.skipCRIDetect = true
 		}
-		data, err := newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath())
+		data, err := newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath(), false)
 		if err != nil {
 			return nil, err
 		}
@@ -335,8 +335,10 @@ func newJoinOptions() *joinOptions {
 
 // newJoinData returns a new joinData struct to be used for the execution of the kubeadm join workflow.
 // This func takes care of validating joinOptions passed to the command, and then it converts
-// options into the internal JoinConfiguration type that is used as input all the phases in the kubeadm join workflow
-func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Writer, adminKubeConfigPath string) (*joinData, error) {
+// options into the internal JoinConfiguration type that is used as input all the phases in the kubeadm join workflow.
+// Set the lazilyFetchInitCfg to true to lazily fetch the InitConfiguration from cluster, e.g. unittest to test joinData
+// without the interaction with cluster.
+func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Writer, adminKubeConfigPath string, lazilyFetchInitCfg bool) (*joinData, error) {
 
 	// Validate the mixed arguments with --config and return early on errors
 	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
@@ -434,7 +436,18 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		return nil, err
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opt.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	initCfg := &kubeadmapi.InitConfiguration{}
+	if !lazilyFetchInitCfg {
+		if tlsBootstrapCfg == nil {
+			if tlsBootstrapCfg, err = discovery.For(cfg); err != nil {
+				return nil, err
+			}
+		}
+		if initCfg, err = fetchInitConfigurationFromJoinConfiguration(cfg, tlsBootstrapCfg); err != nil {
+			return nil, err
+		}
+	}
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(initCfg.FeatureGates, opt.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
 		return nil, err
 	}
@@ -466,6 +479,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	return &joinData{
 		cfg:                   cfg,
 		dryRun:                cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun, opt.dryRun).(bool),
+		initCfg:               initCfg,
 		tlsBootstrapCfg:       tlsBootstrapCfg,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,

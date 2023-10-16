@@ -175,7 +175,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		}
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(cfg.FeatureGates, flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
 		return nil, nil, nil, err
 	}

@@ -38,6 +38,8 @@ const (
 	EtcdLearnerMode = "EtcdLearnerMode"
 	// UpgradeAddonsBeforeControlPlane is expected to be in deprecated in v1.28 and will be removed in future release
 	UpgradeAddonsBeforeControlPlane = "UpgradeAddonsBeforeControlPlane"
+	// MergeCLIArgumentsWithConfig is considered to be in deprecated in v1.29 and is expected to be removed in 1.30
+	MergeCLIArgumentsWithConfig = "MergeCLIArgumentsWithConfig"
 )
 
 // InitFeatureGates are the default feature gates for the init command
@@ -48,6 +50,10 @@ var InitFeatureGates = FeatureList{
 	},
 	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	EtcdLearnerMode:      {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
+	MergeCLIArgumentsWithConfig: {
+		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
+		DeprecationMessage: "The MergeCLIArgumentsWithConfig feature gate is deprecated and will be removed in a future release.",
+	},
 	UpgradeAddonsBeforeControlPlane: {
 		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
 		DeprecationMessage: "The UpgradeAddonsBeforeControlPlane feature gate is deprecated and will be removed in a future release.",
