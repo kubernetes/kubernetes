@@ -420,6 +420,12 @@ func (e *ErrGroupDiscoveryFailed) Error() string {
 	return fmt.Sprintf("unable to retrieve the complete list of server APIs: %s", strings.Join(groups, ", "))
 }
 
+// Is makes it possible for the callers to use `errors.Is(` helper on errors wrapped with ErrGroupDiscoveryFailed error.
+func (e *ErrGroupDiscoveryFailed) Is(target error) bool {
+	_, ok := target.(*ErrGroupDiscoveryFailed)
+	return ok
+}
+
 // IsGroupDiscoveryFailedError returns true if the provided error indicates the server was unable to discover
 // a complete list of APIs for the client to use.
 func IsGroupDiscoveryFailedError(err error) bool {
