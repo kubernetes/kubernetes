@@ -207,7 +207,7 @@ func (l *leaderElection) Run() error {
 				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 			},
 			OnNewLeader: func(identity string) {
-				klog.FromContext(ctx).Info("new leader detected", "idendity", identity)
+				klog.FromContext(ctx).Info("new leader detected", "identity", identity)
 			},
 		},
 		WatchDog: l.healthCheck,

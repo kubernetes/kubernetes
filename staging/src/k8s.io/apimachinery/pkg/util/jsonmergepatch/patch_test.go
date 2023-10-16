@@ -113,7 +113,7 @@ testCases:
     expectedWithoutNull:
       mapKey:
         nonNilKey: {}
-  - description: multiple expliclty empty nested maps
+  - description: multiple explicitly empty nested maps
     originalObj:
       mapKey:
         nonNilKey1: {}

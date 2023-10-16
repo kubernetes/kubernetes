@@ -298,7 +298,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(ctx context.Context, 
 		}
 	}
 
-	gomega.Expect(sc).ToNot(gomega.BeNil(), "storage class is unexpectantly nil")
+	gomega.Expect(sc).ToNot(gomega.BeNil(), "storage class is unexpectedly nil")
 
 	if fsType != "" {
 		if sc.Parameters == nil {

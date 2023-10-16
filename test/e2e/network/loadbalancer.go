@@ -709,7 +709,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// GCE cannot test a specific IP because the test may not own it. This cloud specific condition
 		// will be removed when GCP supports similar functionality.
 		if framework.ProviderIs("azure") {
-			ginkgo.By("switching back to interal type LoadBalancer, with static IP specified.")
+			ginkgo.By("switching back to internal type LoadBalancer, with static IP specified.")
 			// For a cluster created with CAPZ, node-subnet may not be "10.240.0.0/16", e.g. "10.1.0.0/16".
 			base := netutils.BigForIP(subnetPrefix.IP)
 			offset := big.NewInt(0).SetBytes(netutils.ParseIPSloppy("0.0.11.11").To4()).Int64()

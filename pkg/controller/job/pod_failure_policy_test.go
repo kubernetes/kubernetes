@@ -91,7 +91,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			podFailurePolicy: &batch.PodFailurePolicy{
 				Rules: []batch.PodFailurePolicyRule{
 					{
-						Action: "UnkonwnAction",
+						Action: "UnknownAction",
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
 								Type:   v1.DisruptionTarget,

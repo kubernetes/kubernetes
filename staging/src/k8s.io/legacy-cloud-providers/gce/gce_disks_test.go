@@ -963,7 +963,7 @@ func (manager *FakeServiceManager) ResizeDiskOnCloudProvider(
 	disk *Disk,
 	size int64,
 	zone string) error {
-	panic("Not implmented")
+	panic("Not implemented")
 }
 
 func (manager *FakeServiceManager) RegionalResizeDiskOnCloudProvider(

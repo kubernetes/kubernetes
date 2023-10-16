@@ -55,12 +55,12 @@ const (
 	requestTimeoutUpperBound = 34 * time.Second
 	// DuplicateOwnerReferencesWarningFormat is the warning that a client receives when a create/update request contains
 	// duplicate owner reference entries.
-	DuplicateOwnerReferencesWarningFormat = ".metadata.ownerReferences contains duplicate entries; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	DuplicateOwnerReferencesWarningFormat = ".metadata.ownerReferences contains duplicate entries; API server dedupes owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
 	// DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat indicates the duplication was observed
 	// after mutating admission.
-	// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
-	// For PATCH request the API server only dedups after mutating admission.
-	DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat = ".metadata.ownerReferences contains duplicate entries after mutating admission happens; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	// NOTE: For CREATE and UPDATE requests the API server dedupes both before and after mutating admission.
+	// For PATCH request the API server only dedupes after mutating admission.
+	DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat = ".metadata.ownerReferences contains duplicate entries after mutating admission happens; API server dedupes owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
 	// shortPrefix is one possible beginning of yaml unmarshal strict errors.
 	shortPrefix = "yaml: unmarshal errors:\n"
 	// longPrefix is the other possible beginning of yaml unmarshal strict errors.
@@ -291,7 +291,7 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 	return nil
 }
 
-// dedupOwnerReferences dedups owner references over the entire entry.
+// dedupOwnerReferences dedupes owner references over the entire entry.
 // NOTE: We don't know enough about the existing cases of owner references
 // sharing the same UID but different fields. Nor do we know what might break.
 // In the future we may just dedup/reject owner references with the same UID.
@@ -341,8 +341,8 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 	refs := accessor.GetOwnerReferences()
 	deduped, duplicates := dedupOwnerReferences(refs)
 	if len(duplicates) > 0 {
-		// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
-		// For PATCH request the API server only dedups after mutating admission.
+		// NOTE: For CREATE and UPDATE requests the API server dedupes both before and after mutating admission.
+		// For PATCH request the API server only dedupes after mutating admission.
 		format := DuplicateOwnerReferencesWarningFormat
 		if afterMutatingAdmission {
 			format = DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat

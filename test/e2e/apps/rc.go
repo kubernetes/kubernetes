@@ -282,7 +282,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			rcStatusUjson, err := json.Marshal(rcStatusUnstructured)
 			framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
 			json.Unmarshal(rcStatusUjson, &rcStatus)
-			gomega.Expect(rcStatus.Status.Replicas).To(gomega.Equal(testRcInitialReplicaCount), "ReplicationController ReplicaSet cound does not match initial Replica count")
+			gomega.Expect(rcStatus.Status.Replicas).To(gomega.Equal(testRcInitialReplicaCount), "ReplicationController ReplicaSet count does not match initial Replica count")
 
 			rcScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
 				Spec: autoscalingv1.ScaleSpec{

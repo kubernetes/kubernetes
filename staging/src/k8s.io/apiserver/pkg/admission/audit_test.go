@@ -171,9 +171,9 @@ func TestWithAudit(t *testing.T) {
 			annotations[k] = v
 		}
 		if len(annotations) == 0 {
-			assert.Nil(t, ae.Annotations, tcName+": unexptected annotations set in audit event")
+			assert.Nil(t, ae.Annotations, tcName+": unexpected annotations set in audit event")
 		} else {
-			assert.Equal(t, annotations, ae.Annotations, tcName+": unexptected annotations set in audit event")
+			assert.Equal(t, annotations, ae.Annotations, tcName+": unexpected annotations set in audit event")
 		}
 	}
 }

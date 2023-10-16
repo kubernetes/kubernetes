@@ -547,7 +547,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 						},
 					}},
 				applyPatchOperation{
-					"updating validating field num2 to another validating value, but rachet invalid field num1",
+					"updating validating field num2 to another validating value, but ratchet invalid field num1",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"nums": map[string]interface{}{
 							"num1": 1,
@@ -626,7 +626,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					}}},
 
 				patchMyCRDV1Beta1Schema{
-					"remove maxProeprties, set minProperties to 2",
+					"remove maxProperties, set minProperties to 2",
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"restricted": map[string]interface{}{
@@ -733,7 +733,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 
 				expectError{
 					applyPatchOperation{
-						"add array element without satisfying proeprty",
+						"add array element without satisfying property",
 						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 							"array": []interface{}{"value1", "value2", "value3", "value4"},
 						}}},
@@ -795,7 +795,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 
 				expectError{
 					applyPatchOperation{
-						"remove array element without satisfying proeprty",
+						"remove array element without satisfying property",
 						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 							"array": []interface{}{"value1", "value2"},
 						}}},

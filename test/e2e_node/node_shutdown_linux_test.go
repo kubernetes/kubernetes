@@ -126,7 +126,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ginkgo.By("reating batch pods")
+			ginkgo.By("creating batch pods")
 			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 
 			list, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{

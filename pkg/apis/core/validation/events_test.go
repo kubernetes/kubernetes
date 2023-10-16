@@ -709,7 +709,7 @@ zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz`,
 				},
 			},
 			valid: false,
-			msg:   "non-nil series with cound < 2",
+			msg:   "non-nil series with count < 2",
 		},
 		{
 			Event: &core.Event{
