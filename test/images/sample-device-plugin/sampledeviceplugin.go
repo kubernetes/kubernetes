@@ -144,7 +144,7 @@ func handleRegistrationProcess(registerControlFile string) error {
 				if !ok {
 					return
 				}
-				klog.Errorf("error: %w", err)
+				klog.Errorf("error: %v", err)
 				panic(err)
 			}
 		}
@@ -152,7 +152,7 @@ func handleRegistrationProcess(registerControlFile string) error {
 
 	err = watcher.Add(triggerPath)
 	if err != nil {
-		klog.Errorf("Failed to add watch to %q: %w", triggerPath, err)
+		klog.ErrorS(err, "Failed to add watch", "triggerPath", triggerPath)
 		return err
 	}
 
