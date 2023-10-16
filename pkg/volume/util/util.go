@@ -715,7 +715,7 @@ func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 		cmd.SetEnv(env)
 		klog.V(8).Infof("Executing command: %q", cmdString)
 		output, err := cmd.CombinedOutput()
-		klog.Infof("command (%q) execeuted: %v, output: %q", cmdString, err, string(output))
+		klog.Infof("command (%q) executed: %v, output: %q", cmdString, err, string(output))
 		if err != nil {
 			return fmt.Errorf("command (%q) failed: %v, output: %q", cmdString, err, string(output))
 		}

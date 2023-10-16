@@ -859,7 +859,7 @@ func Test_ExecPluginEnvVars(t *testing.T) {
 
 			err := validate(testcase.expectedEnvVars, merged)
 			if err != nil {
-				t.Logf("unexpecged error %v", err)
+				t.Logf("unexpected error %v", err)
 			}
 		})
 	}

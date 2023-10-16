@@ -147,7 +147,7 @@ func (attacher *rbdAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 // mount device at the given mount path.
 // This method is idempotent, callers are responsible for retrying on failure.
 func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
-	klog.V(4).Infof("rbd: mouting device %s to %s", devicePath, deviceMountPath)
+	klog.V(4).Infof("rbd: mounting device %s to %s", devicePath, deviceMountPath)
 	notMnt, err := attacher.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -227,7 +227,7 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		return err
 	}
 	if !notMnt {
-		klog.V(4).Infof("rbd: unmouting device mountpoint %s", deviceMountPath)
+		klog.V(4).Infof("rbd: unmounting device mountpoint %s", deviceMountPath)
 		if err = detacher.mounter.Unmount(deviceMountPath); err != nil {
 			return err
 		}

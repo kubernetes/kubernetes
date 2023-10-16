@@ -97,7 +97,7 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 
 func invokeTest(ctx context.Context, f *framework.Framework, client clientset.Interface, namespace string, nodeName string, nodeKeyValueLabel map[string]string, diskFormat string) {
 
-	framework.Logf("Invoking Test for DiskFomat: %s", diskFormat)
+	framework.Logf("Invoking Test for DiskFormat: %s", diskFormat)
 	scParameters := make(map[string]string)
 	scParameters["diskformat"] = diskFormat
 

@@ -305,7 +305,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(ctx context.Context, c client
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected find stdout to be empty.")
 
-	framework.Logf("Volume unmaped on node %s", clientPod.Spec.NodeName)
+	framework.Logf("Volume unmapped on node %s", clientPod.Spec.NodeName)
 }
 
 // TestVolumeUnmapsFromDeletedPod tests that a volume unmaps if the client pod was deleted while the kubelet was down.

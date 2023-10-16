@@ -347,7 +347,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			kubeletPlugMgr := kubeletVolumeHost.GetPluginMgr()
 
 			// Mount Device
-			t.Log("csiTest.VolumeAll Mouting device...")
+			t.Log("csiTest.VolumeAll Mounting device...")
 			devicePlug, err := kubeletPlugMgr.FindDeviceMountablePluginBySpec(volSpec)
 			if err != nil {
 				t.Fatalf("csiTest.VolumeAll PluginManager.FindDeviceMountablePluginBySpec failed: %v", err)
@@ -384,7 +384,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 
 			// mount volume
-			t.Log("csiTest.VolumeAll Mouting volume...")
+			t.Log("csiTest.VolumeAll Mounting volume...")
 			volPlug, err := kubeletPlugMgr.FindPluginBySpec(volSpec)
 			if err != nil || volPlug == nil {
 				t.Fatalf("csiTest.VolumeAll PluginMgr.FindPluginBySpec failed: %v", err)
@@ -477,7 +477,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			// ************* Teardown everything **************** //
 			t.Log("csiTest.VolumeAll Tearing down...")
 			// unmount volume
-			t.Log("csiTest.VolumeAll Unmouting volume...")
+			t.Log("csiTest.VolumeAll Unmounting volume...")
 			volPlug, err = kubeletPlugMgr.FindPluginBySpec(volSpec)
 			if err != nil || volPlug == nil {
 				t.Fatalf("csiTest.VolumeAll PluginMgr.FindPluginBySpec failed: %v", err)
@@ -503,7 +503,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			t.Log("csiTest.VolumeAll unmounter.TearDownAt done OK for dir:", mounter.GetPath())
 
 			// unmount device
-			t.Log("csiTest.VolumeAll Unmouting device...")
+			t.Log("csiTest.VolumeAll Unmounting device...")
 			devicePlug, err = kubeletPlugMgr.FindDeviceMountablePluginBySpec(volSpec)
 			if err != nil {
 				t.Fatalf("csiTest.VolumeAll failed to create mountable device plugin: %s", err)
@@ -518,7 +518,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 			var devUnmounter volume.DeviceUnmounter
 			if devicePlug != nil {
-				t.Log("csiTest.VolumeAll found DeviceMountablePlugin, entering device unmouting ...")
+				t.Log("csiTest.VolumeAll found DeviceMountablePlugin, entering device unmounting ...")
 				devMounter, err = devicePlug.NewDeviceMounter()
 				if err != nil {
 					t.Fatal("csiTest.VolumeAll failed to create new device mounter: ", err)

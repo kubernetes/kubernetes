@@ -125,7 +125,7 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 	}
 
 	if len(cfg[cfgExtraScopes]) > 0 {
-		klog.V(2).Infof("%s auth provider field depricated, refresh request don't send scopes",
+		klog.V(2).Infof("%s auth provider field deprecated, refresh request don't send scopes",
 			cfgExtraScopes)
 	}
 
