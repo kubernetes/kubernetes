@@ -223,7 +223,20 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		ginkgo.By("Creating a Pod with more than former max resources")
 		pod = newTestPod(podName+"2", getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+		// When the LimitRanger admission plugin find 0 items from the LimitRange informer cache,
+		// it will try to lookup LimitRanges from the local LiveLookupCache which liveTTL is 30s.
+		// If a LimitRange was deleted from the apiserver, informer watch the delete event and then
+		// handle it lead to the informer cache doesn't have any other items, but the local LiveLookupCache
+		// has it and not expired at the same time, the LimitRanger admission plugin will use the
+		// deleted LimitRange to validate the request. So the request will be rejected by the plugin
+		// till the item is expired.
+		//
+		// With the following retry, we can make sure the item is expired and the request will be
+		// validated as expected.
+		err = framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			return err
+		}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).ShouldNot(gomega.HaveOccurred())
 		framework.ExpectNoError(err)
 	})
 
