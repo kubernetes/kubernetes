@@ -624,7 +624,6 @@ github.com/openshift/api/kubecontrolplane/v1
 github.com/openshift/api/network/v1
 github.com/openshift/api/oauth/v1
 github.com/openshift/api/operator/v1
-github.com/openshift/api/operator/v1alpha1
 github.com/openshift/api/osin/v1
 github.com/openshift/api/pkg/serialization
 github.com/openshift/api/project/v1
@@ -743,16 +742,6 @@ github.com/openshift/client-go/oauth/informers/externalversions/internalinterfac
 github.com/openshift/client-go/oauth/informers/externalversions/oauth
 github.com/openshift/client-go/oauth/informers/externalversions/oauth/v1
 github.com/openshift/client-go/oauth/listers/oauth/v1
-github.com/openshift/client-go/operator/applyconfigurations/internal
-github.com/openshift/client-go/operator/applyconfigurations/operator/v1
-github.com/openshift/client-go/operator/applyconfigurations/operator/v1alpha1
-github.com/openshift/client-go/operator/clientset/versioned
-github.com/openshift/client-go/operator/clientset/versioned/fake
-github.com/openshift/client-go/operator/clientset/versioned/scheme
-github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1
-github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1/fake
-github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1alpha1
-github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1alpha1/fake
 github.com/openshift/client-go/quota/applyconfigurations/internal
 github.com/openshift/client-go/quota/applyconfigurations/quota/v1
 github.com/openshift/client-go/quota/clientset/versioned
