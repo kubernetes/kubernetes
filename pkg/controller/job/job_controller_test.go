@@ -291,7 +291,6 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedPodPatches      int
 
 		// features
-		jobReadyPodsEnabled     bool
 		podIndexLabelDisabled   bool
 		jobPodReplacementPolicy bool
 	}{
@@ -301,6 +300,7 @@ func TestControllerSyncJob(t *testing.T) {
 			backoffLimit:      6,
 			expectedCreations: 2,
 			expectedActive:    2,
+			expectedReady:     ptr.To[int32](0),
 		},
 		"WQ job start": {
 			parallelism:       2,
@@ -308,6 +308,7 @@ func TestControllerSyncJob(t *testing.T) {
 			backoffLimit:      6,
 			expectedCreations: 2,
 			expectedActive:    2,
+			expectedReady:     ptr.To[int32](0),
 		},
 		"pending pods": {
 			parallelism:    2,
@@ -315,6 +316,7 @@ func TestControllerSyncJob(t *testing.T) {
 			backoffLimit:   6,
 			pendingPods:    2,
 			expectedActive: 2,
+			expectedReady:  ptr.To[int32](0),
 		},
 		"correct # of pods": {
 			parallelism:    3,
@@ -323,16 +325,7 @@ func TestControllerSyncJob(t *testing.T) {
 			activePods:     3,
 			readyPods:      2,
 			expectedActive: 3,
-		},
-		"correct # of pods, ready enabled": {
-			parallelism:         3,
-			completions:         5,
-			backoffLimit:        6,
-			activePods:          3,
-			readyPods:           2,
-			expectedActive:      3,
-			expectedReady:       ptr.To[int32](2),
-			jobReadyPodsEnabled: true,
+			expectedReady:  ptr.To[int32](2),
 		},
 		"WQ job: correct # of pods": {
 			parallelism:    2,
@@ -340,6 +333,7 @@ func TestControllerSyncJob(t *testing.T) {
 			backoffLimit:   6,
 			activePods:     2,
 			expectedActive: 2,
+			expectedReady:  ptr.To[int32](0),
 		},
 		"too few active pods": {
 			parallelism:        2,
@@ -351,6 +345,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     2,
 			expectedSucceeded:  1,
 			expectedPodPatches: 1,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"WQ job: recreate pods when failed": {
 			parallelism:             1,
@@ -362,6 +357,7 @@ func TestControllerSyncJob(t *testing.T) {
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
 			expectedTerminating:     ptr.To[int32](1),
+			expectedReady:           ptr.To[int32](0),
 			// Removes finalizer and deletes one failed pod
 			expectedPodPatches: 1,
 			expectedFailed:     1,
@@ -375,6 +371,7 @@ func TestControllerSyncJob(t *testing.T) {
 			failedPods:              1,
 			jobPodReplacementPolicy: true,
 			expectedTerminating:     ptr.To[int32](1),
+			expectedReady:           ptr.To[int32](0),
 			terminatingPods:         1,
 			expectedActive:          1,
 			expectedPodPatches:      2,
@@ -390,6 +387,7 @@ func TestControllerSyncJob(t *testing.T) {
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
 			expectedTerminating:     ptr.To[int32](1),
+			expectedReady:           ptr.To[int32](0),
 			expectedActive:          1,
 			expectedPodPatches:      2,
 			expectedFailed:          2,
@@ -404,6 +402,7 @@ func TestControllerSyncJob(t *testing.T) {
 			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
 			jobPodReplacementPolicy: true,
 			expectedTerminating:     ptr.To[int32](4),
+			expectedReady:           ptr.To[int32](0),
 			expectedActive:          1,
 			expectedDeletions:       1,
 			expectedPodPatches:      1,
@@ -428,6 +427,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     0,
 			expectedSucceeded:  0,
 			expectedPodPatches: 0,
+			expectedReady:      ptr.To[int32](0),
 			controllerTime:     &referenceTime,
 		},
 		"too few active pods and no back-offs": {
@@ -444,6 +444,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     1,
 			expectedSucceeded:  0,
 			expectedPodPatches: 0,
+			expectedReady:      ptr.To[int32](0),
 			controllerTime:     &referenceTime,
 		},
 		"too few active pods with a dynamic job": {
@@ -453,6 +454,7 @@ func TestControllerSyncJob(t *testing.T) {
 			activePods:        1,
 			expectedCreations: 1,
 			expectedActive:    2,
+			expectedReady:     ptr.To[int32](0),
 		},
 		"too few active pods, with controller error": {
 			parallelism:        2,
@@ -465,6 +467,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     1,
 			expectedSucceeded:  0,
 			expectedPodPatches: 1,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"too many active pods": {
 			parallelism:        2,
@@ -474,6 +477,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedDeletions:  1,
 			expectedActive:     2,
 			expectedPodPatches: 1,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"too many active pods, with controller error": {
 			parallelism:        2,
@@ -484,6 +488,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedDeletions:  0,
 			expectedPodPatches: 1,
 			expectedActive:     3,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"failed + succeed pods: reset backoff delay": {
 			parallelism:        2,
@@ -497,6 +502,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:  1,
 			expectedFailed:     1,
 			expectedPodPatches: 2,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"new failed pod": {
 			parallelism:        2,
@@ -508,6 +514,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     2,
 			expectedFailed:     1,
 			expectedPodPatches: 1,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"no new pod; possible finalizer update of failed pod": {
 			parallelism:  1,
@@ -524,6 +531,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     1,
 			expectedFailed:     1,
 			expectedPodPatches: 0,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"only new failed pod with controller error": {
 			parallelism:        2,
@@ -536,6 +544,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     1,
 			expectedFailed:     0,
 			expectedPodPatches: 1,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"job finish": {
 			parallelism:             2,
@@ -546,6 +555,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedPodPatches:      5,
+			expectedReady:           ptr.To[int32](0),
 		},
 		"WQ job finishing": {
 			parallelism:        2,
@@ -556,6 +566,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     1,
 			expectedSucceeded:  1,
 			expectedPodPatches: 1,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"WQ job all finished": {
 			parallelism:             2,
@@ -566,6 +577,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedPodPatches:      2,
+			expectedReady:           ptr.To[int32](0),
 		},
 		"WQ job all finished despite one failure": {
 			parallelism:             2,
@@ -578,6 +590,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedPodPatches:      2,
+			expectedReady:           ptr.To[int32](0),
 		},
 		"more active pods than parallelism": {
 			parallelism:        2,
@@ -587,6 +600,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedDeletions:  8,
 			expectedActive:     2,
 			expectedPodPatches: 8,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"more active pods than remaining completions": {
 			parallelism:        3,
@@ -598,6 +612,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     2,
 			expectedSucceeded:  2,
 			expectedPodPatches: 3,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"status change": {
 			parallelism:        2,
@@ -608,6 +623,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     2,
 			expectedSucceeded:  2,
 			expectedPodPatches: 2,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"deleting job": {
 			parallelism:        2,
@@ -620,6 +636,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     2,
 			expectedSucceeded:  1,
 			expectedPodPatches: 3,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"limited pods": {
 			parallelism:       100,
@@ -628,6 +645,7 @@ func TestControllerSyncJob(t *testing.T) {
 			podLimit:          10,
 			expectedCreations: 10,
 			expectedActive:    10,
+			expectedReady:     ptr.To[int32](0),
 		},
 		"too many job failures": {
 			parallelism:             2,
@@ -639,6 +657,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedConditionReason: "BackoffLimitExceeded",
 			expectedPodPatches:      1,
+			expectedReady:           ptr.To[int32](0),
 		},
 		"job failures, unsatisfied expectations": {
 			parallelism:               2,
@@ -648,6 +667,7 @@ func TestControllerSyncJob(t *testing.T) {
 			fakeExpectationAtCreation: 1,
 			expectedFailed:            1,
 			expectedPodPatches:        1,
+			expectedReady:             ptr.To[int32](0),
 		},
 		"indexed job start": {
 			parallelism:            2,
@@ -657,6 +677,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCreations:      2,
 			expectedActive:         2,
 			expectedCreatedIndexes: sets.New(0, 1),
+			expectedReady:          ptr.To[int32](0),
 		},
 		"indexed job with some pods deleted, podReplacementPolicy Failed": {
 			parallelism:             2,
@@ -670,6 +691,7 @@ func TestControllerSyncJob(t *testing.T) {
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
 			expectedTerminating:     ptr.To[int32](1),
+			expectedReady:           ptr.To[int32](0),
 		},
 		"indexed job with some pods deleted, podReplacementPolicy TerminatingOrFailed": {
 			parallelism:             2,
@@ -683,6 +705,7 @@ func TestControllerSyncJob(t *testing.T) {
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
 			expectedTerminating:     ptr.To[int32](1),
+			expectedReady:           ptr.To[int32](0),
 			expectedPodPatches:      1,
 		},
 		"indexed job completed": {
@@ -702,6 +725,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedPodPatches:      4,
+			expectedReady:           ptr.To[int32](0),
 		},
 		"indexed job repeated completed index": {
 			parallelism:    2,
@@ -719,6 +743,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs:  "0,1",
 			expectedCreatedIndexes: sets.New(2),
 			expectedPodPatches:     3,
+			expectedReady:          ptr.To[int32](0),
 		},
 		"indexed job some running and completed pods": {
 			parallelism:    8,
@@ -741,6 +766,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs:  "2,4,5,7-9",
 			expectedCreatedIndexes: sets.New(1, 6, 10, 11, 12, 13),
 			expectedPodPatches:     6,
+			expectedReady:          ptr.To[int32](0),
 		},
 		"indexed job some failed pods": {
 			parallelism:    3,
@@ -757,6 +783,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:         2,
 			expectedCreatedIndexes: sets.New(0, 2),
 			expectedPodPatches:     2,
+			expectedReady:          ptr.To[int32](0),
 		},
 		"indexed job some pods without index": {
 			parallelism:    2,
@@ -781,6 +808,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:        0,
 			expectedCompletedIdxs: "0",
 			expectedPodPatches:    8,
+			expectedReady:         ptr.To[int32](0),
 		},
 		"indexed job repeated indexes": {
 			parallelism:    5,
@@ -802,6 +830,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:     1,
 			expectedCompletedIdxs: "0",
 			expectedPodPatches:    5,
+			expectedReady:         ptr.To[int32](0),
 		},
 		"indexed job with indexes outside of range": {
 			parallelism:    2,
@@ -822,6 +851,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:        0,
 			expectedFailed:        0,
 			expectedPodPatches:    5,
+			expectedReady:         ptr.To[int32](0),
 		},
 		"suspending a job with satisfied expectations": {
 			// Suspended Job should delete active pods when expectations are
@@ -838,6 +868,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedConditionReason: "JobSuspended",
 			expectedPodPatches:      2,
+			expectedReady:           ptr.To[int32](0),
 		},
 		"suspending a job with unsatisfied expectations": {
 			// Unlike the previous test, we expect the controller to NOT suspend the
@@ -853,6 +884,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCreations:         0,
 			expectedDeletions:         0,
 			expectedActive:            3,
+			expectedReady:             ptr.To[int32](0),
 		},
 		"resuming a suspended job": {
 			wasSuspended:            true,
@@ -866,6 +898,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionSuspended,
 			expectedConditionStatus: v1.ConditionFalse,
 			expectedConditionReason: "JobResumed",
+			expectedReady:           ptr.To[int32](0),
 		},
 		"suspending a deleted job": {
 			// We would normally expect the active pods to be deleted (see a few test
@@ -882,6 +915,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedDeletions:  0,
 			expectedActive:     2,
 			expectedPodPatches: 2,
+			expectedReady:      ptr.To[int32](0),
 		},
 		"indexed job with podIndexLabel feature disabled": {
 			parallelism:            2,
@@ -892,13 +926,13 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:         2,
 			expectedCreatedIndexes: sets.New(0, 1),
 			podIndexLabelDisabled:  true,
+			expectedReady:          ptr.To[int32](0),
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)()
 			// job manager setup
@@ -4751,28 +4785,20 @@ func TestJobBackoff(t *testing.T) {
 	newPod.ResourceVersion = "2"
 
 	testCases := map[string]struct {
-		requeues            int
-		oldPodPhase         v1.PodPhase
-		phase               v1.PodPhase
-		jobReadyPodsEnabled bool
-		wantBackoff         time.Duration
+		requeues    int
+		oldPodPhase v1.PodPhase
+		phase       v1.PodPhase
+		wantBackoff time.Duration
 	}{
-		"failure": {
+		"failure with pod updates batching": {
 			requeues:    0,
 			phase:       v1.PodFailed,
 			wantBackoff: syncJobBatchPeriod,
-		},
-		"failure with pod updates batching": {
-			requeues:            0,
-			phase:               v1.PodFailed,
-			jobReadyPodsEnabled: true,
-			wantBackoff:         syncJobBatchPeriod,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
 			fakePodControl := controller.FakePodControl{}
