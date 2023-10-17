@@ -5190,7 +5190,10 @@ func TestFinalizerCleanup(t *testing.T) {
 
 	clientset := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	if err != nil {
+		t.Fatalf("Error creating Job controller: %v", err)
+	}
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
@@ -5204,7 +5207,7 @@ func TestFinalizerCleanup(t *testing.T) {
 
 	// Create a simple Job
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
-	job, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+	job, err = clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating job: %v", err)
 	}
