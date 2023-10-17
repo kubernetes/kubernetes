@@ -896,7 +896,7 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 		{ // empty list in CLI only
 			[]string{},
 			[]string{"a"},
-			sets.New[string](),
+			sets.New[string]("a"),
 			false,
 			false,
 		},

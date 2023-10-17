@@ -656,7 +656,7 @@ func ValidateIgnorePreflightErrors(featureList map[string]bool, ignorePreflightE
 	allErrs := field.ErrorList{}
 	ignorePreflightErr := ignorePreflightErrorsFromConfigFile
 
-	if ignorePreflightErrorsFromCLI != nil {
+	if len(ignorePreflightErrorsFromCLI) != 0 {
 		if features.Enabled(featureList, features.MergeCLIArgumentsWithConfig) {
 			ignorePreflightErr = append(ignorePreflightErr, ignorePreflightErrorsFromCLI...)
 		} else {
