@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/utils/ptr"
 	"sort"
 	"strconv"
 	"strings"
@@ -1757,31 +1758,31 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			},
 			wantActive: int(podCount),
 		},
-		"feature flag true, delete pods, verify active and failed status and recreate once failed": {
+		"feature flag true, recreate failed pods, and verify active and failed counters": {
 			podReplacementPolicyEnabled: true,
 			failPods:                    true,
 			jobSpec: &batchv1.JobSpec{
-				Parallelism:          pointer.Int32Ptr(podCount),
-				Completions:          pointer.Int32Ptr(podCount),
+				Parallelism:          ptr.To(podCount),
+				Completions:          ptr.To(podCount),
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
 			wantActive:      int(podCount),
 			wantFailed:      int(podCount),
-			wantTerminating: pointer.Int32(0),
+			wantTerminating: ptr.To[int32](0),
 		},
-		"feature flag true with NonIndexedJob, delete pods, verify active and failed status and recreate once failed": {
+		"feature flag true with NonIndexedJob, recreate failed pods, and verify active and failed counters": {
 			podReplacementPolicyEnabled: true,
 			failPods:                    true,
 			jobSpec: &batchv1.JobSpec{
-				Parallelism:          pointer.Int32Ptr(podCount),
-				Completions:          pointer.Int32Ptr(podCount),
+				Parallelism:          ptr.To(podCount),
+				Completions:          ptr.To(podCount),
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
 			wantActive:      int(podCount),
 			wantFailed:      int(podCount),
-			wantTerminating: pointer.Int32(0),
+			wantTerminating: ptr.To[int32](0),
 		},
 	}
 	for name, tc := range cases {
