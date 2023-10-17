@@ -80,7 +80,18 @@ var baseOpts = []VersionedOptions{
 			library.Quantity(),
 		},
 	},
-
+	// add the new validator in 1.29
+	{
+		IntroducedVersion: version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			cel.ASTValidators(
+				cel.ValidateDurationLiterals(),
+				cel.ValidateTimestampLiterals(),
+				cel.ValidateRegexLiterals(),
+				cel.ValidateHomogeneousAggregateLiterals(),
+			),
+		},
+	},
 	// String library
 	{
 		IntroducedVersion: version.MajorMinor(1, 0),
