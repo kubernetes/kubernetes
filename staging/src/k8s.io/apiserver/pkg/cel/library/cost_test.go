@@ -527,6 +527,236 @@ func TestQuantityCost(t *testing.T) {
 	}
 }
 
+func TestSetsCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "sets",
+			expr:                `sets.contains([], [])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 21, Max: 21},
+			expectRuntimeCost:   21,
+		},
+		{
+			expr:                `sets.contains([1], [])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 21, Max: 21},
+			expectRuntimeCost:   21,
+		},
+		{
+			expr:                `sets.contains([1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 22, Max: 22},
+			expectRuntimeCost:   22,
+		},
+		{
+			expr:                `sets.contains([1], [1, 1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.contains([1, 1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.contains([2, 1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.contains([1, 2, 3, 4], [2, 3])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 29, Max: 29},
+			expectRuntimeCost:   29,
+		},
+		{
+			expr:                `sets.contains([1], [1.0, 1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.contains([1, 2], [2u, 2.0])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 25, Max: 25},
+			expectRuntimeCost:   25,
+		},
+		{
+			expr:                `sets.contains([1, 2u], [2, 2.0])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 25, Max: 25},
+			expectRuntimeCost:   25,
+		},
+		{
+			expr:                `sets.contains([1, 2.0, 3u], [1.0, 2u, 3])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 30, Max: 30},
+			expectRuntimeCost:   30,
+		},
+		{
+			expr: `sets.contains([[1], [2, 3]], [[2, 3.0]])`,
+			// 10 for each list creation, top-level list sizes are 2, 1
+			expectEstimatedCost: checker.CostEstimate{Min: 53, Max: 53},
+			expectRuntimeCost:   53,
+		},
+		{
+			expr:                `!sets.contains([1], [2])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `!sets.contains([1], [1, 2])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 24, Max: 24},
+			expectRuntimeCost:   24,
+		},
+		{
+			expr:                `!sets.contains([1], ["1", 1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 24, Max: 24},
+			expectRuntimeCost:   24,
+		},
+		{
+			expr:                `!sets.contains([1], [1.1, 1u])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 24, Max: 24},
+			expectRuntimeCost:   24,
+		},
+
+		// set equivalence (note the cost factor is higher as it's basically two contains checks)
+		{
+			expr:                `sets.equivalent([], [])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 21, Max: 21},
+			expectRuntimeCost:   21,
+		},
+		{
+			expr:                `sets.equivalent([1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.equivalent([1], [1, 1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 25, Max: 25},
+			expectRuntimeCost:   25,
+		},
+		{
+			expr:                `sets.equivalent([1, 1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 25, Max: 25},
+			expectRuntimeCost:   25,
+		},
+		{
+			expr:                `sets.equivalent([1], [1u, 1.0])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 25, Max: 25},
+			expectRuntimeCost:   25,
+		},
+		{
+			expr:                `sets.equivalent([1], [1u, 1.0])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 25, Max: 25},
+			expectRuntimeCost:   25,
+		},
+		{
+			expr:                `sets.equivalent([1, 2, 3], [3u, 2.0, 1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 39, Max: 39},
+			expectRuntimeCost:   39,
+		},
+		{
+			expr:                `sets.equivalent([[1.0], [2, 3]], [[1], [2, 3.0]])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 69, Max: 69},
+			expectRuntimeCost:   69,
+		},
+		{
+			expr:                `!sets.equivalent([2, 1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 26, Max: 26},
+			expectRuntimeCost:   26,
+		},
+		{
+			expr:                `!sets.equivalent([1], [1, 2])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 26, Max: 26},
+			expectRuntimeCost:   26,
+		},
+		{
+			expr:                `!sets.equivalent([1, 2], [2u, 2, 2.0])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 34, Max: 34},
+			expectRuntimeCost:   34,
+		},
+		{
+			expr:                `!sets.equivalent([1, 2], [1u, 2, 2.3])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 34, Max: 34},
+			expectRuntimeCost:   34,
+		},
+		{
+			expr:                `sets.intersects([1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 22, Max: 22},
+			expectRuntimeCost:   22,
+		},
+		{
+			expr:                `sets.intersects([1], [1, 1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.intersects([1, 1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.intersects([2, 1], [1])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.intersects([1], [1, 2])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.intersects([1], [1.0, 2])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `sets.intersects([1, 2], [2u, 2, 2.0])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 27, Max: 27},
+			expectRuntimeCost:   27,
+		},
+		{
+			expr:                `sets.intersects([1, 2], [1u, 2, 2.3])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 27, Max: 27},
+			expectRuntimeCost:   27,
+		},
+		{
+			expr:                `sets.intersects([[1], [2, 3]], [[1, 2], [2, 3.0]])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 65, Max: 65},
+			expectRuntimeCost:   65,
+		},
+		{
+			expr:                `!sets.intersects([], [])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 22, Max: 22},
+			expectRuntimeCost:   22,
+		},
+		{
+			expr:                `!sets.intersects([1], [])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 22, Max: 22},
+			expectRuntimeCost:   22,
+		},
+		{
+			expr:                `!sets.intersects([1], [2])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 23, Max: 23},
+			expectRuntimeCost:   23,
+		},
+		{
+			expr:                `!sets.intersects([1], ["1", 2])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 24, Max: 24},
+			expectRuntimeCost:   24,
+		},
+		{
+			expr:                `!sets.intersects([1], [1.1, 2u])`,
+			expectEstimatedCost: checker.CostEstimate{Min: 24, Max: 24},
+			expectRuntimeCost:   24,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
@@ -536,6 +766,10 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		Lists(),
 		Authz(),
 		Quantity(),
+		ext.Sets(),
+		// cel-go v0.17.7 introduced CostEstimatorOptions.
+		// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
+		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)
