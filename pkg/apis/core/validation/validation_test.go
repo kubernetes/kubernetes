@@ -9179,6 +9179,8 @@ func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
 	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
+	gracePeriod := defaultGracePeriod
+
 	minUserID := int64(0)
 	maxUserID := int64(2147483647)
 	minGroupID := int64(0)
@@ -9189,10 +9191,11 @@ func TestValidatePodSpec(t *testing.T) {
 
 	successCases := map[string]core.PodSpec{
 		"populate basic fields, leave defaults for most": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate all fields": {
 			Volumes: []core.Volume{
@@ -9204,10 +9207,11 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeSelector: map[string]string{
 				"key": "value",
 			},
-			NodeName:              "foobar",
-			DNSPolicy:             core.DNSClusterFirst,
-			ActiveDeadlineSeconds: &activeDeadlineSeconds,
-			ServiceAccountName:    "acct",
+			NodeName:                      "foobar",
+			DNSPolicy:                     core.DNSClusterFirst,
+			ActiveDeadlineSeconds:         &activeDeadlineSeconds,
+			ServiceAccountName:            "acct",
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate all fields with larger active deadline": {
 			Volumes: []core.Volume{
@@ -9219,10 +9223,11 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeSelector: map[string]string{
 				"key": "value",
 			},
-			NodeName:              "foobar",
-			DNSPolicy:             core.DNSClusterFirst,
-			ActiveDeadlineSeconds: &activeDeadlineSecondsMax,
-			ServiceAccountName:    "acct",
+			NodeName:                      "foobar",
+			DNSPolicy:                     core.DNSClusterFirst,
+			ActiveDeadlineSeconds:         &activeDeadlineSecondsMax,
+			ServiceAccountName:            "acct",
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate HostNetwork": {
 			Containers: []core.Container{
@@ -9234,8 +9239,9 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &core.PodSecurityContext{
 				HostNetwork: true,
 			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate RunAsUser SupplementalGroups FSGroup with minID 0": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
@@ -9244,8 +9250,9 @@ func TestValidatePodSpec(t *testing.T) {
 				RunAsUser:          &minUserID,
 				FSGroup:            &minGroupID,
 			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
@@ -9254,46 +9261,52 @@ func TestValidatePodSpec(t *testing.T) {
 				RunAsUser:          &maxUserID,
 				FSGroup:            &maxGroupID,
 			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate HostIPC": {
 			SecurityContext: &core.PodSecurityContext{
 				HostIPC: true,
 			},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate HostPID": {
 			SecurityContext: &core.PodSecurityContext{
 				HostPID: true,
 			},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate Affinity": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate HostAliases": {
-			HostAliases:   []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			HostAliases:                   []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate HostAliases with `foo.bar` hostnames": {
-			HostAliases:   []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}},
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			HostAliases:                   []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}},
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate HostAliases with HostNetwork": {
 			HostAliases: []core.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}},
@@ -9301,15 +9314,17 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &core.PodSecurityContext{
 				HostNetwork: true,
 			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate PriorityClassName": {
-			Volumes:           []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:        []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:     core.RestartPolicyAlways,
-			DNSPolicy:         core.DNSClusterFirst,
-			PriorityClassName: "valid-name",
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			PriorityClassName:             "valid-name",
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate ShareProcessNamespace": {
 			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
@@ -9319,27 +9334,31 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &core.PodSecurityContext{
 				ShareProcessNamespace: &[]bool{true}[0],
 			},
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate RuntimeClassName": {
-			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:    core.RestartPolicyAlways,
-			DNSPolicy:        core.DNSClusterFirst,
-			RuntimeClassName: utilpointer.String("valid-sandbox"),
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			RuntimeClassName:              utilpointer.String("valid-sandbox"),
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate Overhead": {
-			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:    core.RestartPolicyAlways,
-			DNSPolicy:        core.DNSClusterFirst,
-			RuntimeClassName: utilpointer.String("valid-sandbox"),
-			Overhead:         core.ResourceList{},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			RuntimeClassName:              utilpointer.String("valid-sandbox"),
+			Overhead:                      core.ResourceList{},
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 		"populate DNSPolicy": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
 				FSGroupChangePolicy: &goodfsGroupChangePolicy,
 			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 	}
 	for k, v := range successCases {
@@ -9355,6 +9374,9 @@ func TestValidatePodSpec(t *testing.T) {
 
 	activeDeadlineSeconds = int64(0)
 	activeDeadlineSecondsTooLarge := int64(math.MaxInt32 + 1)
+
+	terminationGracePeriodBad := int64(-1)
+	terminationGracePeriodTooLarge := int64(math.MaxInt32 + 1)
 
 	minUserID = int64(-1)
 	maxUserID = int64(2147483648)
@@ -9576,6 +9598,22 @@ func TestValidatePodSpec(t *testing.T) {
 			}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"bad termination grace period": {
+			TerminationGracePeriodSeconds: &terminationGracePeriodBad,
+			NodeName:                      "node name",
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+		},
+		"termination grace period too large": {
+			TerminationGracePeriodSeconds: &terminationGracePeriodTooLarge,
+			NodeName:                      "node name",
+			Volumes:                       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
 		},
 	}
 	for k, v := range failureCases {

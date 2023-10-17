@@ -4038,6 +4038,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		}
 	}
 
+	if spec.TerminationGracePeriodSeconds == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("terminationGracePeriodSeconds"), spec.TerminationGracePeriodSeconds, "termination grace period should not be nil"))
+	}
+
 	if len(spec.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(spec.Hostname, fldPath.Child("hostname"))...)
 	}
