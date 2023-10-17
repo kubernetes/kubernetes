@@ -144,8 +144,9 @@ type APIAggregator struct {
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
-	// handledGroups are the groups that already have routes
-	handledGroups sets.String
+	// handledGroupVersions contain the groups that already have routes. The key is the name of the group and the value
+	// is the versions for the group.
+	handledGroupVersions map[string]sets.Set[string]
 
 	// lister is used to add group handling for /apis/<group> aggregator lookups based on
 	// controller state
@@ -235,7 +236,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		delegateHandler:            delegationTarget.UnprotectedHandler(),
 		proxyTransportDial:         proxyTransportDial,
 		proxyHandlers:              map[string]*proxyHandler{},
-		handledGroups:              sets.String{},
+		handledGroupVersions:       map[string]sets.Set[string]{},
 		lister:                     informerFactory.Apiregistration().V1().APIServices().Lister(),
 		APIRegistrationInformers:   informerFactory,
 		serviceResolver:            c.ExtraConfig.ServiceResolver,
@@ -524,7 +525,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	}
 
 	// if we've already registered the path with the handler, we don't want to do it again.
-	if s.handledGroups.Has(apiService.Spec.Group) {
+	versions, exist := s.handledGroupVersions[apiService.Spec.Group]
+	if exist {
+		versions.Insert(apiService.Spec.Version)
 		return nil
 	}
 
@@ -539,7 +542,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	// aggregation is protected
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
-	s.handledGroups.Insert(apiService.Spec.Group)
+	s.handledGroupVersions[apiService.Spec.Group] = sets.New[string](apiService.Spec.Version)
 	return nil
 }
 
@@ -568,8 +571,18 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	}
 	delete(s.proxyHandlers, apiServiceName)
 
-	// TODO unregister group level discovery when there are no more versions for the group
-	// We don't need this right away because the handler properly delegates when no versions are present
+	versions, exist := s.handledGroupVersions[version.Group]
+	if !exist {
+		return
+	}
+	versions.Delete(version.Version)
+	if versions.Len() > 0 {
+		return
+	}
+	delete(s.handledGroupVersions, version.Group)
+	groupPath := "/apis/" + version.Group
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(groupPath)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(groupPath + "/")
 }
 
 // DefaultAPIResourceConfigSource returns default configuration for an APIResource.
