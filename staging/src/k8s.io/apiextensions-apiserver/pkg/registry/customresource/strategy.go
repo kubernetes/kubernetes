@@ -306,10 +306,10 @@ func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label label
 	}
 }
 
-// OpenAPIv3 type/maxLength/maxItems/MaxProperties/required/wrong type field validation failures are viewed as blocking err for CEL validation
+// OpenAPIv3 type/maxLength/maxItems/MaxProperties/required/enum violation/wrong type field validation failures are viewed as blocking err for CEL validation
 func hasBlockingErr(errs field.ErrorList) (bool, *field.Error) {
 	for _, err := range errs {
-		if err.Type == field.ErrorTypeRequired || err.Type == field.ErrorTypeTooLong || err.Type == field.ErrorTypeTooMany || err.Type == field.ErrorTypeTypeInvalid {
+		if err.Type == field.ErrorTypeNotSupported || err.Type == field.ErrorTypeRequired || err.Type == field.ErrorTypeTooLong || err.Type == field.ErrorTypeTooMany || err.Type == field.ErrorTypeTypeInvalid {
 			return true, field.Invalid(nil, nil, "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation")
 		}
 	}
