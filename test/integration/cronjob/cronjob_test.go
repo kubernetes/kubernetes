@@ -52,7 +52,10 @@ func setup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}
-	jc := job.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	jc, err := job.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	if err != nil {
+		t.Fatalf("Error creating Job controller: %v", err)
+	}
 
 	return server.TearDownFn, cjc, jc, informerSet, clientSet
 }
