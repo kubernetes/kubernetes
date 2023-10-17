@@ -282,7 +282,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			}
 			if err != nil {
 				// Add volume back to ReportAsAttached if DetachVolume call failed so that node status updater will add it back to VolumeAttached list.
-				// This function is also called during executing the volume detach operation in operation_generoator.
+				// This function is also called during executing the volume detach operation in operation_generator.
 				// It is needed here too because DetachVolume call might fail before executing the actual operation in operation_executor (e.g., cannot find volume plugin etc.)
 				rc.actualStateOfWorld.AddVolumeToReportAsAttached(logger, attachedVolume.VolumeName, attachedVolume.NodeName)
 

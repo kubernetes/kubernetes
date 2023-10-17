@@ -961,7 +961,7 @@ func TestPodContainerRestartWithConfigmapModified(ctx context.Context, f *framew
 func testSubpathReconstruction(ctx context.Context, f *framework.Framework, hostExec storageutils.HostExec, pod *v1.Pod, forceDelete bool) {
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
 
-	// Disruptive test run serially, we can cache all voluem global mount
+	// Disruptive test run serially, we can cache all volume global mount
 	// points and verify after the test that we do not leak any global mount point.
 	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err, "while listing schedulable nodes")

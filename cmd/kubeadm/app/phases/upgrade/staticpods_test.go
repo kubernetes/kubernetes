@@ -792,7 +792,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pkiutiltesting.Reset()
 
-			// Setup up basic requities
+			// Setup up basic requisites
 			tmpDir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpDir)
 
@@ -819,7 +819,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 
 			certMaps := make(map[string]big.Int)
 
-			// Create expected certs and load to recorde the serial numbers
+			// Create expected certs and load to record the serial numbers
 			for _, kubeCert := range test.certsShouldExist {
 				if err := kubeCert.CreateFromCA(cfg, caCert, caKey); err != nil {
 					t.Fatalf("couldn't create certificate %q: %v", kubeCert.Name, err)

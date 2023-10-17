@@ -158,7 +158,7 @@ cd "${LICENSE_ROOT}"
 
 kube::util::ensure-temp-dir
 
-# Save the genreated LICENSE file for each package temporarily
+# Save the generated LICENSE file for each package temporarily
 TMP_LICENSE_FILE="${KUBE_TEMP}/LICENSES.$$"
 
 # The directory to save all the LICENSE files

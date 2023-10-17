@@ -68,7 +68,7 @@ type OperationExecutor interface {
 	// VerifyVolumesAreAttachedPerNode verifies the given list of volumes to see whether they are still attached to the node.
 	// If any volume is not attached right now, it will update the actual state of the world to reflect that.
 	// Note that this operation could be operated concurrently with other attach/detach operations.
-	// In theory (but very unlikely in practise), race condition among these operations might mark volume as detached
+	// In theory (but very unlikely in practice), race condition among these operations might mark volume as detached
 	// even if it is attached. But reconciler can correct this in a short period of time.
 	VerifyVolumesAreAttachedPerNode(AttachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 

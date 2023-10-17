@@ -81,7 +81,7 @@ func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
 		Exec: &v1.ExecAction{},
 	}
 
-	// Apply test defaults, overwridden for test speed.
+	// Apply test defaults, overwritten for test speed.
 	defaults := map[string]int64{
 		"TimeoutSeconds":   1,
 		"PeriodSeconds":    1,

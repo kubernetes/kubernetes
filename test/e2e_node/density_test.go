@@ -426,7 +426,7 @@ func runDensitySeqTest(ctx context.Context, f *framework.Framework, rc *Resource
 
 	ginkgo.By("Creating a batch of background pods")
 
-	// CreatBatch is synchronized, all pods are running when it returns
+	// CreateBatch is synchronized, all pods are running when it returns
 	e2epod.NewPodClient(f).CreateBatch(ctx, bgPods)
 
 	time.Sleep(sleepBeforeCreatePods)
@@ -637,7 +637,7 @@ func logAndVerifyLatency(ctx context.Context, batchLag time.Duration, e2eLags []
 		// check whether e2e pod startup time is acceptable.
 		framework.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
 
-		// check bactch pod creation latency
+		// check batch pod creation latency
 		if podBatchStartupLimit > 0 {
 			if batchLag > podBatchStartupLimit {
 				framework.Failf("Batch creation startup time %v exceed limit %v", batchLag, podBatchStartupLimit)

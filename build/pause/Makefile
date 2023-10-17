@@ -87,7 +87,7 @@ push-manifest:
 	set -x; \
 	# tagToKernelVersionMap maps the container images tags for different Windows Server releases (ex: ltsc2022 for Windows Server 2022)
 	# to the kernel version for that OS release (ex: 20348 for Windows Server 2022). This is needed to fetch the servicing revision from the
-	# pause base image manifest (which containers an entry for each Windows Server version) so we can add the approrite 'os.version'
+	# pause base image manifest (which containers an entry for each Windows Server version) so we can add the appropriate 'os.version'
 	# field to the pause image manifest.
 	declare -A tagToKernelVersionMap=( ['1809']='17763' ['ltsc2022']='20348' );\
 	for arch in $(ALL_ARCH.windows);  do \

@@ -82,7 +82,7 @@ type MountInfo struct { // nolint: golint
 	Source string
 	// Mount point, the pathname of the mount point.
 	MountPoint string
-	// Optional fieds, zero or more fields of the form "tag[:value]".
+	// Optional fields, zero or more fields of the form "tag[:value]".
 	OptionalFields []string
 	// The filesystem type in the form "type[.subtype]".
 	FsType string

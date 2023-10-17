@@ -84,7 +84,7 @@ func (p *Parser) Parse(text string) error {
 	return p.parseText(p.Root)
 }
 
-// consumeText return the parsed text since last cosumeText
+// consumeText return the parsed text since last consumeText
 func (p *Parser) consumeText() string {
 	value := p.input[p.start:p.pos]
 	p.start = p.pos

@@ -102,7 +102,7 @@ var _ = ginkgo.Describe("e2e", func() {
 		}
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(fail), "failure") // Without a failure the output would not be shown in JUnit.
 
-		// More test cases can be added here without affeccting line numbering
+		// More test cases can be added here without affecting line numbering
 		// of existing tests.
 	})
 })

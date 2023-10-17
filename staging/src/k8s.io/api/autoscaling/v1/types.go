@@ -520,7 +520,7 @@ type ContainerResourceMetricStatus struct {
 	// It will always be set, regardless of the corresponding metric specification.
 	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,3,name=currentAverageValue"`
 
-	// container is the name of the container in the pods of the scaling taget
+	// container is the name of the container in the pods of the scaling target
 	Container string `json:"container" protobuf:"bytes,4,opt,name=container"`
 }
 

@@ -3741,7 +3741,7 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 									Type: autoscalingv2.UtilizationMetricType,
 									// TODO: Change this to &tc.CPUTarget and the expected ScaleLimited
 									//       condition to False. This test incorrectly leaves the v1
-									//       HPA field TargetCPUUtilizization field blank and the
+									//       HPA field TargetCPUUtilization field blank and the
 									//       controller defaults to a target of 80. So the test relies
 									//       on downscale stabilization to prevent a scale change.
 									AverageUtilization: &eighty,

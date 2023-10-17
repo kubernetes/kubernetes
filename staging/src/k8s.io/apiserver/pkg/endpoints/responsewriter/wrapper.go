@@ -22,7 +22,7 @@ import (
 	"net/http"
 )
 
-// UserProvidedDecorator represensts a user (client that uses this package)
+// UserProvidedDecorator represents a user (client that uses this package)
 // provided decorator that wraps an inner http.ResponseWriter object.
 // The user-provided decorator object must return the inner (decorated)
 // http.ResponseWriter object via the Unwrap function.

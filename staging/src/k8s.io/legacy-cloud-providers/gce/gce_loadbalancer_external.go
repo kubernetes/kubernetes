@@ -159,7 +159,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 
 	if !isUserOwnedIP {
 		// If we are not using the user-owned IP, either promote the
-		// emphemeral IP used by the fwd rule, or create a new static IP.
+		// ephemeral IP used by the fwd rule, or create a new static IP.
 		ipAddr, existed, err := ensureStaticIP(g, loadBalancerName, serviceName.String(), g.region, fwdRuleIP, netTier)
 		if err != nil {
 			return nil, fmt.Errorf("failed to ensure a static IP for load balancer (%s): %v", lbRefStr, err)

@@ -161,7 +161,7 @@ func NewCreateRoleOptions(ioStreams genericiooptions.IOStreams) *CreateRoleOptio
 	}
 }
 
-// NewCmdCreateRole returnns an initialized Command instance for 'create role' sub command
+// NewCmdCreateRole returns an initialized Command instance for 'create role' sub command
 func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateRoleOptions(ioStreams)
 

@@ -211,7 +211,7 @@ type KubeletConfiguration struct {
 	EventRecordQPS *int32 `json:"eventRecordQPS,omitempty"`
 	// eventBurst is the maximum size of a burst of event creations, temporarily
 	// allows event creations to burst to this number, while still not exceeding
-	// eventRecordQPS. This field canot be a negative number and it is only used
+	// eventRecordQPS. This field cannot be a negative number and it is only used
 	// when eventRecordQPS > 0.
 	// Default: 100
 	// +optional

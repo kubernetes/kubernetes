@@ -178,7 +178,7 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 
 		if req.Method == "DELETE" {
 			go func() {
-				// Delay the deletion of endoints to make endpoint cache out of sync
+				// Delay the deletion of endpoints to make endpoint cache out of sync
 				<-blockDelete
 				controller.endpointsStore.Delete(endpoint)
 				controller.onEndpointsDelete(endpoint)

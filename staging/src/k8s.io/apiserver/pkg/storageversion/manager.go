@@ -166,7 +166,7 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 	s.setComplete()
 }
 
-// dedupResourceInfos dedups ResourceInfos with the same underlying storage.
+// dedupResourceInfos dedupes ResourceInfos with the same underlying storage.
 // ResourceInfos from the same Group with different Versions share the same underlying storage.
 // ResourceInfos from different Groups may share the same underlying storage, e.g.
 // networking.k8s.io ingresses and extensions ingresses. The StorageVersion manager

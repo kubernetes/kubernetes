@@ -3070,17 +3070,17 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 	// so we have a total of 2 attempts
 	invokeOrderWant := []string{
 		// before we send the request to the server:
-		// - we wait as dictated by the client rate lmiter
+		// - we wait as dictated by the client rate limiter
 		// - we wait, as dictated by the backoff manager
 		"RateLimiter.Wait",
 		"BackoffManager.CalculateBackoff",
 		"BackoffManager.Sleep",
 
 		// A: first attempt for which the server sends a retryable response
-		// status code: 500, Retry-Afer: N
+		// status code: 500, Retry-After: N
 		"Client.Do",
 
-		// we got a response object, status code: 500, Retry-Afer: N
+		// we got a response object, status code: 500, Retry-After: N
 		//  - call metrics method with appropriate status code
 		//  - update backoff parameters with the status code returned
 		"RequestResult.Increment",
@@ -3088,7 +3088,7 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		"BackoffManager.CalculateBackoff",
 		// sleep for delay=max(BackoffManager.CalculateBackoff, Retry-After: N)
 		"BackoffManager.Sleep",
-		// wait as dictated by the client rate lmiter
+		// wait as dictated by the client rate limiter
 		"RateLimiter.Wait",
 
 		// B: 2nd attempt: retry, and this should return a status code=200
@@ -3218,7 +3218,7 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 			//  default metric interfaces, in future if we other tests want
 			//  to override as well, and we want tests to be able to run in
 			//  parallel then we will need to provide a way for tests to
-			//  register/deregister their own metric inerfaces.
+			//  register/deregister their own metric interfaces.
 			oldRequestResult := metrics.RequestResult
 			oldRequestRetry := metrics.RequestRetry
 			metrics.RequestResult = interceptor

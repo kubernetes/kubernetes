@@ -326,7 +326,7 @@ type ContainerResources struct {
 	CPURequest *resource.Quantity
 	// CPU limit enforced on the container
 	CPULimit *resource.Quantity
-	// Memory capaacity reserved for the container
+	// Memory capacity reserved for the container
 	MemoryRequest *resource.Quantity
 	// Memory limit enforced on the container
 	MemoryLimit *resource.Quantity

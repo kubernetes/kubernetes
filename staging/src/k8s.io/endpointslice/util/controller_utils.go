@@ -225,7 +225,7 @@ func determineNeededServiceUpdates(oldServices, services sets.String, podChanged
 		services = services.Union(oldServices)
 	} else {
 		// if only the labels changed, services not common to both the new
-		// and old service set (the disjuntive union) need to be updated
+		// and old service set (the disjunctive union) need to be updated
 		services = services.Difference(oldServices).Union(oldServices.Difference(services))
 	}
 	return services

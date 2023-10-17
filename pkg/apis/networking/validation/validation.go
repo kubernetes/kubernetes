@@ -670,7 +670,7 @@ func ValidateIPAddress(ipAddress *networking.IPAddress) field.ErrorList {
 
 }
 
-// validateIPAddressParentReference ensures that the IPAddress ParenteReference exists and is valid.
+// validateIPAddressParentReference ensures that the IPAddress ParentReference exists and is valid.
 func validateIPAddressParentReference(params *networking.ParentReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

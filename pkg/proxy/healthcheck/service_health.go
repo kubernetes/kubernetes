@@ -110,7 +110,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 		if port, found := newServices[nsn]; !found || port != svc.port {
 			klog.V(2).InfoS("Closing healthcheck", "service", nsn, "port", svc.port)
 
-			// errors are loged in closeAll()
+			// errors are logged in closeAll()
 			_ = svc.closeAll()
 
 			delete(hcs.services, nsn)

@@ -121,7 +121,7 @@ func (r *cachedScaleKindResolver) ScaleForResource(resource schema.GroupVersionR
 }
 
 // NewDiscoveryScaleKindResolver creates a new ScaleKindResolver which uses information from the given
-// disovery client to resolve the correct Scale GroupVersionKind for different resources.
+// discovery client to resolve the correct Scale GroupVersionKind for different resources.
 func NewDiscoveryScaleKindResolver(client discovery.ServerResourcesInterface) ScaleKindResolver {
 	base := &discoveryScaleResolver{
 		discoveryClient: client,

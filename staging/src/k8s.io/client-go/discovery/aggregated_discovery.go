@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// StaleGroupVersionError encasulates failed GroupVersion marked "stale"
+// StaleGroupVersionError encapsulates failed GroupVersion marked "stale"
 // in the returned AggregatedDiscovery format.
 type StaleGroupVersionError struct {
 	gv schema.GroupVersion

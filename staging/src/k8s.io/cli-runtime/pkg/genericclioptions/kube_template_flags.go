@@ -33,7 +33,7 @@ type KubeTemplatePrintFlags struct {
 	TemplateArgument *string
 }
 
-// AllowedFormats returns slice of string of allowed GoTemplete and JSONPathPrint printing formats
+// AllowedFormats returns slice of string of allowed GoTemplate and JSONPathPrint printing formats
 func (f *KubeTemplatePrintFlags) AllowedFormats() []string {
 	if f == nil {
 		return []string{}

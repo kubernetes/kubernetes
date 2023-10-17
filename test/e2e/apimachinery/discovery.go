@@ -164,7 +164,7 @@ var _ = SIGDescribe("Discovery", func() {
 
 	/*
 		Release: v1.28
-		Testname: Discovery, confirm the groupVerion and a resourcefrom each apiGroup
+		Testname: Discovery, confirm the groupVersion and a resourcefrom each apiGroup
 		Description: A resourceList MUST be found for each apiGroup that is retrieved.
 		For each apiGroup the groupVersion MUST equal the groupVersion as reported by
 		the schema. From each resourceList a valid resource MUST be found.

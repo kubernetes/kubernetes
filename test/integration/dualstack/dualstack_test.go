@@ -1573,7 +1573,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	if err := validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
 		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
 	}
-	// reconfigure the apiserver to be sinlge stack
+	// reconfigure the apiserver to be single stack
 	tearDownFn()
 
 	// reset secondary

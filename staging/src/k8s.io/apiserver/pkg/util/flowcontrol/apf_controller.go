@@ -399,7 +399,7 @@ func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plSta
 	for plName, plState := range plStates {
 		obs := plState.seatDemandIntegrator.Reset()
 		plState.seatDemandStats.update(obs)
-		// Lower bound on this priority level's adjusted concurreny limit is the lesser of:
+		// Lower bound on this priority level's adjusted concurrency limit is the lesser of:
 		// - its seat demamd high watermark over the last adjustment period, and
 		// - its configured concurrency limit.
 		// BUT: we do not want this to be lower than the lower bound from configuration.

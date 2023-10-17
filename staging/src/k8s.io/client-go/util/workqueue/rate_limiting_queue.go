@@ -98,7 +98,7 @@ func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter
 	})
 }
 
-// rateLimitingType wraps an Interface and provides rateLimited re-enquing
+// rateLimitingType wraps an Interface and provides rateLimited re-enqueuing
 type rateLimitingType struct {
 	DelayingInterface
 

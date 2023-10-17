@@ -2452,7 +2452,7 @@ func TestGetProviderID(t *testing.T) {
 }
 
 func TestUpdateNodeStatus(t *testing.T) {
-	// emaulate the latency of the cloud API calls
+	// emulate the latency of the cloud API calls
 	const cloudLatency = 10 * time.Millisecond
 
 	generateNodes := func(n int) []runtime.Object {

@@ -129,7 +129,7 @@ const (
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	// Since public IP is not a part of the load balancer on Azure,
-	// there is a chance that we could orphan public IP resources while we delete the load blanacer (kubernetes/kubernetes#80571).
+	// there is a chance that we could orphan public IP resources while we delete the load balancer (kubernetes/kubernetes#80571).
 	// We need to make sure the existence of the load balancer depends on the load balancer resource and public IP resource on Azure.
 	existsPip := func() bool {
 		pipName, _, err := az.determinePublicIPName(clusterName, service)

@@ -70,7 +70,7 @@ func (s *DriversStore) Delete(driverName string) {
 }
 
 // Clear deletes all entries in the store.
-// This methiod is protected by a mutex.
+// This method is protected by a mutex.
 func (s *DriversStore) Clear() {
 	s.Lock()
 	defer s.Unlock()

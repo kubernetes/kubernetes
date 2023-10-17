@@ -37,7 +37,7 @@ import (
 type LocalVolumeType string
 
 const (
-	// LocalVolumeDirectory reprensents a simple directory as local volume
+	// LocalVolumeDirectory represents a simple directory as local volume
 	LocalVolumeDirectory LocalVolumeType = "dir"
 	// LocalVolumeDirectoryLink is like LocalVolumeDirectory but it's a symbolic link to directory
 	LocalVolumeDirectoryLink LocalVolumeType = "dir-link"
