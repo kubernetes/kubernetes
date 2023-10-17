@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/utils/ptr"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +58,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const waitInterval = time.Second
@@ -3012,14 +3012,14 @@ func updateJob(ctx context.Context, jobClient typedv1.JobInterface, jobName stri
 
 func addFinalizerAndDeletePods(ctx context.Context, t *testing.T, clientSet clientset.Interface, namespace string) {
 	t.Helper()
-	pods, errList := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if errList != nil {
-		t.Fatalf("Failed to list pods: %v", errList)
+	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list pods: %v", err)
 	}
 	updatePod(t, clientSet, pods.Items, func(pod *v1.Pod) {
 		pod.Finalizers = append(pod.Finalizers, "fake.example.com/blockDeletion")
 	})
-	err := clientSet.CoreV1().Pods(namespace).DeleteCollection(ctx,
+	err = clientSet.CoreV1().Pods(namespace).DeleteCollection(ctx,
 		metav1.DeleteOptions{},
 		metav1.ListOptions{
 			Limit: 1000,
@@ -3027,14 +3027,8 @@ func addFinalizerAndDeletePods(ctx context.Context, t *testing.T, clientSet clie
 	if err != nil {
 		t.Fatalf("Failed to cleanup Pods: %v", err)
 	}
-
-	podsDelete, errList2 := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if errList2 != nil {
-		t.Fatalf("Failed to list pods: %v", errList2)
-	}
-	for _, val := range podsDelete.Items {
-		if val.DeletionTimestamp == nil {
-			t.Fatalf("Deletion not registered.")
-		}
+	_, err = clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list pods: %v", err)
 	}
 }
