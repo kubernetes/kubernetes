@@ -1719,7 +1719,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          pointer.Int32Ptr(podCount),
 				Completions:          pointer.Int32Ptr(podCount),
-				CompletionMode:       &nonIndexedCompletion,
+				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
 			wantTerminating: pointer.Int32(podCount),
@@ -1763,7 +1763,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          pointer.Int32Ptr(podCount),
 				Completions:          pointer.Int32Ptr(podCount),
-				CompletionMode:       &nonIndexedCompletion,
+				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
 			wantActive:      int(podCount),
