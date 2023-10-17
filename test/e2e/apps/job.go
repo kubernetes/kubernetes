@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -817,7 +818,44 @@ var _ = SIGDescribe("Job", func() {
 		gomega.Expect(jobs.Items).To(gomega.BeEmpty(), "Found job %v", jobName)
 	})
 
+	ginkgo.It("should update the status ready field", func(ctx context.Context) {
+		ginkgo.By("Creating a job with suspend=true")
+		job := e2ejob.NewTestJob("notTerminate", "all-ready", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Suspend = ptr.To[bool](true)
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure the job controller updates the status.ready field")
+		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To[int32](0))
+		framework.ExpectNoError(err, "failed to ensure job status ready field in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Updating the job with suspend=false")
+		err = updateJobSuspendWithRetries(ctx, f, job, ptr.To[bool](false))
+		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure the job controller updates the status.ready field")
+		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, &parallelism)
+		framework.ExpectNoError(err, "failed to ensure job status ready field in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Updating the job with suspend=true")
+		err = updateJobSuspendWithRetries(ctx, f, job, ptr.To[bool](true))
+		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure the job controller updates the status.ready field")
+		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To[int32](0))
+		framework.ExpectNoError(err, "failed to ensure job status ready field in namespace: %s", f.Namespace.Name)
+	})
 })
+
+func updateJobSuspendWithRetries(ctx context.Context, f *framework.Framework, job *batchv1.Job, suspend *bool) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		job, err := e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "unable to get job %s in namespace %s", job.Name, f.Namespace.Name)
+		job.Spec.Suspend = suspend
+		_, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		return err
+	})
+}
 
 // waitForJobEvent is used to track and log Job events.
 // As delivery of events is not actually guaranteed we
