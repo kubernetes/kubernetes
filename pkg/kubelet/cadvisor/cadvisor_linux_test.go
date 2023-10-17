@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/google/cadvisor/container/crio"
 	cadvisorfs "github.com/google/cadvisor/fs"
 )
 
@@ -37,7 +38,7 @@ func TestImageFsInfoLabel(t *testing.T) {
 		expectedError   error
 	}{{
 		description:     "LabelCrioImages should be returned",
-		runtimeEndpoint: CrioSocket,
+		runtimeEndpoint: crio.CrioSocket,
 		expectedLabel:   cadvisorfs.LabelCrioImages,
 		expectedError:   nil,
 	}, {
