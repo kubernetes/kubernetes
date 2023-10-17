@@ -72,6 +72,7 @@ func TestNewResetData(t *testing.T) {
 		validate    func(*testing.T, *resetData)
 		expectError string
 		data        *resetData
+		opts        *resetOptions
 	}{
 		{
 			name: "flags parsed correctly",
@@ -211,11 +212,22 @@ func TestNewResetData(t *testing.T) {
 			},
 			validate: expectedResetIgnorePreflightErrors(sets.New("a", "b", "c", "d")),
 		},
+		{
+			name:  "initCfg should be nil if admin kubeconfig doesn't exist",
+			flags: map[string]string{options.CfgPath: configFilePath},
+			opts: &resetOptions{
+				externalcfg: &kubeadmapiv1.ResetConfiguration{},
+			},
+			validate: expectedInitConfigurationIsNil(),
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external reset option and inject it to the reset cmd
-			resetOptions := newResetOptions()
+			resetOptions := tc.opts
+			if tc.opts == nil {
+				resetOptions = newResetOptions()
+			}
 			cmd := newCmdReset(nil, nil, resetOptions)
 
 			// sets cmd flags (that will be reflected on the reset options)
@@ -252,6 +264,14 @@ func expectedResetIgnorePreflightErrors(expected sets.Set[string]) func(t *testi
 		}
 		if data.cfg != nil && !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
 			t.Errorf("Invalid ignore preflight errors in InitConfiguration. Expected: %v. Actual: %v", sets.List(expected), data.cfg.NodeRegistration.IgnorePreflightErrors)
+		}
+	}
+}
+
+func expectedInitConfigurationIsNil() func(t *testing.T, data *resetData) {
+	return func(t *testing.T, data *resetData) {
+		if data.cfg != nil {
+			t.Errorf("InitConfiguration is expected to be nil, but got: %v", data.cfg)
 		}
 	}
 }
