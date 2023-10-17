@@ -78,7 +78,7 @@ func recurseWithLogger(logger logr.Logger, depth int) {
 // parameter.
 func BenchmarkRecursionWithContext(b *testing.B) {
 	logger := logr.Discard()
-	// nolint:logcheck // Intentionally using NewContext unconditionally here.
+	//nolint:logcheck // Intentionally using NewContext unconditionally here.
 	ctx := logr.NewContext(context.Background(), logger)
 
 	for depth := 10; depth <= 100000; depth *= 10 {
@@ -125,7 +125,7 @@ func recurseWithLoggerAndLog(logger logr.Logger, depth int) {
 // parameter and using it once to retrieve and call a logger.
 func BenchmarkRecursionWithContextAndLog(b *testing.B) {
 	logger := logr.Discard()
-	// nolint:logcheck // Intentionally using NewContext unconditionally here.
+	//nolint:logcheck // Intentionally using NewContext unconditionally here.
 	ctx := logr.NewContext(context.Background(), logger)
 
 	for depth := 10; depth <= 100000; depth *= 10 {
@@ -175,7 +175,7 @@ func nestedContextWithTimeout(ctx context.Context, depth int) {
 // called that creates a new context at each call with context.WithTimeout
 // and then looks up a logger.
 func BenchmarkNestedContextWithTimeoutsAndLookup(b *testing.B) {
-	// nolint:logcheck // Intentionally using NewContext unconditionally here.
+	//nolint:logcheck // Intentionally using NewContext unconditionally here.
 	ctx := logr.NewContext(context.Background(), logr.Discard())
 
 	for depth := 1; depth <= 10000; depth *= 10 {
@@ -206,7 +206,7 @@ var logger logr.Logger
 func BenchmarkLookupWithTimeouts(b *testing.B) {
 	for depth := 1; depth <= 10000; depth *= 10 {
 		b.Run(fmt.Sprintf("%d", depth), func(b *testing.B) {
-			// nolint:logcheck // Intentionally using NewContext unconditionally here.
+			//nolint:logcheck // Intentionally using NewContext unconditionally here.
 			ctx := logr.NewContext(context.Background(), logr.Discard())
 			for i := 0; i < depth; i++ {
 				ctx2, cancel := context.WithTimeout(ctx, time.Hour)
@@ -231,7 +231,7 @@ var key keyT
 func BenchmarkLookupWithValues(b *testing.B) {
 	for depth := 1; depth <= 10000; depth *= 10 {
 		b.Run(fmt.Sprintf("%d", depth), func(b *testing.B) {
-			// nolint:logcheck // Intentionally using NewContext unconditionally here.
+			//nolint:logcheck // Intentionally using NewContext unconditionally here.
 			ctx := logr.NewContext(context.Background(), logr.Discard())
 			for i := 0; i < depth; i++ {
 				ctx = context.WithValue(ctx, key, depth)

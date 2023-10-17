@@ -42,7 +42,7 @@ var _ = Describe("bootstrap signer", func() {
 	f.SkipNamespaceCreation = true
 
 	ginkgo.It("should be active", func(ctx context.Context) {
-		//NB. this is technically implemented a part of the control-plane phase
+		// NB. this is technically implemented a part of the control-plane phase
 		//    and more specifically if the controller manager is properly configured,
 		//    the bootstrapsigner controller is activated and the system:controller:bootstrap-signer
 		//    group will be automatically created

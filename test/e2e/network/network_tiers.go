@@ -62,7 +62,7 @@ var _ = common.SIGDescribe("Services GCE", framework.WithSlow(), func() {
 			framework.Logf("cleaning gce resource for %s", lb)
 			framework.TestContext.CloudConfig.Provider.CleanupServiceResources(ctx, cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
-		//reset serviceLBNames
+		// reset serviceLBNames
 		serviceLBNames = []string{}
 	})
 	f.It("should be able to create and tear down a standard-tier load balancer", f.WithSlow(), func(ctx context.Context) {

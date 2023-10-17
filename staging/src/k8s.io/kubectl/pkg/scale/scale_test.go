@@ -637,7 +637,7 @@ func TestGenericScale(t *testing.T) {
 			resName:      "abc",
 			scaleGetter:  scaleClient,
 		},
-		//scenario 2: a resource name cannot be empty
+		// scenario 2: a resource name cannot be empty
 		{
 			name:         "a resource name cannot be empty",
 			precondition: &ScalePrecondition{10, ""},

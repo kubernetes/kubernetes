@@ -333,8 +333,8 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	}
 	imageManagerEndpoint := runtimeEndpoint
 	if framework.TestContext.ImageServiceEndpoint != "" {
-		//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
-		//explicitly specified
+		// ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
+		// explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
 	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, oteltrace.NewNoopTracerProvider())

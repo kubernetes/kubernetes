@@ -69,7 +69,7 @@ type Manager interface {
 }
 
 type manager struct {
-	//Topology Manager Scope
+	// Topology Manager Scope
 	scope Scope
 }
 

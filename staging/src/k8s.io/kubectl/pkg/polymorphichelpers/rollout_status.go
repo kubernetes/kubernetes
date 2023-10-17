@@ -93,7 +93,7 @@ func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64
 
 // Status returns a message describing daemon set status, and a bool value indicating if the status is considered done.
 func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
-	//ignoring revision as DaemonSets does not have history yet
+	// ignoring revision as DaemonSets does not have history yet
 
 	daemon := &appsv1.DaemonSet{}
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), daemon)

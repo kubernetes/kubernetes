@@ -661,9 +661,9 @@ func TestCopyToPod(t *testing.T) {
 		opts.Complete(tf, cmd, []string{test.src, fmt.Sprintf("pod-ns/pod-name:%s", test.dest)})
 		t.Run(name, func(t *testing.T) {
 			err = opts.Run()
-			//If error is NotFound error , it indicates that the
-			//request has been sent correctly.
-			//Treat this as no error.
+			// If error is NotFound error , it indicates that the
+			// request has been sent correctly.
+			// Treat this as no error.
 			if test.expectedErr && errors.IsNotFound(err) {
 				t.Errorf("expected error but didn't get one")
 			}

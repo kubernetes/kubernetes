@@ -186,7 +186,7 @@ func TestServiceAllocIPAddress(t *testing.T) {
 
 func TestMigrateService(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
-	//logs.GlogSetter("7")
+	// logs.GlogSetter("7")
 
 	etcdOptions := framework.SharedEtcd()
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()

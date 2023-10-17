@@ -450,7 +450,7 @@ func TestBindToCommand(t *testing.T) {
 				Phases: []Phase{phaseBuilder4("foo", []string{"flag1"})},
 			},
 			expectedCmdAndFlags: map[string][]string{
-				"phase foo": {"flag1"}, //not "flag2"
+				"phase foo": {"flag1"}, // not "flag2"
 			},
 		},
 		{
@@ -459,7 +459,7 @@ func TestBindToCommand(t *testing.T) {
 				Phases: []Phase{
 					phaseBuilder4("foo", []string{"flag3"}),
 					phaseBuilder4("bar", []string{"flag1", "flag2", "flag3"}),
-					phaseBuilder4("baz", []string{"flag1"}), //test if additional flags are filtered too
+					phaseBuilder4("baz", []string{"flag1"}), // test if additional flags are filtered too
 				},
 			},
 			setAdditionalFlags: func(flags *pflag.FlagSet) {
@@ -487,7 +487,7 @@ func TestBindToCommand(t *testing.T) {
 				Phases: []Phase{
 					phaseBuilder4("foo", []string{"flag3"},
 						phaseBuilder4("bar", []string{"flag1", "flag2", "flag3"}),
-						phaseBuilder4("baz", []string{"flag1"}), //test if additional flags are filtered too
+						phaseBuilder4("baz", []string{"flag1"}), // test if additional flags are filtered too
 						phaseBuilder5("qux", localFlags),
 					),
 				},

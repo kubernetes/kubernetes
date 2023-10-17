@@ -61,7 +61,7 @@ type NodeManager struct {
 	nodeInfoMap map[string]*NodeInfo
 	// Maps node name to node structure
 	registeredNodes map[string]*v1.Node
-	//CredentialsManager
+	// CredentialsManager
 	credentialManager *SecretCredentialManager
 
 	nodeLister corelisters.NodeLister

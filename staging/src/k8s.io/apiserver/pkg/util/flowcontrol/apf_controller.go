@@ -245,7 +245,7 @@ type priorityLevelState struct {
 	// minCL is the nominal limit less the lendable amount
 	minCL int
 
-	//maxCL is the nominal limit plus the amount that may be borrowed
+	// maxCL is the nominal limit plus the amount that may be borrowed
 	maxCL int
 
 	// currentCL is the dynamically derived concurrency limit to impose for now

@@ -2957,7 +2957,7 @@ func TestValidateFieldPath(t *testing.T) {
 			fieldPath:       ".a.bbb['34']",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			//errDetail:       "does not refer to a valid field",
+			// errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "Valid .list",
@@ -4107,13 +4107,13 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 				cancel()
 				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
-				//found := false
-				//for _, err := range errs {
+				// found := false
+				// for _, err := range errs {
 				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
 				//		found = true
 				//		break
 				//	}
-				//}
+				// }
 				if len(errs) == 0 {
 					b.Errorf("expect operation interrupted err but did not find")
 				}

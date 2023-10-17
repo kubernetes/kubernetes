@@ -227,7 +227,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 
 		status, err := e.runtime.GeneratePodStatus(event)
 		if err != nil {
-			// nolint:logcheck // Not using the result of klog.V inside the
+			//nolint:logcheck // Not using the result of klog.V inside the
 			// if branch is okay, we just use it to determine whether the
 			// additional "podStatus" key and its value should be added.
 			if klog.V(6).Enabled() {

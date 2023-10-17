@@ -415,7 +415,7 @@ func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clien
 		pvcSize := updatedPVC.Spec.Resources.Requests[v1.ResourceStorage]
 		pvcStatusSize := updatedPVC.Status.Capacity[v1.ResourceStorage]
 
-		//If pvc's status field size is greater than or equal to pvc's size then done
+		// If pvc's status field size is greater than or equal to pvc's size then done
 		if pvcStatusSize.Cmp(pvcSize) >= 0 {
 			return true, nil
 		}

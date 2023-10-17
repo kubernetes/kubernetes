@@ -510,12 +510,12 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 	} else {
 		svc = getTestService(svcName, v1.ProtocolTCP, nil, false, 8081)
 	}
-	//*expectedLBs[0].FrontendIPConfigurations = append(*expectedLBs[0].FrontendIPConfigurations, network.FrontendIPConfiguration{
+	// *expectedLBs[0].FrontendIPConfigurations = append(*expectedLBs[0].FrontendIPConfigurations, network.FrontendIPConfiguration{
 	//	Name: pointer.String(fmt.Sprintf("aservice%d", 2)),
 	//	FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
 	//		PrivateIPAllocationMethod: "Dynamic",
 	//	},
-	//})
+	// })
 
 	mockLBsClient := mockloadbalancerclient.NewMockInterface(ctrl)
 	az.LoadBalancerClient = mockLBsClient

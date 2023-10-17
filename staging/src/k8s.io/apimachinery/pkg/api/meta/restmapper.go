@@ -495,7 +495,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 	}
 
 	for _, gvk := range potentialGVK {
-		//Ensure we have a REST mapping
+		// Ensure we have a REST mapping
 		res, ok := m.kindToPluralResource[gvk]
 		if !ok {
 			continue

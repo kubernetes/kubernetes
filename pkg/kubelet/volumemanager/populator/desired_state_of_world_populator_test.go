@@ -334,7 +334,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	dswp, fakePodState, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -395,7 +395,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	fakeASW := dswp.actualStateOfWorld
 	podName := util.GetUniquePodName(pod)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -457,7 +457,7 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 	dswp, fakePodState, pod, expectedVolumeName, pv := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -754,7 +754,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -763,7 +763,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	fakePodManager.RemovePod(pod)
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
-	//pod is added to fakePodManager but pod state knows the pod is removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
+	// pod is added to fakePodManager but pod state knows the pod is removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
 	dswp.findAndRemoveDeletedPods()
 	if dswp.pods.processedPods[podName] {
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")

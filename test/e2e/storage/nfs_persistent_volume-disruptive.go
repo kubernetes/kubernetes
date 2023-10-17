@@ -65,7 +65,7 @@ func checkForControllerManagerHealthy(ctx context.Context, duration time.Duratio
 			if PID == "" {
 				PID = result.Stdout
 			} else {
-				//its dead
+				// its dead
 				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
 			}
 		} else {

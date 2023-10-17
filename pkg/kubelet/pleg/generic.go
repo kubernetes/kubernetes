@@ -444,7 +444,7 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 
 	status, err := g.runtime.GetPodStatus(ctx, pod.ID, pod.Name, pod.Namespace)
 	if err != nil {
-		// nolint:logcheck // Not using the result of klog.V inside the
+		//nolint:logcheck // Not using the result of klog.V inside the
 		// if branch is okay, we just use it to determine whether the
 		// additional "podStatus" key and its value should be added.
 		if klog.V(6).Enabled() {

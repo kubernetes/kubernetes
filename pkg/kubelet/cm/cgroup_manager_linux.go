@@ -642,7 +642,7 @@ func getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {
 		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
 	}
 	mLim := int64(memLimit)
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
+	// TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
 	return &ResourceConfig{Memory: &mLim}, nil
 
 }
@@ -728,7 +728,7 @@ func setCgroupMemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) er
 	if err := os.WriteFile(filepath.Join(cgroupPath, memLimitFile), []byte(memLimit), 0700); err != nil {
 		return fmt.Errorf("failed to write %v to %v/%v: %v", memLimit, cgroupPath, memLimitFile, err)
 	}
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
+	// TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
 	return nil
 }
 

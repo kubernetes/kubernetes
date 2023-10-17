@@ -98,7 +98,7 @@ func NewController(
 		return nil, err
 	}
 
-	//check whether there is a remaining cidr after occupyServiceCIDR
+	// check whether there is a remaining cidr after occupyServiceCIDR
 	cidr, err := c.set.AllocateNext()
 	switch err {
 	case cidrset.ErrCIDRRangeNoCIDRsRemaining:

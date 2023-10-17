@@ -827,7 +827,7 @@ func TestMultipleControllers(t *testing.T) {
 
 	// 100%>1% healthy BUT two RCs => no disruption allowed
 	// TODO: Find out if this assert is still needed
-	//ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	// ps.VerifyDisruptionAllowed(t, pdbName, 0)
 }
 
 func TestReplicationController(t *testing.T) {

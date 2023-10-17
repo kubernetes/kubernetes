@@ -128,7 +128,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 
 	if iscsiDisk != nil {
 
-		//Add volume metrics
+		// Add volume metrics
 		iscsiDisk.MetricsProvider = volume.NewMetricsStatFS(iscsiDisk.GetPath())
 	}
 	return &iscsiDiskMounter{

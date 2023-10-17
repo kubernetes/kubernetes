@@ -254,7 +254,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		//no changes
+		// no changes
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
 			continue
 		}

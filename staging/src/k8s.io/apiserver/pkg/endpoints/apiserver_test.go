@@ -3918,7 +3918,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	client := http.Client{}
 
 	simple := &genericapitesting.Simple{}
-	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
+	// using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
 	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

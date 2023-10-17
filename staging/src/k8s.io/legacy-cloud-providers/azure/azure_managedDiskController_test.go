@@ -167,7 +167,7 @@ func TestCreateManagedDisk(t *testing.T) {
 		}
 
 		mockDisksClient := testCloud.DisksClient.(*mockdiskclient.MockInterface)
-		//disk := getTestDisk(test.diskName)
+		// disk := getTestDisk(test.diskName)
 		mockDisksClient.EXPECT().CreateOrUpdate(gomock.Any(), testCloud.ResourceGroup, test.diskName, gomock.Any()).Return(nil).AnyTimes()
 		mockDisksClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, test.diskName).Return(test.existedDisk, nil).AnyTimes()
 

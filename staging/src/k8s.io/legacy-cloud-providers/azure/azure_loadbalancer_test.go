@@ -2061,7 +2061,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		},
 	}
 
-	//change to false to test that reconciliation will fix it (despite the fact that disable-tcp-reset was removed in 1.20)
+	// change to false to test that reconciliation will fix it (despite the fact that disable-tcp-reset was removed in 1.20)
 	(*slb5.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = pointer.Bool(false)
 
 	expectedSLb5 := getTestLoadBalancer(pointer.String("testCluster"), pointer.String("rg"), pointer.String("testCluster"), pointer.String("aservice1"), service5, "Standard")

@@ -239,7 +239,7 @@ type ExecConfig struct {
 	// If APIVersion is client.authentication.k8s.io/v1alpha1 or
 	// client.authentication.k8s.io/v1beta1, then this field is optional and defaults
 	// to "IfAvailable" when unset. Otherwise, this field is required.
-	//+optional
+	// +optional
 	InteractiveMode ExecInteractiveMode `json:"interactiveMode,omitempty"`
 }
 

@@ -95,7 +95,7 @@ func TestUpdate(t *testing.T) {
 			object.Labels = map[string]string{"a": "b"}
 			return object
 		},
-		//invalid update
+		// invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.CSIStorageCapacity)
 			object.Name = "!@#$%"

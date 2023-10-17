@@ -62,9 +62,9 @@ func copyFile(src, dst string) (err error) {
 }
 
 func TestLoadClientConfig(t *testing.T) {
-	//Create a temporary folder under tmp to store the required certificate files and configuration files.
+	// Create a temporary folder under tmp to store the required certificate files and configuration files.
 	fileDir := t.TempDir()
-	//Copy the required certificate file to the temporary directory.
+	// Copy the required certificate file to the temporary directory.
 	copyFile("./testdata/mycertinvalid.crt", fileDir+"/mycertinvalid.crt")
 	copyFile("./testdata/mycertvalid.crt", fileDir+"/mycertvalid.crt")
 	copyFile("./testdata/mycertinvalid.key", fileDir+"/mycertinvalid.key")

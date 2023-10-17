@@ -547,35 +547,35 @@ func TestKubernetesVersionCheck(t *testing.T) {
 	}{
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //Same version
+				KubeadmVersion:    "v1.6.6", // Same version
 				KubernetesVersion: "v1.6.6",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion version older than KubeadmVersion
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion version older than KubeadmVersion
 				KubernetesVersion: "v1.5.5",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
 				KubernetesVersion: "v1.6.7",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
 				KubernetesVersion: "v1.7.0-alpha.0",
 			},
 			expectWarnings: true,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/stable
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, in a different minor/stable
 				KubernetesVersion: "v1.7.0",
 			},
 			expectWarnings: true,

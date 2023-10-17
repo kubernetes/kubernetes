@@ -513,7 +513,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 		version schema.GroupVersion
 		want    string
 	}{
-		//v1 tests
+		// v1 tests
 		{
 			name:    "v1 in-tree and out-of-tree plugins",
 			version: v1.SchemeGroupVersion,

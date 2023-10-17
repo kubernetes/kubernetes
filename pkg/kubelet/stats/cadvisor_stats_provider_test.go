@@ -86,7 +86,7 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		// should not be shown in the results.
 		"/pod2-c2-terminated-1": getTerminatedContainerInfo(seedPastPod0Container0, pName2, namespace, cName22),
 
-		//ContainerInfo with no CPU/memory usage but has network usage for uncleaned cgroups, should not be filtered out
+		// ContainerInfo with no CPU/memory usage but has network usage for uncleaned cgroups, should not be filtered out
 		"/pod2-c222-zerocpumem-1": getContainerInfoWithZeroCpuMem(seedPastPod0Container0, pName2, namespace, cName222),
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)

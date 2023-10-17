@@ -857,7 +857,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1", //legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1", // legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -4061,15 +4061,15 @@ func TestTruncatePodHostname(t *testing.T) {
 		},
 		"too long hostname": {
 			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567.", // 8*9=72 chars
-			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567",          //8*8-1=63 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567",          // 8*8-1=63 chars
 		},
 		"hostname end with .": {
 			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456.1234567.", // 8*9-1=71 chars
-			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          //8*8-2=62 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          // 8*8-2=62 chars
 		},
 		"hostname end with -": {
 			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456-1234567.", // 8*9-1=71 chars
-			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          //8*8-2=62 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          // 8*8-2=62 chars
 		},
 	} {
 		t.Logf("TestCase: %q", c)

@@ -124,7 +124,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that bootstrap discovery settings are set into join data
 				if data.cfg.Discovery.BootstrapToken == nil ||
-					data.cfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" || //only first arg should be kept as APIServerEndpoint
+					data.cfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" || // only first arg should be kept as APIServerEndpoint
 					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken.UnsafeSkipCAVerification != true {
 					t.Error("Invalid data.cfg.Discovery.BootstrapToken")
@@ -171,7 +171,7 @@ func TestNewJoinData(t *testing.T) {
 				options.ControlPlane:              "true",
 				options.APIServerAdvertiseAddress: "1.2.3.4",
 				options.APIServerBindPort:         "1234",
-				options.FileDiscovery:             "https://foo", //required only to pass discovery validation
+				options.FileDiscovery:             "https://foo", // required only to pass discovery validation
 			},
 			validate: func(t *testing.T, data *joinData) {
 				// validate that control plane attributes are set in join data
@@ -188,7 +188,7 @@ func TestNewJoinData(t *testing.T) {
 				options.ControlPlane:              "false",
 				options.APIServerAdvertiseAddress: "1.2.3.4",
 				options.APIServerBindPort:         "1.2.3.4",
-				options.FileDiscovery:             "https://foo", //required only to pass discovery validation
+				options.FileDiscovery:             "https://foo", // required only to pass discovery validation
 			},
 			validate: func(t *testing.T, data *joinData) {
 				// validate that control plane attributes are unset in join data
@@ -271,7 +271,7 @@ func TestNewJoinData(t *testing.T) {
 			name: "pre-flights errors from CLI args only",
 			flags: map[string]string{
 				options.IgnorePreflightErrors: "a,b",
-				options.FileDiscovery:         "https://foo", //required only to pass discovery validation
+				options.FileDiscovery:         "https://foo", // required only to pass discovery validation
 			},
 			validate: expectedJoinIgnorePreflightErrors(sets.New("a", "b")),
 		},
@@ -294,7 +294,7 @@ func TestNewJoinData(t *testing.T) {
 			name: "warn if --control-plane flag is not set",
 			flags: map[string]string{
 				options.APIServerBindPort: "8888",
-				options.FileDiscovery:     "https://foo", //required only to pass discovery validation
+				options.FileDiscovery:     "https://foo", // required only to pass discovery validation
 			},
 			expectWarn: true,
 		},
@@ -302,7 +302,7 @@ func TestNewJoinData(t *testing.T) {
 			name: "no warn if --control-plane flag is set",
 			flags: map[string]string{
 				options.APIServerBindPort: "8888",
-				options.FileDiscovery:     "https://bar", //required only to pass discovery validation
+				options.FileDiscovery:     "https://bar", // required only to pass discovery validation
 				options.ControlPlane:      "true",
 			},
 		},

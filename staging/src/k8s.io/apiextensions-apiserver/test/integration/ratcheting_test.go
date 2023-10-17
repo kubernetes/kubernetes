@@ -1686,7 +1686,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 						},
 					}}},
 				// Can add a valid sibling field
-				//! Remove this ExpectError if/when we add support for ratcheting
+				// ! Remove this ExpectError if/when we add support for ratcheting
 				// the type of a list
 				applyPatchOperation{
 					"add a valid sibling field",
@@ -1697,7 +1697,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 						},
 					}},
 				// Can remove dups to make valid
-				//! Normally this would be valid, but SSA is unable to interpret
+				// ! Normally this would be valid, but SSA is unable to interpret
 				// the `liveObj` in the new schema, so fails. Changing
 				// x-kubernetes-list-type from anything to a set is unsupported by SSA.
 				applyPatchOperation{

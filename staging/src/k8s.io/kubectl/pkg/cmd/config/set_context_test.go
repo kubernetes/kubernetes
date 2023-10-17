@@ -30,11 +30,11 @@ import (
 type setContextTest struct {
 	description    string
 	testContext    string              // name of the context being modified
-	config         clientcmdapi.Config //initiate kubectl config
-	args           []string            //kubectl set-context args
-	flags          []string            //kubectl set-context flags
-	expected       string              //expected out
-	expectedConfig clientcmdapi.Config //expect kubectl config
+	config         clientcmdapi.Config // initiate kubectl config
+	args           []string            // kubectl set-context args
+	flags          []string            // kubectl set-context flags
+	expected       string              // expected out
+	expectedConfig clientcmdapi.Config // expect kubectl config
 }
 
 func TestCreateContext(t *testing.T) {

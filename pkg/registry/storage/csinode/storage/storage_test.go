@@ -100,10 +100,10 @@ func TestUpdate(t *testing.T) {
 		// we allow status field to be set in v1beta1
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.CSINode)
-			//object.Status = *getCSINodeStatus()
+			// object.Status = *getCSINodeStatus()
 			return object
 		},
-		//invalid update
+		// invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.CSINode)
 			object.Spec.Drivers[0].Name = "invalid-name-!@#$%^&*()"

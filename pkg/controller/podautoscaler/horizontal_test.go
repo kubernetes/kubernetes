@@ -3389,7 +3389,7 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 		},
 		reportedLevels:      []uint64{20000, 10000, 30000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		//useMetricsAPI:       true,
+		// useMetricsAPI:       true,
 		lastScaleTime: &time,
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,

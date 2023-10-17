@@ -86,7 +86,7 @@ func TestUpdate(t *testing.T) {
 			object.ParametersRef = &resource.ResourceClassParametersReference{Kind: "cdiexample", Name: "some-name"}
 			return object
 		},
-		//invalid update
+		// invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.ResourceClass)
 			object.DriverName = ""

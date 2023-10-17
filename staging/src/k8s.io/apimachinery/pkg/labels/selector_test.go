@@ -165,10 +165,10 @@ func TestSetMatches(t *testing.T) {
 	expectMatchDirect(t, Set{"baz": "blah"}, labelset)
 	expectMatchDirect(t, Set{"foo": "bar", "baz": "blah"}, labelset)
 
-	//TODO: bad values not handled for the moment in SelectorFromSet
-	//expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
-	//expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
-	//expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
+	// TODO: bad values not handled for the moment in SelectorFromSet
+	// expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
+	// expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
+	// expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
 }
 
 func TestNilMapIsValid(t *testing.T) {
@@ -203,12 +203,12 @@ func TestLexer(t *testing.T) {
 		{"==", DoubleEqualsToken},
 		{">", GreaterThanToken},
 		{"<", LessThanToken},
-		//Note that Lex returns the longest valid token found
+		// Note that Lex returns the longest valid token found
 		{"!", DoesNotExistToken},
 		{"!=", NotEqualsToken},
 		{"(", OpenParToken},
 		{")", ClosedParToken},
-		//Non-"special" characters are considered part of an identifier
+		// Non-"special" characters are considered part of an identifier
 		{"~", IdentifierToken},
 		{"||", IdentifierToken},
 	}
@@ -460,7 +460,7 @@ func TestRequirementConstructor(t *testing.T) {
 			},
 		},
 		{
-			Key: strings.Repeat("a", 254), //breaks DNS rule that len(key) <= 253
+			Key: strings.Repeat("a", 254), // breaks DNS rule that len(key) <= 253
 			Op:  selection.Exists,
 			WantErr: field.ErrorList{
 				&field.Error{

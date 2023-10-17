@@ -89,10 +89,10 @@ func TestZapLoggerInfo(t *testing.T) {
 		writer := zapcore.AddSync(&buffer)
 		sampleInfoLogger, _ := NewJSONLogger(0, writer, nil, nil)
 		for _, name := range data.names {
-			// nolint:logcheck // This intentionally ignore the feature gate and always tests with a name.
+			//nolint:logcheck // This intentionally ignore the feature gate and always tests with a name.
 			sampleInfoLogger = sampleInfoLogger.WithName(name)
 		}
-		// nolint:logcheck // The linter cannot and doesn't need to check the key/value pairs.
+		//nolint:logcheck // The linter cannot and doesn't need to check the key/value pairs.
 		sampleInfoLogger.Info(data.msg, data.keysValues...)
 		logStr := buffer.String()
 

@@ -568,7 +568,7 @@ func TestAnnotateResourceVersion(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
-	//options := NewAnnotateOptions(iostreams)
+	// options := NewAnnotateOptions(iostreams)
 	flags := NewAnnotateFlags(iostreams)
 	flags.resourceVersion = "10"
 	args := []string{"pods/foo", "a=b"}

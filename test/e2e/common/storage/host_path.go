@@ -40,7 +40,7 @@ var _ = SIGDescribe("HostPath", func() {
 
 	ginkgo.BeforeEach(func() {
 		// TODO permission denied cleanup failures
-		//cleanup before running the test.
+		// cleanup before running the test.
 		_ = os.Remove("/tmp/test-file")
 	})
 
@@ -87,8 +87,8 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--file_content_in_loop=%v", filePath),
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
-		//Read the content of the file with the second container to
-		//verify volumes  being shared properly among containers within the pod.
+		// Read the content of the file with the second container to
+		// verify volumes  being shared properly among containers within the pod.
 		e2epodoutput.TestContainerOutput(ctx, f, "hostPath r/w", pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		})

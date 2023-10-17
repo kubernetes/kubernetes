@@ -61,7 +61,7 @@ func extinguish(ctx context.Context, f *framework.Framework, totalNS int, maxAll
 	}
 	wg.Wait()
 
-	//Wait 10 seconds, then SEND delete requests for all the namespaces.
+	// Wait 10 seconds, then SEND delete requests for all the namespaces.
 	ginkgo.By("Waiting 10 seconds")
 	time.Sleep(10 * time.Second)
 	deleteFilter := []string{"nslifetest"}
@@ -70,7 +70,7 @@ func extinguish(ctx context.Context, f *framework.Framework, totalNS int, maxAll
 	gomega.Expect(deleted).To(gomega.HaveLen(totalNS))
 
 	ginkgo.By("Waiting for namespaces to vanish")
-	//Now POLL until all namespaces have been eradicated.
+	// Now POLL until all namespaces have been eradicated.
 	framework.ExpectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0

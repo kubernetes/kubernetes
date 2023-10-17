@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1" //Added new
+	autoscalingv1 "k8s.io/api/autoscaling/v1" // Added new
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -344,7 +344,7 @@ var _ = SIGDescribe("Deployment", func() {
 			Object: testDeploymentUpdateUnstructuredMap,
 		}
 		// currently this hasn't been able to hit the endpoint replaceAppsV1NamespacedDeploymentStatus
-		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Update(ctx, &testDeploymentUpdateUnstructured, metav1.UpdateOptions{}) //, "status")
+		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Update(ctx, &testDeploymentUpdateUnstructured, metav1.UpdateOptions{}) // , "status")
 		framework.ExpectNoError(err, "failed to update the DeploymentStatus")
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()

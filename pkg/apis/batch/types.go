@@ -159,8 +159,8 @@ const (
 	// TerminatingOrFailed means that we recreate pods
 	// when they are terminating (has a metadata.deletionTimestamp) or failed.
 	TerminatingOrFailed PodReplacementPolicy = "TerminatingOrFailed"
-	//Failed means to wait until a previously created Pod is fully terminated (has phase
-	//Failed or Succeeded) before creating a replacement Pod.
+	// Failed means to wait until a previously created Pod is fully terminated (has phase
+	// Failed or Succeeded) before creating a replacement Pod.
 	Failed PodReplacementPolicy = "Failed"
 )
 

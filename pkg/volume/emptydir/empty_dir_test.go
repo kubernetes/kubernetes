@@ -131,9 +131,9 @@ func TestPluginHugetlbfs(t *testing.T) {
 
 type pluginTestConfig struct {
 	medium v1.StorageMedium
-	//volumeDirExists indicates whether volumeDir already/still exists before volume setup/teardown
+	// volumeDirExists indicates whether volumeDir already/still exists before volume setup/teardown
 	volumeDirExists bool
-	//readyDirExists indicates whether readyDir already/still exists before volume setup/teardown
+	// readyDirExists indicates whether readyDir already/still exists before volume setup/teardown
 	readyDirExists                bool
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool

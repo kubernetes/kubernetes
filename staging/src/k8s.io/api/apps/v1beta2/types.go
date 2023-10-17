@@ -480,7 +480,7 @@ type DeploymentStrategy struct {
 
 	// Rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
-	//---
+	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be.
 	// +optional
@@ -626,7 +626,7 @@ type DaemonSetUpdateStrategy struct {
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 
 	// Rolling update config params. Present only if type = "RollingUpdate".
-	//---
+	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as Deployment `strategy.rollingUpdate`.
 	// See https://github.com/kubernetes/kubernetes/issues/35345

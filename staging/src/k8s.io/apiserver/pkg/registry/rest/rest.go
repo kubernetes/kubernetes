@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-//TODO:
+// TODO:
 // Storage interfaces need to be separated into two groups; those that operate
 // on collections and those that operate on individually named items.
 // Collection interfaces:

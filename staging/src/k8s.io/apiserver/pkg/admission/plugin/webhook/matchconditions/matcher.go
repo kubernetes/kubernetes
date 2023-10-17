@@ -96,7 +96,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 				Matches: false,
 			}
 		}
-		//TODO: add default so that if in future we add different failure types it doesn't fall through
+		// TODO: add default so that if in future we add different failure types it doesn't fall through
 	}
 
 	errorList := []error{}

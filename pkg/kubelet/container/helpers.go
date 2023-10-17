@@ -125,7 +125,7 @@ func HashContainerWithoutResources(container *v1.Container) uint64 {
 	// NOTE: This is needed during alpha and beta so that containers using Resources but
 	//       not subject to In-place resize are not unexpectedly restarted when
 	//       InPlacePodVerticalScaling feature-gate is toggled.
-	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashContainerWithoutResources to become Hash.
+	// TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashContainerWithoutResources to become Hash.
 	hashWithoutResources := fnv.New32a()
 	containerCopy := container.DeepCopy()
 	containerCopy.Resources = v1.ResourceRequirements{}

@@ -1099,7 +1099,7 @@ func statusUnschedulable(logger klog.Logger, reason string, kv ...interface{}) *
 		helper, loggerV := loggerV.WithCallStackHelper()
 		helper()
 		kv = append(kv, "reason", reason)
-		// nolint: logcheck // warns because it cannot check key/values
+		//nolint: logcheck // warns because it cannot check key/values
 		loggerV.Info("pod unschedulable", kv...)
 	}
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, reason)
@@ -1126,7 +1126,7 @@ func statusError(logger klog.Logger, err error, kv ...interface{}) *framework.St
 	if loggerV := logger.V(5); loggerV.Enabled() {
 		helper, loggerV := loggerV.WithCallStackHelper()
 		helper()
-		// nolint: logcheck // warns because it cannot check key/values
+		//nolint: logcheck // warns because it cannot check key/values
 		loggerV.Error(err, "dynamic resource plugin failed", kv...)
 	}
 	return framework.AsStatus(err)

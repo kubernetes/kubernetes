@@ -414,9 +414,9 @@ func importOrder(deps map[string][]string) ([]string, error) {
 	if len(remainingNodes) > 0 {
 		return nil, fmt.Errorf("cycle: remaining nodes: %#v, remaining edges: %#v", remainingNodes, graph)
 	}
-	//for _, n := range sorted {
+	// for _, n := range sorted {
 	//	fmt.Println("topological order", n)
-	//}
+	// }
 	return sorted, nil
 }
 

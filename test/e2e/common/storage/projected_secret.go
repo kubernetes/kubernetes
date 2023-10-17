@@ -408,9 +408,9 @@ var _ = SIGDescribe("Projected secret", func() {
 		gomega.Eventually(ctx, pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-secret-volumes/delete/data-1"))
 	})
 
-	//The secret is in pending during volume creation until the secret objects are available
-	//or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timeout exception unless it is marked optional.
-	//Slow (~5 mins)
+	// The secret is in pending during volume creation until the secret objects are available
+	// or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timeout exception unless it is marked optional.
+	// Slow (~5 mins)
 	f.It("Should fail non-optional pod creation due to secret object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
@@ -419,9 +419,9 @@ var _ = SIGDescribe("Projected secret", func() {
 		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 
-	//Secret object defined for the pod, If a key is specified which is not present in the secret,
+	// Secret object defined for the pod, If a key is specified which is not present in the secret,
 	// the volume setup will error unless it is marked optional, during the pod creation.
-	//Slow (~5 mins)
+	// Slow (~5 mins)
 	f.It("Should fail non-optional pod creation due to the key in the secret object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
@@ -490,7 +490,7 @@ func doProjectedSecretE2EWithoutMapping(ctx context.Context, f *framework.Framew
 	}
 
 	if defaultMode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.DefaultMode = defaultMode
+		// pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.DefaultMode = defaultMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
 	}
 
@@ -574,7 +574,7 @@ func doProjectedSecretE2EWithMapping(ctx context.Context, f *framework.Framework
 	}
 
 	if mode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Mode = mode
+		// pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Mode = mode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = mode
 	}
 

@@ -241,7 +241,7 @@ func TestCIDRSet_RandomishAllocation(t *testing.T) {
 			}
 		}
 
-		//var err error
+		// var err error
 		_, err = a.AllocateNext()
 		if err == nil {
 			t.Fatalf("expected error because of fully-allocated range for %v", tc.description)
@@ -303,7 +303,7 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 			}
 		}
 
-		//var err error
+		// var err error
 		_, err = a.AllocateNext()
 		if err == nil {
 			t.Fatalf("expected error because of fully-allocated range for %v", tc.description)

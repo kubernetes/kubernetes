@@ -127,7 +127,7 @@ func (n *nonceGenerator) next(b []byte) {
 }
 
 func die(msg string) {
-	// nolint:logcheck // we want the stack traces, log flushing, and process exiting logic from FatalDepth
+	//nolint:logcheck // we want the stack traces, log flushing, and process exiting logic from FatalDepth
 	klog.FatalDepth(1, msg)
 }
 

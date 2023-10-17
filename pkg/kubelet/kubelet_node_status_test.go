@@ -640,7 +640,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 					LastHeartbeatTime:  metav1.Time{},
 					LastTransitionTime: metav1.Time{},
 				},
-				{}, //placeholder
+				{}, // placeholder
 			},
 			NodeInfo: v1.NodeSystemInfo{
 				MachineID:               "123",

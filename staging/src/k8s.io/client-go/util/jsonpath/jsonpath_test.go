@@ -76,7 +76,7 @@ func testJSONPathSortOutput(tests []jsonpathTest, t *testing.T) {
 			t.Errorf("in %s, execute error %v", test.name, err)
 		}
 		out := buf.String()
-		//since map is visited in random order, we need to sort the results.
+		// since map is visited in random order, we need to sort the results.
 		sortedOut := strings.Fields(out)
 		sort.Strings(sortedOut)
 		sortedExpect := strings.Fields(test.expect)

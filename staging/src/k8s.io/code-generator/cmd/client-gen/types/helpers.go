@@ -116,6 +116,6 @@ func ToGroupInstallPackages(groups []GroupVersions, groupGoNames map[GroupVersio
 }
 
 // NormalizeGroupVersion calls normalizes the GroupVersion.
-//func NormalizeGroupVersion(gv GroupVersion) GroupVersion {
+// func NormalizeGroupVersion(gv GroupVersion) GroupVersion {
 //	return GroupVersion{Group: gv.Group.NonEmpty(), Version: gv.Version, NonEmptyVersion: normalization.Version(gv.Version)}
-//}
+// }

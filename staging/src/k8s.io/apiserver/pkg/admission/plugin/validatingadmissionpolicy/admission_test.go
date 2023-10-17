@@ -276,7 +276,7 @@ func (f *fakeCompiler) Compile(
 }
 
 func (f *fakeCompiler) RegisterDefinition(definition *v1beta1.ValidatingAdmissionPolicy, compileFunc func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter) {
-	//Key must be something that we can decipher from the inputs to Validate so using expression which will be passed to validate on the filter
+	// Key must be something that we can decipher from the inputs to Validate so using expression which will be passed to validate on the filter
 	key := definition.Spec.Validations[0].Expression
 	if compileFunc != nil {
 		if f.CompileFuncs == nil {
@@ -322,7 +322,7 @@ type fakeValidator struct {
 }
 
 func (f *fakeValidator) RegisterDefinition(definition *v1beta1.ValidatingAdmissionPolicy, validateFunc func(ctx context.Context, matchResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult) {
-	//Key must be something that we can decipher from the inputs to Validate so using message which will be on the validationCondition object of evalResult
+	// Key must be something that we can decipher from the inputs to Validate so using message which will be on the validationCondition object of evalResult
 	var key string
 	if len(definition.Spec.Validations) > 0 {
 		key = definition.Spec.Validations[0].Expression
