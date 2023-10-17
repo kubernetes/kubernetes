@@ -18,6 +18,7 @@ package job
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -27,7 +28,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/utils/ptr"
 )
+
+// JobState is used to verify if Job matches a particular condition.
+// If it matches, an empty string is returned.
+// Otherwise, the string explains why the condition is not matched.
+// This should be a short string. A dump of the job object will
+// get added by the caller.
+type JobState func(job *batchv1.Job) string
 
 // WaitForJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
 // when pods will run for a long time, or it will be racy.
@@ -65,6 +75,16 @@ func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName 
 			return false, err
 		}
 		return curr.Status.Succeeded == completions, nil
+	})
+}
+
+// WaitForJobReady waits for particular value of the Job .status.ready field
+func WaitForJobReady(ctx context.Context, c clientset.Interface, ns, jobName string, ready *int32) error {
+	return WaitForJobState(ctx, c, ns, jobName, JobTimeout, func(job *batchv1.Job) string {
+		if ptr.Equal(ready, job.Status.Ready) {
+			return ""
+		}
+		return "job does not match intended ready status"
 	})
 }
 
@@ -132,4 +152,21 @@ func WaitForAllJobPodsGone(ctx context.Context, c clientset.Interface, ns, jobNa
 		}
 		return len(pods.Items) == 0, nil
 	})
+}
+
+// WaitForJobState waits for a job to be matched to the given condition.
+// The condition callback may use gomega.StopTrying to abort early.
+func WaitForJobState(ctx context.Context, c clientset.Interface, ns, jobName string, timeout time.Duration, state JobState) error {
+	return framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(c.BatchV1().Jobs(ns).Get, jobName, metav1.GetOptions{}))).
+		WithTimeout(timeout).
+		Should(framework.MakeMatcher(func(job *batchv1.Job) (func() string, error) {
+			matches := state(job)
+			if matches == "" {
+				return nil, nil
+			}
+			return func() string {
+				return fmt.Sprintf("%v\n%s", matches, format.Object(job, 1))
+			}, nil
+		}))
 }
