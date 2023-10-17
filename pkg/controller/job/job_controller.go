@@ -1914,16 +1914,16 @@ func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
 }
 
 func recordJobPodsCreationTotal(job *batch.Job) {
-	trigger := metrics.New
+	event := metrics.New
 	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
 		podsTerminating := job.Status.Terminating != nil && *job.Status.Terminating > 0
 		isRecreateAction := podsTerminating || job.Status.Failed > 0
 		if isRecreateAction {
-			trigger = metrics.RecreateTerminatingOrFailed
+			event = metrics.RecreateTerminatingOrFailed
 			if *job.Spec.PodReplacementPolicy == batch.Failed {
-				trigger = metrics.RecreateFailed
+				event = metrics.RecreateFailed
 			}
 		}
 	}
-	metrics.JobPodsCreationTotal.WithLabelValues(trigger).Inc()
+	metrics.JobPodsCreationTotal.WithLabelValues(event).Inc()
 }
