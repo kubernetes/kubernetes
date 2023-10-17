@@ -105,6 +105,8 @@ func Describe() {
 			})
 		},
 	)
+
+	framework.SIGDescribe("123")
 }
 
 const (
@@ -118,13 +120,14 @@ ERROR: bugs.go:77: WithFeature: unknown feature "no-such-feature"
 ERROR: bugs.go:79: WithEnvironment: unknown environment "no-such-env"
 ERROR: bugs.go:81: WithNodeFeature: unknown environment "no-such-node-env"
 ERROR: bugs.go:83: WithFeatureGate: the feature gate "no-such-feature-gate" is unknown
+ERROR: bugs.go:109: SIG label must be lowercase, no spaces and no sig- prefix, got instead: "123"
 ERROR: buggy/buggy.go:100: hello world
 ERROR: some/relative/path/buggy.go:200: with spaces
 `
 	// Used by unittests/list-tests. It's sorted by test name, not source code location.
 	ListTestsOutput = `The following spec names can be used with 'ginkgo run --focus/skip':
-    ../bugs/bugs.go:103: [sig-testing] abc   space1 space2  [Feature: no-such-feature] [Feature: feature-foo] [Environment: no-such-env] [Environment: Linux] [no-such-node-env] [node-feature-foo] [FeatureGate: no-such-feature-gate] [FeatureGate: TestAlphaFeature] [Alpha] [FeatureGate: TestBetaFeature] [Beta] [FeatureGate: TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
-    ../bugs/bugs.go:98: [sig-testing] abc   space1 space2  [Feature: no-such-feature] [Feature: feature-foo] [Environment: no-such-env] [Environment: Linux] [no-such-node-env] [node-feature-foo] [FeatureGate: no-such-feature-gate] [FeatureGate: TestAlphaFeature] [Alpha] [FeatureGate: TestBetaFeature] [Beta] [FeatureGate: TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
+    ../bugs/bugs.go:103: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [NodeFeature:no-such-node-env] [NodeFeature:node-feature-foo] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
+    ../bugs/bugs.go:98: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [NodeFeature:no-such-node-env] [NodeFeature:node-feature-foo] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
 
 `
 
@@ -134,22 +137,22 @@ ERROR: some/relative/path/buggy.go:200: with spaces
     Beta
     Conformance
     Disruptive
-    Environment: Linux
-    Environment: no-such-env
-    Feature: feature-foo
-    Feature: no-such-feature
-    FeatureGate: TestAlphaFeature
-    FeatureGate: TestBetaFeature
-    FeatureGate: TestGAFeature
-    FeatureGate: no-such-feature-gate
+    Environment:Linux
+    Environment:no-such-env
+    Feature:feature-foo
+    Feature:no-such-feature
+    FeatureGate:TestAlphaFeature
+    FeatureGate:TestBetaFeature
+    FeatureGate:TestGAFeature
+    FeatureGate:no-such-feature-gate
     NodeConformance
+    NodeFeature:no-such-node-env
+    NodeFeature:node-feature-foo
     Serial
     Slow
     bar
     custom-label
     foo
-    no-such-node-env
-    node-feature-foo
     sig-testing
 
 `
