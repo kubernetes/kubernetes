@@ -1681,25 +1681,29 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	}
 	cases := map[string]struct {
 		podReplacementPolicyEnabled bool
-		failPodsInsteadOfDeletion   bool
+		deletePods                  bool
+		failPods                    bool
 		wantTerminating             *int32
 		wantFailed                  int
 		wantActive                  int
 		jobSpec                     *batchv1.JobSpec
 	}{
 		"feature flag off, delete pods and verify no terminating status": {
+			deletePods: true,
 			jobSpec:    jobSpecIndexedDefault,
 			wantActive: int(podCount),
 			wantFailed: int(podCount),
 		},
 		"feature flag true, delete pods and verify terminating status": {
 			podReplacementPolicyEnabled: true,
+			deletePods:                  true,
 			jobSpec:                     jobSpecIndexedDefault,
 			wantTerminating:             pointer.Int32(podCount),
 			wantFailed:                  int(podCount),
 		},
 		"feature flag true, delete pods, verify terminating status and recreate upon terminating": {
 			podReplacementPolicyEnabled: true,
+			deletePods:                  true,
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          pointer.Int32Ptr(podCount),
 				Completions:          pointer.Int32Ptr(podCount),
@@ -1711,32 +1715,29 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 		},
 		"feature flag true, delete pods, verify terminating status and recreate once failed": {
 			podReplacementPolicyEnabled: true,
+			deletePods:                  true,
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          pointer.Int32Ptr(podCount),
 				Completions:          pointer.Int32Ptr(podCount),
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			failPodsInsteadOfDeletion: true,
-			wantActive:                int(podCount),
-			wantFailed:                int(podCount),
-			wantTerminating:           pointer.Int32(0),
+			wantTerminating: pointer.Int32(podCount),
 		},
 		"feature flag true with NonIndexedJob, delete pods, verify terminating status and recreate once failed": {
 			podReplacementPolicyEnabled: true,
+			deletePods:                  true,
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          pointer.Int32Ptr(podCount),
 				Completions:          pointer.Int32Ptr(podCount),
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			failPodsInsteadOfDeletion: true,
-			wantActive:                int(podCount),
-			wantFailed:                int(podCount),
-			wantTerminating:           pointer.Int32(0),
+			wantTerminating: pointer.Int32(podCount),
 		},
 		"feature flag false, podFailurePolicy enabled, delete pods, verify terminating status and recreate once failed": {
 			podReplacementPolicyEnabled: false,
+			deletePods:                  true,
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          pointer.Int32Ptr(podCount),
 				Completions:          pointer.Int32Ptr(podCount),
@@ -1755,6 +1756,32 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				},
 			},
 			wantActive: int(podCount),
+		},
+		"feature flag true, delete pods, verify active and failed status and recreate once failed": {
+			podReplacementPolicyEnabled: true,
+			failPods:                    true,
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:          pointer.Int32Ptr(podCount),
+				Completions:          pointer.Int32Ptr(podCount),
+				CompletionMode:       &nonIndexedCompletion,
+				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+			},
+			wantActive:      int(podCount),
+			wantFailed:      int(podCount),
+			wantTerminating: pointer.Int32(0),
+		},
+		"feature flag true with NonIndexedJob, delete pods, verify active and failed status and recreate once failed": {
+			podReplacementPolicyEnabled: true,
+			failPods:                    true,
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:          pointer.Int32Ptr(podCount),
+				Completions:          pointer.Int32Ptr(podCount),
+				CompletionMode:       &nonIndexedCompletion,
+				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+			},
+			wantActive:      int(podCount),
+			wantFailed:      int(podCount),
+			wantTerminating: pointer.Int32(0),
 		},
 	}
 	for name, tc := range cases {
@@ -1791,13 +1818,14 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error waiting for Job pods to become active: %v", err)
 			}
-			if tc.failPodsInsteadOfDeletion {
+			if tc.deletePods {
+				addFinalizerAndDeletePods(ctx, t, clientSet, ns.Name)
+			}
+			if tc.failPods {
 				err, _ = setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, int(podCount))
 				if err != nil {
 					t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 				}
-			} else {
-				addFinalizerAndDeletePods(ctx, t, clientSet, ns.Name)
 			}
 
 			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
