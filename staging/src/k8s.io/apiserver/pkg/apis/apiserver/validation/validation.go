@@ -320,7 +320,7 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 		if c.ConnectionInfo.KubeConfigFile != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("connectionInfo", "kubeConfigFile"), *c.ConnectionInfo.KubeConfigFile, "can only be set when type=KubeConfigFile"))
 		}
-	case api.AuthorizationWebhookConnectionInfoTypeKubeConfig:
+	case api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile:
 		if c.ConnectionInfo.KubeConfigFile == nil || *c.ConnectionInfo.KubeConfigFile == "" {
 			allErrs = append(allErrs, field.Required(fldPath.Child("connectionInfo", "kubeConfigFile"), ""))
 		} else if !filepath.IsAbs(*c.ConnectionInfo.KubeConfigFile) {
@@ -331,7 +331,7 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("connectionInfo", "kubeConfigFile"), *c.ConnectionInfo.KubeConfigFile, "must be a regular file"))
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{"InClusterConfig", "KubeConfigFile"}))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{api.AuthorizationWebhookConnectionInfoTypeInCluster, api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile}))
 	}
 
 	// TODO: Remove this check and ensure that correct validations below for MatchConditions are added
