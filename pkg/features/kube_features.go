@@ -643,14 +643,6 @@ const (
 	// Enable users to specify when a Pod is ready for scheduling.
 	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
 
-	// owner: @rphillips
-	// alpha: v1.21
-	// beta: v1.22
-	// ga: v1.28
-	//
-	// Allows user to override pod-level terminationGracePeriod for probes
-	ProbeTerminationGracePeriod featuregate.Feature = "ProbeTerminationGracePeriod"
-
 	// owner: @jessfraz
 	// alpha: v1.12
 	//
@@ -1063,8 +1055,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodLifecycleSleepAction: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodSchedulingReadiness: {Default: true, PreRelease: featuregate.Beta},
-
-	ProbeTerminationGracePeriod: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	ProcMountType: {Default: false, PreRelease: featuregate.Alpha},
 

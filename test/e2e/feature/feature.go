@@ -89,7 +89,6 @@ var (
 	PodPriority                        = framework.WithFeature(framework.ValidFeatures.Add("PodPriority"))
 	PodReadyToStartContainersCondition = framework.WithFeature(framework.ValidFeatures.Add("PodReadyToStartContainersCondition"))
 	PodResources                       = framework.WithFeature(framework.ValidFeatures.Add("PodResources"))
-	ProbeTerminationGracePeriod        = framework.WithFeature(framework.ValidFeatures.Add("ProbeTerminationGracePeriod"))
 	Reboot                             = framework.WithFeature(framework.ValidFeatures.Add("Reboot"))
 	ReclaimPolicy                      = framework.WithFeature(framework.ValidFeatures.Add("ReclaimPolicy"))
 	RecoverVolumeExpansionFailure      = framework.WithFeature(framework.ValidFeatures.Add("RecoverVolumeExpansionFailure"))
