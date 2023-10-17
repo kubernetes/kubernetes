@@ -29,7 +29,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 func TestValidateToken(t *testing.T) {
@@ -806,14 +805,17 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 		ignorePreflightErrorsFromConfigFile []string
 		expectedSet                         sets.Set[string]
 		expectedError                       bool
-		mergeCLIArgumentsWithConfig         bool
 	}{
-		// FG is off
 		{ // empty lists in CLI and config file
 			[]string{},
 			[]string{},
 			sets.New[string](),
 			false,
+		},
+		{ // empty list in CLI only
+			[]string{},
+			[]string{"a"},
+			sets.New("a"),
 			false,
 		},
 		{ // empty list in config file only
@@ -821,27 +823,23 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 			[]string{},
 			sets.New("a"),
 			false,
-			false,
 		},
 		{ // no duplicates, no overlap
 			[]string{"a", "b"},
 			[]string{"c", "d"},
-			sets.New("a", "b"),
-			false,
+			sets.New("a", "b", "c", "d"),
 			false,
 		},
 		{ // some duplicates, with some overlapping duplicates
 			[]string{"a", "b", "a"},
 			[]string{"c", "b"},
-			sets.New("a", "b"),
-			false,
+			sets.New("a", "b", "c"),
 			false,
 		},
-		{ // CLI is not set, but 'all' present in config file
-			nil,
+		{ // empty list in CLI, but 'all' present in config file
+			[]string{},
 			[]string{"all"},
 			sets.New("all"),
-			false,
 			false,
 		},
 		{ // empty list in config file, but 'all' present in CLI
@@ -849,13 +847,11 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 			[]string{},
 			sets.New("all"),
 			false,
-			false,
 		},
 		{ // some duplicates, only 'all' present in CLI and config file
 			[]string{"all"},
 			[]string{"all"},
 			sets.New("all"),
-			false,
 			false,
 		},
 		{ // non-duplicate, but 'all' present together with individual checks in CLI
@@ -863,61 +859,28 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 			[]string{},
 			sets.New[string](),
 			true,
-			false,
 		},
 		{ // non-duplicate, but 'all' present together with individual checks in config file
-			nil,
+			[]string{},
 			[]string{"a", "b", "all"},
 			sets.New[string](),
 			true,
-			false,
 		},
-		{ // non-duplicate, but 'all' present in config file, while values are in CLI, "all" from config file will be ignored
+		{ // non-duplicate, but 'all' present in config file, while values are in CLI, which is forbidden
 			[]string{"a", "b"},
 			[]string{"all"},
-			sets.New[string]("a", "b"),
-			false,
-			false,
-		},
-		{ // non-duplicate, but 'all' present in CLI, while values are in config file, values from config file will be ignored
-			[]string{"all"},
-			[]string{"a", "b"},
-			sets.New[string]("all"),
-			false,
-			false,
-		},
-		{ // set from CLI will take precedence of the config file
-			[]string{"a", "b"},
-			[]string{"c", "d"},
-			sets.New[string]("a", "b"),
-			false,
-			false,
-		},
-		{ // empty list in CLI only
-			[]string{},
-			[]string{"a"},
 			sets.New[string](),
-			false,
-			false,
+			true,
 		},
-		{ // flag from CLI is not set
-			nil,
-			[]string{"c", "d"},
-			sets.New[string]("c", "d"),
-			false,
-			false,
-		},
-		// FG is on
-		{
+		{ // non-duplicate, but 'all' present in CLI, while values are in config file, which is forbidden
+			[]string{"all"},
 			[]string{"a", "b"},
-			[]string{"c", "d"},
-			sets.New[string]("a", "b", "c", "d"),
-			false,
+			sets.New[string](),
 			true,
 		},
 	}
 	for _, rt := range tests {
-		result, err := ValidateIgnorePreflightErrors(map[string]bool{features.MergeCLIArgumentsWithConfig: rt.mergeCLIArgumentsWithConfig}, rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile)
+		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile)
 		switch {
 		case err != nil && !rt.expectedError:
 			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s, %s), error: %v", rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile, err)
