@@ -724,12 +724,30 @@ func (c *RecommendedConfig) Complete() CompletedConfig {
 	return c.Config.Complete(c.SharedInformerFactory)
 }
 
+var allowedMediaTypes = []string{
+	runtime.ContentTypeJSON,
+	runtime.ContentTypeYAML,
+	runtime.ContentTypeProtobuf,
+}
+
 // New creates a new server which logically combines the handling chain with the passed server.
 // name is used to differentiate for logging. The handler chain in particular can be difficult as it starts delegating.
 // delegationTarget may not be nil.
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
+	}
+	for _, info := range c.Serializer.SupportedMediaTypes() {
+		var ok bool
+		for _, mt := range allowedMediaTypes {
+			if info.MediaType == mt {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return nil, fmt.Errorf("refusing to create new apiserver %q with support for media type %q (allowed media types are: %s)", name, info.MediaType, strings.Join(allowedMediaTypes, ", "))
+		}
 	}
 	if c.LoopbackClientConfig == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.LoopbackClientConfig == nil")
