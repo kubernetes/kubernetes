@@ -184,7 +184,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration, printer); err != nil {
+	if err := runPreflightChecks(client, ignorePreflightErrorsSet, printer); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -236,7 +236,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
+func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
 	printer.Printf("[preflight] Running pre-flight checks.\n")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {
