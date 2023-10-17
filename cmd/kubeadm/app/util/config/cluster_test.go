@@ -646,6 +646,12 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			if !rt.newControlPlane && (cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234) {
 				t.Errorf("invalid cfg.LocalAPIEndpoint: %v", cfg.LocalAPIEndpoint)
 			}
+			if !rt.newControlPlane && (cfg.NodeRegistration.Name != nodeName || cfg.NodeRegistration.CRISocket != "myCRIsocket" || len(cfg.NodeRegistration.Taints) != 1) {
+				t.Errorf("invalid cfg.NodeRegistration: %v", cfg.NodeRegistration)
+			}
+			if rt.newControlPlane && len(cfg.NodeRegistration.CRISocket) > 0 {
+				t.Errorf("invalid cfg.NodeRegistration.CRISocket: expected empty CRISocket, but got %v", cfg.NodeRegistration.CRISocket)
+			}
 			if _, ok := cfg.ComponentConfigs[componentconfigs.KubeletGroup]; !ok {
 				t.Errorf("no cfg.ComponentConfigs[%q]", componentconfigs.KubeletGroup)
 			}
