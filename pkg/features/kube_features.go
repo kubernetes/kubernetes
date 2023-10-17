@@ -159,12 +159,6 @@ const (
 	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
 	CSIMigrationRBD featuregate.Feature = "CSIMigrationRBD"
 
-	// owner: @divyenpatel
-	// beta: v1.19 (requires: vSphere vCenter/ESXi Version: 7.0u2, HW Version: VM version 15)
-	// GA: 1.26
-	// Enables the vSphere in-tree driver to vSphere CSI Driver migration feature.
-	CSIMigrationvSphere featuregate.Feature = "CSIMigrationvSphere"
-
 	// owner: @humblec, @zhucan
 	// kep: https://kep.k8s.io/3171
 	// alpha: v1.25
@@ -931,8 +925,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
 
 	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Deprecated}, //  deprecated in 1.28, remove in 1.31
-
-	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	CSINodeExpandSecret: {Default: true, PreRelease: featuregate.Beta},
 
