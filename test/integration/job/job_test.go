@@ -1820,7 +1820,14 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				t.Fatalf("Error waiting for Job pods to become active: %v", err)
 			}
 			if tc.deletePods {
-				addFinalizerAndDeletePods(ctx, t, clientSet, ns.Name)
+				err = clientSet.CoreV1().Pods(ns.Name).DeleteCollection(ctx,
+					metav1.DeleteOptions{},
+					metav1.ListOptions{
+						Limit: 1000,
+					})
+				if err != nil {
+					t.Fatalf("Failed to delete Pods: %v", err)
+				}
 			}
 			if tc.failPods {
 				err, _ = setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, int(podCount))
@@ -2805,22 +2812,6 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 	return int(updated), nil
 }
 
-func updatePod(t *testing.T, clientSet clientset.Interface, pods []v1.Pod, updateFunc func(*v1.Pod)) {
-	for _, val := range pods {
-		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			newPod, err := clientSet.CoreV1().Pods(val.Namespace).Get(context.TODO(), val.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			updateFunc(newPod)
-			_, err = clientSet.CoreV1().Pods(val.Namespace).Update(context.TODO(), newPod, metav1.UpdateOptions{})
-			return err
-		}); err != nil {
-			t.Fatalf("Failed to update pod %s: %v", val.Name, err)
-		}
-	}
-}
-
 func setJobPhaseForIndex(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, ix int) error {
 	pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -3008,27 +2999,4 @@ func updateJob(ctx context.Context, jobClient typedv1.JobInterface, jobName stri
 		return err
 	})
 	return job, err
-}
-
-func addFinalizerAndDeletePods(ctx context.Context, t *testing.T, clientSet clientset.Interface, namespace string) {
-	t.Helper()
-	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		t.Fatalf("Failed to list pods: %v", err)
-	}
-	updatePod(t, clientSet, pods.Items, func(pod *v1.Pod) {
-		pod.Finalizers = append(pod.Finalizers, "fake.example.com/blockDeletion")
-	})
-	err = clientSet.CoreV1().Pods(namespace).DeleteCollection(ctx,
-		metav1.DeleteOptions{},
-		metav1.ListOptions{
-			Limit: 1000,
-		})
-	if err != nil {
-		t.Fatalf("Failed to cleanup Pods: %v", err)
-	}
-	_, err = clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		t.Fatalf("Failed to list pods: %v", err)
-	}
 }
