@@ -385,6 +385,53 @@ func RunTestDeleteWithSuggestionAndConflict(ctx context.Context, t *testing.T, s
 	if err := store.Get(ctx, key, storage.GetOptions{}, &example.Pod{}); !storage.IsNotFound(err) {
 		t.Errorf("Unexpected error on reading object: %v", err)
 	}
+	updatedPod.ObjectMeta.ResourceVersion = out.ObjectMeta.ResourceVersion
+	expectNoDiff(t, "incorrect pod:", updatedPod, out)
+}
+
+// RunTestDeleteWithConflict tests the case when another conflicting update happened before the delete completed.
+func RunTestDeleteWithConflict(ctx context.Context, t *testing.T, store storage.Interface) {
+	key, _ := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
+
+	// First update, so originalPod is outdated.
+	updatedPod := &example.Pod{}
+	validateCount := 0
+	updateCount := 0
+	// Simulate a conflicting update in the middle of delete.
+	validateAllWithUpdate := func(_ context.Context, _ runtime.Object) error {
+		validateCount++
+		if validateCount > 1 {
+			return nil
+		}
+		if err := store.GuaranteedUpdate(ctx, key, updatedPod, false, nil,
+			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+				pod := obj.(*example.Pod)
+				pod.ObjectMeta.Labels = map[string]string{"foo": "bar"}
+				return pod, nil
+			}), nil); err != nil {
+			t.Errorf("Unexpected failure during updated: %v", err)
+		}
+		updateCount++
+		return nil
+	}
+
+	out := &example.Pod{}
+	if err := store.Delete(ctx, key, out, nil, validateAllWithUpdate, nil); err != nil {
+		t.Errorf("Unexpected failure during deletion: %v", err)
+	}
+
+	if validateCount != 2 {
+		t.Errorf("Expect validateCount = %d, but got %d", 2, validateCount)
+	}
+	if updateCount != 1 {
+		t.Errorf("Expect updateCount = %d, but got %d", 1, updateCount)
+	}
+
+	if err := store.Get(ctx, key, storage.GetOptions{}, &example.Pod{}); !storage.IsNotFound(err) {
+		t.Errorf("Unexpected error on reading object: %v", err)
+	}
+	updatedPod.ObjectMeta.ResourceVersion = out.ObjectMeta.ResourceVersion
+	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
 func RunTestDeleteWithSuggestionOfDeletedObject(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -457,6 +504,64 @@ func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, st
 	}
 }
 
+// RunTestValidateDeletionWithOnlySuggestionValid tests the case of delete with validateDeletion function,
+// when the suggested cachedExistingObject passes the validate function while the current version does not pass the validate function.
+func RunTestValidateDeletionWithOnlySuggestionValid(ctx context.Context, t *testing.T, store storage.Interface) {
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns", Labels: map[string]string{"foo": "bar"}}})
+
+	// Check that validaing fresh object fails is called once and fails.
+	validationCalls := 0
+	validationError := fmt.Errorf("validation error")
+	validateNothing := func(_ context.Context, _ runtime.Object) error {
+		validationCalls++
+		return validationError
+	}
+	out := &example.Pod{}
+	if err := store.Delete(ctx, key, out, nil, validateNothing, originalPod); err != validationError {
+		t.Errorf("Unexpected failure during deletion: %v", err)
+	}
+	if validationCalls != 1 {
+		t.Errorf("validate function should have been called once, called %d", validationCalls)
+	}
+
+	// First update, so originalPod is outdated.
+	updatedPod := &example.Pod{}
+	if err := store.GuaranteedUpdate(ctx, key, updatedPod, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.ObjectMeta.Labels = map[string]string{"foo": "barbar"}
+			return pod, nil
+		}), nil); err != nil {
+		t.Errorf("Unexpected failure during updated: %v", err)
+	}
+
+	calls := 0
+	validateFresh := func(_ context.Context, obj runtime.Object) error {
+		calls++
+		pod := obj.(*example.Pod)
+		if pod.ObjectMeta.Labels == nil || pod.ObjectMeta.Labels["foo"] != "bar" {
+			return fmt.Errorf("stale object")
+		}
+		return nil
+	}
+
+	err := store.Delete(ctx, key, out, nil, validateFresh, originalPod)
+	if err == nil || err.Error() != "stale object" {
+		t.Errorf("expecting stale object error, but get: %s", err)
+	}
+
+	// Implementations of the storage interface are allowed to ignore the suggestion,
+	// in which case just one validation call is possible.
+	if calls > 2 {
+		t.Errorf("validate function should have been called at most twice, called %d", calls)
+	}
+
+	if err = store.Get(ctx, key, storage.GetOptions{}, out); err != nil {
+		t.Errorf("Unexpected error on reading object: %v", err)
+	}
+	expectNoDiff(t, "incorrect pod:", updatedPod, out)
+}
+
 func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
 
@@ -481,6 +586,37 @@ func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T
 	if err := store.Get(ctx, key, storage.GetOptions{}, &example.Pod{}); !storage.IsNotFound(err) {
 		t.Errorf("Unexpected error on reading object: %v", err)
 	}
+}
+
+// RunTestPreconditionalDeleteWithOnlySuggestionPass tests the case of delete with preconditions,
+// when the suggested cachedExistingObject passes the preconditions while the current version does not pass the preconditions.
+func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *testing.T, store storage.Interface) {
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns", UID: "myUID"}})
+
+	// First update, so originalPod is outdated.
+	updatedPod := &example.Pod{}
+	if err := store.GuaranteedUpdate(ctx, key, updatedPod, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.ObjectMeta.UID = "otherUID"
+			return pod, nil
+		}), nil); err != nil {
+		t.Errorf("Unexpected failure during updated: %v", err)
+	}
+
+	prec := storage.NewUIDPreconditions("myUID")
+	// Although originalPod passes the precondition, its delete would fail due to conflict.
+	// The 2nd try with updatedPod would fail the precondition.
+	out := &example.Pod{}
+	err := store.Delete(ctx, key, out, prec, storage.ValidateAllObjectFunc, originalPod)
+	if err == nil || !storage.IsInvalidObj(err) {
+		t.Errorf("expecting invalid UID error, but get: %s", err)
+	}
+
+	if err = store.Get(ctx, key, storage.GetOptions{}, out); err != nil {
+		t.Errorf("Unexpected error on reading object: %v", err)
+	}
+	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
 func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
