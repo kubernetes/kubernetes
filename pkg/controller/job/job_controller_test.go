@@ -2115,7 +2115,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 			}
 
 			var j *batch.Job
-			err = wait.PollImmediate(200*time.Microsecond, 3*time.Second, func() (done bool, err error) {
+			err = wait.PollUntilContextTimeout(ctx, 200*time.Microsecond, 3*time.Second, true, func(ctx context.Context) (done bool, err error) {
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -2125,7 +2125,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 			if err != nil {
 				t.Errorf("Job failed to ensure that start time was set: %v", err)
 			}
-			err = wait.Poll(100*time.Millisecond, 3*time.Second, func() (done bool, err error) {
+			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (done bool, err error) {
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
 					return false, nil
@@ -4666,7 +4666,7 @@ func TestWatchOrphanPods(t *testing.T) {
 				t.Fatalf("Creating orphan pod: %v", err)
 			}
 
-			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -5201,7 +5201,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 
 	uids = sets.New(string(pods[2].UID))
 	var diff string
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		gotExpectedUIDs = manager.finalizerExpectations.getExpectedUIDs(jobKey)
 		diff = cmp.Diff(uids, gotExpectedUIDs)
 		return diff == "", nil
