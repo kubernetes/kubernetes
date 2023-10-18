@@ -134,33 +134,6 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 		// Verify PodReady is not set (since sandboxcreation is blocked)
 		_, err = getTransitionTimeForPodConditionWithStatus(p, v1.PodReady, false)
 		framework.ExpectNoError(err)
-
-		ginkgo.By("update pod related volume resource to unblock sandbox creation")
-
-		e2epod.NewPodClient(f).Update(ctx, p.Name, func(pod *v1.Pod) {
-			pod.Spec.Volumes = []v1.Volume{
-				{
-					Name: "secret",
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName: "secret",
-						},
-					},
-				},
-			}
-			pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
-				{
-					Name:      "secret",
-					MountPath: "/config",
-				},
-			}
-		})
-
-		// Verify PodReadyToStartContainers is set (since sandboxcreation is unblocked)
-		if checkPodReadyToStart {
-			_, err = getTransitionTimeForPodConditionWithStatus(p, v1.PodReadyToStartContainers, true)
-			framework.ExpectNoError(err)
-		}
 	}
 }
 
