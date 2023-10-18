@@ -311,7 +311,7 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		Path(root+path).
 		To(func(req *restful.Request, res *restful.Response) {}).
 		Doc(b.descriptionFor(path, operationVerb)).
-		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 		Operation(operationVerb+namespaced+b.kind+strings.Title(subresource(path))).
 		Metadata(endpoints.ROUTE_META_GVK, metav1.GroupVersionKind{
 			Group:   b.group,
