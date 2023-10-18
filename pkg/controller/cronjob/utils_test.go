@@ -157,7 +157,7 @@ func TestNextScheduleTime(t *testing.T) {
 	// schedule is hourly on the hour
 	schedule := "0 * * * ?"
 
-	PraseSchedule := func(schedule string) cron.Schedule {
+	ParseSchedule := func(schedule string) cron.Schedule {
 		sched, err := cron.ParseStandard(schedule)
 		if err != nil {
 			t.Errorf("Error parsing schedule: %#v", err)
@@ -189,7 +189,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is more than creation time, but less than T1.
 		now := T1.Add(-7 * time.Minute)
-		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, ParseSchedule(cj.Spec.Schedule), recorder)
 		if schedule != nil {
 			t.Errorf("expected no start time, got:  %v", schedule)
 		}
@@ -200,7 +200,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is after T1
 		now := T1.Add(2 * time.Second)
-		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, ParseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start time, got nil")
 		} else if !schedule.Equal(T1) {
@@ -215,7 +215,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1
 		now := T1.Add(2 * time.Minute)
-		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, ParseSchedule(cj.Spec.Schedule), recorder)
 		if schedule != nil {
 			t.Errorf("expected 0 start times, got: %v", schedule)
 		}
@@ -228,7 +228,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, ParseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start times, got nil")
 		} else if !schedule.Equal(T2) {
@@ -241,7 +241,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, ParseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start times, got nil")
 		} else if !schedule.Equal(T2) {
@@ -253,7 +253,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
-		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, ParseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
@@ -266,7 +266,7 @@ func TestNextScheduleTime(t *testing.T) {
 		// Deadline is short
 		deadline := int64(2 * 60 * 60)
 		cj.Spec.StartingDeadlineSeconds = &deadline
-		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, ParseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
@@ -277,7 +277,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = nil
 		now := *deltaTimeAfterTopOfTheHour(1 * time.Hour)
 		// rouge schedule
-		schedule, err := nextScheduleTime(logger, &cj, now, PraseSchedule("59 23 31 2 *"), recorder)
+		schedule, err := nextScheduleTime(logger, &cj, now, ParseSchedule("59 23 31 2 *"), recorder)
 		if schedule != nil {
 			t.Errorf("expected no start time, got:  %v", schedule)
 		}
