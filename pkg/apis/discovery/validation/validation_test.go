@@ -635,6 +635,24 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 				}},
 			},
 		},
+		"good-slice-duplicate-endpoint": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.String("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hostname:  utilpointer.String("valid-123"),
+				}, {
+					Addresses: generateIPAddresses(1),
+					Hostname:  utilpointer.String("valid-123"),
+				}},
+			},
+		},
 		"good-slice-node-name": {
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{

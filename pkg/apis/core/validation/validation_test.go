@@ -19881,6 +19881,15 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 		},
+		"duplicate ready and not ready address": {
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{{
+					Addresses:         []core.EndpointAddress{{IP: "10.10.3.3"}},
+					NotReadyAddresses: []core.EndpointAddress{{IP: "10.10.3.3"}},
+				}},
+			},
+		},
 	}
 
 	for name, tc := range successCases {
