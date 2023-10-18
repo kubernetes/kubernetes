@@ -198,9 +198,7 @@ func TestStatusStrategyValidateUpdate(t *testing.T) {
 	}
 	strategy.customResourceStrategy.validator.kind = kind
 	ss, _ := structuralschema.NewStructural(crd.Spec.Versions[0].Schema.OpenAPIV3Schema)
-	strategy.structuralSchemas = map[string]*structuralschema.Structural{
-		crd.Spec.Versions[0].Name: ss,
-	}
+	strategy.structuralSchema = ss
 
 	ctx := context.TODO()
 
