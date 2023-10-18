@@ -712,12 +712,12 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 					capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
 					time:      imageFs.Time,
 				}
-				if imageFs.InodesFree != nil && imageFs.Inodes != nil {
-					result[evictionapi.SignalImageFsInodesFree] = signalObservation{
-						available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.DecimalSI),
-						capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.DecimalSI),
-						time:      imageFs.Time,
-					}
+			}
+			if imageFs.InodesFree != nil && imageFs.Inodes != nil {
+				result[evictionapi.SignalImageFsInodesFree] = signalObservation{
+					available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.DecimalSI),
+					capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.DecimalSI),
+					time:      imageFs.Time,
 				}
 			}
 		}
@@ -728,12 +728,12 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 					capacity:  resource.NewQuantity(int64(*containerFs.CapacityBytes), resource.BinarySI),
 					time:      containerFs.Time,
 				}
-				if containerFs.InodesFree != nil && containerFs.Inodes != nil {
-					result[evictionapi.SignalContainerFsInodesFree] = signalObservation{
-						available: resource.NewQuantity(int64(*containerFs.InodesFree), resource.DecimalSI),
-						capacity:  resource.NewQuantity(int64(*containerFs.Inodes), resource.DecimalSI),
-						time:      containerFs.Time,
-					}
+			}
+			if containerFs.InodesFree != nil && containerFs.Inodes != nil {
+				result[evictionapi.SignalContainerFsInodesFree] = signalObservation{
+					available: resource.NewQuantity(int64(*containerFs.InodesFree), resource.DecimalSI),
+					capacity:  resource.NewQuantity(int64(*containerFs.Inodes), resource.DecimalSI),
+					time:      containerFs.Time,
 				}
 			}
 		}

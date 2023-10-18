@@ -8036,11 +8036,7 @@ type ImageFsInfoResponse struct {
 	// Information of image filesystem(s).
 	ImageFilesystems []*FilesystemUsage `protobuf:"bytes,1,rep,name=image_filesystems,json=imageFilesystems,proto3" json:"image_filesystems,omitempty"`
 	// Information of container filesystem(s).
-<<<<<<< HEAD
-	// This is an optional field, may be used for example if container and image
-=======
 	// This is an optional field if container and image
->>>>>>> c078bee984e (add container filesystem to CRI api)
 	// storage are separated.
 	// Default will be to return this as empty.
 	ContainerFilesystems []*FilesystemUsage `protobuf:"bytes,2,rep,name=container_filesystems,json=containerFilesystems,proto3" json:"container_filesystems,omitempty"`

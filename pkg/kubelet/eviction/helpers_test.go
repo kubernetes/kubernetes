@@ -1305,6 +1305,12 @@ func TestMakeSignalObservations(t *testing.T) {
 	imageFsInodes := uint64(1024 * 1024)
 	nodeFsInodesFree := uint64(1024)
 	nodeFsInodes := uint64(1024 * 1024)
+	containerFsAvailableBytes := uint64(1024 * 1024 * 2)
+	containerFsCapacityBytes := uint64(1024 * 1024 * 8)
+	containerFsInodesFree := uint64(1024 * 2)
+	containerFsInodes := uint64(1024 * 2)
+	maxPID := int64(255816)
+	numberOfRunningProcesses := int64(1000)
 	fakeStats := &statsapi.Summary{
 		Node: statsapi.NodeStats{
 			Memory: &statsapi.MemoryStats{
@@ -1318,6 +1324,16 @@ func TestMakeSignalObservations(t *testing.T) {
 					InodesFree:     &imageFsInodesFree,
 					Inodes:         &imageFsInodes,
 				},
+				ContainerFs: &statsapi.FsStats{
+					AvailableBytes: &containerFsAvailableBytes,
+					CapacityBytes:  &containerFsCapacityBytes,
+					InodesFree:     &containerFsInodesFree,
+					Inodes:         &containerFsInodes,
+				},
+			},
+			Rlimit: &statsapi.RlimitStats{
+				MaxPID:                &maxPID,
+				NumOfRunningProcesses: &numberOfRunningProcesses,
 			},
 			Fs: &statsapi.FsStats{
 				AvailableBytes: &nodeFsAvailableBytes,
@@ -1402,6 +1418,16 @@ func TestMakeSignalObservations(t *testing.T) {
 	if expectedBytes := int64(imageFsCapacityBytes); imageFsQuantity.capacity.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, imageFsQuantity.capacity.Value())
 	}
+	containerFsQuantity, found := actualObservations[evictionapi.SignalContainerFsAvailable]
+	if !found {
+		t.Error("Expected available containerfs observation")
+	}
+	if expectedBytes := int64(containerFsAvailableBytes); containerFsQuantity.available.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, containerFsQuantity.available.Value())
+	}
+	if expectedBytes := int64(containerFsCapacityBytes); containerFsQuantity.capacity.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, containerFsQuantity.capacity.Value())
+	}
 	imageFsInodesQuantity, found := actualObservations[evictionapi.SignalImageFsInodesFree]
 	if !found {
 		t.Error("Expected inodes free imagefs observation")
@@ -1411,6 +1437,27 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	if expected := int64(imageFsInodes); imageFsInodesQuantity.capacity.Value() != expected {
 		t.Errorf("Expected %v, actual: %v", expected, imageFsInodesQuantity.capacity.Value())
+	}
+	containerFsInodesQuantity, found := actualObservations[evictionapi.SignalContainerFsInodesFree]
+	if !found {
+		t.Error("Expected indoes free containerfs observation")
+	}
+	if expected := int64(containerFsInodesFree); containerFsInodesQuantity.available.Value() != expected {
+		t.Errorf("Expected %v, actual: %v", expected, containerFsInodesQuantity.available.Value())
+	}
+	if expected := int64(containerFsInodes); containerFsInodesQuantity.capacity.Value() != expected {
+		t.Errorf("Expected %v, actual: %v", expected, containerFsInodesQuantity.capacity.Value())
+	}
+
+	pidQuantity, found := actualObservations[evictionapi.SignalPIDAvailable]
+	if !found {
+		t.Error("Expected available memory observation")
+	}
+	if expectedBytes := int64(maxPID); pidQuantity.capacity.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, pidQuantity.capacity.Value())
+	}
+	if expectedBytes := int64(maxPID - numberOfRunningProcesses); pidQuantity.available.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, pidQuantity.available.Value())
 	}
 	for _, pod := range pods {
 		podStats, found := statsFunc(pod)
