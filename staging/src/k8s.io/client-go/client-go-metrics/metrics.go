@@ -17,7 +17,7 @@ limitations under the License.
 package clientgo
 
 import (
-	_ "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection" // load leaderelection metrics
-	_ "k8s.io/component-base/metrics/prometheus/restclient"              // load restclient metrics
-	_ "k8s.io/component-base/metrics/prometheus/workqueue"               // load the workqueue metrics
+	_ "k8s.io/client-go/client-go-metrics/leaderelection" // load leaderelection metrics
+	_ "k8s.io/client-go/client-go-metrics/restclient"     // load restclient metrics
+	_ "k8s.io/client-go/client-go-metrics/workqueue"      // load the workqueue metrics
 )

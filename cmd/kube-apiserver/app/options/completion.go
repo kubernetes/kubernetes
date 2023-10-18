@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	_ "k8s.io/component-base/metrics/prometheus/workqueue"
+	_ "k8s.io/client-go/client-go-metrics/workqueue"
 	netutils "k8s.io/utils/net"
 
 	controlplane "k8s.io/kubernetes/pkg/controlplane/apiserver/options"

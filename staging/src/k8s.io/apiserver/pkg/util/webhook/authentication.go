@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/transport"
+
 	"go.opentelemetry.io/otel/trace"
 
 	corev1 "k8s.io/api/core/v1"
@@ -60,7 +62,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 					return nil, err
 				}
 				if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
-					ret.Wrap(tracing.WrapperFor(tp))
+					ret.Wrap(transport.WrapperFunc(tracing.WrapperFor(tp)))
 				}
 
 				if egressSelector != nil {
@@ -85,7 +87,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 					return nil, err
 				}
 				if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
-					ret.Wrap(tracing.WrapperFor(tp))
+					ret.Wrap(transport.WrapperFunc(tracing.WrapperFor(tp)))
 				}
 
 				if egressSelector != nil {

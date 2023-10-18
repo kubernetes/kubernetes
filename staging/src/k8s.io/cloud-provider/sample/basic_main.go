@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	_ "k8s.io/client-go/client-go-metrics" // load all the prometheus client-go plugins
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
@@ -31,9 +32,8 @@ import (
 	"k8s.io/cloud-provider/options"
 	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
-	_ "k8s.io/component-base/logs/json/register"          // register optional JSON log format
-	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
-	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
+	_ "k8s.io/component-base/logs/json/register"         // register optional JSON log format
+	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
 	"k8s.io/klog/v2"
 	// For existing cloud providers, the option to import legacy providers is still available.
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"

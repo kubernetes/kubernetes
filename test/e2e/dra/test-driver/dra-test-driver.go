@@ -19,12 +19,12 @@ package main
 import (
 	"os"
 
+	_ "k8s.io/client-go/client-go-metrics/leaderelection" // register leader election in the default legacy registry
+	_ "k8s.io/client-go/client-go-metrics/restclient"     // for client metric registration
+	_ "k8s.io/client-go/client-go-metrics/workqueue"      // register work queues in the default legacy registry
 	"k8s.io/component-base/cli"
-	_ "k8s.io/component-base/logs/json/register"                         // for JSON log output support
-	_ "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection" // register leader election in the default legacy registry
-	_ "k8s.io/component-base/metrics/prometheus/restclient"              // for client metric registration
-	_ "k8s.io/component-base/metrics/prometheus/version"                 // for version metric registration
-	_ "k8s.io/component-base/metrics/prometheus/workqueue"               // register work queues in the default legacy registry
+	_ "k8s.io/component-base/logs/json/register"         // for JSON log output support
+	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 )
 

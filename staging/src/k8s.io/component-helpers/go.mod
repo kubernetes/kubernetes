@@ -54,5 +54,6 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
+	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
 )

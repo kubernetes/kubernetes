@@ -29,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storageversion"
-	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
+	_ "k8s.io/client-go/client-go-metrics/workqueue" // for workqueue metric registration
 	"k8s.io/klog/v2"
 )
 

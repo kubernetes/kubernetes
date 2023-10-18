@@ -26,12 +26,12 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	_ "k8s.io/client-go/client-go-metrics/workqueue" // for workqueue metric registration
 	"k8s.io/client-go/kubernetes/scheme"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/legacyregistry"
-	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
 )
 
 // BuildHandlerChain builds a handler chain with a base handler and CompletedConfig.

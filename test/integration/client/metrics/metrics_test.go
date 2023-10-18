@@ -36,7 +36,7 @@ import (
 
 	// the metrics are loaded on cmd/kube-apiserver/apiserver.go
 	// so we need to load them here to be available for the test
-	_ "k8s.io/component-base/metrics/prometheus/restclient"
+	_ "k8s.io/client-go/client-go-metrics/restclient"
 )
 
 // IMPORTANT: metrics are stored globally so all the test must run serially

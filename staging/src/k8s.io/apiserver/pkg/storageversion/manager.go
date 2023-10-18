@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	_ "k8s.io/client-go/client-go-metrics/workqueue" // for workqueue metric registration
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
 	"k8s.io/klog/v2"
 )
 

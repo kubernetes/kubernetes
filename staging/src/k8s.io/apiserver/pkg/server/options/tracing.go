@@ -22,10 +22,12 @@ import (
 	"io/ioutil"
 	"net"
 
+	"k8s.io/client-go/transport"
+
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,7 +123,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	}
 	c.TracerProvider = tp
 	if c.LoopbackClientConfig != nil {
-		c.LoopbackClientConfig.Wrap(tracing.WrapperFor(c.TracerProvider))
+		c.LoopbackClientConfig.Wrap(transport.WrapperFunc(tracing.WrapperFor(c.TracerProvider)))
 	}
 	return nil
 }

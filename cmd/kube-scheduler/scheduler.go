@@ -19,9 +19,9 @@ package main
 import (
 	"os"
 
+	_ "k8s.io/client-go/client-go-metrics"
 	"k8s.io/component-base/cli"
-	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
-	_ "k8s.io/component-base/metrics/prometheus/clientgo"
+	_ "k8s.io/component-base/logs/json/register"         // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 )

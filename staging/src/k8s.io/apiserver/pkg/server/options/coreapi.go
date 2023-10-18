@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/client-go/transport"
+
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
@@ -73,7 +75,7 @@ func (o *CoreAPIOptions) ApplyTo(config *server.RecommendedConfig) error {
 		}
 	}
 	if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
-		kubeconfig.Wrap(tracing.WrapperFor(config.TracerProvider))
+		kubeconfig.Wrap(transport.WrapperFunc(tracing.WrapperFor(config.TracerProvider)))
 	}
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeconfig)
 	if err != nil {

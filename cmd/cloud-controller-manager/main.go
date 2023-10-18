@@ -28,6 +28,7 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	_ "k8s.io/client-go/client-go-metrics" // load all the prometheus client-go plugins
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
@@ -35,8 +36,7 @@ import (
 	"k8s.io/cloud-provider/options"
 	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
-	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
-	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
+	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
 	"k8s.io/klog/v2"
 	kcmnames "k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	// For existing cloud providers, the option to import legacy providers is still available.

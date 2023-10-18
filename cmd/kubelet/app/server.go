@@ -33,6 +33,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/transport"
+
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
@@ -994,7 +996,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		clientConfig.Wrap(tracing.WrapperFor(tp))
+		clientConfig.Wrap(transport.WrapperFunc(tracing.WrapperFor(tp)))
 	}
 	return clientConfig, onHeartbeatFailure, nil
 }

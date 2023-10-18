@@ -33,13 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	_ "k8s.io/client-go/client-go-metrics/restclient" // for client metric registration
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/events"
 	cliflag "k8s.io/component-base/cli/flag"
-	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
-	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
+	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	fakesysctl "k8s.io/component-helpers/node/util/sysctl/testing"
