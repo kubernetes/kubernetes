@@ -1399,7 +1399,7 @@ message Image {
     repeated string repo_tags = 2;
     // Digests by which this image is known.
     repeated string repo_digests = 3;
-    // Size of the image in bytes. Must be > 0.
+    // Size of the image in bytes. Must be > 0 and refer to the uncompressed size (i.e. on disk)
     uint64 size = 4;
     // UID that will run the command(s). This is used as a default if no user is
     // specified when creating the container. UID and the following user name
