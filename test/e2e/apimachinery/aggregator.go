@@ -52,6 +52,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -560,7 +561,6 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	ginkgo.By("Adding a label to the APIService")
 	apiServiceClient := aggrclient.ApiregistrationV1().APIServices()
 	apiServiceLabel := map[string]string{"e2e-apiservice": "patched"}
-	apiServiceLabelSelector := labels.SelectorFromSet(apiServiceLabel).String()
 	apiServicePatch, err := json.Marshal(map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"labels": apiServiceLabel,
@@ -641,7 +641,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.Logf("Found updated apiService label for %q", apiServiceName)
 
 	// kubectl delete flunder test-flunder
-	ginkgo.By(fmt.Sprintf("Delete APIService %q", flunderName))
+	ginkgo.By(fmt.Sprintf("Delete flunders resource %q", flunderName))
 	err = dynamicClient.Delete(ctx, flunderName, metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(ctx, f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
@@ -724,6 +724,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	}
 	framework.Logf("Found patched status condition for %s", wardle.ObjectMeta.Name)
 
+	apiServiceLabelSelector := labels.SelectorFromSet(updatedApiService.Labels).String()
 	ginkgo.By(fmt.Sprintf("APIService deleteCollection with labelSelector: %q", apiServiceLabelSelector))
 
 	err = aggrclient.ApiregistrationV1().APIServices().DeleteCollection(ctx,
@@ -735,6 +736,24 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	err = wait.PollImmediate(apiServiceRetryPeriod, apiServiceRetryTimeout, checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0))
 	framework.ExpectNoError(err, "failed to count the required APIServices")
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
+
+	ginkgo.By("Confirm that the group path of " + apiServiceName + " was removed from root paths")
+	groupPath := "/apis/" + apiServiceGroupName
+	err = wait.PollUntilContextTimeout(ctx, apiServiceRetryPeriod, apiServiceRetryTimeout, true, func(ctx context.Context) (done bool, err error) {
+		rootPaths := metav1.RootPaths{}
+		statusContent, err = restClient.Get().
+			AbsPath("/").
+			SetHeader("Accept", "application/json").DoRaw(ctx)
+		if err != nil {
+			return false, err
+		}
+		err = json.Unmarshal(statusContent, &rootPaths)
+		if err != nil {
+			return false, err
+		}
+		return !slices.Contains(rootPaths.Paths, groupPath), nil
+	})
+	framework.ExpectNoError(err, "Expected to not find %s from root paths", groupPath)
 
 	cleanupSampleAPIServer(ctx, client, aggrclient, n, apiServiceName)
 }
