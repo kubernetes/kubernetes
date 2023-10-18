@@ -110,6 +110,14 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			Framer:           protobuf.LengthDelimitedFramer,
 			StreamSerializer: protoRawSerializer,
 		},
+		{
+			AcceptContentTypes: []string{"foo/bar"},
+			ContentType:        "foo/bar",
+			FileExtensions:     []string{"foobar"},
+			EncodesAsText:      true,
+			Serializer:         yamlSerializer,
+			StrictSerializer:   strictYAMLSerializer,
+		},
 	}
 
 	for _, fn := range serializerExtensions {
