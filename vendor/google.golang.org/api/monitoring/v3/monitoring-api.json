@@ -1217,7 +1217,7 @@
                   "type": "string"
                 },
                 "pageSize": {
-                  "description": "A positive number that is the maximum number of results to return.",
+                  "description": "A positive number that is the maximum number of results to return. The default and maximum value is 10,000. If a page_size \u003c= 0 or \u003e 10,000 is submitted, will instead return a maximum of 10,000 results.",
                   "format": "int32",
                   "location": "query",
                   "type": "integer"
@@ -1505,7 +1505,7 @@
               ]
             },
             "list": {
-              "description": "Lists the notification channels that have been created for the project.",
+              "description": "Lists the notification channels that have been created for the project. To list the types of notification channels that are supported, use the ListNotificationChannelDescriptors method.",
               "flatPath": "v3/projects/{projectsId}/notificationChannels",
               "httpMethod": "GET",
               "id": "monitoring.projects.notificationChannels.list",
@@ -2714,7 +2714,7 @@
       }
     }
   },
-  "revision": "20230212",
+  "revision": "20230531",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -2843,7 +2843,7 @@
           "type": "string"
         },
         "conditions": {
-          "description": "A list of conditions for the policy. The conditions are combined by AND or OR according to the combiner field. If the combined conditions evaluate to true, then an incident is created. A policy can have from one to six conditions. If condition_time_series_query_language is present, it must be the only condition.",
+          "description": "A list of conditions for the policy. The conditions are combined by AND or OR according to the combiner field. If the combined conditions evaluate to true, then an incident is created. A policy can have from one to six conditions. If condition_time_series_query_language is present, it must be the only condition. If condition_monitoring_query_language is present, it must be the only condition.",
           "items": {
             "$ref": "Condition"
           },
@@ -2854,7 +2854,7 @@
           "description": "A read-only record of the creation of the alerting policy. If provided in a call to create or update, this field will be ignored."
         },
         "displayName": {
-          "description": "A short name or phrase used to identify the policy in dashboards, notifications, and incidents. To avoid confusion, don't use the same display name for multiple policies in the same project. The name is limited to 512 Unicode characters.",
+          "description": "A short name or phrase used to identify the policy in dashboards, notifications, and incidents. To avoid confusion, don't use the same display name for multiple policies in the same project. The name is limited to 512 Unicode characters.The convention for the display_name of a PrometheusQueryLanguageCondition is \"/\", where the and should be taken from the corresponding Prometheus configuration file. This convention is not enforced. In any case the display_name is not a unique key of the AlertPolicy.",
           "type": "string"
         },
         "documentation": {
@@ -2884,12 +2884,12 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "User-supplied key/value data to be used for organizing and identifying the AlertPolicy objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.",
+          "description": "User-supplied key/value data to be used for organizing and identifying the AlertPolicy objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.Note that Prometheus and are valid Prometheus label names (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels). This means that they cannot be stored as is in user labels, because Prometheus labels may contain upper-case letters.",
           "type": "object"
         },
         "validity": {
           "$ref": "Status",
-          "description": "Read-only description of how the alert policy is invalid. OK if the alert policy is valid. If not OK, the alert policy will not generate incidents."
+          "description": "Read-only description of how the alert policy is invalid. This field is only set when the alert policy is invalid. An invalid alert policy will not generate incidents."
         }
       },
       "type": "object"
@@ -2902,6 +2902,13 @@
           "description": "If an alert policy that was active has no data for this long, any open incidents will close",
           "format": "google-duration",
           "type": "string"
+        },
+        "notificationChannelStrategy": {
+          "description": "Control how notifications will be sent out, on a per-channel basis.",
+          "items": {
+            "$ref": "NotificationChannelStrategy"
+          },
+          "type": "array"
         },
         "notificationRateLimit": {
           "$ref": "NotificationRateLimit",
@@ -3504,7 +3511,7 @@
       "type": "object"
     },
     "Exponential": {
-      "description": "Specifies an exponential sequence of buckets that have a width that is proportional to the value of the lower bound. Each bucket represents a constant relative uncertainty on a specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): scale * (growth_factor ^ i). Lower bound (1 \u003c= i \u003c N): scale * (growth_factor ^ (i - 1)).",
+      "description": "Specifies an exponential sequence of buckets that have a width that is proportional to the value of the lower bound. Each bucket represents a constant relative uncertainty on a specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): scale * (growth_factor ^ i).Lower bound (1 \u003c= i \u003c N): scale * (growth_factor ^ (i - 1)).",
       "id": "Exponential",
       "properties": {
         "growthFactor": {
@@ -4033,7 +4040,7 @@
       "type": "object"
     },
     "Linear": {
-      "description": "Specifies a linear sequence of buckets that all have the same width (except overflow and underflow). Each bucket represents a constant absolute uncertainty on the specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): offset + (width * i). Lower bound (1 \u003c= i \u003c N): offset + (width * (i - 1)).",
+      "description": "Specifies a linear sequence of buckets that all have the same width (except overflow and underflow). Each bucket represents a constant absolute uncertainty on the specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): offset + (width * i).Lower bound (1 \u003c= i \u003c N): offset + (width * (i - 1)).",
       "id": "Linear",
       "properties": {
         "numFiniteBuckets": {
@@ -4932,6 +4939,25 @@
       },
       "type": "object"
     },
+    "NotificationChannelStrategy": {
+      "description": "Control over how the notification channels in notification_channels are notified when this alert fires, on a per-channel basis.",
+      "id": "NotificationChannelStrategy",
+      "properties": {
+        "notificationChannelNames": {
+          "description": "The full REST resource name for the notification channels that these settings apply to. Each of these correspond to the name field in one of the NotificationChannel objects referenced in the notification_channels field of this AlertPolicy. The format is: projects/[PROJECT_ID_OR_NUMBER]/notificationChannels/[CHANNEL_ID] ",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "renotifyInterval": {
+          "description": "The frequency at which to send reminder notifications for open incidents.",
+          "format": "google-duration",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "NotificationRateLimit": {
       "description": "Control over the rate of notifications sent to this alert policy's notification channels.",
       "id": "NotificationRateLimit",
@@ -5624,6 +5650,10 @@
       "description": "A protocol buffer message type.",
       "id": "Type",
       "properties": {
+        "edition": {
+          "description": "The source edition string, only valid when syntax is SYNTAX_EDITIONS.",
+          "type": "string"
+        },
         "fields": {
           "description": "The list of fields.",
           "items": {
@@ -5657,11 +5687,13 @@
           "description": "The source syntax.",
           "enum": [
             "SYNTAX_PROTO2",
-            "SYNTAX_PROTO3"
+            "SYNTAX_PROTO3",
+            "SYNTAX_EDITIONS"
           ],
           "enumDescriptions": [
             "Syntax proto2.",
-            "Syntax proto3."
+            "Syntax proto3.",
+            "Syntax editions."
           ],
           "type": "string"
         }

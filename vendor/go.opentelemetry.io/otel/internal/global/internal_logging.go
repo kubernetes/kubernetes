@@ -18,7 +18,6 @@ import (
 	"log"
 	"os"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/stdr"
@@ -28,7 +27,7 @@ import (
 //
 // The default logger uses stdr which is backed by the standard `log.Logger`
 // interface. This logger will only show messages at the Error Level.
-var globalLogger unsafe.Pointer
+var globalLogger atomic.Pointer[logr.Logger]
 
 func init() {
 	SetLogger(stdr.New(log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)))
@@ -40,11 +39,11 @@ func init() {
 // To see Info messages use a logger with `l.V(4).Enabled() == true`
 // To see Debug messages use a logger with `l.V(8).Enabled() == true`.
 func SetLogger(l logr.Logger) {
-	atomic.StorePointer(&globalLogger, unsafe.Pointer(&l))
+	globalLogger.Store(&l)
 }
 
 func getLogger() logr.Logger {
-	return *(*logr.Logger)(atomic.LoadPointer(&globalLogger))
+	return *globalLogger.Load()
 }
 
 // Info prints messages about the general state of the API or SDK.

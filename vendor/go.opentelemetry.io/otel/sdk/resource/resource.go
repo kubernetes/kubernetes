@@ -36,7 +36,6 @@ type Resource struct {
 }
 
 var (
-	emptyResource       Resource
 	defaultResource     *Resource
 	defaultResourceOnce sync.Once
 )
@@ -70,7 +69,7 @@ func NewWithAttributes(schemaURL string, attrs ...attribute.KeyValue) *Resource 
 // of the attrs is known use NewWithAttributes instead.
 func NewSchemaless(attrs ...attribute.KeyValue) *Resource {
 	if len(attrs) == 0 {
-		return &emptyResource
+		return &Resource{}
 	}
 
 	// Ensure attributes comply with the specification:
@@ -81,7 +80,7 @@ func NewSchemaless(attrs ...attribute.KeyValue) *Resource {
 
 	// If attrs only contains invalid entries do not allocate a new resource.
 	if s.Len() == 0 {
-		return &emptyResource
+		return &Resource{}
 	}
 
 	return &Resource{attrs: s} //nolint
@@ -195,7 +194,7 @@ func Merge(a, b *Resource) (*Resource, error) {
 // Empty returns an instance of Resource with no attributes. It is
 // equivalent to a `nil` Resource.
 func Empty() *Resource {
-	return &emptyResource
+	return &Resource{}
 }
 
 // Default returns an instance of Resource with a default
@@ -214,7 +213,7 @@ func Default() *Resource {
 		}
 		// If Detect did not return a valid resource, fall back to emptyResource.
 		if defaultResource == nil {
-			defaultResource = &emptyResource
+			defaultResource = &Resource{}
 		}
 	})
 	return defaultResource

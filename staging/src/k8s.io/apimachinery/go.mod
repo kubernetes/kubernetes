@@ -2,7 +2,7 @@
 
 module k8s.io/apimachinery
 
-go 1.20
+go 1.21.3
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
@@ -18,7 +18,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	golang.org/x/net v0.17.0
 	golang.org/x/time v0.3.0
 	gopkg.in/inf.v0 v0.9.1

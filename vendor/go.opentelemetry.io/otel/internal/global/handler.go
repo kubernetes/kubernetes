@@ -18,7 +18,6 @@ import (
 	"log"
 	"os"
 	"sync/atomic"
-	"unsafe"
 )
 
 var (
@@ -42,7 +41,7 @@ type ErrorHandler interface {
 }
 
 type ErrDelegator struct {
-	delegate unsafe.Pointer
+	delegate atomic.Pointer[ErrorHandler]
 }
 
 func (d *ErrDelegator) Handle(err error) {
@@ -50,12 +49,12 @@ func (d *ErrDelegator) Handle(err error) {
 }
 
 func (d *ErrDelegator) getDelegate() ErrorHandler {
-	return *(*ErrorHandler)(atomic.LoadPointer(&d.delegate))
+	return *d.delegate.Load()
 }
 
 // setDelegate sets the ErrorHandler delegate.
 func (d *ErrDelegator) setDelegate(eh ErrorHandler) {
-	atomic.StorePointer(&d.delegate, unsafe.Pointer(&eh))
+	d.delegate.Store(&eh)
 }
 
 func defaultErrorHandler() *ErrDelegator {

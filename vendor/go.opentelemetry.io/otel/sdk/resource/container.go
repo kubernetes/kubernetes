@@ -22,7 +22,7 @@ import (
 	"os"
 	"regexp"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 type containerIDProvider func() (string, error)

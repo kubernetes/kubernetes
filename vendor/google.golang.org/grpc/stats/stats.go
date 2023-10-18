@@ -59,12 +59,22 @@ func (s *Begin) IsClient() bool { return s.Client }
 
 func (s *Begin) isRPCStats() {}
 
+// PickerUpdated indicates that the LB policy provided a new picker while the
+// RPC was waiting for one.
+type PickerUpdated struct{}
+
+// IsClient indicates if the stats information is from client side. Only Client
+// Side interfaces with a Picker, thus always returns true.
+func (*PickerUpdated) IsClient() bool { return true }
+
+func (*PickerUpdated) isRPCStats() {}
+
 // InPayload contains the information for an incoming payload.
 type InPayload struct {
 	// Client is true if this InPayload is from client side.
 	Client bool
 	// Payload is the payload with original type.
-	Payload interface{}
+	Payload any
 	// Data is the serialized message payload.
 	Data []byte
 
@@ -134,7 +144,7 @@ type OutPayload struct {
 	// Client is true if this OutPayload is from client side.
 	Client bool
 	// Payload is the payload with original type.
-	Payload interface{}
+	Payload any
 	// Data is the serialized message payload.
 	Data []byte
 	// Length is the size of the uncompressed payload data. Does not include any
