@@ -1413,13 +1413,14 @@ func TestSlowNodeSync(t *testing.T) {
 		updateCallCh <- update
 	}
 
-	// Three update calls are expected. This is because this test calls
-	// controller.syncNodes once with two existing services, so we will have an
-	// update call for each service, and controller.syncService once. The end
-	// result is therefore three update calls. Each update call takes
-	// cloudProvider.RequestDelay to process. The test asserts that the order of
-	// the Hosts defined by the update calls is respected, but doesn't
-	// necessarily assert the order of the Service. This is because the
+	// Two update calls are expected. This is because this test calls
+	// controller.syncNodes once with two existing services, but with one
+	// controller.syncService while that is happening. The end result is
+	// therefore two update calls - since the second controller.syncNodes won't
+	// trigger an update call because the syncService already did. Each update
+	// call takes cloudProvider.RequestDelay to process. The test asserts that
+	// the order of the Hosts defined by the update calls is respected, but
+	// doesn't necessarily assert the order of the Service. This is because the
 	// controller implementation doesn't use a deterministic order when syncing
 	// services. The test therefor works out which service is impacted by the
 	// slow node sync (which will be whatever service is not synced first) and
@@ -1428,8 +1429,6 @@ func TestSlowNodeSync(t *testing.T) {
 		// First update call for first service from controller.syncNodes
 		{Service: service1, Hosts: []*v1.Node{node1, node2}},
 		// Second update call for impacted service from controller.syncService
-		{Service: service2, Hosts: []*v1.Node{node1, node2, node3}},
-		// Third update call for second service from controller.syncNodes.
 		{Service: service2, Hosts: []*v1.Node{node1, node2, node3}},
 	}
 

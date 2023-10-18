@@ -443,13 +443,13 @@ func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service
 	if len(nodes) == 0 {
 		c.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
 	}
+	c.storeLastSyncedNodes(service, nodes)
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
 	status, err := c.balancer.EnsureLoadBalancer(ctx, c.clusterName, service, nodes)
 	if err != nil {
 		return nil, err
 	}
-	c.storeLastSyncedNodes(service, nodes)
 	return status, nil
 }
 
