@@ -139,6 +139,23 @@ func blocklisted(t *types.Type, member types.Member) bool {
 	return false
 }
 
+func isAtomicList(m types.Member) bool {
+	if m.Type.Kind != types.Slice {
+		return false
+	}
+	listType := types.ExtractCommentTags("+", m.CommentLines)["listType"]
+	// All lists are considered atomic by default.
+	return listType == nil || listType[0] == "atomic"
+}
+
+func isAtomicMap(m types.Member) bool {
+	if m.Type.Kind != types.Map {
+		return false
+	}
+	mapType := types.ExtractCommentTags("+", m.CommentLines)["mapType"]
+	return mapType != nil && mapType[0] == "atomic"
+}
+
 func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams) {
 	for _, member := range t.Members {
 		if blocklisted(t, member) {
@@ -171,20 +188,23 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 			if t := deref(member.Type); t.Kind == types.Slice && g.refGraph.isApplyConfig(t.Elem) {
 				memberParams.ArgType = &types.Type{Kind: types.Pointer, Elem: memberType.Elem}
 				g.generateMemberWithForSlice(sw, member, memberParams)
+				g.generateMemberWithForAtomicSlice(sw, member, memberParams)
 				continue
 			}
+
 			// Note: There are no maps where the values are generated apply configurations (because
 			// associative lists are used instead). So if a type like this is ever introduced, the
 			// default "with" function generator will produce a working (but not entirely convenient "with" function)
 			// that would be used like so:
 			// WithMap(map[string]FooApplyConfiguration{*Foo().WithName("x")})
-
 			switch memberParams.Member.Type.Kind {
 			case types.Slice:
 				memberParams.ArgType = memberType.Elem
 				g.generateMemberWithForSlice(sw, member, memberParams)
+				g.generateMemberWithForAtomicSlice(sw, member, memberParams)
 			case types.Map:
 				g.generateMemberWithForMap(sw, memberParams)
+				g.generateMemberWithForAtomicMap(sw, memberParams)
 			default:
 				g.generateMemberWith(sw, memberParams)
 			}
@@ -261,6 +281,9 @@ func (g *applyConfigurationGenerator) generateMemberWithForSlice(sw *generator.S
 	sw.Do("// With$.Member.Name$ adds the given value to the $.Member.Name$ field in the declarative configuration\n", memberParams)
 	sw.Do("// and returns the receiver, so that objects can be build by chaining \"With\" function invocations.\n", memberParams)
 	sw.Do("// If called multiple times, values provided by each call will be appended to the $.Member.Name$ field.\n", memberParams)
+	if isAtomicList(memberParams.Member) {
+		sw.Do("// Deprecated: With$.Member.Name$ does not replace existing list for atomic list type. Use WithNew$.Member.Name$ instead.\n", memberParams)
+	}
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(values ...$.ArgType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEnbedExistsIfApplicable(sw, memberParams)
 
@@ -291,16 +314,83 @@ func (g *applyConfigurationGenerator) generateMemberWithForSlice(sw *generator.S
 	sw.Do("}\n", memberParams)
 }
 
+func (g *applyConfigurationGenerator) generateMemberWithForAtomicSlice(sw *generator.SnippetWriter, member types.Member, memberParams memberParams) {
+	if !isAtomicList(memberParams.Member) {
+		return
+	}
+	memberIsPointerToSlice := member.Type.Kind == types.Pointer
+	if memberIsPointerToSlice {
+		sw.Do(ensureNonEmbedSliceExists, memberParams)
+	}
+	sw.Do("// WithNew$.Member.Name$ replaces the $.Member.Name$ field in the declarative configuration with given values\n", memberParams)
+	sw.Do("// and returns the receiver, so that objects can be build by chaining \"With\" function invocations.\n", memberParams)
+	sw.Do("// If called multiple times, the $.Member.Name$ field is set to the values of the last call.\n", memberParams)
+	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) WithNew$.Member.Name$(values ...$.ArgType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
+	g.ensureEnbedExistsIfApplicable(sw, memberParams)
+
+	if memberIsPointerToSlice {
+		sw.Do("b.ensure$.MemberType.Elem|public$Exists()\n", memberParams)
+	}
+
+	if memberParams.ArgType.Kind == types.Pointer {
+		if memberIsPointerToSlice {
+			sw.Do("  *b.$.Member.Name$ = nil\n", memberParams)
+		} else {
+			sw.Do("  b.$.Member.Name$ = nil\n", memberParams)
+		}
+		sw.Do("  for i := range values {\n", memberParams)
+		sw.Do("    if values[i] == nil {\n", memberParams)
+		sw.Do("      panic(\"nil value passed to WithNew$.Member.Name$\")\n", memberParams)
+		sw.Do("    }\n", memberParams)
+		if memberIsPointerToSlice {
+			sw.Do("    *b.$.Member.Name$ = append(*b.$.Member.Name$, *values[i])\n", memberParams)
+		} else {
+			sw.Do("    b.$.Member.Name$ = append(b.$.Member.Name$, *values[i])\n", memberParams)
+		}
+		sw.Do("  }\n", memberParams)
+	} else {
+		if memberIsPointerToSlice {
+			sw.Do("  *b.$.Member.Name$ = nil\n", memberParams)
+			sw.Do("  *b.$.Member.Name$ = append(*b.$.Member.Name$, values...)\n", memberParams)
+		} else {
+			sw.Do("  b.$.Member.Name$ = make($.MemberType|raw$, len(values))\n", memberParams)
+			sw.Do("  copy(b.$.Member.Name$, values)\n", memberParams)
+		}
+	}
+	sw.Do("  return b\n", memberParams)
+	sw.Do("}\n", memberParams)
+}
+
 func (g *applyConfigurationGenerator) generateMemberWithForMap(sw *generator.SnippetWriter, memberParams memberParams) {
 	sw.Do("// With$.Member.Name$ puts the entries into the $.Member.Name$ field in the declarative configuration\n", memberParams)
 	sw.Do("// and returns the receiver, so that objects can be build by chaining \"With\" function invocations.\n", memberParams)
 	sw.Do("// If called multiple times, the entries provided by each call will be put on the $.Member.Name$ field,\n", memberParams)
 	sw.Do("// overwriting an existing map entries in $.Member.Name$ field with the same key.\n", memberParams)
+	if isAtomicMap(memberParams.Member) {
+		sw.Do("// Deprecated: With$.Member.Name$ does not replace existing map for atomic map type. Use WithNew$.Member.Name$ instead.\n", memberParams)
+	}
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(entries $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEnbedExistsIfApplicable(sw, memberParams)
 	sw.Do("  if b.$.Member.Name$ == nil && len(entries) > 0 {\n", memberParams)
 	sw.Do("    b.$.Member.Name$ = make($.MemberType|raw$, len(entries))\n", memberParams)
 	sw.Do("  }\n", memberParams)
+	sw.Do("  for k, v := range entries {\n", memberParams)
+	sw.Do("    b.$.Member.Name$[k] = v\n", memberParams)
+	sw.Do("  }\n", memberParams)
+	sw.Do("  return b\n", memberParams)
+	sw.Do("}\n", memberParams)
+}
+
+func (g *applyConfigurationGenerator) generateMemberWithForAtomicMap(sw *generator.SnippetWriter, memberParams memberParams) {
+	if !isAtomicMap(memberParams.Member) {
+		return
+	}
+	sw.Do("// WithNew$.Member.Name$ replaces the $.Member.Name$ field in the declarative configuration with given entries\n", memberParams)
+	sw.Do("// and returns the receiver, so that objects can be build by chaining \"With\" function invocations.\n", memberParams)
+	sw.Do("// If called multiple times, the $.Member.Name$ field is set to the entries of the last call.\n", memberParams)
+	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) WithNew$.Member.Name$(entries $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
+	g.ensureEnbedExistsIfApplicable(sw, memberParams)
+	sw.Do("  b.$.Member.Name$ = make($.MemberType|raw$, len(entries))\n", memberParams)
 	sw.Do("  for k, v := range entries {\n", memberParams)
 	sw.Do("    b.$.Member.Name$[k] = v\n", memberParams)
 	sw.Do("  }\n", memberParams)
