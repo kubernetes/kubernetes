@@ -1013,7 +1013,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -1075,7 +1074,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: data
       type:
         namedType: __untyped_atomic_
-      default: {}
     - name: kind
       type:
         scalar: string
@@ -1114,7 +1112,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -1227,11 +1224,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastUpdateTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -1343,7 +1338,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -1455,7 +1449,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -1586,7 +1579,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: data
       type:
         namedType: __untyped_atomic_
-      default: {}
     - name: kind
       type:
         scalar: string
@@ -1625,11 +1617,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastUpdateTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -1768,7 +1758,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -1899,7 +1888,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: data
       type:
         namedType: __untyped_atomic_
-      default: {}
     - name: kind
       type:
         scalar: string
@@ -1938,7 +1926,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -2051,11 +2038,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastUpdateTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -2167,7 +2152,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -2279,7 +2263,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -2606,7 +2589,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -2860,7 +2842,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: currentAverageValue
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
     - name: name
       type:
         scalar: string
@@ -2904,7 +2885,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: currentValue
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
     - name: metricName
       type:
         scalar: string
@@ -2939,7 +2919,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -3067,7 +3046,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: targetValue
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
 - name: io.k8s.api.autoscaling.v2beta1.ObjectMetricStatus
   map:
     fields:
@@ -3077,7 +3055,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: currentValue
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
     - name: metricName
       type:
         scalar: string
@@ -3102,14 +3079,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: targetAverageValue
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
 - name: io.k8s.api.autoscaling.v2beta1.PodsMetricStatus
   map:
     fields:
     - name: currentAverageValue
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
     - name: metricName
       type:
         scalar: string
@@ -3139,7 +3114,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: currentAverageValue
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
     - name: name
       type:
         scalar: string
@@ -3276,7 +3250,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -3591,11 +3564,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastProbeTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -3876,11 +3847,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastUpdateTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -4002,11 +3971,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastUpdateTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -4716,7 +4683,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: startedAt
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
 - name: io.k8s.api.core.v1.ContainerStateTerminated
   map:
     fields:
@@ -4730,7 +4696,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: finishedAt
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -4743,7 +4708,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: startedAt
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
 - name: io.k8s.api.core.v1.ContainerStateWaiting
   map:
     fields:
@@ -5099,11 +5063,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: eventTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-      default: {}
     - name: firstTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: involvedObject
       type:
         namedType: io.k8s.api.core.v1.ObjectReference
@@ -5114,7 +5076,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -5155,7 +5116,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastObservedTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-      default: {}
 - name: io.k8s.api.core.v1.EventSource
   map:
     fields:
@@ -5338,7 +5298,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: port
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
-      default: {}
     - name: scheme
       type:
         scalar: string
@@ -5646,7 +5605,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -5734,11 +5692,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastHeartbeatTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -6042,11 +5998,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastProbeTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -6352,11 +6306,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastProbeTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -6966,7 +6918,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -7042,7 +6993,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: divisor
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-      default: {}
     - name: resource
       type:
         scalar: string
@@ -7465,7 +7415,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: targetPort
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
-      default: {}
 - name: io.k8s.api.core.v1.ServiceSpec
   map:
     fields:
@@ -7631,7 +7580,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: port
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
-      default: {}
 - name: io.k8s.api.core.v1.Taint
   map:
     fields:
@@ -8182,11 +8130,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: deprecatedFirstTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deprecatedLastTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deprecatedSource
       type:
         namedType: io.k8s.api.core.v1.EventSource
@@ -8194,7 +8140,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: eventTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-      default: {}
     - name: kind
       type:
         scalar: string
@@ -8237,7 +8182,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastObservedTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-      default: {}
 - name: io.k8s.api.events.v1beta1.Event
   map:
     fields:
@@ -8253,11 +8197,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: deprecatedFirstTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deprecatedLastTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deprecatedSource
       type:
         namedType: io.k8s.api.core.v1.EventSource
@@ -8265,7 +8207,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: eventTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-      default: {}
     - name: kind
       type:
         scalar: string
@@ -8308,7 +8249,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastObservedTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-      default: {}
 - name: io.k8s.api.extensions.v1beta1.DaemonSet
   map:
     fields:
@@ -8336,7 +8276,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -8452,11 +8391,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: lastUpdateTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -8612,7 +8549,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: servicePort
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
-      default: {}
 - name: io.k8s.api.extensions.v1beta1.IngressLoadBalancerIngress
   map:
     fields:
@@ -8823,7 +8759,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -8948,7 +8883,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -9094,7 +9028,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -9276,7 +9209,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -9422,7 +9354,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -9604,7 +9535,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -9750,7 +9680,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -10355,7 +10284,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: servicePort
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
-      default: {}
 - name: io.k8s.api.networking.v1beta1.IngressClass
   map:
     fields:
@@ -11854,7 +11782,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: time
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
 - name: io.k8s.api.storage.v1.VolumeNodeResources
   map:
     fields:
@@ -11959,7 +11886,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: time
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
 - name: io.k8s.api.storage.v1beta1.CSIDriver
   map:
     fields:
@@ -12209,7 +12135,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: time
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
 - name: io.k8s.api.storage.v1beta1.VolumeNodeResources
   map:
     fields:
@@ -12224,7 +12149,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -12352,7 +12276,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: creationTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deletionGracePeriodSeconds
       type:
         scalar: numeric
