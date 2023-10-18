@@ -68,4 +68,44 @@ func (ParentReference) SwaggerDoc() map[string]string {
 	return map_ParentReference
 }
 
+var map_ServiceCIDR = map[string]string{
+	"":         "ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64). This range is used by the cluster to allocate the ClusterIPs associated to the Services object.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the desired state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"status":   "status represents the current state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+}
+
+func (ServiceCIDR) SwaggerDoc() map[string]string {
+	return map_ServiceCIDR
+}
+
+var map_ServiceCIDRList = map[string]string{
+	"":         "ServiceCIDRList contains a list of ServiceCIDR objects.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is the list of ServiceCIDRs.",
+}
+
+func (ServiceCIDRList) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRList
+}
+
+var map_ServiceCIDRSpec = map[string]string{
+	"":     "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
+	"ipv4": "IPv4 defines an IPv4 IP block in CIDR notation (e.g. \"192.168.0.0/24\"). This field is immutable.",
+	"ipv6": "IPv6 defines an IPv6 IP block in CIDR notation (e.g. \"2001:db8::/64\"). This field is immutable.",
+}
+
+func (ServiceCIDRSpec) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRSpec
+}
+
+var map_ServiceCIDRStatus = map[string]string{
+	"":           "ServiceCIDRStatus describes the current state of the ServiceCIDR.",
+	"conditions": "conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR. Current service state",
+}
+
+func (ServiceCIDRStatus) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRStatus
+}
+
 // AUTO-GENERATED FUNCTIONS END HERE

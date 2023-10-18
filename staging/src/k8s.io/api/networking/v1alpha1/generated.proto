@@ -85,3 +85,58 @@ message ParentReference {
   optional string name = 4;
 }
 
+// ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64).
+// This range is used by the cluster to allocate the ClusterIPs associated to the Services object.
+message ServiceCIDR {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // spec is the desired state of the ServiceCIDR.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional ServiceCIDRSpec spec = 2;
+
+  // status represents the current state of the ServiceCIDR.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional ServiceCIDRStatus status = 3;
+}
+
+// ServiceCIDRList contains a list of ServiceCIDR objects.
+message ServiceCIDRList {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of ServiceCIDRs.
+  repeated ServiceCIDR items = 2;
+}
+
+// ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.
+message ServiceCIDRSpec {
+  // IPv4 defines an IPv4 IP block in CIDR notation (e.g. "192.168.0.0/24").
+  // This field is immutable.
+  // +optional
+  optional string ipv4 = 1;
+
+  // IPv6 defines an IPv6 IP block in CIDR notation (e.g. "2001:db8::/64").
+  // This field is immutable.
+  // +optional
+  optional string ipv6 = 2;
+}
+
+// ServiceCIDRStatus describes the current state of the ServiceCIDR.
+message ServiceCIDRStatus {
+  // conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR.
+  // Current service state
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+}
+

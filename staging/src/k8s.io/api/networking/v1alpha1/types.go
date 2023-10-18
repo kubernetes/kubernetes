@@ -82,14 +82,13 @@ type IPAddressList struct {
 	Items []IPAddress `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.27
 
 // ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64).
-// This range is used by the cluster to allocate the ClusterIPs associated to the Services object. 
+// This range is used by the cluster to allocate the ClusterIPs associated to the Services object.
 type ServiceCIDR struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -150,5 +149,5 @@ type ServiceCIDRList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// items is the list of ServiceCIDRs.
-	Items           []ServiceCIDR `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []ServiceCIDR `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
