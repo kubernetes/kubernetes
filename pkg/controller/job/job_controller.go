@@ -1546,6 +1546,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
+		// Counters used for the job_pods_created_total_metrics
+		creationsSucceeded, creationsFailed := 0, 0
+
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
 		// This handles attempts to start large numbers of pods that would
@@ -1595,8 +1598,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						jm.expectations.CreationObserved(logger, jobKey)
 						atomic.AddInt32(&active, -1)
 						errCh <- err
+						creationsFailed++
 					}
-					recordJobPodsCreationTotal(job)
+					creationsSucceeded++
 				}()
 			}
 			wait.Wait()
@@ -1615,6 +1619,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			}
 			diff -= batchSize
 		}
+		recordJobPodsCreationTotal(job, creationsSucceeded, creationsFailed)
 		return active, metrics.JobSyncActionPodsCreated, errorFromChannel(errCh)
 	}
 
@@ -1913,17 +1918,22 @@ func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
 	}
 }
 
-func recordJobPodsCreationTotal(job *batch.Job) {
-	event := metrics.New
+func recordJobPodsCreationTotal(job *batch.Job, succeeded, failed int) {
+	reason := metrics.PodCreateNew
 	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
 		podsTerminating := job.Status.Terminating != nil && *job.Status.Terminating > 0
 		isRecreateAction := podsTerminating || job.Status.Failed > 0
 		if isRecreateAction {
-			event = metrics.RecreateTerminatingOrFailed
+			reason = metrics.PodRecreateTerminatingOrFailed
 			if *job.Spec.PodReplacementPolicy == batch.Failed {
-				event = metrics.RecreateFailed
+				reason = metrics.PodRecreateFailed
 			}
 		}
 	}
-	metrics.JobPodsCreationTotal.WithLabelValues(event).Inc()
+	if succeeded > 0 {
+		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.CreationSucceeded).Add(float64(succeeded))
+	}
+	if failed > 0 {
+		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.CreationFailed).Add(float64(failed))
+	}
 }

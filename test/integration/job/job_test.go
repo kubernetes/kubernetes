@@ -101,7 +101,7 @@ func TestMetricsOnSuccesses(t *testing.T) {
 				Value:  2,
 			},
 			wantJobPodsCreatedMetric: metricLabelsWithValue{
-				Labels: []string{"new"},
+				Labels: []string{"new", "succeeded"},
 				Value:  2,
 			},
 		},
@@ -122,7 +122,7 @@ func TestMetricsOnSuccesses(t *testing.T) {
 				Value:  2,
 			},
 			wantJobPodsCreatedMetric: metricLabelsWithValue{
-				Labels: []string{"new"},
+				Labels: []string{"new", "succeeded"},
 				Value:  2,
 			},
 		},
@@ -151,7 +151,7 @@ func TestMetricsOnSuccesses(t *testing.T) {
 			// verify metric values after the job is finished
 			validateCounterMetric(ctx, t, metrics.JobFinishedNum, tc.wantJobFinishedNumMetric)
 			validateCounterMetric(ctx, t, metrics.JobPodsFinished, tc.wantJobPodsFinishedMetric)
-			validateCounterMetric(t, metrics.JobPodsCreationTotal, tc.wantJobPodsCreatedMetric)
+			validateCounterMetric(ctx, t, metrics.JobPodsCreationTotal, tc.wantJobPodsCreatedMetric)
 			validateTerminatedPodsTrackingFinalizerMetric(ctx, t, int(*jobObj.Spec.Parallelism))
 		})
 	}
@@ -1908,16 +1908,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 }
 
 func TestJobPodReplacementPolicyMetrics(t *testing.T) {
-	const podCount int32 = 2
 	indexedCompletion := batchv1.IndexedCompletion
 	nonIndexedCompletion := batchv1.NonIndexedCompletion
 	var podReplacementPolicy = func(obj batchv1.PodReplacementPolicy) *batchv1.PodReplacementPolicy {
 		return &obj
-	}
-	jobSpecIndexedDefault := &batchv1.JobSpec{
-		Parallelism:    ptr.To(podCount),
-		Completions:    ptr.To(podCount),
-		CompletionMode: &indexedCompletion,
 	}
 	cases := map[string]struct {
 		podReplacementPolicyEnabled                 bool
@@ -1931,8 +1925,12 @@ func TestJobPodReplacementPolicyMetrics(t *testing.T) {
 		"feature flag off, delete pods and verify job pods created metric": {
 			podReplacementPolicyEnabled: false,
 			deletePods:                  true,
-			jobSpec:                     jobSpecIndexedDefault,
-			wantJobPodsCreatedNewMetric: 2 * int(podCount),
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:    ptr.To[int32](2),
+				Completions:    ptr.To[int32](2),
+				CompletionMode: &indexedCompletion,
+			},
+			wantJobPodsCreatedNewMetric:                 4,
 			wantJobPodsCreatedTerminatingOrFailedMetric: 0,
 			wantJobPodsCreatedFailedMetric:              0,
 		},
@@ -1940,53 +1938,53 @@ func TestJobPodReplacementPolicyMetrics(t *testing.T) {
 			podReplacementPolicyEnabled: true,
 			deletePods:                  true,
 			jobSpec: &batchv1.JobSpec{
-				Parallelism:          ptr.To(podCount),
-				Completions:          ptr.To(podCount),
+				Parallelism:          ptr.To[int32](2),
+				Completions:          ptr.To[int32](2),
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
 			},
-			wantJobPodsCreatedNewMetric:                 int(podCount),
-			wantJobPodsCreatedTerminatingOrFailedMetric: int(podCount),
+			wantJobPodsCreatedNewMetric:                 2,
+			wantJobPodsCreatedTerminatingOrFailedMetric: 2,
 			wantJobPodsCreatedFailedMetric:              0,
 		},
 		"feature flag on with NonIndexedJob, TerminatingOrFailed pod replacement policy, delete pods, and verify job pods created metric": {
 			podReplacementPolicyEnabled: true,
 			deletePods:                  true,
 			jobSpec: &batchv1.JobSpec{
-				Parallelism:          ptr.To(podCount),
-				Completions:          ptr.To(podCount),
+				Parallelism:          ptr.To[int32](2),
+				Completions:          ptr.To[int32](2),
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
 			},
-			wantJobPodsCreatedNewMetric:                 int(podCount),
-			wantJobPodsCreatedTerminatingOrFailedMetric: int(podCount),
+			wantJobPodsCreatedNewMetric:                 2,
+			wantJobPodsCreatedTerminatingOrFailedMetric: 2,
 			wantJobPodsCreatedFailedMetric:              0,
 		},
 		"feature flag on, Failed pod replacement policy, fail Pods, and verify job pods created metric": {
 			podReplacementPolicyEnabled: true,
 			failPods:                    true,
 			jobSpec: &batchv1.JobSpec{
-				Parallelism:          ptr.To(podCount),
-				Completions:          ptr.To(podCount),
+				Parallelism:          ptr.To[int32](2),
+				Completions:          ptr.To[int32](2),
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			wantJobPodsCreatedNewMetric:                 int(podCount),
+			wantJobPodsCreatedNewMetric:                 2,
 			wantJobPodsCreatedTerminatingOrFailedMetric: 0,
-			wantJobPodsCreatedFailedMetric:              int(podCount),
+			wantJobPodsCreatedFailedMetric:              2,
 		},
 		"feature flag on with NonIndexedJob, Failed pod replacement policy, fail Pods, and verify job pods created metric": {
 			podReplacementPolicyEnabled: true,
 			failPods:                    true,
 			jobSpec: &batchv1.JobSpec{
-				Parallelism:          ptr.To(podCount),
-				Completions:          ptr.To(podCount),
+				Parallelism:          ptr.To[int32](2),
+				Completions:          ptr.To[int32](2),
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			wantJobPodsCreatedNewMetric:                 int(podCount),
+			wantJobPodsCreatedNewMetric:                 2,
 			wantJobPodsCreatedTerminatingOrFailedMetric: 0,
-			wantJobPodsCreatedFailedMetric:              int(podCount),
+			wantJobPodsCreatedFailedMetric:              2,
 		},
 	}
 	for name, tc := range cases {
@@ -2015,7 +2013,7 @@ func TestJobPodReplacementPolicyMetrics(t *testing.T) {
 				if err != nil {
 					return false, err
 				}
-				return job.Status.Active == podCount, nil
+				return job.Status.Active == 2, nil
 			})
 			if err != nil {
 				t.Fatalf("Error waiting for Job pods to become active: %v", err)
@@ -2031,7 +2029,7 @@ func TestJobPodReplacementPolicyMetrics(t *testing.T) {
 				}
 			}
 			if tc.failPods {
-				err, _ = setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, int(podCount))
+				err, _ = setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2)
 				if err != nil {
 					t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 				}
@@ -2042,14 +2040,14 @@ func TestJobPodReplacementPolicyMetrics(t *testing.T) {
 				if err != nil {
 					return false, err
 				}
-				return job.Status.Active == podCount && job.Status.Failed == podCount, nil
+				return job.Status.Active == 2 && job.Status.Failed == 2, nil
 			})
 			if err != nil {
 				t.Fatalf("Error waiting for Job pods to become active: %v", err)
 			}
-			validateCounterMetric(t, metrics.JobPodsCreationTotal, metricLabelsWithValue{Labels: []string{"new"}, Value: tc.wantJobPodsCreatedNewMetric})
-			validateCounterMetric(t, metrics.JobPodsCreationTotal, metricLabelsWithValue{Labels: []string{"recreate_terminating_or_failed"}, Value: tc.wantJobPodsCreatedTerminatingOrFailedMetric})
-			validateCounterMetric(t, metrics.JobPodsCreationTotal, metricLabelsWithValue{Labels: []string{"recreate_failed"}, Value: tc.wantJobPodsCreatedFailedMetric})
+			validateCounterMetric(ctx, t, metrics.JobPodsCreationTotal, metricLabelsWithValue{Labels: []string{"new", "succeeded"}, Value: tc.wantJobPodsCreatedNewMetric})
+			validateCounterMetric(ctx, t, metrics.JobPodsCreationTotal, metricLabelsWithValue{Labels: []string{"recreate_terminating_or_failed", "succeeded"}, Value: tc.wantJobPodsCreatedTerminatingOrFailedMetric})
+			validateCounterMetric(ctx, t, metrics.JobPodsCreationTotal, metricLabelsWithValue{Labels: []string{"recreate_failed", "succeeded"}, Value: tc.wantJobPodsCreatedFailedMetric})
 		})
 	}
 }

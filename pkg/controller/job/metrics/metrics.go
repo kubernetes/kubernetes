@@ -127,18 +127,22 @@ The event label can be "add" or "delete".`,
 		[]string{"status", "backoffLimit"})
 
 	// JobPodsCreationTotal records the number of pods created by the job controller
-	// based on the event which triggered their creation (i.e. if PodReplacementPolicy was specified).
+	// based on the reason for their creation (i.e. if PodReplacementPolicy was specified)
+	// and the status of the creation (i.e. if the Pod creation succeeded or failed).
 	// Possible label values:
-	//   event: new, recreate_terminating_or_failed, recreate_terminated
+	//   reason: new, recreate_terminating_or_failed, recreate_failed
+	//   status: succeeded, failed
 	JobPodsCreationTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem: JobControllerSubsystem,
 			Name:      "job_pods_creation_total",
-			Help: `The number of Pods created by the Job controller labelled with a trigger
-which caused the Pod creation. This metric also distinguishes between Pods created using
-different PodReplacementPolicy settings. Possible values of the trigger label are:
-"new", "recreate_terminating_or_failed", "recreate_terminated".`,
-		}, []string{"event"})
+			Help: `The number of Pods created by the Job controller labelled with a reason for the Pod creation.
+This metric also distinguishes between Pods created using different PodReplacementPolicy settings.
+Possible values of the "reason" label are:
+"new", "recreate_terminating_or_failed", "recreate_failed".
+Possible values of the "status" label are:
+"succeeded", "failed".`,
+		}, []string{"reason", "status"})
 )
 
 const (
@@ -171,11 +175,16 @@ const (
 	Add    = "add"
 	Delete = "delete"
 
-	// Possible values for "event" label in the job_pods_creation_total metric.
+	// Possible values for "reason" label in the job_pods_creation_total metric.
 
-	New                         = "new"
-	RecreateTerminatingOrFailed = "recreate_terminating_or_failed"
-	RecreateFailed              = "recreate_failed"
+	PodCreateNew                   = "new"
+	PodRecreateTerminatingOrFailed = "recreate_terminating_or_failed"
+	PodRecreateFailed              = "recreate_failed"
+
+	// Possible values for "status" label in the job_pods_creation_total metric.
+
+	CreationSucceeded = "succeeded"
+	CreationFailed    = "failed"
 )
 
 var registerMetrics sync.Once
