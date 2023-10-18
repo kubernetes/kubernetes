@@ -18,6 +18,7 @@ package customresource
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -163,25 +164,28 @@ func copyNonMetadata(original map[string]interface{}) map[string]interface{} {
 
 // Validate validates a new CustomResource.
 func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath(""), u, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", u))}
+	}
+
 	var errs field.ErrorList
-	errs = append(errs, a.validator.Validate(ctx, obj, a.scale)...)
+	errs = append(errs, a.validator.Validate(ctx, u, a.scale)...)
 
 	// validate embedded resources
-	if u, ok := obj.(*unstructured.Unstructured); ok {
-		v := obj.GetObjectKind().GroupVersionKind().Version
-		errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.structuralSchemas[v], false)...)
+	v := obj.GetObjectKind().GroupVersionKind().Version
+	errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.structuralSchemas[v], false)...)
 
-		// validate x-kubernetes-list-type "map" and "set" invariant
-		errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], u.Object)...)
+	// validate x-kubernetes-list-type "map" and "set" invariant
+	errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], u.Object)...)
 
-		// validate x-kubernetes-validations rules
-		if celValidator, ok := a.celValidators[v]; ok {
-			if has, err := hasBlockingErr(errs); has {
-				errs = append(errs, err)
-			} else {
-				err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], u.Object, nil, celconfig.RuntimeCELCostBudget)
-				errs = append(errs, err...)
-			}
+	// validate x-kubernetes-validations rules
+	if celValidator, ok := a.celValidators[v]; ok {
+		if has, err := hasBlockingErr(errs); has {
+			errs = append(errs, err)
+		} else {
+			err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], u.Object, nil, celconfig.RuntimeCELCostBudget)
+			errs = append(errs, err...)
 		}
 	}
 
@@ -234,17 +238,17 @@ func (customResourceStrategy) AllowUnconditionalUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user updating status.
 func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	var errs field.ErrorList
-	errs = append(errs, a.validator.ValidateUpdate(ctx, obj, old, a.scale)...)
-
 	uNew, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		return errs
+		return field.ErrorList{field.Invalid(field.NewPath(""), obj, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", obj))}
 	}
 	uOld, ok := old.(*unstructured.Unstructured)
 	if !ok {
-		return errs
+		return field.ErrorList{field.Invalid(field.NewPath(""), old, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", old))}
 	}
+
+	var errs field.ErrorList
+	errs = append(errs, a.validator.ValidateUpdate(ctx, uNew, uOld, a.scale)...)
 
 	// Checks the embedded objects. We don't make a difference between update and create for those.
 	v := obj.GetObjectKind().GroupVersionKind().Version
