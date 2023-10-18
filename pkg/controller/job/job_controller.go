@@ -1546,7 +1546,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
-		// Counters used for the job_pods_created_total_metrics
+		// Counters for pod creation status (used by the job_pods_creation_total metric)
 		creationsSucceeded, creationsFailed := 0, 0
 
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
