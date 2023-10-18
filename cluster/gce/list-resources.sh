@@ -91,8 +91,8 @@ gcloud-list compute addresses "${REGION:+"region=(${REGION}) AND "}name ~ 'a.*|$
 # Match either the header or a line with the specified e2e network.
 # This assumes that the network name is the second field in the output.
 GREP_REGEX="^NAME\|^[^ ]\+[ ]\+\(${NETWORK}\) "
-gcloud-list compute routes "name ~ 'default.*|${INSTANCE_PREFIX}.*'"
-gcloud-list compute firewall-rules "name ~ 'default.*|k8s-fw.*|${INSTANCE_PREFIX}.*'"
+gcloud-list compute routes "name ~ '${INSTANCE_PREFIX}.*'"
+gcloud-list compute firewall-rules "name ~ 'k8s-fw.*|${INSTANCE_PREFIX}.*'"
 GREP_REGEX=""
 gcloud-list compute forwarding-rules ${REGION:+"region=(${REGION})"}
 gcloud-list compute target-pools ${REGION:+"region=(${REGION})"}
