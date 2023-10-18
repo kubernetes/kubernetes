@@ -45,29 +45,25 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-// customResourceStrategy implements behavior for CustomResources.
+// customResourceStrategy implements behavior for CustomResources for a single
+// version
 type customResourceStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 
-	namespaceScoped   bool
-	validator         customResourceValidator
-	structuralSchemas map[string]*structuralschema.Structural
-	celValidators     map[string]*cel.Validator
-	status            *apiextensions.CustomResourceSubresourceStatus
-	scale             *apiextensions.CustomResourceSubresourceScale
-	kind              schema.GroupVersionKind
+	namespaceScoped  bool
+	validator        customResourceValidator
+	structuralSchema *structuralschema.Structural
+	celValidator     *cel.Validator
+	status           *apiextensions.CustomResourceSubresourceStatus
+	scale            *apiextensions.CustomResourceSubresourceScale
+	kind             schema.GroupVersionKind
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
-	celValidators := map[string]*cel.Validator{}
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchema *structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+	var celValidator *cel.Validator
 	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
-		for name, s := range structuralSchemas {
-			v := cel.NewValidator(s, true, celconfig.PerCallLimit) // CEL programs are compiled and cached here
-			if v != nil {
-				celValidators[name] = v
-			}
-		}
+		celValidator = cel.NewValidator(structuralSchema, true, celconfig.PerCallLimit) // CEL programs are compiled and cached here
 	}
 
 	return customResourceStrategy{
@@ -82,9 +78,9 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			schemaValidator:       schemaValidator,
 			statusSchemaValidator: statusSchemaValidator,
 		},
-		structuralSchemas: structuralSchemas,
-		celValidators:     celValidators,
-		kind:              kind,
+		structuralSchema: structuralSchema,
+		celValidator:     celValidator,
+		kind:             kind,
 	}
 }
 
@@ -173,18 +169,17 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 	errs = append(errs, a.validator.Validate(ctx, u, a.scale)...)
 
 	// validate embedded resources
-	v := obj.GetObjectKind().GroupVersionKind().Version
-	errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.structuralSchemas[v], false)...)
+	errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.structuralSchema, false)...)
 
 	// validate x-kubernetes-list-type "map" and "set" invariant
-	errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], u.Object)...)
+	errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, u.Object)...)
 
 	// validate x-kubernetes-validations rules
-	if celValidator, ok := a.celValidators[v]; ok {
+	if celValidator := a.celValidator; celValidator != nil {
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], u.Object, nil, celconfig.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.structuralSchema, u.Object, nil, celconfig.RuntimeCELCostBudget)
 			errs = append(errs, err...)
 		}
 	}
@@ -251,20 +246,19 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	errs = append(errs, a.validator.ValidateUpdate(ctx, uNew, uOld, a.scale)...)
 
 	// Checks the embedded objects. We don't make a difference between update and create for those.
-	v := obj.GetObjectKind().GroupVersionKind().Version
-	errs = append(errs, schemaobjectmeta.Validate(nil, uNew.Object, a.structuralSchemas[v], false)...)
+	errs = append(errs, schemaobjectmeta.Validate(nil, uNew.Object, a.structuralSchema, false)...)
 
 	// ratcheting validation of x-kubernetes-list-type value map and set
-	if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], uOld.Object); len(oldErrs) == 0 {
-		errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], uNew.Object)...)
+	if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uOld.Object); len(oldErrs) == 0 {
+		errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uNew.Object)...)
 	}
 
 	// validate x-kubernetes-validations rules
-	if celValidator, ok := a.celValidators[v]; ok {
+	if celValidator := a.celValidator; celValidator != nil {
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
 			errs = append(errs, err...)
 		}
 	}

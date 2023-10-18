@@ -99,21 +99,19 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 		oldObject = uOld.Object
 	}
 
-	v := obj.GetObjectKind().GroupVersionKind().Version
-
 	// ratcheting validation of x-kubernetes-list-type value map and set
-	if newErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], uNew.Object); len(newErrs) > 0 {
-		if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], oldObject); len(oldErrs) == 0 {
+	if newErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uNew.Object); len(newErrs) > 0 {
+		if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, oldObject); len(oldErrs) == 0 {
 			errs = append(errs, newErrs...)
 		}
 	}
 
 	// validate x-kubernetes-validations rules
-	if celValidator, ok := a.customResourceStrategy.celValidators[v]; ok {
+	if celValidator := a.customResourceStrategy.celValidator; celValidator != nil {
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchemas[v], uNew.Object, oldObject, celconfig.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchema, uNew.Object, oldObject, celconfig.RuntimeCELCostBudget)
 			errs = append(errs, err...)
 		}
 	}
