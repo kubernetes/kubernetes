@@ -18,116 +18,135 @@ package responsewriter
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
-func TestWithHTTP1(t *testing.T) {
-	var originalWant http.ResponseWriter
-	counterGot := &counter{}
-	chain := func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if originalWant == nil {
-				originalWant = w
-			}
-
-			assertCloseNotifierFlusherHijacker(t, true, w)
-
-			decorator := &fakeResponseWriterDecorator{
-				ResponseWriter: w,
-				counter:        counterGot,
-			}
-			wrapped := WrapForHTTP1Or2(decorator)
-
-			assertCloseNotifierFlusherHijacker(t, true, wrapped)
-
-			originalGot := GetOriginal(wrapped)
-			if originalWant != originalGot {
-				t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
-				return
-			}
-
-			h.ServeHTTP(wrapped, r)
-		})
+func TestWrapForHTTP1Or2WithServer(t *testing.T) {
+	tests := []struct {
+		name   string
+		http1x bool
+	}{
+		{
+			name:   "http/1.x",
+			http1x: true,
+		},
+		{
+			name: "http2",
+		},
 	}
 
-	// wrap the original http.ResponseWriter multiple times
-	handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// at this point, the original ResponseWriter object has been wrapped three times
-		// so each decorator is expected to tick the count by one for each method.
-		defer counterGot.assert(t, &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 3})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// keep track of the first ResponseWriter object handed
+			// to the handler by net/http, this is the first handler
+			// we want to execute.
+			var originalWant http.ResponseWriter
+			first := func(d http.Handler) http.Handler {
+				return http.HandlerFunc(func(inner http.ResponseWriter, r *http.Request) {
+					originalWant = inner
+					if originalGot := GetOriginal(inner); originalWant != originalGot {
+						t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
+						return
+					}
 
-		//nolint:staticcheck // SA1019
-		w.(http.CloseNotifier).CloseNotify()
-		w.(http.Flusher).Flush()
-
-		conn, _, err := w.(http.Hijacker).Hijack()
-		if err != nil {
-			t.Errorf("Expected Hijack to succeed, but got error: %v", err)
-			return
-		}
-		conn.Close()
-	}))
-	handler = chain(handler)
-	handler = chain(handler)
-
-	server := newServer(t, handler, false)
-	defer server.Close()
-
-	sendRequest(t, server)
-}
-
-func TestWithHTTP2(t *testing.T) {
-	var originalWant http.ResponseWriter
-	counterGot := &counter{}
-	chain := func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if originalWant == nil {
-				originalWant = w
+					d.ServeHTTP(inner, r)
+				})
 			}
 
-			assertCloseNotifierFlusherHijacker(t, false, w)
+			counterGot := &counter{}
+			// this handler wraps the given ResponseWriter object
+			// with a decorator, multiple times. this handler
+			// asserts that the outer and inner are compatible.
+			intermediary := func(d http.Handler) http.Handler {
+				return http.HandlerFunc(func(inner http.ResponseWriter, r *http.Request) {
+					assertCloseNotifierFlusher(t, inner)
+					if test.http1x {
+						assertHijacker(t, inner)
+					}
 
-			decorator := &fakeResponseWriterDecorator{
-				ResponseWriter: w,
-				counter:        counterGot,
+					middle := &fakeResponseWriterDecorator{
+						ResponseWriter: inner,
+						counter:        counterGot,
+					}
+					outer := WrapForHTTP1Or2(middle)
+
+					assertCloseNotifierFlusher(t, outer)
+					if test.http1x {
+						assertHijacker(t, inner)
+					}
+
+					if originalGot := GetOriginal(outer); originalWant != originalGot {
+						t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
+						return
+					}
+
+					d.ServeHTTP(outer, r)
+				})
 			}
-			wrapped := WrapForHTTP1Or2(decorator)
 
-			assertCloseNotifierFlusherHijacker(t, false, wrapped)
+			// this handler executes last
+			last := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// the original ResponseWriter object should be
+				// wrapped three times, and the test decorator
+				// short circuits CloseNotify method,
+				counterWant := &counter{FlushInvoked: 3, CloseNotifyInvoked: 1, HijackInvoked: 0}
+				if test.http1x {
+					counterWant.HijackInvoked = 3
+				}
+				defer counterGot.assert(t, counterWant)
 
-			originalGot := GetOriginal(wrapped)
-			if originalWant != originalGot {
-				t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
-				return
-			}
+				//nolint:staticcheck // SA1019
+				w.(http.CloseNotifier).CloseNotify()
+				w.(FlusherError).FlushError()
 
-			h.ServeHTTP(wrapped, r)
+				// using Flush is expected to result in a panic
+				func() {
+					expected := fmt.Errorf("Flush not allowed, use FlushError function instead")
+					defer func() {
+						r := recover()
+						if r == nil {
+							t.Errorf("Expected a panic")
+							return
+						}
+						if err, ok := r.(error); !ok || expected.Error() != err.Error() {
+							t.Errorf("Expected error: %v, but got: %v", expected, err)
+						}
+					}()
+					w.(http.Flusher).Flush()
+				}()
+
+				if test.http1x {
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Errorf("Expected Hijack to succeed, but got error: %v", err)
+						return
+					}
+					conn.Close()
+				}
+			})
+
+			// we want the following handler chain:
+			//  first -> intermediary(1) -> intermediary(2) -> intermediary(3) -> last
+			handler := intermediary(last)
+			handler = intermediary(handler)
+			handler = intermediary(handler)
+			handler = first(handler)
+
+			server := newServer(t, handler, false)
+			defer server.Close()
+
+			sendRequest(t, server)
 		})
 	}
-
-	// wrap the original http.ResponseWriter multiple times
-	handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// at this point, the original ResponseWriter object has been wrapped three times
-		// so each decorator is expected to tick the count by one for each method.
-		defer counterGot.assert(t, &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 0})
-
-		//nolint:staticcheck // SA1019
-		w.(http.CloseNotifier).CloseNotify()
-		w.(http.Flusher).Flush()
-
-	}))
-	handler = chain(handler)
-	handler = chain(handler)
-
-	server := newServer(t, handler, true)
-	defer server.Close()
-
-	sendRequest(t, server)
 }
 
 func TestGetOriginal(t *testing.T) {
@@ -139,14 +158,14 @@ func TestGetOriginal(t *testing.T) {
 		{
 			name: "not wrapped",
 			wrap: func() (http.ResponseWriter, http.ResponseWriter) {
-				original := &FakeResponseWriter{}
+				original := &responsewritertesting.FakeResponseWriter{}
 				return original, original
 			},
 		},
 		{
 			name: "wrapped once",
 			wrap: func() (http.ResponseWriter, http.ResponseWriter) {
-				original := &FakeResponseWriter{}
+				original := &responsewritertesting.FakeResponseWriter{}
 				return original, &fakeResponseWriterDecorator{
 					ResponseWriter: original,
 				}
@@ -155,7 +174,7 @@ func TestGetOriginal(t *testing.T) {
 		{
 			name: "wrapped multiple times",
 			wrap: func() (http.ResponseWriter, http.ResponseWriter) {
-				original := &FakeResponseWriter{}
+				original := &responsewritertesting.FakeResponseWriter{}
 				return original, &fakeResponseWriterDecorator{
 					ResponseWriter: &fakeResponseWriterDecorator{
 						ResponseWriter: &fakeResponseWriterDecorator{
@@ -206,6 +225,113 @@ func TestGetOriginal(t *testing.T) {
 	}
 }
 
+func TestResponseWriterDecorator(t *testing.T) {
+	tests := []struct {
+		name      string
+		http1x    bool
+		decorator func(inner http.ResponseWriter) UserProvidedDecorator
+	}{
+		{
+			name:   "http/1.x, decorator overrides Write only",
+			http1x: true,
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &fakeWriteOnly{ResponseWriter: inner}
+			},
+		},
+		{
+			name: "http2, decorator overrides Write only",
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &fakeWriteOnly{ResponseWriter: inner}
+			},
+		},
+		{
+			name:   "http/1.x, decorator overrides Hijack only",
+			http1x: true,
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &fakeHijackOnly{ResponseWriter: inner}
+			},
+		},
+		{
+			name: "http2, decorator overrides Hijack only",
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &fakeHijackOnly{ResponseWriter: inner}
+			},
+		},
+		{
+			name:   "http/1.x, decorator overrides no method",
+			http1x: true,
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &fakeDecoratorNone{ResponseWriter: inner}
+			},
+		},
+		{
+			name: "http2, decorator overrides no method",
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &fakeDecoratorNone{ResponseWriter: inner}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			chainer := func(d http.Handler) http.Handler {
+				return http.HandlerFunc(func(inner http.ResponseWriter, r *http.Request) {
+					assertCloseNotifierFlusher(t, inner)
+					if test.http1x {
+						assertHijacker(t, inner)
+					}
+
+					middle := test.decorator(inner)
+					outer := WrapForHTTP1Or2(middle)
+
+					d.ServeHTTP(outer, r)
+				})
+			}
+
+			invokedCh := make(chan struct{}, 1)
+			handler := chainer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(invokedCh)
+
+				assertCloseNotifierFlusher(t, w)
+				if test.http1x {
+					assertHijacker(t, w)
+				}
+			}))
+
+			server := newServer(t, handler, !test.http1x)
+			defer server.Close()
+			sendRequest(t, server)
+
+			select {
+			case <-invokedCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the handler to be invoked")
+			}
+		})
+	}
+}
+
+func TestDecoratorShouldNotUseFlush(t *testing.T) {
+	errWant := fmt.Errorf("Flush not allowed, use FlushError function instead")
+
+	inner := &responsewritertesting.FakeResponseWriter{}
+	middle := &shoundNotBeUsedflusher{ResponseWriter: inner}
+
+	func() {
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Errorf("Expected a panic")
+				return
+			}
+			if errGot, ok := r.(error); !ok || errWant.Error() != errGot.Error() {
+				t.Errorf("Expected error: %v, but got: %v", errWant, errGot)
+			}
+		}()
+		WrapForHTTP1Or2(middle)
+	}()
+}
+
 func newServer(t *testing.T, h http.Handler, http2 bool) *httptest.Server {
 	server := httptest.NewUnstartedServer(h)
 	if http2 {
@@ -228,28 +354,40 @@ func sendRequest(t *testing.T, server *httptest.Server) {
 	}
 
 	client := server.Client()
-	client.Timeout = 30 * time.Second
-	_, err = client.Do(req)
+	client.Timeout = wait.ForeverTestTimeout
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("Unexpected non-nil err from client.Do: %v", err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected an OK response from the server, but got: %v", resp)
+	}
 }
 
-func assertCloseNotifierFlusherHijacker(t *testing.T, hijackableExpected bool, w http.ResponseWriter) {
+func assertCloseNotifierFlusher(t *testing.T, w http.ResponseWriter) {
+	t.Helper()
+
 	// the http.ResponseWriter object for both http/1.x and http2
-	// implement http.Flusher and http.CloseNotifier
+	// implement http.Flusher, FlusherError, and http.CloseNotifier
 	if _, ok := w.(http.Flusher); !ok {
 		t.Errorf("Expected the http.ResponseWriter object to implement http.Flusher")
+	}
+	if _, ok := w.(FlusherError); !ok {
+		t.Errorf("Expected the http.ResponseWriter object to implement FlusherError")
 	}
 
 	//nolint:staticcheck // SA1019
 	if _, ok := w.(http.CloseNotifier); !ok {
 		t.Errorf("Expected the http.ResponseWriter object to implement http.CloseNotifier")
 	}
+}
+
+func assertHijacker(t *testing.T, w http.ResponseWriter) {
+	t.Helper()
 
 	// http/1.x implements http.Hijacker, not http2
-	if _, ok := w.(http.Hijacker); ok != hijackableExpected {
-		t.Errorf("Unexpected http.Hijacker implementation, expected: %t, but got: %t", hijackableExpected, ok)
+	if _, ok := w.(http.Hijacker); !ok {
+		t.Errorf("Expected the http.ResponseWriter object to implement http.Hijacker")
 	}
 }
 
@@ -261,7 +399,7 @@ type counter struct {
 
 func (c *counter) assert(t *testing.T, expected *counter) {
 	if expected.FlushInvoked != c.FlushInvoked {
-		t.Errorf("Expected Flush() count to match, wanted: %d, but got: %d", expected.FlushInvoked, c.FlushInvoked)
+		t.Errorf("Expected FlushError() count to match, wanted: %d, but got: %d", expected.FlushInvoked, c.FlushInvoked)
 	}
 	if expected.CloseNotifyInvoked != c.CloseNotifyInvoked {
 		t.Errorf("Expected CloseNotify() count to match, wanted: %d, but got: %d", expected.CloseNotifyInvoked, c.CloseNotifyInvoked)
@@ -277,22 +415,45 @@ type fakeResponseWriterDecorator struct {
 }
 
 func (fw *fakeResponseWriterDecorator) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
-func (fw *fakeResponseWriterDecorator) Flush() {
-	if fw.counter != nil {
-		fw.counter.FlushInvoked++
-	}
-	fw.ResponseWriter.(http.Flusher).Flush()
+func (fw *fakeResponseWriterDecorator) FlushError() error {
+	fw.counter.FlushInvoked++
+	return fw.ResponseWriter.(FlusherError).FlushError()
 }
 func (fw *fakeResponseWriterDecorator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if fw.counter != nil {
-		fw.counter.HijackInvoked++
-	}
+	fw.counter.HijackInvoked++
 	return fw.ResponseWriter.(http.Hijacker).Hijack()
 }
 func (fw *fakeResponseWriterDecorator) CloseNotify() <-chan bool {
-	if fw.counter != nil {
-		fw.counter.CloseNotifyInvoked++
-	}
-	//nolint:staticcheck // SA1019
-	return fw.ResponseWriter.(http.CloseNotifier).CloseNotify()
+	fw.counter.CloseNotifyInvoked++
+	// we short circuit the call here
+	return nil
 }
+
+type fakeWriteOnly struct {
+	http.ResponseWriter
+}
+
+func (fw *fakeWriteOnly) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
+func (fw *fakeWriteOnly) Write(b []byte) (int, error) { return fw.ResponseWriter.Write(b) }
+
+type fakeHijackOnly struct {
+	http.ResponseWriter
+}
+
+func (fw *fakeHijackOnly) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
+func (fw *fakeHijackOnly) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return fw.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+type fakeDecoratorNone struct {
+	http.ResponseWriter
+}
+
+func (fw *fakeDecoratorNone) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
+
+type shoundNotBeUsedflusher struct {
+	http.ResponseWriter
+}
+
+func (d shoundNotBeUsedflusher) Unwrap() http.ResponseWriter { return d.ResponseWriter }
+func (shoundNotBeUsedflusher) Flush()                        {}

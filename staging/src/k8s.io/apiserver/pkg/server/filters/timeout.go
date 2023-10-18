@@ -211,17 +211,17 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	return tw.w.Write(p)
 }
 
-func (tw *baseTimeoutWriter) Flush() {
+func (tw *baseTimeoutWriter) FlushError() error {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
 
 	if tw.timedOut {
-		return
+		return http.ErrHandlerTimeout
 	}
 
 	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
 	// http.Flusher if the inner object (tw.w) implements http.Flusher.
-	tw.w.(http.Flusher).Flush()
+	return tw.w.(responsewriter.FlusherError).FlushError()
 }
 
 func (tw *baseTimeoutWriter) WriteHeader(code int) {

@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httptrace"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -42,8 +43,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	"k8s.io/klog/v2"
 )
 
@@ -518,14 +521,104 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	}
 }
 
-func TestResponseWriterDecorator(t *testing.T) {
-	decorator := &baseTimeoutWriter{
-		w: &responsewriter.FakeResponseWriter{},
+func TestResponseWriterDecoratorShouldNotUseFlush(t *testing.T) {
+	var decorator interface{} = &baseTimeoutWriter{}
+	if _, ok := decorator.(http.Flusher); ok {
+		t.Errorf("decorator should not use Flush method, use FlushError instead")
 	}
-	var w http.ResponseWriter = decorator
+}
 
-	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.w {
+func TestResponseWriterDecoratorConstruction(t *testing.T) {
+	inner1 := &responsewritertesting.FakeResponseWriter{}
+	middle := &baseTimeoutWriter{w: inner1}
+	outer := responsewriter.WrapForHTTP1Or2(middle)
+	// FakeResponseWriter does not implement http.Flusher, FlusherError,
+	// http.CloseNotifier, or http.Hijacker; so WrapForHTTP1Or2 is not
+	// expected to return an outer object.
+	if outer != middle {
+		t.Errorf("Did not expect a new outer object, but got %v", outer)
+	}
+	if innerGot := outer.(responsewriter.UserProvidedDecorator).Unwrap(); inner1 != innerGot {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	}
+
+	// simulate http2
+	inner2 := &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{FakeResponseWriter: inner1}
+	_, outer = newTimeoutWriter(inner2)
+	if innerGot := outer.(responsewriter.UserProvidedDecorator).Unwrap(); inner2 != innerGot {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	}
+	responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner2, outer)
+
+	// simulate http/1x
+	inner3 := &responsewritertesting.FakeResponseWriterFlusherCloseNotifierHijacker{FakeResponseWriterFlusherCloseNotifier: inner2}
+	_, outer = newTimeoutWriter(inner3)
+	if innerGot := outer.(responsewriter.UserProvidedDecorator).Unwrap(); inner3 != innerGot {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	}
+	responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner3, outer)
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	tests := []struct {
+		name  string
+		http2 bool
+	}{
+		{
+			name: "http/1.x",
+		},
+		{
+			name:  "http2",
+			http2: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var inner http.ResponseWriter
+			chain := func(h http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					inner = w
+					_, w = newTimeoutWriter(w)
+					h.ServeHTTP(w, r)
+				})
+			}
+
+			invokedCh := make(chan struct{}, 1)
+			handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(invokedCh)
+				responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner, w)
+			}))
+
+			server := httptest.NewUnstartedServer(handler)
+			defer server.Close()
+			if test.http2 {
+				server.EnableHTTP2 = true
+			}
+			server.StartTLS()
+			if _, err := url.Parse(server.URL); err != nil {
+				t.Errorf("Expected the server to have a valid URL, but got: %s", server.URL)
+				return
+			}
+			req, err := http.NewRequest("GET", server.URL, nil)
+			if err != nil {
+				t.Errorf("error creating request: %v", err)
+				return
+			}
+
+			client := server.Client()
+			client.Timeout = wait.ForeverTestTimeout
+			_, err = client.Do(req)
+			if err != nil {
+				t.Errorf("Unexpected error from the server: %v", err)
+			}
+
+			select {
+			case <-invokedCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the handler to be invoked")
+			}
+		})
 	}
 }
 

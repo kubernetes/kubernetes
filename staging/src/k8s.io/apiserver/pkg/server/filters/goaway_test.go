@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 func TestProbabilisticGoawayDecider(t *testing.T) {
@@ -111,7 +112,7 @@ var (
 )
 
 // newTestGOAWAYServer return a test GOAWAY server instance.
-func newTestGOAWAYServer() (*httptest.Server, error) {
+func newTestGOAWAYServer(t *testing.T) (*httptest.Server, error) {
 	watchHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		timer := time.NewTicker(time.Second)
 		defer timer.Stop()
@@ -119,8 +120,11 @@ func newTestGOAWAYServer() (*httptest.Server, error) {
 		w.Header().Set("Transfer-Encoding", "chunked")
 		w.WriteHeader(200)
 
-		flusher, _ := w.(http.Flusher)
-		flusher.Flush()
+		flusher, _ := w.(responsewriter.FlusherError)
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("unexpected error from FlushError: %v", err)
+			return
+		}
 
 		count := 0
 		for {
@@ -129,7 +133,12 @@ func newTestGOAWAYServer() (*httptest.Server, error) {
 			if err != nil {
 				return
 			}
-			flusher.Flush()
+
+			if err := flusher.FlushError(); err != nil {
+				t.Errorf("unexpected error from FlushError: %v", err)
+				return
+			}
+
 			count += n
 			if count == len(responseBody) {
 				return
@@ -263,7 +272,7 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 // TestClientReceivedGOAWAY tests the in-flight watch requests will not be affected and new requests use a new
 // connection after client received GOAWAY.
 func TestClientReceivedGOAWAY(t *testing.T) {
-	s, err := newTestGOAWAYServer()
+	s, err := newTestGOAWAYServer(t)
 	if err != nil {
 		t.Fatalf("failed to set-up test GOAWAY http server, err: %v", err)
 	}
@@ -417,7 +426,7 @@ func TestGOAWAYHTTP1Requests(t *testing.T) {
 
 // TestGOAWAYConcurrency tests GOAWAY frame will not affect concurrency requests in a single http client instance.
 func TestGOAWAYConcurrency(t *testing.T) {
-	s, err := newTestGOAWAYServer()
+	s, err := newTestGOAWAYServer(t)
 	if err != nil {
 		t.Fatalf("failed to set-up test GOAWAY http server, err: %v", err)
 	}
