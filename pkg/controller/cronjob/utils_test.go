@@ -301,7 +301,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 		now                   time.Time
 		expectedEarliestTime  time.Time
 		expectedRecentTime    *time.Time
-		expectedTooManyMissed bool
+		expectedTooManyMissed missedSchedulesType
 		wantErr               bool
 	}{
 		{
@@ -342,9 +342,10 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					Schedule: "0 * * * *",
 				},
 			},
-			now:                  *deltaTimeAfterTopOfTheHour(301 * time.Minute),
-			expectedRecentTime:   deltaTimeAfterTopOfTheHour(300 * time.Minute),
-			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(10 * time.Second),
+			now:                   *deltaTimeAfterTopOfTheHour(301 * time.Minute),
+			expectedRecentTime:    deltaTimeAfterTopOfTheHour(300 * time.Minute),
+			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(10 * time.Second),
+			expectedTooManyMissed: fewMissed,
 		},
 		{
 			name: "complex schedule",
@@ -359,9 +360,10 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					LastScheduleTime: &metav1HalfPastTheHour,
 				},
 			},
-			now:                  *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
-			expectedRecentTime:   deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
-			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			now:                   *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:    deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedTooManyMissed: fewMissed,
 		},
 		{
 			name: "another complex schedule",
@@ -376,9 +378,10 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					LastScheduleTime: &metav1HalfPastTheHour,
 				},
 			},
-			now:                  *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
-			expectedRecentTime:   nil,
-			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			now:                   *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
+			expectedRecentTime:    nil,
+			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedTooManyMissed: fewMissed,
 		},
 		{
 			name: "complex schedule with longer diff between executions",
@@ -393,9 +396,10 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					LastScheduleTime: &metav1HalfPastTheHour,
 				},
 			},
-			now:                  *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
-			expectedRecentTime:   deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
-			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			now:                   *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
+			expectedRecentTime:    deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
+			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedTooManyMissed: fewMissed,
 		},
 		{
 			name: "complex schedule with shorter diff between executions",
@@ -407,9 +411,10 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					Schedule: "30 6-16/4 * * 1-5",
 				},
 			},
-			now:                  *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
-			expectedRecentTime:   deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
-			expectedEarliestTime: *topOfTheHour(),
+			now:                   *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:    deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime:  *topOfTheHour(),
+			expectedTooManyMissed: fewMissed,
 		},
 		{
 			name: "@every schedule",
@@ -428,7 +433,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                   *deltaTimeAfterTopOfTheHour(7 * 24 * time.Hour),
 			expectedRecentTime:    deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
 			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(1 * time.Minute),
-			expectedTooManyMissed: true,
+			expectedTooManyMissed: manyMissed,
 		},
 		{
 			name: "rogue cronjob",
@@ -543,6 +548,63 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			}
 			if gotTooManyMissed != tt.expectedTooManyMissed {
 				t.Errorf("expectedNumberOfMisses - got %v, want %v", gotTooManyMissed, tt.expectedTooManyMissed)
+			}
+		})
+	}
+}
+
+func TestNextScheduleTimeDuration(t *testing.T) {
+	metav1TopOfTheHour := metav1.NewTime(*topOfTheHour())
+	metav1HalfPastTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(30 * time.Minute))
+
+	tests := []struct {
+		name             string
+		cj               *batchv1.CronJob
+		now              time.Time
+		expectedDuration time.Duration
+	}{
+		{
+			name: "complex schedule skipping weekend",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:              *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedDuration: 3*time.Hour + 59*time.Minute + nextScheduleDelta,
+		},
+		{
+			name: "another complex schedule skipping weekend",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 10,11,12 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:              *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
+			expectedDuration: 66*time.Hour + nextScheduleDelta,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sched, err := cron.ParseStandard(tt.cj.Spec.Schedule)
+			if err != nil {
+				t.Errorf("error setting up the test, %s", err)
+			}
+			gotScheduleTimeDuration := nextScheduleTimeDuration(tt.cj, tt.now, sched)
+			if !reflect.DeepEqual(gotScheduleTimeDuration, &tt.expectedDuration) {
+				t.Errorf("scheduleTimeDuration - got %s, want %s", gotScheduleTimeDuration, tt.expectedDuration)
 			}
 		})
 	}

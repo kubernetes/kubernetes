@@ -33,6 +33,27 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
+type missedSchedulesType int
+
+const (
+	noneMissed missedSchedulesType = iota
+	fewMissed
+	manyMissed
+)
+
+func (e missedSchedulesType) String() string {
+	switch e {
+	case noneMissed:
+		return "none"
+	case fewMissed:
+		return "few"
+	case manyMissed:
+		return "many"
+	default:
+		return fmt.Sprintf("unknown(%d)", int(e))
+	}
+}
+
 // inActiveList checks if cronjob's .status.active has a job with the same UID.
 func inActiveList(cj *batchv1.CronJob, uid types.UID) bool {
 	for _, j := range cj.Status.Active {
@@ -72,11 +93,12 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 // mostRecentScheduleTime returns:
 //   - the last schedule time or CronJob's creation time,
 //   - the most recent time a Job should be created or nil, if that's after now,
-//   - boolean indicating an excessive number of missed schedules,
+//   - value indicating either none missed schedules, a few missed or many missed
 //   - error in an edge case where the schedule specification is grammatically correct,
 //     but logically doesn't make sense (31st day for months with only 30 days, for example).
-func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule, includeStartingDeadlineSeconds bool) (time.Time, *time.Time, bool, error) {
+func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule, includeStartingDeadlineSeconds bool) (time.Time, *time.Time, missedSchedulesType, error) {
 	earliestTime := cj.ObjectMeta.CreationTimestamp.Time
+	missedSchedules := noneMissed
 	if cj.Status.LastScheduleTime != nil {
 		earliestTime = cj.Status.LastScheduleTime.Time
 	}
@@ -93,10 +115,10 @@ func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Sc
 	t2 := schedule.Next(t1)
 
 	if now.Before(t1) {
-		return earliestTime, nil, false, nil
+		return earliestTime, nil, missedSchedules, nil
 	}
 	if now.Before(t2) {
-		return earliestTime, &t1, false, nil
+		return earliestTime, &t1, missedSchedules, nil
 	}
 
 	// It is possible for cron.ParseStandard("59 23 31 2 *") to return an invalid schedule
@@ -104,7 +126,7 @@ func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Sc
 	// In this case the timeBetweenTwoSchedules will be 0, and we error out the invalid schedule
 	timeBetweenTwoSchedules := int64(t2.Sub(t1).Round(time.Second).Seconds())
 	if timeBetweenTwoSchedules < 1 {
-		return earliestTime, nil, false, fmt.Errorf("time difference between two schedules is less than 1 second")
+		return earliestTime, nil, missedSchedules, fmt.Errorf("time difference between two schedules is less than 1 second")
 	}
 	// this logic used for calculating number of missed schedules does a rough
 	// approximation, by calculating a diff between two schedules (t1 and t2),
@@ -143,12 +165,18 @@ func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Sc
 	//
 	// I've somewhat arbitrarily picked 100, as more than 80,
 	// but less than "lots".
-	tooManyMissed := numberOfMissedSchedules > 100
+	switch {
+	case numberOfMissedSchedules > 100:
+		missedSchedules = manyMissed
+	// inform about few missed, still
+	case numberOfMissedSchedules > 0:
+		missedSchedules = fewMissed
+	}
 
 	if mostRecentTime.IsZero() {
-		return earliestTime, nil, tooManyMissed, nil
+		return earliestTime, nil, missedSchedules, nil
 	}
-	return earliestTime, &mostRecentTime, tooManyMissed, nil
+	return earliestTime, &mostRecentTime, missedSchedules, nil
 }
 
 // nextScheduleTimeDuration returns the time duration to requeue based on
@@ -157,13 +185,18 @@ func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Sc
 // realistic cases should be around 100s, the job will still be executed without missing
 // the schedule.
 func nextScheduleTimeDuration(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule) *time.Duration {
-	earliestTime, mostRecentTime, _, err := mostRecentScheduleTime(cj, now, schedule, false)
+	earliestTime, mostRecentTime, missedSchedules, err := mostRecentScheduleTime(cj, now, schedule, false)
 	if err != nil {
 		// we still have to requeue at some point, so aim for the next scheduling slot from now
 		mostRecentTime = &now
 	} else if mostRecentTime == nil {
-		// no missed schedules since earliestTime
-		mostRecentTime = &earliestTime
+		if missedSchedules == noneMissed {
+			// no missed schedules since earliestTime
+			mostRecentTime = &earliestTime
+		} else {
+			// if there are missed schedules since earliestTime, always use now
+			mostRecentTime = &now
+		}
 	}
 
 	t := schedule.Next(*mostRecentTime).Add(nextScheduleDelta).Sub(now)
@@ -174,13 +207,13 @@ func nextScheduleTimeDuration(cj *batchv1.CronJob, now time.Time, schedule cron.
 // and before now, or nil if no unmet schedule times, and an error.
 // If there are too many (>100) unstarted times, it will also record a warning.
 func nextScheduleTime(logger klog.Logger, cj *batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
-	_, mostRecentTime, tooManyMissed, err := mostRecentScheduleTime(cj, now, schedule, true)
+	_, mostRecentTime, missedSchedules, err := mostRecentScheduleTime(cj, now, schedule, true)
 
 	if mostRecentTime == nil || mostRecentTime.After(now) {
 		return nil, err
 	}
 
-	if tooManyMissed {
+	if missedSchedules == manyMissed {
 		recorder.Eventf(cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times. Set or decrease .spec.startingDeadlineSeconds or check clock skew")
 		logger.Info("too many missed times", "cronjob", klog.KObj(cj))
 	}
