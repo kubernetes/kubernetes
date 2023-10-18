@@ -195,3 +195,14 @@ func (c *FakeTestTypes) ApplyStatus(ctx context.Context, testType *examplev1.Tes
 	}
 	return obj.(*v1.TestType), err
 }
+
+// GetClusterTestType takes name of the testType, and returns the corresponding testType object, and an error if there is any.
+func (c *FakeTestTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &v1.TestType{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.TestType), err
+}
