@@ -24,12 +24,12 @@ import "google.golang.org/grpc/internal/grpclog"
 //
 // Deprecated: use LoggerV2.
 type Logger interface {
-	Fatal(args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Fatalln(args ...interface{})
-	Print(args ...interface{})
-	Printf(format string, args ...interface{})
-	Println(args ...interface{})
+	Fatal(args ...any)
+	Fatalf(format string, args ...any)
+	Fatalln(args ...any)
+	Print(args ...any)
+	Printf(format string, args ...any)
+	Println(args ...any)
 }
 
 // SetLogger sets the logger that is used in grpc. Call only from
@@ -45,39 +45,39 @@ type loggerWrapper struct {
 	Logger
 }
 
-func (g *loggerWrapper) Info(args ...interface{}) {
+func (g *loggerWrapper) Info(args ...any) {
 	g.Logger.Print(args...)
 }
 
-func (g *loggerWrapper) Infoln(args ...interface{}) {
+func (g *loggerWrapper) Infoln(args ...any) {
 	g.Logger.Println(args...)
 }
 
-func (g *loggerWrapper) Infof(format string, args ...interface{}) {
+func (g *loggerWrapper) Infof(format string, args ...any) {
 	g.Logger.Printf(format, args...)
 }
 
-func (g *loggerWrapper) Warning(args ...interface{}) {
+func (g *loggerWrapper) Warning(args ...any) {
 	g.Logger.Print(args...)
 }
 
-func (g *loggerWrapper) Warningln(args ...interface{}) {
+func (g *loggerWrapper) Warningln(args ...any) {
 	g.Logger.Println(args...)
 }
 
-func (g *loggerWrapper) Warningf(format string, args ...interface{}) {
+func (g *loggerWrapper) Warningf(format string, args ...any) {
 	g.Logger.Printf(format, args...)
 }
 
-func (g *loggerWrapper) Error(args ...interface{}) {
+func (g *loggerWrapper) Error(args ...any) {
 	g.Logger.Print(args...)
 }
 
-func (g *loggerWrapper) Errorln(args ...interface{}) {
+func (g *loggerWrapper) Errorln(args ...any) {
 	g.Logger.Println(args...)
 }
 
-func (g *loggerWrapper) Errorf(format string, args ...interface{}) {
+func (g *loggerWrapper) Errorf(format string, args ...any) {
 	g.Logger.Printf(format, args...)
 }
 
