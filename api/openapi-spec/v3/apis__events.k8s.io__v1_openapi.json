@@ -72,7 +72,6 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "default": {},
             "description": "deprecatedFirstTimestamp is the deprecated field assuring backward compatibility with core.v1 Event type."
           },
           "deprecatedLastTimestamp": {
@@ -81,7 +80,6 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "default": {},
             "description": "deprecatedLastTimestamp is the deprecated field assuring backward compatibility with core.v1 Event type."
           },
           "deprecatedSource": {
@@ -99,7 +97,6 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime"
               }
             ],
-            "default": {},
             "description": "eventTime is the time when this Event was first observed. It is required."
           },
           "kind": {
@@ -233,7 +230,6 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime"
               }
             ],
-            "default": {},
             "description": "lastObservedTime is the time when last Event from the series was seen before last heartbeat."
           }
         },
@@ -775,7 +771,6 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "default": {},
             "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "deletionGracePeriodSeconds": {
@@ -1056,7 +1051,6 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
               }
             ],
-            "default": {},
             "description": "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context."
           },
           "type": {
