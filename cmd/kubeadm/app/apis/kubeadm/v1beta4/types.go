@@ -493,6 +493,10 @@ type ResetConfiguration struct {
 	// +optional
 	DryRun bool `json:"dryRun,omitempty"`
 
+	// FeatureGates enabled by the user.
+	// +optional
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
 	// Force flag instructs kubeadm to reset the node without prompting for confirmation.
 	// +optional
 	Force bool `json:"force,omitempty"`

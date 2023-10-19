@@ -580,6 +580,13 @@ func (in *Patches) DeepCopy() *Patches {
 func (in *ResetConfiguration) DeepCopyInto(out *ResetConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.FeatureGates != nil {
+		in, out := &in.FeatureGates, &out.FeatureGates
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.IgnorePreflightErrors != nil {
 		in, out := &in.IgnorePreflightErrors, &out.IgnorePreflightErrors
 		*out = make([]string, len(*in))

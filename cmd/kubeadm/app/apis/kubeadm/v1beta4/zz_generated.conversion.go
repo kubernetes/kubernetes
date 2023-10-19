@@ -853,6 +853,7 @@ func autoConvert_v1beta4_ResetConfiguration_To_kubeadm_ResetConfiguration(in *Re
 	out.CertificatesDir = in.CertificatesDir
 	out.CRISocket = in.CRISocket
 	out.DryRun = in.DryRun
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.Force = in.Force
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
@@ -869,6 +870,7 @@ func autoConvert_kubeadm_ResetConfiguration_To_v1beta4_ResetConfiguration(in *ku
 	out.CleanupTmpDir = in.CleanupTmpDir
 	out.CRISocket = in.CRISocket
 	out.DryRun = in.DryRun
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.Force = in.Force
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))

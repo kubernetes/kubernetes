@@ -500,6 +500,9 @@ type ResetConfiguration struct {
 	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
 	DryRun bool
 
+	// FeatureGates enabled by the user.
+	FeatureGates map[string]bool
+
 	// Force flag instructs kubeadm to reset the node without prompting for confirmation.
 	Force bool
 
