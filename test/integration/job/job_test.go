@@ -1697,13 +1697,13 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	}
 	cases := map[string]struct {
 		podReplacementPolicyEnabled  bool
+		jobSpec                      *batchv1.JobSpec
 		wantActiveAfterDeletion      int
 		wantActiveAfterFailure       int
 		wantTerminatingAfterDeletion *int32
 		wantTerminatingAfterFailure  *int32
 		wantFailedAfterDeletion      int
 		wantFailedAfterFailure       int
-		jobSpec                      *batchv1.JobSpec
 	}{
 		"feature flag off, delete & fail pods, recreate terminating pods, and verify job status counters": {
 			jobSpec: &batchv1.JobSpec{
@@ -2550,10 +2550,6 @@ func validateJobsPodsStatusOnly(ctx context.Context, t *testing.T, clientSet cli
 		updatedJob, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get updated Job: %v", err)
-		}
-		pods, _ := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
-		if len(pods.Items) == 0 {
-			return false, nil
 		}
 		actualCounts = podsByStatus{
 			Active:      int(updatedJob.Status.Active),
