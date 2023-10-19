@@ -18,6 +18,7 @@ package common
 
 import (
 	"reflect"
+	"time"
 )
 
 // CorrelatedObject represents a node in a tree of objects that are being
@@ -42,6 +43,10 @@ type CorrelatedObject struct {
 	// to determine how to correlate the old object.
 	Schema Schema
 
+	// Duration spent on ratcheting validation for this object and all of its
+	// children.
+	Duration *time.Duration
+
 	// Scratch space below, may change during validation
 
 	// Cached comparison result of DeepEqual of `value` and `thunk.oldValue`
@@ -64,10 +69,12 @@ type CorrelatedObject struct {
 }
 
 func NewCorrelatedObject(new, old interface{}, schema Schema) *CorrelatedObject {
+	d := time.Duration(0)
 	return &CorrelatedObject{
 		OldValue: old,
 		Value:    new,
 		Schema:   schema,
+		Duration: &d,
 	}
 }
 
@@ -136,6 +143,13 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) interf
 // to validation logic short circuiting and skipping the children, then
 // this function simply defers to reflect.DeepEqual.
 func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
+	start := time.Now()
+	defer func() {
+		if r != nil && r.Duration != nil {
+			*r.Duration += time.Since(start)
+		}
+	}()
+
 	if r == nil {
 		// Uncorrelatable node is not considered equal to its old value
 		return false
@@ -222,6 +236,13 @@ func (r *CorrelatedObject) CachedDeepEqual() (res bool) {
 // value is not correlatable to an old value.
 // If receiver is nil or if the new value is not an object/map, returns nil.
 func (r *CorrelatedObject) Key(field string) *CorrelatedObject {
+	start := time.Now()
+	defer func() {
+		if r != nil && r.Duration != nil {
+			*r.Duration += time.Since(start)
+		}
+	}()
+
 	if r == nil || r.Schema == nil {
 		return nil
 	} else if existing, exists := r.children[field]; exists {
@@ -254,7 +275,12 @@ func (r *CorrelatedObject) Key(field string) *CorrelatedObject {
 		r.children = make(map[interface{}]*CorrelatedObject, len(newAsMap))
 	}
 
-	res := NewCorrelatedObject(newValueForField, oldValueForField, propertySchema)
+	res := &CorrelatedObject{
+		OldValue: oldValueForField,
+		Value:    newValueForField,
+		Schema:   propertySchema,
+		Duration: r.Duration,
+	}
 	r.children[field] = res
 	return res
 }
@@ -264,6 +290,13 @@ func (r *CorrelatedObject) Key(field string) *CorrelatedObject {
 // correlatable to an old value.
 // If receiver is nil or if the new value is not an array, returns nil.
 func (r *CorrelatedObject) Index(i int) *CorrelatedObject {
+	start := time.Now()
+	defer func() {
+		if r != nil && r.Duration != nil {
+			*r.Duration += time.Since(start)
+		}
+	}()
+
 	if r == nil || r.Schema == nil {
 		return nil
 	} else if existing, exists := r.children[i]; exists {
@@ -290,7 +323,12 @@ func (r *CorrelatedObject) Index(i int) *CorrelatedObject {
 		r.children = make(map[interface{}]*CorrelatedObject, len(asList))
 	}
 
-	res := NewCorrelatedObject(asList[i], oldValueForIndex, itemSchema)
+	res := &CorrelatedObject{
+		OldValue: oldValueForIndex,
+		Value:    asList[i],
+		Schema:   itemSchema,
+		Duration: r.Duration,
+	}
 	r.children[i] = res
 	return res
 }
