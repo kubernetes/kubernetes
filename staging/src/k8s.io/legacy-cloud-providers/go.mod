@@ -15,16 +15,8 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/stretchr/testify v1.8.2
-<<<<<<< HEAD
 	github.com/vmware/govmomi v0.30.0
 	golang.org/x/crypto v0.14.0
-||||||| 89a4ea3e1e4
-	github.com/vmware/govmomi v0.30.0
-	golang.org/x/crypto v0.11.0
-=======
-	github.com/vmware/govmomi v0.30.6
-	golang.org/x/crypto v0.14.0
->>>>>>> v1.28.3
 	golang.org/x/oauth2 v0.8.0
 	google.golang.org/api v0.114.0
 	gopkg.in/gcfg.v1 v1.2.3
