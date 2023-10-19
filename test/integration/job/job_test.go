@@ -1711,6 +1711,11 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				Parallelism:    ptr.To[int32](2),
 				Completions:    ptr.To[int32](2),
 				CompletionMode: &indexedCompletion,
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{"fake.example.com/blockDeletion"},
+					},
+				},
 			},
 			wantStatusAfterDeletion: jobStatus{
 				active: 2,
@@ -1728,6 +1733,11 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				Completions:          ptr.To[int32](2),
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{"fake.example.com/blockDeletion"},
+					},
+				},
 			},
 			wantStatusAfterDeletion: jobStatus{
 				active:      2,
@@ -1737,7 +1747,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			wantStatusAfterFailure: jobStatus{
 				active:      2,
 				failed:      2,
-				terminating: ptr.To[int32](2),
+				terminating: ptr.To[int32](0),
 			},
 		},
 		"feature flag true with NonIndexedJob, TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
@@ -1747,6 +1757,11 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				Completions:          ptr.To[int32](2),
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{"fake.example.com/blockDeletion"},
+					},
+				},
 			},
 			wantStatusAfterDeletion: jobStatus{
 				active:      2,
@@ -1756,7 +1771,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			wantStatusAfterFailure: jobStatus{
 				active:      2,
 				failed:      2,
-				terminating: ptr.To[int32](2),
+				terminating: ptr.To[int32](0),
 			},
 		},
 		"feature flag false, podFailurePolicy enabled, delete & fail pods, recreate failed pods, and verify job status counters": {
@@ -1766,6 +1781,11 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				Completions:          ptr.To[int32](2),
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{"fake.example.com/blockDeletion"},
+					},
+				},
 				PodFailurePolicy: &batchv1.PodFailurePolicy{
 					Rules: []batchv1.PodFailurePolicyRule{
 						{
@@ -1792,6 +1812,11 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				Completions:          ptr.To[int32](2),
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{"fake.example.com/blockDeletion"},
+					},
+				},
 			},
 			wantStatusAfterDeletion: jobStatus{
 				active:      0,
@@ -1811,6 +1836,11 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				Completions:          ptr.To[int32](2),
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{"fake.example.com/blockDeletion"},
+					},
+				},
 			},
 			wantStatusAfterDeletion: jobStatus{
 				active:      0,
@@ -1846,7 +1876,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 
 			waitForPodsToBeActive(ctx, t, jobClient, 2, jobObj)
 
-			addFinalizerAndDeletePods(ctx, t, clientSet, ns.Name)
+			deletePods(ctx, t, clientSet, ns.Name)
 
 			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
 				Terminating: tc.wantStatusAfterDeletion.terminating,
@@ -3039,16 +3069,9 @@ func waitForPodsToBeActive(ctx context.Context, t *testing.T, jobClient typedv1.
 	}
 }
 
-func addFinalizerAndDeletePods(ctx context.Context, t *testing.T, clientSet clientset.Interface, namespace string) {
+func deletePods(ctx context.Context, t *testing.T, clientSet clientset.Interface, namespace string) {
 	t.Helper()
-	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		t.Fatalf("Failed to list pods: %v", err)
-	}
-	updatePod(ctx, t, clientSet, pods.Items, func(pod *v1.Pod) {
-		pod.Finalizers = append(pod.Finalizers, "fake.example.com/blockDeletion")
-	})
-	err = clientSet.CoreV1().Pods(namespace).DeleteCollection(ctx,
+	err := clientSet.CoreV1().Pods(namespace).DeleteCollection(ctx,
 		metav1.DeleteOptions{},
 		metav1.ListOptions{
 			Limit: 1000,
@@ -3065,8 +3088,8 @@ func removePodsFinalizer(ctx context.Context, t *testing.T, clientSet clientset.
 		t.Fatalf("Failed to list pods: %v", err)
 	}
 	updatePod(ctx, t, clientSet, pods.Items, func(pod *v1.Pod) {
-		for i := range pod.Finalizers {
-			if pod.Finalizers[i] == "fake.example.com/blockDeletion" {
+		for i, finalizer := range pod.Finalizers {
+			if finalizer == "fake.example.com/blockDeletion" {
 				pod.Finalizers = append(pod.Finalizers[:i], pod.Finalizers[i+1:]...)
 			}
 		}

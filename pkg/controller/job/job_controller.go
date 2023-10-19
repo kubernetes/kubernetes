@@ -914,10 +914,10 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	}
 
 	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !ptr.Equal(ready, job.Status.Ready)
+	needsStatusUpdate = needsStatusUpdate || !ptr.Equal(job.Status.Terminating, jobCtx.terminating)
 	job.Status.Active = active
 	job.Status.Ready = ready
 	job.Status.Terminating = jobCtx.terminating
-	needsStatusUpdate = needsStatusUpdate || !ptr.Equal(job.Status.Terminating, jobCtx.terminating)
 	err = jm.trackJobStatusAndRemoveFinalizers(ctx, jobCtx, needsStatusUpdate)
 	if err != nil {
 		return fmt.Errorf("tracking status: %w", err)
