@@ -61,7 +61,6 @@ apiVersion: %s
 kind: InitConfiguration
 nodeRegistration:
   name: foo
-  criSocket: %s
 localAPIEndpoint:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
@@ -86,7 +85,7 @@ networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 // fakeWaiter is a fake apiclient.Waiter that returns errors it was initialized with
 type fakeWaiter struct {
@@ -600,7 +599,7 @@ func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.InitConfigura
 	configBytes := []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version))
 
 	// Unmarshal the config
-	return configutil.BytesToInitConfiguration(configBytes, false)
+	return configutil.BytesToInitConfiguration(configBytes, true /* skipCRIDetect */)
 }
 
 func getTempDir(t *testing.T, name string) (string, func()) {
