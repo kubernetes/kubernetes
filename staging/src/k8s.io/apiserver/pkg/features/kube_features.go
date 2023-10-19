@@ -142,15 +142,6 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
-	// owner: @jefftree
-	// kep: https://kep.k8s.io/2896
-	// alpha: v1.23
-	// beta: v1.24
-	// stable: v1.27
-	//
-	// Enables kubernetes to publish OpenAPI v3
-	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
-
 	// owner: @caesarxuchao
 	// alpha: v1.15
 	// beta: v1.16
@@ -295,8 +286,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KMSv2KDF: {Default: true, PreRelease: featuregate.Beta}, // lock to true in 1.29 once KMSv2 is GA, remove in 1.31
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
-
-	OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
