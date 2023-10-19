@@ -121,7 +121,7 @@ func allNodesReady(ctx context.Context, c clientset.Interface, timeout time.Dura
 	framework.Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, framework.TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})

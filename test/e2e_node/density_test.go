@@ -552,7 +552,7 @@ func createBatchPodSequential(ctx context.Context, f *framework.Framework, pods 
 		create := metav1.Now()
 		createTimes[pod.Name] = create
 		p := e2epod.NewPodClient(f).Create(ctx, pod)
-		framework.ExpectNoError(wait.PollImmediateWithContext(ctx, 2*time.Second, framework.PodStartTimeout, podWatchedRunning(watchTimes, p.Name)))
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 2*time.Second, framework.PodStartTimeout, true, podWatchedRunning(watchTimes, p.Name)))
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: pod.Name, Latency: watchTimes[pod.Name].Time.Sub(create.Time)})
 	}

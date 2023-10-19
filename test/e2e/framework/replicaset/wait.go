@@ -52,7 +52,7 @@ func WaitForReplicaSetTargetAvailableReplicas(ctx context.Context, c clientset.I
 // with given timeout.
 func WaitForReplicaSetTargetAvailableReplicasWithTimeout(ctx context.Context, c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32, timeout time.Duration) error {
 	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(ctx, replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

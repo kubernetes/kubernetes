@@ -175,7 +175,7 @@ func deleteObjectAndWaitForGC(ctx context.Context, c clientset.Interface, rtObje
 // waitForPodsGone waits until there are no pods left in the PodStore.
 func waitForPodsGone(ctx context.Context, ps *testutils.PodStore, interval, timeout time.Duration) error {
 	var pods []*v1.Pod
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		if pods = ps.List(); len(pods) == 0 {
 			return true, nil
 		}
@@ -197,7 +197,7 @@ func waitForPodsGone(ctx context.Context, ps *testutils.PodStore, interval, time
 // when the pod is inactvie.
 func waitForPodsInactive(ctx context.Context, ps *testutils.PodStore, interval, timeout time.Duration) error {
 	var activePods []*v1.Pod
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		pods := ps.List()
 		activePods = e2epod.FilterActivePods(pods)
 		if len(activePods) != 0 {

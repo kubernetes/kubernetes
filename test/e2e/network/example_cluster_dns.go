@@ -171,7 +171,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 func waitForServiceResponding(ctx context.Context, c clientset.Interface, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
-	return wait.PollImmediateWithContext(ctx, framework.Poll, RespondingTimeout, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, RespondingTimeout, true, func(ctx context.Context) (done bool, err error) {
 		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("Failed to get services proxy request: %v:", errProxy)

@@ -740,7 +740,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 // the only caller of this function.
 func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
 	endpointSlices := []discoveryv1.EndpointSlice{}
-	if err := wait.PollImmediateWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(ctx, cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
 			return false, nil
