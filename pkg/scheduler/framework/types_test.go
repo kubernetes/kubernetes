@@ -494,7 +494,7 @@ func TestNodeInfoClone(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			ni := test.nodeInfo.Clone()
+			ni := test.nodeInfo.Snapshot()
 			// Modify the field to check if the result is a clone of the origin one.
 			test.nodeInfo.Generation += 10
 			test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
