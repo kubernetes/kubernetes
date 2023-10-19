@@ -495,7 +495,7 @@ func (rc *ResourceConsumer) GetHpa(ctx context.Context, name string) (*autoscali
 // WaitForReplicas wait for the desired replicas
 func (rc *ResourceConsumer) WaitForReplicas(ctx context.Context, desiredReplicas int, duration time.Duration) {
 	interval := 20 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
 		replicas := rc.GetReplicas(ctx)
 		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
@@ -506,7 +506,7 @@ func (rc *ResourceConsumer) WaitForReplicas(ctx context.Context, desiredReplicas
 // EnsureDesiredReplicasInRange ensure the replicas is in a desired range
 func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
 		replicas := rc.GetReplicas(ctx)
 		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
 		as, err := rc.GetHpa(ctx, hpaName)
@@ -964,7 +964,7 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 		crd, err = c.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crdSchema, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		// Wait until just created CRD appears in discovery.
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			return ExistsInDiscovery(crd, c, "v1")
 		})
 		framework.ExpectNoError(err)

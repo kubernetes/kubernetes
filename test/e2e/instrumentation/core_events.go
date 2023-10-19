@@ -217,7 +217,7 @@ var _ = common.SIGDescribe("Events", func() {
 
 		ginkgo.By("check that the list of events matches the requested quantity")
 
-		err = wait.PollImmediateWithContext(ctx, eventRetryPeriod, eventRetryTimeout, checkEventListQuantity(f, "testevent-set=true", 0))
+		err = wait.PollUntilContextTimeout(ctx, eventRetryPeriod, eventRetryTimeout, true, checkEventListQuantity(f, "testevent-set=true", 0))
 		framework.ExpectNoError(err, "failed to count required events")
 	})
 

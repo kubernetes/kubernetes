@@ -615,7 +615,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 
 			ginkgo.By("Waiting for all pods to complete successfully")
 			const completeTimeout = 5 * time.Minute
-			waitErr := wait.PollImmediateWithContext(ctx, time.Second, completeTimeout, func(ctx context.Context) (done bool, err error) {
+			waitErr := wait.PollUntilContextTimeout(ctx, time.Second, completeTimeout, true, func(ctx context.Context) (done bool, err error) {
 				podsList, err := config.client.CoreV1().Pods(config.ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return false, err

@@ -196,7 +196,7 @@ func SimpleGET(ctx context.Context, c *http.Client, url, host string) (string, e
 // expectUnreachable is true, it breaks on first non-healthy http code instead.
 func PollURL(ctx context.Context, route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
 	var lastBody string
-	pollErr := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		var err error
 		lastBody, err = SimpleGET(ctx, httpClient, route, host)
 		if err != nil {
@@ -733,7 +733,7 @@ func getIngressAddress(ctx context.Context, client clientset.Interface, ns, name
 // WaitForIngressAddress waits for the Ingress to acquire an address.
 func (j *TestJig) WaitForIngressAddress(ctx context.Context, c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
-	err := wait.PollImmediateWithContext(ctx, 10*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 10*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		ipOrNameList, err := getIngressAddress(ctx, c, ns, ingName, j.Class)
 		if err != nil || len(ipOrNameList) == 0 {
 			j.Logger.Errorf("Waiting for Ingress %s/%s to acquire IP, error: %v, ipOrNameList: %v", ns, ingName, err, ipOrNameList)
@@ -889,7 +889,7 @@ func getPortURL(ctx context.Context, client clientset.Interface, ns, name string
 	// unschedulable, since control plane nodes don't run kube-proxy. Without
 	// kube-proxy NodePorts won't work.
 	var nodes *v1.NodeList
-	if wait.PollImmediateWithContext(ctx, poll, framework.SingleCallTimeout, func(ctx context.Context) (bool, error) {
+	if wait.PollUntilContextTimeout(ctx, poll, framework.SingleCallTimeout, true, func(ctx context.Context) (bool, error) {
 		nodes, err = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})

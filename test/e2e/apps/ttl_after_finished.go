@@ -126,7 +126,7 @@ func finishTime(finishedJob *batchv1.Job) metav1.Time {
 func updateJobWithRetries(ctx context.Context, c clientset.Interface, namespace, name string, applyUpdate func(*batchv1.Job)) (job *batchv1.Job, err error) {
 	jobs := c.BatchV1().Jobs(namespace)
 	var updateErr error
-	pollErr := wait.PollImmediateWithContext(ctx, framework.Poll, JobTimeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, true, func(ctx context.Context) (bool, error) {
 		if job, err = jobs.Get(ctx, name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
@@ -148,7 +148,7 @@ func updateJobWithRetries(ctx context.Context, c clientset.Interface, namespace,
 // waitForJobDeleting uses c to wait for the Job jobName in namespace ns to have
 // a non-nil deletionTimestamp (i.e. being deleted).
 func waitForJobDeleting(ctx context.Context, c clientset.Interface, ns, jobName string) error {
-	return wait.PollImmediateWithContext(ctx, framework.Poll, JobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, true, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

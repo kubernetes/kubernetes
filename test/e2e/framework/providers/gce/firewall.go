@@ -251,7 +251,7 @@ func WaitForFirewallRule(ctx context.Context, gceCloud *gcecloud.Cloud, fwName s
 		return true, nil
 	}
 
-	if err := wait.PollImmediateWithContext(ctx, 5*time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, condition); err != nil {
 		return nil, fmt.Errorf("error waiting for firewall %v exist=%v", fwName, exist)
 	}
 	return fw, nil

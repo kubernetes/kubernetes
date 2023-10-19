@@ -1822,7 +1822,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execPodName := execPod.Name
 		cmd := fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
 		var stdout string
-		if pollErr := wait.PollImmediateWithContext(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, func(ctx context.Context) (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {

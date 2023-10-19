@@ -1826,7 +1826,7 @@ func lastLine(out string) string {
 }
 
 func pollReadWithTimeout(ctx context.Context, statefulPod statefulPodTester, statefulPodNumber int, key, expectedVal string) error {
-	err := wait.PollImmediateWithContext(ctx, time.Second, readTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, readTimeout, true, func(ctx context.Context) (bool, error) {
 		val := statefulPod.read(statefulPodNumber, key)
 		if val == "" {
 			return false, nil

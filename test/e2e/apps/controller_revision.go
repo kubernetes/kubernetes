@@ -65,7 +65,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 			for _, ds := range daemonsets.Items {
 				ginkgo.By(fmt.Sprintf("Deleting DaemonSet %q", ds.Name))
 				framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
-				err = wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, &ds))
+				err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnNoNodes(f, &ds))
 				framework.ExpectNoError(err, "error waiting for daemon pod to be reaped")
 			}
 		}
@@ -134,7 +134,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-		err = wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, testDaemonset))
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnAllNodes(f, testDaemonset))
 		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
 		framework.ExpectNoError(err)
@@ -191,7 +191,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		framework.Logf("Created ControllerRevision: %s", newControllerRevision.Name)
 
 		ginkgo.By("Confirm that there are two ControllerRevisions")
-		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
+		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
 		ginkgo.By(fmt.Sprintf("Deleting ControllerRevision %q", initialRevision.Name))
@@ -199,7 +199,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		framework.ExpectNoError(err, "Failed to delete ControllerRevision: %v", err)
 
 		ginkgo.By("Confirm that there is only one ControllerRevision")
-		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
+		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
 		listControllerRevisions, err := csAppsV1.ControllerRevisions(ns).List(ctx, metav1.ListOptions{})
@@ -226,7 +226,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		framework.ExpectNoError(err, "error patching daemon set")
 
 		ginkgo.By("Confirm that there are two ControllerRevisions")
-		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
+		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
 		updatedLabel := map[string]string{updatedControllerRevision.Name: "updated"}
@@ -237,7 +237,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		framework.ExpectNoError(err, "Failed to delete ControllerRevision: %v", err)
 
 		ginkgo.By("Confirm that there is only one ControllerRevision")
-		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
+		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
 		list, err := csAppsV1.ControllerRevisions(ns).List(ctx, metav1.ListOptions{})
