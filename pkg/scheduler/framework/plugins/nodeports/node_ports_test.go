@@ -313,7 +313,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 		"backoff-wrong-old-object": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       "not-a-pod",
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
 		"skip-queue-on-unscheduled": {
@@ -334,7 +334,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 		"queue-on-released-hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").HostPort(8080).Obj(),
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 	}
 

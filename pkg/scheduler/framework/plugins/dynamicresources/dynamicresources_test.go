@@ -346,7 +346,7 @@ func TestPlugin(t *testing.T) {
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
 					added:  []metav1.Object{schedulingSelectedPotential},
 				},
 			},
@@ -360,7 +360,7 @@ func TestPlugin(t *testing.T) {
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to provide information`),
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver to provide information`),
 					added:  []metav1.Object{schedulingPotential},
 				},
 			},
@@ -374,7 +374,7 @@ func TestPlugin(t *testing.T) {
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
 					changes: change{
 						scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
 							return st.FromPodSchedulingContexts(in).
@@ -925,7 +925,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		"queue-on-add": {
 			pod:          podWithClaimName,
 			newObj:       pendingImmediateClaim,
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 		"backoff-wrong-old-object": {
 			pod:         podWithClaimName,
@@ -953,7 +953,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
 				return claim
 			}(),
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 	}
 
@@ -1051,7 +1051,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			claims:       []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			oldObj:       scheduling,
 			newObj:       schedulingInfo,
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 		"queue-bad-selected-node": {
 			pod:    podWithClaimTemplateInStatus,
@@ -1067,7 +1067,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 				scheduling.Status.ResourceClaims[0].UnsuitableNodes = append(scheduling.Status.ResourceClaims[0].UnsuitableNodes, scheduling.Spec.SelectedNode)
 				return scheduling
 			}(),
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 		"skip-spec-changes": {
 			pod:    podWithClaimTemplateInStatus,
@@ -1089,7 +1089,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 				scheduling.Finalizers = append(scheduling.Finalizers, "foo")
 				return scheduling
 			}(),
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 	}
 

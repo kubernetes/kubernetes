@@ -1189,7 +1189,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       "not-a-node",
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
 		"backoff-wrong-old-object": {
@@ -1197,7 +1197,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			pod:          podWithNodeAffinity.Obj(),
 			oldObj:       "not-a-node",
 			newObj:       st.MakeNode().Obj(),
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
 		"skip-queue-on-add": {
@@ -1210,7 +1210,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 		"skip-unrelated-changes": {
 			args:         &config.NodeAffinityArgs{},
@@ -1245,7 +1245,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			pod:          podWithNodeAffinity.Obj(),
 			oldObj:       st.MakeNode().Obj(),
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 		"skip-queue-on-add-scheduler-enforced-node-affinity": {
 			args: &config.NodeAffinityArgs{
@@ -1289,7 +1289,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 	}
 

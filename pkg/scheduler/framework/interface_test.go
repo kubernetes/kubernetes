@@ -131,6 +131,7 @@ func TestStatusCodes(t *testing.T) {
 	assertStatusCode(t, UnschedulableAndUnresolvable, 3)
 	assertStatusCode(t, Wait, 4)
 	assertStatusCode(t, Skip, 5)
+	assertStatusCode(t, Pending, 6)
 }
 
 func assertStatusCode(t *testing.T, code Code, value int) {

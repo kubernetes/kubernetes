@@ -120,7 +120,7 @@ func (pl *NodePorts) EventsToRegister() []framework.ClusterEventWithHint {
 		// See: https://github.com/kubernetes/kubernetes/issues/109437
 		// And, we can remove NodeUpdated event once https://github.com/kubernetes/kubernetes/issues/110175 is solved.
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
-		// (the same as QueueAfterBackoff)
+		// (the same as Queue)
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
 	}
 }
@@ -130,7 +130,7 @@ func (pl *NodePorts) EventsToRegister() []framework.ClusterEventWithHint {
 func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, nil)
 	if err != nil {
-		return framework.QueueAfterBackoff, err
+		return framework.Queue, err
 	}
 
 	// If the deleted pod is unscheduled, it doesn't make the target pod schedulable.
@@ -163,8 +163,8 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		return framework.QueueSkip, nil
 	}
 
-	logger.V(4).Info("the deleted pod and the target pod have any common port(s), returning QueueAfterBackoff as deleting this Pod may make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
-	return framework.QueueAfterBackoff, nil
+	logger.V(4).Info("the deleted pod and the target pod have any common port(s), returning Queue as deleting this Pod may make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	return framework.Queue, nil
 }
 
 // Filter invoked at the filter extension point.
