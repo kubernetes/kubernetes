@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"fmt"
 	"time"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -32,17 +33,21 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 	ps *statsapi.PodStats, fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
-	rootFsInfo *cadvisorapiv2.FsInfo, updateCPUNanoCoreUsage bool) {
+	rootFsInfo *cadvisorapiv2.FsInfo, updateCPUNanoCoreUsage bool) error {
 	for _, criContainerStat := range criSandboxStat.Linux.Containers {
 		container, found := containerMap[criContainerStat.Attributes.Id]
 		if !found {
 			continue
 		}
 		// Fill available stats for full set of required pod stats
-		cs := p.makeContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(),
+		cs, err := p.makeContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(),
 			updateCPUNanoCoreUsage)
+		if err != nil {
+			return fmt.Errorf("make container stats: %w", err)
+		}
 		ps.Containers = append(ps.Containers, *cs)
 	}
+	return nil
 }
 
 func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
