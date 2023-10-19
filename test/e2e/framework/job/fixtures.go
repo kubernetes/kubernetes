@@ -90,6 +90,16 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 		job.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "1000000"}
 	case "fail":
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 1"}
+	case "failOddSucceedEven":
+		job.Spec.Template.Spec.Containers[0].Command = []string{"sh", "-c"}
+		job.Spec.Template.Spec.Containers[0].Args = []string{`
+			if [ $(expr ${JOB_COMPLETION_INDEX} % 2) -ne 0 ]; then
+				exit 1
+			else
+				exit 0
+			fi
+			`,
+		}
 	case "succeed":
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 0"}
 	case "randomlySucceedOrFail":
