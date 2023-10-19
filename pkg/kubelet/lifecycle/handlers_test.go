@@ -43,48 +43,44 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-func TestResolvePortInt(t *testing.T) {
-	expected := 80
-	port, err := resolvePort(intstr.FromInt32(int32(expected)), &v1.Container{})
-	if port != expected {
-		t.Errorf("expected: %d, saw: %d", expected, port)
-	}
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestResolvePortString(t *testing.T) {
-	expected := 80
-	name := "foo"
-	container := &v1.Container{
-		Ports: []v1.ContainerPort{
-			{Name: name, ContainerPort: int32(expected)},
+func TestResolvePort(t *testing.T) {
+	for _, testCase := range []struct {
+		container  *v1.Container
+		stringPort string
+		expected   int
+	}{
+		{
+			stringPort: "foo",
+			container: &v1.Container{
+				Ports: []v1.ContainerPort{{Name: "foo", ContainerPort: int32(80)}},
+			},
+			expected: 80,
 		},
-	}
-	port, err := resolvePort(intstr.FromString(name), container)
-	if port != expected {
-		t.Errorf("expected: %d, saw: %d", expected, port)
-	}
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestResolvePortStringUnknown(t *testing.T) {
-	expected := int32(80)
-	name := "foo"
-	container := &v1.Container{
-		Ports: []v1.ContainerPort{
-			{Name: "bar", ContainerPort: expected},
+		{
+			container:  &v1.Container{},
+			stringPort: "80",
+			expected:   80,
 		},
-	}
-	port, err := resolvePort(intstr.FromString(name), container)
-	if port != -1 {
-		t.Errorf("expected: -1, saw: %d", port)
-	}
-	if err == nil {
-		t.Error("unexpected non-error")
+		{
+			container: &v1.Container{
+				Ports: []v1.ContainerPort{
+					{Name: "bar", ContainerPort: int32(80)},
+				},
+			},
+			stringPort: "foo",
+			expected:   -1,
+		},
+	} {
+		port, err := resolvePort(intstr.FromString(testCase.stringPort), testCase.container)
+		if testCase.expected != -1 && err != nil {
+			t.Fatalf("unexpected error while resolving port: %s", err)
+		}
+		if testCase.expected == -1 && err == nil {
+			t.Errorf("expected error when a port fails to resolve")
+		}
+		if testCase.expected != port {
+			t.Errorf("failed to resolve port, expected %d, got %d", testCase.expected, port)
+		}
 	}
 }
 
