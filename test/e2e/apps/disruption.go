@@ -146,7 +146,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
-		err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 			pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, defaultName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -329,7 +329,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
-				err = wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+				err = wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 					err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
 					if err != nil {
 						return false, nil
@@ -519,7 +519,7 @@ func deletePDBCollection(ctx context.Context, cs kubernetes.Interface, ns string
 
 func waitForPDBCollectionToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns string) {
 	ginkgo.By("Waiting for the PDB collection to be deleted")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pdbList, err := cs.PolicyV1().PodDisruptionBudgets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -558,7 +558,7 @@ func createPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n 
 
 func waitForPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n int) {
 	ginkgo.By("Waiting for all pods to be running")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {
 			return false, err
@@ -624,7 +624,7 @@ func createReplicaSetOrDie(ctx context.Context, cs kubernetes.Interface, ns stri
 
 func locateRunningPod(ctx context.Context, cs kubernetes.Interface, ns string) (pod *v1.Pod, err error) {
 	ginkgo.By("locating a running pod")
-	err = wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -645,7 +645,7 @@ func locateRunningPod(ctx context.Context, cs kubernetes.Interface, ns string) (
 
 func waitForPdbToBeProcessed(ctx context.Context, cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be processed")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -660,7 +660,7 @@ func waitForPdbToBeProcessed(ctx context.Context, cs kubernetes.Interface, ns st
 
 func waitForPdbToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be deleted")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil // done
@@ -675,7 +675,7 @@ func waitForPdbToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns stri
 
 func waitForPdbToObserveHealthyPods(ctx context.Context, cs kubernetes.Interface, ns string, healthyCount int32) {
 	ginkgo.By("Waiting for the pdb to observed all healthy pods")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, wait.ForeverTestTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, "foo", metav1.GetOptions{})
 		if err != nil {
 			return false, err

@@ -1859,7 +1859,7 @@ func getScaleUpStatus(ctx context.Context, c clientset.Interface) (*scaleUpStatu
 func waitForScaleUpStatus(ctx context.Context, c clientset.Interface, cond func(s *scaleUpStatus) bool, timeout time.Duration) (*scaleUpStatus, error) {
 	var finalErr error
 	var status *scaleUpStatus
-	err := wait.PollImmediateWithContext(ctx, 5*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		status, finalErr = getScaleUpStatus(ctx, c)
 		if finalErr != nil {
 			return false, nil

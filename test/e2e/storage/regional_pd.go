@@ -260,7 +260,7 @@ func testZonalFailover(ctx context.Context, c clientset.Interface, ns string) {
 	} else {
 		otherZone = cloudZones[0]
 	}
-	waitErr := wait.PollImmediateWithContext(ctx, framework.Poll, statefulSetReadyTimeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, framework.Poll, statefulSetReadyTimeout, true, func(ctx context.Context) (bool, error) {
 		framework.Logf("Checking whether new pod is scheduled in zone %q", otherZone)
 		pod := getPod(ctx, c, ns, regionalPDLabels)
 		node, err := c.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
