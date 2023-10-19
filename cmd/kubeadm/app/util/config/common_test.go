@@ -510,30 +510,24 @@ func TestValidateConfig(t *testing.T) {
 			cfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: InitConfiguration
-			nodeRegistration:
-			  criSocket: %s
 			  name: foo bar # not a valid subdomain
-			`, gv, constants.UnknownCRISocket)),
+			`, gv)),
 			expectedError: true,
 		},
 		{
 			name: "unknown API GVK",
-			cfg: dedent.Dedent(fmt.Sprintf(`
+			cfg: dedent.Dedent(`
 			apiVersion: foo/bar # not a valid GroupVersion
 			kind: zzz # not a valid Kind
-			nodeRegistration:
-			  criSocket: %s
-			`, constants.UnknownCRISocket)),
+			`),
 			expectedError: true,
 		},
 		{
 			name: "legacy API GVK",
-			cfg: dedent.Dedent(fmt.Sprintf(`
+			cfg: dedent.Dedent(`
 			apiVersion: kubeadm.k8s.io/v1beta1 # legacy API
 			kind: InitConfiguration
-			nodeRegistration:
-			  criSocket: %s
-			`, constants.UnknownCRISocket)),
+			`),
 			expectedError: true,
 		},
 		{
@@ -542,9 +536,7 @@ func TestValidateConfig(t *testing.T) {
 			apiVersion: %s
 			kind: InitConfiguration
 			foo: bar
-			nodeRegistration:
-			  criSocket: %s
-			`, gv, constants.UnknownCRISocket)),
+			`, gv)),
 			expectedError: true,
 		},
 		{
@@ -552,9 +544,7 @@ func TestValidateConfig(t *testing.T) {
 			cfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: InitConfiguration
-			nodeRegistration:
-			  criSocket: %s
-			`, gv, constants.UnknownCRISocket)),
+			`, gv)),
 			expectedError: false,
 		},
 		{
