@@ -22,12 +22,13 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
+	"strings"
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/internal/pretty"
 	"google.golang.org/grpc/serviceconfig"
 )
 
@@ -40,8 +41,9 @@ var (
 
 // TODO(bar) install dns resolver in init(){}.
 
-// Register registers the resolver builder to the resolver map. b.Scheme will be
-// used as the scheme registered with this builder.
+// Register registers the resolver builder to the resolver map. b.Scheme will
+// be used as the scheme registered with this builder. The registry is case
+// sensitive, and schemes should not contain any uppercase characters.
 //
 // NOTE: this function must only be called during initialization time (i.e. in
 // an init() function), and is not thread-safe. If multiple Resolvers are
@@ -122,7 +124,7 @@ type Address struct {
 	Attributes *attributes.Attributes
 
 	// BalancerAttributes contains arbitrary data about this address intended
-	// for consumption by the LB policy.  These attribes do not affect SubConn
+	// for consumption by the LB policy.  These attributes do not affect SubConn
 	// creation, connection establishment, handshaking, etc.
 	BalancerAttributes *attributes.Attributes
 
@@ -149,7 +151,17 @@ func (a Address) Equal(o Address) bool {
 
 // String returns JSON formatted string representation of the address.
 func (a Address) String() string {
-	return pretty.ToJSON(a)
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("{Addr: %q, ", a.Addr))
+	sb.WriteString(fmt.Sprintf("ServerName: %q, ", a.ServerName))
+	if a.Attributes != nil {
+		sb.WriteString(fmt.Sprintf("Attributes: %v, ", a.Attributes.String()))
+	}
+	if a.BalancerAttributes != nil {
+		sb.WriteString(fmt.Sprintf("BalancerAttributes: %v", a.BalancerAttributes.String()))
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
 
 // BuildOptions includes additional information for the builder to create
@@ -202,6 +214,15 @@ type State struct {
 // gRPC to add new methods to this interface.
 type ClientConn interface {
 	// UpdateState updates the state of the ClientConn appropriately.
+	//
+	// If an error is returned, the resolver should try to resolve the
+	// target again. The resolver should use a backoff timer to prevent
+	// overloading the server with requests. If a resolver is certain that
+	// reresolving will not change the result, e.g. because it is
+	// a watch-based resolver, returned errors can be ignored.
+	//
+	// If the resolved State is the same as the last reported one, calling
+	// UpdateState can be omitted.
 	UpdateState(State) error
 	// ReportError notifies the ClientConn that the Resolver encountered an
 	// error.  The ClientConn will notify the load balancer and begin calling
@@ -247,14 +268,29 @@ type Target struct {
 	Scheme string
 	// Deprecated: use URL.Host instead.
 	Authority string
-	// Deprecated: use URL.Path or URL.Opaque instead. The latter is set when
-	// the former is empty.
-	Endpoint string
 	// URL contains the parsed dial target with an optional default scheme added
 	// to it if the original dial target contained no scheme or contained an
 	// unregistered scheme. Any query params specified in the original dial
 	// target can be accessed from here.
 	URL url.URL
+}
+
+// Endpoint retrieves endpoint without leading "/" from either `URL.Path`
+// or `URL.Opaque`. The latter is used when the former is empty.
+func (t Target) Endpoint() string {
+	endpoint := t.URL.Path
+	if endpoint == "" {
+		endpoint = t.URL.Opaque
+	}
+	// For targets of the form "[scheme]://[authority]/endpoint, the endpoint
+	// value returned from url.Parse() contains a leading "/". Although this is
+	// in accordance with RFC 3986, we do not want to break existing resolver
+	// implementations which expect the endpoint without the leading "/". So, we
+	// end up stripping the leading "/" here. But this will result in an
+	// incorrect parsing for something like "unix:///path/to/socket". Since we
+	// own the "unix" resolver, we can workaround in the unix resolver by using
+	// the `URL` field.
+	return strings.TrimPrefix(endpoint, "/")
 }
 
 // Builder creates a resolver that will be used to watch name resolution updates.
@@ -264,8 +300,10 @@ type Builder interface {
 	// gRPC dial calls Build synchronously, and fails if the returned error is
 	// not nil.
 	Build(target Target, cc ClientConn, opts BuildOptions) (Resolver, error)
-	// Scheme returns the scheme supported by this resolver.
-	// Scheme is defined at https://github.com/grpc/grpc/blob/master/doc/naming.md.
+	// Scheme returns the scheme supported by this resolver.  Scheme is defined
+	// at https://github.com/grpc/grpc/blob/master/doc/naming.md.  The returned
+	// string should not contain uppercase characters, as they will not match
+	// the parsed target's scheme as defined in RFC 3986.
 	Scheme() string
 }
 

@@ -21,6 +21,7 @@ package transport
 import (
 	"bufio"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -37,7 +38,6 @@ import (
 	"golang.org/x/net/http2/hpack"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/status"
 )
 
@@ -85,7 +85,6 @@ var (
 		// 504 Gateway timeout - UNAVAILABLE.
 		http.StatusGatewayTimeout: codes.Unavailable,
 	}
-	logger = grpclog.Component("transport")
 )
 
 // isReservedHeader checks whether hdr belongs to HTTP2 headers
@@ -330,7 +329,8 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 		return 0, w.err
 	}
 	if w.batchSize == 0 { // Buffer has been disabled.
-		return w.conn.Write(b)
+		n, err = w.conn.Write(b)
+		return n, toIOError(err)
 	}
 	for len(b) > 0 {
 		nn := copy(w.buf[w.offset:], b)
@@ -352,8 +352,28 @@ func (w *bufWriter) Flush() error {
 		return nil
 	}
 	_, w.err = w.conn.Write(w.buf[:w.offset])
+	w.err = toIOError(w.err)
 	w.offset = 0
 	return w.err
+}
+
+type ioError struct {
+	error
+}
+
+func (i ioError) Unwrap() error {
+	return i.error
+}
+
+func isIOError(err error) bool {
+	return errors.As(err, &ioError{})
+}
+
+func toIOError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return ioError{error: err}
 }
 
 type framer struct {

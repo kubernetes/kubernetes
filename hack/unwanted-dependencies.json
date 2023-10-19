@@ -43,6 +43,9 @@
   },
   "status": {
     "unwantedReferences": {
+      "cloud.google.com/go/firestore": [
+        "google.golang.org/genproto"
+      ],
       "github.com/getsentry/raven-go": [
         "go.etcd.io/etcd/raft/v3"
       ],

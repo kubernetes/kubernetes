@@ -279,6 +279,14 @@ type PickResult struct {
 	// type, Done may not be called.  May be nil if the balancer does not wish
 	// to be notified when the RPC completes.
 	Done func(DoneInfo)
+
+	// Metadata provides a way for LB policies to inject arbitrary per-call
+	// metadata. Any metadata returned here will be merged with existing
+	// metadata added by the client application.
+	//
+	// LB policies with child policies are responsible for propagating metadata
+	// injected by their children to the ClientConn, as part of Pick().
+	Metadata metadata.MD
 }
 
 // TransientFailureError returns e.  It exists for backward compatibility and
