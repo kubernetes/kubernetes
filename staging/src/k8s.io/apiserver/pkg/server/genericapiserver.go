@@ -430,11 +430,9 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
-		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
-			s.OpenAPIV3VersionedService = routes.OpenAPI{
-				V3Config: s.openAPIV3Config,
-			}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
-		}
+		s.OpenAPIV3VersionedService = routes.OpenAPI{
+			V3Config: s.openAPIV3Config,
+		}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 	}
 
 	s.installHealthz()
