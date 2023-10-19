@@ -79,15 +79,6 @@ var (
 	MaxPodCreateDeletePerSync = 500
 )
 
-const (
-	// MaxFailedIndexesExceeded indicates that an indexed of a job failed
-	// https://kep.k8s.io/3850
-	// In Beta, this should be moved to staging as an API field.
-	jobReasonMaxFailedIndexesExceeded string = "MaxFailedIndexesExceeded"
-	// FailedIndexes means Job has failed indexes.
-	jobReasonFailedIndexes string = "FailedIndexes"
-)
-
 // Controller ensures that all Job objects have corresponding pods to
 // run their configured workload.
 type Controller struct {
@@ -847,9 +838,9 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			jobCtx.failedIndexes = calculateFailedIndexes(logger, &job, pods)
 			if jobCtx.finishedCondition == nil {
 				if job.Spec.MaxFailedIndexes != nil && jobCtx.failedIndexes.total() > int(*job.Spec.MaxFailedIndexes) {
-					jobCtx.finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, jobReasonMaxFailedIndexesExceeded, "Job has exceeded the specified maximal number of failed indexes", jm.clock.Now())
+					jobCtx.finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, batch.JobReasonMaxFailedIndexesExceeded, "Job has exceeded the specified maximal number of failed indexes", jm.clock.Now())
 				} else if jobCtx.failedIndexes.total() > 0 && jobCtx.failedIndexes.total()+jobCtx.succeededIndexes.total() >= int(*job.Spec.Completions) {
-					jobCtx.finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, jobReasonFailedIndexes, "Job has failed indexes", jm.clock.Now())
+					jobCtx.finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, batch.JobReasonFailedIndexes, "Job has failed indexes", jm.clock.Now())
 				}
 			}
 			jobCtx.podsWithDelayedDeletionPerIndex = getPodsWithDelayedDeletionPerIndex(logger, jobCtx)
