@@ -94,7 +94,7 @@ func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEventWithHint {
 func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
-		return framework.QueueAfterBackoff, err
+		return framework.Queue, err
 	}
 
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(modifiedNode) {
@@ -105,7 +105,7 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	isMatched, err := requiredNodeAffinity.Match(modifiedNode)
 	if err != nil {
-		return framework.QueueAfterBackoff, err
+		return framework.Queue, err
 	}
 	if !isMatched {
 		logger.V(4).Info("node was created or updated, but doesn't matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -116,14 +116,14 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 	if originalNode != nil {
 		wasMatched, err = requiredNodeAffinity.Match(originalNode)
 		if err != nil {
-			return framework.QueueAfterBackoff, err
+			return framework.Queue, err
 		}
 	}
 
 	if !wasMatched {
 		// This modification makes this Node match with Pod's NodeAffinity.
 		logger.V(4).Info("node was created or updated, and matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.QueueAfterBackoff, nil
+		return framework.Queue, nil
 	}
 
 	logger.V(4).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
