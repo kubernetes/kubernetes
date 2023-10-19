@@ -453,7 +453,7 @@ func (ht *serverHandlerTransport) IncrMsgSent() {}
 
 func (ht *serverHandlerTransport) IncrMsgRecv() {}
 
-func (ht *serverHandlerTransport) Drain() {
+func (ht *serverHandlerTransport) Drain(debugData string) {
 	panic("Drain() is not implemented")
 }
 
