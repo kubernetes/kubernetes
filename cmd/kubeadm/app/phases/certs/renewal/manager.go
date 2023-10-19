@@ -142,6 +142,10 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 			fileName: kubeadmconstants.AdminKubeConfigFileName,
 		},
 		{
+			longName: "certificate embedded in the kubeconfig file for the super-admin",
+			fileName: kubeadmconstants.SuperAdminKubeConfigFileName,
+		},
+		{
 			longName: "certificate embedded in the kubeconfig file for the controller manager to use",
 			fileName: kubeadmconstants.ControllerManagerKubeConfigFileName,
 		},
