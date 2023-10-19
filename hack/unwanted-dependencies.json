@@ -67,7 +67,6 @@
   "status": {
     "unwantedReferences": {
       "cloud.google.com/go": [
-        "cloud.google.com/go/compute",
         "github.com/google/cadvisor",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/genproto"
