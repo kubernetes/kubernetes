@@ -560,8 +560,8 @@ func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.type|private$Nam
 		return nil, err
 	}
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$Name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})
-		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})$end$
+		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$Name, $.ApplyPatchType|raw$, data, "$.subresourcePath$"), &$.resultType|raw${})
+		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, $.ApplyPatchType|raw$, data, "$.subresourcePath$"), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
