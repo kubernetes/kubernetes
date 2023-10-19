@@ -72,20 +72,21 @@ var _ phases.InitData = &initData{}
 // initData defines all the runtime information used when running the kubeadm init workflow;
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
-	cfg                     *kubeadmapi.InitConfiguration
-	skipTokenPrint          bool
-	dryRun                  bool
-	kubeconfigDir           string
-	kubeconfigPath          string
-	ignorePreflightErrors   sets.Set[string]
-	certificatesDir         string
-	dryRunDir               string
-	externalCA              bool
-	client                  clientset.Interface
-	outputWriter            io.Writer
-	uploadCerts             bool
-	skipCertificateKeyPrint bool
-	patchesDir              string
+	cfg                         *kubeadmapi.InitConfiguration
+	skipTokenPrint              bool
+	dryRun                      bool
+	kubeconfigDir               string
+	kubeconfigPath              string
+	ignorePreflightErrors       sets.Set[string]
+	certificatesDir             string
+	dryRunDir                   string
+	externalCA                  bool
+	client                      clientset.Interface
+	outputWriter                io.Writer
+	uploadCerts                 bool
+	skipCertificateKeyPrint     bool
+	patchesDir                  string
+	adminKubeConfigBootstrapped bool
 }
 
 // newCmdInit returns "kubeadm init" command.
@@ -495,12 +496,22 @@ func (d *initData) Client() (clientset.Interface, error) {
 			// If we're dry-running, we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
 			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
 			d.client = apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
-		} else {
-			// If we're acting for real, we should create a connection to the API server and wait for it to come up
+		} else { // Use a real client
 			var err error
-			d.client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
-			if err != nil {
-				return nil, err
+			if !d.adminKubeConfigBootstrapped {
+				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
+				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil)
+				if err != nil {
+					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s", kubeadmconstants.AdminKubeConfigFileName)
+				}
+				d.adminKubeConfigBootstrapped = true
+			} else {
+				// In case adminKubeConfigBootstrapped is already set just return a client from the default
+				// kubeconfig location.
+				d.client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
