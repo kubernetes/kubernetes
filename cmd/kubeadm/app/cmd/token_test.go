@@ -271,12 +271,12 @@ func TestGetClientSet(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	fullPath := filepath.Join(tmpDir, testConfigTokenFile)
 
-	// test dryRun = false on a non-existant file
+	// test dryRun = false on a non-existent file
 	if _, err = cmdutil.GetClientSet(fullPath, false); err == nil {
 		t.Errorf("GetClientSet(); dry-run: false; did no fail for test file %q: %v", fullPath, err)
 	}
 
-	// test dryRun = true on a non-existant file
+	// test dryRun = true on a non-existent file
 	if _, err = cmdutil.GetClientSet(fullPath, true); err == nil {
 		t.Errorf("GetClientSet(); dry-run: true; did no fail for test file %q: %v", fullPath, err)
 	}
