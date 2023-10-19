@@ -332,21 +332,21 @@ func ValidateConfig(config []byte, allowExperimental bool) error {
 
 	// Validate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		if _, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true, false); err != nil {
+		if _, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true, false); err != nil {
+		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate ResetConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
-		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, false); err != nil {
+		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
