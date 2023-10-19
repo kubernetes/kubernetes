@@ -306,8 +306,8 @@ type JobSpec struct {
 	// batch.kubernetes.io/job-index-failure-count annotation. It can only
 	// be set when Job's completionMode=Indexed, and the Pod's restart
 	// policy is Never. The field is immutable.
-	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
-	// feature gate is enabled (disabled by default).
+	// This field is beta-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (enabled by default).
 	// +optional
 	BackoffLimitPerIndex *int32
 
@@ -319,8 +319,8 @@ type JobSpec struct {
 	// It can only be specified when backoffLimitPerIndex is set.
 	// It can be null or up to completions. It is required and must be
 	// less than or equal to 10^4 when is completions greater than 10^5.
-	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
-	// feature gate is enabled (disabled by default).
+	// This field is beta-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (enabled by default).
 	// +optional
 	MaxFailedIndexes *int32
 
@@ -481,8 +481,8 @@ type JobStatus struct {
 	// last element of the series, separated by a hyphen.
 	// For example, if the failed indexes are 1, 3, 4, 5 and 7, they are
 	// represented as "1,3-5,7".
-	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
-	// feature gate is enabled (disabled by default).
+	// This field is beta-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (enabled by default).
 	// +optional
 	FailedIndexes *string
 
