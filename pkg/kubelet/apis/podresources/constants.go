@@ -19,4 +19,14 @@ package podresources
 const (
 	// Socket is the name of the podresources server socket
 	Socket = "kubelet"
+
+	// DefaultQPS is determined by empirically reviewing known consumers of the API.
+	// It's at least unlikely that there is a legitimate need to query podresources
+	// more than 100 times per second, the other subsystems are not guaranteed to react
+	// so fast in the first place.
+	DefaultQPS = 100
+
+	// DefaultBurstTokens is determined by empirically reviewing known consumers of the API.
+	// See the documentation of DefaultQPS, same caveats apply.
+	DefaultBurstTokens = 10
 )
