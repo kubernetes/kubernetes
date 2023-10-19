@@ -162,7 +162,7 @@ func copyNonMetadata(original map[string]interface{}) map[string]interface{} {
 func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		return field.ErrorList{field.Invalid(field.NewPath(""), u, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", u))}
+		return field.ErrorList{field.Invalid(field.NewPath(""), u, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", obj))}
 	}
 
 	var errs field.ErrorList
