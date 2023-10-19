@@ -594,11 +594,43 @@ func defaultFromComments(comments []string, commentPath string, t *types.Type) (
 	return i, nil, nil
 }
 
-func mustEnforceDefault(t *types.Type, omitEmpty bool) (interface{}, error) {
+func implementsCustomUnmarshalling(t *types.Type) bool {
 	switch t.Kind {
+	case types.Pointer:
+		unmarshaller, isUnmarshaller := t.Elem.Methods["UnmarshalJSON"]
+		return isUnmarshaller && unmarshaller.Signature.Receiver.Kind == types.Pointer
+	case types.Struct:
+		_, isUnmarshaller := t.Methods["UnmarshalJSON"]
+		return isUnmarshaller
+	default:
+		return false
+	}
+}
+
+func mustEnforceDefault(t *types.Type, omitEmpty bool) (interface{}, error) {
+	// Treat types with custom unmarshalling as a value
+	// (Can be alias, struct, or pointer)
+	if implementsCustomUnmarshalling(t) {
+		// Since Go JSON deserializer always feeds `null` when present
+		// to structs with custom UnmarshalJSON, the zero value for
+		// these structs is also null.
+		//
+		// In general, Kubernetes API types with custom marshalling should
+		// marshal their empty values to `null`.
+		return nil, nil
+	}
+
+	switch t.Kind {
+	case types.Alias:
+		return mustEnforceDefault(t.Underlying, omitEmpty)
 	case types.Pointer, types.Map, types.Slice, types.Array, types.Interface:
 		return nil, nil
 	case types.Struct:
+		if len(t.Members) == 1 && t.Members[0].Embedded {
+			// Treat a struct with a single embedded member the same as an alias
+			return mustEnforceDefault(t.Members[0].Type, omitEmpty)
+		}
+
 		return map[string]interface{}{}, nil
 	case types.Builtin:
 		if !omitEmpty {
@@ -619,7 +651,7 @@ func (g openAPITypeWriter) generateDefault(comments []string, t *types.Type, omi
 	if err != nil {
 		return err
 	}
-	if enforced, err := mustEnforceDefault(resolveAliasAndEmbeddedType(t), omitEmpty); err != nil {
+	if enforced, err := mustEnforceDefault(t, omitEmpty); err != nil {
 		return err
 	} else if enforced != nil {
 		if def == nil {
@@ -749,22 +781,6 @@ func (g openAPITypeWriter) generateSimpleProperty(typeString, format string) {
 func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
 	g.refTypes[t.Name.String()] = t
 	g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
-}
-
-func resolveAliasAndEmbeddedType(t *types.Type) *types.Type {
-	var prev *types.Type
-	for prev != t {
-		prev = t
-		if t.Kind == types.Alias {
-			t = t.Underlying
-		}
-		if t.Kind == types.Struct {
-			if len(t.Members) == 1 && t.Members[0].Embedded {
-				t = t.Members[0].Type
-			}
-		}
-	}
-	return t
 }
 
 func resolveAliasAndPtrType(t *types.Type) *types.Type {
