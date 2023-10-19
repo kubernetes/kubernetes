@@ -86,10 +86,7 @@ func (info *HostCertificateInfo) FromURL(u *url.URL, config *tls.Config) error {
 
 	conn, err := tls.Dial("tcp", addr, config)
 	if err != nil {
-		switch err.(type) {
-		case x509.UnknownAuthorityError:
-		case x509.HostnameError:
-		default:
+		if !soap.IsCertificateUntrusted(err) {
 			return err
 		}
 

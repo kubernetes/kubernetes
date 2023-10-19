@@ -840,9 +840,11 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 		p.inFlightPods[pInfo.Pod.UID] = p.inFlightEvents.PushBack(pInfo.Pod)
 	}
 
+	// Update metrics and reset the set of unschedulable plugins for the next attempt.
 	for plugin := range pInfo.UnschedulablePlugins {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 	}
+	pInfo.UnschedulablePlugins.Clear()
 
 	return pInfo, nil
 }

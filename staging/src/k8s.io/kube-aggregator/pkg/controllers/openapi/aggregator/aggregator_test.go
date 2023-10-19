@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"bytes"
+
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -90,6 +91,9 @@ func TestAddUpdateAPIService(t *testing.T) {
 	if err := s.AddUpdateAPIService(apiService, handler); err != nil {
 		t.Error(err)
 	}
+	if err := s.UpdateAPIServiceSpec(apiService.Name); err != nil {
+		t.Error(err)
+	}
 
 	swagger, err := fetchOpenAPI(mux)
 	if err != nil {
@@ -109,7 +113,9 @@ func TestAddUpdateAPIService(t *testing.T) {
 			},
 		},
 	}
-	s.UpdateAPIServiceSpec(apiService.Name)
+	if err := s.UpdateAPIServiceSpec(apiService.Name); err != nil {
+		t.Error(err)
+	}
 
 	swagger, err = fetchOpenAPI(mux)
 	if err != nil {
@@ -158,6 +164,9 @@ func TestAddRemoveAPIService(t *testing.T) {
 	if err := s.AddUpdateAPIService(apiService, handler); err != nil {
 		t.Error(err)
 	}
+	if err := s.UpdateAPIServiceSpec(apiService.Name); err != nil {
+		t.Error(err)
+	}
 
 	swagger, err := fetchOpenAPI(mux)
 	if err != nil {
@@ -174,6 +183,78 @@ func TestAddRemoveAPIService(t *testing.T) {
 		t.Error(err)
 	}
 	// Ensure that the if the APIService is added then removed, the OpenAPI disappears from the aggregated OpenAPI as well.
+	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+}
+
+func TestUpdateAPIService(t *testing.T) {
+	mux := http.NewServeMux()
+	var delegationHandlers []http.Handler
+	delegate1 := &openAPIHandler{openapi: &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Paths: &spec.Paths{
+				Paths: map[string]spec.PathItem{
+					"/apis/foo/v1": {},
+				},
+			},
+		},
+	}}
+	delegationHandlers = append(delegationHandlers, delegate1)
+
+	s := buildAndRegisterSpecAggregator(delegationHandlers, mux)
+
+	apiService := &v1.APIService{
+		Spec: v1.APIServiceSpec{
+			Service: &v1.ServiceReference{Name: "dummy"},
+		},
+	}
+	apiService.Name = "apiservice"
+
+	handler := &openAPIHandler{openapi: &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Paths: &spec.Paths{
+				Paths: map[string]spec.PathItem{
+					"/apis/apiservicegroup/v1": {},
+				},
+			},
+		},
+	}}
+
+	handler2 := &openAPIHandler{openapi: &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Paths: &spec.Paths{
+				Paths: map[string]spec.PathItem{},
+			},
+		},
+	}}
+
+	if err := s.AddUpdateAPIService(apiService, handler); err != nil {
+		t.Error(err)
+	}
+	if err := s.UpdateAPIServiceSpec(apiService.Name); err != nil {
+		t.Error(err)
+	}
+
+	swagger, err := fetchOpenAPI(mux)
+	if err != nil {
+		t.Error(err)
+	}
+	expectPath(t, swagger, "/apis/apiservicegroup/v1")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+
+	t.Logf("Updating APIService %s", apiService.Name)
+	if err := s.AddUpdateAPIService(apiService, handler2); err != nil {
+		t.Error(err)
+	}
+	if err := s.UpdateAPIServiceSpec(apiService.Name); err != nil {
+		t.Error(err)
+	}
+
+	swagger, err = fetchOpenAPI(mux)
+	if err != nil {
+		t.Error(err)
+	}
+	// Ensure that the if the APIService is added and then handler is modified, the new data is reflected in the aggregated OpenAPI.
 	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
 	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
 }
@@ -233,8 +314,19 @@ func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
 		},
 	}
 
-	s.AddUpdateAPIService(apiServiceFailed, handlerFailed)
-	s.AddUpdateAPIService(apiServiceSuccess, handlerSuccess)
+	if err := s.AddUpdateAPIService(apiServiceSuccess, handlerSuccess); err != nil {
+		t.Error(err)
+	}
+	if err := s.AddUpdateAPIService(apiServiceFailed, handlerFailed); err != nil {
+		t.Error(err)
+	}
+	if err := s.UpdateAPIServiceSpec(apiServiceSuccess.Name); err != nil {
+		t.Error(err)
+	}
+	err := s.UpdateAPIServiceSpec(apiServiceFailed.Name)
+	if err == nil {
+		t.Errorf("Expected updating failing apiService %s to return error", apiServiceFailed.Name)
+	}
 
 	swagger, err := fetchOpenAPI(mux)
 	if err != nil {
@@ -281,7 +373,12 @@ func TestAPIServiceFailSuccessTransition(t *testing.T) {
 		},
 	}
 
-	s.AddUpdateAPIService(apiService, handler)
+	if err := s.AddUpdateAPIService(apiService, handler); err != nil {
+		t.Error(err)
+	}
+	if err := s.UpdateAPIServiceSpec(apiService.Name); err == nil {
+		t.Errorf("Expected error for when updating spec for failing apiservice")
+	}
 
 	swagger, err := fetchOpenAPI(mux)
 	if err != nil {
@@ -304,12 +401,75 @@ func TestAPIServiceFailSuccessTransition(t *testing.T) {
 	expectPath(t, swagger, "/apis/apiservicegroup/v1")
 }
 
+func TestFailingAPIServiceDoesNotBlockAdd(t *testing.T) {
+	mux := http.NewServeMux()
+	var delegationHandlers []http.Handler
+	delegate1 := &openAPIHandler{openapi: &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Paths: &spec.Paths{
+				Paths: map[string]spec.PathItem{
+					"/apis/foo/v1": {},
+				},
+			},
+		},
+	}}
+	delegationHandlers = append(delegationHandlers, delegate1)
+
+	s := buildAndRegisterSpecAggregator(delegationHandlers, mux)
+
+	apiServiceFailed := &v1.APIService{
+		Spec: v1.APIServiceSpec{
+			Service: &v1.ServiceReference{Name: "dummy"},
+		},
+	}
+	apiServiceFailed.Name = "apiserviceFailed"
+
+	// Create a handler that has a long response time and ensure that
+	// adding the APIService does not block.
+	handlerFailed := &openAPIHandler{
+		delaySeconds: 5,
+		returnErr:    true,
+		openapi: &spec.Swagger{
+			SwaggerProps: spec.SwaggerProps{
+				Paths: &spec.Paths{
+					Paths: map[string]spec.PathItem{
+						"/apis/failed/v1": {},
+					},
+				},
+			},
+		},
+	}
+
+	updateDone := make(chan bool)
+	go func() {
+		if err := s.AddUpdateAPIService(apiServiceFailed, handlerFailed); err != nil {
+			t.Error(err)
+		}
+		close(updateDone)
+	}()
+
+	select {
+	case <-updateDone:
+	case <-time.After(2 * time.Second):
+		t.Errorf("AddUpdateAPIService affected by APIService response time")
+	}
+
+	swagger, err := fetchOpenAPI(mux)
+	if err != nil {
+		t.Error(err)
+	}
+	expectPath(t, swagger, "/apis/foo/v1")
+	expectNoPath(t, swagger, "/apis/failed/v1")
+}
+
 type openAPIHandler struct {
-	openapi   *spec.Swagger
-	returnErr bool
+	delaySeconds int
+	openapi      *spec.Swagger
+	returnErr    bool
 }
 
 func (o *openAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	time.Sleep(time.Duration(o.delaySeconds) * time.Second)
 	if o.returnErr {
 		w.WriteHeader(500)
 		return

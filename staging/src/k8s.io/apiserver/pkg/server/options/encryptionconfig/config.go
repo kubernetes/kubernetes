@@ -43,12 +43,13 @@ import (
 	"k8s.io/apiserver/pkg/apis/config/validation"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
+	envelopemetrics "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -103,6 +104,12 @@ const (
 	//   the endpoint is present even if there are no KMS plugins configured (it is a no-op then)
 	kmsReloadHealthCheckName = "kms-providers"
 )
+
+func init() {
+	metrics.RegisterMetrics()
+	storagevalue.RegisterMetrics()
+	envelopemetrics.RegisterMetrics()
+}
 
 type kmsPluginHealthzResponse struct {
 	err      error
@@ -445,10 +452,10 @@ func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.C
 	}
 
 	if errCode, err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
-		metrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
+		envelopemetrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
 		errs = append(errs, fmt.Errorf("got invalid KMSv2 KeyID hash %q: %w", envelopekmsv2.GetHashIfNotEmpty(response.KeyID), err))
 	} else {
-		metrics.RecordKeyIDFromStatus(h.name, response.KeyID)
+		envelopemetrics.RecordKeyIDFromStatus(h.name, response.KeyID)
 		// unconditionally append as we filter out nil errors below
 		errs = append(errs, h.rotateDEKOnKeyIDChange(ctx, response.KeyID, string(uuid.NewUUID())))
 	}
