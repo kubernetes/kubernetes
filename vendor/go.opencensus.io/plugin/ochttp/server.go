@@ -31,14 +31,14 @@ import (
 // Handler is an http.Handler wrapper to instrument your HTTP server with
 // OpenCensus. It supports both stats and tracing.
 //
-// Tracing
+// # Tracing
 //
 // This handler is aware of the incoming request's span, reading it from request
 // headers as configured using the Propagation field.
 // The extracted span can be accessed from the incoming request's
 // context.
 //
-//    span := trace.FromContext(r.Context())
+//	span := trace.FromContext(r.Context())
 //
 // The server span will be automatically ended at the end of ServeHTTP.
 type Handler struct {
@@ -224,7 +224,9 @@ func (t *trackingResponseWriter) WriteHeader(statusCode int) {
 }
 
 // wrappedResponseWriter returns a wrapped version of the original
-//  ResponseWriter and only implements the same combination of additional
+//
+//	ResponseWriter and only implements the same combination of additional
+//
 // interfaces as the original.
 // This implementation is based on https://github.com/felixge/httpsnoop.
 func (t *trackingResponseWriter) wrappedResponseWriter() http.ResponseWriter {

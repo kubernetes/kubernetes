@@ -20,8 +20,8 @@ package transport
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -38,14 +38,13 @@ import (
 	"golang.org/x/net/http2/hpack"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/status"
 )
 
 const (
 	// http2MaxFrameLen specifies the max length of a HTTP2 frame.
 	http2MaxFrameLen = 16384 // 16KB frame
-	// http://http2.github.io/http2-spec/#SettingValues
+	// https://httpwg.org/specs/rfc7540.html#SettingValues
 	http2InitHeaderTableSize = 4096
 )
 
@@ -86,7 +85,6 @@ var (
 		// 504 Gateway timeout - UNAVAILABLE.
 		http.StatusGatewayTimeout: codes.Unavailable,
 	}
-	logger = grpclog.Component("transport")
 )
 
 // isReservedHeader checks whether hdr belongs to HTTP2 headers
@@ -251,13 +249,13 @@ func encodeGrpcMessage(msg string) string {
 }
 
 func encodeGrpcMessageUnchecked(msg string) string {
-	var buf bytes.Buffer
+	var sb strings.Builder
 	for len(msg) > 0 {
 		r, size := utf8.DecodeRuneInString(msg)
 		for _, b := range []byte(string(r)) {
 			if size > 1 {
 				// If size > 1, r is not ascii. Always do percent encoding.
-				buf.WriteString(fmt.Sprintf("%%%02X", b))
+				fmt.Fprintf(&sb, "%%%02X", b)
 				continue
 			}
 
@@ -266,14 +264,14 @@ func encodeGrpcMessageUnchecked(msg string) string {
 			//
 			// fmt.Sprintf("%%%02X", utf8.RuneError) gives "%FFFD".
 			if b >= spaceByte && b <= tildeByte && b != percentByte {
-				buf.WriteByte(b)
+				sb.WriteByte(b)
 			} else {
-				buf.WriteString(fmt.Sprintf("%%%02X", b))
+				fmt.Fprintf(&sb, "%%%02X", b)
 			}
 		}
 		msg = msg[size:]
 	}
-	return buf.String()
+	return sb.String()
 }
 
 // decodeGrpcMessage decodes the msg encoded by encodeGrpcMessage.
@@ -291,23 +289,23 @@ func decodeGrpcMessage(msg string) string {
 }
 
 func decodeGrpcMessageUnchecked(msg string) string {
-	var buf bytes.Buffer
+	var sb strings.Builder
 	lenMsg := len(msg)
 	for i := 0; i < lenMsg; i++ {
 		c := msg[i]
 		if c == percentByte && i+2 < lenMsg {
 			parsed, err := strconv.ParseUint(msg[i+1:i+3], 16, 8)
 			if err != nil {
-				buf.WriteByte(c)
+				sb.WriteByte(c)
 			} else {
-				buf.WriteByte(byte(parsed))
+				sb.WriteByte(byte(parsed))
 				i += 2
 			}
 		} else {
-			buf.WriteByte(c)
+			sb.WriteByte(c)
 		}
 	}
-	return buf.String()
+	return sb.String()
 }
 
 type bufWriter struct {
@@ -331,7 +329,8 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 		return 0, w.err
 	}
 	if w.batchSize == 0 { // Buffer has been disabled.
-		return w.conn.Write(b)
+		n, err = w.conn.Write(b)
+		return n, toIOError(err)
 	}
 	for len(b) > 0 {
 		nn := copy(w.buf[w.offset:], b)
@@ -353,8 +352,28 @@ func (w *bufWriter) Flush() error {
 		return nil
 	}
 	_, w.err = w.conn.Write(w.buf[:w.offset])
+	w.err = toIOError(w.err)
 	w.offset = 0
 	return w.err
+}
+
+type ioError struct {
+	error
+}
+
+func (i ioError) Unwrap() error {
+	return i.error
+}
+
+func isIOError(err error) bool {
+	return errors.As(err, &ioError{})
+}
+
+func toIOError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return ioError{error: err}
 }
 
 type framer struct {

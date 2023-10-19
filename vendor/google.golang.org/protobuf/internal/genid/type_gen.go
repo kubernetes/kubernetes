@@ -32,6 +32,7 @@ const (
 	Type_Options_field_name       protoreflect.Name = "options"
 	Type_SourceContext_field_name protoreflect.Name = "source_context"
 	Type_Syntax_field_name        protoreflect.Name = "syntax"
+	Type_Edition_field_name       protoreflect.Name = "edition"
 
 	Type_Name_field_fullname          protoreflect.FullName = "google.protobuf.Type.name"
 	Type_Fields_field_fullname        protoreflect.FullName = "google.protobuf.Type.fields"
@@ -39,6 +40,7 @@ const (
 	Type_Options_field_fullname       protoreflect.FullName = "google.protobuf.Type.options"
 	Type_SourceContext_field_fullname protoreflect.FullName = "google.protobuf.Type.source_context"
 	Type_Syntax_field_fullname        protoreflect.FullName = "google.protobuf.Type.syntax"
+	Type_Edition_field_fullname       protoreflect.FullName = "google.protobuf.Type.edition"
 )
 
 // Field numbers for google.protobuf.Type.
@@ -49,6 +51,7 @@ const (
 	Type_Options_field_number       protoreflect.FieldNumber = 4
 	Type_SourceContext_field_number protoreflect.FieldNumber = 5
 	Type_Syntax_field_number        protoreflect.FieldNumber = 6
+	Type_Edition_field_number       protoreflect.FieldNumber = 7
 )
 
 // Names for google.protobuf.Field.
@@ -121,12 +124,14 @@ const (
 	Enum_Options_field_name       protoreflect.Name = "options"
 	Enum_SourceContext_field_name protoreflect.Name = "source_context"
 	Enum_Syntax_field_name        protoreflect.Name = "syntax"
+	Enum_Edition_field_name       protoreflect.Name = "edition"
 
 	Enum_Name_field_fullname          protoreflect.FullName = "google.protobuf.Enum.name"
 	Enum_Enumvalue_field_fullname     protoreflect.FullName = "google.protobuf.Enum.enumvalue"
 	Enum_Options_field_fullname       protoreflect.FullName = "google.protobuf.Enum.options"
 	Enum_SourceContext_field_fullname protoreflect.FullName = "google.protobuf.Enum.source_context"
 	Enum_Syntax_field_fullname        protoreflect.FullName = "google.protobuf.Enum.syntax"
+	Enum_Edition_field_fullname       protoreflect.FullName = "google.protobuf.Enum.edition"
 )
 
 // Field numbers for google.protobuf.Enum.
@@ -136,6 +141,7 @@ const (
 	Enum_Options_field_number       protoreflect.FieldNumber = 3
 	Enum_SourceContext_field_number protoreflect.FieldNumber = 4
 	Enum_Syntax_field_number        protoreflect.FieldNumber = 5
+	Enum_Edition_field_number       protoreflect.FieldNumber = 6
 )
 
 // Names for google.protobuf.EnumValue.

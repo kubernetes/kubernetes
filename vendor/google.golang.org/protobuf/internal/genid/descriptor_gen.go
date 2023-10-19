@@ -50,6 +50,7 @@ const (
 	FileDescriptorProto_Options_field_name          protoreflect.Name = "options"
 	FileDescriptorProto_SourceCodeInfo_field_name   protoreflect.Name = "source_code_info"
 	FileDescriptorProto_Syntax_field_name           protoreflect.Name = "syntax"
+	FileDescriptorProto_Edition_field_name          protoreflect.Name = "edition"
 
 	FileDescriptorProto_Name_field_fullname             protoreflect.FullName = "google.protobuf.FileDescriptorProto.name"
 	FileDescriptorProto_Package_field_fullname          protoreflect.FullName = "google.protobuf.FileDescriptorProto.package"
@@ -63,6 +64,7 @@ const (
 	FileDescriptorProto_Options_field_fullname          protoreflect.FullName = "google.protobuf.FileDescriptorProto.options"
 	FileDescriptorProto_SourceCodeInfo_field_fullname   protoreflect.FullName = "google.protobuf.FileDescriptorProto.source_code_info"
 	FileDescriptorProto_Syntax_field_fullname           protoreflect.FullName = "google.protobuf.FileDescriptorProto.syntax"
+	FileDescriptorProto_Edition_field_fullname          protoreflect.FullName = "google.protobuf.FileDescriptorProto.edition"
 )
 
 // Field numbers for google.protobuf.FileDescriptorProto.
@@ -79,6 +81,7 @@ const (
 	FileDescriptorProto_Options_field_number          protoreflect.FieldNumber = 8
 	FileDescriptorProto_SourceCodeInfo_field_number   protoreflect.FieldNumber = 9
 	FileDescriptorProto_Syntax_field_number           protoreflect.FieldNumber = 12
+	FileDescriptorProto_Edition_field_number          protoreflect.FieldNumber = 13
 )
 
 // Names for google.protobuf.DescriptorProto.
@@ -180,13 +183,58 @@ const (
 // Field names for google.protobuf.ExtensionRangeOptions.
 const (
 	ExtensionRangeOptions_UninterpretedOption_field_name protoreflect.Name = "uninterpreted_option"
+	ExtensionRangeOptions_Declaration_field_name         protoreflect.Name = "declaration"
+	ExtensionRangeOptions_Verification_field_name        protoreflect.Name = "verification"
 
 	ExtensionRangeOptions_UninterpretedOption_field_fullname protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.uninterpreted_option"
+	ExtensionRangeOptions_Declaration_field_fullname         protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.declaration"
+	ExtensionRangeOptions_Verification_field_fullname        protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.verification"
 )
 
 // Field numbers for google.protobuf.ExtensionRangeOptions.
 const (
 	ExtensionRangeOptions_UninterpretedOption_field_number protoreflect.FieldNumber = 999
+	ExtensionRangeOptions_Declaration_field_number         protoreflect.FieldNumber = 2
+	ExtensionRangeOptions_Verification_field_number        protoreflect.FieldNumber = 3
+)
+
+// Full and short names for google.protobuf.ExtensionRangeOptions.VerificationState.
+const (
+	ExtensionRangeOptions_VerificationState_enum_fullname = "google.protobuf.ExtensionRangeOptions.VerificationState"
+	ExtensionRangeOptions_VerificationState_enum_name     = "VerificationState"
+)
+
+// Names for google.protobuf.ExtensionRangeOptions.Declaration.
+const (
+	ExtensionRangeOptions_Declaration_message_name     protoreflect.Name     = "Declaration"
+	ExtensionRangeOptions_Declaration_message_fullname protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration"
+)
+
+// Field names for google.protobuf.ExtensionRangeOptions.Declaration.
+const (
+	ExtensionRangeOptions_Declaration_Number_field_name     protoreflect.Name = "number"
+	ExtensionRangeOptions_Declaration_FullName_field_name   protoreflect.Name = "full_name"
+	ExtensionRangeOptions_Declaration_Type_field_name       protoreflect.Name = "type"
+	ExtensionRangeOptions_Declaration_IsRepeated_field_name protoreflect.Name = "is_repeated"
+	ExtensionRangeOptions_Declaration_Reserved_field_name   protoreflect.Name = "reserved"
+	ExtensionRangeOptions_Declaration_Repeated_field_name   protoreflect.Name = "repeated"
+
+	ExtensionRangeOptions_Declaration_Number_field_fullname     protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.number"
+	ExtensionRangeOptions_Declaration_FullName_field_fullname   protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.full_name"
+	ExtensionRangeOptions_Declaration_Type_field_fullname       protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.type"
+	ExtensionRangeOptions_Declaration_IsRepeated_field_fullname protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.is_repeated"
+	ExtensionRangeOptions_Declaration_Reserved_field_fullname   protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.reserved"
+	ExtensionRangeOptions_Declaration_Repeated_field_fullname   protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.repeated"
+)
+
+// Field numbers for google.protobuf.ExtensionRangeOptions.Declaration.
+const (
+	ExtensionRangeOptions_Declaration_Number_field_number     protoreflect.FieldNumber = 1
+	ExtensionRangeOptions_Declaration_FullName_field_number   protoreflect.FieldNumber = 2
+	ExtensionRangeOptions_Declaration_Type_field_number       protoreflect.FieldNumber = 3
+	ExtensionRangeOptions_Declaration_IsRepeated_field_number protoreflect.FieldNumber = 4
+	ExtensionRangeOptions_Declaration_Reserved_field_number   protoreflect.FieldNumber = 5
+	ExtensionRangeOptions_Declaration_Repeated_field_number   protoreflect.FieldNumber = 6
 )
 
 // Names for google.protobuf.FieldDescriptorProto.
@@ -494,26 +542,29 @@ const (
 
 // Field names for google.protobuf.MessageOptions.
 const (
-	MessageOptions_MessageSetWireFormat_field_name         protoreflect.Name = "message_set_wire_format"
-	MessageOptions_NoStandardDescriptorAccessor_field_name protoreflect.Name = "no_standard_descriptor_accessor"
-	MessageOptions_Deprecated_field_name                   protoreflect.Name = "deprecated"
-	MessageOptions_MapEntry_field_name                     protoreflect.Name = "map_entry"
-	MessageOptions_UninterpretedOption_field_name          protoreflect.Name = "uninterpreted_option"
+	MessageOptions_MessageSetWireFormat_field_name               protoreflect.Name = "message_set_wire_format"
+	MessageOptions_NoStandardDescriptorAccessor_field_name       protoreflect.Name = "no_standard_descriptor_accessor"
+	MessageOptions_Deprecated_field_name                         protoreflect.Name = "deprecated"
+	MessageOptions_MapEntry_field_name                           protoreflect.Name = "map_entry"
+	MessageOptions_DeprecatedLegacyJsonFieldConflicts_field_name protoreflect.Name = "deprecated_legacy_json_field_conflicts"
+	MessageOptions_UninterpretedOption_field_name                protoreflect.Name = "uninterpreted_option"
 
-	MessageOptions_MessageSetWireFormat_field_fullname         protoreflect.FullName = "google.protobuf.MessageOptions.message_set_wire_format"
-	MessageOptions_NoStandardDescriptorAccessor_field_fullname protoreflect.FullName = "google.protobuf.MessageOptions.no_standard_descriptor_accessor"
-	MessageOptions_Deprecated_field_fullname                   protoreflect.FullName = "google.protobuf.MessageOptions.deprecated"
-	MessageOptions_MapEntry_field_fullname                     protoreflect.FullName = "google.protobuf.MessageOptions.map_entry"
-	MessageOptions_UninterpretedOption_field_fullname          protoreflect.FullName = "google.protobuf.MessageOptions.uninterpreted_option"
+	MessageOptions_MessageSetWireFormat_field_fullname               protoreflect.FullName = "google.protobuf.MessageOptions.message_set_wire_format"
+	MessageOptions_NoStandardDescriptorAccessor_field_fullname       protoreflect.FullName = "google.protobuf.MessageOptions.no_standard_descriptor_accessor"
+	MessageOptions_Deprecated_field_fullname                         protoreflect.FullName = "google.protobuf.MessageOptions.deprecated"
+	MessageOptions_MapEntry_field_fullname                           protoreflect.FullName = "google.protobuf.MessageOptions.map_entry"
+	MessageOptions_DeprecatedLegacyJsonFieldConflicts_field_fullname protoreflect.FullName = "google.protobuf.MessageOptions.deprecated_legacy_json_field_conflicts"
+	MessageOptions_UninterpretedOption_field_fullname                protoreflect.FullName = "google.protobuf.MessageOptions.uninterpreted_option"
 )
 
 // Field numbers for google.protobuf.MessageOptions.
 const (
-	MessageOptions_MessageSetWireFormat_field_number         protoreflect.FieldNumber = 1
-	MessageOptions_NoStandardDescriptorAccessor_field_number protoreflect.FieldNumber = 2
-	MessageOptions_Deprecated_field_number                   protoreflect.FieldNumber = 3
-	MessageOptions_MapEntry_field_number                     protoreflect.FieldNumber = 7
-	MessageOptions_UninterpretedOption_field_number          protoreflect.FieldNumber = 999
+	MessageOptions_MessageSetWireFormat_field_number               protoreflect.FieldNumber = 1
+	MessageOptions_NoStandardDescriptorAccessor_field_number       protoreflect.FieldNumber = 2
+	MessageOptions_Deprecated_field_number                         protoreflect.FieldNumber = 3
+	MessageOptions_MapEntry_field_number                           protoreflect.FieldNumber = 7
+	MessageOptions_DeprecatedLegacyJsonFieldConflicts_field_number protoreflect.FieldNumber = 11
+	MessageOptions_UninterpretedOption_field_number                protoreflect.FieldNumber = 999
 )
 
 // Names for google.protobuf.FieldOptions.
@@ -528,16 +579,26 @@ const (
 	FieldOptions_Packed_field_name              protoreflect.Name = "packed"
 	FieldOptions_Jstype_field_name              protoreflect.Name = "jstype"
 	FieldOptions_Lazy_field_name                protoreflect.Name = "lazy"
+	FieldOptions_UnverifiedLazy_field_name      protoreflect.Name = "unverified_lazy"
 	FieldOptions_Deprecated_field_name          protoreflect.Name = "deprecated"
 	FieldOptions_Weak_field_name                protoreflect.Name = "weak"
+	FieldOptions_DebugRedact_field_name         protoreflect.Name = "debug_redact"
+	FieldOptions_Retention_field_name           protoreflect.Name = "retention"
+	FieldOptions_Target_field_name              protoreflect.Name = "target"
+	FieldOptions_Targets_field_name             protoreflect.Name = "targets"
 	FieldOptions_UninterpretedOption_field_name protoreflect.Name = "uninterpreted_option"
 
 	FieldOptions_Ctype_field_fullname               protoreflect.FullName = "google.protobuf.FieldOptions.ctype"
 	FieldOptions_Packed_field_fullname              protoreflect.FullName = "google.protobuf.FieldOptions.packed"
 	FieldOptions_Jstype_field_fullname              protoreflect.FullName = "google.protobuf.FieldOptions.jstype"
 	FieldOptions_Lazy_field_fullname                protoreflect.FullName = "google.protobuf.FieldOptions.lazy"
+	FieldOptions_UnverifiedLazy_field_fullname      protoreflect.FullName = "google.protobuf.FieldOptions.unverified_lazy"
 	FieldOptions_Deprecated_field_fullname          protoreflect.FullName = "google.protobuf.FieldOptions.deprecated"
 	FieldOptions_Weak_field_fullname                protoreflect.FullName = "google.protobuf.FieldOptions.weak"
+	FieldOptions_DebugRedact_field_fullname         protoreflect.FullName = "google.protobuf.FieldOptions.debug_redact"
+	FieldOptions_Retention_field_fullname           protoreflect.FullName = "google.protobuf.FieldOptions.retention"
+	FieldOptions_Target_field_fullname              protoreflect.FullName = "google.protobuf.FieldOptions.target"
+	FieldOptions_Targets_field_fullname             protoreflect.FullName = "google.protobuf.FieldOptions.targets"
 	FieldOptions_UninterpretedOption_field_fullname protoreflect.FullName = "google.protobuf.FieldOptions.uninterpreted_option"
 )
 
@@ -547,8 +608,13 @@ const (
 	FieldOptions_Packed_field_number              protoreflect.FieldNumber = 2
 	FieldOptions_Jstype_field_number              protoreflect.FieldNumber = 6
 	FieldOptions_Lazy_field_number                protoreflect.FieldNumber = 5
+	FieldOptions_UnverifiedLazy_field_number      protoreflect.FieldNumber = 15
 	FieldOptions_Deprecated_field_number          protoreflect.FieldNumber = 3
 	FieldOptions_Weak_field_number                protoreflect.FieldNumber = 10
+	FieldOptions_DebugRedact_field_number         protoreflect.FieldNumber = 16
+	FieldOptions_Retention_field_number           protoreflect.FieldNumber = 17
+	FieldOptions_Target_field_number              protoreflect.FieldNumber = 18
+	FieldOptions_Targets_field_number             protoreflect.FieldNumber = 19
 	FieldOptions_UninterpretedOption_field_number protoreflect.FieldNumber = 999
 )
 
@@ -562,6 +628,18 @@ const (
 const (
 	FieldOptions_JSType_enum_fullname = "google.protobuf.FieldOptions.JSType"
 	FieldOptions_JSType_enum_name     = "JSType"
+)
+
+// Full and short names for google.protobuf.FieldOptions.OptionRetention.
+const (
+	FieldOptions_OptionRetention_enum_fullname = "google.protobuf.FieldOptions.OptionRetention"
+	FieldOptions_OptionRetention_enum_name     = "OptionRetention"
+)
+
+// Full and short names for google.protobuf.FieldOptions.OptionTargetType.
+const (
+	FieldOptions_OptionTargetType_enum_fullname = "google.protobuf.FieldOptions.OptionTargetType"
+	FieldOptions_OptionTargetType_enum_name     = "OptionTargetType"
 )
 
 // Names for google.protobuf.OneofOptions.
@@ -590,20 +668,23 @@ const (
 
 // Field names for google.protobuf.EnumOptions.
 const (
-	EnumOptions_AllowAlias_field_name          protoreflect.Name = "allow_alias"
-	EnumOptions_Deprecated_field_name          protoreflect.Name = "deprecated"
-	EnumOptions_UninterpretedOption_field_name protoreflect.Name = "uninterpreted_option"
+	EnumOptions_AllowAlias_field_name                         protoreflect.Name = "allow_alias"
+	EnumOptions_Deprecated_field_name                         protoreflect.Name = "deprecated"
+	EnumOptions_DeprecatedLegacyJsonFieldConflicts_field_name protoreflect.Name = "deprecated_legacy_json_field_conflicts"
+	EnumOptions_UninterpretedOption_field_name                protoreflect.Name = "uninterpreted_option"
 
-	EnumOptions_AllowAlias_field_fullname          protoreflect.FullName = "google.protobuf.EnumOptions.allow_alias"
-	EnumOptions_Deprecated_field_fullname          protoreflect.FullName = "google.protobuf.EnumOptions.deprecated"
-	EnumOptions_UninterpretedOption_field_fullname protoreflect.FullName = "google.protobuf.EnumOptions.uninterpreted_option"
+	EnumOptions_AllowAlias_field_fullname                         protoreflect.FullName = "google.protobuf.EnumOptions.allow_alias"
+	EnumOptions_Deprecated_field_fullname                         protoreflect.FullName = "google.protobuf.EnumOptions.deprecated"
+	EnumOptions_DeprecatedLegacyJsonFieldConflicts_field_fullname protoreflect.FullName = "google.protobuf.EnumOptions.deprecated_legacy_json_field_conflicts"
+	EnumOptions_UninterpretedOption_field_fullname                protoreflect.FullName = "google.protobuf.EnumOptions.uninterpreted_option"
 )
 
 // Field numbers for google.protobuf.EnumOptions.
 const (
-	EnumOptions_AllowAlias_field_number          protoreflect.FieldNumber = 2
-	EnumOptions_Deprecated_field_number          protoreflect.FieldNumber = 3
-	EnumOptions_UninterpretedOption_field_number protoreflect.FieldNumber = 999
+	EnumOptions_AllowAlias_field_number                         protoreflect.FieldNumber = 2
+	EnumOptions_Deprecated_field_number                         protoreflect.FieldNumber = 3
+	EnumOptions_DeprecatedLegacyJsonFieldConflicts_field_number protoreflect.FieldNumber = 6
+	EnumOptions_UninterpretedOption_field_number                protoreflect.FieldNumber = 999
 )
 
 // Names for google.protobuf.EnumValueOptions.
@@ -813,11 +894,13 @@ const (
 	GeneratedCodeInfo_Annotation_SourceFile_field_name protoreflect.Name = "source_file"
 	GeneratedCodeInfo_Annotation_Begin_field_name      protoreflect.Name = "begin"
 	GeneratedCodeInfo_Annotation_End_field_name        protoreflect.Name = "end"
+	GeneratedCodeInfo_Annotation_Semantic_field_name   protoreflect.Name = "semantic"
 
 	GeneratedCodeInfo_Annotation_Path_field_fullname       protoreflect.FullName = "google.protobuf.GeneratedCodeInfo.Annotation.path"
 	GeneratedCodeInfo_Annotation_SourceFile_field_fullname protoreflect.FullName = "google.protobuf.GeneratedCodeInfo.Annotation.source_file"
 	GeneratedCodeInfo_Annotation_Begin_field_fullname      protoreflect.FullName = "google.protobuf.GeneratedCodeInfo.Annotation.begin"
 	GeneratedCodeInfo_Annotation_End_field_fullname        protoreflect.FullName = "google.protobuf.GeneratedCodeInfo.Annotation.end"
+	GeneratedCodeInfo_Annotation_Semantic_field_fullname   protoreflect.FullName = "google.protobuf.GeneratedCodeInfo.Annotation.semantic"
 )
 
 // Field numbers for google.protobuf.GeneratedCodeInfo.Annotation.
@@ -826,4 +909,11 @@ const (
 	GeneratedCodeInfo_Annotation_SourceFile_field_number protoreflect.FieldNumber = 2
 	GeneratedCodeInfo_Annotation_Begin_field_number      protoreflect.FieldNumber = 3
 	GeneratedCodeInfo_Annotation_End_field_number        protoreflect.FieldNumber = 4
+	GeneratedCodeInfo_Annotation_Semantic_field_number   protoreflect.FieldNumber = 5
+)
+
+// Full and short names for google.protobuf.GeneratedCodeInfo.Annotation.Semantic.
+const (
+	GeneratedCodeInfo_Annotation_Semantic_enum_fullname = "google.protobuf.GeneratedCodeInfo.Annotation.Semantic"
+	GeneratedCodeInfo_Annotation_Semantic_enum_name     = "Semantic"
 )

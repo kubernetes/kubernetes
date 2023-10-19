@@ -87,7 +87,7 @@ func (sb *Builder) grow(n int) {
 	// Unlike strings.Builder, we do not need to copy over the contents
 	// of the old buffer since our builder provides no API for
 	// retrieving previously created strings.
-	sb.buf = make([]byte, 2*(cap(sb.buf)+n))
+	sb.buf = make([]byte, 0, 2*(cap(sb.buf)+n))
 }
 
 func (sb *Builder) last(n int) string {

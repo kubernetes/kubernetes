@@ -34,8 +34,8 @@ type builder struct {
 }
 
 func (b *builder) Build(target resolver.Target, cc resolver.ClientConn, _ resolver.BuildOptions) (resolver.Resolver, error) {
-	if target.Authority != "" {
-		return nil, fmt.Errorf("invalid (non-empty) authority: %v", target.Authority)
+	if target.URL.Host != "" {
+		return nil, fmt.Errorf("invalid (non-empty) authority: %v", target.URL.Host)
 	}
 
 	// gRPC was parsing the dial target manually before PR #4817, and we
@@ -49,8 +49,9 @@ func (b *builder) Build(target resolver.Target, cc resolver.ClientConn, _ resolv
 	}
 	addr := resolver.Address{Addr: endpoint}
 	if b.scheme == unixAbstractScheme {
-		// prepend "\x00" to address for unix-abstract
-		addr.Addr = "\x00" + addr.Addr
+		// We can not prepend \0 as c++ gRPC does, as in Golang '@' is used to signify we do
+		// not want trailing \0 in address.
+		addr.Addr = "@" + addr.Addr
 	}
 	cc.UpdateState(resolver.State{Addresses: []resolver.Address{networktype.Set(addr, "unix")}})
 	return &nopResolver{}, nil

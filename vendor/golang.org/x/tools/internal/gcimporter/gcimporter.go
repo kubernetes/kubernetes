@@ -7,6 +7,18 @@
 // Package gcimporter provides various functions for reading
 // gc-generated object files that can be used to implement the
 // Importer interface defined by the Go 1.5 standard library package.
+//
+// The encoding is deterministic: if the encoder is applied twice to
+// the same types.Package data structure, both encodings are equal.
+// This property may be important to avoid spurious changes in
+// applications such as build systems.
+//
+// However, the encoder is not necessarily idempotent. Importing an
+// exported package may yield a types.Package that, while it
+// represents the same set of Go types as the original, may differ in
+// the details of its internal representation. Because of these
+// differences, re-encoding the imported package may yield a
+// different, but equally valid, encoding of the package.
 package gcimporter // import "golang.org/x/tools/internal/gcimporter"
 
 import (
@@ -218,20 +230,17 @@ func Import(packages map[string]*types.Package, path, srcDir string, lookup func
 		// Or, define a new standard go/types/gcexportdata package.
 		fset := token.NewFileSet()
 
-		// The indexed export format starts with an 'i'; the older
-		// binary export format starts with a 'c', 'd', or 'v'
-		// (from "version"). Select appropriate importer.
+		// Select appropriate importer.
 		if len(data) > 0 {
 			switch data[0] {
-			case 'i':
+			case 'v', 'c', 'd': // binary, till go1.10
+				return nil, fmt.Errorf("binary (%c) import format is no longer supported", data[0])
+
+			case 'i': // indexed, till go1.19
 				_, pkg, err := IImportData(fset, packages, data[1:], id)
 				return pkg, err
 
-			case 'v', 'c', 'd':
-				_, pkg, err := BImportData(fset, packages, data, id)
-				return pkg, err
-
-			case 'u':
+			case 'u': // unified, from go1.20
 				_, pkg, err := UImportData(fset, packages, data[1:size], id)
 				return pkg, err
 
