@@ -1695,15 +1695,16 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	var podReplacementPolicy = func(obj batchv1.PodReplacementPolicy) *batchv1.PodReplacementPolicy {
 		return &obj
 	}
+	type jobStatus struct {
+		active      int
+		failed      int
+		terminating *int32
+	}
 	cases := map[string]struct {
-		podReplacementPolicyEnabled  bool
-		jobSpec                      *batchv1.JobSpec
-		wantActiveAfterDeletion      int
-		wantActiveAfterFailure       int
-		wantTerminatingAfterDeletion *int32
-		wantTerminatingAfterFailure  *int32
-		wantFailedAfterDeletion      int
-		wantFailedAfterFailure       int
+		podReplacementPolicyEnabled bool
+		jobSpec                     *batchv1.JobSpec
+		wantStatusAfterDeletion     jobStatus
+		wantStatusAfterFailure      jobStatus
 	}{
 		"feature flag off, delete & fail pods, recreate terminating pods, and verify job status counters": {
 			jobSpec: &batchv1.JobSpec{
@@ -1711,24 +1712,14 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				Completions:    ptr.To[int32](2),
 				CompletionMode: &indexedCompletion,
 			},
-			wantActiveAfterDeletion: 2,
-			wantActiveAfterFailure:  2,
-			wantFailedAfterDeletion: 2,
-			wantFailedAfterFailure:  2,
-		},
-		"feature flag true, defaulted TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
-			podReplacementPolicyEnabled: true,
-			jobSpec: &batchv1.JobSpec{
-				Parallelism:    ptr.To[int32](2),
-				Completions:    ptr.To[int32](2),
-				CompletionMode: &indexedCompletion,
+			wantStatusAfterDeletion: jobStatus{
+				active: 2,
+				failed: 2,
 			},
-			wantActiveAfterDeletion:      2,
-			wantActiveAfterFailure:       2,
-			wantFailedAfterDeletion:      2,
-			wantFailedAfterFailure:       2,
-			wantTerminatingAfterDeletion: ptr.To[int32](2),
-			wantTerminatingAfterFailure:  ptr.To[int32](2),
+			wantStatusAfterFailure: jobStatus{
+				active: 2,
+				failed: 2,
+			},
 		},
 		"feature flag true, TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
 			podReplacementPolicyEnabled: true,
@@ -1738,12 +1729,35 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
 			},
-			wantActiveAfterDeletion:      2,
-			wantActiveAfterFailure:       2,
-			wantFailedAfterDeletion:      2,
-			wantFailedAfterFailure:       2,
-			wantTerminatingAfterDeletion: ptr.To[int32](2),
-			wantTerminatingAfterFailure:  ptr.To[int32](2),
+			wantStatusAfterDeletion: jobStatus{
+				active:      2,
+				failed:      2,
+				terminating: ptr.To[int32](2),
+			},
+			wantStatusAfterFailure: jobStatus{
+				active:      2,
+				failed:      2,
+				terminating: ptr.To[int32](2),
+			},
+		},
+		"feature flag true with NonIndexedJob, TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
+			podReplacementPolicyEnabled: true,
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:          ptr.To[int32](2),
+				Completions:          ptr.To[int32](2),
+				CompletionMode:       &indexedCompletion,
+				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
+			},
+			wantStatusAfterDeletion: jobStatus{
+				active:      2,
+				failed:      2,
+				terminating: ptr.To[int32](2),
+			},
+			wantStatusAfterFailure: jobStatus{
+				active:      2,
+				failed:      2,
+				terminating: ptr.To[int32](2),
+			},
 		},
 		"feature flag false, podFailurePolicy enabled, delete & fail pods, recreate failed pods, and verify job status counters": {
 			podReplacementPolicyEnabled: false,
@@ -1764,8 +1778,12 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 					},
 				},
 			},
-			wantActiveAfterDeletion: 2,
-			wantActiveAfterFailure:  2,
+			wantStatusAfterDeletion: jobStatus{
+				active: 2,
+			},
+			wantStatusAfterFailure: jobStatus{
+				active: 2,
+			},
 		},
 		"feature flag true, Failed policy, delete & fail pods, recreate failed pods, and verify job status counters": {
 			podReplacementPolicyEnabled: true,
@@ -1775,12 +1793,16 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				CompletionMode:       &indexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			wantActiveAfterDeletion:      0,
-			wantActiveAfterFailure:       2,
-			wantFailedAfterDeletion:      0,
-			wantFailedAfterFailure:       2,
-			wantTerminatingAfterDeletion: ptr.To[int32](2),
-			wantTerminatingAfterFailure:  ptr.To[int32](0),
+			wantStatusAfterDeletion: jobStatus{
+				active:      0,
+				failed:      0,
+				terminating: ptr.To[int32](2),
+			},
+			wantStatusAfterFailure: jobStatus{
+				active:      2,
+				failed:      2,
+				terminating: ptr.To[int32](0),
+			},
 		},
 		"feature flag true with NonIndexedJob, Failed policy, delete & fail pods, recreate failed pods, and verify job status counters": {
 			podReplacementPolicyEnabled: true,
@@ -1790,12 +1812,16 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
 			},
-			wantActiveAfterDeletion:      0,
-			wantActiveAfterFailure:       2,
-			wantFailedAfterDeletion:      0,
-			wantFailedAfterFailure:       2,
-			wantTerminatingAfterDeletion: ptr.To[int32](2),
-			wantTerminatingAfterFailure:  ptr.To[int32](0),
+			wantStatusAfterDeletion: jobStatus{
+				active:      0,
+				failed:      0,
+				terminating: ptr.To[int32](2),
+			},
+			wantStatusAfterFailure: jobStatus{
+				active:      2,
+				failed:      2,
+				terminating: ptr.To[int32](0),
+			},
 		},
 	}
 	for name, tc := range cases {
@@ -1823,9 +1849,9 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			addFinalizerAndDeletePods(ctx, t, clientSet, ns.Name)
 
 			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
-				Terminating: tc.wantTerminatingAfterDeletion,
-				Failed:      tc.wantFailedAfterDeletion,
-				Active:      tc.wantActiveAfterDeletion,
+				Terminating: tc.wantStatusAfterDeletion.terminating,
+				Failed:      tc.wantStatusAfterDeletion.failed,
+				Active:      tc.wantStatusAfterDeletion.active,
 				Ready:       ptr.To[int32](0),
 			})
 
@@ -1834,9 +1860,9 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			removePodsFinalizer(ctx, t, clientSet, ns.Name)
 
 			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
-				Terminating: tc.wantTerminatingAfterFailure,
-				Failed:      tc.wantFailedAfterFailure,
-				Active:      tc.wantActiveAfterFailure,
+				Terminating: tc.wantStatusAfterFailure.terminating,
+				Failed:      tc.wantStatusAfterFailure.failed,
+				Active:      tc.wantStatusAfterFailure.active,
 				Ready:       ptr.To[int32](0),
 			})
 		})
