@@ -242,7 +242,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	Variables []Variable `json:"variables" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=variables"`
+	Variables []Variable `json:"variables,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=variables"`
 }
 
 // ParamKind is a tuple of Group Kind and Version.
