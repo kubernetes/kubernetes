@@ -80,7 +80,7 @@ message ContainerResourceMetricStatus {
   // It will always be set, regardless of the corresponding metric specification.
   optional k8s.io.apimachinery.pkg.api.resource.Quantity currentAverageValue = 3;
 
-  // container is the name of the container in the pods of the scaling taget
+  // container is the name of the container in the pods of the scaling target
   optional string container = 4;
 }
 

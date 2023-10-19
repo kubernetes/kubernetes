@@ -308,7 +308,7 @@ message ValidatingAdmissionPolicy {
   optional ValidatingAdmissionPolicyStatus status = 3;
 }
 
-// ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
+// ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with parametrized resources.
 // ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
 //
 // For a given admission request, each binding will cause its policy to be
