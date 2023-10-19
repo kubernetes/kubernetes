@@ -77,11 +77,18 @@ func FromProto(s *spb.Status) *Status {
 // FromError returns a Status representation of err.
 //
 //   - If err was produced by this package or implements the method `GRPCStatus()
-//     *Status`, or if err wraps a type satisfying this, the appropriate Status is
-//     returned.  For wrapped errors, the message returned contains the entire
-//     err.Error() text and not just the wrapped status.
+//     *Status` and `GRPCStatus()` does not return nil, or if err wraps a type
+//     satisfying this, the Status from `GRPCStatus()` is returned.  For wrapped
+//     errors, the message returned contains the entire err.Error() text and not
+//     just the wrapped status. In that case, ok is true.
 //
-//   - If err is nil, a Status is returned with codes.OK and no message.
+//   - If err is nil, a Status is returned with codes.OK and no message, and ok
+//     is true.
+//
+//   - If err implements the method `GRPCStatus() *Status` and `GRPCStatus()`
+//     returns nil (which maps to Codes.OK), or if err wraps a type
+//     satisfying this, a Status is returned with codes.Unknown and err's
+//     Error() message, and ok is false.
 //
 //   - Otherwise, err is an error not compatible with this package.  In this
 //     case, a Status is returned with codes.Unknown and err's Error() message,
@@ -92,10 +99,24 @@ func FromError(err error) (s *Status, ok bool) {
 	}
 	type grpcstatus interface{ GRPCStatus() *Status }
 	if gs, ok := err.(grpcstatus); ok {
+		if gs.GRPCStatus() == nil {
+			// Error has status nil, which maps to codes.OK. There
+			// is no sensible behavior for this, so we turn it into
+			// an error with codes.Unknown and discard the existing
+			// status.
+			return New(codes.Unknown, err.Error()), false
+		}
 		return gs.GRPCStatus(), true
 	}
 	var gs grpcstatus
 	if errors.As(err, &gs) {
+		if gs.GRPCStatus() == nil {
+			// Error wraps an error that has status nil, which maps
+			// to codes.OK.  There is no sensible behavior for this,
+			// so we turn it into an error with codes.Unknown and
+			// discard the existing status.
+			return New(codes.Unknown, err.Error()), false
+		}
 		p := gs.GRPCStatus().Proto()
 		p.Message = err.Error()
 		return status.FromProto(p), true
