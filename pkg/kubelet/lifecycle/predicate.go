@@ -71,6 +71,23 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	admitPod := attrs.Pod
+
+	// perform the checks that preemption will not help first to avoid meaningless pod eviction
+	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "PodOSSelectorNodeLabelDoesNotMatch",
+			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
+		}
+	}
+	if rejectPodAdmissionBasedOnOSField(admitPod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "PodOSNotSupported",
+			Message: "Failed to admit pod as the OS field doesn't match node OS",
+		}
+	}
+
 	pods := attrs.OtherPods
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
@@ -158,21 +175,6 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   fit,
 			Reason:  reason,
 			Message: message,
-		}
-	}
-	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "PodOSSelectorNodeLabelDoesNotMatch",
-			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
-		}
-	}
-	// By this time, node labels should have been synced, this helps in identifying the pod with the usage.
-	if rejectPodAdmissionBasedOnOSField(admitPod) {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "PodOSNotSupported",
-			Message: "Failed to admit pod as the OS field doesn't match node OS",
 		}
 	}
 	return PodAdmitResult{
