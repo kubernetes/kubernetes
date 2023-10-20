@@ -584,6 +584,47 @@ func (s *store) Count(key string) (int64, error) {
 	return getResp.Count, nil
 }
 
+// resolveGetListRev is used by GetList to resolve the rev to use in the client.KV.Get request.
+func (s *store) resolveGetListRev(continueKey string, continueRV int64, opts storage.ListOptions) (int64, error) {
+	var withRev int64
+	// Uses continueRV if this is a continuation request.
+	if len(continueKey) > 0 {
+		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return withRev, apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
+		}
+		// If continueRV > 0, the LIST request needs a specific resource version.
+		// continueRV==0 is invalid.
+		// If continueRV < 0, the request is for the latest resource version.
+		if continueRV > 0 {
+			withRev = continueRV
+		}
+		return withRev, nil
+	}
+	// Returns 0 if ResourceVersion is not specified.
+	if len(opts.ResourceVersion) == 0 {
+		return withRev, nil
+	}
+	parsedRV, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return withRev, apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+	}
+
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchNotOlderThan:
+		// The not older than constraint is checked after we get a response from etcd,
+		// and returnedRV is then set to the revision we get from the etcd response.
+	case metav1.ResourceVersionMatchExact:
+		withRev = int64(parsedRV)
+	case "": // legacy case
+		if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
+			withRev = int64(parsedRV)
+		}
+	default:
+		return withRev, fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
+	}
+	return withRev, nil
+}
+
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	preparedKey, err := s.prepareKey(key)
@@ -636,41 +677,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	var continueRV, withRev int64
 	var continueKey string
-	switch {
-	case opts.Recursive && len(opts.Predicate.Continue) > 0:
+	if opts.Recursive && len(opts.Predicate.Continue) > 0 {
 		continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
-
-		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
-		}
 		preparedKey = continueKey
-		// If continueRV > 0, the LIST request needs a specific resource version.
-		// continueRV==0 is invalid.
-		// If continueRV < 0, the request is for the latest resource version.
-		if continueRV > 0 {
-			withRev = continueRV
-		}
-	case len(opts.ResourceVersion) > 0:
-		parsedRV, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
-		if err != nil {
-			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
-		}
-		switch opts.ResourceVersionMatch {
-		case metav1.ResourceVersionMatchNotOlderThan:
-			// The not older than constraint is checked after we get a response from etcd,
-			// and returnedRV is then set to the revision we get from the etcd response.
-		case metav1.ResourceVersionMatchExact:
-			withRev = int64(parsedRV)
-		case "": // legacy case
-			if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
-				withRev = int64(parsedRV)
-			}
-		default:
-			return fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
-		}
+	}
+	if withRev, err = s.resolveGetListRev(continueKey, continueRV, opts); err != nil {
+		return err
 	}
 
 	if withRev != 0 {
