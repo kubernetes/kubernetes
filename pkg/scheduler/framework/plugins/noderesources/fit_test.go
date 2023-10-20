@@ -694,16 +694,16 @@ func TestRestartableInitContainers(t *testing.T) {
 		name                    string
 		pod                     *v1.Pod
 		enableSidecarContainers bool
-		wantStatus              *framework.Status
+		wantPreFilterStatus     *framework.Status
 	}{
 		{
 			name: "allow pod without restartable init containers if sidecar containers is disabled",
 			pod:  newPod(),
 		},
 		{
-			name:       "not allow pod with restartable init containers if sidecar containers is disabled",
-			pod:        newPodWithRestartableInitContainers(),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
+			name:                "not allow pod with restartable init containers if sidecar containers is disabled",
+			pod:                 newPodWithRestartableInitContainers(),
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
 		},
 		{
 			name:                    "allow pod without restartable init containers if sidecar containers is enabled",
@@ -732,13 +732,16 @@ func TestRestartableInitContainers(t *testing.T) {
 			}
 			cycleState := framework.NewCycleState()
 			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
+				t.Error("status does not match (-expected +actual):\n", diff)
+			}
 			if !preFilterStatus.IsSuccess() {
-				t.Errorf("prefilter failed with status: %v", preFilterStatus)
+				return
 			}
 
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, nodeInfo)
-			if diff := cmp.Diff(gotStatus, test.wantStatus); diff != "" {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			filterStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, nodeInfo)
+			if !filterStatus.IsSuccess() {
+				t.Error("status does not match (-expected +actual):\n- Success\n +\n", filterStatus.Code())
 			}
 		})
 	}

@@ -211,6 +211,14 @@ func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
+		// Scheduler will calculate resources usage for a Pod containing
+		// restartable init containers that will be equal or more than kubelet will
+		// require to run the Pod. So there will be no overbooking. However, to
+		// avoid the inconsistency in resource calculation between the scheduler
+		// and the older (before v1.28) kubelet, make the Pod unschedulable.
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled")
+	}
 	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod))
 	return nil, nil
 }
@@ -253,15 +261,6 @@ func (f *Fit) EventsToRegister() []framework.ClusterEventWithHint {
 // Checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 // It returns a list of insufficient resources, if empty, then the node has all the resources requested by the pod.
 func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
-		// Scheduler will calculate resources usage for a Pod containing
-		// restartable init containers that will be equal or more than kubelet will
-		// require to run the Pod. So there will be no overbooking. However, to
-		// avoid the inconsistency in resource calculation between the scheduler
-		// and the older (before v1.28) kubelet, make the Pod unschedulable.
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled")
-	}
-
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
