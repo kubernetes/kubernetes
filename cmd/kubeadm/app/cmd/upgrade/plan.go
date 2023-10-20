@@ -247,7 +247,7 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infoln("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/plan] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, false, false, printer, loadConfig)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, false, false, printer)
 	if err != nil {
 		return err
 	}

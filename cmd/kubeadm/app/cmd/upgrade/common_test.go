@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -52,10 +51,6 @@ users:
   user:
     client-certificate-data:
 `
-
-func fakeLoadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error) {
-	return &kubeadmapi.InitConfiguration{}, false, nil
-}
 
 func TestEnforceRequirements(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
@@ -106,7 +101,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false, &output.TextPrinter{}, fakeLoadConfig)
+			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
 
 			if err == nil && len(tt.expectedErr) != 0 {
 				t.Error("Expected error, but got success")
