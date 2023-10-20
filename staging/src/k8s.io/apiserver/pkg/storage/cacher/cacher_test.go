@@ -179,12 +179,6 @@ func TestListWithListFromCache(t *testing.T) {
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
 }
 
-func TestListWithoutPaging(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withoutPaging)
-	t.Cleanup(terminate)
-	storagetesting.RunTestListWithoutPaging(ctx, t, cacher)
-}
-
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
@@ -368,7 +362,6 @@ type setupOptions struct {
 	resourcePrefix string
 	keyFunc        func(runtime.Object) (string, error)
 	indexerFuncs   map[string]storage.IndexerFunc
-	pagingEnabled  bool
 	clock          clock.WithTicker
 }
 
@@ -379,7 +372,6 @@ func withDefaults(options *setupOptions) {
 
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
-	options.pagingEnabled = true
 	options.clock = clock.RealClock{}
 }
 
@@ -401,10 +393,6 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 	}
 }
 
-func withoutPaging(options *setupOptions) {
-	options.pagingEnabled = false
-}
-
 func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
 	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 	return ctx, cacher, tearDown
@@ -417,7 +405,7 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		opt(&setupOpts)
 	}
 
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix(), setupOpts.pagingEnabled)
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	// Inject one list error to make sure we test the relist case.
 	wrappedStorage := &storagetesting.StorageInjectingListErrors{
 		Interface: etcdStorage,

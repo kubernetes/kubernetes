@@ -77,7 +77,6 @@ type store struct {
 	groupResource       schema.GroupResource
 	groupResourceString string
 	watcher             *watcher
-	pagingEnabled       bool
 	leaseManager        *leaseManager
 }
 
@@ -96,11 +95,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := storage.APIObjectVersioner{}
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
@@ -129,7 +128,6 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 		codec:               codec,
 		versioner:           versioner,
 		transformer:         transformer,
-		pagingEnabled:       pagingEnabled,
 		pathPrefix:          pathPrefix,
 		groupResource:       groupResource,
 		groupResourceString: groupResource.String(),
@@ -623,7 +621,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	limit := opts.Predicate.Limit
 	var paging bool
 	options := make([]clientv3.OpOption, 0, 4)
-	if s.pagingEnabled && opts.Predicate.Limit > 0 {
+	if opts.Predicate.Limit > 0 {
 		paging = true
 		options = append(options, clientv3.WithLimit(limit))
 		limitOption = &options[len(options)-1]
@@ -643,7 +641,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	var continueRV, withRev int64
 	var continueKey string
 	switch {
-	case opts.Recursive && s.pagingEnabled && len(opts.Predicate.Continue) > 0:
+	case opts.Recursive && len(opts.Predicate.Continue) > 0:
 		continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
@@ -668,7 +666,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			case metav1.ResourceVersionMatchExact:
 				withRev = int64(*fromRV)
 			case "": // legacy case
-				if opts.Recursive && s.pagingEnabled && opts.Predicate.Limit > 0 && *fromRV > 0 {
+				if opts.Recursive && opts.Predicate.Limit > 0 && *fromRV > 0 {
 					withRev = int64(*fromRV)
 				}
 			default:
