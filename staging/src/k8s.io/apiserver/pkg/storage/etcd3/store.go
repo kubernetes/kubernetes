@@ -627,6 +627,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		limitOption = &options[len(options)-1]
 	}
 
+	if opts.Recursive {
+		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+		options = append(options, clientv3.WithRange(rangeEnd))
+	}
+
 	newItemFunc := getNewItemFunc(listObj, v)
 
 	var fromRV *uint64
@@ -675,10 +680,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 	}
 
-	if opts.Recursive {
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
-	}
 	if withRev != 0 {
 		options = append(options, clientv3.WithRev(withRev))
 	}
@@ -716,6 +717,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 		if len(getResp.Kvs) == 0 && getResp.More {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+		}
+		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
+		if withRev == 0 {
+			withRev = getResp.Header.Revision
+			options = append(options, clientv3.WithRev(withRev))
 		}
 
 		// avoid small allocations for the result slice, since this can be called in many
@@ -768,14 +774,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			*limitOption = clientv3.WithLimit(limit)
 		}
 		preparedKey = string(lastKey) + "\x00"
-		if withRev == 0 {
-			withRev = getResp.Header.Revision
-			options = append(options, clientv3.WithRev(withRev))
-		}
-	}
-	// indicate to the client which resource version was returned
-	if withRev == 0 {
-		withRev = getResp.Header.Revision
 	}
 
 	if v.IsNil() {
