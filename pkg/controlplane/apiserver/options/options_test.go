@@ -143,7 +143,6 @@ func TestAddFlags(t *testing.T) {
 					CertFile:       "/var/run/kubernetes/etcdce.crt",
 					TracerProvider: oteltrace.NewNoopTracerProvider(),
 				},
-				Paging:                true,
 				Prefix:                "/registry",
 				CompactionInterval:    storagebackend.DefaultCompactInterval,
 				CountMetricPollPeriod: time.Minute,

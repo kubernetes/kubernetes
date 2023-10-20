@@ -149,7 +149,6 @@ func NewDefaultStorageFactory(
 	resourceConfig APIResourceConfigSource,
 	specialDefaultResourcePrefixes map[schema.GroupResource]string,
 ) *DefaultStorageFactory {
-	config.Paging = true
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}
