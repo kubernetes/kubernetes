@@ -127,27 +127,22 @@ func AnnotatedLocationWithOffset(annotation string, offset int) types.CodeLocati
 // SIGDescribe returns a wrapper function for ginkgo.Describe which injects
 // the SIG name as annotation. The parameter should be lowercase with
 // no spaces and no sig- or SIG- prefix.
-func SIGDescribe(sig string) func(string, ...interface{}) bool {
+func SIGDescribe(sig string) func(...interface{}) bool {
 	if !sigRE.MatchString(sig) || strings.HasPrefix(sig, "sig-") {
-		panic(fmt.Sprintf("SIG label must be lowercase, no spaces and no sig- prefix, got instead: %q", sig))
+		RecordBug(NewBug(fmt.Sprintf("SIG label must be lowercase, no spaces and no sig- prefix, got instead: %q", sig), 1))
 	}
-	return func(text string, args ...interface{}) bool {
-		args = append(args, ginkgo.Label("sig-"+sig))
-		if text == "" {
-			text = fmt.Sprintf("[sig-%s]", sig)
-		} else {
-			text = fmt.Sprintf("[sig-%s] %s", sig, text)
-		}
-		return registerInSuite(ginkgo.Describe, text, args)
+	return func(args ...interface{}) bool {
+		args = append([]interface{}{WithLabel("sig-" + sig)}, args...)
+		return registerInSuite(ginkgo.Describe, args)
 	}
 }
 
 var sigRE = regexp.MustCompile(`^[a-z]+(-[a-z]+)*$`)
 
 // ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
-func ConformanceIt(text string, args ...interface{}) bool {
+func ConformanceIt(args ...interface{}) bool {
 	args = append(args, ginkgo.Offset(1), WithConformance())
-	return It(text, args...)
+	return It(args...)
 }
 
 // It is a wrapper around [ginkgo.It] which supports framework With* labels as
@@ -156,13 +151,13 @@ func ConformanceIt(text string, args ...interface{}) bool {
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
-func It(text string, args ...interface{}) bool {
-	return registerInSuite(ginkgo.It, text, args)
+func It(args ...interface{}) bool {
+	return registerInSuite(ginkgo.It, args)
 }
 
 // It is a shorthand for the corresponding package function.
-func (f *Framework) It(text string, args ...interface{}) bool {
-	return registerInSuite(ginkgo.It, text, args)
+func (f *Framework) It(args ...interface{}) bool {
+	return registerInSuite(ginkgo.It, args)
 }
 
 // Describe is a wrapper around [ginkgo.Describe] which supports framework
@@ -171,13 +166,13 @@ func (f *Framework) It(text string, args ...interface{}) bool {
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
-func Describe(text string, args ...interface{}) bool {
-	return registerInSuite(ginkgo.Describe, text, args)
+func Describe(args ...interface{}) bool {
+	return registerInSuite(ginkgo.Describe, args)
 }
 
 // Describe is a shorthand for the corresponding package function.
-func (f *Framework) Describe(text string, args ...interface{}) bool {
-	return registerInSuite(ginkgo.Describe, text, args)
+func (f *Framework) Describe(args ...interface{}) bool {
+	return registerInSuite(ginkgo.Describe, args)
 }
 
 // Context is a wrapper around [ginkgo.Context] which supports framework With*
@@ -186,24 +181,21 @@ func (f *Framework) Describe(text string, args ...interface{}) bool {
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
-func Context(text string, args ...interface{}) bool {
-	return registerInSuite(ginkgo.Context, text, args)
+func Context(args ...interface{}) bool {
+	return registerInSuite(ginkgo.Context, args)
 }
 
 // Context is a shorthand for the corresponding package function.
-func (f *Framework) Context(text string, args ...interface{}) bool {
-	return registerInSuite(ginkgo.Context, text, args)
+func (f *Framework) Context(args ...interface{}) bool {
+	return registerInSuite(ginkgo.Context, args)
 }
 
 // registerInSuite is the common implementation of all wrapper functions. It
 // expects to be called through one intermediate wrapper.
-func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, text string, args []interface{}) bool {
+func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interface{}) bool {
 	var ginkgoArgs []interface{}
 	var offset ginkgo.Offset
 	var texts []string
-	if text != "" {
-		texts = append(texts, text)
-	}
 
 	addLabel := func(label string) {
 		texts = append(texts, fmt.Sprintf("[%s]", label))
@@ -214,7 +206,7 @@ func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, tex
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case label:
-			fullLabel := strings.Join(arg.parts, ": ")
+			fullLabel := strings.Join(arg.parts, ":")
 			addLabel(fullLabel)
 			if arg.extra != "" {
 				addLabel(arg.extra)
@@ -249,7 +241,7 @@ func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, tex
 	}
 
 	ginkgoArgs = append(ginkgoArgs, offset)
-	text = strings.Join(texts, " ")
+	text := strings.Join(texts, " ")
 	return ginkgoCall(text, ginkgoArgs...)
 }
 
@@ -349,7 +341,7 @@ func withNodeFeature(name NodeFeature) interface{} {
 	if !ValidNodeFeatures.items.Has(name) {
 		RecordBug(NewBug(fmt.Sprintf("WithNodeFeature: unknown environment %q", name), 2))
 	}
-	return newLabel(string(name))
+	return newLabel("NodeFeature", string(name))
 }
 
 // WithConformace specifies that a certain test or group of tests must pass in
@@ -456,7 +448,7 @@ func withLabel(label string) interface{} {
 }
 
 type label struct {
-	// parts get concatenated with ": " to build the full label.
+	// parts get concatenated with ":" to build the full label.
 	parts []string
 	// extra is an optional fully-formed extra label.
 	extra string
