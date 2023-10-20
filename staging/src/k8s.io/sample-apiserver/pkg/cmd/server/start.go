@@ -123,8 +123,6 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	o.RecommendedOptions.Etcd.StorageConfig.Paging = true
-
 	o.RecommendedOptions.ExtraAdmissionInitializers = func(c *genericapiserver.RecommendedConfig) ([]admission.PluginInitializer, error) {
 		client, err := clientset.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
