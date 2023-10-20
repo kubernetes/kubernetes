@@ -551,7 +551,7 @@ function kube::codegen::gen_client() {
     done < <(
         ( kube::codegen::internal::git_grep -l --null \
             -e '+genclient' \
-            ":(glob)${in_root}"/'**/types.go' \
+            ":(glob)${in_root}"/'**/*.go' \
             || true \
         ) | xargs -0 -n1 dirname \
           | LC_ALL=C sort -u
