@@ -180,7 +180,7 @@ type Status struct {
 	reasons []string
 	err     error
 	// failedPlugin is an optional field that records the plugin name a Pod failed by.
-	// It's set by the framework when code is Unschedulable or UnschedulableAndUnresolvable.
+	// It's set by the framework when code is Unschedulable, UnschedulableAndUnresolvable or Pending.
 	failedPlugin string
 }
 

@@ -304,7 +304,7 @@ const (
 	NoNodeAvailableMsg = "0/%v nodes are available"
 )
 
-func (d *Diagnosis) SetFailedPlugin(sts *Status) {
+func (d *Diagnosis) AddPluginStatus(sts *Status) {
 	if sts.FailedPlugin() == "" {
 		return
 	}

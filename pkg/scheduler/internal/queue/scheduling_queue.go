@@ -451,7 +451,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				continue
 			}
 
-			h, err := hintfn.QueueingHintFn(logger, pod, oldObj, newObj)
+			hint, err := hintfn.QueueingHintFn(logger, pod, oldObj, newObj)
 			if err != nil {
 				// If the QueueingHintFn returned an error, we should treat the event as Queue so that we can prevent
 				// the Pod from being stuck in the unschedulable pod pool.
@@ -461,9 +461,9 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				} else {
 					logger.Error(err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod), "oldObj", klog.KObj(oldObjMeta), "newObj", klog.KObj(newObjMeta))
 				}
-				h = framework.Queue
+				hint = framework.Queue
 			}
-			if h == framework.QueueSkip {
+			if hint == framework.QueueSkip {
 				continue
 			}
 

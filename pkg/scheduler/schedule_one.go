@@ -214,7 +214,7 @@ func (sched *Scheduler) schedulingCycle(
 					NodeToStatusMap: framework.NodeToStatusMap{scheduleResult.SuggestedHost: sts},
 				},
 			}
-			fitErr.Diagnosis.SetFailedPlugin(sts)
+			fitErr.Diagnosis.AddPluginStatus(sts)
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, framework.NewStatus(sts.Code()).WithError(fitErr)
 		}
 		return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, sts
@@ -237,7 +237,7 @@ func (sched *Scheduler) schedulingCycle(
 					NodeToStatusMap: framework.NodeToStatusMap{scheduleResult.SuggestedHost: runPermitStatus},
 				},
 			}
-			fitErr.Diagnosis.SetFailedPlugin(runPermitStatus)
+			fitErr.Diagnosis.AddPluginStatus(runPermitStatus)
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, framework.NewStatus(runPermitStatus.Code()).WithError(fitErr)
 		}
 
@@ -458,7 +458,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		msg := s.Message()
 		diagnosis.PreFilterMsg = msg
 		logger.V(5).Info("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
-		diagnosis.SetFailedPlugin(s)
+		diagnosis.AddPluginStatus(s)
 		return nil, diagnosis, nil
 	}
 
@@ -569,7 +569,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		} else {
 			statusesLock.Lock()
 			diagnosis.NodeToStatusMap[nodeInfo.Node().Name] = status
-			diagnosis.SetFailedPlugin(status)
+			diagnosis.AddPluginStatus(status)
 			statusesLock.Unlock()
 		}
 	}
