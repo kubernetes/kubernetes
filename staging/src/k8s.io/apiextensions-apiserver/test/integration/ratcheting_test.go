@@ -22,18 +22,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,6 +50,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 var stringSchema *apiextensionsv1.JSONSchemaProps = &apiextensionsv1.JSONSchemaProps{
@@ -1663,4 +1674,234 @@ func TestRatchetingFunctionality(t *testing.T) {
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+type validator func(new, old *unstructured.Unstructured)
+
+func newValidator(customResourceValidation *apiextensionsinternal.JSONSchemaProps, kind schema.GroupVersionKind, namespaceScoped bool) (validator, error) {
+	// Replicate customResourceStrategy validation
+	openapiSchema := &spec.Schema{}
+	if customResourceValidation != nil {
+		// TODO: replace with NewStructural(...).ToGoOpenAPI
+		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
+			return nil, err
+		}
+	}
+
+	schemaValidator := apiservervalidation.NewRatchetingSchemaValidator(
+		openapiSchema,
+		nil,
+		"",
+		strfmt.Default)
+	sts, err := structuralschema.NewStructural(customResourceValidation)
+	if err != nil {
+		return nil, err
+	}
+
+	strategy := customresource.NewStrategy(
+		nil, // No need for typer, since only using validation
+		namespaceScoped,
+		kind,
+		schemaValidator,
+		nil, // No status schema validator
+		sts,
+		nil, // No need for status
+		nil, // No need for scale
+	)
+
+	return func(new, old *unstructured.Unstructured) {
+		_ = strategy.ValidateUpdate(context.TODO(), new, old)
+	}, nil
+}
+
+// Recursively walks the provided directory and parses the YAML files into
+// unstructured objects. If there are more than one object in a single file,
+// they are all added to the returned slice.
+func loadObjects(dir string) []*unstructured.Unstructured {
+	result := []*unstructured.Unstructured{}
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		} else if d.IsDir() {
+			return nil
+		} else if filepath.Ext(d.Name()) != ".yaml" {
+			return nil
+		}
+		// Read the file in as []byte
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		decoder := utilyaml.NewYAMLOrJSONDecoder(bytes.NewReader(data), 4096)
+
+		// Split the data by YAML drame
+		for {
+			parsed := &unstructured.Unstructured{}
+			if err := decoder.Decode(parsed); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return err
+			}
+
+			result = append(result, parsed)
+		}
+
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func BenchmarkRatcheting(b *testing.B) {
+	// Walk directory with CRDs, for each file parse YAML with multiple CRDs in it.
+	// Keep track in a map a validator for each unique gvk
+	crdObjects := loadObjects("ratcheting_test_cases/crds")
+	invalidFiles := loadObjects("ratcheting_test_cases/invalid")
+	validFiles := loadObjects("ratcheting_test_cases/valid")
+
+	// Create a validator for each GVK.
+	validators := map[schema.GroupVersionKind]validator{}
+	for _, crd := range crdObjects {
+		parsed := apiextensionsv1.CustomResourceDefinition{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(crd.Object, &parsed); err != nil {
+			b.Fatalf("Failed to parse CRD %v", err)
+			return
+		}
+
+		for _, v := range parsed.Spec.Versions {
+			gvk := schema.GroupVersionKind{
+				Group:   parsed.Spec.Group,
+				Version: v.Name,
+				Kind:    parsed.Spec.Names.Kind,
+			}
+
+			// Create structural schema from v.Schema.OpenAPIV3Schema
+			internalValidation := &apiextensionsinternal.CustomResourceValidation{}
+			if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalValidation, nil); err != nil {
+				b.Fatal(fmt.Errorf("failed converting CRD validation to internal version: %v", err))
+				return
+			}
+
+			validator, err := newValidator(internalValidation.OpenAPIV3Schema, gvk, parsed.Spec.Scope == apiextensionsv1.NamespaceScoped)
+			if err != nil {
+				b.Fatal(err)
+				return
+			}
+			validators[gvk] = validator
+		}
+
+	}
+
+	// Organize all the files by GVK.
+	gvksToValidFiles := map[schema.GroupVersionKind][]*unstructured.Unstructured{}
+	gvksToInvalidFiles := map[schema.GroupVersionKind][]*unstructured.Unstructured{}
+
+	for _, valid := range validFiles {
+		gvk := valid.GroupVersionKind()
+		gvksToValidFiles[gvk] = append(gvksToValidFiles[gvk], valid)
+	}
+
+	for _, invalid := range invalidFiles {
+		gvk := invalid.GroupVersionKind()
+		gvksToInvalidFiles[gvk] = append(gvksToInvalidFiles[gvk], invalid)
+	}
+
+	// Remove any GVKs for which we dont have both valid and invalid files.
+	for gvk := range gvksToValidFiles {
+		if _, ok := gvksToInvalidFiles[gvk]; !ok {
+			delete(gvksToValidFiles, gvk)
+		}
+	}
+
+	for gvk := range gvksToInvalidFiles {
+		if _, ok := gvksToValidFiles[gvk]; !ok {
+			delete(gvksToInvalidFiles, gvk)
+		}
+	}
+
+	type pair struct {
+		old *unstructured.Unstructured
+		new *unstructured.Unstructured
+	}
+
+	// For each valid file, match it with every invalid file of the same GVK
+	validXValidPairs := []pair{}
+	validXInvalidPairs := []pair{}
+	invalidXInvalidPairs := []pair{}
+
+	for gvk, valids := range gvksToValidFiles {
+		for _, validOld := range valids {
+			for _, validNew := range gvksToValidFiles[gvk] {
+				validXValidPairs = append(validXValidPairs, pair{old: validOld, new: validNew})
+			}
+		}
+	}
+
+	for gvk, valids := range gvksToValidFiles {
+		for _, valid := range valids {
+			for _, invalid := range gvksToInvalidFiles[gvk] {
+				validXInvalidPairs = append(validXInvalidPairs, pair{old: valid, new: invalid})
+			}
+		}
+	}
+
+	// For each invalid file, add pair with every other invalid file of the same
+	// GVK including itself
+	for gvk, invalids := range gvksToInvalidFiles {
+		for _, invalid := range invalids {
+			for _, invalid2 := range gvksToInvalidFiles[gvk] {
+				invalidXInvalidPairs = append(invalidXInvalidPairs, pair{old: invalid, new: invalid2})
+			}
+		}
+	}
+
+	// For each pair, run the ratcheting algorithm on the update.
+	//
+	for _, ratchetingEnabled := range []bool{true, false} {
+		name := "RatchetingEnabled"
+		if !ratchetingEnabled {
+			name = "RatchetingDisabled"
+		}
+		b.Run(name, func(b *testing.B) {
+			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)()
+			b.ResetTimer()
+
+			do := func(pairs []pair) {
+				for _, pair := range pairs {
+					// Create a validator for the GVK of the valid object.
+					validator, ok := validators[pair.old.GroupVersionKind()]
+					if !ok {
+						b.Log("No validator for GVK", pair.old.GroupVersionKind())
+						continue
+					}
+
+					// Run the ratcheting algorithm on the update.
+					// Don't care about result for benchmark
+					validator(pair.old, pair.new)
+				}
+			}
+
+			b.Run("ValidXValid", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					do(validXValidPairs)
+				}
+			})
+
+			b.Run("ValidXInvalid", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					do(validXInvalidPairs)
+				}
+			})
+
+			b.Run("InvalidXInvalid", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					do(invalidXInvalidPairs)
+				}
+			})
+		})
+	}
 }

@@ -1,0 +1,23 @@
+#$ Used in:
+#$ - site-src/concepts/api-overview.md
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: foo-gateway
+  namespace: gateway-api-example-ns1
+spec:
+  gatewayClassName: foo-lb
+  listeners:
+  - name: prod-web
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            # This label is added automatically as of K8s 1.22
+            # to all namespaces
+            kubernetes.io/metadata.name: gateway-api-example-ns2
