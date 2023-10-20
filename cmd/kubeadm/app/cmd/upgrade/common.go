@@ -134,7 +134,12 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	printer.Printf("[upgrade/config] Making sure the configuration is correct:\n")
 
 	var newK8sVersion string
-	cfg, legacyReconfigure, err := loadConfig(flags.cfgPath, client, !upgradeApply, printer)
+	_, err = configutil.LoadUpgradeConfig(flags.cfgPath)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/upgrade config] FATAL")
+	}
+
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, true)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
@@ -143,16 +148,10 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 			printer.Printf("[upgrade/config] Next steps:\n")
 			printer.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
 			printer.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
-			printer.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
 			printer.Println()
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
-	} else if legacyReconfigure {
-		// Set the newK8sVersion to the value in the ClusterConfiguration. This is done, so that users who use the --config option
-		// to supply a new ClusterConfiguration don't have to specify the Kubernetes version twice,
-		// if they don't want to upgrade but just change a setting.
-		newK8sVersion = cfg.KubernetesVersion
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
 
 	// The version arg is mandatory, during upgrade apply, unless it's specified in the config file

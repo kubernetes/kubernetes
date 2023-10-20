@@ -431,3 +431,37 @@ func TestGroupVersionKindsHasResetConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupVersionKindsHasUpgradeConfiguration(t *testing.T) {
+	var tests = []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		kind     string
+		expected bool
+	}{
+		{
+			name: "no UpgradeConfiguration found",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "UpgradeConfiguration is found",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "UpgradeConfiguration"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+			actual := GroupVersionKindsHasUpgradeConfiguration(rt.gvks...)
+			if rt.expected != actual {
+				t2.Errorf("expected gvks has UpgradeConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
+	}
+}
