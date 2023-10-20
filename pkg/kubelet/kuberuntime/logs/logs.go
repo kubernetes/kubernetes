@@ -277,6 +277,26 @@ func (w *logWriter) write(msg *logMessage, addPrefix bool) error {
 	return nil
 }
 
+type fileCloser struct {
+	oldFile *os.File
+}
+
+func (fc *fileCloser) Close() error {
+	return fc.oldFile.Close()
+}
+
+// NewFileToClose close the old file, save the newF and close it next time.
+func (fc *fileCloser) NewFileToClose(newF *os.File) error {
+	if fc.oldFile != nil {
+		klog.V(4).InfoS("Closing log file", "name", fc.oldFile.Name())
+		if err := fc.oldFile.Close(); err != nil {
+			return err
+		}
+	}
+	fc.oldFile = newF
+	return nil
+}
+
 // ReadLogs read the container log and redirect into stdout and stderr.
 // Note that containerID is only needed when following the log, or else
 // just pass in empty string "".
@@ -295,7 +315,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
-	defer f.Close()
+	fileToClose := fileCloser{
+		oldFile: f,
+	}
+	defer fileToClose.Close()
 
 	// Search start point based on tail line.
 	start, err := tail.FindTailLineStartIndex(f, opts.tail)
@@ -367,9 +390,9 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
-					defer newF.Close()
-					f.Close()
+
 					f = newF
+					fileToClose.NewFileToClose(f)
 					r = bufio.NewReader(f)
 				}
 				// If the container exited consume data until the next EOF
