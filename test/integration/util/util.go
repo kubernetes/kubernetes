@@ -67,7 +67,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
@@ -652,7 +652,7 @@ func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Op
 func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, kubeschedulerconfigv1.KubeSchedulerConfiguration{
 		Profiles: []kubeschedulerconfigv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &kubeschedulerconfigv1.Plugins{
 				PostFilter: kubeschedulerconfigv1.PluginSet{
 					Disabled: []kubeschedulerconfigv1.Plugin{
