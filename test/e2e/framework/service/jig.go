@@ -440,7 +440,7 @@ func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Dur
 
 	go esController.Run(stopCh)
 
-	err := wait.PollWithContext(ctx, 1*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		return endpointAvailable && endpointSliceAvailable, nil
 	})
 	if err != nil {

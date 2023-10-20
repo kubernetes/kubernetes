@@ -85,7 +85,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation", framework.WithSerial(), framewo
 func waitForNodeLabels(ctx context.Context, c v1core.CoreV1Interface, nodeName string, timeout time.Duration) error {
 	ginkgo.By(fmt.Sprintf("Waiting for node %v to have appropriate labels", nodeName))
 	// Poll until the node has desired labels
-	return wait.PollWithContext(ctx, framework.Poll, timeout,
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false,
 		func(ctx context.Context) (bool, error) {
 			node, err := c.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 			if err != nil {

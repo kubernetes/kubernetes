@@ -84,7 +84,7 @@ func (cont *IngressController) CleanupIngressController(ctx context.Context) err
 // CleanupIngressControllerWithTimeout calls the IngressController.Cleanup(false)
 // followed with deleting the static ip, and then a final IngressController.Cleanup(true)
 func (cont *IngressController) CleanupIngressControllerWithTimeout(ctx context.Context, timeout time.Duration) error {
-	pollErr := wait.PollWithContext(ctx, 5*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		if err := cont.Cleanup(false); err != nil {
 			framework.Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
 			return false, nil
@@ -105,7 +105,7 @@ func (cont *IngressController) CleanupIngressControllerWithTimeout(ctx context.C
 	// controller. Delete this IP only after the controller has had a chance
 	// to cleanup or it might interfere with the controller, causing it to
 	// throw out confusing events.
-	if ipErr := wait.PollWithContext(ctx, 5*time.Second, 1*time.Minute, func(ctx context.Context) (bool, error) {
+	if ipErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		if err := cont.deleteStaticIPs(); err != nil {
 			framework.Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
@@ -605,7 +605,7 @@ func (cont *IngressController) isHTTPErrorCode(err error, code int) bool {
 
 // WaitForNegBackendService waits for the expected backend service to become
 func (cont *IngressController) WaitForNegBackendService(ctx context.Context, svcPorts map[string]v1.ServicePort) error {
-	return wait.PollWithContext(ctx, 5*time.Second, 1*time.Minute, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, negBackend)
 		if err != nil {
 			framework.Logf("Err while checking if backend service is using NEG: %v", err)
@@ -617,7 +617,7 @@ func (cont *IngressController) WaitForNegBackendService(ctx context.Context, svc
 
 // WaitForIgBackendService returns true only if all global backend service with matching svcPorts pointing to IG as backend
 func (cont *IngressController) WaitForIgBackendService(ctx context.Context, svcPorts map[string]v1.ServicePort) error {
-	return wait.PollWithContext(ctx, 5*time.Second, 1*time.Minute, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, igBackend)
 		if err != nil {
 			framework.Logf("Err while checking if backend service is using IG: %v", err)

@@ -752,7 +752,7 @@ func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns st
 	}
 
 	endpoints := &v1.Endpoints{}
-	if err := wait.PollWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
 		endpointsFound, hasMatchingEndpoints := hasMatchingEndpoints(ctx, cs, ns, svc.Name, len(pods), numSubsets)
 		if !hasMatchingEndpoints {
 			framework.Logf("Matching Endpoints not found")

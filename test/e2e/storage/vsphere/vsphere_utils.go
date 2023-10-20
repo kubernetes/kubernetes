@@ -74,7 +74,7 @@ func waitForVSphereDisksToDetach(ctx context.Context, nodeVolumes map[string][]s
 		detachTimeout  = 5 * time.Minute
 		detachPollTime = 10 * time.Second
 	)
-	waitErr := wait.PollWithContext(ctx, detachPollTime, detachTimeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, detachPollTime, detachTimeout, false, func(ctx context.Context) (bool, error) {
 		attachedResult, err := disksAreAttached(ctx, nodeVolumes)
 		if err != nil {
 			return false, err
@@ -117,7 +117,7 @@ func waitForVSphereDiskStatus(ctx context.Context, volumePath string, nodeName s
 		volumeStateDetached: "detached from",
 	}
 
-	waitErr := wait.PollWithContext(ctx, pollTime, timeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, pollTime, timeout, false, func(ctx context.Context) (bool, error) {
 		diskAttached, err := diskIsAttached(ctx, volumePath, nodeName)
 		if err != nil {
 			return true, err

@@ -720,7 +720,7 @@ func (cl *ClusterVerification) WaitFor(ctx context.Context, atLeast int, timeout
 	pods := []v1.Pod{}
 	var returnedErr error
 
-	err := wait.PollWithContext(ctx, 1*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		pods, returnedErr = cl.podState.filter(ctx, cl.client, cl.namespace)
 
 		// Failure

@@ -2231,7 +2231,7 @@ type updateStatefulSetFunc func(*appsv1.StatefulSet)
 func updateStatefulSetWithRetries(ctx context.Context, c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *appsv1.StatefulSet, err error) {
 	statefulSets := c.AppsV1().StatefulSets(namespace)
 	var updateErr error
-	pollErr := wait.PollWithContext(ctx, 10*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		if statefulSet, err = statefulSets.Get(ctx, name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}

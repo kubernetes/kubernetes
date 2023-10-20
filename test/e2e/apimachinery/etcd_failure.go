@@ -118,7 +118,7 @@ func checkExistingRCRecovers(ctx context.Context, f *framework.Framework) {
 	rcSelector := labels.Set{"name": "baz"}.AsSelector()
 
 	ginkgo.By("deleting pods from existing replication controller")
-	framework.ExpectNoError(wait.PollWithContext(ctx, time.Millisecond*500, time.Second*60, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Millisecond*500, time.Second*60, false, func(ctx context.Context) (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(ctx, options)
 		if err != nil {
@@ -137,7 +137,7 @@ func checkExistingRCRecovers(ctx context.Context, f *framework.Framework) {
 	}))
 
 	ginkgo.By("waiting for replication controller to recover")
-	framework.ExpectNoError(wait.PollWithContext(ctx, time.Millisecond*500, time.Second*60, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Millisecond*500, time.Second*60, false, func(ctx context.Context) (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(ctx, options)
 		framework.ExpectNoError(err, "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())

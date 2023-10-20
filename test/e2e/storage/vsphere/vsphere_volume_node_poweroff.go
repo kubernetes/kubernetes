@@ -157,7 +157,7 @@ func waitForPodToFailover(ctx context.Context, client clientset.Interface, deplo
 		pollTime = 10 * time.Second
 	)
 
-	waitErr := wait.PollWithContext(ctx, pollTime, timeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, pollTime, timeout, false, func(ctx context.Context) (bool, error) {
 		currentNode, err := getNodeForDeployment(ctx, client, deployment)
 		if err != nil {
 			return true, err

@@ -192,7 +192,7 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ctx context.Context, ip, p
 		return fmt.Errorf("could not get region for zone %q: %w", framework.TestContext.CloudConfig.Zone, err)
 	}
 
-	return wait.PollWithContext(ctx, 10*time.Second, 5*time.Minute, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 10*time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
 		computeservice := p.gceCloud.ComputeServices().GA
 		list, err := computeservice.ForwardingRules.List(project, region).Do()
 		if err != nil {
@@ -287,7 +287,7 @@ func (p *Provider) DeletePVSource(ctx context.Context, pvSource *v1.PersistentVo
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
 func (p *Provider) CleanupServiceResources(ctx context.Context, c clientset.Interface, loadBalancerName, region, zone string) {
-	if pollErr := wait.PollWithContext(ctx, 5*time.Second, e2eservice.LoadBalancerCleanupTimeout, func(ctx context.Context) (bool, error) {
+	if pollErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, e2eservice.LoadBalancerCleanupTimeout, false, func(ctx context.Context) (bool, error) {
 		if err := p.cleanupGCEResources(ctx, c, loadBalancerName, region, zone); err != nil {
 			framework.Logf("Still waiting for glbc to cleanup: %v", err)
 			return false, nil
