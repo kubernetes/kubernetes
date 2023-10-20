@@ -35,6 +35,7 @@ import "sync"
 // internal/transport/transport.go for an example of this.
 type Unbounded struct {
 	c       chan interface{}
+	closed  bool
 	mu      sync.Mutex
 	backlog []interface{}
 }
@@ -47,16 +48,18 @@ func NewUnbounded() *Unbounded {
 // Put adds t to the unbounded buffer.
 func (b *Unbounded) Put(t interface{}) {
 	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
 	if len(b.backlog) == 0 {
 		select {
 		case b.c <- t:
-			b.mu.Unlock()
 			return
 		default:
 		}
 	}
 	b.backlog = append(b.backlog, t)
-	b.mu.Unlock()
 }
 
 // Load sends the earliest buffered data, if any, onto the read channel
@@ -64,6 +67,10 @@ func (b *Unbounded) Put(t interface{}) {
 // value from the read channel.
 func (b *Unbounded) Load() {
 	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
 	if len(b.backlog) > 0 {
 		select {
 		case b.c <- b.backlog[0]:
@@ -72,7 +79,6 @@ func (b *Unbounded) Load() {
 		default:
 		}
 	}
-	b.mu.Unlock()
 }
 
 // Get returns a read channel on which values added to the buffer, via Put(),
@@ -80,6 +86,20 @@ func (b *Unbounded) Load() {
 //
 // Upon reading a value from this channel, users are expected to call Load() to
 // send the next buffered value onto the channel if there is any.
+//
+// If the unbounded buffer is closed, the read channel returned by this method
+// is closed.
 func (b *Unbounded) Get() <-chan interface{} {
 	return b.c
+}
+
+// Close closes the unbounded buffer.
+func (b *Unbounded) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
+	b.closed = true
+	close(b.c)
 }

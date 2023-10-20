@@ -75,7 +75,6 @@
   "status": {
     "unwantedReferences": {
       "cloud.google.com/go": [
-        "cloud.google.com/go/compute",
         "github.com/google/cadvisor",
         "google.golang.org/genproto"
       ],
