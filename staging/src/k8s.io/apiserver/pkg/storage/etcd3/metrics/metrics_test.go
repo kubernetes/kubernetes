@@ -226,6 +226,48 @@ func TestStorageSizeCollector(t *testing.T) {
 
 }
 
+func TestUpdateObjectCount(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	registry.Register(objectCounts)
+	testedMetrics := "apiserver_storage_objects"
+
+	testCases := []struct {
+		desc     string
+		resource string
+		count    int64
+		want     string
+	}{
+		{
+			desc:     "successful fetch",
+			resource: "foo",
+			count:    10,
+			want: `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="foo"} 10
+`,
+		},
+		{
+			desc:     "failed fetch",
+			resource: "bar",
+			count:    -1,
+			want: `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="bar"} -1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			defer registry.Reset()
+			UpdateObjectCount(test.resource, test.count)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 type fakeEtcdMonitor struct {
 	storageSize int64
 }
