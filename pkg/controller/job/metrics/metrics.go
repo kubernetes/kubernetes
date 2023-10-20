@@ -114,6 +114,17 @@ var (
 that have the finalizer batch.kubernetes.io/job-tracking
 The event label can be "add" or "delete".`,
 		}, []string{"event"})
+
+	// JobFinishedIndexesTotal records the number of finished indexes.
+	JobFinishedIndexesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "job_finished_indexes_total",
+			Help: `The number of finished indexes. Possible values for the
+			status label are: "succeeded", "failed". Possible values for the
+			backoffLimit label are: "perIndex" and "global"`,
+		},
+		[]string{"status", "backoffLimit"})
 )
 
 const (
@@ -158,5 +169,6 @@ func Register() {
 		legacyregistry.MustRegister(JobPodsFinished)
 		legacyregistry.MustRegister(PodFailuresHandledByFailurePolicy)
 		legacyregistry.MustRegister(TerminatedPodsTrackingFinalizerTotal)
+		legacyregistry.MustRegister(JobFinishedIndexesTotal)
 	})
 }
