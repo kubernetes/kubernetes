@@ -44,6 +44,9 @@ spec.securityContext.sysctls[*].name
 'net.ipv4.ip_unprivileged_port_start'
 'net.ipv4.ip_local_reserved_ports'
 'net.ipv4.tcp_keepalive_time'
+'net.ipv4.tcp_fin_timeout'
+'net.ipv4.tcp_keepalive_intvl'
+'net.ipv4.tcp_keepalive_probes'
 
 */
 
@@ -97,6 +100,9 @@ var (
 		"net.ipv4.ip_unprivileged_port_start",
 		"net.ipv4.ip_local_reserved_ports",
 		"net.ipv4.tcp_keepalive_time",
+		"net.ipv4.tcp_fin_timeout",
+		"net.ipv4.tcp_keepalive_intvl",
+		"net.ipv4.tcp_keepalive_probes",
 	)
 )
 
