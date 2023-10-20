@@ -2010,6 +2010,8 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 		ss.Namespace, ss.Name, updateRevision, currentRevision))
+	framework.Logf("STEP 1: %#v", ss.Status)
+
 	pods := e2estatefulset.GetPodList(ctx, c, ss)
 	for i := range pods.Items {
 		gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision), fmt.Sprintf("Pod %s/%s revision %s is not equal to currentRevision %s",
@@ -2054,6 +2056,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 		}
 		return false, nil
 	})
+	framework.Logf("STEP 2: %#v", ss.Status)
 
 	ginkgo.By("Verify pod images before pod-0 deletion and recreation")
 	for i := range pods.Items {
@@ -2100,6 +2103,9 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 		pods = pods2
 		return ss.Status.ReadyReplicas == *ss.Spec.Replicas, nil
 	})
+	ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, ss.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	framework.Logf("STEP 3: %#v", ss.Status)
 
 	ginkgo.By("Verify pod images after pod-0 deletion and recreation")
 	pods = e2estatefulset.GetPodList(ctx, c, ss)
