@@ -216,7 +216,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 
 		// Once we get here, we should not unpause workers until we've successfully synced
 		attempt := 0
-		wait.PollImmediateUntilWithContext(ctx, 100*time.Millisecond, func(ctx context.Context) (bool, error) {
+		_ = wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 			attempt++
 
 			// On a reattempt, check if available resources have changed
