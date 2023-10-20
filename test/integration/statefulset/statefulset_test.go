@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -500,11 +499,12 @@ func TestDeletingPodForRollingUpdatePartition(t *testing.T) {
 
 	labelMap := labelMap()
 	sts := newSTS("sts", ns.Name, 2)
+	partition := int32(1)
 	sts.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 		Type: appsv1.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 			return &appsv1.RollingUpdateStatefulSetStrategy{
-				Partition: ptr.To[int32](1),
+				Partition: &partition,
 			}
 		}(),
 	}
