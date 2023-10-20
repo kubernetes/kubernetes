@@ -75,4 +75,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	sigs.k8s.io/yaml => github.com/liggitt/kubernetes-yaml v1.2.1-0.20231023131723-3f79f32f41c9
 )

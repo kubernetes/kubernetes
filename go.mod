@@ -278,4 +278,5 @@ replace (
 	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
+	sigs.k8s.io/yaml => github.com/liggitt/kubernetes-yaml v1.2.1-0.20231023131723-3f79f32f41c9
 )

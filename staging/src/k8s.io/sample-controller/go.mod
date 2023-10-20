@@ -63,4 +63,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
 	k8s.io/sample-controller => ../sample-controller
+	sigs.k8s.io/yaml => github.com/liggitt/kubernetes-yaml v1.2.1-0.20231023131723-3f79f32f41c9
 )

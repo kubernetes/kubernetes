@@ -69,4 +69,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/endpointslice => ../endpointslice
+	sigs.k8s.io/yaml => github.com/liggitt/kubernetes-yaml v1.2.1-0.20231023131723-3f79f32f41c9
 )
