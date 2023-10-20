@@ -36,4 +36,5 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cluster-bootstrap => ../cluster-bootstrap
+	sigs.k8s.io/yaml => github.com/natasha41575/yaml-1 v1.3.1-0.20231023160344-f2c02299d455
 )

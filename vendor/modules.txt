@@ -2525,9 +2525,10 @@ sigs.k8s.io/structured-merge-diff/v4/merge
 sigs.k8s.io/structured-merge-diff/v4/schema
 sigs.k8s.io/structured-merge-diff/v4/typed
 sigs.k8s.io/structured-merge-diff/v4/value
-# sigs.k8s.io/yaml v1.3.0
+# sigs.k8s.io/yaml v1.3.1-0.20231023160344-f2c02299d455 => github.com/natasha41575/yaml-1 v1.3.1-0.20231023160344-f2c02299d455
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+sigs.k8s.io/yaml/goyaml.v2
 # k8s.io/api => ./staging/src/k8s.io/api
 # k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 # k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
@@ -2558,3 +2559,4 @@ sigs.k8s.io/yaml
 # k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
+# sigs.k8s.io/yaml => github.com/natasha41575/yaml-1 v1.3.1-0.20231023160344-f2c02299d455

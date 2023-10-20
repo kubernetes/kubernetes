@@ -31,7 +31,7 @@ import (
 	"strings"
 	"text/template"
 
-	"gopkg.in/yaml.v2"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 
 	"github.com/onsi/ginkgo/v2/types"
 )

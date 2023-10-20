@@ -28,7 +28,7 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml/goyaml.v2"
 )
 
 // RegistryList holds public and private image registries

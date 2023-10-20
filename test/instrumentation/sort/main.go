@@ -22,7 +22,8 @@ import (
 	"sort"
 
 	flag "github.com/spf13/pflag"
-	"gopkg.in/yaml.v2"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
+
 	"k8s.io/component-base/metrics"
 )
 

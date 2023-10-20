@@ -9,7 +9,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/component-base v0.0.0
-	sigs.k8s.io/yaml v1.3.0
+	sigs.k8s.io/yaml v1.3.1-0.20231023160344-f2c02299d455
 )
 
 require (
@@ -35,4 +35,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/kube-scheduler => ../kube-scheduler
+	sigs.k8s.io/yaml => github.com/natasha41575/yaml-1 v1.3.1-0.20231023160344-f2c02299d455
 )

@@ -29,5 +29,5 @@ var (
 	smdNewParser       = types.Ref("sigs.k8s.io/structured-merge-diff/v4/typed", "NewParser")
 	smdParser          = types.Ref("sigs.k8s.io/structured-merge-diff/v4/typed", "Parser")
 	yamlObject         = types.Ref("sigs.k8s.io/structured-merge-diff/v4/typed", "YAMLObject")
-	yamlUnmarshal      = types.Ref("gopkg.in/yaml.v2", "Unmarshal")
+	yamlUnmarshal      = types.Ref("sigs.k8s.io/yaml/goyaml.v2", "Unmarshal")
 )
