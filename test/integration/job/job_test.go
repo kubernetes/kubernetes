@@ -1363,101 +1363,77 @@ func TestNonParallelJob(t *testing.T) {
 
 func TestParallelJob(t *testing.T) {
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
-	cases := map[string]struct {
-		enableReadyPods bool
-	}{
-		"none": {},
-		"ready pods": {
-			enableReadyPods: true,
+	closeFn, restConfig, clientSet, ns := setup(t, "parallel")
+	defer closeFn()
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	defer cancel()
+	resetMetrics()
+
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](5),
 		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
 	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.enableReadyPods)()
-
-			closeFn, restConfig, clientSet, ns := setup(t, "parallel")
-			defer closeFn()
-			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-			defer cancel()
-			resetMetrics()
-
-			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism: ptr.To[int32](5),
-				},
-			})
-			if err != nil {
-				t.Fatalf("Failed to create Job: %v", err)
-			}
-			want := podsByStatus{Active: 5}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-
-			// Tracks ready pods, if enabled.
-			if err, _ := setJobPodsReady(ctx, clientSet, jobObj, 2); err != nil {
-				t.Fatalf("Failed Marking Pods as ready: %v", err)
-			}
-			if tc.enableReadyPods {
-				*want.Ready = 2
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-
-			// Failed Pods are replaced.
-			if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
-				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
-			}
-			want = podsByStatus{
-				Active: 5,
-				Failed: 2,
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-			// Once one Pod succeeds, no more Pods are created, even if some fail.
-			if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
-				t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
-			}
-			want = podsByStatus{
-				Failed:    2,
-				Succeeded: 1,
-				Active:    4,
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-			if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
-				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
-			}
-			want = podsByStatus{
-				Failed:    4,
-				Succeeded: 1,
-				Active:    2,
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-			// No more Pods are created after remaining Pods succeed.
-			if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
-				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodSucceeded, err)
-			}
-			validateJobSucceeded(ctx, t, clientSet, jobObj)
-			want = podsByStatus{
-				Failed:    4,
-				Succeeded: 3,
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
-			validateTerminatedPodsTrackingFinalizerMetric(ctx, t, 7)
-		})
+	want := podsByStatus{
+		Active: 5,
+		Ready:  ptr.To[int32](0),
 	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+
+	// Tracks ready pods, if enabled.
+	if err, _ := setJobPodsReady(ctx, clientSet, jobObj, 2); err != nil {
+		t.Fatalf("Failed Marking Pods as ready: %v", err)
+	}
+	want.Ready = ptr.To[int32](2)
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+
+	// Failed Pods are replaced.
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
+	}
+	want = podsByStatus{
+		Active: 5,
+		Failed: 2,
+		Ready:  ptr.To[int32](0),
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	// Once one Pod succeeds, no more Pods are created, even if some fail.
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
+	}
+	want = podsByStatus{
+		Failed:    2,
+		Succeeded: 1,
+		Active:    4,
+		Ready:     ptr.To[int32](0),
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
+	}
+	want = podsByStatus{
+		Failed:    4,
+		Succeeded: 1,
+		Active:    2,
+		Ready:     ptr.To[int32](0),
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	// No more Pods are created after remaining Pods succeed.
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodSucceeded, err)
+	}
+	validateJobSucceeded(ctx, t, clientSet, jobObj)
+	want = podsByStatus{
+		Failed:    4,
+		Succeeded: 3,
+		Ready:     ptr.To[int32](0),
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
+	validateTerminatedPodsTrackingFinalizerMetric(ctx, t, 7)
 }
 
 func TestParallelJobParallelism(t *testing.T) {
@@ -1520,87 +1496,65 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	t.Cleanup(setDuringTest(&jobcontroller.MaxUncountedPods, 10))
 	t.Cleanup(setDuringTest(&jobcontroller.MaxPodCreateDeletePerSync, 10))
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
-	cases := map[string]struct {
-		enableReadyPods bool
-	}{
-		"none": {},
-		"ready pods": {
-			enableReadyPods: true,
+	closeFn, restConfig, clientSet, ns := setup(t, "completions")
+	defer closeFn()
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	defer cancel()
+
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](54),
+			Completions: ptr.To[int32](56),
 		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
 	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.enableReadyPods)()
-			closeFn, restConfig, clientSet, ns := setup(t, "completions")
-			defer closeFn()
-			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-			defer cancel()
-
-			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism: ptr.To[int32](54),
-					Completions: ptr.To[int32](56),
-				},
-			})
-			if err != nil {
-				t.Fatalf("Failed to create Job: %v", err)
-			}
-			want := podsByStatus{Active: 54}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-
-			// Tracks ready pods, if enabled.
-			if err, _ := setJobPodsReady(ctx, clientSet, jobObj, 52); err != nil {
-				t.Fatalf("Failed Marking Pods as ready: %v", err)
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](52)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-
-			// Failed Pods are replaced.
-			if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
-				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
-			}
-			want = podsByStatus{
-				Active: 54,
-				Failed: 2,
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](50)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-			// Pods are created until the number of succeeded Pods equals completions.
-			if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 53); err != nil {
-				t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
-			}
-			want = podsByStatus{
-				Failed:    2,
-				Succeeded: 53,
-				Active:    3,
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-			// No more Pods are created after the Job completes.
-			if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
-				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodSucceeded, err)
-			}
-			validateJobSucceeded(ctx, t, clientSet, jobObj)
-			want = podsByStatus{
-				Failed:    2,
-				Succeeded: 56,
-			}
-			if tc.enableReadyPods {
-				want.Ready = ptr.To[int32](0)
-			}
-			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
-			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
-		})
+	want := podsByStatus{
+		Active: 54,
+		Ready:  ptr.To[int32](0),
 	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	// Tracks ready pods, if enabled.
+	if err, _ := setJobPodsReady(ctx, clientSet, jobObj, 52); err != nil {
+		t.Fatalf("Failed Marking Pods as ready: %v", err)
+	}
+	want.Ready = ptr.To[int32](52)
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+
+	// Failed Pods are replaced.
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
+	}
+	want = podsByStatus{
+		Active: 54,
+		Failed: 2,
+		Ready:  ptr.To[int32](50),
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	// Pods are created until the number of succeeded Pods equals completions.
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 53); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
+	}
+	want = podsByStatus{
+		Failed:    2,
+		Succeeded: 53,
+		Active:    3,
+		Ready:     ptr.To[int32](0),
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	// No more Pods are created after the Job completes.
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodSucceeded, err)
+	}
+	validateJobSucceeded(ctx, t, clientSet, jobObj)
+	want = podsByStatus{
+		Failed:    2,
+		Succeeded: 56,
+		Ready:     ptr.To[int32](0),
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
+	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 }
 
 func TestIndexedJob(t *testing.T) {

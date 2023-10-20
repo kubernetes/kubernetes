@@ -975,7 +975,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobPodReplacementPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
-	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
+	JobReadyPods: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	KubeletCgroupDriverFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
