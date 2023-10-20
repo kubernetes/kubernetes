@@ -85,15 +85,15 @@ type ClusterEventWithHint struct {
 	// and filters out events to reduce useless retry of Pod's scheduling.
 	// It's an optional field. If not set,
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
-	// (the same as QueueAfterBackoff)
+	// (the same as Queue)
 	QueueingHintFn QueueingHintFn
 }
 
 // QueueingHintFn returns a hint that signals whether the event can make a Pod,
 // which was rejected by this plugin in the past scheduling cycle, schedulable or not.
 // It's called before a Pod gets moved from unschedulableQ to backoffQ or activeQ.
-// If it returns an error, we'll take the returned QueueingHint as `QueueAfterBackoff` at the caller whatever we returned here so that
-// we can prevent the Pod from stucking in the unschedulable pod pool.
+// If it returns an error, we'll take the returned QueueingHint as `Queue` at the caller whatever we returned here so that
+// we can prevent the Pod from being stuck in the unschedulable pod pool.
 //
 // - `pod`: the Pod to be enqueued, which is rejected by this plugin in the past.
 // - `oldObj` `newObj`: the object involved in that event.
@@ -109,29 +109,16 @@ const (
 	// scheduling of the pod.
 	QueueSkip QueueingHint = iota
 
-	// QueueAfterBackoff implies that the Pod may be schedulable by the event,
-	// and worth retrying the scheduling again after backoff.
-	QueueAfterBackoff
-
-	// QueueImmediately is returned only when it is highly possible that the Pod gets scheduled in the next scheduling.
-	// You should only return QueueImmediately when there is a high chance that the Pod gets scheduled in the next scheduling.
-	// Otherwise, it's detrimental to scheduling throughput.
-	// For example, when the Pod was rejected as waiting for an external resource to be provisioned, that is directly tied to the Pod,
-	// and the event is that the resource is provisioned, then you can return QueueImmediately.
-	// As a counterexample, when the Pod was rejected due to insufficient memory resource,
-	// and the event is that more memory on Node is available, then you should return QueueAfterBackoff instead of QueueImmediately
-	// because other Pods may be waiting for the same resources and only a few of them would schedule in the next scheduling cycle.
-	QueueImmediately
+	// Queue implies that the Pod may be schedulable by the event.
+	Queue
 )
 
 func (s QueueingHint) String() string {
 	switch s {
 	case QueueSkip:
 		return "QueueSkip"
-	case QueueAfterBackoff:
-		return "QueueAfterBackoff"
-	case QueueImmediately:
-		return "QueueImmediately"
+	case Queue:
+		return "Queue"
 	}
 	return ""
 }
@@ -179,9 +166,11 @@ type QueuedPodInfo struct {
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
 	InitialAttemptTimestamp *time.Time
-	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
+	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status.
 	// It's registered only when the Pod is rejected in PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
 	UnschedulablePlugins sets.Set[string]
+	// PendingPlugins records the plugin names that the Pod failed with Pending status.
+	PendingPlugins sets.Set[string]
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
 }
@@ -292,8 +281,11 @@ type WeightedAffinityTerm struct {
 
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
-	NodeToStatusMap      NodeToStatusMap
+	NodeToStatusMap NodeToStatusMap
+	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]
+	// UnschedulablePlugins are plugins that returns Pending.
+	PendingPlugins sets.Set[string]
 	// PreFilterMsg records the messages returned from PreFilter plugins.
 	PreFilterMsg string
 	// PostFilterMsg records the messages returned from PostFilter plugins.
@@ -311,6 +303,24 @@ const (
 	// NoNodeAvailableMsg is used to format message when no nodes available.
 	NoNodeAvailableMsg = "0/%v nodes are available"
 )
+
+func (d *Diagnosis) AddPluginStatus(sts *Status) {
+	if sts.FailedPlugin() == "" {
+		return
+	}
+	if sts.IsUnschedulable() {
+		if d.UnschedulablePlugins == nil {
+			d.UnschedulablePlugins = sets.New[string]()
+		}
+		d.UnschedulablePlugins.Insert(sts.FailedPlugin())
+	}
+	if sts.Code() == Pending {
+		if d.PendingPlugins == nil {
+			d.PendingPlugins = sets.New[string]()
+		}
+		d.PendingPlugins.Insert(sts.FailedPlugin())
+	}
+}
 
 // Error returns detailed information of why the pod failed to fit on each node.
 // A message format is "0/X nodes are available: <PreFilterMsg>. <FilterMsg>. <PostFilterMsg>."

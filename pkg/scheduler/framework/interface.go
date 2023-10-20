@@ -77,18 +77,30 @@ const (
 	// Success means that plugin ran correctly and found pod schedulable.
 	// NOTE: A nil status is also considered as "Success".
 	Success Code = iota
-	// Error is used for internal plugin errors, unexpected input, etc.
+	// Error is one of the failures, used for internal plugin errors, unexpected input, etc.
+	// Plugin shouldn't return this code for expected failures, like Unschedulable.
+	// Since it's the unexpected failure, the scheduling queue registers the pod without unschedulable plugins.
+	// Meaning, the Pod will be requeued to activeQ/backoffQ soon.
 	Error
-	// Unschedulable is used when a plugin finds a pod unschedulable. The scheduler might attempt to
+	// Unschedulable is one of the failures, used when a plugin finds a pod unschedulable.
+	// If it's returned from PreFilter or Filter, the scheduler might attempt to
 	// run other postFilter plugins like preemption to get this pod scheduled.
 	// Use UnschedulableAndUnresolvable to make the scheduler skipping other postFilter plugins.
 	// The accompanying status message should explain why the pod is unschedulable.
+	//
+	// We regard the backoff as a penalty of wasting the scheduling cycle.
+	// When the scheduling queue requeues Pods, which was rejected with Unschedulable in the last scheduling,
+	// the Pod goes through backoff.
 	Unschedulable
 	// UnschedulableAndUnresolvable is used when a plugin finds a pod unschedulable and
 	// other postFilter plugins like preemption would not change anything.
 	// Plugins should return Unschedulable if it is possible that the pod can get scheduled
 	// after running other postFilter plugins.
 	// The accompanying status message should explain why the pod is unschedulable.
+	//
+	// We regard the backoff as a penalty of wasting the scheduling cycle.
+	// When the scheduling queue requeues Pods, which was rejected with Unschedulable in the last scheduling,
+	// the Pod goes through backoff.
 	UnschedulableAndUnresolvable
 	// Wait is used when a Permit plugin finds a pod scheduling should wait.
 	Wait
@@ -97,10 +109,27 @@ const (
 	// - when a PreFilter plugin returns Skip so that coupled Filter plugin/PreFilterExtensions() will be skipped.
 	// - when a PreScore plugin returns Skip so that coupled Score plugin will be skipped.
 	Skip
+	// Pending means that the scheduling process is finished successfully,
+	// but the plugin wants to abort the scheduling cycle/binding cycle here.
+	//
+	// For example, the DRA plugin sometimes needs to wait for the external device driver
+	// to provision the resource for the Pod.
+	// It's different from when to return Unschedulable/UnschedulableAndUnresolvable,
+	// because in this case, the scheduler decides where the Pod can go successfully,
+	// but we need to wait for the external component to do something based on that scheduling result.
+	//
+	// We regard the backoff as a penalty of wasting the scheduling cycle.
+	// In the case of returning Pending, we cannot say the scheduling cycle is wasted
+	// because the scheduling result is used to proceed the Pod's scheduling forward,
+	// that particular scheduling cycle is failed though.
+	// So, Pods rejected by such reasons don't need to suffer a penalty (backoff).
+	// When the scheduling queue requeues Pods, which was rejected with Pending in the last scheduling,
+	// the Pod goes to activeQ directly ignoring backoff.
+	Pending
 )
 
 // This list should be exactly the same as the codes iota defined above in the same order.
-var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip"}
+var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip", "Pending"}
 
 func (c Code) String() string {
 	return codes[c]
@@ -151,7 +180,7 @@ type Status struct {
 	reasons []string
 	err     error
 	// failedPlugin is an optional field that records the plugin name a Pod failed by.
-	// It's set by the framework when code is Error, Unschedulable or UnschedulableAndUnresolvable.
+	// It's set by the framework when code is Unschedulable, UnschedulableAndUnresolvable or Pending.
 	failedPlugin string
 }
 

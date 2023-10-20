@@ -544,7 +544,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 				frameworkHandler: fh,
 				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 					queueingHintCalledCounter++
-					return framework.QueueImmediately, nil
+					return framework.Queue, nil
 				},
 			}
 			return fakePermit, nil

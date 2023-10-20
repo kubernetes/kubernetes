@@ -315,7 +315,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	originalClaim, modifiedClaim, err := schedutil.As[*resourcev1alpha2.ResourceClaim](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
-		return framework.QueueAfterBackoff, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
+		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
 	}
 
 	usesClaim := false
@@ -339,7 +339,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 
 	if originalClaim == nil {
 		logger.V(4).Info("claim for pod got created", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-		return framework.QueueImmediately, nil
+		return framework.Queue, nil
 	}
 
 	// Modifications may or may not be relevant. If the entire
@@ -357,7 +357,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-	return framework.QueueImmediately, nil
+	return framework.Queue, nil
 }
 
 // isSchedulableAfterPodSchedulingContextChange is invoked for all
@@ -376,7 +376,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	oldPodScheduling, newPodScheduling, err := schedutil.As[*resourcev1alpha2.PodSchedulingContext](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
-		return framework.QueueAfterBackoff, fmt.Errorf("unexpected object in isSchedulableAfterPodSchedulingContextChange: %w", err)
+		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterPodSchedulingContextChange: %w", err)
 	}
 	podScheduling := newPodScheduling // Never nil because deletes are handled above.
 
@@ -423,7 +423,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 		len(oldPodScheduling.Status.ResourceClaims) < len(podScheduling.Status.ResourceClaims) /* new information and not incomplete (checked above) */ {
 		// This definitely is new information for the scheduler. Try again immediately.
 		logger.V(4).Info("PodSchedulingContext for pod has all required information, schedule immediately", "pod", klog.KObj(pod))
-		return framework.QueueImmediately, nil
+		return framework.Queue, nil
 	}
 
 	// The other situation where the scheduler needs to do
@@ -448,7 +448,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 		for _, claimStatus := range podScheduling.Status.ResourceClaims {
 			if sliceContains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
 				logger.V(5).Info("PodSchedulingContext has unsuitable selected node, schedule immediately", "pod", klog.KObj(pod), "selectedNode", podScheduling.Spec.SelectedNode, "podResourceName", claimStatus.Name)
-				return framework.QueueImmediately, nil
+				return framework.Queue, nil
 			}
 		}
 	}
@@ -463,7 +463,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 
 	// Once we get here, all changes which are known to require special responses
 	// have been checked for. Whatever the change was, we don't know exactly how
-	// to handle it and thus return QueueAfterBackoff. This will cause the
+	// to handle it and thus return Queue. This will cause the
 	// scheduler to treat the event as if no event hint callback had been provided.
 	// Developers who want to investigate this can enable a diff at log level 6.
 	if loggerV := logger.V(6); loggerV.Enabled() {
@@ -471,7 +471,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	} else {
 		logger.V(5).Info("PodSchedulingContext for pod with unknown changes, maybe schedule", "pod", klog.KObj(pod))
 	}
-	return framework.QueueAfterBackoff, nil
+	return framework.Queue, nil
 
 }
 
@@ -961,7 +961,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
 				return statusError(logger, err)
 			}
-			return statusUnschedulable(logger, "waiting for resource driver to allocate resource", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+			return statusPending(logger, "waiting for resource driver to allocate resource", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 		}
 	}
 
@@ -977,7 +977,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	// provisioning?  On the one hand, volume provisioning is currently
 	// irreversible, so it better should come last. On the other hand,
 	// triggering both in parallel might be faster.
-	return statusUnschedulable(logger, "waiting for resource driver to provide information", "pod", klog.KObj(pod))
+	return statusPending(logger, "waiting for resource driver to provide information", "pod", klog.KObj(pod))
 }
 
 func containsNode(hay []string, needle string) bool {
@@ -1071,6 +1071,21 @@ func statusUnschedulable(logger klog.Logger, reason string, kv ...interface{}) *
 		loggerV.Info("pod unschedulable", kv...)
 	}
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, reason)
+}
+
+// statusPending ensures that there is a log message associated with the
+// line where the status originated.
+func statusPending(logger klog.Logger, reason string, kv ...interface{}) *framework.Status {
+	if loggerV := logger.V(5); loggerV.Enabled() {
+		helper, loggerV := loggerV.WithCallStackHelper()
+		helper()
+		kv = append(kv, "reason", reason)
+		// nolint: logcheck // warns because it cannot check key/values
+		loggerV.Info("pod waiting for external component", kv...)
+	}
+
+	// When we return Pending, we want to block the Pod at the same time.
+	return framework.NewStatus(framework.Pending, reason)
 }
 
 // statusError ensures that there is a log message associated with the

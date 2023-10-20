@@ -98,7 +98,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 			name:         "backoff-wrong-new-object",
 			pod:          &v1.Pod{},
 			newObj:       "not-a-node",
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
 		{
@@ -110,7 +110,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 				},
 			},
 			oldObj:       "not-a-node",
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
 		{
@@ -131,7 +131,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 					Unschedulable: false,
 				},
 			},
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 		{
 			name: "skip-unrelated-change",
@@ -167,7 +167,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 	}
 
