@@ -634,15 +634,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	newItemFunc := getNewItemFunc(listObj, v)
 
-	var fromRV *uint64
-	if len(opts.ResourceVersion) > 0 {
-		parsedRV, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
-		if err != nil {
-			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
-		}
-		fromRV = &parsedRV
-	}
-
 	var continueRV, withRev int64
 	var continueKey string
 	switch {
@@ -662,21 +653,23 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if continueRV > 0 {
 			withRev = continueRV
 		}
-	default:
-		if fromRV != nil {
-			switch opts.ResourceVersionMatch {
-			case metav1.ResourceVersionMatchNotOlderThan:
-				// The not older than constraint is checked after we get a response from etcd,
-				// and returnedRV is then set to the revision we get from the etcd response.
-			case metav1.ResourceVersionMatchExact:
-				withRev = int64(*fromRV)
-			case "": // legacy case
-				if opts.Recursive && opts.Predicate.Limit > 0 && *fromRV > 0 {
-					withRev = int64(*fromRV)
-				}
-			default:
-				return fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
+	case len(opts.ResourceVersion) > 0:
+		parsedRV, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
+		if err != nil {
+			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+		}
+		switch opts.ResourceVersionMatch {
+		case metav1.ResourceVersionMatchNotOlderThan:
+			// The not older than constraint is checked after we get a response from etcd,
+			// and returnedRV is then set to the revision we get from the etcd response.
+		case metav1.ResourceVersionMatchExact:
+			withRev = int64(parsedRV)
+		case "": // legacy case
+			if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
+				withRev = int64(parsedRV)
 			}
+		default:
+			return fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 		}
 	}
 

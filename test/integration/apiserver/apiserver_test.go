@@ -527,12 +527,6 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 		}
 		return
 	}
-	if opts.ResourceVersion == invalidResourceVersion {
-		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
-			t.Fatalf("expecting invalid value error, but got: %v", err)
-		}
-		return
-	}
 	if opts.Continue == invalidContinueToken {
 		if err == nil || !strings.Contains(err.Error(), "continue key is not valid") {
 			t.Fatalf("expected continue key not valid error, but got: %v", err)
@@ -543,6 +537,12 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	if opts.Continue != "" && !(opts.ResourceVersion == "" || opts.ResourceVersion == "0") {
 		if err == nil || !strings.Contains(err.Error(), "specifying resource version is not allowed when using continue") {
 			t.Fatalf("expected not allowed error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersion == invalidResourceVersion {
+		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
+			t.Fatalf("expecting invalid value error, but got: %v", err)
 		}
 		return
 	}
