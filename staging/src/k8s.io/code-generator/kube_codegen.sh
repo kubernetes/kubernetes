@@ -400,6 +400,11 @@ function kube::codegen::gen_openapi() {
 #     clients to be generated.  This must be Go package syntax, e.g.
 #     "k8s.io/foo/bar".
 #
+#   --one-input-api <string>
+#     A specific API (a directory) under the --input-pkg-root for which to
+#     generate a client.  If this is not set, clients for all APIs under the
+#     input root will be generated (under the --output-pkg-root).
+#
 #   --output-pkg-root <string>
 #     The root package into which generated directories and files will be
 #     placed.  This must be Go package syntax, e.g. "k8s.io/foo/bar".
@@ -435,6 +440,7 @@ function kube::codegen::gen_openapi() {
 #
 function kube::codegen::gen_client() {
     local in_pkg_root=""
+    local one_input_api=""
     local out_pkg_root=""
     local out_base="" # gengo needs the output dir must be $out_base/$out_pkg_root
     local clientset_subdir="clientset"
@@ -451,6 +457,10 @@ function kube::codegen::gen_client() {
         case "$1" in
             "--input-pkg-root")
                 in_pkg_root="$2"
+                shift 2
+                ;;
+            "--one-input-api")
+                one_input_api="/$2"
                 shift 2
                 ;;
             "--output-pkg-root")
@@ -551,7 +561,7 @@ function kube::codegen::gen_client() {
     done < <(
         ( kube::codegen::internal::git_grep -l --null \
             -e '+genclient' \
-            ":(glob)${in_root}"/'**/*.go' \
+            ":(glob)${in_root}${one_input_api}"/'**/*.go' \
             || true \
         ) | xargs -0 -n1 dirname \
           | LC_ALL=C sort -u
