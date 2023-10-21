@@ -34,11 +34,13 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsinstall "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	commoncel "k8s.io/apiserver/pkg/cel"
@@ -360,6 +362,16 @@ func TestBuiltinResolution(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResolveRecursiveSchema(t *testing.T) {
+	sch := runtime.NewScheme()
+	apiextensionsinstall.Install(sch)
+	res := resolver.NewDefinitionsSchemaResolver(sch, openapi.GetOpenAPIDefinitions)
+	_, err := res.ResolveSchema(schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
