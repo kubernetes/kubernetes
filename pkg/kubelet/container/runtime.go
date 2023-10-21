@@ -99,6 +99,10 @@ type Runtime interface {
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
 	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	// SyncTerminatingPod syncs the terminating pod into the desired pod. This
+	// returns a PodSyncResult and a bool indicating whether the pod is
+	// terminated.
+	SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, gracePeriodOverride *int64, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (PodSyncResult, bool)
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.

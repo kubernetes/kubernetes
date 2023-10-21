@@ -170,6 +170,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Root directory used to store pod logs
 	podLogsDirectory string
+
+	// Worker to terminate containers
+	containerTermination *containerTermination
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -290,6 +293,8 @@ func NewKubeGenericRuntimeManager(
 		},
 		versionCacheTTL,
 	)
+
+	kubeRuntimeManager.containerTermination = newContainerTermination(recorder, runtimeService, kubeRuntimeManager.runner)
 
 	return kubeRuntimeManager, nil
 }
@@ -453,6 +458,9 @@ type containerToKillInfo struct {
 	// The reason is a clearer source of info on why a container will be killed
 	// TODO: replace message with reason?
 	reason containerKillReason
+	// An init container with `Always` restartPolicy can stop after all
+	// dependent containers stop.
+	canStop bool
 }
 
 // containerResources holds the set of resources applicable to the running container

@@ -244,6 +244,19 @@ func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.P
 	return
 }
 
+func (f *FakeRuntime) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriodOverride *int64, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (kubecontainer.PodSyncResult, bool) {
+	f.Lock()
+	defer f.Unlock()
+
+	var result kubecontainer.PodSyncResult
+	f.CalledFunctions = append(f.CalledFunctions, "SyncTerminatingPod")
+	f.KilledPods = append(f.KilledPods, string(podStatus.ID))
+	for _, c := range podStatus.ContainerStatuses {
+		f.KilledContainers = append(f.KilledContainers, c.Name)
+	}
+	return result, true
+}
+
 func (f *FakeRuntime) KillPod(_ context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
 	f.Lock()
 	defer f.Unlock()

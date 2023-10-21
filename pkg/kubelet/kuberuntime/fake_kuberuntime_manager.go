@@ -152,5 +152,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		}
 	}
 
+	kubeRuntimeManager.containerTermination = newContainerTermination(recorder, runtimeService, kubeRuntimeManager.runner)
+
 	return kubeRuntimeManager, nil
 }

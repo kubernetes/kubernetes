@@ -2038,11 +2038,23 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	kl.probeManager.StopLivenessAndStartup(pod)
 
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-	if err := kl.killPod(ctx, pod, p, gracePeriod); err != nil {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
-		// there was an error killing the pod, so we return that error directly
-		utilruntime.HandleError(err)
-		return err
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		result, terminated := kl.containerRuntime.SyncTerminatingPod(ctx, pod, podStatus, gracePeriod, kl.getPullSecretsForPod(pod), kl.backOff)
+		err := result.Error()
+		if err != nil {
+			return err
+		}
+
+		if !terminated {
+			return fmt.Errorf("pod %q is not terminated", klog.KObj(pod))
+		}
+	} else {
+		if err := kl.killPod(ctx, pod, p, gracePeriod); err != nil {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
+			// there was an error killing the pod, so we return that error directly
+			utilruntime.HandleError(err)
+			return err
+		}
 	}
 
 	// Once the containers are stopped, we can stop probing for liveness and readiness.
