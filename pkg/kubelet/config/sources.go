@@ -24,7 +24,7 @@ import (
 )
 
 // SourcesReadyFn is function that returns true if the specified sources have been seen.
-type SourcesReadyFn func(sourcesSeen sets.String) bool
+type SourcesReadyFn func(sourcesSeen sets.Set[string]) bool
 
 // SourcesReady tracks the set of configured sources seen by the kubelet.
 type SourcesReady interface {
@@ -37,7 +37,7 @@ type SourcesReady interface {
 // NewSourcesReady returns a SourcesReady with the specified function.
 func NewSourcesReady(sourcesReadyFn SourcesReadyFn) SourcesReady {
 	return &sourcesImpl{
-		sourcesSeen:    sets.NewString(),
+		sourcesSeen:    sets.New[string](),
 		sourcesReadyFn: sourcesReadyFn,
 	}
 }
@@ -47,7 +47,7 @@ type sourcesImpl struct {
 	// lock protects access to sources seen.
 	lock sync.RWMutex
 	// set of sources seen.
-	sourcesSeen sets.String
+	sourcesSeen sets.Set[string]
 	// sourcesReady is a function that evaluates if the sources are ready.
 	sourcesReadyFn SourcesReadyFn
 }
