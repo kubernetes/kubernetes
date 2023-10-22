@@ -284,7 +284,7 @@ type Diagnosis struct {
 	NodeToStatusMap NodeToStatusMap
 	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]
-	// UnschedulablePlugins are plugins that returns Pending.
+	// PendingPlugins are plugins that returns Pending.
 	PendingPlugins sets.Set[string]
 	// PreFilterMsg records the messages returned from PreFilter plugins.
 	PreFilterMsg string

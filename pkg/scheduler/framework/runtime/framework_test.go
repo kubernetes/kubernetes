@@ -1793,7 +1793,7 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(framework.Error)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin" filter plugin: %w`, errInjectedFilterStatus)).WithPlugin("TestPlugin"),
+			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin" filter plugin: %w`, errInjectedFilterStatus)),
 		},
 		{
 			name: "UnschedulableFilter",
@@ -1829,7 +1829,7 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(framework.Error)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithPlugin("TestPlugin1"),
+			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)),
 		},
 		{
 			name: "UnschedulableAndUnschedulableFilters",
@@ -1901,7 +1901,7 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(framework.Success)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithPlugin("TestPlugin1"),
+			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)),
 		},
 		{
 			name: "SuccessAndErrorFilters",
@@ -1916,7 +1916,7 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(framework.Error)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin2" filter plugin: %w`, errInjectedFilterStatus)).WithPlugin("TestPlugin2"),
+			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin2" filter plugin: %w`, errInjectedFilterStatus)),
 		},
 		{
 			name: "SuccessAndUnschedulableFilters",
@@ -2015,7 +2015,7 @@ func TestPostFilterPlugins(t *testing.T) {
 			wantStatus: framework.NewStatus(framework.Success, injectReason),
 		},
 		{
-			name: "plugin1 failed to make a Pod schedulable, followed by plugin2 which makes the Pod schedulable",
+			name: "plugin1 failed by an error, followed by plugin2 which makes the Pod schedulable",
 			plugins: []*TestPlugin{
 				{
 					name: "TestPlugin1",
@@ -2026,7 +2026,7 @@ func TestPostFilterPlugins(t *testing.T) {
 					inj:  injectedResult{PostFilterStatus: int(framework.Success)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(injectReason)).WithPlugin("TestPlugin1"),
+			wantStatus: framework.AsStatus(fmt.Errorf(injectReason)),
 		},
 		{
 			name: "plugin1 failed to make a Pod schedulable, followed by plugin2 which makes the Pod unresolvable",
@@ -2166,7 +2166,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			nominatedPod: highPriorityPod,
 			node:         node,
 			nodeInfo:     framework.NewNodeInfo(pod),
-			wantStatus:   framework.AsStatus(fmt.Errorf(`running "TestPlugin2" filter plugin: %w`, errInjectedFilterStatus)).WithPlugin("TestPlugin2"),
+			wantStatus:   framework.AsStatus(fmt.Errorf(`running "TestPlugin2" filter plugin: %w`, errInjectedFilterStatus)),
 		},
 		{
 			name: "node has a low-priority nominated pod and pre filters return unschedulable",
@@ -2599,7 +2599,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(framework.Error)},
 				},
 			},
-			want: framework.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
+			want: framework.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)),
 		},
 		{
 			name: "UnschedulableAndUnresolvablePermitPlugin",
@@ -2647,7 +2647,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(framework.Error)},
 				},
 			},
-			want: framework.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
+			want: framework.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)),
 		},
 	}
 

@@ -654,11 +654,13 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			continue
 		}
 		if !s.IsSuccess() {
-			s.SetPlugin(pl.Name())
-			if s.IsRejected() {
-				return nil, s
+			if !s.IsRejected() {
+				// When an error happens, we don't register the plugin as failed plugins.
+				// Because such errors may not be able to be solved by specific cluster events registered by the plugin (EventsToRegister).
+				return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError()))
 			}
-			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name())
+			s.SetPlugin(pl.Name())
+			return nil, s
 		}
 		if !r.AllNodes() {
 			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
@@ -796,9 +798,9 @@ func (f *frameworkImpl) RunFilterPlugins(
 		}
 		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
 			if !status.IsRejected() {
-				// Filter plugins are not supposed to return any status other than
-				// Success or Unschedulable.
-				status = framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), status.AsError()))
+				// When error happens, we don't register the plugin as failed plugins.
+				// Because such errors may not be able to be solved by specific cluster events registered by the plugin (EventsToRegister).
+				return framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), status.AsError()))
 			}
 			status.SetPlugin(pl.Name())
 			return status
@@ -846,8 +848,9 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 		} else if s.Code() == framework.UnschedulableAndUnresolvable {
 			return r, s.WithPlugin(pl.Name())
 		} else if !s.IsRejected() {
-			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
-			return nil, framework.AsStatus(s.AsError()).WithPlugin(pl.Name())
+			// Any status other than Success, Pending, Unschedulable or UnschedulableAndUnresolvable is Error.
+			// When error happens, we don't register the plugin as failed plugins.
+			return nil, framework.AsStatus(s.AsError())
 		} else if r != nil && r.Mode() != framework.ModeNoop {
 			result = r
 		}
@@ -1349,23 +1352,25 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
-		if !status.IsSuccess() {
-			if status.IsRejected() {
-				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
-				return status.WithPlugin(pl.Name())
+		switch {
+		case status.IsSuccess():
+			// do nothing and continue to run other plugins to get the wait time.
+		case status.IsWait():
+			// Not allowed to be greater than maxTimeout.
+			if timeout > maxTimeout {
+				timeout = maxTimeout
 			}
-			if status.IsWait() {
-				// Not allowed to be greater than maxTimeout.
-				if timeout > maxTimeout {
-					timeout = maxTimeout
-				}
-				pluginsWaitTime[pl.Name()] = timeout
-				statusCode = framework.Wait
-			} else {
-				err := status.AsError()
-				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
-				return framework.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
-			}
+			pluginsWaitTime[pl.Name()] = timeout
+			statusCode = framework.Wait
+			// We need to continue to run other plugins to get the wait time.
+		case status.IsRejected():
+			logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+			return status.WithPlugin(pl.Name())
+		default:
+			// Error (or other unexpected status code).
+			err := status.AsError()
+			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
+			return framework.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err))
 		}
 	}
 	if statusCode == framework.Wait {
@@ -1406,11 +1411,11 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 	if !s.IsSuccess() {
 		if s.IsRejected() {
 			logger.V(4).Info("Pod rejected while waiting on permit", "pod", klog.KObj(pod), "status", s.Message())
-			return s
+			return s.WithPlugin(s.Plugin())
 		}
 		err := s.AsError()
 		logger.Error(err, "Failed waiting on permit for pod", "pod", klog.KObj(pod))
-		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err)).WithPlugin(s.Plugin())
+		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err))
 	}
 	return nil
 }
