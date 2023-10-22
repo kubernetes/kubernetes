@@ -73,6 +73,7 @@ type PluginScore struct {
 type Code int
 
 // These are predefined codes used in a Status.
+// Note: when you add a new status, you have to add it in `codes` slice below.
 const (
 	// Success means that plugin ran correctly and found pod schedulable.
 	// NOTE: A nil status is also considered as "Success".
