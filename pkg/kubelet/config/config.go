@@ -68,7 +68,7 @@ type PodConfig struct {
 
 	// contains the list of all configured sources
 	sourcesLock sync.Mutex
-	sources     sets.String
+	sources     sets.Set[string]
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -80,7 +80,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder,
 		pods:    storage,
 		mux:     config.NewMux(storage),
 		updates: updates,
-		sources: sets.String{},
+		sources: sets.New[string](),
 	}
 	return podConfig
 }
@@ -102,8 +102,8 @@ func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 	}
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
-	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.List(), "seenSources", seenSources)
-	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
+	klog.V(5).InfoS("Looking for sources, have seen", "sources", sets.List(c.sources), "seenSources", seenSources)
+	return seenSources.HasAll(sets.List(c.sources)...) && c.pods.seenSources(sets.List(c.sources)...)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
