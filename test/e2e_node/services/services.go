@@ -154,7 +154,7 @@ func (e *E2EServices) collectLogFiles() {
 	journaldFound := isJournaldAvailable()
 	for targetFileName, log := range e.logs {
 		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
-		if journaldFound {
+		if journaldFound && log.JournalctlCommand != nil {
 			// Skip log files that do not have an equivalent in journald-based machines.
 			if len(log.JournalctlCommand) == 0 {
 				continue
@@ -173,6 +173,7 @@ func (e *E2EServices) collectLogFiles() {
 		for _, file := range log.Files {
 			if _, err := os.Stat(file); err != nil {
 				// Expected file not found on this distro.
+				klog.Errorf("failed to find %q from file: %v", file, err)
 				continue
 			}
 			if err := copyLogFile(file, targetLink); err != nil {
