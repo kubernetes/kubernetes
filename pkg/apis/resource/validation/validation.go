@@ -224,19 +224,9 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 	return allErrs
 }
 
-// validateSliceIsASet ensures that a slice contains no duplicates and does not exceed a certain maximum size.
-func validateSliceIsASet[T comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+// validateSlicet ensures that a slice does not exceed a certain maximum size.
+func validateSlice[T comparable](slice []T, maxSize int, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allItems := sets.New[T]()
-	for i, item := range slice {
-		idxPath := fldPath.Index(i)
-		if allItems.Has(item) {
-			allErrs = append(allErrs, field.Duplicate(idxPath, item))
-		} else {
-			allErrs = append(allErrs, validateItem(item, idxPath)...)
-			allItems.Insert(item)
-		}
-	}
 	if len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
@@ -276,7 +266,7 @@ func ValidatePodSchedulingContexts(schedulingCtx *resource.PodSchedulingContext)
 }
 
 func validatePodSchedulingSpec(spec *resource.PodSchedulingContextSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSliceIsASet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("potentialNodes"))
+	allErrs := validateSlice(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, fldPath.Child("potentialNodes"))
 	return allErrs
 }
 
@@ -313,7 +303,7 @@ func validatePodSchedulingClaims(claimStatuses []resource.ResourceClaimSchedulin
 }
 
 func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSliceIsASet(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("unsuitableNodes"))
+	allErrs := validateSlice(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, fldPath.Child("unsuitableNodes"))
 	return allErrs
 }
 
@@ -335,13 +325,5 @@ func ValidateClaimTemplateUpdate(template, oldTemplate *resource.ResourceClaimTe
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&template.ObjectMeta, &oldTemplate.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(template.Spec, oldTemplate.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateClaimTemplate(template)...)
-	return allErrs
-}
-
-func validateNodeName(name string, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for _, msg := range corevalidation.ValidateNodeName(name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
-	}
 	return allErrs
 }
