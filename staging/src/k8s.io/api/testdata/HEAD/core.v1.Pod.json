@@ -1426,7 +1426,13 @@
                   ]
                 }
               ]
-            }
+            },
+            "matchLabelKeys": [
+              "matchLabelKeysValue"
+            ],
+            "mismatchLabelKeys": [
+              "mismatchLabelKeysValue"
+            ]
           }
         ],
         "preferredDuringSchedulingIgnoredDuringExecution": [
@@ -1464,7 +1470,13 @@
                     ]
                   }
                 ]
-              }
+              },
+              "matchLabelKeys": [
+                "matchLabelKeysValue"
+              ],
+              "mismatchLabelKeys": [
+                "mismatchLabelKeysValue"
+              ]
             }
           }
         ]
@@ -1503,7 +1515,13 @@
                   ]
                 }
               ]
-            }
+            },
+            "matchLabelKeys": [
+              "matchLabelKeysValue"
+            ],
+            "mismatchLabelKeys": [
+              "mismatchLabelKeysValue"
+            ]
           }
         ],
         "preferredDuringSchedulingIgnoredDuringExecution": [
@@ -1541,7 +1559,13 @@
                     ]
                   }
                 ]
-              }
+              },
+              "matchLabelKeys": [
+                "matchLabelKeysValue"
+              ],
+              "mismatchLabelKeys": [
+                "mismatchLabelKeysValue"
+              ]
             }
           }
         ]

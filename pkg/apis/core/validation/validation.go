@@ -4385,6 +4385,7 @@ func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, allowInvalidL
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
 		}
 	}
+	allErrs = append(allErrs, validateMatchLabelKeysAndMismatchLabelKeys(fldPath, podAffinityTerm.MatchLabelKeys, podAffinityTerm.MismatchLabelKeys, podAffinityTerm.LabelSelector)...)
 	if len(podAffinityTerm.TopologyKey) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can not be empty"))
 	}
@@ -4945,6 +4946,11 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 				mungedPodSpec.Affinity.NodeAffinity = oldNodeAffinity // +k8s:verify-mutation:reason=clone
 			}
 		}
+
+		// Note: Unlike NodeAffinity and NodeSelector, we cannot make PodAffinity/PodAntiAffinity mutable due to the presence of the matchLabelKeys/mismatchLabelKeys feature.
+		// Those features automatically generate the matchExpressions in labelSelector for PodAffinity/PodAntiAffinity when the Pod is created.
+		// When we make them mutable, we need to make sure things like how to handle/validate matchLabelKeys,
+		// and what if the fieldManager/A sets matchexpressions and fieldManager/B sets matchLabelKeys later. (could it lead the understandable conflict, etc)
 	}
 
 	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
@@ -7210,7 +7216,7 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 		if err := validateNodeInclusionPolicy(subFldPath.Child("nodeTaintsPolicy"), constraint.NodeTaintsPolicy); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		allErrs = append(allErrs, validateMatchLabelKeys(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+		allErrs = append(allErrs, validateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
 		if !opts.AllowInvalidTopologySpreadConstraintLabelSelector {
 			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(constraint.LabelSelector, unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, subFldPath.Child("labelSelector"))...)
 		}
@@ -7287,8 +7293,60 @@ func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusion
 	return nil
 }
 
-// validateMatchLabelKeys tests that the elements are a valid label name and are not already included in labelSelector.
-func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+// validateMatchLabelKeysAndMismatchLabelKeys checks if both matchLabelKeys and mismatchLabelKeys are valid.
+// - validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
+// - validate that the user doens't specify the same key in both matchLabelKeys and labelSelector.
+// - validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
+func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+	var allErrs field.ErrorList
+	// 1. validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
+	allErrs = append(allErrs, validateLabelKeys(fldPath.Child("matchLabelKeys"), matchLabelKeys, labelSelector)...)
+	allErrs = append(allErrs, validateLabelKeys(fldPath.Child("mismatchLabelKeys"), mismatchLabelKeys, labelSelector)...)
+
+	// 2. validate that the user doens't specify the same key in both matchLabelKeys and labelSelector.
+	// It doesn't make sense to have the labelselector with the key specified in matchLabelKeys
+	// because the matchLabelKeys will be `In` labelSelector which matches with only one value in the key
+	// and we cannot make any further filtering with that key.
+	// On the other hand, we may want to have labelSelector with the key specified in mismatchLabelKeys.
+	// because the mismatchLabelKeys will be `NotIn` labelSelector
+	// and we may want to filter Pods further with other labelSelector with that key.
+
+	// labelKeysMap is keyed by label key and valued by the index of label key in labelKeys.
+	if labelSelector != nil {
+		labelKeysMap := map[string]int{}
+		for i, key := range matchLabelKeys {
+			labelKeysMap[key] = i
+		}
+		labelSelectorKeys := sets.New[string]()
+		for key := range labelSelector.MatchLabels {
+			labelSelectorKeys.Insert(key)
+		}
+		for _, matchExpression := range labelSelector.MatchExpressions {
+			key := matchExpression.Key
+			if i, ok := labelKeysMap[key]; ok && labelSelectorKeys.Has(key) {
+				// Before validateLabelKeysWithSelector is called, the labelSelector has already got the selector created from matchLabelKeys.
+				// Here, we found the duplicate key in labelSelector and the key is specified in labelKeys.
+				// Meaning that the same key is specified in both labelSelector and matchLabelKeys/mismatchLabelKeys.
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+			}
+
+			labelSelectorKeys.Insert(key)
+		}
+	}
+
+	// 3. validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
+	mismatchLabelKeysSet := sets.New(mismatchLabelKeys...)
+	for i, k := range matchLabelKeys {
+		if mismatchLabelKeysSet.Has(k) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), k, "exists in both matchLabelKeys and mismatchLabelKeys"))
+		}
+	}
+
+	return allErrs
+}
+
+// validateMatchLabelKeysInTopologySpread tests that the elements are a valid label name and are not already included in labelSelector.
+func validateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
 	if len(matchLabelKeys) == 0 {
 		return nil
 	}
@@ -7312,6 +7370,25 @@ func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelS
 		if labelSelectorKeys.Has(key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector"))
 		}
+	}
+
+	return allErrs
+}
+
+// validateLabelKeys tests that the label keys are a valid label name.
+// It's intended to be used for matchLabelKeys or mismatchLabelKeys.
+func validateLabelKeys(fldPath *field.Path, labelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+	if len(labelKeys) == 0 {
+		return nil
+	}
+
+	if labelSelector == nil {
+		return field.ErrorList{field.Forbidden(fldPath, "must not be specified when labelSelector is not set")}
+	}
+
+	var allErrs field.ErrorList
+	for i, key := range labelKeys {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 	}
 
 	return allErrs

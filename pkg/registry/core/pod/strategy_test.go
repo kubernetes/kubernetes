@@ -1672,3 +1672,362 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 		t.Error("NodeInclusionPolicy updated with unexpected result")
 	}
 }
+
+func Test_mutatePodAffinity(t *testing.T) {
+	tests := []struct {
+		name               string
+		pod                *api.Pod
+		wantPod            *api.Pod
+		featureGateEnabled bool
+	}{
+		{
+			name:               "matchLabelKeys are merged into labelSelector with In and mismatchLabelKeys are merged with NotIn",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+									},
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"region": "Asia",
+											},
+										},
+										MatchLabelKeys:    []string{"country"},
+										MismatchLabelKeys: []string{"city"},
+									},
+								},
+							},
+						},
+						PodAntiAffinity: &api.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+									},
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"region": "Asia",
+											},
+										},
+										MatchLabelKeys:    []string{"country"},
+										MismatchLabelKeys: []string{"city"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "country",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"Japan"},
+											},
+											{
+												Key:      "city",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"Kyoto"},
+											},
+										},
+									},
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"region": "Asia",
+											},
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "country",
+													Operator: metav1.LabelSelectorOpIn,
+													Values:   []string{"Japan"},
+												},
+												{
+													Key:      "city",
+													Operator: metav1.LabelSelectorOpNotIn,
+													Values:   []string{"Kyoto"},
+												},
+											},
+										},
+										MatchLabelKeys:    []string{"country"},
+										MismatchLabelKeys: []string{"city"},
+									},
+								},
+							},
+						},
+						PodAntiAffinity: &api.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "country",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"Japan"},
+											},
+											{
+												Key:      "city",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"Kyoto"},
+											},
+										},
+									},
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"region": "Asia",
+											},
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "country",
+													Operator: metav1.LabelSelectorOpIn,
+													Values:   []string{"Japan"},
+												},
+												{
+													Key:      "city",
+													Operator: metav1.LabelSelectorOpNotIn,
+													Values:   []string{"Kyoto"},
+												},
+											},
+										},
+										MatchLabelKeys:    []string{"country"},
+										MismatchLabelKeys: []string{"city"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:               "keys, which are not found in Pod labels, are ignored",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+									},
+									MatchLabelKeys: []string{"city", "not-found"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											// "city" should be added correctly even if matchLabelKey has "not-found" key.
+											{
+												Key:      "city",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"Kyoto"},
+											},
+										},
+									},
+									MatchLabelKeys: []string{"city", "not-found"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:               "matchLabelKeys is ignored if the labelSelector is nil",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "the feature gate is disabled and matchLabelKeys is ignored",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+									},
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Kyoto",
+					},
+				},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"region": "Asia",
+										},
+									},
+									MatchLabelKeys:    []string{"country"},
+									MismatchLabelKeys: []string{"city"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tc.featureGateEnabled)()
+
+			pod := tc.pod
+			mutatePodAffinity(pod)
+			if diff := cmp.Diff(tc.wantPod.Spec.Affinity, pod.Spec.Affinity); diff != "" {
+				t.Errorf("unexpected affinity (-want, +got): %s\n", diff)
+			}
+		})
+	}
+}
