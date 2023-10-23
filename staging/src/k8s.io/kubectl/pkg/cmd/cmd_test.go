@@ -29,8 +29,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd/plugin"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -129,47 +127,45 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.CmdPluginAsSubcommand}, t, func(t *testing.T) {
-			t.Run(test.name, func(t *testing.T) {
-				pluginsHandler := &testPluginHandler{
-					pluginsDirectory: "plugin/testdata",
-					validPrefixes:    plugin.ValidPluginFilenamePrefixes,
+		t.Run(test.name, func(t *testing.T) {
+			pluginsHandler := &testPluginHandler{
+				pluginsDirectory: "plugin/testdata",
+				validPrefixes:    plugin.ValidPluginFilenamePrefixes,
+			}
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+			root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
+			// original plugin handler (DefaultPluginHandler) is implemented by exec call so no additional actions are expected on the cobra command if we activate the plugin flow
+			if !pluginsHandler.lookedup && !pluginsHandler.executed {
+				// args must be set, otherwise Execute will use os.Args (args used for starting the test) and test.args would not be passed
+				// to the command which might invoke only "kubectl" without any additional args and give false positives
+				root.SetArgs(test.args[1:])
+				// Important note! Incorrect command or command failing validation might just call os.Exit(1) which would interrupt execution of the test
+				if err := root.Execute(); err != nil {
+					t.Fatalf("unexpected error: %v", err)
 				}
-				ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
-				root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
-				// original plugin handler (DefaultPluginHandler) is implemented by exec call so no additional actions are expected on the cobra command if we activate the plugin flow
-				if !pluginsHandler.lookedup && !pluginsHandler.executed {
-					// args must be set, otherwise Execute will use os.Args (args used for starting the test) and test.args would not be passed
-					// to the command which might invoke only "kubectl" without any additional args and give false positives
-					root.SetArgs(test.args[1:])
-					// Important note! Incorrect command or command failing validation might just call os.Exit(1) which would interrupt execution of the test
-					if err := root.Execute(); err != nil {
-						t.Fatalf("unexpected error: %v", err)
-					}
-				}
+			}
 
-				if (pluginsHandler.lookupErr != nil && pluginsHandler.lookupErr.Error() != test.expectLookupError) ||
-					(pluginsHandler.lookupErr == nil && len(test.expectLookupError) > 0) {
-					t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectLookupError, pluginsHandler.lookupErr)
-				}
+			if (pluginsHandler.lookupErr != nil && pluginsHandler.lookupErr.Error() != test.expectLookupError) ||
+				(pluginsHandler.lookupErr == nil && len(test.expectLookupError) > 0) {
+				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectLookupError, pluginsHandler.lookupErr)
+			}
 
-				if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectLookupError) == 0 {
-					// we have to fail here, because we have found the plugin, but not executed the plugin, nor the command (this would normally result in an error: unknown command)
-					t.Fatalf("expected plugin execution, but did not occur")
-				}
+			if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectLookupError) == 0 {
+				// we have to fail here, because we have found the plugin, but not executed the plugin, nor the command (this would normally result in an error: unknown command)
+				t.Fatalf("expected plugin execution, but did not occur")
+			}
 
-				if pluginsHandler.executedPlugin != test.expectPlugin {
-					t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
-				}
+			if pluginsHandler.executedPlugin != test.expectPlugin {
+				t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+			}
 
-				if pluginsHandler.executed && len(test.expectPlugin) == 0 {
-					t.Fatalf("unexpected plugin execution: expected no plugin, got %q", pluginsHandler.executedPlugin)
-				}
+			if pluginsHandler.executed && len(test.expectPlugin) == 0 {
+				t.Fatalf("unexpected plugin execution: expected no plugin, got %q", pluginsHandler.executedPlugin)
+			}
 
-				if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
-					t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
-				}
-			})
+			if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
+				t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+			}
 		})
 	}
 }
