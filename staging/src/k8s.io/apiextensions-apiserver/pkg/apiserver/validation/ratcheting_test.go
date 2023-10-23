@@ -58,8 +58,8 @@ var largeIntSchema *spec.Schema = &spec.Schema{
 
 func TestScalarRatcheting(t *testing.T) {
 	validator := validation.NewRatchetingSchemaValidator(mediumIntSchema, nil, "", strfmt.Default)
-	require.True(t, validator.ValidateUpdate(1, 1).IsValid())
-	require.False(t, validator.ValidateUpdate(1, 2).IsValid())
+	require.True(t, validator.ValidateUpdate(1, 1, validation.WithRatcheting(nil)).IsValid())
+	require.False(t, validator.ValidateUpdate(1, 2, validation.WithRatcheting(nil)).IsValid())
 }
 
 var objectSchema *spec.Schema = &spec.Schema{
@@ -90,18 +90,18 @@ func TestObjectScalarFieldsRatcheting(t *testing.T) {
 		"small": 500,
 	}, map[string]interface{}{
 		"small": 500,
-	}).IsValid())
+	}, validation.WithRatcheting(nil)).IsValid())
 	assert.True(t, validator.ValidateUpdate(map[string]interface{}{
 		"small": 501,
 	}, map[string]interface{}{
 		"small":  501,
 		"medium": 500,
-	}).IsValid())
+	}, validation.WithRatcheting(nil)).IsValid())
 	assert.False(t, validator.ValidateUpdate(map[string]interface{}{
 		"small": 500,
 	}, map[string]interface{}{
 		"small": 501,
-	}).IsValid())
+	}, validation.WithRatcheting(nil)).IsValid())
 }
 
 // Shows schemas with object fields which themselves are ratcheted can be ratcheted
@@ -113,7 +113,7 @@ func TestObjectObjectFieldsRatcheting(t *testing.T) {
 		}}, map[string]interface{}{
 		"nested": map[string]interface{}{
 			"small": 500,
-		}}).IsValid())
+		}}, validation.WithRatcheting(nil)).IsValid())
 	assert.True(t, validator.ValidateUpdate(map[string]interface{}{
 		"nested": map[string]interface{}{
 			"small": 501,
@@ -121,14 +121,14 @@ func TestObjectObjectFieldsRatcheting(t *testing.T) {
 		"nested": map[string]interface{}{
 			"small":  501,
 			"medium": 500,
-		}}).IsValid())
+		}}, validation.WithRatcheting(nil)).IsValid())
 	assert.False(t, validator.ValidateUpdate(map[string]interface{}{
 		"nested": map[string]interface{}{
 			"small": 500,
 		}}, map[string]interface{}{
 		"nested": map[string]interface{}{
 			"small": 501,
-		}}).IsValid())
+		}}, validation.WithRatcheting(nil)).IsValid())
 }
 
 func ptr[T any](v T) *T {
