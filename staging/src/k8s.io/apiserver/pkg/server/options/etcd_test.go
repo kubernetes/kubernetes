@@ -160,6 +160,40 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
 		},
+		{
+			name: "empty storage-media-type",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+				},
+				DefaultStorageMediaType: "",
+			},
+		},
+		{
+			name: "recognized storage-media-type",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+				},
+				DefaultStorageMediaType: "application/json",
+			},
+		},
+		{
+			name: "unrecognized storage-media-type",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+					},
+				},
+				DefaultStorageMediaType: "foo/bar",
+			},
+			expectErr: `--storage-media-type "foo/bar" invalid, allowed values: application/json, application/vnd.kubernetes.protobuf, application/yaml`,
+		},
 	}
 
 	for _, testcase := range testCases {

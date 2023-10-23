@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -361,4 +362,22 @@ type testBackend struct {
 func (b *testBackend) ProcessEvents(events ...*auditinternal.Event) bool {
 	b.events = append(b.events, events...)
 	return true
+}
+
+func TestNewErrorForbiddenSerializer(t *testing.T) {
+	config := CompletedConfig{
+		&completedConfig{
+			Config: &Config{
+				Serializer: runtime.NewSimpleNegotiatedSerializer(runtime.SerializerInfo{
+					MediaType: "application/cbor",
+				}),
+			},
+		},
+	}
+	_, err := config.New("test", NewEmptyDelegate())
+	if err == nil {
+		t.Error("successfully created a new server configured with cbor support")
+	} else if err.Error() != `refusing to create new apiserver "test" with support for media type "application/cbor" (allowed media types are: application/json, application/yaml, application/vnd.kubernetes.protobuf)` {
+		t.Errorf("unexpected error: %v", err)
+	}
 }
