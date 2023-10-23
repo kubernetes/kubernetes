@@ -19,7 +19,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -73,7 +75,16 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 	return &responses, nil
 }
 
+// stubAllocFunc creates and returns allocation response for the input allocate request
+func stubRegisterControlFunc() bool {
+	return false
+}
+
 func main() {
+	// respond to syscalls for termination
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
 	devs := []*pluginapi.Device{
 		{ID: "Dev-1", Health: pluginapi.Healthy},
 		{ID: "Dev-2", Health: pluginapi.Healthy},
@@ -82,8 +93,7 @@ func main() {
 	pluginSocksDir := os.Getenv("PLUGIN_SOCK_DIR")
 	klog.Infof("pluginSocksDir: %s", pluginSocksDir)
 	if pluginSocksDir == "" {
-		klog.Errorf("Empty pluginSocksDir")
-		return
+		pluginSocksDir = pluginapi.DevicePluginPath
 	}
 
 	socketPath := pluginSocksDir + "/dp." + fmt.Sprintf("%d", time.Now().Unix())
@@ -94,70 +104,99 @@ func main() {
 
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
+	var registerControlFile string
+	autoregister := true
 
-	if registerControlFile := os.Getenv("REGISTER_CONTROL_FILE"); registerControlFile != "" {
-		if err := handleRegistrationProcess(registerControlFile); err != nil {
+	if registerControlFile = os.Getenv("REGISTER_CONTROL_FILE"); registerControlFile != "" {
+		autoregister = false
+		dp1.SetRegisterControlFunc(stubRegisterControlFunc)
+	}
+
+	if !autoregister {
+		go dp1.Watch(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+
+		triggerPath := filepath.Dir(registerControlFile)
+
+		klog.InfoS("Registration process will be managed explicitly", "triggerPath", triggerPath, "triggerEntry", registerControlFile)
+
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			klog.Errorf("Watcher creation failed: %v ", err)
 			panic(err)
 		}
-	}
+		defer watcher.Close()
 
-	if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
-		panic(err)
-	}
-	select {}
-}
+		updateCh := make(chan bool)
+		defer close(updateCh)
 
-func handleRegistrationProcess(registerControlFile string) error {
-	triggerPath := filepath.Dir(registerControlFile)
+		go handleRegistrationProcess(registerControlFile, dp1, watcher, updateCh)
 
-	klog.InfoS("Registration process will be managed explicitly", "triggerPath", triggerPath, "triggerEntry", registerControlFile)
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		klog.Errorf("Watcher creation failed: %v ", err)
-		return err
-	}
-
-	defer watcher.Close()
-	updateCh := make(chan bool)
-	defer close(updateCh)
-
-	go func() {
-		klog.Infof("Starting watching routine")
+		err = watcher.Add(triggerPath)
+		if err != nil {
+			klog.Errorf("Failed to add watch to %q: %w", triggerPath, err)
+			panic(err)
+		}
 		for {
 			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				klog.InfoS("Received event", "name", event.Name, "operation", event.Op)
-				switch {
-				case event.Op&fsnotify.Remove == fsnotify.Remove:
-					if event.Name == registerControlFile {
-						klog.InfoS("Expected delete", "name", event.Name, "operation", event.Op)
-						updateCh <- true
-						return
+			case received := <-updateCh:
+				if received {
+					if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+						panic(err)
 					}
-					klog.InfoS("Spurious delete", "name", event.Name, "operation", event.Op)
+					klog.InfoS("Control file was deleted, registration succeeded")
 				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
+			// Catch termination signals
+			case sig := <-sigCh:
+				klog.InfoS("Shutting down, received signal", "signal", sig)
+				if err := dp1.Stop(); err != nil {
+					panic(err)
 				}
-				klog.Errorf("error: %v", err)
-				panic(err)
+				return
 			}
+			time.Sleep(5 * time.Second)
 		}
-	}()
+	} else {
+		if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+			panic(err)
+		}
 
-	err = watcher.Add(triggerPath)
-	if err != nil {
-		klog.ErrorS(err, "Failed to add watch", "triggerPath", triggerPath)
-		return err
+		go dp1.Watch(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+		// Catch termination signals
+		sig := <-sigCh
+		klog.InfoS("Shutting down, received signal", "signal", sig)
+		if err := dp1.Stop(); err != nil {
+			panic(err)
+		}
+		return
 	}
+}
 
-	klog.InfoS("Waiting for control file to be deleted", "path", registerControlFile)
-	<-updateCh
-	klog.InfoS("Control file was deleted, connecting!")
-	return nil
+func handleRegistrationProcess(registerControlFile string, dpStub *plugin.Stub, watcher *fsnotify.Watcher, updateCh chan<- bool) {
+	klog.InfoS("Starting watching routine")
+	for {
+		klog.InfoS("handleRegistrationProcess for loop")
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			klog.InfoS("Received event", "name", event.Name, "operation", event.Op)
+			if event.Op&fsnotify.Remove == fsnotify.Remove {
+				if event.Name == registerControlFile {
+					klog.InfoS("Expected delete", "name", event.Name, "operation", event.Op)
+					updateCh <- true
+					continue
+				}
+				klog.InfoS("Spurious delete", "name", event.Name, "operation", event.Op)
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			klog.ErrorS(err, "error")
+			panic(err)
+		default:
+			time.Sleep(5 * time.Second)
+		}
+	}
 }
