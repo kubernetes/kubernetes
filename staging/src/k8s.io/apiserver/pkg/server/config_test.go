@@ -351,8 +351,8 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		}
 
 		// confirm that we have an audit event
-		ae := audit.AuditEventFrom(r.Context())
-		if ae == nil {
+		ac := audit.AuditContextFrom(r.Context())
+		if ac == nil {
 			t.Error("unexpected nil audit event")
 		}
 
@@ -376,11 +376,15 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 	}
 	// these should all be the same because the handler chain mutates the event in place
 	want := map[string]string{"pandas": "are awesome", "dogs": "are okay"}
+	foundResponseComplete := false
 	for _, event := range backend.events {
+		if event.Stage == auditinternal.StageRequestReceived {
+			continue
+		}
 		if event.Stage != auditinternal.StageResponseComplete {
 			t.Errorf("expected event stage to be complete, got: %s", event.Stage)
 		}
-
+		foundResponseComplete = true
 		for wantK, wantV := range want {
 			gotV, ok := event.Annotations[wantK]
 			if !ok {
@@ -391,6 +395,9 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 				t.Errorf("expected the annotation value to match, key: %q, want: %q got: %q", wantK, wantV, gotV)
 			}
 		}
+	}
+	if !foundResponseComplete {
+		t.Errorf("expected to find %s in events", auditinternal.StageResponseComplete)
 	}
 }
 
