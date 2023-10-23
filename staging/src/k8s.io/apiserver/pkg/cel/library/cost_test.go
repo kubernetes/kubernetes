@@ -409,6 +409,124 @@ func TestAuthzLibrary(t *testing.T) {
 	}
 }
 
+func TestQuantityCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "path",
+			expr:                `quantity("12Mi")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name:                "isQuantity",
+			expr:                `isQuantity("20")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name:                "isQuantity_megabytes",
+			expr:                `isQuantity("20M")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name:                "equality_reflexivity",
+			expr:                `quantity("200M") == quantity("200M")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 1844674407370955266},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "equality_symmetry",
+			expr:                `quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3689348814741910532},
+			expectRuntimeCost:   6,
+		},
+		{
+			name:                "equality_transitivity",
+			expr:                `quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 5534023222112865798},
+			expectRuntimeCost:   9,
+		},
+		{
+			name:                "quantity_less",
+			expr:                `quantity("50M").isLessThan(quantity("50Mi"))`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "quantity_greater",
+			expr:                `quantity("50Mi").isGreaterThan(quantity("50M"))`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "compare_equal",
+			expr:                `quantity("200M").compareTo(quantity("0.2G")) > 0`,
+			expectEstimatedCost: checker.CostEstimate{Min: 4, Max: 4},
+			expectRuntimeCost:   4,
+		},
+		{
+			name:                "add_quantity",
+			expr:                `quantity("50k").add(quantity("20")) == quantity("50.02k")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 5, Max: 1844674407370955268},
+			expectRuntimeCost:   5,
+		},
+		{
+			name:                "sub_quantity",
+			expr:                `quantity("50k").sub(quantity("20")) == quantity("49.98k")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 5, Max: 1844674407370955268},
+			expectRuntimeCost:   5,
+		},
+		{
+			name:                "sub_int",
+			expr:                `quantity("50k").sub(20) == quantity("49980")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 4, Max: 1844674407370955267},
+			expectRuntimeCost:   4,
+		},
+		{
+			name:                "arith_chain_1",
+			expr:                `quantity("50k").add(20).sub(quantity("100k")).asInteger() > 0`,
+			expectEstimatedCost: checker.CostEstimate{Min: 6, Max: 6},
+			expectRuntimeCost:   6,
+		},
+		{
+			name:                "arith_chain",
+			expr:                `quantity("50k").add(20).sub(quantity("100k")).sub(-50000).asInteger() > 0`,
+			expectEstimatedCost: checker.CostEstimate{Min: 7, Max: 7},
+			expectRuntimeCost:   7,
+		},
+		{
+			name:                "as_integer",
+			expr:                `quantity("50k").asInteger() > 0`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "is_integer",
+			expr:                `quantity("50").isInteger()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		{
+			name:                "as_float",
+			expr:                `quantity("50.703k").asApproximateFloat() > 0.0`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
@@ -417,6 +535,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		Regex(),
 		Lists(),
 		Authz(),
+		Quantity(),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)
