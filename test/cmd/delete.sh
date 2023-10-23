@@ -58,9 +58,6 @@ run_kubectl_delete_interactive_tests() {
   set -o nounset
   set -o errexit
 
-  # enable interactivity flag feature environment variable
-  export KUBECTL_INTERACTIVE_DELETE=true
-
   ns_one="namespace-$(date +%s)-${RANDOM}"
   ns_two="namespace-$(date +%s)-${RANDOM}"
   kubectl create namespace "${ns_one}"
@@ -118,8 +115,6 @@ run_kubectl_delete_interactive_tests() {
   # no configmaps should be in either of those namespaces with label deletetest3
   kubectl config set-context "${CONTEXT}" --namespace="${ns_one}"
   kube::test::get_object_assert 'configmap -l deletetest3' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
-
-  unset KUBECTL_INTERACTIVE_DELETE
 
   set +o nounset
   set +o errexit
