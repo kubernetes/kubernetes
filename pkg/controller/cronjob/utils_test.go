@@ -619,6 +619,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 func TestNextScheduleTimeDuration(t *testing.T) {
 	metav1TopOfTheHour := metav1.NewTime(*topOfTheHour())
 	metav1HalfPastTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(30 * time.Minute))
+	metav1TwoHoursLater := metav1.NewTime(*deltaTimeAfterTopOfTheHour(2 * time.Hour))
 
 	tests := []struct {
 		name             string
@@ -658,6 +659,35 @@ func TestNextScheduleTimeDuration(t *testing.T) {
 			now:              *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
 			expectedDuration: 66*time.Hour + nextScheduleDelta,
 		},
+		{
+			name: "once a week cronjob, missed two runs",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "0 12 * * 4",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1TwoHoursLater,
+				},
+			},
+			now:              *deltaTimeAfterTopOfTheHour(19*24*time.Hour + 1*time.Hour + 30*time.Minute),
+			expectedDuration: 48*time.Hour + 30*time.Minute + nextScheduleDelta,
+		},
+		{
+			name: "no previous run of a cronjob",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "0 12 * * 5",
+				},
+			},
+			now:              *deltaTimeAfterTopOfTheHour(6 * time.Hour),
+			expectedDuration: 20*time.Hour + nextScheduleDelta,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -666,6 +696,9 @@ func TestNextScheduleTimeDuration(t *testing.T) {
 				t.Errorf("error setting up the test, %s", err)
 			}
 			gotScheduleTimeDuration := nextScheduleTimeDuration(tt.cj, tt.now, sched)
+			if *gotScheduleTimeDuration < 0 {
+				t.Errorf("scheduleTimeDuration should never be less than 0, got %s", gotScheduleTimeDuration)
+			}
 			if !reflect.DeepEqual(gotScheduleTimeDuration, &tt.expectedDuration) {
 				t.Errorf("scheduleTimeDuration - got %s, want %s", gotScheduleTimeDuration, tt.expectedDuration)
 			}
