@@ -805,7 +805,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				kind,
 				validator,
 				statusValidator,
-				structuralSchemas,
+				structuralSchemas[v.Name],
 				statusSpec,
 				scaleSpec,
 			),
