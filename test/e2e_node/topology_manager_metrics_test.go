@@ -41,7 +41,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration
 		var testPod *v1.Pod
-		var cpusNumPerNUMA, numaNodes, threadsPerCore int
+		var cpusNumPerNUMA, coresNumPerNUMA, numaNodes, threadsPerCore int
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
@@ -50,15 +50,17 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 				framework.ExpectNoError(err)
 			}
 
-			numaNodes, cpusNumPerNUMA, threadsPerCore = hostCheck()
+			numaNodes, coresNumPerNUMA, threadsPerCore = hostCheck()
+			cpusNumPerNUMA = coresNumPerNUMA * threadsPerCore
 
 			// It is safe to assume that the CPUs are distributed equally across
 			// NUMA nodes and therefore number of CPUs on all NUMA nodes are same
 			// so we just check the CPUs on the first NUMA node
 
 			framework.Logf("numaNodes on the system %d", numaNodes)
-			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
+			framework.Logf("Cores per NUMA on the system %d", coresNumPerNUMA)
 			framework.Logf("Threads per Core on the system %d", threadsPerCore)
+			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
 
 			policy := topologymanager.PolicySingleNumaNode
 			scope := podScopeTopology
