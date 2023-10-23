@@ -945,6 +945,7 @@ var (
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
 		nodeHasProviderIDPredicate,
+		nodeReadyPredicate,
 	}
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeNotDeletedPredicate,
