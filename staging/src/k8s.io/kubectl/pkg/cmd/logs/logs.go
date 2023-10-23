@@ -23,28 +23,39 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	errorsapi "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 const (
-	logsUsageStr = "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]"
+	logsUsageStr = "logs [-f | -F] [-p] (POD | TYPE/NAME) [-c CONTAINER]"
 )
 
 var (
@@ -68,11 +79,14 @@ var (
 		# Begin streaming the logs of the ruby container in pod web-1
 		kubectl logs -f -c ruby web-1
 
-		# Wait for atleast one container to be ready before streaming the logs
-		kubectl logs -f web-1 -w
-
 		# Begin streaming the logs from all containers in pods defined by label app=nginx
 		kubectl logs -f -l app=nginx --all-containers=true
+
+		# Wait for atleast one container to be ready before streaming the logs
+		kubectl logs -F web-1
+
+		# Print previous terminated ruby container logs from pod web-1 and begin streaming the logs from the same
+		kubectl logs -p -F -c ruby web-1
 
 		# Display only the most recent 20 lines of output in pod nginx
 		kubectl logs --tail=20 nginx
@@ -117,7 +131,7 @@ type LogsOptions struct {
 	Tail                         int64
 	Container                    string
 	InsecureSkipTLSVerifyBackend bool
-	Wait                         bool
+	FollowWithWait               bool
 
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
@@ -172,6 +186,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers' logs in the pod(s).")
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
+	cmd.Flags().BoolVarP(&o.FollowWithWait, "follow-with-wait", "F", o.FollowWithWait, "Wait for the container to be in running state when the logs are streaming")
 	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64Var(&o.LimitBytes, "limit-bytes", o.LimitBytes, "Maximum bytes of logs to return. Defaults to no limit.")
 	cmd.Flags().BoolVarP(&o.Previous, "previous", "p", o.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists.")
@@ -186,7 +201,6 @@ func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
 	cmd.Flags().BoolVar(&o.Prefix, "prefix", o.Prefix, "Prefix each log line with the log source (pod name and container name)")
-	cmd.Flags().BoolVarP(&o.Wait, "wait", "w", o.Wait, "Wait for the container to be running when the logs are streaming")
 }
 
 func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
@@ -260,6 +274,10 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
+	if o.FollowWithWait {
+		o.Follow = true
+	}
+
 	o.Options, err = o.ToLogOptions()
 	if err != nil {
 		return err
@@ -324,16 +342,12 @@ func (o LogsOptions) Validate() error {
 		return fmt.Errorf("--tail must be greater than or equal to -1")
 	}
 
-	if o.Wait && !o.Follow {
-		return fmt.Errorf("--wait should be used only with --follow")
-	}
-
 	return nil
 }
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() error {
-	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.Wait)
+	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.FollowWithWait)
 	if err != nil {
 		return err
 	}
@@ -352,25 +366,53 @@ func (o LogsOptions) RunLogs() error {
 	return o.sequentialConsumeRequest(requests)
 }
 
-func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference][]rest.ResponseWrapper) error {
 	reader, writer := io.Pipe()
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
 	for objRef, request := range requests {
-		go func(objRef corev1.ObjectReference, request rest.ResponseWrapper) {
+		go func(objRef corev1.ObjectReference, request []rest.ResponseWrapper) {
 			defer wg.Done()
 			out := o.addPrefixIfNeeded(objRef, writer)
-			if err := o.ConsumeRequestFn(request, out); err != nil {
-				if !o.IgnoreLogErrors {
-					writer.CloseWithError(err)
-
-					// It's important to return here to propagate the error via the pipe
-					return
+			for _, req := range request {
+				var isRequestWithPrevious bool
+				switch t := req.(type) {
+				case *rest.Request:
+					isRequestWithPrevious = strings.Contains(t.URL().String(), "previous=true")
+				default:
+					isRequestWithPrevious = false
 				}
+				if o.FollowWithWait && !isRequestWithPrevious {
+					for {
+						err := o.waitForContainer(objRef)
+						if err != nil {
+							writer.CloseWithError(err)
+							return
+						}
+						if err := o.ConsumeRequestFn(req, out); err != nil {
+							if !o.IgnoreLogErrors {
+								writer.CloseWithError(err)
 
-				fmt.Fprintf(writer, "error: %v\n", err)
+								// It's important to return here to propagate the error via the pipe
+								return
+							}
+
+							fmt.Fprintf(writer, "error: %v\n", err)
+						}
+					}
+				} else {
+					if err := o.ConsumeRequestFn(req, out); err != nil {
+						if !o.IgnoreLogErrors {
+							writer.CloseWithError(err)
+
+							// It's important to return here to propagate the error via the pipe
+							return
+						}
+
+						fmt.Fprintf(writer, "error: %v\n", err)
+					}
+				}
 			}
-
 		}(objRef, request)
 	}
 
@@ -383,15 +425,40 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 	return err
 }
 
-func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReference][]rest.ResponseWrapper) error {
 	for objRef, request := range requests {
 		out := o.addPrefixIfNeeded(objRef, o.Out)
-		if err := o.ConsumeRequestFn(request, out); err != nil {
-			if !o.IgnoreLogErrors {
-				return err
+		for _, req := range request {
+			var isRequestWithPrevious bool
+			switch t := req.(type) {
+			case *rest.Request:
+				isRequestWithPrevious = strings.Contains(t.URL().String(), "previous=true")
+			default:
+				isRequestWithPrevious = false
 			}
+			if o.FollowWithWait && !isRequestWithPrevious {
+				for {
+					err := o.waitForContainer(objRef)
+					if err != nil {
+						return err
+					}
+					if err := o.ConsumeRequestFn(req, out); err != nil {
+						if !o.IgnoreLogErrors {
+							return err
+						}
 
-			fmt.Fprintf(o.Out, "error: %v\n", err)
+						fmt.Fprintf(o.Out, "error: %v\n", err)
+					}
+				}
+			} else {
+				if err := o.ConsumeRequestFn(req, out); err != nil {
+					if !o.IgnoreLogErrors {
+						return err
+					}
+
+					fmt.Fprintf(o.Out, "error: %v\n", err)
+				}
+			}
 		}
 	}
 
@@ -470,4 +537,79 @@ func (pw *prefixingWriter) Write(p []byte) (int, error) {
 		return len(p), err
 	}
 	return n, err
+}
+
+// waitForContainer watches the given pod until the container is running
+// func (o LogsOptions) waitForContainer( clientset corev1client.CoreV1Interface, ns string, podName string, containerName string) error {
+func (o LogsOptions) waitForContainer(ref corev1.ObjectReference) error {
+	clientConfig, err := o.RESTClientGetter.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	clientset, err := corev1client.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	var containerName string
+	containerNameMatches := o.containerNameFromRefSpecRegexp.FindStringSubmatch(ref.FieldPath)
+	if len(containerNameMatches) == 2 {
+		containerName = containerNameMatches[1]
+	}
+
+	// TODO: expose the timeout
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), 0*time.Second)
+	defer cancel()
+
+	// return err if Pod is not found
+	_, err = clientset.Pods(ref.Namespace).Get(ctx, ref.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", ref.Name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return clientset.Pods(ref.Namespace).List(ctx, options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return clientset.Pods(ref.Namespace).Watch(ctx, options)
+		},
+	}
+
+	intr := interrupt.New(nil, cancel)
+	err = intr.Run(func() error {
+		_, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, nil, func(ev watch.Event) (bool, error) {
+			klog.V(2).Infof("watch received event %q with object %T", ev.Type, ev.Object)
+			if ev.Type == watch.Deleted {
+				return false, errorsapi.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+			}
+
+			p, ok := ev.Object.(*corev1.Pod)
+			if !ok {
+				return false, fmt.Errorf("watch did not return a pod: %v", ev.Object)
+			}
+
+			s := podcmd.GetContainerStatusByName(p, containerName)
+			if s == nil {
+				return false, nil
+			}
+			klog.V(2).Infof("debug container status is %v", s)
+			if s.State.Running != nil {
+				return true, nil
+			}
+			if s.State.Waiting != nil && s.State.Waiting.Message != "" {
+				klog.V(2).Infof("container %s: %s", containerName, s.State.Waiting.Message)
+			}
+			if s.State.Terminated != nil && s.State.Terminated.Message != "" {
+				klog.V(2).Infof("container %s: %s", containerName, s.State.Terminated.Message)
+			}
+			return false, nil
+		})
+		return err
+	})
+	return err
 }

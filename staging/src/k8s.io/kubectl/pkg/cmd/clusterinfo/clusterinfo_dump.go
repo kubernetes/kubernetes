@@ -277,13 +277,18 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			}
 
 			for _, request := range requests {
-				data, err := request.DoRaw(context.TODO())
-				if err != nil {
-					// Print error and return.
-					writer.Write([]byte(fmt.Sprintf("Request log error: %s\n", err.Error())))
-					return
+				for _, req := range request {
+					data, err := req.DoRaw(context.TODO())
+					if err != nil {
+						// Print error and return.
+						if _, err := writer.Write([]byte(fmt.Sprintf("Request log error: %s\n", err.Error()))); err != nil {
+							return
+						}
+					}
+					if _, err := writer.Write(data); err != nil {
+						return
+					}
 				}
-				writer.Write(data)
 			}
 		}
 
