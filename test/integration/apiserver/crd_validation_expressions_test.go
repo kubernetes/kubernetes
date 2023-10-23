@@ -301,6 +301,13 @@ func TestCustomResourceValidators(t *testing.T) {
 			t.Error("Unexpected error creating custom resource but metadata validation rule")
 		}
 	})
+	t.Run("CRD creation MUST pass for an CRD with empty field", func(t *testing.T) {
+		structuralWithValidators := crdWithSchema(t, "WithEmptyObject", structuralSchemaWithEmptyObject)
+		_, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		if err != nil {
+			t.Errorf("unexpected error creating CRD with empty field: %v", err)
+		}
+	})
 	t.Run("CR creation MUST fail if a x-kubernetes-validations rule exceeds the runtime cost limit", func(t *testing.T) {
 		structuralWithValidators := crdWithSchema(t, "RuntimeCostLimit", structuralSchemaWithCostLimit)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
@@ -1101,3 +1108,26 @@ var structuralSchemaWithCostLimit = []byte(`
     }
   }
 }`)
+
+var structuralSchemaWithEmptyObject = []byte(`
+{
+  "openAPIV3Schema": {
+    "description": "weird CRD with empty spec, unstructured status. designed to fit test fixtures.",
+    "type": "object",
+    "x-kubernetes-validations": [
+      {
+        "rule": "[has(self.spec), has(self.status)].exists_one(x, x)"
+      }
+    ],
+    "properties": {
+      "spec": {
+        "type": "object"
+      },
+      "status": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  }
+}
+`)
