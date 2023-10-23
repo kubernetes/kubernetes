@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	certificatestore "k8s.io/kubernetes/pkg/registry/certificates/certificates/storage"
 	clustertrustbundlestore "k8s.io/kubernetes/pkg/registry/certificates/clustertrustbundle/storage"
+	podcertificaterequeststore "k8s.io/kubernetes/pkg/registry/certificates/podcertificaterequest/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -82,6 +83,19 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 			storage[resource] = bundleStorage
 		} else {
 			klog.Warning("ClusterTrustBundle storage is disabled because the ClusterTrustBundle feature gate is disabled")
+		}
+	}
+
+	if resource := "podcertificaterequests"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+			pcrStorage, pcrStatusStorage, err := podcertificaterequeststore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = pcrStorage
+			storage[resource+"/status"] = pcrStatusStorage
+		} else {
+			klog.Warning("PodCertificateRequest storage is disabled because the PodCertificateRequest feature gate is disabled")
 		}
 	}
 

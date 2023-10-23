@@ -18,6 +18,7 @@ package certificates
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -127,6 +128,12 @@ const (
 	// kube-apiserver for a kubelet.
 	// May be auto-approved by kube-controller-manager.
 	KubeAPIServerClientKubeletSignerName = "kubernetes.io/kube-apiserver-client-kubelet"
+
+	// "kubernetes.io/kube-apiserver-client-pod" issues client certificates that pods can use to authenticate to kube-apiserver.
+	// Pods can only obtain these certificates by using PodCertificate projected volumes.
+	// Can be auto-approved by the "csrapproving" controller in kube-controller-manager.
+	// Can be issued by the "csrsigning" controller in kube-controller-manager.
+	KubeAPIServerClientPodSignerName = "kubernetes.io/kube-apiserver-client-pod"
 
 	// Signs serving certificates that are honored as a valid kubelet serving
 	// certificate by the kube-apiserver, but has no other guarantees.
@@ -280,3 +287,158 @@ type ClusterTrustBundleList struct {
 
 // MaxTrustBundleSize is the maximimum size of a single trust bundle field.
 const MaxTrustBundleSize = 1 * 1024 * 1024
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodCertificateRequest encodes a pod requesting a certificate from a given
+// signer.
+//
+// Kubelets use this API to implement podCertificate projected volumes
+type PodCertificateRequest struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec contains the details about the certificate being requested.
+	Spec PodCertificateRequestSpec
+
+	// Status contains the issued certificate, and a standard set of conditions.
+	// +optional
+	Status PodCertificateRequestStatus
+}
+
+// PodCertificateRequestSpec describes the certificate request.  All fields are
+// immutable after creation.
+type PodCertificateRequestSpec struct {
+	// SignerName indicates the request signer.
+	SignerName string
+
+	// PodName is the name of the pod into which the certificate will be mounted.
+	PodName string
+	// PodUID is the UID of the pod into which the certificate will be mounted.
+	PodUID types.UID
+
+	// ServiceAccountname is the name of the service account the pod is running as.
+	ServiceAccountName string
+
+	// ServiceAccountUID is the UID of the service account the pod is running as.
+	ServiceAccountUID types.UID
+
+	// NodeName is the name of the node the pod is assigned to.
+	NodeName types.NodeName
+
+	// NodeUID is the UID of the node the pod is assigned to.
+	NodeUID types.UID
+
+	// PKIXPublicKey is the PKIX-serialized public key the signer should issue
+	// the certificate to.
+	//
+	// The key must be one of RSA-3072, RSA-4096, ECDSA-P256 or ECDSA-P384.
+	PKIXPublicKey []byte
+
+	// ProofOfPossession proves that the requesting Kubelet holds the private
+	// key corresponding to pkixPublicKey.
+	//
+	// If the key is an RSA key, then the signature is over the ASCII bytes of
+	// the pod UID, using  RSASSA-PKCS1-V1_5-SIGN from RSA PKCS #1 v1.5 (as
+	// implemented by the golang function crypto/rsa.SignPKCS1v15).
+	//
+	// If the key is an ECDSA key, then the signature is as described by [SEC 1,
+	// Version 2.0](https://www.secg.org/sec1-v2.pdf) (as implemented by the
+	// golang library function crypto/ecdsa.SignASN1)
+	ProofOfPossession []byte
+}
+
+type PodCertificateRequestStatus struct {
+	// Conditions applied to the request. Known conditions are "Denied",
+	// "Failed", and "SuggestedKeyType".
+	//
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition
+
+	// CertificateChain is populated with an issued certificate by the signer.
+	// This field is set via the /status subresource. Once populated, this field
+	// is immutable.
+	//
+	// If the certificate signing request is denied, a condition of type
+	// "Denied" is added and this field remains empty. If the signer cannot
+	// issue the certificate, a condition of type "Failed" is added and this
+	// field remains empty.
+	//
+	// Validation requirements:
+	//  1. certificateChain must contain one or more entries.
+	//  2. Each entry must contain a single DER-encoded ASN.1 Certificate structure as described in section 4 of RFC5280.
+	//
+	// If more than one entry is present, and the definition of the requested
+	// spec.signerName does not indicate otherwise, the first entry is the
+	// issued certificate, and subsequent entries should be treated as
+	// intermediate certificates and presented in TLS handshakes.  When
+	// projecting the chain into a pod volume, kubelet will preserve the order
+	// of certificateChain.
+	//
+	// As a reminder, when serialized as JSON or YAML, each entry is
+	// additionally base64-encoded.
+	//
+	// +listType=atomic
+	// +optional
+	CertificateChain [][]byte
+
+	// IssuedAt is the time at which the signer issued the certificate.  This
+	// field is set via the /status subresource.  Once populated, it is
+	// immutable.
+	//
+	// +optional
+	IssuedAt metav1.Time
+
+	// NotBefore is the time at which the certificate becomes valid.  This field
+	// is set via the /status subresource.  Once populated, it is immutable.
+	//
+	// +optional
+	NotBefore metav1.Time
+
+	// BeginRefreshAt is the time at which the kubelet should begin trying to
+	// refresh the certificate.  This field is set via the /status subresource,
+	// and must be set at the same time as certificateChain.  Once populated,
+	// this field is immutable.
+	//
+	// +optional
+	BeginRefreshAt metav1.Time
+
+	// NotAfter is the time at which the certificate expires.  This field is set
+	// via the /status subresource.  Once populated, it is immutable.
+	//
+	// +optional
+	NotAfter metav1.Time
+}
+
+// Well-known condition types for PodCertificateRequests
+const (
+	// Denied indicates the request was denied by the signer.
+	PodCertificateRequestConditionTypeDenied string = "Denied"
+	// Failed indicates the signer failed to issue the certificate.
+	PodCertificateRequestConditionTypeFailed string = "Failed"
+	// SuggestedKeyType is an auxiliary condition that a signer can attach if it
+	// denied the request due to an unsupported key type.
+	PodCertificateRequestConditionTypeSuggestedKeyType string = "SuggestedKeyType"
+)
+
+// Well-known condition reasons for PodCertificateRequests
+const (
+	// UnsupportedKeyType should be set on "Denied" conditions when the signer
+	// doesn't support the key type of publicKey.
+	PodCertificateRequestConditionUnsupportedKeyType string = "UnsupportedKeyType"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodCertificateRequestList is a collection of PodCertificateRequest objects.
+type PodCertificateRequestList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is a collection of PodCertificateRequest objects
+	Items []PodCertificateRequest
+}

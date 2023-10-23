@@ -1228,6 +1228,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
 			}
 		}
+		// TODO(ahmedtd): Validation for podCertificate projected volumes.
 		if numSources > 1 {
 			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type per source"))
 		}

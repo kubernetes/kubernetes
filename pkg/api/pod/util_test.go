@@ -3200,6 +3200,159 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 	}
 }
 
+func TestDropPodCertificateProjectedVolumes(t *testing.T) {
+	testCases := []struct {
+		description                     string
+		podCertificateProjectionEnabled bool
+		oldPod                          *api.PodSpec
+		newPod                          *api.PodSpec
+		wantPod                         *api.PodSpec
+	}{
+		{
+			description: "feature gate disabled, cannot add volume to pod",
+			oldPod: &api.PodSpec{
+				Volumes: []api.Volume{},
+			},
+			newPod: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											SignerName: "foo.example.com/bar",
+										},
+									},
+								},
+							}},
+					},
+				},
+			},
+			wantPod: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{},
+								},
+							}},
+					},
+				},
+			},
+		},
+		{
+			description: "feature gate disabled, can keep volume on pod",
+			oldPod: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											SignerName: "foo.example.com/bar",
+										},
+									},
+								},
+							}},
+					},
+				},
+			},
+			newPod: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											SignerName: "foo.example.com/bar",
+										},
+									},
+								},
+							}},
+					},
+				},
+			},
+			wantPod: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											SignerName: "foo.example.com/bar",
+										},
+									},
+								},
+							}},
+					},
+				},
+			},
+		},
+		{
+			description:                     "feature gate enabled, can add volume to pod",
+			podCertificateProjectionEnabled: true,
+			oldPod: &api.PodSpec{
+				Volumes: []api.Volume{},
+			},
+			newPod: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											SignerName: "foo.example.com/bar",
+										},
+									},
+								},
+							}},
+					},
+				},
+			},
+			wantPod: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										PodCertificate: &api.PodCertificateProjection{
+											SignerName: "foo.example.com/bar",
+										},
+									},
+								},
+							}},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodCertificateProjection, tc.podCertificateProjectionEnabled)
+
+			dropDisabledPodCertificateProjection(tc.newPod, tc.oldPod)
+			if diff := cmp.Diff(tc.newPod, tc.wantPod); diff != "" {
+				t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestDropPodLifecycleSleepAction(t *testing.T) {
 	makeSleepHandler := func() *api.LifecycleHandler {
 		return &api.LifecycleHandler{
