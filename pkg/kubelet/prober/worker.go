@@ -316,12 +316,12 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
 
-	if (w.probeType == liveness && result == results.Failure) || w.probeType == startup {
+	if (w.probeType == liveness && result == results.Failure) || (w.probeType == startup && (result == results.Success || result == results.Failure)) {
 		// The container fails a liveness/startup check, it will need to be restarted.
 		// Stop probing until we see a new container ID. This is to reduce the
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.
-		// In addition, if the container succeeds a startup probe, we should stop probing
+		// In addition, if the threshold for each result of a startup probe is exceeded, we should stop probing
 		// until the container is restarted.
 		// This is to prevent extra Probe executions #117153.
 		w.onHold = true
