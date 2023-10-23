@@ -432,7 +432,7 @@ const (
 // IsEnabled returns true iff environment variable is set to true.
 // All other cases, it returns false.
 func (f FeatureGate) IsEnabled() bool {
-	return os.Getenv(string(f)) == "true"
+	return strings.ToLower(os.Getenv(string(f))) == "true"
 }
 
 // IsDisabled returns true iff environment variable is set to false.
@@ -440,7 +440,7 @@ func (f FeatureGate) IsEnabled() bool {
 // This function is used for the cases where feature is enabled by default,
 // but it may be needed to provide a way to ability to disable this feature.
 func (f FeatureGate) IsDisabled() bool {
-	return os.Getenv(string(f)) == "false"
+	return strings.ToLower(os.Getenv(string(f))) == "false"
 }
 
 func AddValidateFlags(cmd *cobra.Command) {
