@@ -937,6 +937,7 @@ var (
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
 		nodeHasProviderIDPredicate,
+		nodeReadyPredicate,
 	}
 )
 
