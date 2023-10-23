@@ -1238,6 +1238,68 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
 			}
 		}
+		if projPath := srcPath.Child("podCertificate"); source.PodCertificate != nil {
+			numSources++
+
+			allErrs = append(allErrs, ValidateSignerName(projPath.Child("signerName"), source.PodCertificate.SignerName)...)
+
+			switch source.PodCertificate.KeyType {
+			case "", "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ED25519":
+				// ok
+			default:
+				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"", "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ED25519"}))
+			}
+
+			if source.PodCertificate.MaxExpirationSeconds != nil {
+				if *source.PodCertificate.MaxExpirationSeconds < 3600 {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("maxExpirationSeconds"), *source.PodCertificate.MaxExpirationSeconds, "if provided, maxExpirationSeconds must be >= 3600"))
+				}
+			}
+
+			if source.PodCertificate.CredentialBundlePath != "" {
+				// Credential bundle mode is mutex with separate key / cert mode.
+				if source.PodCertificate.KeyPath != "" {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("keyPath"), source.PodCertificate.KeyPath, "credentialBundlePath is mutually-exclusive with keyPath"))
+				}
+				if source.PodCertificate.CertificateChainPath != "" {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("certificateChainPath"), source.PodCertificate.CertificateChainPath, "credentialBundlePath is mutually-exclusive with certificateChainPath"))
+				}
+
+				// Credential bundle path must not be weird.
+				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.PodCertificate.CredentialBundlePath, projPath.Child("credentialBundlePath"))...)
+
+				// Credential bundle path must not collide with a path from another source.
+				if !allPaths.Has(source.PodCertificate.CredentialBundlePath) {
+					allPaths.Insert(source.PodCertificate.CredentialBundlePath)
+				} else {
+					allErrs = append(allErrs, field.Invalid(fldPath, source.PodCertificate.CredentialBundlePath, "conflicting duplicate paths"))
+				}
+			} else if source.PodCertificate.KeyPath != "" || source.PodCertificate.CertificateChainPath != "" {
+				// Separate key / cert mode is mutex with bundle mode.
+				if source.PodCertificate.CredentialBundlePath != "" {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("credentialBundlePath"), source.PodCertificate.CredentialBundlePath, "credentialBundlePath is mutually-exclusive with keyPath and certificateChainPath"))
+				}
+
+				// keyPath and certificateChainPath must not be weird.
+				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.PodCertificate.KeyPath, projPath.Child("keyPath"))...)
+				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.PodCertificate.CertificateChainPath, projPath.Child("certificateChainPath"))...)
+
+				// keyPath and certificateChainPath must not collide with paths from another source.
+				if !allPaths.Has(source.PodCertificate.KeyPath) {
+					allPaths.Insert(source.PodCertificate.KeyPath)
+				} else {
+					allErrs = append(allErrs, field.Invalid(fldPath, source.PodCertificate.KeyPath, "conflicting duplicate paths"))
+				}
+				if !allPaths.Has(source.PodCertificate.CertificateChainPath) {
+					allPaths.Insert(source.PodCertificate.CertificateChainPath)
+				} else {
+					allErrs = append(allErrs, field.Invalid(fldPath, source.PodCertificate.CertificateChainPath, "conflicting duplicate paths"))
+				}
+			} else {
+				// Neither mode validly specified.
+				allErrs = append(allErrs, field.Required(projPath, "either credentialBundlePath or (keyPath, certificateChainPath) must be specified"))
+			}
+		}
 		if numSources > 1 {
 			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type per source"))
 		}
