@@ -41,7 +41,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration
 		var testPod *v1.Pod
-		var cpusNumPerNUMA, numaNodes int
+		var cpusNumPerNUMA, numaNodes, threadsPerCore int
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
@@ -50,7 +50,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 				framework.ExpectNoError(err)
 			}
 
-			numaNodes, cpusNumPerNUMA = hostCheck()
+			numaNodes, cpusNumPerNUMA, threadsPerCore = hostCheck()
 
 			// It is safe to assume that the CPUs are distributed equally across
 			// NUMA nodes and therefore number of CPUs on all NUMA nodes are same
@@ -58,6 +58,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 
 			framework.Logf("numaNodes on the system %d", numaNodes)
 			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
+			framework.Logf("Threads per Core on the system %d", threadsPerCore)
 
 			policy := topologymanager.PolicySingleNumaNode
 			scope := podScopeTopology
@@ -151,7 +152,7 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 	})
 })
 
-func hostCheck() (int, int) {
+func hostCheck() (int, int, int) {
 	// this is a very rough check. We just want to rule out system that does NOT have
 	// multi-NUMA nodes or at least 4 cores
 
@@ -165,7 +166,9 @@ func hostCheck() (int, int) {
 		e2eskipper.Skipf("this test is intended to be run on a system with at least %d cores per socket", minCoreCount)
 	}
 
-	return numaNodes, coreCount
+	threadsPerCore := detectThreadPerCore()
+
+	return numaNodes, coreCount, threadsPerCore
 }
 
 func checkMetricValueGreaterThan(value interface{}) types.GomegaMatcher {
