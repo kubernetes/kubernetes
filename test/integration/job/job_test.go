@@ -1857,13 +1857,13 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobSpec.PodFailurePolicy != nil)()
+			t.Cleanup(featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled))
+			t.Cleanup(featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobSpec.PodFailurePolicy != nil))
 
 			closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
-			defer closeFn()
+			t.Cleanup(closeFn)
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-			defer cancel()
+			t.Cleanup(cancel)
 			resetMetrics()
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -1875,6 +1875,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
 
 			waitForPodsToBeActive(ctx, t, jobClient, 2, jobObj)
+			t.Cleanup(func() { removePodsFinalizer(ctx, t, clientSet, ns.Name) })
 
 			deletePods(ctx, t, clientSet, ns.Name)
 
@@ -1886,8 +1887,6 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			})
 
 			failTerminatingPods(ctx, t, clientSet, ns.Name)
-
-			removePodsFinalizer(ctx, t, clientSet, ns.Name)
 
 			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
 				Terminating: tc.wantStatusAfterFailure.terminating,
