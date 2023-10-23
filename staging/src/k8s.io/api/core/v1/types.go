@@ -1763,6 +1763,22 @@ type ServiceAccountTokenProjection struct {
 	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
 }
 
+// PodCertificateProjection provides a private key and X.509 certificate in
+// a combined file.
+type PodCertificateProjection struct {
+	// Kubelet's generated CSRs will be addressed to this signer.
+	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,rep,name=signerName"`
+
+	// The type of keypair Kubelet will generate for the pod.
+	//
+	// Valid values are "RSA2048", "RSA3072", "RSA4096", "ECDSAP256", and
+	// "ECDSAP384".  If left empty, Kubelet defaults to "ECDSAP256".
+	KeyType string `json:"keyType,omitempty" protobuf:"bytes,2,rep,name=keyType"`
+
+	// Write the credential bundle at this path in the projected volume.
+	CredentialBundlePath string `json:"credentialBundlePath,omitempty" protobuf:"bytes,3,rep,name=credentialBundlePath"`
+}
+
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// sources is the list of volume projections
@@ -1794,6 +1810,31 @@ type VolumeProjection struct {
 	// serviceAccountToken is information about the serviceAccountToken data to project
 	// +optional
 	ServiceAccountToken *ServiceAccountTokenProjection `json:"serviceAccountToken,omitempty" protobuf:"bytes,4,opt,name=serviceAccountToken"`
+
+	// Projects an auto-rotating credential bundle (private key and certificate
+	// chain) that the pod can use either as a TLS client or server.
+	//
+	// Kubelet generates a private key and uses it to send a
+	// CertificateSigningRequest to the named signer.  Once the signer approves
+	// the request and issues a certificate chain, Kubelet writes the key and
+	// certificate chain to the pod filesystem.  The pod does not start until
+	// certificates have been issued for each podCertificate projected volume
+	// source in its spec.
+	//
+	// Kubelet will begin trying to rotate the certificate after 50% of the leaf
+	// certificate's lifetime has elapsed, or 24 hours, whichever is shorter.
+	//
+	// The credential bundle is a single file in PEM format.  The first PEM
+	// entry is the private key, and the remaining PEM entries are the
+	// certificate chain issued by the signer (typically, signers will return
+	// their certificate chain in leaf-to-root order).
+	//
+	// The named signer controls chooses the format of the certificate it
+	// issues; consult the signer implementation's documentation to learn how to
+	// use the certificates it issues.
+	//
+	// +featureGate=PodCertificateProjection +optional
+	PodCertificate *PodCertificateProjection `json:"workloadCertificate,omitempty" protobuf:"bytes,6,opt,name=workloadCertificate"`
 }
 
 const (

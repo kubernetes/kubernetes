@@ -1685,6 +1685,22 @@ type ServiceAccountTokenProjection struct {
 	Path string
 }
 
+// PodCertificateProjection provides a private key and X.509 certificate in
+// a combined file.
+type PodCertificateProjection struct {
+	// Kubelet's generated CSRs will be addressed to this signer.
+	SignerName string
+
+	// The type of keypair Kubelet will generate for the pod.
+	//
+	// Valid values are "RSA2048", "RSA3072", "RSA4096", "ECDSAP256", and
+	// "ECDSAP384".  If left empty, Kubelet defaults to "ECDSAP256".
+	KeyType string
+
+	// Write the credential bundle at this path in the projected volume.
+	CredentialBundlePath string
+}
+
 // ProjectedVolumeSource represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1710,6 +1726,8 @@ type VolumeProjection struct {
 	ConfigMap *ConfigMapProjection
 	// information about the serviceAccountToken data to project
 	ServiceAccountToken *ServiceAccountTokenProjection
+	// information about the workload certificate to project.
+	PodCertificate *PodCertificateProjection
 }
 
 // KeyToPath maps a string key to a path within a volume.
