@@ -134,10 +134,8 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor, containerType ContainerT
 			}
 		case source.Projected != nil:
 			for j := range source.Projected.Sources {
-				if source.Projected.Sources[j].Secret != nil {
-					if !visitor(source.Projected.Sources[j].Secret.Name) {
-						return false
-					}
+				if source.Projected.Sources[j].Secret != nil && !visitor(source.Projected.Sources[j].Secret.Name) {
+					return false
 				}
 			}
 		case source.RBD != nil:
@@ -171,17 +169,13 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor, containerType ContainerT
 
 func visitContainerSecretNames(container *api.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
-		if env.SecretRef != nil {
-			if !visitor(env.SecretRef.Name) {
-				return false
-			}
+		if env.SecretRef != nil && !visitor(env.SecretRef.Name) {
+			return false
 		}
 	}
 	for _, envVar := range container.Env {
-		if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
-			if !visitor(envVar.ValueFrom.SecretKeyRef.Name) {
-				return false
-			}
+		if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil && !visitor(envVar.ValueFrom.SecretKeyRef.Name) {
+			return false
 		}
 	}
 	return true
@@ -202,10 +196,8 @@ func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor, containerType Contain
 		switch {
 		case source.Projected != nil:
 			for j := range source.Projected.Sources {
-				if source.Projected.Sources[j].ConfigMap != nil {
-					if !visitor(source.Projected.Sources[j].ConfigMap.Name) {
-						return false
-					}
+				if source.Projected.Sources[j].ConfigMap != nil && !visitor(source.Projected.Sources[j].ConfigMap.Name) {
+					return false
 				}
 			}
 		case source.ConfigMap != nil:
@@ -219,17 +211,13 @@ func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor, containerType Contain
 
 func visitContainerConfigmapNames(container *api.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
-		if env.ConfigMapRef != nil {
-			if !visitor(env.ConfigMapRef.Name) {
-				return false
-			}
+		if env.ConfigMapRef != nil && !visitor(env.ConfigMapRef.Name) {
+			return false
 		}
 	}
 	for _, envVar := range container.Env {
-		if envVar.ValueFrom != nil && envVar.ValueFrom.ConfigMapKeyRef != nil {
-			if !visitor(envVar.ValueFrom.ConfigMapKeyRef.Name) {
-				return false
-			}
+		if envVar.ValueFrom != nil && envVar.ValueFrom.ConfigMapKeyRef != nil && !visitor(envVar.ValueFrom.ConfigMapKeyRef.Name) {
+			return false
 		}
 	}
 	return true
@@ -298,18 +286,14 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 
 func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
 	for resourceName, quantity := range container.Resources.Limits {
-		if helper.IsHugePageResourceName(resourceName) {
-			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-				return true
-			}
+		if helper.IsHugePageResourceName(resourceName) && !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
+			return true
 		}
 	}
 
 	for resourceName, quantity := range container.Resources.Requests {
-		if helper.IsHugePageResourceName(resourceName) {
-			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-				return true
-			}
+		if helper.IsHugePageResourceName(resourceName) && !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
+			return true
 		}
 	}
 
@@ -332,10 +316,8 @@ func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
 	}
 
 	for resourceName, quantity := range podSpec.Overhead {
-		if helper.IsHugePageResourceName(resourceName) {
-			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-				return true
-			}
+		if helper.IsHugePageResourceName(resourceName) && helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
+			return true
 		}
 	}
 
@@ -350,6 +332,7 @@ func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -414,8 +397,7 @@ func hasUsedDownwardAPIFieldPathWithVolume(volume *api.Volume, fieldPath string)
 		return false
 	}
 	for _, file := range volume.DownwardAPI.Items {
-		if file.FieldRef != nil &&
-			file.FieldRef.FieldPath == fieldPath {
+		if file.FieldRef != nil && file.FieldRef.FieldPath == fieldPath {
 			return true
 		}
 	}
@@ -427,9 +409,7 @@ func hasUsedDownwardAPIFieldPathWithContainer(container *api.Container, fieldPat
 		return false
 	}
 	for _, env := range container.Env {
-		if env.ValueFrom != nil &&
-			env.ValueFrom.FieldRef != nil &&
-			env.ValueFrom.FieldRef.FieldPath == fieldPath {
+		if env.ValueFrom != nil && env.ValueFrom.FieldRef != nil && env.ValueFrom.FieldRef.FieldPath == fieldPath {
 			return true
 		}
 	}
