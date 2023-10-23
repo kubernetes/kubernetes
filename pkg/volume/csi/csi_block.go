@@ -319,7 +319,9 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 
 	csiClient, err := m.csiClientGetter.Get()
 	if err != nil {
-		return "", errors.New(log("blockMapper.SetUpDevice failed to get CSI client: %v", err))
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return "", volumetypes.NewTransientOperationFailure(log("blockMapper.SetUpDevice failed to get CSI client: %v", err))
 	}
 
 	// Call NodeStageVolume
@@ -379,7 +381,9 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 
 	csiClient, err := m.csiClientGetter.Get()
 	if err != nil {
-		return "", errors.New(log("blockMapper.MapPodDevice failed to get CSI client: %v", err))
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return "", volumetypes.NewTransientOperationFailure(log("blockMapper.MapPodDevice failed to get CSI client: %v", err))
 	}
 
 	// Call NodePublishVolume
@@ -444,7 +448,9 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 
 	csiClient, err := m.csiClientGetter.Get()
 	if err != nil {
-		return errors.New(log("blockMapper.TearDownDevice failed to get CSI client: %v", err))
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return volumetypes.NewTransientOperationFailure(log("blockMapper.TearDownDevice failed to get CSI client: %v", err))
 	}
 
 	// Call NodeUnstageVolume
@@ -506,7 +512,9 @@ func (m *csiBlockMapper) UnmapPodDevice() error {
 
 	csiClient, err := m.csiClientGetter.Get()
 	if err != nil {
-		return errors.New(log("blockMapper.UnmapPodDevice failed to get CSI client: %v", err))
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return volumetypes.NewTransientOperationFailure(log("blockMapper.UnmapPodDevice failed to get CSI client: %v", err))
 	}
 
 	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
