@@ -67,6 +67,21 @@ func (e enableDirectPath) Apply(o *internal.DialSettings) {
 	o.EnableDirectPath = bool(e)
 }
 
+// EnableDirectPathXds returns a ClientOption that overrides the default
+// DirectPath type. It is only valid when DirectPath is enabled.
+//
+// It should only be used internally by generated clients.
+// This is an EXPERIMENTAL API and may be changed or removed in the future.
+func EnableDirectPathXds() option.ClientOption {
+	return enableDirectPathXds(true)
+}
+
+type enableDirectPathXds bool
+
+func (x enableDirectPathXds) Apply(o *internal.DialSettings) {
+	o.EnableDirectPathXds = bool(x)
+}
+
 // AllowNonDefaultServiceAccount returns a ClientOption that overrides the default
 // requirement for using the default service account for DirectPath.
 //
@@ -133,6 +148,19 @@ type withCreds google.Credentials
 
 func (w *withCreds) Apply(o *internal.DialSettings) {
 	o.InternalCredentials = (*google.Credentials)(w)
+}
+
+// EnableNewAuthLibrary returns a ClientOption that specifies if libraries in this
+// module to delegate auth to our new library. This option will be removed in
+// the future once all clients have been moved to the new auth layer.
+func EnableNewAuthLibrary() option.ClientOption {
+	return enableNewAuthLibrary(true)
+}
+
+type enableNewAuthLibrary bool
+
+func (w enableNewAuthLibrary) Apply(o *internal.DialSettings) {
+	o.EnableNewAuthLibrary = bool(w)
 }
 
 // EmbeddableAdapter is a no-op option.ClientOption that allow libraries to

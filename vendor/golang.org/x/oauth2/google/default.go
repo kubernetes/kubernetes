@@ -19,7 +19,10 @@ import (
 	"golang.org/x/oauth2/authhandler"
 )
 
-const adcSetupURL = "https://cloud.google.com/docs/authentication/external/set-up-adc"
+const (
+	adcSetupURL           = "https://cloud.google.com/docs/authentication/external/set-up-adc"
+	universeDomainDefault = "googleapis.com"
+)
 
 // Credentials holds Google credentials, including "Application Default Credentials".
 // For more details, see:
@@ -37,6 +40,18 @@ type Credentials struct {
 	// environment and not with a credentials file, e.g. when code is
 	// running on Google Cloud Platform.
 	JSON []byte
+
+	// universeDomain is the default service domain for a given Cloud universe.
+	universeDomain string
+}
+
+// UniverseDomain returns the default service domain for a given Cloud universe.
+// The default value is "googleapis.com".
+func (c *Credentials) UniverseDomain() string {
+	if c.universeDomain == "" {
+		return universeDomainDefault
+	}
+	return c.universeDomain
 }
 
 // DefaultCredentials is the old name of Credentials.
@@ -200,15 +215,23 @@ func CredentialsFromJSONWithParams(ctx context.Context, jsonData []byte, params 
 	if err := json.Unmarshal(jsonData, &f); err != nil {
 		return nil, err
 	}
+
+	universeDomain := f.UniverseDomain
+	// Authorized user credentials are only supported in the googleapis.com universe.
+	if f.Type == userCredentialsKey {
+		universeDomain = universeDomainDefault
+	}
+
 	ts, err := f.tokenSource(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 	ts = newErrWrappingTokenSource(ts)
 	return &Credentials{
-		ProjectID:   f.ProjectID,
-		TokenSource: ts,
-		JSON:        jsonData,
+		ProjectID:      f.ProjectID,
+		TokenSource:    ts,
+		JSON:           jsonData,
+		universeDomain: universeDomain,
 	}, nil
 }
 

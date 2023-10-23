@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -59,7 +58,7 @@ func NewSecureConnectSource(configFilePath string) (Source, error) {
 		configFilePath = filepath.Join(user.HomeDir, metadataPath, metadataFile)
 	}
 
-	file, err := ioutil.ReadFile(configFilePath)
+	file, err := os.ReadFile(configFilePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// Config file missing means Secure Connect is not supported.

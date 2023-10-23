@@ -14,9 +14,9 @@ import (
 	"github.com/google/go-cmp/cmp/internal/value"
 )
 
-// Path is a list of PathSteps describing the sequence of operations to get
+// Path is a list of [PathStep] describing the sequence of operations to get
 // from some root type to the current position in the value tree.
-// The first Path element is always an operation-less PathStep that exists
+// The first Path element is always an operation-less [PathStep] that exists
 // simply to identify the initial type.
 //
 // When traversing structs with embedded structs, the embedded struct will
@@ -29,8 +29,13 @@ type Path []PathStep
 // a value's tree structure. Users of this package never need to implement
 // these types as values of this type will be returned by this package.
 //
-// Implementations of this interface are
-// StructField, SliceIndex, MapIndex, Indirect, TypeAssertion, and Transform.
+// Implementations of this interface:
+//   - [StructField]
+//   - [SliceIndex]
+//   - [MapIndex]
+//   - [Indirect]
+//   - [TypeAssertion]
+//   - [Transform]
 type PathStep interface {
 	String() string
 
@@ -70,8 +75,9 @@ func (pa *Path) pop() {
 	*pa = (*pa)[:len(*pa)-1]
 }
 
-// Last returns the last PathStep in the Path.
-// If the path is empty, this returns a non-nil PathStep that reports a nil Type.
+// Last returns the last [PathStep] in the Path.
+// If the path is empty, this returns a non-nil [PathStep]
+// that reports a nil [PathStep.Type].
 func (pa Path) Last() PathStep {
 	return pa.Index(-1)
 }
@@ -79,7 +85,8 @@ func (pa Path) Last() PathStep {
 // Index returns the ith step in the Path and supports negative indexing.
 // A negative index starts counting from the tail of the Path such that -1
 // refers to the last step, -2 refers to the second-to-last step, and so on.
-// If index is invalid, this returns a non-nil PathStep that reports a nil Type.
+// If index is invalid, this returns a non-nil [PathStep]
+// that reports a nil [PathStep.Type].
 func (pa Path) Index(i int) PathStep {
 	if i < 0 {
 		i = len(pa) + i
@@ -168,7 +175,8 @@ func (ps pathStep) String() string {
 	return fmt.Sprintf("{%s}", s)
 }
 
-// StructField represents a struct field access on a field called Name.
+// StructField is a [PathStep] that represents a struct field access
+// on a field called [StructField.Name].
 type StructField struct{ *structField }
 type structField struct {
 	pathStep
@@ -204,10 +212,11 @@ func (sf StructField) String() string { return fmt.Sprintf(".%s", sf.name) }
 func (sf StructField) Name() string { return sf.name }
 
 // Index is the index of the field in the parent struct type.
-// See reflect.Type.Field.
+// See [reflect.Type.Field].
 func (sf StructField) Index() int { return sf.idx }
 
-// SliceIndex is an index operation on a slice or array at some index Key.
+// SliceIndex is a [PathStep] that represents an index operation on
+// a slice or array at some index [SliceIndex.Key].
 type SliceIndex struct{ *sliceIndex }
 type sliceIndex struct {
 	pathStep
@@ -247,12 +256,12 @@ func (si SliceIndex) Key() int {
 // all of the indexes to be shifted. If an index is -1, then that
 // indicates that the element does not exist in the associated slice.
 //
-// Key is guaranteed to return -1 if and only if the indexes returned
-// by SplitKeys are not the same. SplitKeys will never return -1 for
+// [SliceIndex.Key] is guaranteed to return -1 if and only if the indexes
+// returned by SplitKeys are not the same. SplitKeys will never return -1 for
 // both indexes.
 func (si SliceIndex) SplitKeys() (ix, iy int) { return si.xkey, si.ykey }
 
-// MapIndex is an index operation on a map at some index Key.
+// MapIndex is a [PathStep] that represents an index operation on a map at some index Key.
 type MapIndex struct{ *mapIndex }
 type mapIndex struct {
 	pathStep
@@ -266,7 +275,7 @@ func (mi MapIndex) String() string                 { return fmt.Sprintf("[%#v]",
 // Key is the value of the map key.
 func (mi MapIndex) Key() reflect.Value { return mi.key }
 
-// Indirect represents pointer indirection on the parent type.
+// Indirect is a [PathStep] that represents pointer indirection on the parent type.
 type Indirect struct{ *indirect }
 type indirect struct {
 	pathStep
@@ -276,7 +285,7 @@ func (in Indirect) Type() reflect.Type             { return in.typ }
 func (in Indirect) Values() (vx, vy reflect.Value) { return in.vx, in.vy }
 func (in Indirect) String() string                 { return "*" }
 
-// TypeAssertion represents a type assertion on an interface.
+// TypeAssertion is a [PathStep] that represents a type assertion on an interface.
 type TypeAssertion struct{ *typeAssertion }
 type typeAssertion struct {
 	pathStep
@@ -286,7 +295,8 @@ func (ta TypeAssertion) Type() reflect.Type             { return ta.typ }
 func (ta TypeAssertion) Values() (vx, vy reflect.Value) { return ta.vx, ta.vy }
 func (ta TypeAssertion) String() string                 { return fmt.Sprintf(".(%v)", value.TypeString(ta.typ, false)) }
 
-// Transform is a transformation from the parent type to the current type.
+// Transform is a [PathStep] that represents a transformation
+// from the parent type to the current type.
 type Transform struct{ *transform }
 type transform struct {
 	pathStep
@@ -297,13 +307,13 @@ func (tf Transform) Type() reflect.Type             { return tf.typ }
 func (tf Transform) Values() (vx, vy reflect.Value) { return tf.vx, tf.vy }
 func (tf Transform) String() string                 { return fmt.Sprintf("%s()", tf.trans.name) }
 
-// Name is the name of the Transformer.
+// Name is the name of the [Transformer].
 func (tf Transform) Name() string { return tf.trans.name }
 
 // Func is the function pointer to the transformer function.
 func (tf Transform) Func() reflect.Value { return tf.trans.fnc }
 
-// Option returns the originally constructed Transformer option.
+// Option returns the originally constructed [Transformer] option.
 // The == operator can be used to detect the exact option used.
 func (tf Transform) Option() Option { return tf.trans }
 

@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -48,7 +47,7 @@ func baseCreds(ctx context.Context, ds *DialSettings) (*google.Credentials, erro
 		return credentialsFromJSON(ctx, ds.CredentialsJSON, ds)
 	}
 	if ds.CredentialsFile != "" {
-		data, err := ioutil.ReadFile(ds.CredentialsFile)
+		data, err := os.ReadFile(ds.CredentialsFile)
 		if err != nil {
 			return nil, fmt.Errorf("cannot read credentials file: %v", err)
 		}
@@ -79,9 +78,8 @@ const (
 // met:
 //
 //	(1) At least one of the following is true:
-//	    (a) No scope is provided
-//	    (b) Scope for self-signed JWT flow is enabled
-//	    (c) Audiences are explicitly provided by users
+//	    (a) Scope for self-signed JWT flow is enabled
+//	    (b) Audiences are explicitly provided by users
 //	(2) No service account impersontation
 //
 // - Otherwise, executes standard OAuth 2.0 flow
@@ -92,7 +90,7 @@ func credentialsFromJSON(ctx context.Context, data []byte, ds *DialSettings) (*g
 
 	// Determine configurations for the OAuth2 transport, which is separate from the API transport.
 	// The OAuth2 transport and endpoint will be configured for mTLS if applicable.
-	clientCertSource, oauth2Endpoint, err := GetClientCertificateSourceAndEndpoint(oauth2DialSettings(ds))
+	clientCertSource, oauth2Endpoint, err := getClientCertificateSourceAndEndpoint(oauth2DialSettings(ds))
 	if err != nil {
 		return nil, err
 	}

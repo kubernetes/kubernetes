@@ -22,6 +22,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 const configFileName = "certificate_config.json"
@@ -63,6 +64,9 @@ func LoadSignerBinaryPath(configFilePath string) (path string, err error) {
 	if signerBinaryPath == "" {
 		return "", ErrConfigUnavailable
 	}
+
+	signerBinaryPath = strings.ReplaceAll(signerBinaryPath, "~", guessHomeDir())
+	signerBinaryPath = strings.ReplaceAll(signerBinaryPath, "$HOME", guessHomeDir())
 	return signerBinaryPath, nil
 }
 
@@ -88,4 +92,9 @@ func getDefaultConfigFileDirectory() (directory string) {
 // GetDefaultConfigFilePath returns the default path of the enterprise certificate config file created by gCloud.
 func GetDefaultConfigFilePath() (path string) {
 	return filepath.Join(getDefaultConfigFileDirectory(), configFileName)
+}
+
+// GetConfigFilePathFromEnv returns the path associated with environment variable GOOGLE_API_CERTIFICATE_CONFIG
+func GetConfigFilePathFromEnv() (path string) {
+	return os.Getenv("GOOGLE_API_CERTIFICATE_CONFIG")
 }

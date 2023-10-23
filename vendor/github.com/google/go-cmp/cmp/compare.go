@@ -5,7 +5,7 @@
 // Package cmp determines equality of values.
 //
 // This package is intended to be a more powerful and safer alternative to
-// reflect.DeepEqual for comparing whether two values are semantically equal.
+// [reflect.DeepEqual] for comparing whether two values are semantically equal.
 // It is intended to only be used in tests, as performance is not a goal and
 // it may panic if it cannot compare the values. Its propensity towards
 // panicking means that its unsuitable for production environments where a
@@ -18,16 +18,17 @@
 //     For example, an equality function may report floats as equal so long as
 //     they are within some tolerance of each other.
 //
-//   - Types with an Equal method may use that method to determine equality.
-//     This allows package authors to determine the equality operation
-//     for the types that they define.
+//   - Types with an Equal method (e.g., [time.Time.Equal]) may use that method
+//     to determine equality. This allows package authors to determine
+//     the equality operation for the types that they define.
 //
 //   - If no custom equality functions are used and no Equal method is defined,
 //     equality is determined by recursively comparing the primitive kinds on
-//     both values, much like reflect.DeepEqual. Unlike reflect.DeepEqual,
+//     both values, much like [reflect.DeepEqual]. Unlike [reflect.DeepEqual],
 //     unexported fields are not compared by default; they result in panics
-//     unless suppressed by using an Ignore option (see cmpopts.IgnoreUnexported)
-//     or explicitly compared using the Exporter option.
+//     unless suppressed by using an [Ignore] option
+//     (see [github.com/google/go-cmp/cmp/cmpopts.IgnoreUnexported])
+//     or explicitly compared using the [Exporter] option.
 package cmp
 
 import (
@@ -45,14 +46,14 @@ import (
 // Equal reports whether x and y are equal by recursively applying the
 // following rules in the given order to x and y and all of their sub-values:
 //
-//   - Let S be the set of all Ignore, Transformer, and Comparer options that
+//   - Let S be the set of all [Ignore], [Transformer], and [Comparer] options that
 //     remain after applying all path filters, value filters, and type filters.
-//     If at least one Ignore exists in S, then the comparison is ignored.
-//     If the number of Transformer and Comparer options in S is non-zero,
+//     If at least one [Ignore] exists in S, then the comparison is ignored.
+//     If the number of [Transformer] and [Comparer] options in S is non-zero,
 //     then Equal panics because it is ambiguous which option to use.
-//     If S contains a single Transformer, then use that to transform
+//     If S contains a single [Transformer], then use that to transform
 //     the current values and recursively call Equal on the output values.
-//     If S contains a single Comparer, then use that to compare the current values.
+//     If S contains a single [Comparer], then use that to compare the current values.
 //     Otherwise, evaluation proceeds to the next rule.
 //
 //   - If the values have an Equal method of the form "(T) Equal(T) bool" or
@@ -66,21 +67,22 @@ import (
 //     Functions are only equal if they are both nil, otherwise they are unequal.
 //
 // Structs are equal if recursively calling Equal on all fields report equal.
-// If a struct contains unexported fields, Equal panics unless an Ignore option
-// (e.g., cmpopts.IgnoreUnexported) ignores that field or the Exporter option
-// explicitly permits comparing the unexported field.
+// If a struct contains unexported fields, Equal panics unless an [Ignore] option
+// (e.g., [github.com/google/go-cmp/cmp/cmpopts.IgnoreUnexported]) ignores that field
+// or the [Exporter] option explicitly permits comparing the unexported field.
 //
 // Slices are equal if they are both nil or both non-nil, where recursively
 // calling Equal on all non-ignored slice or array elements report equal.
 // Empty non-nil slices and nil slices are not equal; to equate empty slices,
-// consider using cmpopts.EquateEmpty.
+// consider using [github.com/google/go-cmp/cmp/cmpopts.EquateEmpty].
 //
 // Maps are equal if they are both nil or both non-nil, where recursively
 // calling Equal on all non-ignored map entries report equal.
 // Map keys are equal according to the == operator.
-// To use custom comparisons for map keys, consider using cmpopts.SortMaps.
+// To use custom comparisons for map keys, consider using
+// [github.com/google/go-cmp/cmp/cmpopts.SortMaps].
 // Empty non-nil maps and nil maps are not equal; to equate empty maps,
-// consider using cmpopts.EquateEmpty.
+// consider using [github.com/google/go-cmp/cmp/cmpopts.EquateEmpty].
 //
 // Pointers and interfaces are equal if they are both nil or both non-nil,
 // where they have the same underlying concrete type and recursively

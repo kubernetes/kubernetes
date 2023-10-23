@@ -7,6 +7,7 @@ package cmpopts
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"time"
@@ -16,10 +17,10 @@ import (
 
 func equateAlways(_, _ interface{}) bool { return true }
 
-// EquateEmpty returns a Comparer option that determines all maps and slices
+// EquateEmpty returns a [cmp.Comparer] option that determines all maps and slices
 // with a length of zero to be equal, regardless of whether they are nil.
 //
-// EquateEmpty can be used in conjunction with SortSlices and SortMaps.
+// EquateEmpty can be used in conjunction with [SortSlices] and [SortMaps].
 func EquateEmpty() cmp.Option {
 	return cmp.FilterValues(isEmpty, cmp.Comparer(equateAlways))
 }
@@ -31,7 +32,7 @@ func isEmpty(x, y interface{}) bool {
 		(vx.Len() == 0 && vy.Len() == 0)
 }
 
-// EquateApprox returns a Comparer option that determines float32 or float64
+// EquateApprox returns a [cmp.Comparer] option that determines float32 or float64
 // values to be equal if they are within a relative fraction or absolute margin.
 // This option is not used when either x or y is NaN or infinite.
 //
@@ -45,7 +46,7 @@ func isEmpty(x, y interface{}) bool {
 //
 //	|x-y| ≤ max(fraction*min(|x|, |y|), margin)
 //
-// EquateApprox can be used in conjunction with EquateNaNs.
+// EquateApprox can be used in conjunction with [EquateNaNs].
 func EquateApprox(fraction, margin float64) cmp.Option {
 	if margin < 0 || fraction < 0 || math.IsNaN(margin) || math.IsNaN(fraction) {
 		panic("margin or fraction must be a non-negative number")
@@ -73,10 +74,10 @@ func (a approximator) compareF32(x, y float32) bool {
 	return a.compareF64(float64(x), float64(y))
 }
 
-// EquateNaNs returns a Comparer option that determines float32 and float64
+// EquateNaNs returns a [cmp.Comparer] option that determines float32 and float64
 // NaN values to be equal.
 //
-// EquateNaNs can be used in conjunction with EquateApprox.
+// EquateNaNs can be used in conjunction with [EquateApprox].
 func EquateNaNs() cmp.Option {
 	return cmp.Options{
 		cmp.FilterValues(areNaNsF64s, cmp.Comparer(equateAlways)),
@@ -91,8 +92,8 @@ func areNaNsF32s(x, y float32) bool {
 	return areNaNsF64s(float64(x), float64(y))
 }
 
-// EquateApproxTime returns a Comparer option that determines two non-zero
-// time.Time values to be equal if they are within some margin of one another.
+// EquateApproxTime returns a [cmp.Comparer] option that determines two non-zero
+// [time.Time] values to be equal if they are within some margin of one another.
 // If both times have a monotonic clock reading, then the monotonic time
 // difference will be used. The margin must be non-negative.
 func EquateApproxTime(margin time.Duration) cmp.Option {
@@ -131,8 +132,8 @@ type anyError struct{}
 func (anyError) Error() string     { return "any error" }
 func (anyError) Is(err error) bool { return err != nil }
 
-// EquateErrors returns a Comparer option that determines errors to be equal
-// if errors.Is reports them to match. The AnyError error can be used to
+// EquateErrors returns a [cmp.Comparer] option that determines errors to be equal
+// if [errors.Is] reports them to match. The [AnyError] error can be used to
 // match any non-nil error.
 func EquateErrors() cmp.Option {
 	return cmp.FilterValues(areConcreteErrors, cmp.Comparer(compareErrors))
@@ -154,3 +155,31 @@ func compareErrors(x, y interface{}) bool {
 	ye := y.(error)
 	return errors.Is(xe, ye) || errors.Is(ye, xe)
 }
+
+// EquateComparable returns a [cmp.Option] that determines equality
+// of comparable types by directly comparing them using the == operator in Go.
+// The types to compare are specified by passing a value of that type.
+// This option should only be used on types that are documented as being
+// safe for direct == comparison. For example, [net/netip.Addr] is documented
+// as being semantically safe to use with ==, while [time.Time] is documented
+// to discourage the use of == on time values.
+func EquateComparable(typs ...interface{}) cmp.Option {
+	types := make(typesFilter)
+	for _, typ := range typs {
+		switch t := reflect.TypeOf(typ); {
+		case !t.Comparable():
+			panic(fmt.Sprintf("%T is not a comparable Go type", typ))
+		case types[t]:
+			panic(fmt.Sprintf("%T is already specified", typ))
+		default:
+			types[t] = true
+		}
+	}
+	return cmp.FilterPath(types.filter, cmp.Comparer(equateAny))
+}
+
+type typesFilter map[reflect.Type]bool
+
+func (tf typesFilter) filter(p cmp.Path) bool { return tf[p.Last().Type()] }
+
+func equateAny(x, y interface{}) bool { return x == y }
