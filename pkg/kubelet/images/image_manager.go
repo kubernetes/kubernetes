@@ -98,7 +98,7 @@ func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, 
 
 // EnsureImageExists pulls the image for the specified pod and container, and returns
 // (imageRef, error message, error).
-func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
+func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string) (string, string, error) {
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, container.Image)
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
@@ -122,9 +122,11 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 	}
 
 	spec := kubecontainer.ImageSpec{
-		Image:       image,
-		Annotations: podAnnotations,
+		Image:          image,
+		Annotations:    podAnnotations,
+		RuntimeHandler: podRuntimeHandler,
 	}
+
 	imageRef, err := m.imageService.GetImageRef(ctx, spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)

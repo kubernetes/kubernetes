@@ -52,6 +52,8 @@ type Version interface {
 type ImageSpec struct {
 	// ID of the image.
 	Image string
+	// Runtime handler used to pull this image
+	RuntimeHandler string
 	// The annotations for the image.
 	// This should be passed to CRI during image pulls and returned when images are listed.
 	Annotations []Annotation
@@ -282,6 +284,8 @@ type Container struct {
 	Image string
 	// The id of the image used by the container.
 	ImageID string
+	// Runtime handler used to pull the image if any.
+	ImageRuntimeHandler string
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
@@ -347,6 +351,8 @@ type Status struct {
 	Image string
 	// ID of the image.
 	ImageID string
+	// Runtime handler used to pull the image if any.
+	ImageRuntimeHandler string
 	// Hash of the container, used for comparison.
 	Hash uint64
 	// Hash of the container over fields with Resources field zero'd out.

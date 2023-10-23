@@ -179,7 +179,23 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	container := spec.container
 
 	// Step 1: pull the image.
-	imageRef, msg, err := m.imagePuller.EnsureImageExists(ctx, pod, container, pullSecrets, podSandboxConfig)
+
+	// If RuntimeClassInImageCriAPI feature gate is enabled, pass runtimehandler
+	// information for the runtime class specified. If not runtime class is
+	// specified, then pass ""
+	podRuntimeHandler := ""
+	var err error
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+		if pod.Spec.RuntimeClassName != nil && *pod.Spec.RuntimeClassName != "" {
+			podRuntimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+			if err != nil {
+				msg := fmt.Sprintf("Failed to lookup runtimeHandler for runtimeClassName %v", pod.Spec.RuntimeClassName)
+				return msg, err
+			}
+		}
+	}
+
+	imageRef, msg, err := m.imagePuller.EnsureImageExists(ctx, pod, container, pullSecrets, podSandboxConfig, podRuntimeHandler)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
@@ -601,6 +617,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		Name:                 labeledInfo.ContainerName,
 		Image:                status.Image.Image,
 		ImageID:              status.ImageRef,
+		ImageRuntimeHandler:  status.Image.RuntimeHandler,
 		Hash:                 annotatedInfo.Hash,
 		HashWithoutResources: annotatedInfo.HashWithoutResources,
 		RestartCount:         annotatedInfo.RestartCount,
