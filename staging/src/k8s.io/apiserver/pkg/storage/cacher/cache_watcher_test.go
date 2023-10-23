@@ -594,6 +594,66 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	}
 }
 
+func TestCacheWatcherDrainingNoBookmarkAfterResourceVersion(t *testing.T) {
+	makePod := func(rv uint64) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", rv),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", rv),
+				Annotations:     map[string]string{},
+			},
+		}
+	}
+	var lock sync.RWMutex
+	var w *cacheWatcher
+	ctx := context.TODO()
+	count := 0
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func(drainWatcher bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		count++
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+	initEvents := []*watchCacheEvent{{Object: makePod(1)}, {Object: makePod(2)}}
+	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
+	w.setBookmarkAfterResourceVersion(0)
+	go w.processInterval(ctx, intervalFromEvents(initEvents), 0)
+
+	if !w.add(&watchCacheEvent{Object: makePod(5), ResourceVersion: 5}, time.NewTimer(1*time.Second)) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, time.NewTimer(1*time.Second)) {
+		t.Fatal("expected the add method to fail")
+	}
+	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 1, nil
+	}); err != nil {
+		t.Fatalf("expected forget() to be called once, just from the w.add() method: %v", err)
+	}
+
+	if !w.stopped {
+		t.Fatal("expected the watcher to be stopped but it wasn't")
+	}
+	verifyEvents(t, w, []watch.Event{
+		{Type: watch.Added, Object: makePod(1)},
+		{Type: watch.Added, Object: makePod(2)},
+		{Type: watch.Added, Object: makePod(5)},
+	}, true)
+
+	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 2, nil
+	}); err != nil {
+		t.Fatalf("expected forget() to be called twice, the second call is from w.Stop() method called from  w.processInterval(): %v", err)
+	}
+}
+
 func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	newWatcher := func(id string, deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, func(_ string, _ labels.Set, _ fields.Set) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, id)
