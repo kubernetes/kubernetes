@@ -22,6 +22,7 @@ package nftables
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
@@ -342,90 +343,24 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
 }
 
-// When chains get removed from iptablesJumpChains, add them here so they get cleaned up
-// on upgrade.
-var iptablesCleanupOnlyChains = []iptablesJumpChain{}
-
-// CleanupLeftovers removes all iptables rules and chains created by the Proxier
+// CleanupLeftovers removes all nftables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
-func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
-	// Unlink our chains
-	for _, jump := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
-		args := append(jump.extraArgs,
-			"-m", "comment", "--comment", jump.comment,
-			"-j", string(jump.dstChain),
-		)
-		if err := ipt.DeleteRule(jump.table, jump.srcChain, args...); err != nil {
-			if !utiliptables.IsNotFoundError(err) {
-				klog.ErrorS(err, "Error removing pure-iptables proxy rule")
-				encounteredError = true
-			}
-		}
-	}
+func CleanupLeftovers() bool {
+	var encounteredError bool
 
-	// Flush and remove all of our "-t nat" chains.
-	iptablesData := bytes.NewBuffer(nil)
-	if err := ipt.SaveInto(utiliptables.TableNAT, iptablesData); err != nil {
-		klog.ErrorS(err, "Failed to execute iptables-save", "table", utiliptables.TableNAT)
-		encounteredError = true
-	} else {
-		existingNATChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
-		natChains := proxyutil.NewLineBuffer()
-		natRules := proxyutil.NewLineBuffer()
-		natChains.Write("*nat")
-		// Start with chains we know we need to remove.
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
-			if _, found := existingNATChains[chain]; found {
-				chainString := string(chain)
-				natChains.Write(utiliptables.MakeChainLine(chain)) // flush
-				natRules.Write("-X", chainString)                  // delete
-			}
+	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
+		nft, err := knftables.New(family, kubeProxyTable)
+		if err == nil {
+			tx := nft.NewTransaction()
+			tx.Delete(&knftables.Table{})
+			err = nft.Run(context.TODO(), tx)
 		}
-		// Hunt for service and endpoint chains.
-		for chain := range existingNATChains {
-			chainString := string(chain)
-			if isServiceChainName(chainString) {
-				natChains.Write(utiliptables.MakeChainLine(chain)) // flush
-				natRules.Write("-X", chainString)                  // delete
-			}
-		}
-		natRules.Write("COMMIT")
-		natLines := append(natChains.Bytes(), natRules.Bytes()...)
-		// Write it.
-		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
-		if err != nil {
-			klog.ErrorS(err, "Failed to execute iptables-restore", "table", utiliptables.TableNAT)
-			metrics.IptablesRestoreFailuresTotal.Inc()
+		if err != nil && !knftables.IsNotFound(err) {
+			klog.ErrorS(err, "Error cleaning up nftables rules")
 			encounteredError = true
 		}
 	}
 
-	// Flush and remove all of our "-t filter" chains.
-	iptablesData.Reset()
-	if err := ipt.SaveInto(utiliptables.TableFilter, iptablesData); err != nil {
-		klog.ErrorS(err, "Failed to execute iptables-save", "table", utiliptables.TableFilter)
-		encounteredError = true
-	} else {
-		existingFilterChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
-		filterChains := proxyutil.NewLineBuffer()
-		filterRules := proxyutil.NewLineBuffer()
-		filterChains.Write("*filter")
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain} {
-			if _, found := existingFilterChains[chain]; found {
-				chainString := string(chain)
-				filterChains.Write(utiliptables.MakeChainLine(chain))
-				filterRules.Write("-X", chainString)
-			}
-		}
-		filterRules.Write("COMMIT")
-		filterLines := append(filterChains.Bytes(), filterRules.Bytes()...)
-		// Write it.
-		if err := ipt.Restore(utiliptables.TableFilter, filterLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
-			klog.ErrorS(err, "Failed to execute iptables-restore", "table", utiliptables.TableFilter)
-			metrics.IptablesRestoreFailuresTotal.Inc()
-			encounteredError = true
-		}
-	}
 	return encounteredError
 }
 

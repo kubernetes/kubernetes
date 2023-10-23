@@ -375,9 +375,12 @@ func (o *Options) Run() error {
 		return o.writeConfigFile()
 	}
 
+	err := platformCleanup(o.config.Mode, o.CleanupAndExit)
 	if o.CleanupAndExit {
-		return cleanupAndExit()
+		return err
 	}
+	// We ignore err otherwise; the cleanup is best-effort, and the backends will have
+	// logged messages if they failed in interesting ways.
 
 	proxyServer, err := newProxyServer(o.config, o.master, o.InitAndExit)
 	if err != nil {
