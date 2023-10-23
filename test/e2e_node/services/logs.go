@@ -82,6 +82,14 @@ var requiredLogs = []LogFileData{
 		Name:              "containerd-installation.log",
 		JournalctlCommand: []string{"-u", "containerd-installation"},
 	},
+	{
+		Name:  "kubelet.log",
+		Files: []string{"kubelet.log"},
+	},
+	{
+		Name:  "services.log",
+		Files: []string{"services.log"},
+	},
 }
 
 // getLogFiles get all logs to collect after the test.
