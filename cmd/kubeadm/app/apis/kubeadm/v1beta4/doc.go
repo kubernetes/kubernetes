@@ -35,6 +35,9 @@ limitations under the License.
 //   - Add `ClusterConfiguration.EncryptionAlgorithm` that can be used to set the asymmetric encryption algorithm
 //     used for this cluster's keys and certificates. Can be "RSA" (default algorithm, key size is 2048) or
 //     "ECDSA" (uses the P-256 elliptic curve).
+//   - Add `ClusterConfiguration.DNS.Disabled` and `ClusterConfiguration.Proxy.Disabled` that can be used to disable
+//     the CoreDNS and kube-proxy addons during cluster initialization. Skipping the related addons phases,
+//     during cluster creation will set the same fields to `false`.
 //
 // Migration from old kubeadm config versions
 //
