@@ -674,6 +674,12 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 	// "k8s.io/initial-events-end" bookmark.
 	initTrace.Step("Objects streamed", trace.Field{Key: "count", Value: len(temporaryStore.List())})
 	r.setIsLastSyncResourceVersionUnavailable(false)
+
+	// we utilize the temporaryStore to ensure independence from the current store implementation.
+	// as of today, the store is implemented as a queue and will be drained by the higher-level
+	// component as soon as it finishes replacing the content.
+	checkWatchListConsistencyIfRequested(stopCh, r.name, resourceVersion, r.listerWatcher, temporaryStore)
+
 	if err = r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
 		return nil, fmt.Errorf("unable to sync watch-list result: %v", err)
 	}
