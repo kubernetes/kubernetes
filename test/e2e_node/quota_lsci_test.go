@@ -74,7 +74,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 			}
 			initialConfig.FeatureGates[string(LSCIQuotaFeature)] = quotasRequested
 		})
-		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
+		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, &[]podEvictSpec{
 			{
 				evictionPriority: priority, // This pod should be evicted because of emptyDir violation only if quotas are enabled
 				pod: diskConcealingPod(fmt.Sprintf("emptydir-concealed-disk-over-sizelimit-quotas-%v", quotasRequested), useOverLimit, &v1.VolumeSource{
