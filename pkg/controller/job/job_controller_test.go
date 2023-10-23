@@ -3761,7 +3761,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  jobReasonFailedIndexes,
+						Reason:  batch.JobReasonFailedIndexes,
 						Message: "Job has failed indexes",
 					},
 				},
@@ -3799,7 +3799,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  jobReasonMaxFailedIndexesExceeded,
+						Reason:  batch.JobReasonMaxFailedIndexesExceeded,
 						Message: "Job has exceeded the specified maximal number of failed indexes",
 					},
 				},
