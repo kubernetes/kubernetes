@@ -163,9 +163,9 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				t.Fatalf("Test Failed: error: %q, while getting updated pod", err)
 			}
 			_, cond := podutil.GetPodCondition(&testPod.Status, v1.DisruptionTarget)
-			if test.enablePodDisruptionConditions == true && cond == nil {
+			if test.enablePodDisruptionConditions && cond == nil {
 				t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(testPod), v1.DisruptionTarget)
-			} else if test.enablePodDisruptionConditions == false && cond != nil {
+			} else if !test.enablePodDisruptionConditions && cond != nil {
 				t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(testPod), v1.DisruptionTarget)
 			}
 		})

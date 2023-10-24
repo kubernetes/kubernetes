@@ -143,10 +143,10 @@ func TestExec(t *testing.T) {
 		if status != test.expectedStatus {
 			t.Errorf("[%d] expected %v, got %v", i, test.expectedStatus, status)
 		}
-		if err != nil && test.expectError == false {
+		if err != nil && !test.expectError {
 			t.Errorf("[%d] unexpected error: %v", i, err)
 		}
-		if err == nil && test.expectError == true {
+		if err == nil && test.expectError {
 			t.Errorf("[%d] unexpected non-error", i)
 		}
 		if test.output != output {
