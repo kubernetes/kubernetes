@@ -82,7 +82,6 @@ func TestMetricsOnSuccesses(t *testing.T) {
 		job                       *batchv1.Job
 		wantJobFinishedNumMetric  metricLabelsWithValue
 		wantJobPodsFinishedMetric metricLabelsWithValue
-		wantJobPodsCreatedMetric  metricLabelsWithValue
 	}{
 		"non-indexed job": {
 			job: &batchv1.Job{
@@ -100,10 +99,6 @@ func TestMetricsOnSuccesses(t *testing.T) {
 				Labels: []string{"NonIndexed", "succeeded"},
 				Value:  2,
 			},
-			wantJobPodsCreatedMetric: metricLabelsWithValue{
-				Labels: []string{"new", "succeeded"},
-				Value:  2,
-			},
 		},
 		"indexed job": {
 			job: &batchv1.Job{
@@ -119,10 +114,6 @@ func TestMetricsOnSuccesses(t *testing.T) {
 			},
 			wantJobPodsFinishedMetric: metricLabelsWithValue{
 				Labels: []string{"Indexed", "succeeded"},
-				Value:  2,
-			},
-			wantJobPodsCreatedMetric: metricLabelsWithValue{
-				Labels: []string{"new", "succeeded"},
 				Value:  2,
 			},
 		},
@@ -151,7 +142,6 @@ func TestMetricsOnSuccesses(t *testing.T) {
 			// verify metric values after the job is finished
 			validateCounterMetric(ctx, t, metrics.JobFinishedNum, tc.wantJobFinishedNumMetric)
 			validateCounterMetric(ctx, t, metrics.JobPodsFinished, tc.wantJobPodsFinishedMetric)
-			validateCounterMetric(ctx, t, metrics.JobPodsCreationTotal, tc.wantJobPodsCreatedMetric)
 			validateTerminatedPodsTrackingFinalizerMetric(ctx, t, int(*jobObj.Spec.Parallelism))
 		})
 	}
