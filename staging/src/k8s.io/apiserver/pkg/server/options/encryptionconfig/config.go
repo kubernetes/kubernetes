@@ -107,6 +107,26 @@ const (
 
 var codecs serializer.CodecFactory
 
+// this atomic bool allows us to swap enablement of the KMSv2KDF feature in tests
+// as the feature gate is now locked to true starting with v1.29
+// Note: it cannot be set by an end user
+var kdfDisabled atomic.Bool
+
+// this function should only be called in tests to swap enablement of the KMSv2KDF feature
+func SetKDFForTests(b bool) func() {
+	kdfDisabled.Store(!b)
+	return func() {
+		kdfDisabled.Store(false)
+	}
+}
+
+// this function should be used to determine enablement of the KMSv2KDF feature
+// instead of getting it from DefaultFeatureGate as the feature gate is now locked
+// to true starting with v1.29
+func GetKDF() bool {
+	return !kdfDisabled.Load()
+}
+
 func init() {
 	configScheme := runtime.NewScheme()
 	utilruntime.Must(apiserverconfig.AddToScheme(configScheme))
@@ -138,6 +158,7 @@ type kmsv2PluginProbe struct {
 	lastResponse *kmsPluginHealthzResponse
 	l            *sync.Mutex
 	apiServerID  string
+	version      string
 }
 
 type kmsHealthChecker []healthz.HealthChecker
@@ -369,7 +390,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// this gate can only change during tests, but the check is cheap enough to always make
 	// this allows us to easily exercise both modes without restarting the API server
 	// TODO integration test that this dynamically takes effect
-	useSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+	useSeed := GetKDF()
 	stateUseSeed := state.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 
 	// state is valid and status keyID is unchanged from when we generated this DEK/seed so there is no need to rotate it
@@ -454,8 +475,16 @@ func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.C
 	if response.Healthz != "ok" {
 		errs = append(errs, fmt.Errorf("got unexpected healthz status: %s", response.Healthz))
 	}
-	if response.Version != envelopekmsv2.KMSAPIVersion {
-		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersion, response.Version))
+	if response.Version != envelopekmsv2.KMSAPIVersionv2 && response.Version != envelopekmsv2.KMSAPIVersionv2beta1 {
+		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersionv2, response.Version))
+	} else {
+		// set version for the first status response
+		if len(h.version) == 0 {
+			h.version = response.Version
+		}
+		if h.version != response.Version {
+			errs = append(errs, fmt.Errorf("KMSv2 API version should not change after the initial status response version %s, got %s", h.version, response.Version))
+		}
 	}
 
 	if errCode, err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
