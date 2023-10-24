@@ -144,20 +144,29 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 	return nil
 }
 
+type options struct {
+	ratchetingOptions
+}
+
+type Option func(*options)
+
+func WithRatcheting(correlation *common.CorrelatedObject) Option {
+	return func(o *options) {
+		o.currentCorrelation = correlation
+	}
+}
+
 // Validate validates all x-kubernetes-validations rules in Validator against obj and returns any errors.
 // If the validation rules exceed the costBudget, subsequent evaluations will be skipped, the list of errs returned will not be empty, and a negative remainingBudget will be returned.
 // Most callers can ignore the returned remainingBudget value unless another validate call is going to be made
 // context is passed for supporting context cancellation during cel validation
-func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
-	return s.validate(ctx, fldPath, sts, obj, oldObj, ratchetingOptions{}, costBudget)
-}
+func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64, opts ...Option) (errs field.ErrorList, remainingBudget int64) {
+	opt := options{}
+	for _, o := range opts {
+		o(&opt)
+	}
 
-func (s *Validator) ValidateWithRatcheting(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
-	// May be a worthwhile optimization to share the correlated object instance
-	// with the OpenAPI schema validator to avoid doing DeepEqual twice
-	return s.validate(ctx, fldPath, sts, obj, oldObj, ratchetingOptions{
-		currentCorrelation: common.NewCorrelatedObject(obj, oldObj, &model.Structural{Structural: sts}),
-	}, costBudget)
+	return s.validate(ctx, fldPath, sts, obj, oldObj, opt.ratchetingOptions, costBudget)
 }
 
 // ratchetingOptions stores the current correlation object and the nearest
