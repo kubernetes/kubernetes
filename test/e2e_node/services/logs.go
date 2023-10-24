@@ -83,12 +83,12 @@ var requiredLogs = []LogFileData{
 		JournalctlCommand: []string{"-u", "containerd-installation"},
 	},
 	{
-		Name:  "results/kubelet.log",
-		Files: []string{"kubelet.log"},
+		Name:  "kubelet.log",
+		Files: []string{"results/kubelet.log"},
 	},
 	{
-		Name:  "results/services.log",
-		Files: []string{"services.log"},
+		Name:  "services.log",
+		Files: []string{"results/services.log"},
 	},
 }
 
