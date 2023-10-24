@@ -540,7 +540,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 			entrypoints: map[string]frameworkruntime.PluginFactory{
 				"AddIndexer": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
-					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodSpecNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer"}, err
@@ -553,14 +553,14 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 			entrypoints: map[string]frameworkruntime.PluginFactory{
 				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
-					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodSpecNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer1"}, err
 				},
 				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
-					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodAnnotationNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer1"}, err
@@ -574,14 +574,14 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 			entrypoints: map[string]frameworkruntime.PluginFactory{
 				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
-					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName1": indexByPodSpecNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer1"}, err
 				},
 				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
-					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName2": indexByPodAnnotationNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer2"}, err
