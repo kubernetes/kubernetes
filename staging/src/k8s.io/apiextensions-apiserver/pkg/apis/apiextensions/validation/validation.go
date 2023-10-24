@@ -1186,6 +1186,8 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 							if uncorrelatablePath := ssv.forbidOldSelfValidations(); uncorrelatablePath != nil {
 								allErrs.CELErrors = append(allErrs.CELErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, fmt.Sprintf("oldSelf cannot be used on the uncorrelatable portion of the schema within %v", uncorrelatablePath)))
 							}
+						} else if schema.XValidations[i].OptionalOldSelf != nil {
+							allErrs.CELErrors = append(allErrs.CELErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("optionalOldSelf"), *schema.XValidations[i].OptionalOldSelf, "may not be set if oldSelf is not used in rule"))
 						}
 					}
 				}

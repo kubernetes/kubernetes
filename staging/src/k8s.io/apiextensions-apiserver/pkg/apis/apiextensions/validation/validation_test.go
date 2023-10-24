@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type validationMatch struct {
@@ -9648,6 +9649,157 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			expectedErrors: []validationMatch{
 				required("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+			},
+		},
+		{
+			name: "forbid transition rule on element of list of type atomic when optionalOldSelf is set",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "array",
+							XListType: strPtr("atomic"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "forbid transition rule on element of list defaulting to type atomic when optionalOldSelf is set",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "forbid transition rule on element of list of type set when optionalOldSelf is set",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "array",
+							MaxItems:  int64ptr(10),
+							XListType: strPtr("set"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "forbid transition rule on element of map of unrecognized type when optionalOldSelf is set",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "object",
+							XMapType: strPtr("future"),
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subfield": {
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].properties[subfield].x-kubernetes-validations[0].rule"),
+				unsupported("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-map-type"),
+			},
+		},
+		{
+			name: "forbid setting optionalOldSelf to true if oldSelf is not used",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "string",
+							MaxLength: int64ptr(10),
+							XValidations: apiextensions.ValidationRules{
+								{Rule: `self == "foo"`, OptionalOldSelf: ptr.To(true)},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].optionalOldSelf"),
+			},
+		},
+		{
+			name: "forbid setting optionalOldSelf to false if oldSelf is not used",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "string",
+							MaxLength: int64ptr(10),
+							XValidations: apiextensions.ValidationRules{
+								{Rule: `self == "foo"`, OptionalOldSelf: ptr.To(false)},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].optionalOldSelf"),
 			},
 		},
 	}
