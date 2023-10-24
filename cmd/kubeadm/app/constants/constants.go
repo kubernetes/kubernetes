@@ -261,9 +261,6 @@ const (
 	// init/join time for use later. kubeadm annotates the node object with this information
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
 
-	// UnknownCRISocket defines the undetected or unknown CRI socket
-	UnknownCRISocket = "unix:///var/run/unknown.sock"
-
 	// KubeadmConfigConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	KubeadmConfigConfigMap = "kubeadm-config"
 
