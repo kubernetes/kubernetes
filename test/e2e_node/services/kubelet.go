@@ -22,8 +22,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -62,8 +60,10 @@ func (a *args) Set(value string) error {
 }
 
 // kubeletArgs is the override kubelet args specified by the test runner.
-var kubeletArgs args
-var kubeletConfigFile = "./kubeletconfig.yaml"
+var (
+	kubeletArgs       args
+	kubeletConfigFile = "./kubeletconfig.yaml"
+)
 
 func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate. Deprecated, see: --kubelet-config-file.")
@@ -214,27 +214,15 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 	var unitName string
 	// Apply default kubelet flags.
 	cmdArgs := []string{}
+	kubeletLogName := "kubelet.log"
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
 		// On systemd services, detection of a service / unit works reliably while
 		// detection of a process started from an ssh session does not work.
 		// Since kubelet will typically be run as a service it also makes more
 		// sense to test it that way
 		isSystemd = true
+		kubeletLogName = "kubelet-spawn.log"
 
-		// If we are running on systemd >=240, we can append to the
-		// same log file on restarts
-		logLocation := "StandardError=file:"
-		if version, verr := exec.Command("systemd-run", "--version").Output(); verr == nil {
-			// sample output from $ systemd-run --version
-			// systemd 245 (245.4-4ubuntu3.13)
-			re := regexp.MustCompile(`systemd (\d+)`)
-			if match := re.FindSubmatch(version); len(match) > 1 {
-				num, _ := strconv.Atoi(string(match[1]))
-				if num >= 240 {
-					logLocation = "StandardError=append:"
-				}
-			}
-		}
 		// We can ignore errors, to have GetTimestampFromWorkspaceDir() fallback
 		// to the current time.
 		cwd, _ := os.Getwd()
@@ -244,7 +232,6 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		cmdArgs = append(cmdArgs,
 			systemdRun,
 			"-p", "Delegate=true",
-			"-p", logLocation+framework.TestContext.ReportDir+"/kubelet.log",
 			"--unit="+unitName,
 			"--slice=runtime.slice",
 			"--remain-after-exit",
@@ -317,7 +304,7 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		killCommand,
 		restartCommand,
 		[]string{kubeletHealthCheckURL},
-		"kubelet.log",
+		kubeletLogName,
 		e.monitorParent,
 		restartOnExit,
 		unitName)
