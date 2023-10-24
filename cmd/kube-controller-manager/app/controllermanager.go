@@ -569,6 +569,8 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
 		}
 	}
+	// TODO: Add feature gate
+	register(names.LeaderElectionController, startLeaderElectionController)
 
 	return controllers
 }
