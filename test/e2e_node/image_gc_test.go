@@ -50,8 +50,8 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 		_, is, err = getCRIClient()
 		framework.ExpectNoError(err)
 	})
-	ginkgo.AfterEach(func() {
-		framework.ExpectNoError(PrePullAllImages())
+	ginkgo.AfterEach(func(ctx context.Context) {
+		framework.ExpectNoError(PrePullAllImages(ctx))
 	})
 	ginkgo.Context("when ImageMaximumGCAge is set", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
