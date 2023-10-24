@@ -165,13 +165,14 @@ const (
 	// parallelism.
 	JobSyncActionPodsDeleted = "pods_deleted"
 
-	// Possible values for "result" label in the above metrics.
+	// Possible values for "result" and "status" (job_pods_creation_total) labels in the above metrics.
 
 	Succeeded = "succeeded"
 	Failed    = "failed"
 
 	// Possible values for "event"  label in the terminated_pods_tracking_finalizer
 	// metric.
+
 	Add    = "add"
 	Delete = "delete"
 
@@ -180,11 +181,6 @@ const (
 	PodCreateNew                   = "new"
 	PodRecreateTerminatingOrFailed = "recreate_terminating_or_failed"
 	PodRecreateFailed              = "recreate_failed"
-
-	// Possible values for "status" label in the job_pods_creation_total metric.
-
-	CreationSucceeded = "succeeded"
-	CreationFailed    = "failed"
 )
 
 var registerMetrics sync.Once

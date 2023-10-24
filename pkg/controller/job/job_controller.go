@@ -1547,7 +1547,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
 		// Counters for pod creation status (used by the job_pods_creation_total metric)
-		creationsSucceeded, creationsFailed := 0, 0
+		var creationsSucceeded, creationsFailed int32 = 0, 0
 
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
@@ -1598,9 +1598,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						jm.expectations.CreationObserved(logger, jobKey)
 						atomic.AddInt32(&active, -1)
 						errCh <- err
-						creationsFailed++
+						atomic.AddInt32(&creationsFailed, 1)
 					}
-					creationsSucceeded++
+					atomic.AddInt32(&creationsSucceeded, 1)
 				}()
 			}
 			wait.Wait()
@@ -1918,7 +1918,7 @@ func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
 	}
 }
 
-func recordJobPodsCreationTotal(job *batch.Job, succeeded, failed int) {
+func recordJobPodsCreationTotal(job *batch.Job, succeeded, failed int32) {
 	reason := metrics.PodCreateNew
 	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
 		podsTerminating := job.Status.Terminating != nil && *job.Status.Terminating > 0
@@ -1931,9 +1931,9 @@ func recordJobPodsCreationTotal(job *batch.Job, succeeded, failed int) {
 		}
 	}
 	if succeeded > 0 {
-		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.CreationSucceeded).Add(float64(succeeded))
+		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.Succeeded).Add(float64(succeeded))
 	}
 	if failed > 0 {
-		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.CreationFailed).Add(float64(failed))
+		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.Failed).Add(float64(failed))
 	}
 }
