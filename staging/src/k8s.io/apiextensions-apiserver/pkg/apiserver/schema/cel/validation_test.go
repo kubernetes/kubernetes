@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/warning"
 )
 
@@ -3564,13 +3565,14 @@ func TestRatcheting(t *testing.T) {
 			if budget == 0 {
 				budget = celconfig.RuntimeCELCostBudget
 			}
-			errs, _ := validator.ValidateWithRatcheting(
+			errs, _ := validator.Validate(
 				ctx,
 				field.NewPath("root"),
 				c.schema,
 				c.newObj,
 				c.oldObj,
 				budget,
+				WithRatcheting(common.NewCorrelatedObject(c.newObj, c.oldObj, &model.Structural{Structural: c.schema})),
 			)
 
 			require.Len(t, errs, len(c.errors), "must have expected number of errors")

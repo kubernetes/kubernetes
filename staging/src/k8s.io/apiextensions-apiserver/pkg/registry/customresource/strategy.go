@@ -246,9 +246,11 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	}
 
 	var options []validation.ValidationOption
+	var celOptions []cel.Option
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
 		correlatedObject := common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
 		options = append(options, validation.WithRatcheting(correlatedObject))
+		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
 	}
 
 	var errs field.ErrorList
@@ -266,11 +268,8 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	if celValidator := a.celValidator; celValidator != nil {
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
-		} else if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-			err, _ := celValidator.ValidateWithRatcheting(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
-			errs = append(errs, err...)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget, celOptions...)
 			errs = append(errs, err...)
 		}
 	}
