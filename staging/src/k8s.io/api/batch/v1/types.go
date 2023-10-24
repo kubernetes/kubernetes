@@ -547,9 +547,10 @@ const (
 	// JobReasponDeadlineExceeded means job duration is past ActiveDeadline
 	JobReasonDeadlineExceeded string = "DeadlineExceeded"
 	// JobReasonMaxFailedIndexesExceeded indicates that an indexed of a job failed
-	// https://kep.k8s.io/3850
+	// This const is used in beta-level feature: https://kep.k8s.io/3850.
 	JobReasonMaxFailedIndexesExceeded string = "MaxFailedIndexesExceeded"
 	// JobReasonFailedIndexes means Job has failed indexes.
+	// This const is used in beta-level feature: https://kep.k8s.io/3850.
 	JobReasonFailedIndexes string = "FailedIndexes"
 )
 
