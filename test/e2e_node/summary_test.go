@@ -317,6 +317,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"Inodes":     bounded(1e4, 1e8),
 							"InodesUsed": bounded(0, 1e8),
 						}),
+						"ContainerFs": gomega.BeNil(),
 					}),
 					"Rlimit": ptrMatchAllFields(gstruct.Fields{
 						"Time":                  recent(maxStatsAge),
