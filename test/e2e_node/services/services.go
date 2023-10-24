@@ -171,12 +171,27 @@ func (e *E2EServices) collectLogFiles() {
 			continue
 		}
 		for _, file := range log.Files {
-			if _, err := os.Stat(file); err != nil {
-				// Expected file not found on this distro.
-				klog.Errorf("failed to find %q from file: %v", file, err)
-				continue
+			fileWithAbsolutePath := file
+			if path.IsAbs(file) {
+				if _, err := os.Stat(file); err != nil {
+					// Expected file not found on this distro.
+					klog.Errorf("failed to find %q from file: %v", file, err)
+					continue
+				}
+			} else {
+				wd, err := os.Getwd()
+				if err != nil {
+					klog.Errorf("failed to get working directory", err)
+				}
+				fileWithWd := path.Join(wd, file)
+				if _, err := os.Stat(fileWithWd); err != nil {
+					// Expected file not found on this distro.
+					klog.Errorf("failed to find %q from file: %v", fileWithWd, err)
+					continue
+				}
+				fileWithAbsolutePath = fileWithWd
 			}
-			if err := copyLogFile(file, targetLink); err != nil {
+			if err := copyLogFile(fileWithAbsolutePath, targetLink); err != nil {
 				klog.Error(err)
 			} else {
 				break
