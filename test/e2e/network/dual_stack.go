@@ -111,6 +111,44 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
+	ginkgo.It("should create pod, add ipv6 and ipv4 ip to host ips [Feature:PodHostIPs]", func(ctx context.Context) {
+		podName := "pod-dualstack-ips"
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"test": "dualstack-host-ips"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "dualstack-host-ips",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					},
+				},
+			},
+		}
+
+		ginkgo.By("submitting the pod to kubernetes")
+		p := podClient.CreateSync(ctx, pod)
+
+		gomega.Expect(p.Status.HostIP).ShouldNot(gomega.BeEquivalentTo(""))
+		gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
+
+		// validate there are 2 ips in hostIPs
+		gomega.Expect(p.Status.HostIPs).To(gomega.HaveLen(2))
+		// validate first ip in hostIPs is same as HostIP
+		gomega.Expect(p.Status.HostIP).To(gomega.Equal(p.Status.HostIPs[0].IP))
+		// assert 2 host ips belong to different families
+		if netutils.IsIPv4String(p.Status.HostIPs[0].IP) == netutils.IsIPv4String(p.Status.HostIPs[1].IP) {
+			framework.Failf("both internalIPs %s and %s belong to the same families", p.Status.HostIPs[0], p.Status.HostIPs[1])
+		}
+
+		ginkgo.By("deleting the pod")
+		err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(30))
+		framework.ExpectNoError(err, "failed to delete pod")
+	})
+
 	// takes close to 140s to complete, so doesn't need to be marked [SLOW]
 	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip", func(ctx context.Context) {
 		serverDeploymentName := "dualstack-server"
