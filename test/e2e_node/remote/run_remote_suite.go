@@ -77,7 +77,7 @@ func RunRemoteTestSuite(testSuite TestSuite) {
 		os.Exit(1)
 	}()
 
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	if *buildOnly {
 		// Build the archive and exit
 		CreateTestArchive(testSuite,

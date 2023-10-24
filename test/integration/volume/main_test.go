@@ -25,6 +25,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	framework.EtcdMain(m.Run)
 }
