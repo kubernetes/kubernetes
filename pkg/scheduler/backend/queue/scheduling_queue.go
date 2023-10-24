@@ -642,17 +642,16 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 // determineSchedulingHintForInFlightPod looks at the unschedulable plugins of the given Pod
 // and determines the scheduling hint for this Pod while checking the events that happened during in-flight.
 func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) queueingStrategy {
-	events, err := p.activeQ.clusterEventsForPod(logger, pInfo)
-	if err != nil {
-		logger.Error(err, "Error getting cluster events for pod", "pod", klog.KObj(pInfo.Pod))
-		return queueAfterBackoff
-	}
-
-	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
-	if len(rejectorPlugins) == 0 {
+	if len(pInfo.UnschedulablePlugins) == 0 && len(pInfo.PendingPlugins) == 0 {
 		// No failed plugins are associated with this Pod.
 		// Meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
 		// In this case, we should retry scheduling it because this Pod may not be retried until the next flush.
+		return queueAfterBackoff
+	}
+
+	events, err := p.activeQ.clusterEventsForPod(logger, pInfo)
+	if err != nil {
+		logger.Error(err, "Error getting cluster events for pod", "pod", klog.KObj(pInfo.Pod))
 		return queueAfterBackoff
 	}
 
