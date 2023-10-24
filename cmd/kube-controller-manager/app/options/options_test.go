@@ -41,6 +41,7 @@ import (
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
+	leaderelectionconfig "k8s.io/kubernetes/pkg/controller/leaderelection/config"
 	netutils "k8s.io/utils/net"
 
 	clientgofeaturegate "k8s.io/client-go/features"
@@ -641,6 +642,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			ValidatingAdmissionPolicyStatusController: validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration{
 				ConcurrentPolicySyncs: 9,
+			},
+			LeaderElectionController: leaderelectionconfig.LeaderElectionControllerConfiguration{
+				ConcurrentLeaseSyncs: 5,
 			},
 		},
 	}

@@ -30,6 +30,7 @@ import (
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
+	leaderelectionconfig "k8s.io/kubernetes/pkg/controller/leaderelection/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
@@ -136,6 +137,9 @@ type KubeControllerManagerConfiguration struct {
 	// ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for
 	// ValidatingAdmissionPolicyStatusController related features.
 	ValidatingAdmissionPolicyStatusController validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration
+	//LeaderElectionControllerConfiguration holds configuration for
+	// LeaderElectionController related features.
+	LeaderElectionController leaderelectionconfig.LeaderElectionControllerConfiguration
 }
 
 // DeprecatedControllerConfiguration contains elements be deprecated.

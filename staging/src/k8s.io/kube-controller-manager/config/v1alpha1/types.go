@@ -487,3 +487,12 @@ type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
 	// The default value is 5.
 	ConcurrentPolicySyncs int32
 }
+
+// LeaderElectionControllerConfiguration contains elements describing LeaderElectionController.
+type LeaderElectionControllerConfiguration struct {
+	// LeaderElectionConcurrentLeaseSyncs is the number of lease objects that are
+	// allowed to sync concurrently. Larger number = quicker type checking,
+	// but more CPU (and network) load.
+	// The default value is 5.
+	LeaderElectionConcurrentLeaseSyncs int32
+}
