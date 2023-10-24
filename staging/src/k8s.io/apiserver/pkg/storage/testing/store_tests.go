@@ -28,7 +28,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1238,79 +1237,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 			} else {
 				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
-			}
-		})
-	}
-}
-
-func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.Interface) {
-	_, preset, err := seedMultiLevelData(ctx, store)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		pod := obj.(*example.Pod)
-		return nil, fields.Set{"metadata.name": pod.Name}, nil
-	}
-
-	tests := []struct {
-		name                       string
-		disablePaging              bool
-		rv                         string
-		rvMatch                    metav1.ResourceVersionMatch
-		prefix                     string
-		pred                       storage.SelectionPredicate
-		expectedOut                []*example.Pod
-		expectContinue             bool
-		expectedRemainingItemCount *int64
-		expectError                bool
-	}{
-		{
-			name:          "test List with limit when paging disabled",
-			disablePaging: true,
-			prefix:        "/pods/second/",
-			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
-				Limit: 1,
-			},
-			expectedOut:    []*example.Pod{preset[1], preset[2]},
-			expectContinue: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.pred.GetAttrs == nil {
-				tt.pred.GetAttrs = getAttrs
-			}
-
-			out := &example.PodList{}
-			storageOpts := storage.ListOptions{
-				ResourceVersion:      tt.rv,
-				ResourceVersionMatch: tt.rvMatch,
-				Predicate:            tt.pred,
-				Recursive:            true,
-			}
-
-			if err := store.GetList(ctx, tt.prefix, storageOpts, out); err != nil {
-				t.Fatalf("GetList failed: %v", err)
-				return
-			}
-			if (len(out.Continue) > 0) != tt.expectContinue {
-				t.Errorf("unexpected continue token: %q", out.Continue)
-			}
-
-			if len(tt.expectedOut) != len(out.Items) {
-				t.Fatalf("length of list want=%d, got=%d", len(tt.expectedOut), len(out.Items))
-			}
-			if diff := cmp.Diff(tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount()); diff != "" {
-				t.Errorf("incorrect remainingItemCount: %s", diff)
-			}
-			for j, wantPod := range tt.expectedOut {
-				getPod := &out.Items[j]
-				expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
 			}
 		})
 	}

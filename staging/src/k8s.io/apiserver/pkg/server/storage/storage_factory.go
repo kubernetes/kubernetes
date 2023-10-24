@@ -112,8 +112,6 @@ type groupResourceOverrides struct {
 	// decoderDecoratorFn is optional and may wrap the provided decoders (can add new decoders). The order of
 	// returned decoders will be priority for attempt to decode.
 	decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder
-	// disablePaging will prevent paging on the provided resource.
-	disablePaging bool
 }
 
 // Apply overrides the provided config and options if the override has a value in that position
@@ -137,9 +135,6 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	if o.decoderDecoratorFn != nil {
 		options.DecoderDecoratorFn = o.decoderDecoratorFn
 	}
-	if o.disablePaging {
-		config.Paging = false
-	}
 }
 
 var _ StorageFactory = &DefaultStorageFactory{}
@@ -154,7 +149,6 @@ func NewDefaultStorageFactory(
 	resourceConfig APIResourceConfigSource,
 	specialDefaultResourcePrefixes map[schema.GroupResource]string,
 ) *DefaultStorageFactory {
-	config.Paging = true
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}
