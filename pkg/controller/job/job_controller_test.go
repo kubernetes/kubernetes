@@ -3452,6 +3452,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  1,
 				Succeeded:               2,
+				Terminating:             ptr.To[int32](0),
 				CompletedIndexes:        "0,1",
 				FailedIndexes:           ptr.To(""),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
@@ -3483,6 +3484,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			},
 			wantStatus: batch.JobStatus{
 				Active:                  2,
+				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				FailedIndexes:           ptr.To(""),
 			},
@@ -3509,6 +3511,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Active:                  2,
 				Failed:                  1,
+				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				FailedIndexes:           ptr.To(""),
 			},
@@ -3535,6 +3538,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Active:                  1,
 				Failed:                  1,
 				FailedIndexes:           ptr.To("0"),
+				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
@@ -3583,6 +3587,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Active:                  1,
 				Failed:                  1,
 				FailedIndexes:           ptr.To("0"),
+				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
@@ -3632,6 +3637,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Active:                  0,
 				Failed:                  1,
 				FailedIndexes:           ptr.To(""),
+				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
@@ -3695,6 +3701,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Active:                  2,
 				Failed:                  0,
 				FailedIndexes:           ptr.To(""),
+				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
@@ -3721,6 +3728,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Failed:                  2,
 				Succeeded:               0,
 				FailedIndexes:           ptr.To(""),
+				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
@@ -3754,6 +3762,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  1,
 				Succeeded:               1,
+				Terminating:             ptr.To[int32](0),
 				FailedIndexes:           ptr.To("0"),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
@@ -3792,6 +3801,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  3,
 				Succeeded:               1,
+				Terminating:             ptr.To[int32](0),
 				FailedIndexes:           ptr.To("0,2"),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
@@ -3830,6 +3840,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Active:                  2,
 				Succeeded:               1,
+				Terminating:             ptr.To[int32](0),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},

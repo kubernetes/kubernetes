@@ -389,6 +389,7 @@ const (
 	// owner: @kannon92
 	// kep : https://kep.k8s.io/3939
 	// alpha: v1.28
+	// beta: v1.29
 	//
 	// Allow users to specify recreating pods of a job only when
 	// pods have fully terminated.
@@ -990,7 +991,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 
-	JobPodReplacementPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	JobPodReplacementPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	JobReadyPods: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
