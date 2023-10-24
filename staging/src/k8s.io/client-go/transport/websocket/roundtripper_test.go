@@ -49,7 +49,7 @@ func TestWebSocketRoundTripper_RoundTripperSucceeds(t *testing.T) {
 	// Create the wrapped roundtripper and websocket upgrade roundtripper and call "RoundTrip()".
 	websocketLocation, err := url.Parse(websocketServer.URL)
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), "POST", websocketServer.URL, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
 	require.NoError(t, err)
 	rt, wsRt, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
 	require.NoError(t, err)
@@ -67,18 +67,17 @@ func TestWebSocketRoundTripper_RoundTripperSucceeds(t *testing.T) {
 func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 	// Create fake WebSocket server.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w)
-		if err != nil {
-			t.Fatalf("error on webSocketServerStreams: %v", err)
-		}
-		defer conns.conn.Close()
+		// Bad handshake means websocket server will not completely initialize.
+		_, err := webSocketServerStreams(req, w)
+		require.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "websocket server finished before becoming ready"))
 	}))
 	defer websocketServer.Close()
 
 	// Create the wrapped roundtripper and websocket upgrade roundtripper and call "RoundTrip()".
 	websocketLocation, err := url.Parse(websocketServer.URL)
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), "POST", websocketServer.URL, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
 	require.NoError(t, err)
 	rt, _, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
 	require.NoError(t, err)
@@ -105,7 +104,7 @@ func TestWebSocketRoundTripper_NegotiateCreatesConnection(t *testing.T) {
 	// Create the websocket roundtripper and call "Negotiate" to create websocket connection.
 	websocketLocation, err := url.Parse(websocketServer.URL)
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), "POST", websocketServer.URL, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
 	require.NoError(t, err)
 	rt, wsRt, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
 	require.NoError(t, err)
