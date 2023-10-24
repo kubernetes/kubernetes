@@ -140,7 +140,7 @@ func transitionRule(t bool) validationMatcher {
 }
 
 func (v transitionRuleMatcher) matches(cr CompilationResult) bool {
-	return cr.TransitionRule == bool(v)
+	return cr.UsesOldSelf == bool(v)
 }
 
 func (v transitionRuleMatcher) String() string {

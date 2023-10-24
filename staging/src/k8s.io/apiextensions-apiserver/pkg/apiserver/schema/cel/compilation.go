@@ -48,9 +48,8 @@ const (
 type CompilationResult struct {
 	Program cel.Program
 	Error   *apiservercel.Error
-	// If true, the compiled expression contains a reference to the identifier "oldSelf", and its corresponding rule
-	// is implicitly a transition rule.
-	TransitionRule bool
+	// If true, the compiled expression contains a reference to the identifier "oldSelf".
+	UsesOldSelf bool
 	// Represents the worst-case cost of the compiled expression in terms of CEL's cost units, as used by cel.EstimateCost.
 	MaxCost uint64
 	// MaxCardinality represents the worse case number of times this validation rule could be invoked if contained under an
@@ -190,7 +189,7 @@ func compileRule(s *schema.Structural, rule apiextensions.ValidationRule, envSet
 	}
 	for _, ref := range checkedExpr.ReferenceMap {
 		if ref.Name == OldScopedVarName {
-			compilationResult.TransitionRule = true
+			compilationResult.UsesOldSelf = true
 			break
 		}
 	}

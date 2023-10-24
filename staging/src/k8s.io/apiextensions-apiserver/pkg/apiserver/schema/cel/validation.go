@@ -124,7 +124,7 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 	if len(compiledRules) > 0 || err != nil || itemsValidator != nil || additionalPropertiesValidator != nil || len(propertiesValidators) > 0 {
 		var activationFactory func(*schema.Structural, interface{}, interface{}) interpreter.Activation = validationActivationWithoutOldSelf
 		for _, rule := range compiledRules {
-			if rule.TransitionRule {
+			if rule.UsesOldSelf {
 				activationFactory = validationActivationWithOldSelf
 				break
 			}
@@ -300,7 +300,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			// rule is empty
 			continue
 		}
-		if compiled.TransitionRule && oldObj == nil {
+		if compiled.UsesOldSelf && oldObj == nil {
 			// transition rules are evaluated only if there is a comparable existing value
 			continue
 		}
@@ -344,7 +344,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			}
 
 			addErr := func(e *field.Error) {
-				if !compiled.TransitionRule && correlation.shouldRatchetError() {
+				if !compiled.UsesOldSelf && correlation.shouldRatchetError() {
 					warning.AddWarning(ctx, "", e.Error())
 				} else {
 					errs = append(errs, e)
