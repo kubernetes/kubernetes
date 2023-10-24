@@ -106,11 +106,15 @@ func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps)
 			return nil, nil, err
 		}
 	}
+	return NewSchemaValidatorFromOpenAPI(openapiSchema), openapiSchema, nil
+}
 
+func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema) SchemaValidator {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
-		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
+		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 	}
-	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}, openapiSchema, nil
+	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}
+
 }
 
 // ValidateCustomResourceUpdate validates the transition of Custom Resource from
