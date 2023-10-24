@@ -56,7 +56,7 @@ func TestUploadConfiguration(t *testing.T) {
 			cfg.ComponentConfigs = kubeadmapi.ComponentConfigMap{}
 			cfg.ClusterConfiguration.KubernetesVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String()
 			cfg.NodeRegistration.Name = "node-foo"
-			cfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+			cfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultCRISocket
 
 			client := clientsetfake.NewSimpleClientset()
 			// For idempotent test, we check the result of the second call.
