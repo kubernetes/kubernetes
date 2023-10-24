@@ -132,7 +132,7 @@ func TestMain(m *testing.M) {
 	// into TestContext.
 	// TODO(pohly): remove RegisterNodeFlags from test_context.go enable Viper config support here?
 
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	pflag.Parse()
 	if pflag.CommandLine.NArg() > 0 {
 		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", pflag.CommandLine.Args())

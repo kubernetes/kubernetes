@@ -142,7 +142,7 @@ func TestMain(m *testing.M) {
 		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}
 
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	os.Exit(m.Run())
 }
 
