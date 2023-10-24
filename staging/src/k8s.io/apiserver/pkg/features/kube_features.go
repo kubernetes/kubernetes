@@ -122,6 +122,7 @@ const (
 	// kep: https://kep.k8s.io/3299
 	// alpha: v1.25
 	// beta: v1.27
+	// stable: v1.29
 	//
 	// Enables KMS v2 API for encryption at rest.
 	KMSv2 featuregate.Feature = "KMSv2"
@@ -129,6 +130,7 @@ const (
 	// owner: @enj
 	// kep: https://kep.k8s.io/3299
 	// beta: v1.28
+	// stable: v1.29
 	//
 	// Enables the use of derived encryption keys with KMS v2.
 	KMSv2KDF featuregate.Feature = "KMSv2KDF"
@@ -279,11 +281,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	KMSv1: {Default: true, PreRelease: featuregate.Deprecated},
+	KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
 
-	KMSv2: {Default: true, PreRelease: featuregate.Beta},
+	KMSv2: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
-	KMSv2KDF: {Default: true, PreRelease: featuregate.Beta}, // lock to true in 1.29 once KMSv2 is GA, remove in 1.31
+	KMSv2KDF: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 

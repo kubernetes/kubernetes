@@ -34,7 +34,7 @@ import (
 	kmsapi "k8s.io/kms/apis/v2"
 )
 
-const version = "v2alpha1"
+const version = "v2"
 
 func TestGRPCService(t *testing.T) {
 	t.Parallel()

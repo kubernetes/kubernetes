@@ -64,7 +64,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	kmsv2api "k8s.io/kms/apis/v2"
 	kmsv2svc "k8s.io/kms/pkg/service"
@@ -163,6 +162,84 @@ func (r envelopekmsv2) plainTextPayload(secretETCDPath string) ([]byte, error) {
 	return plainSecret, nil
 }
 
+// TestDefaultValues tests default flag values without setting any of the feature flags or
+// calling SetKDFForTests, and assert that the data stored in etcd is using KDF
+func TestDefaultValues(t *testing.T) {
+	if encryptionconfig.GetKDF() != true {
+		t.Fatalf("without updating the feature flags, default value of KMSv2KDF should be enabled.")
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) != true {
+		t.Fatalf("without updating the feature flags, default value of KMSv2 should be enabled.")
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KMSv1) != false {
+		t.Fatalf("without updating the feature flags, default value of KMSv1 should be disabled.")
+	}
+	// since encryptionconfig.GetKDF() is true by default, following test should verify if
+	// object.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	t.Cleanup(cancel)
+
+	encryptionConfig := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - pods
+    providers:
+    - kms:
+       apiVersion: v2
+       name: kms-provider
+       endpoint: unix:///@kms-provider.sock
+`
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	if err != nil {
+		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
+	}
+	t.Cleanup(test.cleanUp)
+
+	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+	if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "busybox",
+					Image: "busybox",
+				},
+			},
+		},
+	}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	config := test.kubeAPIServer.ServerOpts.Etcd.StorageConfig
+	rawClient, etcdClient, err := integration.GetEtcdClients(config.Transport)
+	if err != nil {
+		t.Fatalf("failed to create etcd client: %v", err)
+	}
+	t.Cleanup(func() { _ = rawClient.Close() })
+
+	response, err := etcdClient.Get(ctx, "/"+config.Prefix+"/pods/"+testNamespace+"/", clientv3.WithPrefix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Kvs) != 1 {
+		t.Fatalf("expected 1 KVs, but got %d", len(response.Kvs))
+	}
+	object := kmstypes.EncryptedObject{}
+	v := bytes.TrimPrefix(response.Kvs[0].Value, []byte("k8s:enc:kms:v2:kms-provider:"))
+	if err := proto.Unmarshal(v, &object); err != nil {
+		t.Fatal(err)
+	}
+	if object.EncryptedDEKSourceType != kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED {
+		t.Errorf("invalid type: %d", object.EncryptedDEKSourceType)
+	}
+}
+
 // TestKMSv2Provider is an integration test between KubeAPI, ETCD and KMSv2 Plugin
 // Concretely, this test verifies the following integration contracts:
 // 1. Raw records in ETCD that were processed by KMSv2 Provider should be prefixed with k8s:enc:kms:v2:<plugin name>:
@@ -171,22 +248,19 @@ func (r envelopekmsv2) plainTextPayload(secretETCDPath string) ([]byte, error) {
 // 4. The cipherTextPayload (ex. Secret) should be encrypted via AES GCM transform / extended nonce GCM
 // 5. kmstypes.EncryptedObject structure should be serialized and deposited in ETCD
 func TestKMSv2Provider(t *testing.T) {
-	defaultUseSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+	defaultUseSeed := encryptionconfig.GetKDF()
 
 	t.Run("regular gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+		defer encryptionconfig.SetKDFForTests(false)()
 		testKMSv2Provider(t, !defaultUseSeed)
 	})
-
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, true)()
+		defer encryptionconfig.SetKDFForTests(true)()
 		testKMSv2Provider(t, defaultUseSeed)
 	})
 }
 
 func testKMSv2Provider(t *testing.T, useSeed bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -327,19 +401,15 @@ resources:
 // 7. when kms-plugin is down, no-op update for a pod should succeed and not result in RV change even once the DEK/seed is valid
 func TestKMSv2ProviderKeyIDStaleness(t *testing.T) {
 	t.Run("regular gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+		defer encryptionconfig.SetKDFForTests(false)()
 		testKMSv2ProviderKeyIDStaleness(t)
 	})
-
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, true)()
 		testKMSv2ProviderKeyIDStaleness(t)
 	})
 }
 
 func testKMSv2ProviderKeyIDStaleness(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -382,7 +452,7 @@ resources:
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	t.Cleanup(cancel)
 
-	useSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+	useSeed := encryptionconfig.GetKDF()
 
 	var firstEncryptedDEKSource []byte
 	var f checkFunc
@@ -577,9 +647,8 @@ resources:
 	if version7 != version8 {
 		t.Fatalf("Resource version should not have changed after plugin health is restored. old pod: %v, new pod: %v", updatedNewPod, updatedNewPod2)
 	}
-
 	// flip the current config
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, !useSeed)()
+	defer encryptionconfig.SetKDFForTests(!useSeed)()
 
 	// 9. confirm that no-op update for a pod results in RV change due to KDF config change
 	var version9 string
@@ -603,7 +672,7 @@ resources:
 
 func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 	t.Run("regular gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+		defer encryptionconfig.SetKDFForTests(false)()
 		testKMSv2ProviderDEKSourceReuse(t,
 			func(i int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
 				if obj.KeyID != "1" {
@@ -618,9 +687,8 @@ func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 			},
 		)
 	})
-
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, true)()
+		defer encryptionconfig.SetKDFForTests(true)()
 		testKMSv2ProviderDEKSourceReuse(t,
 			func(_ int, _ uint64, etcdKey string, obj kmstypes.EncryptedObject) {
 				if obj.KeyID != "1" {
@@ -632,8 +700,6 @@ func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 }
 
 func testKMSv2ProviderDEKSourceReuse(t *testing.T, f checkFunc) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(cancel)
 
@@ -705,7 +771,7 @@ func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebacken
 		t.Fatalf("expected %d KVs, but got %d", podCount, len(response.Kvs))
 	}
 
-	useSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+	useSeed := encryptionconfig.GetKDF()
 
 	out := make([]kmstypes.EncryptedObject, len(response.Kvs))
 	for i, kv := range response.Kvs {
@@ -767,8 +833,7 @@ func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebacken
 }
 
 func TestKMSv2Healthz(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, randomBool())()
+	defer encryptionconfig.SetKDFForTests(randomBool())()
 
 	encryptionConfig := `
 kind: EncryptionConfiguration
@@ -833,8 +898,7 @@ resources:
 }
 
 func TestKMSv2SingleService(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, randomBool())()
+	defer encryptionconfig.SetKDFForTests(randomBool())()
 
 	var kmsv2Calls int
 	origEnvelopeKMSv2ServiceFactory := encryptionconfig.EnvelopeKMSv2ServiceFactory
@@ -903,12 +967,8 @@ resources:
 
 // TestKMSv2FeatureFlag is an integration test between KubeAPI and ETCD
 // Concretely, this test verifies the following:
-// 1. When feature flag is not enabled, loading a encryptionConfig with KMSv2 should fail
-// 2. When feature flag is enabled, loading a encryptionConfig with KMSv2 should work
-// 3. When feature flag is disabled, loading a encryptionConfig with a non-v2 provider should work.
-// without performing a storage migration, decryption of existing data encrypted with v2 should fail for Get and List operations.
-// New data stored in etcd will no longer be encrypted using the external kms provider with v2 API.
-// 4. when feature flag is re-enabled, loading a encryptionConfig with the same KMSv2 plugin from 2 should work,
+// 1. When feature flag is enabled, loading a encryptionConfig with KMSv2 should work
+// 2. After a restart, loading a encryptionConfig with the same KMSv2 plugin from 1 should work,
 // decryption of data encrypted with v2 should work
 func TestKMSv2FeatureFlag(t *testing.T) {
 	encryptionConfig := `
@@ -927,8 +987,7 @@ resources:
 	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 	storageConfig := framework.SharedEtcd()
 
-	// When feature flag is enabled, loading a encryptionConfig with KMSv1 and v2 should work
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+	// KMSv2 is enabled by default. Loading a encryptionConfig with KMSv2 should work
 	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
@@ -999,48 +1058,7 @@ resources:
 	}
 	test.shutdownAPIServer()
 
-	// When KMSv2 feature flag is disabled, loading a encryptionConfig with a non-v2 provider should work. without performing a storage migration, decryption of existing data encrypted with v2 should fail for Get and List operations.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, false)()
-
-	encryptionConfig1 := `
-kind: EncryptionConfiguration
-apiVersion: apiserver.config.k8s.io/v1
-resources:
-  - resources:
-    - secrets
-    providers:
-    - aescbc:
-        keys:
-        - name: key1
-          secret: c2VjcmV0IGlzIHNlY3VyZQ==
-`
-	test, err = newTransformTest(t, encryptionConfig1, false, "", storageConfig)
-	if err != nil {
-		t.Fatalf("Failed to restart api server, error: %v", err)
-	}
-
-	_, err = test.createSecret("test2", testNamespace)
-	if err != nil {
-		t.Fatalf("Failed to create test secret, error: %v", err)
-	}
-	test.runResource(t, unSealWithCBCTransformer, aesCBCPrefix, "", "v1", "secrets", "test2", testNamespace)
-
-	secretClient = test.restClient.CoreV1().Secrets(testNamespace)
-
-	// Getting an old secret that was encrypted by another provider should fail
-	_, err = secretClient.Get(ctx, testSecret, metav1.GetOptions{})
-	if err == nil || !strings.Contains(err.Error(), "no matching prefix found") {
-		t.Fatalf("using a new provider, get Secret %s from %s should return err containing: no matching prefix found. Got err: %v", testSecret, testNamespace, err)
-	}
-	// List all cluster wide secrets should fail
-	_, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
-	if err == nil || !strings.Contains(err.Error(), "no matching prefix found") {
-		t.Fatalf("using a new provider, LIST all Secrets should return err containing: no matching prefix found. Got err: %v", err)
-	}
-	test.shutdownAPIServer()
-
-	// when feature flag is re-enabled, loading a encryptionConfig with the same KMSv2 plugin before the restart should work, decryption of data encrypted with v2 should work
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+	// After a restart, loading a encryptionConfig with the same KMSv2 plugin before the restart should work, decryption of data encrypted with v2 should work
 
 	test, err = newTransformTest(t, encryptionConfig, false, "", storageConfig)
 	if err != nil {
@@ -1059,12 +1077,6 @@ resources:
 	if secretVal != string(s.Data[secretKey]) {
 		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}
-	secretClient = test.restClient.CoreV1().Secrets(testNamespace)
-	// Getting an old secret that was encrypted by another plugin should fail
-	_, err = secretClient.Get(ctx, "test2", metav1.GetOptions{})
-	if err == nil || !strings.Contains(err.Error(), "no matching prefix found") {
-		t.Fatalf("after re-enabling feature gate, get test2 Secret from %s should return err containing: no matching prefix found. actual err: %v", testNamespace, err)
-	}
 }
 
 var benchSecret *api.Secret
@@ -1075,8 +1087,7 @@ func BenchmarkKMSv2KDF(b *testing.B) {
 	klog.SetOutput(io.Discard)
 	klog.LogToStderr(false)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+	defer encryptionconfig.SetKDFForTests(false)()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	b.Cleanup(cancel)
@@ -1231,8 +1242,7 @@ func BenchmarkKMSv2REST(b *testing.B) {
 	klog.SetOutput(io.Discard)
 	klog.LogToStderr(false)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+	defer encryptionconfig.SetKDFForTests(true)()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	b.Cleanup(cancel)
@@ -1317,19 +1327,16 @@ func randomBool() bool { return utilrand.Int()%2 == 1 }
 // TestKMSv2ProviderLegacyData confirms that legacy data recorded from the earliest released commit can still be read.
 func TestKMSv2ProviderLegacyData(t *testing.T) {
 	t.Run("regular gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+		defer encryptionconfig.SetKDFForTests(false)()
 		testKMSv2ProviderLegacyData(t)
 	})
-
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, true)()
+		defer encryptionconfig.SetKDFForTests(true)()
 		testKMSv2ProviderLegacyData(t)
 	})
 }
 
 func testKMSv2ProviderLegacyData(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
-
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1

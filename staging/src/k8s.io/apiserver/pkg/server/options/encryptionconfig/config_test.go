@@ -187,7 +187,7 @@ func TestLegacyConfig(t *testing.T) {
 }
 
 func TestEncryptionProviderConfigCorrect(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
 	// Set factory for mock envelope service
 	factory := envelopeServiceFactory
@@ -353,41 +353,32 @@ func TestKMSv1Deprecation(t *testing.T) {
 
 func TestKMSvsEnablement(t *testing.T) {
 	testCases := []struct {
-		name         string
-		kmsv2Enabled bool
-		filePath     string
-		expectedErr  string
+		name        string
+		filePath    string
+		expectedErr string
 	}{
 		{
-			name:         "config with kmsv2 and kmsv1, KMSv2=false",
-			kmsv2Enabled: false,
-			filePath:     "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
-			expectedErr:  "KMSv2 feature is not enabled",
+			name:        "config with kmsv2 and kmsv1, KMSv2=true, KMSv1=false, should fail when feature is disabled",
+			filePath:    "testdata/valid-configs/kms/multiple-providers-mixed.yaml",
+			expectedErr: "KMSv1 is deprecated and will only receive security updates going forward. Use KMSv2 instead",
 		},
 		{
-			name:         "config with kmsv2 and kmsv1, KMSv2=true",
-			kmsv2Enabled: true,
-			filePath:     "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
-			expectedErr:  "",
-		},
-		{
-			name:         "config with kmsv1, KMSv2=false",
-			kmsv2Enabled: false,
-			filePath:     "testdata/valid-configs/kms/multiple-providers.yaml",
-			expectedErr:  "",
+			name:        "config with kmsv2, KMSv2=true, KMSv1=false",
+			filePath:    "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
+			expectedErr: "",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			// Just testing KMSv2 feature flag
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, testCase.kmsv2Enabled)()
+			// only the KMSv2 feature flag is enabled
 			_, err := LoadEncryptionConfig(testContext(t), testCase.filePath, false, "")
 
-			if !strings.Contains(errString(err), testCase.expectedErr) {
+			if len(testCase.expectedErr) > 0 && !strings.Contains(errString(err), testCase.expectedErr) {
 				t.Fatalf("expected error %q, got %q", testCase.expectedErr, errString(err))
+			}
+			if len(testCase.expectedErr) == 0 && err != nil {
+				t.Fatalf("unexpected error %q", errString(err))
 			}
 
 		})
@@ -400,43 +391,6 @@ func TestKMSvsEnablement(t *testing.T) {
 		config          apiserverconfig.EncryptionConfiguration
 		wantV2Used      bool
 	}{
-		{
-			name:         "with kmsv1 and kmsv2, KMSv2=false",
-			kmsv2Enabled: false,
-			config: apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
-					{
-						Resources: []string{"secrets"},
-						Providers: []apiserverconfig.ProviderConfiguration{
-							{
-								KMS: &apiserverconfig.KMSConfiguration{
-									Name:       "kms",
-									APIVersion: "v1",
-									Timeout: &metav1.Duration{
-										Duration: 1 * time.Second,
-									},
-									Endpoint:  "unix:///tmp/testprovider.sock",
-									CacheSize: pointer.Int32(1000),
-								},
-							},
-							{
-								KMS: &apiserverconfig.KMSConfiguration{
-									Name:       "another-kms",
-									APIVersion: "v2",
-									Timeout: &metav1.Duration{
-										Duration: 1 * time.Second,
-									},
-									Endpoint:  "unix:///tmp/anothertestprovider.sock",
-									CacheSize: pointer.Int32(1000),
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErr: "KMSv2 feature is not enabled",
-			wantV2Used:  false,
-		},
 		{
 			name:         "with kmsv1 and kmsv2, KMSv2=true",
 			kmsv2Enabled: true,
@@ -501,7 +455,7 @@ func TestKMSvsEnablement(t *testing.T) {
 }
 
 func TestKMSMaxTimeout(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
 	testCases := []struct {
 		name            string
@@ -749,7 +703,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 }
 
 func TestKMSPluginHealthz(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
 	kmsv2Probe := &kmsv2PluginProbe{
 		name:        "foo",
@@ -823,7 +777,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 		},
 		{
 			desc:   "Install multiple healthz with v1 and v2",
-			config: "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
+			config: "testdata/valid-configs/kms/multiple-providers-mixed.yaml",
 			want: []healthChecker{
 				kmsv2Probe,
 				&kmsPluginProbe{
@@ -900,6 +854,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 
 // tests for masking rules
 func TestWildcardMasking(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
 	testCases := []struct {
 		desc          string
@@ -1308,7 +1263,7 @@ func TestWildcardMasking(t *testing.T) {
 }
 
 func TestWildcardStructure(t *testing.T) {
-
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 	testCases := []struct {
 		desc                         string
 		expectedResourceTransformers map[string]string
@@ -1752,7 +1707,7 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "unhealthy",
 			},
-			expectedErr: "got unexpected healthz status: unhealthy, expected KMSv2 API version v2beta1, got , got invalid KMSv2 KeyID ",
+			expectedErr: "got unexpected healthz status: unhealthy, expected KMSv2 API version v2, got , got invalid KMSv2 KeyID ",
 			wantMetrics: `
 			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
 			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
@@ -1760,11 +1715,11 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			`,
 		},
 		{
-			desc: "version is not v2beta1",
+			desc: "version is not v2",
 			statusResponse: &kmsservice.StatusResponse{
 				Version: "v1beta1",
 			},
-			expectedErr: "got unexpected healthz status: , expected KMSv2 API version v2beta1, got v1beta1, got invalid KMSv2 KeyID ",
+			expectedErr: "got unexpected healthz status: , expected KMSv2 API version v2, got v1beta1, got invalid KMSv2 KeyID ",
 			wantMetrics: `
 			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
 			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
@@ -1788,7 +1743,7 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			desc: "invalid long keyID",
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "ok",
-				Version: "v2beta1",
+				Version: "v2",
 				KeyID:   sampleInvalidKeyID,
 			},
 			expectedErr: "got invalid KMSv2 KeyID ",
@@ -1810,6 +1765,52 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.wantMetrics),
 				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
 			); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// test to ensure KMSv2 API version is not changed after the first status response
+func TestKMSv2SameVersionFromStatus(t *testing.T) {
+	probe := &kmsv2PluginProbe{name: "testplugin"}
+	service, _ := newMockEnvelopeKMSv2Service(testContext(t), "unix:///tmp/testprovider.sock", "providerName", 3*time.Second)
+	probe.l = &sync.Mutex{}
+	probe.state.Store(&envelopekmsv2.State{})
+	probe.service = service
+
+	testCases := []struct {
+		desc        string
+		expectedErr string
+		newVersion  string
+	}{
+		{
+			desc:        "version changed",
+			newVersion:  "v2",
+			expectedErr: "KMSv2 API version should not change",
+		},
+		{
+			desc:        "version unchanged",
+			newVersion:  "v2beta1",
+			expectedErr: "",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			statusResponse := &kmsservice.StatusResponse{
+				Healthz: "ok",
+				Version: "v2beta1",
+				KeyID:   "1",
+			}
+			if err := probe.isKMSv2ProviderHealthyAndMaybeRotateDEK(testContext(t), statusResponse); err != nil {
+				t.Fatal(err)
+			}
+			statusResponse.Version = tt.newVersion
+			err := probe.isKMSv2ProviderHealthyAndMaybeRotateDEK(testContext(t), statusResponse)
+			if len(tt.expectedErr) > 0 && !strings.Contains(errString(err), tt.expectedErr) {
+				t.Errorf("expected err %q, got %q", tt.expectedErr, errString(err))
+			}
+			if len(tt.expectedErr) == 0 && err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -1840,7 +1841,7 @@ func TestComputeEncryptionConfigHash(t *testing.T) {
 }
 
 func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
-	defaultUseSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+	defaultUseSeed := GetKDF()
 
 	origNowFunc := envelopekmsv2.NowFunc
 	now := origNowFunc() // freeze time
@@ -2065,7 +2066,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, tt.useSeed)()
+			defer SetKDFForTests(tt.useSeed)()
 
 			var buf bytes.Buffer
 			klog.SetOutput(&buf)
