@@ -31,16 +31,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/utils/ptr"
 
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/common"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -3614,6 +3618,401 @@ func TestRatcheting(t *testing.T) {
 				assert.True(t, found, "expected warning %q not found", expectedWarning)
 			}
 
+		})
+	}
+}
+
+// Runs transition rule cases with OptionalOldSelf set to true on the schema
+func TestOptionalOldSelf(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		oldObj interface{}
+		errors []string // strings that error message must contain
+	}{
+		{
+			name: "allow new value if old value is null",
+			obj: map[string]interface{}{
+				"foo": "bar",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'not bar' || !oldSelf.hasValue()"),
+		},
+		{
+			name: "block new value if old value is not null",
+			obj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "bar",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || !oldSelf.hasValue()"),
+			errors: []string{"failed rule"},
+		},
+		{
+			name: "allow invalid new value if old value is also invalid",
+			obj: map[string]interface{}{
+				"foo": "invalid again",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || (oldSelf.hasValue() && oldSelf.value().foo != 'valid')"),
+		},
+		{
+			name: "allow invalid new value if old value is also invalid with chained optionals",
+			obj: map[string]interface{}{
+				"foo": "invalid again",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || oldSelf.foo.orValue('') != 'valid'"),
+		},
+		{
+			name: "block invalid new value if old value is valid",
+			obj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "valid",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || (oldSelf.hasValue() && oldSelf.value().foo != 'valid')"),
+			errors: []string{"failed rule"},
+		},
+		{
+			name:   "create: new min or allow higher than oldValue",
+			obj:    10,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name: "block create: new min or allow higher than oldValue",
+			obj:  9,
+			// Can't use != null because type is integer and no overload
+			// workaround by comparing type, but kinda hacky
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+			errors: []string{"failed rule"},
+		},
+		{
+			name:   "update: new min or allow higher than oldValue",
+			obj:    10,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name:   "ratchet update: new min or allow higher than oldValue",
+			obj:    9,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name:   "ratchet noop update: new min or allow higher than oldValue",
+			obj:    5,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name:   "block update: new min or allow higher than oldValue",
+			obj:    4,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+			errors: []string{"failed rule"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		tp := true
+		for i := range tt.schema.XValidations {
+			tt.schema.XValidations[i].OptionalOldSelf = &tp
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			// t.Parallel()
+
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, false), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, tt.oldObj, math.MaxInt)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeInvalid {
+					t.Errorf("expected only ErrorTypeInvalid errors, but got: %v", err)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+// Shows that type(oldSelf) == null_type works for all supported OpenAPI types
+// both when oldSelf is null and when it is not null
+func TestOptionalOldSelfCheckForNull(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+
+	tests := []struct {
+		name   string
+		schema schema.Structural
+		obj    interface{}
+		oldObj interface{}
+	}{
+		{
+			name: "object",
+			obj: map[string]interface{}{
+				"foo": "bar",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "baz",
+			},
+			schema: withRule(objectType(map[string]schema.Structural{
+				"foo": stringType,
+			}), `!oldSelf.hasValue() || self.foo == "bar"`),
+		},
+		{
+			name: "object - conditional field",
+			obj: map[string]interface{}{
+				"foo": "bar",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "baz",
+			},
+			schema: withRule(objectType(map[string]schema.Structural{
+				"foo": stringType,
+			}), `self.foo != "bar" || oldSelf.?foo.orValue("baz") == "baz"`),
+		},
+		{
+			name:   "string",
+			obj:    "bar",
+			oldObj: "baz",
+			schema: withRule(stringType, `
+				!oldSelf.hasValue() || self == "bar"
+			`),
+		},
+		{
+			name:   "integer",
+			obj:    1,
+			oldObj: 2,
+			schema: withRule(integerType, `
+				!oldSelf.hasValue() || self == 1
+			`),
+		},
+		{
+			name:   "number",
+			obj:    1.1,
+			oldObj: 2.2,
+			schema: withRule(numberType, `
+				!oldSelf.hasValue() || self == 1.1
+			`),
+		},
+		{
+			name:   "boolean",
+			obj:    true,
+			oldObj: false,
+			schema: withRule(booleanType, `
+				!oldSelf.hasValue() || self == true
+			`),
+		},
+		{
+			name:   "array",
+			obj:    []interface{}{"bar"},
+			oldObj: []interface{}{"baz"},
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				!oldSelf.hasValue() || self[0] == "bar"
+			`),
+		},
+		{
+			name: "array - conditional index",
+			obj:  []interface{}{},
+			oldObj: []interface{}{
+				"baz",
+			},
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				self.size() > 0 || oldSelf[?0].orValue("baz") == "baz"
+			`),
+		},
+		{
+			name:   "set-array",
+			obj:    []interface{}{"bar"},
+			oldObj: []interface{}{"baz"},
+			schema: withRule(arrayType("set", nil, &stringSchema), `
+				!oldSelf.hasValue() || self[0] == "bar"
+			`),
+		},
+		{
+			name: "map-array",
+			obj: []interface{}{map[string]interface{}{
+				"key":   "foo",
+				"value": "bar",
+			}},
+			oldObj: []interface{}{map[string]interface{}{
+				"key":   "foo",
+				"value": "baz",
+			}},
+			schema: withRule(arrayType("map", []string{"key"}, objectTypePtr(map[string]schema.Structural{
+				"key":   stringType,
+				"value": stringType,
+			})), `
+				!oldSelf.hasValue() || self[0].value == "bar"
+			`),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		tp := true
+		for i := range tt.schema.XValidations {
+			tt.schema.XValidations[i].OptionalOldSelf = &tp
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			celValidator := validator(&tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+
+			t.Run("null old", func(t *testing.T) {
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &tt.schema, tt.obj, nil, math.MaxInt)
+				if len(errs) != 0 {
+					t.Errorf("expected no errors, but got: %v", errs)
+				}
+			})
+
+			t.Run("non-null old", func(t *testing.T) {
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &tt.schema, tt.obj, tt.oldObj, math.MaxInt)
+				if len(errs) != 0 {
+					t.Errorf("expected no errors, but got: %v", errs)
+				}
+			})
+		})
+	}
+}
+
+// Show that we cant just use oldSelf as if it was unwrapped
+func TestOptionalOldSelfIsOptionalType(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+
+	cases := []struct {
+		name   string
+		schema schema.Structural
+		obj    interface{}
+		errors []string
+	}{
+		{
+			name: "forbid direct usage of optional integer",
+			schema: withRule(integerType, `
+				oldSelf + self > 5
+			`),
+			obj:    5,
+			errors: []string{"no matching overload for '_+_' applied to '(optional(int), int)"},
+		},
+		{
+			name: "forbid direct usage of optional string",
+			schema: withRule(stringType, `
+				oldSelf == "foo"
+			`),
+			obj:    "bar",
+			errors: []string{"no matching overload for '_==_' applied to '(optional(string), string)"},
+		},
+		{
+			name: "forbid direct usage of optional array",
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				oldSelf.all(x, x == x)
+			`),
+			obj:    []interface{}{"bar"},
+			errors: []string{"expression of type 'optional(list(string))' cannot be range of a comprehension"},
+		},
+		{
+			name: "forbid direct usage of optional array element",
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				oldSelf[0] == "foo"
+			`),
+			obj:    []interface{}{"bar"},
+			errors: []string{"found no matching overload for '_==_' applied to '(optional(string), string)"},
+		},
+		{
+			name: "forbid direct usage of optional struct",
+			schema: withRule(arrayType("map", []string{"key"}, objectTypePtr(map[string]schema.Structural{
+				"key":   stringType,
+				"value": stringType,
+			})), `oldSelf.key == "foo"`),
+			obj: []interface{}{map[string]interface{}{
+				"key":   "bar",
+				"value": "baz",
+			}},
+			errors: []string{"does not support field selection"},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+
+			for i := range tt.schema.XValidations {
+				tt.schema.XValidations[i].OptionalOldSelf = ptr.To(true)
+			}
+
+			celValidator := validator(&tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &tt.schema, tt.obj, tt.obj, math.MaxInt)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeInvalid {
+					t.Errorf("expected only ErrorTypeInvalid errors, but got: %v", err)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
 		})
 	}
 }
