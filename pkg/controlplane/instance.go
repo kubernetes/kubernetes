@@ -364,7 +364,7 @@ func (c *Config) Complete() CompletedConfig {
 // KubeletClientConfig
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
 	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
-		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
+		return nil, fmt.Errorf("new Instance with empty config.KubeletClientConfig")
 	}
 
 	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
