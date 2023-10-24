@@ -1700,11 +1700,17 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 		failed      int
 		terminating *int32
 	}
+	type jobPodsCreationMetrics struct {
+		new                         int
+		recreateTerminatingOrFailed int
+		recreateFailed              int
+	}
 	cases := map[string]struct {
 		podReplacementPolicyEnabled bool
 		jobSpec                     *batchv1.JobSpec
 		wantStatusAfterDeletion     jobStatus
 		wantStatusAfterFailure      jobStatus
+		wantMetrics                 jobPodsCreationMetrics
 	}{
 		"feature flag off, delete & fail pods, recreate terminating pods, and verify job status counters": {
 			jobSpec: &batchv1.JobSpec{
@@ -1724,6 +1730,9 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			wantStatusAfterFailure: jobStatus{
 				active: 2,
 				failed: 2,
+			},
+			wantMetrics: jobPodsCreationMetrics{
+				new: 4,
 			},
 		},
 		"feature flag true, TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
@@ -1749,6 +1758,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				failed:      2,
 				terminating: ptr.To[int32](0),
 			},
+			wantMetrics: jobPodsCreationMetrics{
+				new:                         2,
+				recreateTerminatingOrFailed: 2,
+			},
 		},
 		"feature flag true with NonIndexedJob, TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
 			podReplacementPolicyEnabled: true,
@@ -1772,6 +1785,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				active:      2,
 				failed:      2,
 				terminating: ptr.To[int32](0),
+			},
+			wantMetrics: jobPodsCreationMetrics{
+				new:                         2,
+				recreateTerminatingOrFailed: 2,
 			},
 		},
 		"feature flag false, podFailurePolicy enabled, delete & fail pods, recreate failed pods, and verify job status counters": {
@@ -1804,6 +1821,9 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			wantStatusAfterFailure: jobStatus{
 				active: 2,
 			},
+			wantMetrics: jobPodsCreationMetrics{
+				new: 2,
+			},
 		},
 		"feature flag true, Failed policy, delete & fail pods, recreate failed pods, and verify job status counters": {
 			podReplacementPolicyEnabled: true,
@@ -1828,6 +1848,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				failed:      2,
 				terminating: ptr.To[int32](0),
 			},
+			wantMetrics: jobPodsCreationMetrics{
+				new:            2,
+				recreateFailed: 2,
+			},
 		},
 		"feature flag true with NonIndexedJob, Failed policy, delete & fail pods, recreate failed pods, and verify job status counters": {
 			podReplacementPolicyEnabled: true,
@@ -1851,6 +1875,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				active:      2,
 				failed:      2,
 				terminating: ptr.To[int32](0),
+			},
+			wantMetrics: jobPodsCreationMetrics{
+				new:            2,
+				recreateFailed: 2,
 			},
 		},
 	}
@@ -1887,13 +1915,31 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			})
 
 			failTerminatingPods(ctx, t, clientSet, ns.Name)
-
 			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
 				Terminating: tc.wantStatusAfterFailure.terminating,
 				Failed:      tc.wantStatusAfterFailure.failed,
 				Active:      tc.wantStatusAfterFailure.active,
 				Ready:       ptr.To[int32](0),
 			})
+
+			validateCounterMetric(
+				ctx,
+				t,
+				metrics.JobPodsCreationTotal,
+				metricLabelsWithValue{Labels: []string{"new", "succeeded"}, Value: tc.wantMetrics.new},
+			)
+			validateCounterMetric(
+				ctx,
+				t,
+				metrics.JobPodsCreationTotal,
+				metricLabelsWithValue{Labels: []string{"recreate_terminating_or_failed", "succeeded"}, Value: tc.wantMetrics.recreateTerminatingOrFailed},
+			)
+			validateCounterMetric(
+				ctx,
+				t,
+				metrics.JobPodsCreationTotal,
+				metricLabelsWithValue{Labels: []string{"recreate_failed", "succeeded"}, Value: tc.wantMetrics.recreateFailed},
+			)
 		})
 	}
 }
@@ -3002,6 +3048,7 @@ func resetMetrics() {
 	metrics.JobPodsFinished.Reset()
 	metrics.PodFailuresHandledByFailurePolicy.Reset()
 	metrics.JobFinishedIndexesTotal.Reset()
+	metrics.JobPodsCreationTotal.Reset()
 }
 
 func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclient.Config, informerSet informers.SharedInformerFactory) (*jobcontroller.Controller, context.Context, context.CancelFunc) {
