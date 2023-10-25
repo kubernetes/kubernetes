@@ -21,9 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
-	kubeopenapivalidate "k8s.io/kube-openapi/pkg/validation/validate"
-
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
@@ -74,7 +71,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 	isResourceRoot := s == rootSchema
 
 	if s.Default.Object != nil {
-		validator := kubeopenapivalidate.NewSchemaValidator(s.ToKubeOpenAPI(), nil, "", strfmt.Default)
+		validator := apiservervalidation.NewSchemaValidatorFromOpenAPI(s.ToKubeOpenAPI())
 
 		if insideMeta {
 			obj, _, err := f(runtime.DeepCopyJSONValue(s.Default.Object))

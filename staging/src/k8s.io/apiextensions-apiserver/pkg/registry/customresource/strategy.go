@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/features"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -243,8 +245,16 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 		return field.ErrorList{field.Invalid(field.NewPath(""), old, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", old))}
 	}
 
+	var options []validation.ValidationOption
+	var celOptions []cel.Option
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+		correlatedObject := common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
+		options = append(options, validation.WithRatcheting(correlatedObject))
+		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
+	}
+
 	var errs field.ErrorList
-	errs = append(errs, a.validator.ValidateUpdate(ctx, uNew, uOld, a.scale)...)
+	errs = append(errs, a.validator.ValidateUpdate(ctx, uNew, uOld, a.scale, options...)...)
 
 	// Checks the embedded objects. We don't make a difference between update and create for those.
 	errs = append(errs, schemaobjectmeta.Validate(nil, uNew.Object, a.structuralSchema, false)...)
@@ -258,11 +268,8 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	if celValidator := a.celValidator; celValidator != nil {
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
-		} else if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-			err, _ := celValidator.ValidateWithRatcheting(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
-			errs = append(errs, err...)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget, celOptions...)
 			errs = append(errs, err...)
 		}
 	}

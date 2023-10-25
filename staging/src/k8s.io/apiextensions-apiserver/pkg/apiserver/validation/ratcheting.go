@@ -54,14 +54,26 @@ func NewRatchetingSchemaValidator(schema *spec.Schema, rootSchema interface{}, r
 	}
 }
 
-func (r *RatchetingSchemaValidator) Validate(new interface{}) *validate.Result {
+func (r *RatchetingSchemaValidator) Validate(new interface{}, options ...ValidationOption) *validate.Result {
 	sv := validate.NewSchemaValidator(r.schema, r.root, r.path, r.knownFormats, r.options...)
 	return sv.Validate(new)
 }
 
-func (r *RatchetingSchemaValidator) ValidateUpdate(new, old interface{}) *validate.Result {
+func (r *RatchetingSchemaValidator) ValidateUpdate(new, old interface{}, options ...ValidationOption) *validate.Result {
+	opts := NewValidationOptions(options...)
+
+	if !opts.Ratcheting {
+		sv := validate.NewSchemaValidator(r.schema, r.root, r.path, r.knownFormats, r.options...)
+		return sv.Validate(new)
+	}
+
+	correlation := opts.CorrelatedObject
+	if correlation == nil {
+		correlation = common.NewCorrelatedObject(new, old, &celopenapi.Schema{Schema: r.schema})
+	}
+
 	return newRatchetingValueValidator(
-		common.NewCorrelatedObject(new, old, &celopenapi.Schema{Schema: r.schemaArgs.schema}),
+		correlation,
 		r.schemaArgs,
 	).Validate(new)
 }
