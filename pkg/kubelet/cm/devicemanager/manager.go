@@ -236,12 +236,12 @@ func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if _, exists := m.endpoints[resourceName]; exists {
+	if ep, exists := m.endpoints[resourceName]; exists {
 		m.markResourceUnhealthy(resourceName)
-		klog.V(2).InfoS("Endpoint became unhealthy", "resourceName", resourceName, "endpoint", m.endpoints[resourceName])
-	}
+		klog.V(2).InfoS("Endpoint became unhealthy", "resourceName", resourceName, "endpoint", ep)
 
-	m.endpoints[resourceName].e.setStopTime(time.Now())
+		ep.e.setStopTime(time.Now())
+	}
 }
 
 // PluginListAndWatchReceiver receives ListAndWatchResponse from a device plugin
