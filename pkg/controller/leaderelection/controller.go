@@ -34,7 +34,6 @@ import (
 	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/cri-api/pkg/errors"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -236,7 +235,7 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLeaseId) (*v1.Lease, bool, error) {
 	leaderLease, err := c.leaseInformer.Lister().Leases(leaderLeaseId.namespace).Get(leaderLeaseId.name)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			return nil, false, nil
 		} else {
 			return nil, false, err
