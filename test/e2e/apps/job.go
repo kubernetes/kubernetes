@@ -381,6 +381,36 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
+		Testcase: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex despite some failing
+		Description: Create an indexed job and ensure that all indexes are either failed or succeeded, depending
+		on the end state of the corresponding pods. Pods with odd indexes fail, while the pods with even indexes
+		succeeded. Also, verify that the number of failed pods doubles the number of failing indexes, as the
+		backoffLimitPerIndex=1, allowing for one pod recreation before marking that indexed failed.
+	*/
+	ginkgo.It("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
+		ginkgo.By("Creating an indexed job with backoffLimit per index and failing pods")
+		job := e2ejob.NewTestJob("failOddSucceedEven", "with-backoff-limit-per-index", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.BackoffLimit = nil
+		job.Spec.BackoffLimitPerIndex = ptr.To[int32](1)
+		mode := batchv1.IndexedCompletion
+		job.Spec.CompletionMode = &mode
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to fail as there are failed indexes")
+		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verifying the Job status fields to ensure all indexes were executed")
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		gomega.Expect(job.Status.FailedIndexes).Should(gomega.HaveValue(gomega.Equal("1,3")))
+		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0,2"))
+		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(4)))
+		gomega.Expect(job.Status.Succeeded).Should(gomega.Equal(int32(2)))
+	})
+
+	/*
 		Testcase: Ensure that the pods associated with the job are removed once the job is deleted
 		Description: Create a job and ensure the associated pod count is equal to parallelism count. Delete the
 		job and ensure if the pods associated with the job have been removed
