@@ -176,7 +176,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 			NumAllNodes: len(nodeToStatusMap),
 			Diagnosis: framework.Diagnosis{
 				NodeToStatusMap: nodeToStatusMap,
-				// Leave FailedPlugins as nil as it won't be used on moving Pods.
+				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
 			},
 		}
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
