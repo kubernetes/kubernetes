@@ -17,10 +17,17 @@ limitations under the License.
 package leaderelection
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/coordination/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/pointer"
 )
 
 func TestCompare(t *testing.T) {
@@ -356,6 +363,100 @@ func TestShouldReelect(t *testing.T) {
 			result := shouldReelect(tc.candidates, tc.currentLeader)
 			if tc.expectResult != result {
 				t.Errorf("Expected %t but got %t", tc.expectResult, result)
+			}
+		})
+	}
+}
+
+func TestController(t *testing.T) {
+	cases := []struct {
+		name                  string
+		leaderLeaseId         leaderLeaseId
+		identityLeasesCreated []*v1.Lease
+		expectedLeaderLeases  []*v1.Lease
+	}{
+		{
+			name:          "single identity lease leader",
+			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			identityLeasesCreated: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-1",
+						Annotations: map[string]string{
+							CompatibilityVersionAnnotationName: "1.19",
+							BinaryVersionAnnotationName:        "1.19",
+						},
+						Labels: map[string]string{
+							CanLeadLeasesLabelName: "kube-system/component-A",
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("kube-system/component-identity-1"),
+					},
+				},
+			},
+			expectedLeaderLeases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("kube-system/component-identity-1"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+
+			//client := fake.NewSimpleClientset(tc.identityLeasesCreated...)
+			client := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			controller, err := NewController(
+				informerFactory.Coordination().V1().Leases(),
+				client.CoordinationV1(),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			go informerFactory.Start(ctx.Done())
+			go controller.Run(ctx, 1)
+
+			for _, obj := range tc.identityLeasesCreated {
+				_, err := client.CoordinationV1().Leases(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			for _, expectedLease := range tc.expectedLeaderLeases {
+				var lease *v1.Lease
+				err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 600*time.Second, true, func(ctx context.Context) (done bool, err error) {
+					lease, err = client.CoordinationV1().Leases(expectedLease.Namespace).Get(ctx, expectedLease.Name, metav1.GetOptions{})
+					if err != nil {
+						if errors.IsNotFound(err) {
+							return false, nil
+						}
+						return true, err
+					}
+					return true, nil
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if lease.Spec.HolderIdentity == nil {
+					t.Fatalf("Expected HolderIdentity of %s but got nil", expectedLease.Name)
+				}
+				if *lease.Spec.HolderIdentity != *expectedLease.Spec.HolderIdentity {
+					t.Errorf("Expected HolderIdentity of %s but got %s", *expectedLease.Spec.HolderIdentity, *lease.Spec.HolderIdentity)
+				}
 			}
 		})
 	}
