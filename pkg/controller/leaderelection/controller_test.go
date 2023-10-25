@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -370,15 +371,16 @@ func TestShouldReelect(t *testing.T) {
 
 func TestController(t *testing.T) {
 	cases := []struct {
-		name                  string
-		leaderLeaseId         leaderLeaseId
-		identityLeasesCreated []*v1.Lease
-		expectedLeaderLeases  []*v1.Lease
+		name                       string
+		leaderLeaseId              leaderLeaseId
+		createAfterControllerStart []*v1.Lease
+		deleteAfterControllerStart []leaderLeaseId
+		expectedLeaderLeases       []*v1.Lease
 	}{
 		{
-			name:          "single identity lease leader",
+			name:          "single candidate leader election",
 			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
-			identityLeasesCreated: []*v1.Lease{
+			createAfterControllerStart: []*v1.Lease{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
@@ -392,7 +394,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("kube-system/component-identity-1"),
+						HolderIdentity: pointer.String("component-identity-1"),
 					},
 				},
 			},
@@ -401,9 +403,197 @@ func TestController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
+						Annotations: map[string]string{
+							ElectedByAnnotationName: controllerName,
+						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("kube-system/component-identity-1"),
+						HolderIdentity: pointer.String("component-identity-1"),
+					},
+				},
+			},
+		},
+		{
+			name:          "multiple candidate leader election",
+			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			createAfterControllerStart: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-1",
+						Annotations: map[string]string{
+							CompatibilityVersionAnnotationName: "1.19",
+							BinaryVersionAnnotationName:        "1.19",
+						},
+						Labels: map[string]string{
+							CanLeadLeasesLabelName: "kube-system/component-A",
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-1"),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-2",
+						Annotations: map[string]string{
+							CompatibilityVersionAnnotationName: "1.19",
+							BinaryVersionAnnotationName:        "1.20",
+						},
+						Labels: map[string]string{
+							CanLeadLeasesLabelName: "kube-system/component-A",
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-2"),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-3",
+						Annotations: map[string]string{
+							CompatibilityVersionAnnotationName: "1.20",
+							BinaryVersionAnnotationName:        "1.20",
+						},
+						Labels: map[string]string{
+							CanLeadLeasesLabelName: "kube-system/component-A",
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-3"),
+					},
+				},
+			},
+			expectedLeaderLeases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+						Annotations: map[string]string{
+							ElectedByAnnotationName: controllerName,
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-3"),
+					},
+				},
+			},
+		},
+		{
+			name:          "deletion of lease triggers reelection",
+			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			createAfterControllerStart: []*v1.Lease{
+				{
+					// Leader lease
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+						Annotations: map[string]string{
+							ElectedByAnnotationName: controllerName,
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-9"),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-1",
+						Annotations: map[string]string{
+							CompatibilityVersionAnnotationName: "1.19",
+							BinaryVersionAnnotationName:        "1.19",
+						},
+						Labels: map[string]string{
+							CanLeadLeasesLabelName: "kube-system/component-A",
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-1"),
+					},
+				},
+			},
+			deleteAfterControllerStart: []leaderLeaseId{
+				{namespace: "kube-system", name: "component-A"},
+			},
+			expectedLeaderLeases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+						Annotations: map[string]string{
+							ElectedByAnnotationName: controllerName,
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-1"),
+					},
+				},
+			},
+		},
+		{
+			name:          "better candidate triggers reelection",
+			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			createAfterControllerStart: []*v1.Lease{
+				{
+					// Leader lease
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+						Annotations: map[string]string{
+							ElectedByAnnotationName: controllerName,
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-1"),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-1",
+						Annotations: map[string]string{
+							CompatibilityVersionAnnotationName: "1.19",
+							BinaryVersionAnnotationName:        "1.19",
+						},
+						Labels: map[string]string{
+							CanLeadLeasesLabelName: "kube-system/component-A",
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-1"),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-2",
+						Annotations: map[string]string{
+							CompatibilityVersionAnnotationName: "1.20",
+							BinaryVersionAnnotationName:        "1.20",
+						},
+						Labels: map[string]string{
+							CanLeadLeasesLabelName: "kube-system/component-A",
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-2"),
+					},
+				},
+			},
+			expectedLeaderLeases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+						Annotations: map[string]string{
+							ElectedByAnnotationName: controllerName,
+						},
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: pointer.String("component-identity-2"),
 					},
 				},
 			},
@@ -415,7 +605,7 @@ func TestController(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 
-			//client := fake.NewSimpleClientset(tc.identityLeasesCreated...)
+			//client := fake.NewSimpleClientset(tc.createAfterControllerStart...)
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			controller, err := NewController(
@@ -429,8 +619,40 @@ func TestController(t *testing.T) {
 			go informerFactory.Start(ctx.Done())
 			go controller.Run(ctx, 1)
 
-			for _, obj := range tc.identityLeasesCreated {
+			go func() {
+				ticker := time.NewTicker(10 * time.Millisecond)
+
+				// Mock out the removal of end-of-term leases.
+				// When controllers are running, they are expected to do this voluntarily
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						for _, expectedLease := range tc.expectedLeaderLeases {
+							lease, err := client.CoordinationV1().Leases(expectedLease.Namespace).Get(ctx, expectedLease.Name, metav1.GetOptions{})
+							if err == nil {
+								if endOfTerm := lease.Annotations[EndOfTermAnnotationName]; endOfTerm == "true" {
+									err = client.CoordinationV1().Leases(expectedLease.Namespace).Delete(ctx, expectedLease.Name, metav1.DeleteOptions{})
+									if err != nil {
+										runtime.HandleError(err)
+									}
+								}
+							}
+						}
+					}
+				}
+			}()
+
+			for _, obj := range tc.createAfterControllerStart {
 				_, err := client.CoordinationV1().Leases(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			for _, obj := range tc.deleteAfterControllerStart {
+				err := client.CoordinationV1().Leases(obj.namespace).Delete(ctx, obj.name, metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -445,6 +667,12 @@ func TestController(t *testing.T) {
 							return false, nil
 						}
 						return true, err
+					}
+					if expectedLease.Spec.HolderIdentity == nil || lease.Spec.HolderIdentity == nil {
+						return expectedLease.Spec.HolderIdentity == nil && lease.Spec.HolderIdentity == nil, nil
+					}
+					if expectedLease.Spec.HolderIdentity != nil && lease.Spec.HolderIdentity != nil && *expectedLease.Spec.HolderIdentity != *lease.Spec.HolderIdentity {
+						return false, nil
 					}
 					return true, nil
 				})
