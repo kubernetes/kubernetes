@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-const controllerName = "leader-election-controller"
+const controllerName = "leader-election-controller" // TODO: make exported?
 
 // TODO: multi-valued labels are problematic.. label matching gets broken.. should we use a label
 // per leader lease? Do we need to add a spec field?
@@ -45,6 +45,10 @@ const CanLeadLeasesLabelName = "coordination.k8s.io/can-lead-leases"
 
 const CompatibilityVersionAnnotationName = "coordination.k8s.io/compatibility-version"
 const BinaryVersionAnnotationName = "coordination.k8s.io/binary-version"
+
+const EndOfTermAnnotationName = "coordination.k8s.io/end-of-term"
+
+const ElectedByAnnotationName = "coordination.k8s.io/elected-by" // Value should be set to controllerName
 
 const electionDuration = time.Second * 1
 
@@ -113,7 +117,9 @@ func NewController(leaseInformer coordinationv1.LeaseInformer, leaseClient coord
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			c.enqueueLease(newObj)
 		},
-		// DeleteFunc: TODO: Start a new election, if needed
+		DeleteFunc: func(oldObj interface{}) {
+			c.leaseDeleted(oldObj)
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -130,6 +136,18 @@ func (c *Controller) enqueueLease(obj any) {
 			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v: %w", lease, err))
 		}
 		c.leaseQueue.Add(key)
+	}
+}
+
+func (c *Controller) leaseDeleted(oldObj any) {
+	if lease, ok := oldObj.(*v1.Lease); ok {
+		// TODO: Check if this is a lease that needs a leader election? We may need to maintain
+		// a set of leader election leases?  For prototype purposes can we just scan the leases?
+
+		err := c.scheduleElection(leaderLeaseId{namespace: lease.Namespace, name: lease.Name})
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("cannot start election for %v: %w", lease, err))
+		}
 	}
 }
 
@@ -220,10 +238,9 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 				if !shouldReelect(candidates, leader) {
 					continue
 				}
-
 			}
 
-			err = c.startElection(leaderLeaseId)
+			err = c.scheduleElection(leaderLeaseId)
 			if err != nil {
 				return err
 			}
@@ -251,7 +268,7 @@ func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLease
 	return holderIdentityLease, !isLeaseExpired(leaderLease), nil
 }
 
-func (c *Controller) startElection(leaderLeaseId leaderLeaseId) error {
+func (c *Controller) scheduleElection(leaderLeaseId leaderLeaseId) error {
 	// TODO: add a set to track ongoing elections and avoid requesting an election if one has already been kicked off?
 	// This might not be needed..
 	c.electionCh <- election{
@@ -275,16 +292,48 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseI
 	// create the leader election lease
 	leaderLease := &v1.Lease{
 		// TODO: fill out all lease fields
-		ObjectMeta: metav1.ObjectMeta{Namespace: leaderLeaseId.namespace, Name: leaderLeaseId.name},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: leaderLeaseId.namespace,
+			Name:      leaderLeaseId.name,
+			Annotations: map[string]string{ // TODO: Needed?
+				ElectedByAnnotationName: controllerName,
+			},
+		},
 		Spec: v1.LeaseSpec{
 			HolderIdentity: electee.Spec.HolderIdentity,
 		},
 	}
 	_, err = c.leaseClient.Leases(leaderLeaseId.namespace).Create(ctx, leaderLease, metav1.CreateOptions{})
 	if err != nil {
+		if kerrors.IsAlreadyExists(err) {
+			// TODO: Check if there is a better leader. If so, mark the lease as "end of term"
+
+			// mark as "end of term"
+
+			// Update approach:
+			lease, err := c.leaseClient.Leases(leaderLeaseId.namespace).Get(ctx, leaderLeaseId.name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			lease.Annotations[EndOfTermAnnotationName] = "true"
+			_, err = c.leaseClient.Leases(leaderLeaseId.namespace).Update(ctx, lease, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+
+			// Apply approach:
+			//_, err := c.leaseClient.Leases(leaderLeaseId.namespace).Apply(ctx, coordinationv1apply.Lease(leaderLeaseId.name, leaderLeaseId.namespace).
+			//	WithAnnotations(map[string]string{
+			//		EndOfTermAnnotationName: "true",
+			//	}),
+			//	metav1.ApplyOptions{})
+			//if err != nil {
+			//	return err
+
+			return nil
+		}
 		return err
 	}
-
 	return nil
 }
 
