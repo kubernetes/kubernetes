@@ -171,7 +171,7 @@ func logFormattedEndpoints(logMsg string, logLevel klog.Level, svcPortName proxy
 	if klog.V(logLevel).Enabled() {
 		var epInfo string
 		for _, v := range eps {
-			epInfo = epInfo + fmt.Sprintf("\n  %s={Ready:%v,Serving:%v,Terminating:%v,IsRemote:%v}", v.String(), v.IsReady(), v.IsServing(), v.IsTerminating(), !v.GetIsLocal())
+			epInfo = epInfo + fmt.Sprintf("\n  %s={Ready:%v,Serving:%v,Terminating:%v,IsRemote:%v}", v.String(), v.IsReady(), v.IsServing(), v.IsTerminating(), !v.IsLocal())
 		}
 		klog.V(logLevel).InfoS(logMsg, "svcPortName", svcPortName, "endpoints", epInfo)
 	}
@@ -294,8 +294,8 @@ func (info *endpointInfo) String() string {
 	return net.JoinHostPort(info.ip, strconv.Itoa(int(info.port)))
 }
 
-// GetIsLocal is part of proxy.Endpoint interface.
-func (info *endpointInfo) GetIsLocal() bool {
+// IsLocal is part of proxy.Endpoint interface.
+func (info *endpointInfo) IsLocal() bool {
 	return info.isLocal
 }
 
@@ -314,8 +314,8 @@ func (info *endpointInfo) IsTerminating() bool {
 	return info.terminating
 }
 
-// GetZoneHint returns the zone hint for the endpoint.
-func (info *endpointInfo) GetZoneHints() sets.Set[string] {
+// ZoneHints returns the zone hints for the endpoint.
+func (info *endpointInfo) ZoneHints() sets.Set[string] {
 	return sets.Set[string]{}
 }
 
@@ -327,21 +327,6 @@ func (info *endpointInfo) IP() string {
 // Port returns just the Port part of the endpoint.
 func (info *endpointInfo) Port() (int, error) {
 	return int(info.port), nil
-}
-
-// Equal is part of proxy.Endpoint interface.
-func (info *endpointInfo) Equal(other proxy.Endpoint) bool {
-	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
-}
-
-// GetNodeName returns the NodeName for this endpoint.
-func (info *endpointInfo) GetNodeName() string {
-	return ""
-}
-
-// GetZone returns the Zone for this endpoint.
-func (info *endpointInfo) GetZone() string {
-	return ""
 }
 
 // Uses mac prefix and IPv4 address to return a mac address
@@ -460,15 +445,15 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, _ *pro
 	info := &endpointInfo{
 		ip:         baseInfo.IP(),
 		port:       uint16(portNumber),
-		isLocal:    baseInfo.GetIsLocal(),
+		isLocal:    baseInfo.IsLocal(),
 		macAddress: conjureMac("02-11", netutils.ParseIPSloppy(baseInfo.IP())),
 		refCount:   new(uint16),
 		hnsID:      "",
 		hns:        proxier.hns,
 
-		ready:       baseInfo.Ready,
-		serving:     baseInfo.Serving,
-		terminating: baseInfo.Terminating,
+		ready:       baseInfo.IsReady(),
+		serving:     baseInfo.IsServing(),
+		terminating: baseInfo.IsTerminating(),
 	}
 
 	return info
@@ -491,20 +476,20 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 
 func (ep *endpointInfo) DecrementRefCount() {
 	klog.V(3).InfoS("Decrementing Endpoint RefCount", "endpointInfo", ep)
-	if !ep.GetIsLocal() && ep.refCount != nil && *ep.refCount > 0 {
+	if !ep.IsLocal() && ep.refCount != nil && *ep.refCount > 0 {
 		*ep.refCount--
 	}
 }
 
 func (ep *endpointInfo) Cleanup() {
 	klog.V(3).InfoS("Endpoint cleanup", "endpointInfo", ep)
-	if !ep.GetIsLocal() && ep.refCount != nil {
+	if !ep.IsLocal() && ep.refCount != nil {
 		*ep.refCount--
 
 		// Remove the remote hns endpoint, if no service is referring it
 		// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
 		// Remove only remote endpoints created by this service
-		if *ep.refCount <= 0 && !ep.GetIsLocal() {
+		if *ep.refCount <= 0 && !ep.IsLocal() {
 			klog.V(4).InfoS("Removing endpoints, since no one is referencing it", "endpoint", ep)
 			err := ep.hns.deleteEndpoint(ep.hnsID)
 			if err == nil {
@@ -1062,7 +1047,7 @@ func (proxier *Proxier) isAllEndpointsTerminating(svcName proxy.ServicePortName,
 		if !ok {
 			continue
 		}
-		if isLocalTrafficDSR && !ep.GetIsLocal() {
+		if isLocalTrafficDSR && !ep.IsLocal() {
 			// KEP-1669: Ignore remote endpoints when the ExternalTrafficPolicy is Local (DSR Mode)
 			continue
 		}
@@ -1087,7 +1072,7 @@ func (proxier *Proxier) isAllEndpointsNonServing(svcName proxy.ServicePortName, 
 		if !ok {
 			continue
 		}
-		if isLocalTrafficDSR && !ep.GetIsLocal() {
+		if isLocalTrafficDSR && !ep.IsLocal() {
 			continue
 		}
 		if ep.IsServing() {
@@ -1251,7 +1236,7 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			if svcInfo.internalTrafficLocal && svcInfo.localTrafficDSR && !ep.GetIsLocal() {
+			if svcInfo.internalTrafficLocal && svcInfo.localTrafficDSR && !ep.IsLocal() {
 				// No need to use or create remote endpoint when internal and external traffic policy is remote
 				klog.V(3).InfoS("Skipping the endpoint. Both internalTraffic and external traffic policies are local", "EpIP", ep.ip, " EpPort", ep.port)
 				continue
@@ -1294,7 +1279,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			if newHnsEndpoint == nil {
-				if ep.GetIsLocal() {
+				if ep.IsLocal() {
 					klog.ErrorS(err, "Local endpoint not found: on network", "ip", ep.IP(), "hnsNetworkName", hnsNetworkName)
 					continue
 				}
@@ -1355,7 +1340,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// a) Endpoints are any IP's outside the cluster ==> Choose NodeIP as the SourceVIP
 			// b) Endpoints are IP addresses of a remote node => Choose NodeIP as the SourceVIP
 			// c) Everything else (Local POD's, Remote POD's, Node IP of current node) ==> Choose the configured SourceVIP
-			if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) && !ep.GetIsLocal() {
+			if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) && !ep.IsLocal() {
 				providerAddress := proxier.network.findRemoteSubnetProviderAddress(ep.IP())
 
 				isNodeIP := (ep.IP() == providerAddress)
@@ -1370,7 +1355,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(1).InfoS("Hns endpoint resource", "endpointInfo", newHnsEndpoint)
 
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
-			if newHnsEndpoint.GetIsLocal() {
+			if newHnsEndpoint.IsLocal() {
 				hnsLocalEndpoints = append(hnsLocalEndpoints, *newHnsEndpoint)
 			} else {
 				// We only share the refCounts for remote endpoints

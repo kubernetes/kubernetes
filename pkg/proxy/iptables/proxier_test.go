@@ -3371,7 +3371,12 @@ func makeServiceMap(proxier *Proxier, allServices ...*v1.Service) {
 	proxier.servicesSynced = true
 }
 
-func compareEndpointsMapsExceptChainName(t *testing.T, tci int, newMap proxy.EndpointsMap, expected map[proxy.ServicePortName][]*endpointInfo) {
+type endpointExpectation struct {
+	endpoint string
+	isLocal  bool
+}
+
+func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap, expected map[proxy.ServicePortName][]endpointExpectation) {
 	if len(newMap) != len(expected) {
 		t.Errorf("[%d] expected %d results, got %d: %v", tci, len(expected), len(newMap), newMap)
 	}
@@ -3380,13 +3385,9 @@ func compareEndpointsMapsExceptChainName(t *testing.T, tci int, newMap proxy.End
 			t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(expected[x]), x, len(newMap[x]))
 		} else {
 			for i := range expected[x] {
-				newEp, ok := newMap[x][i].(*endpointInfo)
-				if !ok {
-					t.Errorf("Failed to cast endpointInfo")
-					continue
-				}
-				if newEp.Endpoint != expected[x][i].Endpoint ||
-					newEp.IsLocal != expected[x][i].IsLocal {
+				newEp := newMap[x][i]
+				if newEp.String() != expected[x][i].endpoint ||
+					newEp.IsLocal() != expected[x][i].isLocal {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
 				}
 			}
@@ -3731,16 +3732,16 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name                           string
 		previousEndpoints              []*discovery.EndpointSlice
 		currentEndpoints               []*discovery.EndpointSlice
-		oldEndpoints                   map[proxy.ServicePortName][]*endpointInfo
-		expectedResult                 map[proxy.ServicePortName][]*endpointInfo
+		oldEndpoints                   map[proxy.ServicePortName][]endpointExpectation
+		expectedResult                 map[proxy.ServicePortName][]endpointExpectation
 		expectedDeletedUDPEndpoints    []proxy.ServiceEndpoint
 		expectedNewlyActiveUDPServices map[proxy.ServicePortName]bool
 		expectedLocalEndpoints         map[types.NamespacedName]int
 	}{{
 		// Case[0]: nothing
 		name:                           "nothing",
-		oldEndpoints:                   map[proxy.ServicePortName][]*endpointInfo{},
-		expectedResult:                 map[proxy.ServicePortName][]*endpointInfo{},
+		oldEndpoints:                   map[proxy.ServicePortName][]endpointExpectation{},
+		expectedResult:                 map[proxy.ServicePortName][]endpointExpectation{},
 		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
 		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
@@ -3749,14 +3750,14 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "no change, named port, local",
 		previousEndpoints: namedPortLocal,
 		currentEndpoints:  namedPortLocal,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: true},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: true},
 			},
 		},
 		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
@@ -3769,20 +3770,20 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "no change, multiple subsets",
 		previousEndpoints: multipleSubsets,
 		currentEndpoints:  multipleSubsets,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.2:12", isLocal: false},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.2:12", isLocal: false},
 			},
 		},
 		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
@@ -3793,26 +3794,26 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "no change, multiple subsets, multiple ports, local",
 		previousEndpoints: multipleSubsetsMultiplePortsLocal,
 		currentEndpoints:  multipleSubsetsMultiplePortsLocal,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:12", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.3:13", isLocal: false},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:12", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.3:13", isLocal: false},
 			},
 		},
 		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
@@ -3825,56 +3826,56 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "no change, multiple endpoints, subsets, IPs, and ports",
 		previousEndpoints: multipleSubsetsIPsPorts,
 		currentEndpoints:  multipleSubsetsIPsPorts,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
+				{endpoint: "10.1.1.2:11", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:12", isLocal: false},
+				{endpoint: "10.1.1.2:12", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.3:13", isLocal: false},
+				{endpoint: "10.1.1.4:13", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.3:14", isLocal: false},
+				{endpoint: "10.1.1.4:14", isLocal: true},
 			},
 			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.2.2.1:21", isLocal: false},
+				{endpoint: "10.2.2.2:21", isLocal: true},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.2.2.1:22", isLocal: false},
+				{endpoint: "10.2.2.2:22", isLocal: true},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
+				{endpoint: "10.1.1.2:11", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:12", isLocal: false},
+				{endpoint: "10.1.1.2:12", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.3:13", isLocal: false},
+				{endpoint: "10.1.1.4:13", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.3:14", isLocal: false},
+				{endpoint: "10.1.1.4:14", isLocal: true},
 			},
 			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.2.2.1:21", isLocal: false},
+				{endpoint: "10.2.2.2:21", isLocal: true},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.2.2.1:22", isLocal: false},
+				{endpoint: "10.2.2.2:22", isLocal: true},
 			},
 		},
 		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
@@ -3888,10 +3889,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "add an Endpoints",
 		previousEndpoints: []*discovery.EndpointSlice{nil},
 		currentEndpoints:  namedPortLocal,
-		oldEndpoints:      map[proxy.ServicePortName][]*endpointInfo{},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints:      map[proxy.ServicePortName][]endpointExpectation{},
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: true},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
@@ -3906,12 +3907,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "remove an Endpoints",
 		previousEndpoints: namedPortLocal,
 		currentEndpoints:  []*discovery.EndpointSlice{nil},
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: true},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{},
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "10.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
@@ -3923,19 +3924,19 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "add an IP and port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortsLocalNoLocal,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
+				{endpoint: "10.1.1.2:11", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:12", isLocal: false},
+				{endpoint: "10.1.1.2:12", isLocal: true},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
@@ -3950,19 +3951,19 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "remove an IP and port",
 		previousEndpoints: namedPortsLocalNoLocal,
 		currentEndpoints:  namedPort,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
+				{endpoint: "10.1.1.2:11", isLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:12", isLocal: false},
+				{endpoint: "10.1.1.2:12", isLocal: true},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
@@ -3982,17 +3983,17 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "add a subset",
 		previousEndpoints: []*discovery.EndpointSlice{namedPort[0], nil},
 		currentEndpoints:  multipleSubsetsWithLocal,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.2:12", isLocal: true},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
@@ -4007,17 +4008,17 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "remove a subset",
 		previousEndpoints: multipleSubsets,
 		currentEndpoints:  []*discovery.EndpointSlice{namedPort[0], nil},
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.2:12", isLocal: false},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
@@ -4031,14 +4032,14 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "rename a port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortRenamed,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
@@ -4054,14 +4055,14 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "renumber a port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortRenumbered,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:22", isLocal: false},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
@@ -4075,41 +4076,41 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "complex add and remove",
 		previousEndpoints: complexBefore,
 		currentEndpoints:  complexAfter,
-		oldEndpoints: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.2.2.22:22", isLocal: true},
+				{endpoint: "10.2.2.2:22", isLocal: true},
 			},
 			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.3:23", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.2.2.3:23", isLocal: true},
 			},
 			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.5:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.4.4.4:44", isLocal: true},
+				{endpoint: "10.4.4.5:44", isLocal: true},
 			},
 			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.4.4.6:45", isLocal: true},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.11:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.11:11", isLocal: false},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.2:12", isLocal: false},
 			},
 			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:122", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.2:122", isLocal: false},
 			},
 			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.3.3.3:33", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.3.3.3:33", isLocal: false},
 			},
 			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.4.4.4:44", isLocal: true},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
@@ -4141,10 +4142,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		name:              "change from 0 endpoint address to 1 unnamed port",
 		previousEndpoints: emptyEndpointSlices,
 		currentEndpoints:  namedPort,
-		oldEndpoints:      map[proxy.ServicePortName][]*endpointInfo{},
-		expectedResult: map[proxy.ServicePortName][]*endpointInfo{
+		oldEndpoints:      map[proxy.ServicePortName][]endpointExpectation{},
+		expectedResult: map[proxy.ServicePortName][]endpointExpectation{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{endpoint: "10.1.1.1:11", isLocal: false},
 			},
 		},
 		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
@@ -4169,7 +4170,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				}
 			}
 			fp.endpointsMap.Update(fp.endpointsChanges)
-			compareEndpointsMapsExceptChainName(t, tci, fp.endpointsMap, tc.oldEndpoints)
+			checkEndpointExpectations(t, tci, fp.endpointsMap, tc.oldEndpoints)
 
 			// Now let's call appropriate handlers to get to state we want to be.
 			if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
@@ -4189,7 +4190,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			}
 			result := fp.endpointsMap.Update(fp.endpointsChanges)
 			newMap := fp.endpointsMap
-			compareEndpointsMapsExceptChainName(t, tci, newMap, tc.expectedResult)
+			checkEndpointExpectations(t, tci, newMap, tc.expectedResult)
 			if len(result.DeletedUDPEndpoints) != len(tc.expectedDeletedUDPEndpoints) {
 				t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedDeletedUDPEndpoints), len(result.DeletedUDPEndpoints), result.DeletedUDPEndpoints)
 			}
