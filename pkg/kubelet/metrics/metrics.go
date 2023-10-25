@@ -41,6 +41,7 @@ const (
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
+	PodStartTotalDurationKey           = "pod_start_total_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
@@ -126,6 +127,10 @@ const (
 )
 
 var (
+	podStartupDurationBuckets = []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600}
+)
+
+var (
 	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -165,7 +170,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
 			Help:           "Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run",
-			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
+			Buckets:        podStartupDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -182,11 +187,30 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartSLIDurationKey,
 			Help:           "Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
-			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
+			Buckets:        podStartupDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{},
 	)
+
+	// PodStartTotalDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run
+	// since creation, including the time for image pulling.
+	//
+	// The histogram bucket boundaries for pod startup latency metrics, measured in seconds. These are hand-picked
+	// so as to be roughly exponential but still round numbers in everyday units. This is to minimise the number
+	// of buckets while allowing accurate measurement of thresholds which might be used in SLOs
+	// e.g. x% of pods start up within 30 seconds, or 15 minutes, etc.
+	PodStartTotalDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStartTotalDurationKey,
+			Help:           "Duration in seconds to start a pod since creation, including time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
+			Buckets:        podStartupDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{},
+	)
+
 	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
 	// Broken down by method.
 	CgroupManagerDuration = metrics.NewHistogramVec(
@@ -810,6 +834,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(PodStartSLIDuration)
+		legacyregistry.MustRegister(PodStartTotalDuration)
 		legacyregistry.MustRegister(NodeStartupPreKubeletDuration)
 		legacyregistry.MustRegister(NodeStartupPreRegistrationDuration)
 		legacyregistry.MustRegister(NodeStartupRegistrationDuration)
