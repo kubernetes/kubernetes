@@ -38,8 +38,10 @@ const (
 )
 
 var (
+	// ErrInvalidSubCommandMsg is an error message returned on invalid subcommands
 	ErrInvalidSubCommandMsg = "invalid subcommand"
-	ErrExit                 = errors.New("exit")
+	// ErrExit is an error returned when kubeadm is about to exit
+	ErrExit = errors.New("exit")
 )
 
 // fatal prints the message if set and then exits.
