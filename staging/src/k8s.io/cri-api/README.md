@@ -245,7 +245,7 @@ You can reach the maintainers of this repository at:
 Participation in the Kubernetes community is governed by the [Kubernetes
 Code of Conduct](code-of-conduct.md).
 
-### Contibution Guidelines
+### Contribution Guidelines
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more information. Please note that [kubernetes/cri-api](https://github.com/kubernetes/cri-api)
 is a readonly mirror repository, all development is done at [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).
