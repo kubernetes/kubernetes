@@ -170,17 +170,12 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath string) *TestServer {
 	return oidcServer
 }
 
-// TokenHandlerBehaviourReturningPredefinedJWT describes the scenario when signed JWT token is being created.
-// This behaviour should being applied to the MockTokenHandler.
-func TokenHandlerBehaviourReturningPredefinedJWT(
+// TokenHandlerBehaviorReturningPredefinedJWT describes the scenario when signed JWT token is being created.
+// This behavior should being applied to the MockTokenHandler.
+func TokenHandlerBehaviorReturningPredefinedJWT(
 	t *testing.T,
 	rsaPrivateKey *rsa.PrivateKey,
-	issClaim,
-	audClaim,
-	subClaim,
-	accessToken,
-	refreshToken string,
-	expClaim int64,
+	claims map[string]interface{}, accessToken, refreshToken string,
 ) func() (Token, error) {
 	t.Helper()
 
@@ -188,18 +183,7 @@ func TokenHandlerBehaviourReturningPredefinedJWT(
 		signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: rsaPrivateKey}, nil)
 		require.NoError(t, err)
 
-		payload := struct {
-			Iss string `json:"iss"`
-			Aud string `json:"aud"`
-			Sub string `json:"sub"`
-			Exp int64  `json:"exp"`
-		}{
-			Iss: issClaim,
-			Aud: audClaim,
-			Sub: subClaim,
-			Exp: expClaim,
-		}
-		payloadJSON, err := json.Marshal(payload)
+		payloadJSON, err := json.Marshal(claims)
 		require.NoError(t, err)
 
 		idTokenSignature, err := signer.Sign(payloadJSON)
@@ -215,9 +199,9 @@ func TokenHandlerBehaviourReturningPredefinedJWT(
 	}
 }
 
-// DefaultJwksHandlerBehaviour describes the scenario when JSON Web Key Set token is being returned.
-// This behaviour should being applied to the MockJWKsHandler.
-func DefaultJwksHandlerBehaviour(t *testing.T, verificationPublicKey *rsa.PublicKey) func() jose.JSONWebKeySet {
+// DefaultJwksHandlerBehavior describes the scenario when JSON Web Key Set token is being returned.
+// This behavior should being applied to the MockJWKsHandler.
+func DefaultJwksHandlerBehavior(t *testing.T, verificationPublicKey *rsa.PublicKey) func() jose.JSONWebKeySet {
 	t.Helper()
 
 	return func() jose.JSONWebKeySet {
