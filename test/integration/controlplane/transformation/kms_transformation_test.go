@@ -394,9 +394,7 @@ resources:
 	// start new KMS Plugin
 	_ = mock.NewBase64Plugin(t, "@new-kms-provider.sock")
 	// update encryption config
-	if err := os.WriteFile(filepath.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithNewProvider), 0644); err != nil {
-		t.Fatalf("failed to update encryption config, err: %v", err)
-	}
+	updateFile(t, test.configDir, encryptionConfigFileName, []byte(encryptionConfigWithNewProvider))
 
 	wantPrefixForSecrets := "k8s:enc:kms:v1:new-kms-provider-for-secrets:"
 
@@ -493,9 +491,7 @@ resources:
 `
 
 	// update encryption config and wait for hot reload
-	if err := os.WriteFile(filepath.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithoutOldProvider), 0644); err != nil {
-		t.Fatalf("failed to update encryption config, err: %v", err)
-	}
+	updateFile(t, test.configDir, encryptionConfigFileName, []byte(encryptionConfigWithoutOldProvider))
 
 	// wait for config to be observed
 	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, test)
@@ -994,6 +990,29 @@ func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix string, test *trans
 	})
 	if pollErr == wait.ErrWaitTimeout {
 		t.Fatalf("failed to verify if kms transformers swapped, err: %v", swapErr)
+	}
+}
+
+func updateFile(t *testing.T, configDir, filename string, newContent []byte) {
+	t.Helper()
+
+	// Create a temporary file
+	tempFile, err := os.CreateTemp(configDir, "tempfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tempFile.Close()
+
+	// Write the new content to the temporary file
+	_, err = tempFile.Write(newContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Atomically replace the original file with the temporary file
+	err = os.Rename(tempFile.Name(), filepath.Join(configDir, filename))
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
