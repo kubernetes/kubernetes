@@ -411,6 +411,8 @@ func getProbeAddress(addr string) string {
 	return addr
 }
 
+// GetUsersAndGroups returns the local usersAndGroups, but first creates it
+// in a thread safe way once.
 func GetUsersAndGroups() (*users.UsersAndGroups, error) {
 	var err error
 	usersAndGroupsOnce.Do(func() {

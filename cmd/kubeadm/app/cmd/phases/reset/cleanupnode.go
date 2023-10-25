@@ -212,6 +212,7 @@ func CleanDir(filePath string) error {
 	return nil
 }
 
+// IsDirEmpty returns true if a directory is empty
 func IsDirEmpty(dir string) (bool, error) {
 	d, err := os.Open(dir)
 	if err != nil {
