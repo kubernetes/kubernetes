@@ -108,6 +108,8 @@ type Options struct {
 	WriteConfigTo string
 	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
 	CleanupAndExit bool
+	// InitAndExit, when true, makes the proxy server makes configurations that need privileged access, then exit.
+	InitAndExit bool
 	// WindowsService should be set to true if kube-proxy is running as a service on Windows.
 	// Its corresponding flag only gets registered in Windows builds
 	WindowsService bool
@@ -168,7 +170,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
 			"rather than being surprised when they are permanently removed in the release after that. "+
 			"This parameter is ignored if a config file is specified by --config.")
-
+	fs.BoolVar(&o.InitAndExit, "init-only", o.InitAndExit, "If true, perform any initialization steps that must be done with full root privileges, and then exit. After doing this, you can run kube-proxy again with only the CAP_NET_ADMIN capability.")
 	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: on Linux this can be 'iptables' (default) or 'ipvs'. On Windows the only supported value is 'kernelspace'."+
 		"This parameter is ignored if a config file is specified by --config.")
 
@@ -376,9 +378,12 @@ func (o *Options) Run() error {
 		return cleanupAndExit()
 	}
 
-	proxyServer, err := newProxyServer(o.config, o.master)
+	proxyServer, err := newProxyServer(o.config, o.master, o.InitAndExit)
 	if err != nil {
 		return err
+	}
+	if o.InitAndExit {
+		return nil
 	}
 
 	o.proxyServer = proxyServer
@@ -589,7 +594,7 @@ type ProxyServer struct {
 }
 
 // newProxyServer creates a ProxyServer based on the given config
-func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master string) (*ProxyServer, error) {
+func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master string, initOnly bool) (*ProxyServer, error) {
 	s := &ProxyServer{Config: config}
 
 	cz, err := configz.New(kubeproxyconfig.GroupName)
@@ -653,7 +658,7 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		klog.ErrorS(err, "Kube-proxy configuration may be incomplete or incorrect")
 	}
 
-	s.Proxier, err = s.createProxier(config, dualStackSupported)
+	s.Proxier, err = s.createProxier(config, dualStackSupported, initOnly)
 	if err != nil {
 		return nil, err
 	}

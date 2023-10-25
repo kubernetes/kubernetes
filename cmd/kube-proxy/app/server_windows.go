@@ -79,7 +79,10 @@ func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, du
 }
 
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStackMode bool) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
+	if initOnly {
+		return nil, fmt.Errorf("--init-only is not implemented on Windows")
+	}
 	var healthzPort int
 	if len(config.HealthzBindAddress) > 0 {
 		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)

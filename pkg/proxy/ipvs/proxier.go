@@ -340,6 +340,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	scheduler string,
 	nodePortAddressStrings []string,
 	kernelHandler KernelHandler,
+	initOnly bool,
 ) (*Proxier, error) {
 	// Set the conntrack sysctl we need for
 	if err := proxyutil.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
@@ -400,6 +401,11 @@ func NewProxier(ipFamily v1.IPFamily,
 		if err := ipvs.ConfigureTimeouts(tcpTimeout, tcpFinTimeout, udpTimeout); err != nil {
 			klog.ErrorS(err, "Failed to configure IPVS timeouts")
 		}
+	}
+
+	if initOnly {
+		klog.InfoS("System initialized and --init-only specified")
+		return nil, nil
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -490,6 +496,7 @@ func NewDualStackProxier(
 	scheduler string,
 	nodePortAddresses []string,
 	kernelHandler KernelHandler,
+	initOnly bool,
 ) (proxy.Provider, error) {
 
 	safeIpset := newSafeIpset(ipset)
@@ -499,7 +506,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
+		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -508,9 +515,12 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
+		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
 	}
 
 	// Return a meta-proxier that dispatch calls between the two
