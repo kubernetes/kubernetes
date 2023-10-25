@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -333,6 +335,12 @@ type KubeletVolumeHost interface {
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
+
+	// Returns the credential bundle for the specified podCertificate projected volume source.
+	GetPodCertificateCredentialBundle(ctx context.Context, pod podcertificate.PodIdentity, volumeName, path, signerName, keyType string) ([]byte, error)
+
+	// Call on unmount to forget the credential bundles for a given pod.
+	ForgetPodCertificateCredentialBundle(ctx context.Context, podUID, volumeName, path string)
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
