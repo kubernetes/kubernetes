@@ -913,7 +913,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			NumAllNodes: 1,
 			Diagnosis: framework.Diagnosis{
 				NodeToStatusMap: framework.NodeToStatusMap{
-					node.Name: framework.NewStatus(framework.Unschedulable, nodeports.ErrReason).WithFailedPlugin(nodeports.Name),
+					node.Name: framework.NewStatus(framework.Unschedulable, nodeports.ErrReason).WithPlugin(nodeports.Name),
 				},
 				UnschedulablePlugins: sets.New(nodeports.Name),
 			},
@@ -1002,7 +1002,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			framework.Unschedulable,
 			fmt.Sprintf("Insufficient %v", v1.ResourceCPU),
 			fmt.Sprintf("Insufficient %v", v1.ResourceMemory),
-		).WithFailedPlugin(noderesources.Name)
+		).WithPlugin(noderesources.Name)
 	}
 	fns := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1793,8 +1793,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-						"node2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+						"node1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("FalseFilter"),
+						"node2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("FalseFilter"),
 					},
 					UnschedulablePlugins: sets.New("FalseFilter"),
 				},
@@ -1881,9 +1881,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"3": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-						"2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-						"1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+						"3": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("FalseFilter"),
+						"2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("FalseFilter"),
+						"1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("FalseFilter"),
 					},
 					UnschedulablePlugins: sets.New("FalseFilter"),
 				},
@@ -1908,8 +1908,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("MatchFilter"),
-						"2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("NoPodsFilter"),
+						"1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("MatchFilter"),
+						"2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("NoPodsFilter"),
 					},
 					UnschedulablePlugins: sets.New("MatchFilter", "NoPodsFilter"),
 				},
@@ -1951,8 +1951,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin("VolumeBinding"),
-						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin("VolumeBinding"),
+						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithPlugin("VolumeBinding"),
+						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithPlugin("VolumeBinding"),
 					},
 					PreFilterMsg:         `persistentvolumeclaim "unknownPVC" not found`,
 					UnschedulablePlugins: sets.New(volumebinding.Name),
@@ -1976,8 +1976,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin("VolumeBinding"),
-						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin("VolumeBinding"),
+						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithPlugin("VolumeBinding"),
+						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithPlugin("VolumeBinding"),
 					},
 					PreFilterMsg:         `persistentvolumeclaim "existingPVC" is being deleted`,
 					UnschedulablePlugins: sets.New(volumebinding.Name),
@@ -2072,7 +2072,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
+						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithPlugin("FakeFilter"),
 					},
 					UnschedulablePlugins: sets.New("FakeFilter"),
 				},
@@ -2097,7 +2097,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
+						"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter").WithPlugin("FakeFilter"),
 					},
 					UnschedulablePlugins: sets.New("FakeFilter"),
 				},
@@ -2137,8 +2137,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
-						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
+						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithPlugin("FakePreFilter"),
+						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithPlugin("FakePreFilter"),
 					},
 					PreFilterMsg:         "injected unschedulable status",
 					UnschedulablePlugins: sets.New("FakePreFilter"),
@@ -2401,9 +2401,9 @@ func TestFindFitAllError(t *testing.T) {
 
 	expected := framework.Diagnosis{
 		NodeToStatusMap: framework.NodeToStatusMap{
-			"1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("MatchFilter"),
-			"2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("MatchFilter"),
-			"3": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithFailedPlugin("MatchFilter"),
+			"1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("MatchFilter"),
+			"2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("MatchFilter"),
+			"3": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("MatchFilter"),
 		},
 		UnschedulablePlugins: sets.New("MatchFilter"),
 	}

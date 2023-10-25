@@ -223,7 +223,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 		err := f.runPredicate(pod, node)
 		if err.IsSuccess() {
 			return []*v1.Pod{}, 0, true, nil
-		} else if err.IsUnschedulable() {
+		} else if err.IsRejected() {
 			return nil, 0, false, nil
 		} else {
 			return nil, 0, false, err.AsError()
@@ -258,7 +258,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 	status := f.runPredicate(pod, nodeInfoCopy.Node())
 	if status.IsSuccess() {
 		// pass
-	} else if status.IsUnschedulable() {
+	} else if status.IsRejected() {
 		// does not fit
 		return nil, 0, false, nil
 	} else {
