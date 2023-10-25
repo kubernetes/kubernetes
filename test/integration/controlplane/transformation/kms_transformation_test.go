@@ -394,15 +394,13 @@ resources:
 	// start new KMS Plugin
 	_ = mock.NewBase64Plugin(t, "@new-kms-provider.sock")
 	// update encryption config
-	if err := os.WriteFile(filepath.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithNewProvider), 0644); err != nil {
-		t.Fatalf("failed to update encryption config, err: %v", err)
-	}
+	updateFile(t, test.configDir, encryptionConfigFileName, []byte(encryptionConfigWithNewProvider))
 
 	wantPrefixForSecrets := "k8s:enc:kms:v1:new-kms-provider-for-secrets:"
 
 	// implementing this brute force approach instead of fancy channel notification to avoid test specific code in prod.
 	// wait for config to be observed
-	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, "", test)
+	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, test)
 
 	// run storage migration
 	// get secrets
@@ -472,10 +470,6 @@ resources:
 	}
 
 	// remove old KMS provider
-	// verifyIfKMSTransformersSwapped sometimes passes even before the changes in the encryption config file are observed.
-	// this causes the metrics tests to fail, which validate two config changes.
-	// this may happen when an existing KMS provider is already running (e.g., new-kms-provider-for-secrets in this case).
-	// to ensure that the changes are observed, we added one more provider (kms-provider-to-encrypt-all) and are validating it in verifyIfKMSTransformersSwapped.
 	encryptionConfigWithoutOldProvider := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -494,28 +488,13 @@ resources:
        name: new-kms-provider-for-configmaps
        cachesize: 1000
        endpoint: unix:///@new-kms-provider.sock
-  - resources:
-    - '*.*'
-    providers:
-    - kms:
-        name: kms-provider-to-encrypt-all
-        cachesize: 1000
-        endpoint: unix:///@new-encrypt-all-kms-provider.sock
-    - identity: {}
 `
 
-	// start new KMS Plugin
-	_ = mock.NewBase64Plugin(t, "@new-encrypt-all-kms-provider.sock")
-
 	// update encryption config and wait for hot reload
-	if err := os.WriteFile(filepath.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithoutOldProvider), 0644); err != nil {
-		t.Fatalf("failed to update encryption config, err: %v", err)
-	}
-
-	wantPrefixForEncryptAll := "k8s:enc:kms:v1:kms-provider-to-encrypt-all:"
+	updateFile(t, test.configDir, encryptionConfigFileName, []byte(encryptionConfigWithoutOldProvider))
 
 	// wait for config to be observed
-	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, wantPrefixForEncryptAll, test)
+	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, test)
 
 	// confirm that reading secrets still works
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
@@ -942,7 +921,7 @@ resources:
 func verifyPrefixOfSecretResource(t *testing.T, wantPrefix string, test *transformTest) {
 	// implementing this brute force approach instead of fancy channel notification to avoid test specific code in prod.
 	// wait for config to be observed
-	verifyIfKMSTransformersSwapped(t, wantPrefix, "", test)
+	verifyIfKMSTransformersSwapped(t, wantPrefix, test)
 
 	// run storage migration
 	secretsList, err := test.restClient.CoreV1().Secrets("").List(
@@ -976,7 +955,7 @@ func verifyPrefixOfSecretResource(t *testing.T, wantPrefix string, test *transfo
 	}
 }
 
-func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix, wantPrefixForEncryptAll string, test *transformTest) {
+func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix string, test *transformTest) {
 	t.Helper()
 
 	var swapErr error
@@ -1007,33 +986,33 @@ func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix, wantPrefixForEncry
 			return false, nil
 		}
 
-		if wantPrefixForEncryptAll != "" {
-			deploymentName := fmt.Sprintf("deployment-%d", idx)
-			_, err := test.createDeployment(deploymentName, "default")
-			if err != nil {
-				t.Fatalf("Failed to create test secret, error: %v", err)
-			}
-
-			rawEnvelope, err := test.readRawRecordFromETCD(test.getETCDPathForResource(test.storageConfig.Prefix, "", "deployments", deploymentName, "default"))
-			if err != nil {
-				t.Fatalf("failed to read %s from etcd: %v", test.getETCDPathForResource(test.storageConfig.Prefix, "", "deployments", deploymentName, "default"), err)
-			}
-
-			// check prefix
-			if !bytes.HasPrefix(rawEnvelope.Kvs[0].Value, []byte(wantPrefixForEncryptAll)) {
-				idx++
-
-				swapErr = fmt.Errorf("expected deployment to be prefixed with %s, but got %s", wantPrefixForEncryptAll, rawEnvelope.Kvs[0].Value)
-
-				// return nil error to continue polling till timeout
-				return false, nil
-			}
-		}
-
 		return true, nil
 	})
 	if pollErr == wait.ErrWaitTimeout {
 		t.Fatalf("failed to verify if kms transformers swapped, err: %v", swapErr)
+	}
+}
+
+func updateFile(t *testing.T, configDir, filename string, newContent []byte) {
+	t.Helper()
+
+	// Create a temporary file
+	tempFile, err := os.CreateTemp(configDir, "tempfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tempFile.Close()
+
+	// Write the new content to the temporary file
+	_, err = tempFile.Write(newContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Atomically replace the original file with the temporary file
+	err = os.Rename(tempFile.Name(), filepath.Join(configDir, filename))
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
