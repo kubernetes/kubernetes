@@ -31,6 +31,9 @@ spec:
       - name: dev
         hostPath:
           path: /dev
+      - name: cdi-dir
+        hostPath:
+          path: /var/run/cdi
       containers:
       - image: registry.k8s.io/e2e-test-images/sample-device-plugin:1.3
         name: sample-device-plugin
@@ -46,5 +49,7 @@ spec:
           mountPath: /var/lib/kubelet/plugins_registry
         - name: dev
           mountPath: /dev
+        - name: cdi-dir
+          mountPath: /var/run/cdi
   updateStrategy:
     type: RollingUpdate

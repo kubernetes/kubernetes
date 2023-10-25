@@ -32,6 +32,9 @@ import (
 
 const (
 	resourceName = "example.com/resource"
+	cdiPath      = "/var/run/cdi/example.com.json"
+	cdiVersion   = "0.3.0"
+	cdiPrefix    = "CDI-"
 )
 
 // stubAllocFunc creates and returns allocation response for the input allocate request
@@ -68,6 +71,14 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 				ContainerPath: fpath,
 				HostPath:      fpath,
 			})
+
+			if os.Getenv("CDI_ENABLED") != "" {
+				// add the CDI device ID to the response.
+				cdiDevice := &pluginapi.CDIDevice{
+					Name: fmt.Sprintf("%s=%s", resourceName, cdiPrefix+dev.ID),
+				}
+				response.CDIDevices = append(response.CDIDevices, cdiDevice)
+			}
 		}
 		responses.ContainerResponses = append(responses.ContainerResponses, response)
 	}
@@ -104,6 +115,24 @@ func main() {
 
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
+
+	cdiEnabled := os.Getenv("CDI_ENABLED")
+	klog.Infof("CDI_ENABLED: %s", cdiEnabled)
+	if cdiEnabled != "" {
+		if err := createCDIFile(devs); err != nil {
+			panic(err)
+		}
+		defer func() {
+			// Remove CDI file
+			if _, err := os.Stat(cdiPath); err == nil || os.IsExist(err) {
+				err := os.Remove(cdiPath)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}()
+	}
+
 	var registerControlFile string
 	autoregister := true
 
@@ -199,4 +228,21 @@ func handleRegistrationProcess(registerControlFile string, dpStub *plugin.Stub, 
 			time.Sleep(5 * time.Second)
 		}
 	}
+}
+
+func createCDIFile(devs []*pluginapi.Device) error {
+	content := fmt.Sprintf(`{"cdiVersion":"%s","kind":"%s","devices":[`, cdiVersion, resourceName)
+	for i, dev := range devs {
+		name := cdiPrefix + dev.ID
+		content += fmt.Sprintf(`{"name":"%s","containerEdits":{"env":["CDI_DEVICE=%s"],"deviceNodes":[{"path":"/tmp/%s","type":"b","major":1,"minor":%d}]}}`, name, name, name, i)
+		if i < len(devs)-1 {
+			content += ","
+		}
+	}
+	content += "]}"
+	if err := os.WriteFile(cdiPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to create CDI file: %s", err)
+	}
+	klog.InfoS("Created CDI file", "path", cdiPath, "devices", devs)
+	return nil
 }
