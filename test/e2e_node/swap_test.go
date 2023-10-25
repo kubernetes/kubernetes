@@ -19,21 +19,22 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strconv"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"path/filepath"
-	"strconv"
 )
 
 const (
@@ -46,36 +47,44 @@ const (
 var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("swap-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	// Empty context so we can apply the config setting.
+	ginkgo.Context("", func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates = map[string]bool{
+				string(features.NodeSwap): true,
+			}
+		})
 
-	ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
-		ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
-		pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
-		pod = runPodAndWaitUntilScheduled(f, pod)
+		ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
+			ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
+			pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
+			pod = runPodAndWaitUntilScheduled(f, pod)
 
-		isCgroupV2 := isPodCgroupV2(f, pod)
-		isLimitedSwap := isLimitedSwap(f, pod)
+			isCgroupV2 := isPodCgroupV2(f, pod)
+			isLimitedSwap := isLimitedSwap(f, pod)
 
-		if !isSwapFeatureGateEnabled() || !isCgroupV2 || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
-			ginkgo.By(fmt.Sprintf("Expecting no swap. feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
-			expectNoSwap(f, pod, isCgroupV2)
-			return
-		}
+			if !isCgroupV2 || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
+				ginkgo.By(fmt.Sprintf("Expecting no swap. isCgroupV2? %t is QoS burstable? %t", isCgroupV2, qosClass == v1.PodQOSBurstable))
+				expectNoSwap(f, pod, isCgroupV2)
+				return
+			}
 
-		if !isLimitedSwap {
-			ginkgo.By("expecting unlimited swap")
-			expectUnlimitedSwap(f, pod, isCgroupV2)
-			return
-		}
+			if !isLimitedSwap {
+				ginkgo.By("expecting unlimited swap")
+				expectUnlimitedSwap(f, pod, isCgroupV2)
+				return
+			}
 
-		ginkgo.By("expecting limited swap")
-		expectedSwapLimit := calcSwapForBurstablePod(f, pod)
-		expectLimitedSwap(f, pod, expectedSwapLimit)
-	},
-		ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
-		ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
-		ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
-		ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
-	)
+			ginkgo.By("expecting limited swap")
+			expectedSwapLimit := calcSwapForBurstablePod(f, pod)
+			expectLimitedSwap(f, pod, expectedSwapLimit)
+		},
+			ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
+			ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
+			ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
+			ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
+		)
+	})
 })
 
 // Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
@@ -140,11 +149,6 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrue(), "pod should be ready")
 
 	return pod
-}
-
-func isSwapFeatureGateEnabled() bool {
-	ginkgo.By("figuring if NodeSwap feature gate is turned on")
-	return utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap)
 }
 
 func readCgroupFile(f *framework.Framework, pod *v1.Pod, filename string) string {
