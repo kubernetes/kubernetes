@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"runtime"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/volume"
@@ -57,6 +59,7 @@ func NewInitializedVolumePluginMgr(
 	configMapManager configmap.Manager,
 	tokenManager *token.Manager,
 	clusterTrustBundleManager clustertrustbundle.Manager,
+	podCertificateManager podcertificate.Manager,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
 
@@ -83,6 +86,7 @@ func NewInitializedVolumePluginMgr(
 		configMapManager:          configMapManager,
 		tokenManager:              tokenManager,
 		clusterTrustBundleManager: clusterTrustBundleManager,
+		podCertificateManager:     podCertificateManager,
 		informerFactory:           informerFactory,
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
@@ -113,6 +117,7 @@ type kubeletVolumeHost struct {
 	tokenManager              *token.Manager
 	configMapManager          configmap.Manager
 	clusterTrustBundleManager clustertrustbundle.Manager
+	podCertificateManager     podcertificate.Manager
 	informerFactory           informers.SharedInformerFactory
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
@@ -271,6 +276,14 @@ func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bo
 
 func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
 	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
+}
+
+func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, pod podcertificate.PodIdentity, volumeName, path, signerName, keyType string) ([]byte, error) {
+	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, pod, volumeName, path, signerName, keyType)
+}
+
+func (kvh *kubeletVolumeHost) ForgetPodCertificateCredentialBundle(ctx context.Context, podUID, volumeName, path string) {
+	kvh.podCertificateManager.ForgetPodCertificateCredentialBundle(ctx, podUID, volumeName, path)
 }
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
