@@ -206,7 +206,7 @@ func (sched *Scheduler) schedulingCycle(
 			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		if sts.IsUnschedulable() {
+		if sts.IsRejected() {
 			fitErr := &framework.FitError{
 				NumAllNodes: 1,
 				Pod:         pod,
@@ -229,7 +229,7 @@ func (sched *Scheduler) schedulingCycle(
 			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		if runPermitStatus.IsUnschedulable() {
+		if runPermitStatus.IsRejected() {
 			fitErr := &framework.FitError{
 				NumAllNodes: 1,
 				Pod:         pod,
@@ -269,13 +269,13 @@ func (sched *Scheduler) bindingCycle(
 
 	// Run "permit" plugins.
 	if status := fwk.WaitOnPermit(ctx, assumedPod); !status.IsSuccess() {
-		if status.IsUnschedulable() {
+		if status.IsRejected() {
 			fitErr := &framework.FitError{
 				NumAllNodes: 1,
 				Pod:         assumedPodInfo.Pod,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: status},
-					UnschedulablePlugins: sets.New(status.FailedPlugin()),
+					UnschedulablePlugins: sets.New(status.Plugin()),
 				},
 			}
 			return framework.NewStatus(status.Code()).WithError(fitErr)
@@ -336,7 +336,7 @@ func (sched *Scheduler) handleBindingCycleError(
 		// Avoid moving the assumed Pod itself as it's always Unschedulable.
 		// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
 		// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
-		if status.IsUnschedulable() {
+		if status.IsRejected() {
 			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, internalqueue.AssignedPodDelete, assumedPod, nil, func(pod *v1.Pod) bool {
 				return assumedPod.UID != pod.UID
 			})
@@ -445,7 +445,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 	// Run "prefilter" plugins.
 	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
 	if !s.IsSuccess() {
-		if !s.IsUnschedulable() {
+		if !s.IsRejected() {
 			return nil, diagnosis, s.AsError()
 		}
 		// All nodes in NodeToStatusMap will have the same status so that they can be handled in the preemption.
@@ -959,7 +959,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 
 	logger := klog.FromContext(ctx)
 	reason := v1.PodReasonSchedulerError
-	if status.IsUnschedulable() {
+	if status.IsRejected() {
 		reason = v1.PodReasonUnschedulable
 	}
 

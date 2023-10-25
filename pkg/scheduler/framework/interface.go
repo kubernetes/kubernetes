@@ -110,7 +110,7 @@ const (
 	// - when a PreScore plugin returns Skip so that coupled Score plugin will be skipped.
 	Skip
 	// Pending means that the scheduling process is finished successfully,
-	// but the plugin wants to abort the scheduling cycle/binding cycle here.
+	// but the plugin wants to stop the scheduling cycle/binding cycle here.
 	//
 	// For example, the DRA plugin sometimes needs to wait for the external device driver
 	// to provision the resource for the Pod.
@@ -179,9 +179,9 @@ type Status struct {
 	code    Code
 	reasons []string
 	err     error
-	// failedPlugin is an optional field that records the plugin name a Pod failed by.
+	// plugin is an optional field that records the plugin name causes this status.
 	// It's set by the framework when code is Unschedulable, UnschedulableAndUnresolvable or Pending.
-	failedPlugin string
+	plugin string
 }
 
 func (s *Status) WithError(err error) *Status {
@@ -205,21 +205,21 @@ func (s *Status) Message() string {
 	return strings.Join(s.Reasons(), ", ")
 }
 
-// SetFailedPlugin sets the given plugin name to s.failedPlugin.
-func (s *Status) SetFailedPlugin(plugin string) {
-	s.failedPlugin = plugin
+// SetPlugin sets the given plugin name to s.plugin.
+func (s *Status) SetPlugin(plugin string) {
+	s.plugin = plugin
 }
 
-// WithFailedPlugin sets the given plugin name to s.failedPlugin,
+// WithPlugin sets the given plugin name to s.plugin,
 // and returns the given status object.
-func (s *Status) WithFailedPlugin(plugin string) *Status {
-	s.SetFailedPlugin(plugin)
+func (s *Status) WithPlugin(plugin string) *Status {
+	s.SetPlugin(plugin)
 	return s
 }
 
-// FailedPlugin returns the failed plugin name.
-func (s *Status) FailedPlugin() string {
-	return s.failedPlugin
+// Plugin returns the plugin name which caused this status.
+func (s *Status) Plugin() string {
+	return s.plugin
 }
 
 // Reasons returns reasons of the Status.
@@ -250,10 +250,10 @@ func (s *Status) IsSkip() bool {
 	return s.Code() == Skip
 }
 
-// IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
-func (s *Status) IsUnschedulable() bool {
+// IsRejected returns true if "Status" is Unschedulable (Unschedulable, UnschedulableAndUnresolvable, or Pending).
+func (s *Status) IsRejected() bool {
 	code := s.Code()
-	return code == Unschedulable || code == UnschedulableAndUnresolvable
+	return code == Unschedulable || code == UnschedulableAndUnresolvable || code == Pending
 }
 
 // AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
@@ -283,7 +283,7 @@ func (s *Status) Equal(x *Status) bool {
 	if !cmp.Equal(s.reasons, x.reasons) {
 		return false
 	}
-	return cmp.Equal(s.failedPlugin, x.failedPlugin)
+	return cmp.Equal(s.plugin, x.plugin)
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
