@@ -24,6 +24,15 @@ output:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+
+  # The default excludes disable the "should have comment or be unexported" check from revive.
+  # We want that to be enabled, therefore we have to disable all default excludes and
+  # add those back one-by-one that we want. See https://github.com/golangci/golangci-lint/issues/456#issuecomment-617470264
+  exclude-use-default: false
+  exclude:
+    # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
+    - ineffective break statement. Did you mean to break out of the outer loop
+
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
     # exclude ineffassign linter for generated files for conversion
@@ -45,7 +54,8 @@ issues:
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
     - linters:
         - stylecheck
-      text: "ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)"
+        - revive
+      text: "(ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
 
     # This check currently has some false positives (https://github.com/nunnatsa/ginkgolinter/issues/91).
     - linters:
@@ -83,6 +93,12 @@ issues:
         - gosimple
       text: "S1033: unnecessary guard around call to delete"
 
+    # Only packages listed here opt into the strict "exported symbols must be documented".
+    - linters:
+        - revive
+      text: "(exported: exported .* or be unexported|exported: comment on exported.*should be of the form)"
+      path-except: cmd/kubeadm
+
     # Didn't make it into https://github.com/kubernetes/kubernetes/issues/117288.
     # Discussion on Slack concluded that "it's hard to have a universal policy for all
     # functions marked deprecated" and thus this can only be a hint which must
@@ -110,6 +126,7 @@ linters:
     - govet
     - ineffassign
     - logcheck
+    - revive
     - staticcheck
     - stylecheck
     - unused
@@ -133,6 +150,12 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+  revive:
+    # Only these rules are enabled.
+    rules:
+      - name: exported
+        arguments:
+        - disableStutteringCheck
   staticcheck:
     checks:
       - "all"
