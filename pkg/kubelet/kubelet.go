@@ -424,6 +424,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageMaximumGCAge) {
+		imageGCPolicy.MaxAge = kubeCfg.ImageMaximumGCAge.Duration
+	} else if kubeCfg.ImageMaximumGCAge.Duration != 0 {
+		klog.InfoS("ImageMaximumGCAge flag enabled, but corresponding feature gate is not enabled. Ignoring flag.")
+	}
+
 	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
 	if experimentalNodeAllocatableIgnoreEvictionThreshold {
 		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
