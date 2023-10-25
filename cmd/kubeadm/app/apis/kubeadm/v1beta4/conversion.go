@@ -22,10 +22,12 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+// Convert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration converts a private InitConfiguration to a public InitConfiguration.
 func Convert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	return autoConvert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in, out, s)
 }
 
+// Convert_v1beta4_InitConfiguration_To_kubeadm_InitConfiguration converts a public InitConfiguration to a private InitConfiguration.
 func Convert_v1beta4_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
 	err := autoConvert_v1beta4_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s)
 	if err != nil {

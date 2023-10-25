@@ -120,6 +120,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	return initCfg, false, nil
 }
 
+// LoadConfigFunc is a function type that loads configuration from a file and/or the cluster.
 type LoadConfigFunc func(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error)
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure

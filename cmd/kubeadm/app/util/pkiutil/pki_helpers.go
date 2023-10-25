@@ -623,6 +623,7 @@ func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 // NewPrivateKey returns a new private key.
 var NewPrivateKey = GeneratePrivateKey
 
+// GeneratePrivateKey is the default function for generating private keys.
 func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, error) {
 	if keyType == kubeadmapi.EncryptionAlgorithmECDSA {
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
