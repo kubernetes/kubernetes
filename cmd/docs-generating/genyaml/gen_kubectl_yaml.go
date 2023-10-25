@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"k8s.io/kubernetes/cmd/docs-generating/genutils"
 	"os"
 	"strings"
 
@@ -28,7 +29,6 @@ import (
 	"gopkg.in/yaml.v2"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd"
-	"k8s.io/kubernetes/cmd/genutils"
 )
 
 type cmdOption struct {
