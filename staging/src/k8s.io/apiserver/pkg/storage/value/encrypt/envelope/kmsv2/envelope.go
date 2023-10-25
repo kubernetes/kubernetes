@@ -28,6 +28,7 @@ import (
 	"unsafe"
 
 	"github.com/gogo/protobuf/proto"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/crypto/cryptobyte"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -39,6 +40,7 @@ import (
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	kmsservice "k8s.io/kms/pkg/service"
 	"k8s.io/utils/clock"
@@ -133,11 +135,28 @@ func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, provide
 
 // TransformFromStorage decrypts data encrypted by this transformer using envelope encryption.
 func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	ctx, span := tracing.Start(ctx, "TransformFromStorage with envelopeTransformer",
+		attribute.String("transformer.provider.name", t.providerName),
+		// The service.instance_id of the apiserver is already available in the trace
+		/*
+			{
+			"key": "service.instance.id",
+			"type": "string",
+			"value": "apiserver-zsteyir5lyrtdcmqqmd5kzze6m"
+			}
+		*/
+	)
+	defer span.End(500 * time.Millisecond)
+
+	span.AddEvent("About to decode encrypted object")
 	// Deserialize the EncryptedObject from the data.
 	encryptedObject, err := t.doDecode(data)
 	if err != nil {
+		span.AddEvent("Decoding encrypted object failed")
+		span.RecordError(err)
 		return nil, false, err
 	}
+	span.AddEvent("Decoded encrypted object")
 
 	useSeed := encryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 
@@ -158,6 +177,7 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 
 	// fallback to the envelope service if we do not have the transformer locally
 	if transformer == nil {
+		span.AddEvent("About to decrypt DEK using remote service")
 		value.RecordCacheMiss()
 
 		requestInfo := getRequestInfoFromContext(ctx)
@@ -172,8 +192,11 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 			Annotations: encryptedObject.Annotations,
 		})
 		if err != nil {
+			span.AddEvent("DEK decryption failed")
+			span.RecordError(err)
 			return nil, false, fmt.Errorf("failed to decrypt DEK, error: %w", err)
 		}
+		span.AddEvent("DEK decryption succeeded")
 
 		transformer, err = t.addTransformerForDecryption(encryptedObjectCacheKey, key, useSeed)
 		if err != nil {
@@ -182,11 +205,15 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	}
 	metrics.RecordKeyID(metrics.FromStorageLabel, t.providerName, encryptedObject.KeyID, t.apiServerID)
 
+	span.AddEvent("About to decrypt data using DEK")
 	out, stale, err := transformer.TransformFromStorage(ctx, encryptedObject.EncryptedData, dataCtx)
 	if err != nil {
+		span.AddEvent("Data decryption failed")
+		span.RecordError(err)
 		return nil, false, err
 	}
 
+	span.AddEvent("Data decryption succeeded")
 	// data is considered stale if the key ID does not match our current write transformer
 	return out,
 		stale ||
@@ -197,6 +224,19 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 
 // TransformToStorage encrypts data to be written to disk using envelope encryption.
 func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	ctx, span := tracing.Start(ctx, "TransformToStorage with envelopeTransformer",
+		attribute.String("transformer.provider.name", t.providerName),
+		// The service.instance_id of the apiserver is already available in the trace
+		/*
+			{
+			"key": "service.instance.id",
+			"type": "string",
+			"value": "apiserver-zsteyir5lyrtdcmqqmd5kzze6m"
+			}
+		*/
+	)
+	defer span.End(500 * time.Millisecond)
+
 	state, err := t.stateFunc()
 	if err != nil {
 		return nil, err
@@ -215,18 +255,31 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		"group", requestInfo.APIGroup, "version", requestInfo.APIVersion, "resource", requestInfo.Resource, "subresource", requestInfo.Subresource,
 		"verb", requestInfo.Verb, "namespace", requestInfo.Namespace, "name", requestInfo.Name)
 
+	span.AddEvent("About to encrypt data using DEK")
 	result, err := state.Transformer.TransformToStorage(ctx, data, dataCtx)
 	if err != nil {
+		span.AddEvent("Data encryption failed")
+		span.RecordError(err)
 		return nil, err
 	}
+	span.AddEvent("Data encryption succeeded")
 
 	metrics.RecordKeyID(metrics.ToStorageLabel, t.providerName, state.EncryptedObject.KeyID, t.apiServerID)
 
 	encObjectCopy := state.EncryptedObject
 	encObjectCopy.EncryptedData = result
 
+	span.AddEvent("About to encode encrypted object")
 	// Serialize the EncryptedObject to a byte array.
-	return t.doEncode(&encObjectCopy)
+	out, err := t.doEncode(&encObjectCopy)
+	if err != nil {
+		span.AddEvent("Encoding encrypted object failed")
+		span.RecordError(err)
+		return nil, err
+	}
+	span.AddEvent("Encoded encrypted object")
+
+	return out, nil
 }
 
 // addTransformerForDecryption inserts a new transformer to the Envelope cache of DEKs for future reads.
