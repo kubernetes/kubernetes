@@ -20,10 +20,13 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/scheduler/util"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	ephemeral "k8s.io/component-helpers/storage/ephemeral"
@@ -77,8 +80,82 @@ func (pl *CSILimits) Name() string {
 func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 	}
+}
+
+func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		logger.V(5).Info("Unexpected objects in isSchedulableAfterPodDeleted", "oldObj", oldObj, "err", err)
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+	}
+
+	if deletedPod.Namespace != pod.Namespace {
+		return framework.Queue, nil
+	}
+
+	if len(deletedPod.Spec.Volumes) == 0 {
+		return framework.Queue, nil
+	}
+
+	csiNode, err := pl.csiNodeLister.Get(deletedPod.Spec.NodeName)
+	if err != nil {
+		logger.V(5).Info("Could not get a CSINode object", "nodeName", deletedPod.Spec.NodeName, "err", err)
+		return framework.Queue, fmt.Errorf("could not get a CSINode object: %w", err)
+	}
+
+	deletedPodDrivers := sets.Set[string]{}
+	for _, vol := range deletedPod.Spec.Volumes {
+		pvcName := ""
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+		case vol.Ephemeral != nil:
+			pvcName = ephemeral.VolumeClaimName(pod, &vol)
+		default:
+			continue
+		}
+
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			logger.V(5).Info("Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName, "err", err)
+			return framework.Queue, fmt.Errorf("unable to look up PVC info: %w", err)
+		}
+
+		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
+		deletedPodDrivers = deletedPodDrivers.Insert(driverName)
+	}
+
+	for _, vol := range pod.Spec.Volumes {
+		pvcName := ""
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+		case vol.Ephemeral != nil:
+			pvcName = ephemeral.VolumeClaimName(pod, &vol)
+		default:
+			continue
+		}
+
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			logger.V(5).Info("Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName, "err", err)
+			return framework.Queue, fmt.Errorf("unable to look up PVC info: %w", err)
+		}
+
+		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
+
+		for deletedPodDriver := range deletedPodDrivers {
+			if driverName == deletedPodDriver {
+				// This event may make Pod schedulable because the deleted Pod used the same CSI driver as the new Pod.
+				return framework.QueueSkip, nil
+			}
+		}
+	}
+
+	logger.V(5).Info("The deleted pod does not affect the new pod", "deletedPod", fmt.Sprintf("%s/%s", deletedPod.Namespace, deletedPod.Name), "pod", fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+	return framework.Queue, nil
 }
 
 // PreFilter invoked at the prefilter extension point
