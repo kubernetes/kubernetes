@@ -33,9 +33,10 @@ import (
 type ClaimInfo struct {
 	sync.RWMutex
 	state.ClaimInfoState
-	// annotations is a list of container annotations associated with
+	// annotations is a mapping of container annotations per DRA plugin associated with
 	// a prepared resource
-	annotations []kubecontainer.Annotation
+	annotations map[string][]kubecontainer.Annotation
+	prepared    bool
 }
 
 func (info *ClaimInfo) addPodReference(podUID types.UID) {
@@ -69,9 +70,21 @@ func (info *ClaimInfo) addCDIDevices(pluginName string, cdiDevices []string) err
 	}
 
 	info.CDIDevices[pluginName] = cdiDevices
-	info.annotations = append(info.annotations, annotations...)
+	info.annotations[pluginName] = annotations
 
 	return nil
+}
+
+// annotationsAsList returns container annotations as a single list.
+func (info *ClaimInfo) annotationsAsList() []kubecontainer.Annotation {
+	info.RLock()
+	defer info.RUnlock()
+
+	var lst []kubecontainer.Annotation
+	for _, v := range info.annotations {
+		lst = append(lst, v...)
+	}
+	return lst
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
@@ -93,8 +106,31 @@ func newClaimInfo(driverName, className string, claimUID types.UID, claimName, n
 	}
 	claimInfo := ClaimInfo{
 		ClaimInfoState: claimInfoState,
+		annotations:    make(map[string][]kubecontainer.Annotation),
 	}
 	return &claimInfo
+}
+
+// newClaimInfoFromResourceClaim creates a new ClaimInfo object
+func newClaimInfoFromResourceClaim(resourceClaim *resourcev1alpha2.ResourceClaim) *ClaimInfo {
+	// Grab the allocation.resourceHandles. If there are no
+	// allocation.resourceHandles, create a single resourceHandle with no
+	// content. This will trigger processing of this claim by a single
+	// kubelet plugin whose name matches resourceClaim.Status.DriverName.
+	resourceHandles := resourceClaim.Status.Allocation.ResourceHandles
+	if len(resourceHandles) == 0 {
+		resourceHandles = make([]resourcev1alpha2.ResourceHandle, 1)
+	}
+
+	return newClaimInfo(
+		resourceClaim.Status.DriverName,
+		resourceClaim.Spec.ResourceClassName,
+		resourceClaim.UID,
+		resourceClaim.Name,
+		resourceClaim.Namespace,
+		make(sets.Set[string]),
+		resourceHandles,
+	)
 }
 
 // newClaimInfoCache is a function that returns an instance of the claimInfoCache.
