@@ -23,7 +23,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io/ioutil"
+	"os"
 	"math/rand"
 	"testing"
 	"time"
@@ -49,7 +49,7 @@ func TestSigner(t *testing.T) {
 		t.Fatalf("failed to create signer: %v", err)
 	}
 
-	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
+	csrb, err := os.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
 		t.Fatalf("failed to read CSR: %v", err)
 	}
