@@ -333,6 +333,12 @@ func (s *ProxyServer) setupConntrack() error {
 		}
 	}
 
+	if s.Config.Conntrack.TCPBeLiberal {
+		if err := ct.SetTCPBeLiberal(1); err != nil {
+			return err
+		}
+	}
+
 	if s.Config.Conntrack.UDPTimeout.Duration > 0 {
 		timeout := int(s.Config.Conntrack.UDPTimeout.Duration / time.Second)
 		if err := ct.SetUDPTimeout(timeout); err != nil {
