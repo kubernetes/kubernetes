@@ -46,7 +46,7 @@ func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework
 	if !pl.enablePodSchedulingReadiness || len(p.Spec.SchedulingGates) == 0 {
 		return nil
 	}
-	var gates []string
+	gates := make([]string, 0, len(p.Spec.SchedulingGates))
 	for _, gate := range p.Spec.SchedulingGates {
 		gates = append(gates, gate.Name)
 	}
