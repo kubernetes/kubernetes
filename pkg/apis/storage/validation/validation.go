@@ -270,7 +270,7 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 		return allErrs
 	}
 
-	rawTopologies := make([]map[string]sets.String, len(topologies))
+	rawTopologies := make([]map[string]sets.Set[string], len(topologies))
 	for i, term := range topologies {
 		idxPath := fldPath.Index(i)
 		exprMap, termErrs := apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))
