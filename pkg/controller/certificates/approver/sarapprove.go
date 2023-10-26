@@ -29,26 +29,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-helpers/kubernetesx509"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 )
 
-type csrRecognizer struct {
-	recognize      func(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool
-	permission     authorization.ResourceAttributes
-	successMessage string
-}
-
 type sarApprover struct {
-	client      clientset.Interface
-	recognizers []csrRecognizer
+	client clientset.Interface
 }
 
 // NewCSRApprovingController creates a new CSRApprovingController.
 func NewCSRApprovingController(ctx context.Context, client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
-		client:      client,
-		recognizers: recognizers(),
+		client: client,
 	}
 	return certificates.NewCertificateController(
 		ctx,
@@ -57,22 +50,6 @@ func NewCSRApprovingController(ctx context.Context, client clientset.Interface, 
 		csrInformer,
 		approver.handle,
 	)
-}
-
-func recognizers() []csrRecognizer {
-	recognizers := []csrRecognizer{
-		{
-			recognize:      isSelfNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient", Version: "*"},
-			successMessage: "Auto approving self kubelet client certificate after SubjectAccessReview.",
-		},
-		{
-			recognize:      isNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient", Version: "*"},
-			successMessage: "Auto approving kubelet client certificate after SubjectAccessReview.",
-		},
-	}
-	return recognizers
 }
 
 func (a *sarApprover) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
@@ -87,33 +64,83 @@ func (a *sarApprover) handle(ctx context.Context, csr *capi.CertificateSigningRe
 		return fmt.Errorf("unable to parse csr %q: %v", csr.Name, err)
 	}
 
-	tried := []string{}
-
-	for _, r := range a.recognizers {
-		if !r.recognize(csr, x509cr) {
-			continue
+	if isSelfNodeClientCert(csr, x509cr) {
+		permission := authorization.ResourceAttributes{
+			Group:       "certificates.k8s.io",
+			Resource:    "certificatesigningrequests",
+			Verb:        "create",
+			Subresource: "selfnodeclient",
+			Version:     "*",
 		}
-
-		tried = append(tried, r.permission.Subresource)
-
-		approved, err := a.authorize(ctx, csr, r.permission)
+		approved, err := a.authorize(ctx, csr, permission)
 		if err != nil {
-			return err
+			return fmt.Errorf("while authorizing csr %q: %w", csr.ObjectMeta.Name, err)
 		}
-		if approved {
-			appendApprovalCondition(csr, r.successMessage)
-			_, err = a.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
-			if err != nil {
-				return fmt.Errorf("error updating approval for csr: %v", err)
-			}
-			return nil
+		if !approved {
+			return certificates.IgnorableError("recognized csr %q as selfNodeClientCert but subject access review was not approved", csr.Name)
 		}
+
+		appendApprovalCondition(csr, "Auto approving self kubelet client certificate after SubjectAccessReview.")
+		_, err = a.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("error updating approval for csr: %v", err)
+		}
+		return nil
 	}
 
-	if len(tried) != 0 {
-		return certificates.IgnorableError("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
+	if isNodeClientCert(csr, x509cr) {
+		permission := authorization.ResourceAttributes{
+			Group:       "certificates.k8s.io",
+			Resource:    "certificatesigningrequests",
+			Verb:        "create",
+			Subresource: "nodeclient",
+			Version:     "*",
+		}
+		approved, err := a.authorize(ctx, csr, permission)
+		if err != nil {
+			return fmt.Errorf("while authorizing csr %q: %w", csr.ObjectMeta.Name, err)
+		}
+		if !approved {
+			return certificates.IgnorableError("recognized csr %q as nodeClientCert but subject access review was not approved", csr.Name)
+		}
+
+		appendApprovalCondition(csr, "Auto approving kubelet client certificate after SubjectAccessReview.")
+		_, err = a.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("error updating approval for csr: %v", err)
+		}
+		return nil
+
 	}
 
+	if csr.Spec.SignerName == capi.KubeAPIServerClientPodSignerName {
+		pi, err := kubernetesx509.PodIdentityFromCertificateRequest(x509cr)
+		if err != nil {
+			return fmt.Errorf("while checking for Kubernetes X.509 extensions: %w", err)
+		}
+		if pi == nil {
+			return fmt.Errorf("CSR addressed to signer %s did not contain a Kubernetes PodIdentity X509 extension", capi.KubeAPIServerClientKubeletSignerName)
+		}
+
+		// TODO(KEP-PodCertificates): Adjust the comment below once it's clear
+		// exactly which admission controller enforces this.
+
+		// The noderestriction admission controller will have already ensured
+		// that the CSR requester is a node/kubelet, and it's actually running the pod
+		// referenced in the pod identity extension.  We can just approve the
+		// CSR.
+
+		appendApprovalCondition(csr, "Auto approving pod client certificate.")
+		_, err = a.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("while updating approval for csr: %v", err)
+		}
+
+		return nil
+	}
+
+	// We didn't recognize the CSR as one of the types we auto-approve.  Take no
+	// action.  Maybe someone will manually approve it.
 	return nil
 }
 
