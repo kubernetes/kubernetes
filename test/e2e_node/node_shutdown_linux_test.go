@@ -62,24 +62,44 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
-		if _, err := exec.LookPath("systemd-run"); err == nil {
-			if version, verr := exec.Command("systemd-run", "--version").Output(); verr == nil {
-				// sample output from $ systemd-run --version
-				// systemd 245 (245.4-4ubuntu3.13)
-				re := regexp.MustCompile(`systemd (\d+)`)
-				if match := re.FindSubmatch(version); len(match) > 1 {
-					systemdVersion, err := strconv.Atoi(string(match[1]))
-					if err != nil {
-						framework.Logf("failed to parse systemd version with error %v, 'systemd-run --version' output was [%s]", err, version)
-					} else {
-						// See comments in issue 107043, this is a known problem for a long time that this feature does not work on older systemd
-						// https://github.com/kubernetes/kubernetes/issues/107043#issuecomment-997546598
-						if systemdVersion < 245 {
-							e2eskipper.Skipf("skipping GracefulNodeShutdown tests as we are running on an old version of systemd : %d", systemdVersion)
-						}
-					}
-				}
+		if _, err := exec.LookPath("systemd-run"); err != nil {
+			e2eskipper.Skipf("skipping GracefulNodeShutdown tests as we are running on a non-systemd system: %v", err)
+		}
+		version, err := exec.Command("systemd-run", "--version").Output()
+		if err != nil {
+			e2eskipper.Skipf("skipping GracefulNodeShutdown tests as we are running on a non-systemd system: %v", err)
+		}
+
+		// sample output from $ systemd-run --version
+		// systemd 245 (245.4-4ubuntu3.13)
+		re := regexp.MustCompile(`systemd (\d+)`)
+		match := re.FindSubmatch(version)
+		if len(match) <= 1 {
+			e2eskipper.Skipf("skipping GracefulNodeShutdown tests as we are running on a non-systemd system: version %s", version)
+		}
+
+		systemdVersion, err := strconv.Atoi(string(match[1]))
+		if err != nil {
+			e2eskipper.Skipf("skipping failed to parse systemd version with error %v, 'systemd-run --version' output was [%s]", err, version)
+		}
+
+		// See comments in issue 107043, this is a known problem for a long time that this feature does not work on older systemd
+		// https://github.com/kubernetes/kubernetes/issues/107043#issuecomment-997546598
+		if systemdVersion < 245 {
+			e2eskipper.Skipf("skipping GracefulNodeShutdown tests as we are running on an old version of systemd : %d", systemdVersion)
+		}
+
+		framework.Logf("Running systemd version %d", systemdVersion)
+
+		for i := 0; i != 30; i++ {
+			err = checkInhibit()
+			if err == nil {
+				break
 			}
+			time.Sleep(time.Second)
+		}
+		if err != nil {
+			e2eskipper.Skipf("skipping failed to check inhibit: %v", err)
 		}
 	})
 
@@ -649,6 +669,12 @@ func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
 	return isNodeReady(&nodeList.Items[0])
+}
+
+func checkInhibit() error {
+	cmd := "systemd-inhibit --list"
+	_, err := runCommand("sh", "-c", cmd)
+	return err
 }
 
 func systemctlDaemonReload() error {
