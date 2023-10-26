@@ -31,6 +31,7 @@ import (
 	_ "net/http/pprof"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
@@ -81,7 +82,8 @@ func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, du
 // createProxier creates the proxy.Provider
 func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
 	if initOnly {
-		return nil, fmt.Errorf("--init-only is not implemented on Windows")
+		klog.Info("--init-only is not implemented on Windows")
+		return nil, nil
 	}
 	var healthzPort int
 	if len(config.HealthzBindAddress) > 0 {
