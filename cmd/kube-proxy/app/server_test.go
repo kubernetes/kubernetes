@@ -20,8 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -30,16 +30,16 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
+
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 // TestLoadConfig tests proper operation of loadConfig()
@@ -492,7 +492,7 @@ kind: KubeProxyConfiguration
 			if len(tc.config) > 0 {
 				tmp := t.TempDir()
 				configFile := path.Join(tmp, "kube-proxy.conf")
-				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
+				require.NoError(t, os.WriteFile(configFile, []byte(tc.config), 0666))
 				flags = append(flags, "--config", configFile)
 			}
 			require.NoError(t, fs.Parse(flags))

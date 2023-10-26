@@ -19,7 +19,6 @@ package options
 import (
 	stdjson "encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,9 +28,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/natefinch/lumberjack.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/server"
-	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 func TestAuditValidOptions(t *testing.T) {
@@ -271,7 +271,7 @@ func makeTmpWebhookConfig(t *testing.T) string {
 			{Cluster: v1.Cluster{Server: "localhost", InsecureSkipTLSVerify: true}},
 		},
 	}
-	f, err := ioutil.TempFile("", "k8s_audit_webhook_test_")
+	f, err := os.CreateTemp("", "k8s_audit_webhook_test_")
 	require.NoError(t, err, "creating temp file")
 	require.NoError(t, stdjson.NewEncoder(f).Encode(config), "writing webhook kubeconfig")
 	require.NoError(t, f.Close())
@@ -289,7 +289,7 @@ func makeTmpPolicy(t *testing.T) string {
 			},
 		},
 	}
-	f, err := ioutil.TempFile("", "k8s_audit_policy_test_")
+	f, err := os.CreateTemp("", "k8s_audit_policy_test_")
 	require.NoError(t, err, "creating temp file")
 	require.NoError(t, stdjson.NewEncoder(f).Encode(pol), "writing policy file")
 	require.NoError(t, f.Close())

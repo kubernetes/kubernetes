@@ -17,13 +17,13 @@ limitations under the License.
 package unstructured
 
 import (
-	"io/ioutil"
+	"io"
 	"sync"
 	"testing"
 
-	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
-
 	"github.com/stretchr/testify/assert"
+
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 )
 
 // TestCodecOfUnstructuredList tests that there are no data races in Encode().
@@ -38,7 +38,7 @@ func TestCodecOfUnstructuredList(t *testing.T) {
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
-			assert.NoError(t, UnstructuredJSONScheme.Encode(&list, ioutil.Discard))
+			assert.NoError(t, UnstructuredJSONScheme.Encode(&list, io.Discard))
 		}()
 	}
 	wg.Wait()

@@ -25,7 +25,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -51,9 +50,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 )
 
@@ -412,7 +411,7 @@ func TestVSphereLoginByToken(t *testing.T) {
 }
 
 func TestVSphereLoginWithCaCert(t *testing.T) {
-	caCertPEM, err := ioutil.ReadFile("./vclib/testdata/ca.pem")
+	caCertPEM, err := os.ReadFile("./vclib/testdata/ca.pem")
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
 	}

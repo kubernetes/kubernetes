@@ -21,7 +21,6 @@ package azure_file
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -34,16 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	fakecloud "k8s.io/cloud-provider/fake"
+	"k8s.io/legacy-cloud-providers/azure"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/legacy-cloud-providers/azure"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "azureFileTest")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "azureFileTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -67,7 +66,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "azureFileTest")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "azureFileTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -98,7 +97,7 @@ func getAzureTestCloud(t *testing.T) *azure.Cloud {
 }
 
 func getTestTempDir(t *testing.T) string {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "azurefileTest")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "azurefileTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -246,7 +245,7 @@ func (s *fakeAzureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, ac
 }
 
 func TestMounterAndUnmounterTypeAssert(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "azurefileTest")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "azurefileTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

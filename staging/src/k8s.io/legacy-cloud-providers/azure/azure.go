@@ -22,11 +22,13 @@ package azure
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -42,9 +44,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/legacy-cloud-providers/azure/auth"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	azclients "k8s.io/legacy-cloud-providers/azure/clients"
+	_ "k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient"
+	_ "k8s.io/legacy-cloud-providers/azure/clients/deploymentclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/diskclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/fileclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient"
@@ -61,13 +67,6 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
-
-	// ensure the newly added package from azure-sdk-for-go is in vendor/
-	_ "k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient"
-	// ensure the newly added package from azure-sdk-for-go is in vendor/
-	_ "k8s.io/legacy-cloud-providers/azure/clients/deploymentclient"
-
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -650,7 +649,7 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 		return nil, nil
 	}
 
-	configContents, err := ioutil.ReadAll(configReader)
+	configContents, err := io.ReadAll(configReader)
 	if err != nil {
 		return nil, err
 	}

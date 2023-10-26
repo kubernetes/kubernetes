@@ -18,16 +18,17 @@ package policy
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/klog/v2"
+
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/apis/audit/validation"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -47,7 +48,7 @@ func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path not specified")
 	}
-	policyDef, err := ioutil.ReadFile(filePath)
+	policyDef, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file path %q: %+v", filePath, err)
 	}

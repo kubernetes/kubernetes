@@ -20,7 +20,6 @@ import (
 	stdjson "encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -30,15 +29,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/wait"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // newWebhookHandler returns a handler which receives webhook events and decodes the
@@ -65,7 +64,7 @@ type testWebhookHandler struct {
 
 func (t *testWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := func() error {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			return fmt.Errorf("read webhook request body: %v", err)
 		}
@@ -96,7 +95,7 @@ func newWebhook(t *testing.T, endpoint string, groupVersion schema.GroupVersion)
 			{Cluster: v1.Cluster{Server: endpoint, InsecureSkipTLSVerify: true}},
 		},
 	}
-	f, err := ioutil.TempFile("", "k8s_audit_webhook_test_")
+	f, err := os.CreateTemp("", "k8s_audit_webhook_test_")
 	require.NoError(t, err, "creating temp file")
 
 	defer func() {

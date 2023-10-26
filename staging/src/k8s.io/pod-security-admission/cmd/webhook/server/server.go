@@ -23,14 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -43,6 +41,7 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
+
 	"k8s.io/pod-security-admission/admission"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
@@ -182,7 +181,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 	limitedReader := &io.LimitedReader{R: r.Body, N: maxRequestSize}
-	if body, err = ioutil.ReadAll(limitedReader); err != nil {
+	if body, err = io.ReadAll(limitedReader); err != nil {
 		logger.Error(err, "unable to read the body from the incoming request")
 		http.Error(w, "unable to read the body from the incoming request", http.StatusBadRequest)
 		return

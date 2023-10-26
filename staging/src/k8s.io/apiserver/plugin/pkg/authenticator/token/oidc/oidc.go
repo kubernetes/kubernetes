@@ -33,7 +33,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -42,21 +42,19 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc"
-	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types/ref"
-
-	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
+
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
-	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -803,7 +801,7 @@ func getClaimJWT(ctx context.Context, client *http.Client, url, accessToken stri
 	if response.StatusCode < http.StatusOK || response.StatusCode > http.StatusIMUsed {
 		return "", fmt.Errorf("error while getting distributed claim JWT: %v", response.Status)
 	}
-	responseBytes, err := ioutil.ReadAll(response.Body)
+	responseBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not decode distributed claim response")
 	}

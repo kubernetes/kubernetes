@@ -18,10 +18,11 @@ package versioning
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -133,7 +134,7 @@ func TestEncodeUnstructured(t *testing.T) {
 	for _, testCase := range testCases {
 		serializer := &mockSerializer{}
 		codec := NewCodec(serializer, serializer, testCase.convertor, nil, testCase.typer, nil, testCase.targetVersion, nil, "noxu-scheme")
-		err := codec.Encode(testCase.outObj, ioutil.Discard)
+		err := codec.Encode(testCase.outObj, io.Discard)
 		if testCase.errFunc != nil {
 			if !testCase.errFunc(err) {
 				t.Errorf("%v: failed: %v", testCase.name, err)

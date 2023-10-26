@@ -19,7 +19,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -28,14 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	cliflag "k8s.io/component-base/cli/flag"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/klog/v2"
+
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
-	cliflag "k8s.io/component-base/cli/flag"
-	logsapi "k8s.io/component-base/logs/api/v1"
-	"k8s.io/klog/v2"
 )
 
 func init() {
@@ -99,7 +99,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "cloud-controller-manager")
+	result.TmpDir, err = os.MkdirTemp("", "cloud-controller-manager")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}

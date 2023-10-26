@@ -23,22 +23,22 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
 	capi "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
+	testingclock "k8s.io/utils/clock/testing"
+
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 	"k8s.io/kubernetes/pkg/controller/certificates"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestSigner(t *testing.T) {
@@ -49,7 +49,7 @@ func TestSigner(t *testing.T) {
 		t.Fatalf("failed to create signer: %v", err)
 	}
 
-	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
+	csrb, err := os.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
 		t.Fatalf("failed to read CSR: %v", err)
 	}

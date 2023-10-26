@@ -23,7 +23,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -36,15 +36,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/http2"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
-	"k8s.io/klog/v2"
 )
 
 type recorder struct {
@@ -121,7 +121,7 @@ func TestTimeout(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusOK)
 	}
-	body, _ := ioutil.ReadAll(res.Body)
+	body, _ := io.ReadAll(res.Body)
 	if string(body) != resp {
 		t.Errorf("got body %q; expected %q", string(body), resp)
 	}
@@ -143,7 +143,7 @@ func TestTimeout(t *testing.T) {
 	if res.StatusCode != http.StatusGatewayTimeout {
 		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusGatewayTimeout)
 	}
-	body, _ = ioutil.ReadAll(res.Body)
+	body, _ = io.ReadAll(res.Body)
 	status := &metav1.Status{}
 	if err := json.Unmarshal(body, status); err != nil {
 		t.Fatal(err)

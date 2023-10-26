@@ -21,14 +21,9 @@ package azure_file
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"time"
-
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -37,9 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/klog/v2"
+	"k8s.io/legacy-cloud-providers/azure"
+	"k8s.io/mount-utils"
+	utilstrings "k8s.io/utils/strings"
+
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/legacy-cloud-providers/azure"
 )
 
 // ProbeVolumePlugins is the primary endpoint for volume plugins
@@ -264,7 +263,7 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 	if !notMnt {
 		// testing original mount point, make sure the mount link is valid
-		if _, err := ioutil.ReadDir(dir); err == nil {
+		if _, err := os.ReadDir(dir); err == nil {
 			klog.V(4).Infof("azureFile - already mounted to target %s", dir)
 			return nil
 		}

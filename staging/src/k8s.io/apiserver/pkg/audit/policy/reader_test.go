@@ -17,14 +17,15 @@ limitations under the License.
 package policy
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/apiserver/pkg/apis/audit"
+	// import to call webhook's init(
+	// import to call webhook's init(
 
+	"k8s.io/apiserver/pkg/apis/audit"
 	// import to call webhook's init() function to register audit.Policy to schema
 	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 
@@ -158,7 +159,7 @@ kind: Policy`,
 }
 
 func writePolicy(t *testing.T, policy string) (string, error) {
-	f, err := ioutil.TempFile("", "policy.yaml")
+	f, err := os.MkDirTemp("", "policy.yaml")
 	require.NoError(t, err)
 
 	_, err = f.WriteString(policy)

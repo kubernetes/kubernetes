@@ -19,14 +19,12 @@ limitations under the License.
 
 package vsphere
 
-import (
-	"io/ioutil"
-)
+import "os"
 
 const UUIDPath = "/sys/class/dmi/id/product_serial"
 
 func getRawUUID() (string, error) {
-	id, err := ioutil.ReadFile(UUIDPath)
+	id, err := os.ReadFile(UUIDPath)
 	if err != nil {
 		return "", err
 	}

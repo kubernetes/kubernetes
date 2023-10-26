@@ -26,7 +26,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -40,11 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	netutils "k8s.io/utils/net"
+
+	"k8s.io/apiserver/pkg/server"
 )
 
 func setUp(t *testing.T) server.Config {
@@ -400,13 +400,13 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 	}
 
 	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0755))
-	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0755))
+	err = os.WriteFile(certFileName, certPem, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
 
 	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0755))
-	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0755))
+	err = os.WriteFile(keyFileName, keyPem, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
@@ -415,7 +415,7 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 }
 
 func caCertFromBundle(bundlePath string) (*x509.Certificate, error) {
-	pemData, err := ioutil.ReadFile(bundlePath)
+	pemData, err := os.ReadFile(bundlePath)
 	if err != nil {
 		return nil, err
 	}

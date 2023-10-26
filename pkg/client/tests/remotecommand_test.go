@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -31,7 +30,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +39,7 @@ import (
 	remoteclient "k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -336,7 +335,7 @@ func TestDial(t *testing.T) {
 		conn:          &fakeConnection{},
 		resp: &http.Response{
 			StatusCode: http.StatusSwitchingProtocols,
-			Body:       ioutil.NopCloser(&bytes.Buffer{}),
+			Body:       io.NopCloser(&bytes.Buffer{}),
 		},
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: upgrader}, "POST", &url.URL{Host: "something.com", Scheme: "https"})
