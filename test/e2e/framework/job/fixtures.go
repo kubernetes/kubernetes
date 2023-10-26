@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/ptr"
 )
 
 // NewTestJob returns a Job which does one of several testing behaviors. notTerminate starts a Job that will run
@@ -91,7 +93,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 	}
 	switch behavior {
 	case "notTerminate":
-		job.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "1000000"}
+		job.Spec.Template.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 	case "fail":
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 1"}
 	case "failOddSucceedEven":
@@ -126,6 +128,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 		// the non-0-indexed pods are succeeded is used to determine that the
 		// 0th indexed pod already created the marker file.
 		setupHostPathDirectory(job)
+		job.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; elif [[ $JOB_COMPLETION_INDEX -eq 0 ]] ; then touch /data/foo ; sleep 1000000 ; else exit 1 ; fi"}
 	}
 	return job

@@ -262,7 +262,7 @@ var _ = SIGDescribe("Job", func() {
 			Rules: []batchv1.PodFailurePolicyRule{
 				{
 					// Ignore failures of the non 0-indexed pods which fail until the marker file is created
-					// And the 127 in the 0-indexed pod due to eviction.
+					// And the 137 in the 0-indexed pod due to eviction.
 					Action: batchv1.PodFailurePolicyActionIgnore,
 					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
 						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
