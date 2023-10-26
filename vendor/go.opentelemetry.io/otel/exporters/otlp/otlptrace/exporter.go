@@ -17,9 +17,9 @@ package otlptrace // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
-	"go.opentelemetry.io/otel/exporters/otlp/internal"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -48,7 +48,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, ss []tracesdk.ReadOnlySpan) 
 
 	err := e.client.UploadTraces(ctx, protoSpans)
 	if err != nil {
-		return internal.WrapTracesError(err)
+		return fmt.Errorf("traces export: %w", err)
 	}
 	return nil
 }

@@ -157,6 +157,8 @@ type Meter interface {
 	//
 	// If no instruments are passed, f should not be registered nor called
 	// during collection.
+	//
+	// The function f needs to be concurrent safe.
 	RegisterCallback(f Callback, instruments ...Observable) (Registration, error)
 }
 

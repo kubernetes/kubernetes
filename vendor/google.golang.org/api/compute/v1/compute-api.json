@@ -550,6 +550,56 @@
             "https://www.googleapis.com/auth/compute.readonly"
           ]
         },
+        "move": {
+          "description": "Moves the specified address resource.",
+          "flatPath": "projects/{project}/regions/{region}/addresses/{address}/move",
+          "httpMethod": "POST",
+          "id": "compute.addresses.move",
+          "parameterOrder": [
+            "project",
+            "region",
+            "address"
+          ],
+          "parameters": {
+            "address": {
+              "description": "Name of the address resource to move.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?|[1-9][0-9]{0,19}",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Source project ID which the Address is moved from.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "region": {
+              "description": "Name of the region for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed. For example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments. The request ID must be a valid UUID with the exception that zero UUID is not supported ( 00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "projects/{project}/regions/{region}/addresses/{address}/move",
+          "request": {
+            "$ref": "RegionAddressesMoveRequest"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
+          ]
+        },
         "setLabels": {
           "description": "Sets the labels on an Address. To learn more about labels, read the Labeling Resources documentation.",
           "flatPath": "projects/{project}/regions/{region}/addresses/{resource}/setLabels",
@@ -4495,6 +4545,48 @@
             "https://www.googleapis.com/auth/cloud-platform",
             "https://www.googleapis.com/auth/compute",
             "https://www.googleapis.com/auth/compute.readonly"
+          ]
+        },
+        "move": {
+          "description": "Moves the specified address resource from one project to another project.",
+          "flatPath": "projects/{project}/global/addresses/{address}/move",
+          "httpMethod": "POST",
+          "id": "compute.globalAddresses.move",
+          "parameterOrder": [
+            "project",
+            "address"
+          ],
+          "parameters": {
+            "address": {
+              "description": "Name of the address resource to move.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?|[1-9][0-9]{0,19}",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Source project ID which the Address is moved from.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed. For example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments. The request ID must be a valid UUID with the exception that zero UUID is not supported ( 00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "projects/{project}/global/addresses/{address}/move",
+          "request": {
+            "$ref": "GlobalAddressesMoveRequest"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
           ]
         },
         "setLabels": {
@@ -10647,6 +10739,11 @@
               "required": true,
               "type": "string"
             },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed. For example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments. The request ID must be a valid UUID with the exception that zero UUID is not supported ( 00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            },
             "zone": {
               "description": "The name of the zone for this request.",
               "location": "path",
@@ -11660,6 +11757,100 @@
           "path": "projects/{project}/global/interconnectLocations",
           "response": {
             "$ref": "InterconnectLocationList"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute",
+            "https://www.googleapis.com/auth/compute.readonly"
+          ]
+        }
+      }
+    },
+    "interconnectRemoteLocations": {
+      "methods": {
+        "get": {
+          "description": "Returns the details for the specified interconnect remote location. Gets a list of available interconnect remote locations by making a list() request.",
+          "flatPath": "projects/{project}/global/interconnectRemoteLocations/{interconnectRemoteLocation}",
+          "httpMethod": "GET",
+          "id": "compute.interconnectRemoteLocations.get",
+          "parameterOrder": [
+            "project",
+            "interconnectRemoteLocation"
+          ],
+          "parameters": {
+            "interconnectRemoteLocation": {
+              "description": "Name of the interconnect remote location to return.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?|[1-9][0-9]{0,19}",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "projects/{project}/global/interconnectRemoteLocations/{interconnectRemoteLocation}",
+          "response": {
+            "$ref": "InterconnectRemoteLocation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute",
+            "https://www.googleapis.com/auth/compute.readonly"
+          ]
+        },
+        "list": {
+          "description": "Retrieves the list of interconnect remote locations available to the specified project.",
+          "flatPath": "projects/{project}/global/interconnectRemoteLocations",
+          "httpMethod": "GET",
+          "id": "compute.interconnectRemoteLocations.list",
+          "parameterOrder": [
+            "project"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "A filter expression that filters resources listed in the response. Most Compute resources support two types of filter expressions: expressions that support regular expressions and expressions that follow API improvement proposal AIP-160. If you want to use AIP-160, your expression must specify the field name, an operator, and the value that you want to use for filtering. The value must be a string, a number, or a boolean. The operator must be either `=`, `!=`, `\u003e`, `\u003c`, `\u003c=`, `\u003e=` or `:`. For example, if you are filtering Compute Engine instances, you can exclude instances named `example-instance` by specifying `name != example-instance`. The `:` operator can be used with string fields to match substrings. For non-string fields it is equivalent to the `=` operator. The `:*` comparison can be used to test whether a key has been defined. For example, to find all objects with `owner` label use: ``` labels.owner:* ``` You can also filter nested fields. For example, you could specify `scheduling.automaticRestart = false` to include instances only if they are not scheduled for automatic restarts. You can use filtering on nested fields to filter based on resource labels. To filter on multiple expressions, provide each separate expression within parentheses. For example: ``` (scheduling.automaticRestart = true) (cpuPlatform = \"Intel Skylake\") ``` By default, each expression is an `AND` expression. However, you can include `AND` and `OR` expressions explicitly. For example: ``` (cpuPlatform = \"Intel Skylake\") OR (cpuPlatform = \"Intel Broadwell\") AND (scheduling.automaticRestart = true) ``` If you want to use a regular expression, use the `eq` (equal) or `ne` (not equal) operator against a single un-parenthesized expression with or without quotes or against multiple parenthesized expressions. Examples: `fieldname eq unquoted literal` `fieldname eq 'single quoted literal'` `fieldname eq \"double quoted literal\"` `(fieldname1 eq literal) (fieldname2 ne \"literal\")` The literal value is interpreted as a regular expression using Google RE2 library syntax. The literal value must match the entire field. For example, to filter for instances that do not end with name \"instance\", you would use `name ne .*instance`.",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "The maximum number of results per page that should be returned. If the number of available results is larger than `maxResults`, Compute Engine returns a `nextPageToken` that can be used to get the next page of results in subsequent list requests. Acceptable values are `0` to `500`, inclusive. (Default: `500`)",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "orderBy": {
+              "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name. You can also sort results in descending order based on the creation timestamp using `orderBy=\"creationTimestamp desc\"`. This sorts results based on the `creationTimestamp` field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first. Currently, only sorting by `name` or `creationTimestamp desc` is supported.",
+              "location": "query",
+              "type": "string"
+            },
+            "pageToken": {
+              "description": "Specifies a page token to use. Set `pageToken` to the `nextPageToken` returned by a previous list request to get the next page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "returnPartialSuccess": {
+              "description": "Opt-in for partial success behavior which provides partial results in case of failure. The default value is false.",
+              "location": "query",
+              "type": "boolean"
+            }
+          },
+          "path": "projects/{project}/global/interconnectRemoteLocations",
+          "response": {
+            "$ref": "InterconnectRemoteLocationList"
           },
           "scopes": [
             "https://www.googleapis.com/auth/cloud-platform",
@@ -15703,6 +15894,56 @@
           "path": "projects/{project}/zones/{zone}/nodeGroups/{nodeGroup}/setNodeTemplate",
           "request": {
             "$ref": "NodeGroupsSetNodeTemplateRequest"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
+          ]
+        },
+        "simulateMaintenanceEvent": {
+          "description": "Simulates maintenance event on specified nodes from the node group.",
+          "flatPath": "projects/{project}/zones/{zone}/nodeGroups/{nodeGroup}/simulateMaintenanceEvent",
+          "httpMethod": "POST",
+          "id": "compute.nodeGroups.simulateMaintenanceEvent",
+          "parameterOrder": [
+            "project",
+            "zone",
+            "nodeGroup"
+          ],
+          "parameters": {
+            "nodeGroup": {
+              "description": "Name of the NodeGroup resource whose nodes will go under maintenance simulation.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?|[1-9][0-9]{0,19}",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed. For example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments. The request ID must be a valid UUID with the exception that zero UUID is not supported ( 00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            },
+            "zone": {
+              "description": "The name of the zone for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "projects/{project}/zones/{zone}/nodeGroups/{nodeGroup}/simulateMaintenanceEvent",
+          "request": {
+            "$ref": "NodeGroupsSimulateMaintenanceEventRequest"
           },
           "response": {
             "$ref": "Operation"
@@ -25956,6 +26197,11 @@
               "minimum": "0",
               "type": "integer"
             },
+            "natName": {
+              "description": "Name of the nat service to filter the Nat Mapping information. If it is omitted, all nats for this router will be returned. Name should conform to RFC1035.",
+              "location": "query",
+              "type": "string"
+            },
             "orderBy": {
               "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name. You can also sort results in descending order based on the creation timestamp using `orderBy=\"creationTimestamp desc\"`. This sorts results based on the `creationTimestamp` field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first. Currently, only sorting by `name` or `creationTimestamp desc` is supported.",
               "location": "query",
@@ -33123,7 +33369,7 @@
       }
     }
   },
-  "revision": "20230307",
+  "revision": "20230516",
   "rootUrl": "https://compute.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -33543,11 +33789,11 @@
       "id": "AccessConfig",
       "properties": {
         "externalIpv6": {
-          "description": "The first IPv6 address of the external IPv6 range associated with this instance, prefix length is stored in externalIpv6PrefixLength in ipv6AccessConfig. To use a static external IP address, it must be unused and in the same region as the instance's zone. If not specified, Google Cloud will automatically assign an external IPv6 address from the instance's subnetwork.",
+          "description": "Applies to ipv6AccessConfigs only. The first IPv6 address of the external IPv6 range associated with this instance, prefix length is stored in externalIpv6PrefixLength in ipv6AccessConfig. To use a static external IP address, it must be unused and in the same region as the instance's zone. If not specified, Google Cloud will automatically assign an external IPv6 address from the instance's subnetwork.",
           "type": "string"
         },
         "externalIpv6PrefixLength": {
-          "description": "The prefix length of the external IPv6 range.",
+          "description": "Applies to ipv6AccessConfigs only. The prefix length of the external IPv6 range.",
           "format": "int32",
           "type": "integer"
         },
@@ -33557,11 +33803,11 @@
           "type": "string"
         },
         "name": {
-          "description": "The name of this access configuration. The default and recommended name is External NAT, but you can use any arbitrary string, such as My external IP or Network Access.",
+          "description": "The name of this access configuration. In accessConfigs (IPv4), the default and recommended name is External NAT, but you can use any arbitrary string, such as My external IP or Network Access. In ipv6AccessConfigs, the recommend name is External IPv6.",
           "type": "string"
         },
         "natIP": {
-          "description": "An external IP address associated with this instance. Specify an unused static external IP address available to the project or leave this field undefined to use an IP from a shared ephemeral IP address pool. If you specify a static external IP address, it must live in the same region as the zone of the instance.",
+          "description": "Applies to accessConfigs (IPv4) only. An external IP address associated with this instance. Specify an unused static external IP address available to the project or leave this field undefined to use an IP from a shared ephemeral IP address pool. If you specify a static external IP address, it must live in the same region as the zone of the instance.",
           "type": "string"
         },
         "networkTier": {
@@ -33589,8 +33835,7 @@
           "type": "boolean"
         },
         "type": {
-          "default": "ONE_TO_ONE_NAT",
-          "description": "The type of configuration. The default and only option is ONE_TO_ONE_NAT.",
+          "description": "The type of configuration. In accessConfigs (IPv4), the default and only option is ONE_TO_ONE_NAT. In ipv6AccessConfigs, the default and only option is DIRECT_IPV6.",
           "enum": [
             "DIRECT_IPV6",
             "ONE_TO_ONE_NAT"
@@ -33669,6 +33914,18 @@
           "default": "compute#address",
           "description": "[Output Only] Type of the resource. Always compute#address for addresses.",
           "type": "string"
+        },
+        "labelFingerprint": {
+          "description": "A fingerprint for the labels being applied to this Address, which is essentially a hash of the labels set used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after every request to modify or update labels. You must always provide an up-to-date fingerprint hash in order to update or change labels, otherwise the request will fail with error 412 conditionNotMet. To see the latest fingerprint, make a get() request to retrieve an Address.",
+          "format": "byte",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for this resource. These can only be added or modified by the setLabels method. Each label key/value pair must comply with RFC1035. Label values may be empty.",
+          "type": "object"
         },
         "name": {
           "annotations": {
@@ -34357,6 +34614,18 @@
           ],
           "type": "string"
         },
+        "savedState": {
+          "description": "For LocalSSD disks on VM Instances in STOPPED or SUSPENDED state, this field is set to PRESERVED if the LocalSSD data has been saved to a persistent location by customer request. (see the discard_local_ssd option on Stop/Suspend). Read-only in the api.",
+          "enum": [
+            "DISK_SAVED_STATE_UNSPECIFIED",
+            "PRESERVED"
+          ],
+          "enumDescriptions": [
+            "*[Default]* Disk state has not been preserved.",
+            "Disk state has been preserved."
+          ],
+          "type": "string"
+        },
         "shieldedInstanceInitialState": {
           "$ref": "InitialStateConfig",
           "description": "[Output Only] shielded vm initial state stored on disk"
@@ -34447,6 +34716,18 @@
           "description": "Indicates how many IOPS to provision for the disk. This sets the number of I/O operations per second that the disk can handle. Values must be between 10,000 and 120,000. For more details, see the Extreme persistent disk documentation.",
           "format": "int64",
           "type": "string"
+        },
+        "provisionedThroughput": {
+          "description": "Indicates how much throughput to provision for the disk. This sets the number of throughput mb per second that the disk can handle. Values must be between 1 and 7,124.",
+          "format": "int64",
+          "type": "string"
+        },
+        "replicaZones": {
+          "description": "Required for each regional disk associated with the instance. Specify the URLs of the zones where the disk should be replicated to. You must provide exactly two replica zones, and one zone must be the same as the instance zone. You can't use this option with boot disks.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "resourceManagerTags": {
           "additionalProperties": {
@@ -35067,7 +35348,7 @@
       "id": "AutoscalingPolicy",
       "properties": {
         "coolDownPeriodSec": {
-          "description": "The number of seconds that the autoscaler waits before it starts collecting information from a new instance. This prevents the autoscaler from collecting information when the instance is initializing, during which the collected usage would not be reliable. The default time autoscaler waits is 60 seconds. Virtual machine initialization times might vary because of numerous factors. We recommend that you test how long an instance may take to initialize. To do this, create an instance and time the startup process.",
+          "description": "The number of seconds that your application takes to initialize on a VM instance. This is referred to as the [initialization period](/compute/docs/autoscaler#cool_down_period). Specifying an accurate initialization period improves autoscaler decisions. For example, when scaling out, the autoscaler ignores data from VMs that are still initializing because those VMs might not yet represent normal usage of your application. The default initialization period is 60 seconds. Initialization periods might vary because of numerous factors. We recommend that you test how long your application takes to initialize. To do this, create a VM and time your application's startup process.",
           "format": "int32",
           "type": "integer"
         },
@@ -35097,7 +35378,7 @@
           "type": "integer"
         },
         "mode": {
-          "description": "Defines operating mode for this policy.",
+          "description": "Defines the operating mode for this policy. The following modes are available: - OFF: Disables the autoscaler but maintains its configuration. - ONLY_SCALE_OUT: Restricts the autoscaler to add VM instances only. - ON: Enables all autoscaler activities according to its policy. For more information, see \"Turning off or restricting an autoscaler\"",
           "enum": [
             "OFF",
             "ON",
@@ -35805,6 +36086,13 @@
         "maxStreamDuration": {
           "$ref": "Duration",
           "description": "Specifies the default maximum duration (timeout) for streams to this service. Duration is computed from the beginning of the stream until the response has been completely processed, including all retries. A stream that does not complete in this duration is closed. If not specified, there will be no timeout limit, i.e. the maximum duration is infinite. This value can be overridden in the PathMatcher configuration of the UrlMap that references this backend service. This field is only allowed when the loadBalancingScheme of the backend service is INTERNAL_SELF_MANAGED."
+        },
+        "metadatas": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Deployment metadata associated with the resource to be set by a GKE hub controller and read by the backend RCTH",
+          "type": "object"
         },
         "name": {
           "description": "Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply with RFC1035. Specifically, the name must be 1-63 characters long and match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means the first character must be a lowercase letter, and all following characters must be a dash, lowercase letter, or digit, except the last character, which cannot be a dash.",
@@ -37095,7 +37383,7 @@
           "type": "string"
         },
         "splitSourceCommitment": {
-          "description": "Source commitment to be splitted into a new commitment.",
+          "description": "Source commitment to be split into a new commitment.",
           "type": "string"
         },
         "startTimestamp": {
@@ -37136,11 +37424,13 @@
             "GENERAL_PURPOSE_N2",
             "GENERAL_PURPOSE_N2D",
             "GENERAL_PURPOSE_T2D",
+            "GRAPHICS_OPTIMIZED",
             "MEMORY_OPTIMIZED",
             "MEMORY_OPTIMIZED_M3",
             "TYPE_UNSPECIFIED"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             "",
@@ -37802,6 +38092,17 @@
           ],
           "type": "string"
         },
+        "asyncPrimaryDisk": {
+          "$ref": "DiskAsyncReplication",
+          "description": "Disk asynchronously replicated into this disk."
+        },
+        "asyncSecondaryDisks": {
+          "additionalProperties": {
+            "$ref": "DiskAsyncReplicationList"
+          },
+          "description": "[Output Only] A list of disks this disk is asynchronously replicated to.",
+          "type": "object"
+        },
         "creationTimestamp": {
           "description": "[Output Only] Creation timestamp in RFC3339 text format.",
           "type": "string"
@@ -37898,6 +38199,11 @@
           "format": "int64",
           "type": "string"
         },
+        "provisionedThroughput": {
+          "description": "Indicates how much throughput to provision for the disk. This sets the number of throughput mb per second that the disk can handle. Values must be between 1 and 7,124.",
+          "format": "int64",
+          "type": "string"
+        },
         "region": {
           "description": "[Output Only] URL of the region where the disk resides. Only applicable for regional resources. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body.",
           "type": "string"
@@ -37916,6 +38222,10 @@
           },
           "type": "array"
         },
+        "resourceStatus": {
+          "$ref": "DiskResourceStatus",
+          "description": "[Output Only] Status information for the disk resource."
+        },
         "satisfiesPzs": {
           "description": "[Output Only] Reserved for future use.",
           "type": "boolean"
@@ -37927,6 +38237,14 @@
         "sizeGb": {
           "description": "Size, in GB, of the persistent disk. You can specify this field when creating a persistent disk using the sourceImage, sourceSnapshot, or sourceDisk parameter, or specify it alone to create an empty persistent disk. If you specify this field along with a source, the value of sizeGb must not be less than the size of the source. Acceptable values are 1 to 65536, inclusive.",
           "format": "int64",
+          "type": "string"
+        },
+        "sourceConsistencyGroupPolicy": {
+          "description": "[Output Only] URL of the DiskConsistencyGroupPolicy for a secondary disk that was created using a consistency group.",
+          "type": "string"
+        },
+        "sourceConsistencyGroupPolicyId": {
+          "description": "[Output Only] ID of the DiskConsistencyGroupPolicy for a secondary disk that was created using a consistency group.",
           "type": "string"
         },
         "sourceDisk": {
@@ -38128,6 +38446,37 @@
       },
       "type": "object"
     },
+    "DiskAsyncReplication": {
+      "id": "DiskAsyncReplication",
+      "properties": {
+        "consistencyGroupPolicy": {
+          "description": "[Output Only] URL of the DiskConsistencyGroupPolicy if replication was started on the disk as a member of a group.",
+          "type": "string"
+        },
+        "consistencyGroupPolicyId": {
+          "description": "[Output Only] ID of the DiskConsistencyGroupPolicy if replication was started on the disk as a member of a group.",
+          "type": "string"
+        },
+        "disk": {
+          "description": "The other disk asynchronously replicated to or from the current disk. You can provide this as a partial or full URL to the resource. For example, the following are valid values: - https://www.googleapis.com/compute/v1/projects/project/zones/zone /disks/disk - projects/project/zones/zone/disks/disk - zones/zone/disks/disk ",
+          "type": "string"
+        },
+        "diskId": {
+          "description": "[Output Only] The unique ID of the other disk asynchronously replicated to or from the current disk. This value identifies the exact disk that was used to create this replication. For example, if you started replicating the persistent disk from a disk that was later deleted and recreated under the same name, the disk ID would identify the exact version of the disk that was used.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DiskAsyncReplicationList": {
+      "id": "DiskAsyncReplicationList",
+      "properties": {
+        "asyncReplicationDisk": {
+          "$ref": "DiskAsyncReplication"
+        }
+      },
+      "type": "object"
+    },
     "DiskInstantiationConfig": {
       "description": "A specification of the desired way to instantiate a disk in the instance template when its created from a source instance.",
       "id": "DiskInstantiationConfig",
@@ -38313,6 +38662,47 @@
           },
           "description": "Resource manager tags to be bound to the disk. Tag keys and values have the same definition as resource manager tags. Keys must be in the format `tagKeys/{tag_key_id}`, and values are in the format `tagValues/456`. The field is ignored (both PUT \u0026 PATCH) when empty.",
           "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DiskResourceStatus": {
+      "id": "DiskResourceStatus",
+      "properties": {
+        "asyncPrimaryDisk": {
+          "$ref": "DiskResourceStatusAsyncReplicationStatus"
+        },
+        "asyncSecondaryDisks": {
+          "additionalProperties": {
+            "$ref": "DiskResourceStatusAsyncReplicationStatus"
+          },
+          "description": "Key: disk, value: AsyncReplicationStatus message",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DiskResourceStatusAsyncReplicationStatus": {
+      "id": "DiskResourceStatusAsyncReplicationStatus",
+      "properties": {
+        "state": {
+          "enum": [
+            "ACTIVE",
+            "CREATED",
+            "STARTING",
+            "STATE_UNSPECIFIED",
+            "STOPPED",
+            "STOPPING"
+          ],
+          "enumDescriptions": [
+            "Replication is active.",
+            "Secondary disk is created and is waiting for replication to start.",
+            "Replication is starting.",
+            "",
+            "Replication is stopped.",
+            "Replication is stopping."
+          ],
+          "type": "string"
         }
       },
       "type": "object"
@@ -39982,8 +40372,36 @@
       "description": "Represents a match condition that incoming traffic is evaluated against. Exactly one field must be specified.",
       "id": "FirewallPolicyRuleMatcher",
       "properties": {
+        "destAddressGroups": {
+          "description": "Address groups which should be matched against the traffic destination. Maximum number of destination address groups is 10.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "destFqdns": {
+          "description": "Fully Qualified Domain Name (FQDN) which should be matched against traffic destination. Maximum number of destination fqdn allowed is 100.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "destIpRanges": {
           "description": "CIDR IP address range. Maximum number of destination CIDR IP ranges allowed is 5000.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "destRegionCodes": {
+          "description": "Region codes whose IP addresses will be used to match for destination of traffic. Should be specified as 2 letter country code defined as per ISO 3166 alpha-2 country codes. ex.\"US\" Maximum number of dest region codes allowed is 5000.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "destThreatIntelligences": {
+          "description": "Names of Network Threat Intelligence lists. The IPs in these lists will be matched against traffic destination.",
           "items": {
             "type": "string"
           },
@@ -39996,8 +40414,29 @@
           },
           "type": "array"
         },
+        "srcAddressGroups": {
+          "description": "Address groups which should be matched against the traffic source. Maximum number of source address groups is 10.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "srcFqdns": {
+          "description": "Fully Qualified Domain Name (FQDN) which should be matched against traffic source. Maximum number of source fqdn allowed is 100.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "srcIpRanges": {
           "description": "CIDR IP address range. Maximum number of source CIDR IP ranges allowed is 5000.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "srcRegionCodes": {
+          "description": "Region codes whose IP addresses will be used to match for source of traffic. Should be specified as 2 letter country code defined as per ISO 3166 alpha-2 country codes. ex.\"US\" Maximum number of source region codes allowed is 5000.",
           "items": {
             "type": "string"
           },
@@ -40007,6 +40446,13 @@
           "description": "List of secure tag values, which should be matched at the source of the traffic. For INGRESS rule, if all the srcSecureTag are INEFFECTIVE, and there is no srcIpRange, this rule will be ignored. Maximum number of source tag values allowed is 256.",
           "items": {
             "$ref": "FirewallPolicyRuleSecureTag"
+          },
+          "type": "array"
+        },
+        "srcThreatIntelligences": {
+          "description": "Names of Network Threat Intelligence lists. The IPs in these lists will be matched against traffic source.",
+          "items": {
+            "type": "string"
           },
           "type": "array"
         }
@@ -40113,6 +40559,10 @@
           "description": "This field is used along with the backend_service field for internal load balancing or with the target field for internal TargetInstance. If the field is set to TRUE, clients can access ILB from all regions. Otherwise only allows access from clients in the same region as the internal load balancer.",
           "type": "boolean"
         },
+        "allowPscGlobalAccess": {
+          "description": "This is used in PSC consumer ForwardingRule to control whether the PSC endpoint can be accessed from another region.",
+          "type": "boolean"
+        },
         "backendService": {
           "description": "Identifies the backend service to which the forwarding rule sends traffic. Required for Internal TCP/UDP Load Balancing and Network Load Balancing; must be omitted for all other load balancer types.",
           "type": "string"
@@ -40207,7 +40657,7 @@
           "type": "string"
         },
         "network": {
-          "description": "This field is not used for external load balancing. For Internal TCP/UDP Load Balancing, this field identifies the network that the load balanced IP should belong to for this Forwarding Rule. If this field is not specified, the default network will be used. For Private Service Connect forwarding rules that forward traffic to Google APIs, a network must be provided.",
+          "description": "This field is not used for external load balancing. For Internal TCP/UDP Load Balancing, this field identifies the network that the load balanced IP should belong to for this Forwarding Rule. If the subnetwork is specified, the network of the subnetwork will be used. If neither subnetwork nor this field is specified, the default network will be used. For Private Service Connect forwarding rules that forward traffic to Google APIs, a network must be provided.",
           "type": "string"
         },
         "networkTier": {
@@ -40717,6 +41167,20 @@
       },
       "type": "object"
     },
+    "GlobalAddressesMoveRequest": {
+      "id": "GlobalAddressesMoveRequest",
+      "properties": {
+        "description": {
+          "description": "An optional destination address description if intended to be different from the source.",
+          "type": "string"
+        },
+        "destinationAddress": {
+          "description": "The URL of the destination address to move to. This can be a full or partial URL. For example, the following are all valid URLs to a address: - https://www.googleapis.com/compute/v1/projects/project /global/addresses/address - projects/project/global/addresses/address Note that destination project must be different from the source project. So /global/addresses/address is not valid partial url.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "GlobalNetworkEndpointGroupsAttachEndpointsRequest": {
       "id": "GlobalNetworkEndpointGroupsAttachEndpointsRequest",
       "properties": {
@@ -40874,19 +41338,21 @@
       "id": "GuestOsFeature",
       "properties": {
         "type": {
-          "description": "The ID of a supported feature. To add multiple values, use commas to separate values. Set to one or more of the following values: - VIRTIO_SCSI_MULTIQUEUE - WINDOWS - MULTI_IP_SUBNET - UEFI_COMPATIBLE - GVNIC - SEV_CAPABLE - SUSPEND_RESUME_COMPATIBLE - SEV_SNP_CAPABLE - TDX_CAPABLE For more information, see Enabling guest operating system features.",
+          "description": "The ID of a supported feature. To add multiple values, use commas to separate values. Set to one or more of the following values: - VIRTIO_SCSI_MULTIQUEUE - WINDOWS - MULTI_IP_SUBNET - UEFI_COMPATIBLE - GVNIC - SEV_CAPABLE - SUSPEND_RESUME_COMPATIBLE - SEV_LIVE_MIGRATABLE - SEV_SNP_CAPABLE For more information, see Enabling guest operating system features.",
           "enum": [
             "FEATURE_TYPE_UNSPECIFIED",
             "GVNIC",
             "MULTI_IP_SUBNET",
             "SECURE_BOOT",
             "SEV_CAPABLE",
+            "SEV_LIVE_MIGRATABLE",
             "SEV_SNP_CAPABLE",
             "UEFI_COMPATIBLE",
             "VIRTIO_SCSI_MULTIQUEUE",
             "WINDOWS"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             "",
@@ -41062,7 +41528,7 @@
       "type": "object"
     },
     "HealthCheck": {
-      "description": "Represents a Health Check resource. Google Compute Engine has two Health Check resources: * [Global](/compute/docs/reference/rest/v1/healthChecks) * [Regional](/compute/docs/reference/rest/v1/regionHealthChecks) Internal HTTP(S) load balancers must use regional health checks (`compute.v1.regionHealthChecks`). Traffic Director must use global health checks (`compute.v1.HealthChecks`). Internal TCP/UDP load balancers can use either regional or global health checks (`compute.v1.regionHealthChecks` or `compute.v1.HealthChecks`). External HTTP(S), TCP proxy, and SSL proxy load balancers as well as managed instance group auto-healing must use global health checks (`compute.v1.HealthChecks`). Backend service-based network load balancers must use regional health checks (`compute.v1.regionHealthChecks`). Target pool-based network load balancers must use legacy HTTP health checks (`compute.v1.httpHealthChecks`). For more information, see Health checks overview.",
+      "description": "Represents a Health Check resource. Google Compute Engine has two Health Check resources: * [Global](/compute/docs/reference/rest/v1/healthChecks) * [Regional](/compute/docs/reference/rest/v1/regionHealthChecks) Internal HTTP(S) load balancers must use regional health checks (`compute.v1.regionHealthChecks`). Traffic Director must use global health checks (`compute.v1.healthChecks`). Internal TCP/UDP load balancers can use either regional or global health checks (`compute.v1.regionHealthChecks` or `compute.v1.healthChecks`). External HTTP(S), TCP proxy, and SSL proxy load balancers as well as managed instance group auto-healing must use global health checks (`compute.v1.healthChecks`). Backend service-based network load balancers must use regional health checks (`compute.v1.regionHealthChecks`). Target pool-based network load balancers must use legacy HTTP health checks (`compute.v1.httpHealthChecks`). For more information, see Health checks overview.",
       "id": "HealthCheck",
       "properties": {
         "checkIntervalSec": {
@@ -41757,7 +42223,7 @@
           "type": "string"
         },
         "healthState": {
-          "description": "Health state of the instance.",
+          "description": "Health state of the IPv4 address of the instance.",
           "enum": [
             "HEALTHY",
             "UNHEALTHY"
@@ -41830,10 +42296,10 @@
             "UNKNOWN"
           ],
           "enumDescriptions": [
-            "",
-            "",
-            "",
-            ""
+            "Endpoint is being drained.",
+            "Endpoint is healthy.",
+            "Endpoint is unhealthy.",
+            "Health status of the endpoint is unknown."
           ],
           "type": "string"
         }
@@ -42415,6 +42881,10 @@
             "$ref": "MetadataFilter"
           },
           "type": "array"
+        },
+        "pathTemplateMatch": {
+          "description": "If specified, the route is a pattern match expression that must match the :path header once the query string is removed. A pattern match allows you to match - The value must be between 1 and 1024 characters - The pattern must start with a leading slash (\"/\") - There may be no more than 5 operators in pattern Precisely one of prefix_match, full_path_match, regex_match or path_template_match must be set.",
+          "type": "string"
         },
         "prefixMatch": {
           "description": "For satisfying the matchRule condition, the request's path must begin with the specified prefixMatch. prefixMatch must begin with a /. The value must be from 1 to 1024 characters. Only one of prefixMatch, fullPathMatch or regexMatch must be specified.",
@@ -43218,7 +43688,7 @@
             "TERMINATED"
           ],
           "enumDescriptions": [
-            "The Nanny is halted and we are performing tear down tasks like network deprogramming, releasing quota, IP, tearing down disks etc.",
+            "The instance is halted and we are performing tear down tasks like network deprogramming, releasing quota, IP, tearing down disks etc.",
             "Resources are being allocated for the instance.",
             "The instance is in repair.",
             "The instance is running.",
@@ -44080,7 +44550,7 @@
           "type": "string"
         },
         "initialDelaySec": {
-          "description": "The number of seconds that the managed instance group waits before it applies autohealing policies to new instances or recently recreated instances. This initial delay allows instances to initialize and run their startup scripts before the instance group determines that they are UNHEALTHY. This prevents the managed instance group from recreating its instances prematurely. This value must be from range [0, 3600].",
+          "description": "The initial delay is the number of seconds that a new VM takes to initialize and run its startup script. During a VM's initial delay period, the MIG ignores unsuccessful health checks because the VM might be in the startup process. This prevents the MIG from prematurely recreating a VM. If the health check receives a healthy response during the initial delay, it indicates that the startup process is complete and the VM is ready. The value of initial delay must be between 0 and 3600 seconds. The default value is 0.",
           "format": "int32",
           "type": "integer"
         }
@@ -44444,7 +44914,7 @@
       "id": "InstanceGroupManagersDeleteInstancesRequest",
       "properties": {
         "instances": {
-          "description": "The URLs of one or more instances to delete. This can be a full URL or a partial URL, such as zones/[ZONE]/instances/[INSTANCE_NAME].",
+          "description": "The URLs of one or more instances to delete. This can be a full URL or a partial URL, such as zones/[ZONE]/instances/[INSTANCE_NAME]. Queued instances do not have URL and can be deleted only by name. One cannot specify both URLs and names in a single request.",
           "items": {
             "type": "string"
           },
@@ -45986,7 +46456,7 @@
             "TERMINATED"
           ],
           "enumDescriptions": [
-            "The Nanny is halted and we are performing tear down tasks like network deprogramming, releasing quota, IP, tearing down disks etc.",
+            "The instance is halted and we are performing tear down tasks like network deprogramming, releasing quota, IP, tearing down disks etc.",
             "Resources are being allocated for the instance.",
             "The instance is in repair.",
             "The instance is running.",
@@ -46303,7 +46773,7 @@
       "type": "object"
     },
     "Interconnect": {
-      "description": "Represents an Interconnect resource. An Interconnect resource is a dedicated connection between the GCP network and your on-premises network. For more information, read the Dedicated Interconnect Overview.",
+      "description": "Represents an Interconnect resource. An Interconnect resource is a dedicated connection between the Google Cloud network and your on-premises network. For more information, read the Dedicated Interconnect Overview.",
       "id": "Interconnect",
       "properties": {
         "adminEnabled": {
@@ -46375,6 +46845,18 @@
           "description": "[Output Only] Type of the resource. Always compute#interconnect for interconnects.",
           "type": "string"
         },
+        "labelFingerprint": {
+          "description": "A fingerprint for the labels being applied to this Interconnect, which is essentially a hash of the labels set used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after every request to modify or update labels. You must always provide an up-to-date fingerprint hash in order to update or change labels, otherwise the request will fail with error 412 conditionNotMet. To see the latest fingerprint, make a get() request to retrieve an Interconnect.",
+          "format": "byte",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for this resource. These can only be added or modified by the setLabels method. Each label key/value pair must comply with RFC1035. Label values may be empty.",
+          "type": "object"
+        },
         "linkType": {
           "description": "Type of link requested, which can take one of the following values: - LINK_TYPE_ETHERNET_10G_LR: A 10G Ethernet with LR optics - LINK_TYPE_ETHERNET_100G_LR: A 100G Ethernet with LR optics. Note that this field indicates the speed of each of the links in the bundle, not the speed of the entire bundle.",
           "enum": [
@@ -46425,6 +46907,10 @@
           "description": "[Output Only] Number of links actually provisioned in this interconnect.",
           "format": "int32",
           "type": "integer"
+        },
+        "remoteLocation": {
+          "description": "Indicates that this is a Cross-Cloud Interconnect. This field specifies the location outside of Google's network that the interconnect is connected to.",
+          "type": "string"
         },
         "requestedLinkCount": {
           "description": "Target number of physical links in the link bundle, as requested by the customer.",
@@ -46520,6 +47006,10 @@
           "description": "This field is not available.",
           "type": "string"
         },
+        "configurationConstraints": {
+          "$ref": "InterconnectAttachmentConfigurationConstraints",
+          "description": "[Output Only] Constraints for this attachment, if any. The attachment does not work if these constraints are not met."
+        },
         "creationTimestamp": {
           "description": "[Output Only] Creation timestamp in RFC3339 text format.",
           "type": "string"
@@ -46585,7 +47075,7 @@
           "type": "string"
         },
         "ipsecInternalAddresses": {
-          "description": "A list of URLs of addresses that have been reserved for the VLAN attachment. Used only for the VLAN attachment that has the encryption option as IPSEC. The addresses must be regional internal IP address ranges. When creating an HA VPN gateway over the VLAN attachment, if the attachment is configured to use a regional internal IP address, then the VPN gateway's IP address is allocated from the IP address range specified here. For example, if the HA VPN gateway's interface 0 is paired to this VLAN attachment, then a regional internal IP address for the VPN gateway interface 0 will be allocated from the IP address specified for this VLAN attachment. If this field is not specified when creating the VLAN attachment, then later on when creating an HA VPN gateway on this VLAN attachment, the HA VPN gateway's IP address is allocated from the regional external IP address pool. Not currently available publicly. ",
+          "description": "A list of URLs of addresses that have been reserved for the VLAN attachment. Used only for the VLAN attachment that has the encryption option as IPSEC. The addresses must be regional internal IP address ranges. When creating an HA VPN gateway over the VLAN attachment, if the attachment is configured to use a regional internal IP address, then the VPN gateway's IP address is allocated from the IP address range specified here. For example, if the HA VPN gateway's interface 0 is paired to this VLAN attachment, then a regional internal IP address for the VPN gateway interface 0 will be allocated from the IP address specified for this VLAN attachment. If this field is not specified when creating the VLAN attachment, then later on when creating an HA VPN gateway on this VLAN attachment, the HA VPN gateway's IP address is allocated from the regional external IP address pool.",
           "items": {
             "type": "string"
           },
@@ -46595,6 +47085,18 @@
           "default": "compute#interconnectAttachment",
           "description": "[Output Only] Type of the resource. Always compute#interconnectAttachment for interconnect attachments.",
           "type": "string"
+        },
+        "labelFingerprint": {
+          "description": "A fingerprint for the labels being applied to this InterconnectAttachment, which is essentially a hash of the labels set used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after every request to modify or update labels. You must always provide an up-to-date fingerprint hash in order to update or change labels, otherwise the request will fail with error 412 conditionNotMet. To see the latest fingerprint, make a get() request to retrieve an InterconnectAttachment.",
+          "format": "byte",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for this resource. These can only be added or modified by the setLabels method. Each label key/value pair must comply with RFC1035. Label values may be empty.",
+          "type": "object"
         },
         "mtu": {
           "description": "Maximum Transmission Unit (MTU), in bytes, of packets passing through this interconnect attachment. Only 1440 and 1500 are allowed. If not specified, the value will default to 1440.",
@@ -46637,6 +47139,10 @@
         },
         "region": {
           "description": "[Output Only] URL of the region where the regional interconnect attachment resides. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body.",
+          "type": "string"
+        },
+        "remoteService": {
+          "description": "[Output Only] If the attachment is on a Cross-Cloud Interconnect connection, this field contains the interconnect's remote location service provider. Example values: \"Amazon Web Services\" \"Microsoft Azure\". The field is set only for attachments on Cross-Cloud Interconnect connections. Its value is copied from the InterconnectRemoteLocation remoteService field.",
           "type": "string"
         },
         "router": {
@@ -46684,6 +47190,11 @@
             "Indicates that attachment is not ready to use yet, because turnup is not complete."
           ],
           "type": "string"
+        },
+        "subnetLength": {
+          "description": "Length of the IPv4 subnet mask. Allowed values: - 29 (default) - 30 The default value is 29, except for Cross-Cloud Interconnect connections that use an InterconnectRemoteLocation with a constraints.subnetLengthRange.min equal to 30. For example, connections that use an Azure remote location fall into this category. In these cases, the default value is 30, and requesting 29 returns an error. Where both 29 and 30 are allowed, 29 is preferred, because it gives Google Cloud Support more debugging visibility. ",
+          "format": "int32",
+          "type": "integer"
         },
         "type": {
           "description": "The type of interconnect attachment this is, which can take one of the following values: - DEDICATED: an attachment to a Dedicated Interconnect. - PARTNER: an attachment to a Partner Interconnect, created by the customer. - PARTNER_PROVIDER: an attachment to a Partner Interconnect, created by the partner. ",
@@ -46830,6 +47341,47 @@
             }
           },
           "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "InterconnectAttachmentConfigurationConstraints": {
+      "id": "InterconnectAttachmentConfigurationConstraints",
+      "properties": {
+        "bgpMd5": {
+          "description": "[Output Only] Whether the attachment's BGP session requires/allows/disallows BGP MD5 authentication. This can take one of the following values: MD5_OPTIONAL, MD5_REQUIRED, MD5_UNSUPPORTED. For example, a Cross-Cloud Interconnect connection to a remote cloud provider that requires BGP MD5 authentication has the interconnectRemoteLocation attachment_configuration_constraints.bgp_md5 field set to MD5_REQUIRED, and that property is propagated to the attachment. Similarly, if BGP MD5 is MD5_UNSUPPORTED, an error is returned if MD5 is requested.",
+          "enum": [
+            "MD5_OPTIONAL",
+            "MD5_REQUIRED",
+            "MD5_UNSUPPORTED"
+          ],
+          "enumDescriptions": [
+            "MD5_OPTIONAL: BGP MD5 authentication is supported and can optionally be configured.",
+            "MD5_REQUIRED: BGP MD5 authentication must be configured.",
+            "MD5_UNSUPPORTED: BGP MD5 authentication must not be configured"
+          ],
+          "type": "string"
+        },
+        "bgpPeerAsnRanges": {
+          "description": "[Output Only] List of ASN ranges that the remote location is known to support. Formatted as an array of inclusive ranges {min: min-value, max: max-value}. For example, [{min: 123, max: 123}, {min: 64512, max: 65534}] allows the peer ASN to be 123 or anything in the range 64512-65534. This field is only advisory. Although the API accepts other ranges, these are the ranges that we recommend.",
+          "items": {
+            "$ref": "InterconnectAttachmentConfigurationConstraintsBgpPeerASNRange"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "InterconnectAttachmentConfigurationConstraintsBgpPeerASNRange": {
+      "id": "InterconnectAttachmentConfigurationConstraintsBgpPeerASNRange",
+      "properties": {
+        "max": {
+          "format": "uint32",
+          "type": "integer"
+        },
+        "min": {
+          "format": "uint32",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -47727,6 +48279,308 @@
       },
       "type": "object"
     },
+    "InterconnectRemoteLocation": {
+      "description": "Represents a Cross-Cloud Interconnect Remote Location resource. You can use this resource to find remote location details about an Interconnect attachment (VLAN).",
+      "id": "InterconnectRemoteLocation",
+      "properties": {
+        "address": {
+          "description": "[Output Only] The postal address of the Point of Presence, each line in the address is separated by a newline character.",
+          "type": "string"
+        },
+        "attachmentConfigurationConstraints": {
+          "$ref": "InterconnectAttachmentConfigurationConstraints",
+          "description": "[Output Only] Subset of fields from InterconnectAttachment's |configurationConstraints| field that apply to all attachments for this remote location."
+        },
+        "city": {
+          "description": "[Output Only] Metropolitan area designator that indicates which city an interconnect is located. For example: \"Chicago, IL\", \"Amsterdam, Netherlands\".",
+          "type": "string"
+        },
+        "constraints": {
+          "$ref": "InterconnectRemoteLocationConstraints",
+          "description": "[Output Only] Constraints on the parameters for creating Cross-Cloud Interconnect and associated InterconnectAttachments."
+        },
+        "continent": {
+          "description": "[Output Only] Continent for this location, which can take one of the following values: - AFRICA - ASIA_PAC - EUROPE - NORTH_AMERICA - SOUTH_AMERICA ",
+          "enum": [
+            "AFRICA",
+            "ASIA_PAC",
+            "EUROPE",
+            "NORTH_AMERICA",
+            "SOUTH_AMERICA"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        },
+        "creationTimestamp": {
+          "description": "[Output Only] Creation timestamp in RFC3339 text format.",
+          "type": "string"
+        },
+        "description": {
+          "description": "[Output Only] An optional description of the resource.",
+          "type": "string"
+        },
+        "facilityProvider": {
+          "description": "[Output Only] The name of the provider for this facility (e.g., EQUINIX).",
+          "type": "string"
+        },
+        "facilityProviderFacilityId": {
+          "description": "[Output Only] A provider-assigned Identifier for this facility (e.g., Ashburn-DC1).",
+          "type": "string"
+        },
+        "id": {
+          "description": "[Output Only] The unique identifier for the resource. This identifier is defined by the server.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "kind": {
+          "default": "compute#interconnectRemoteLocation",
+          "description": "[Output Only] Type of the resource. Always compute#interconnectRemoteLocation for interconnect remote locations.",
+          "type": "string"
+        },
+        "lacp": {
+          "description": "[Output Only] Link Aggregation Control Protocol (LACP) constraints, which can take one of the following values: LACP_SUPPORTED, LACP_UNSUPPORTED",
+          "enum": [
+            "LACP_SUPPORTED",
+            "LACP_UNSUPPORTED"
+          ],
+          "enumDescriptions": [
+            "LACP_SUPPORTED: LACP is supported, and enabled by default on the Cross-Cloud Interconnect.",
+            "LACP_UNSUPPORTED: LACP is not supported and is not be enabled on this port. GetDiagnostics shows bundleAggregationType as \"static\". GCP does not support LAGs without LACP, so requestedLinkCount must be 1."
+          ],
+          "type": "string"
+        },
+        "maxLagSize100Gbps": {
+          "description": "[Output Only] The maximum number of 100 Gbps ports supported in a link aggregation group (LAG). When linkType is 100 Gbps, requestedLinkCount cannot exceed max_lag_size_100_gbps.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "maxLagSize10Gbps": {
+          "description": "[Output Only] The maximum number of 10 Gbps ports supported in a link aggregation group (LAG). When linkType is 10 Gbps, requestedLinkCount cannot exceed max_lag_size_10_gbps.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "name": {
+          "description": "[Output Only] Name of the resource.",
+          "type": "string"
+        },
+        "peeringdbFacilityId": {
+          "description": "[Output Only] The peeringdb identifier for this facility (corresponding with a netfac type in peeringdb).",
+          "type": "string"
+        },
+        "permittedConnections": {
+          "description": "[Output Only] Permitted connections.",
+          "items": {
+            "$ref": "InterconnectRemoteLocationPermittedConnections"
+          },
+          "type": "array"
+        },
+        "remoteService": {
+          "description": "[Output Only] Indicates the service provider present at the remote location. Example values: \"Amazon Web Services\", \"Microsoft Azure\".",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] Server-defined URL for the resource.",
+          "type": "string"
+        },
+        "status": {
+          "description": "[Output Only] The status of this InterconnectRemoteLocation, which can take one of the following values: - CLOSED: The InterconnectRemoteLocation is closed and is unavailable for provisioning new Cross-Cloud Interconnects. - AVAILABLE: The InterconnectRemoteLocation is available for provisioning new Cross-Cloud Interconnects. ",
+          "enum": [
+            "AVAILABLE",
+            "CLOSED"
+          ],
+          "enumDescriptions": [
+            "The InterconnectRemoteLocation is available for provisioning new Cross-Cloud Interconnects.",
+            "The InterconnectRemoteLocation is closed for provisioning new Cross-Cloud Interconnects."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "InterconnectRemoteLocationConstraints": {
+      "id": "InterconnectRemoteLocationConstraints",
+      "properties": {
+        "portPairRemoteLocation": {
+          "description": "[Output Only] Port pair remote location constraints, which can take one of the following values: PORT_PAIR_UNCONSTRAINED_REMOTE_LOCATION, PORT_PAIR_MATCHING_REMOTE_LOCATION. GCP's API refers only to individual ports, but the UI uses this field when ordering a pair of ports, to prevent users from accidentally ordering something that is incompatible with their cloud provider. Specifically, when ordering a redundant pair of Cross-Cloud Interconnect ports, and one of them uses a remote location with portPairMatchingRemoteLocation set to matching, the UI requires that both ports use the same remote location.",
+          "enum": [
+            "PORT_PAIR_MATCHING_REMOTE_LOCATION",
+            "PORT_PAIR_UNCONSTRAINED_REMOTE_LOCATION"
+          ],
+          "enumDescriptions": [
+            "If PORT_PAIR_MATCHING_REMOTE_LOCATION, the remote cloud provider allocates ports in pairs, and the user should choose the same remote location for both ports.",
+            "If PORT_PAIR_UNCONSTRAINED_REMOTE_LOCATION, a user may opt to provision a redundant pair of Cross-Cloud Interconnects using two different remote locations in the same city."
+          ],
+          "type": "string"
+        },
+        "portPairVlan": {
+          "description": "[Output Only] Port pair VLAN constraints, which can take one of the following values: PORT_PAIR_UNCONSTRAINED_VLAN, PORT_PAIR_MATCHING_VLAN",
+          "enum": [
+            "PORT_PAIR_MATCHING_VLAN",
+            "PORT_PAIR_UNCONSTRAINED_VLAN"
+          ],
+          "enumDescriptions": [
+            "If PORT_PAIR_MATCHING_VLAN, the Interconnect for this attachment is part of a pair of ports that should have matching VLAN allocations. This occurs with Cross-Cloud Interconnect to Azure remote locations. While GCP's API does not explicitly group pairs of ports, the UI uses this field to ensure matching VLAN ids when configuring a redundant VLAN pair.",
+            "PORT_PAIR_UNCONSTRAINED_VLAN means there is no constraint."
+          ],
+          "type": "string"
+        },
+        "subnetLengthRange": {
+          "$ref": "InterconnectRemoteLocationConstraintsSubnetLengthRange",
+          "description": "[Output Only] [min-length, max-length] The minimum and maximum value (inclusive) for the IPv4 subnet length. For example, an interconnectRemoteLocation for Azure has {min: 30, max: 30} because Azure requires /30 subnets. This range specifies the values supported by both cloud providers. Interconnect currently supports /29 and /30 IPv4 subnet lengths. If a remote cloud has no constraint on IPv4 subnet length, the range would thus be {min: 29, max: 30}. "
+        }
+      },
+      "type": "object"
+    },
+    "InterconnectRemoteLocationConstraintsSubnetLengthRange": {
+      "id": "InterconnectRemoteLocationConstraintsSubnetLengthRange",
+      "properties": {
+        "max": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "min": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "InterconnectRemoteLocationList": {
+      "description": "Response to the list request, and contains a list of interconnect remote locations.",
+      "id": "InterconnectRemoteLocationList",
+      "properties": {
+        "id": {
+          "description": "[Output Only] Unique identifier for the resource; defined by the server.",
+          "type": "string"
+        },
+        "items": {
+          "description": "A list of InterconnectRemoteLocation resources.",
+          "items": {
+            "$ref": "InterconnectRemoteLocation"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "default": "compute#interconnectRemoteLocationList",
+          "description": "[Output Only] Type of resource. Always compute#interconnectRemoteLocationList for lists of interconnect remote locations.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "[Output Only] This token lets you get the next page of results for list requests. If the number of results is larger than maxResults, use the nextPageToken as a value for the query parameter pageToken in the next list request. Subsequent list requests will have their own nextPageToken to continue paging through the results.",
+          "type": "string"
+        },
+        "selfLink": {
+          "description": "[Output Only] Server-defined URL for this resource.",
+          "type": "string"
+        },
+        "warning": {
+          "description": "[Output Only] Informational warning message.",
+          "properties": {
+            "code": {
+              "description": "[Output Only] A warning code, if applicable. For example, Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in the response.",
+              "enum": [
+                "CLEANUP_FAILED",
+                "DEPRECATED_RESOURCE_USED",
+                "DEPRECATED_TYPE_USED",
+                "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+                "EXPERIMENTAL_TYPE_USED",
+                "EXTERNAL_API_WARNING",
+                "FIELD_VALUE_OVERRIDEN",
+                "INJECTED_KERNELS_DEPRECATED",
+                "INVALID_HEALTH_CHECK_FOR_DYNAMIC_WIEGHTED_LB",
+                "LARGE_DEPLOYMENT_WARNING",
+                "MISSING_TYPE_DEPENDENCY",
+                "NEXT_HOP_ADDRESS_NOT_ASSIGNED",
+                "NEXT_HOP_CANNOT_IP_FORWARD",
+                "NEXT_HOP_INSTANCE_HAS_NO_IPV6_INTERFACE",
+                "NEXT_HOP_INSTANCE_NOT_FOUND",
+                "NEXT_HOP_INSTANCE_NOT_ON_NETWORK",
+                "NEXT_HOP_NOT_RUNNING",
+                "NOT_CRITICAL_ERROR",
+                "NO_RESULTS_ON_PAGE",
+                "PARTIAL_SUCCESS",
+                "REQUIRED_TOS_AGREEMENT",
+                "RESOURCE_IN_USE_BY_OTHER_RESOURCE_WARNING",
+                "RESOURCE_NOT_DELETED",
+                "SCHEMA_VALIDATION_IGNORED",
+                "SINGLE_INSTANCE_PROPERTY_TEMPLATE",
+                "UNDECLARED_PROPERTIES",
+                "UNREACHABLE"
+              ],
+              "enumDescriptions": [
+                "Warning about failed cleanup of transient changes made by a failed operation.",
+                "A link to a deprecated resource was created.",
+                "When deploying and at least one of the resources has a type marked as deprecated",
+                "The user created a boot disk that is larger than image size.",
+                "When deploying and at least one of the resources has a type marked as experimental",
+                "Warning that is present in an external api call",
+                "Warning that value of a field has been overridden. Deprecated unused field.",
+                "The operation involved use of an injected kernel, which is deprecated.",
+                "A WEIGHTED_MAGLEV backend service is associated with a health check that is not of type HTTP/HTTPS/HTTP2.",
+                "When deploying a deployment with a exceedingly large number of resources",
+                "A resource depends on a missing type",
+                "The route's nextHopIp address is not assigned to an instance on the network.",
+                "The route's next hop instance cannot ip forward.",
+                "The route's nextHopInstance URL refers to an instance that does not have an ipv6 interface on the same network as the route.",
+                "The route's nextHopInstance URL refers to an instance that does not exist.",
+                "The route's nextHopInstance URL refers to an instance that is not on the same network as the route.",
+                "The route's next hop instance does not have a status of RUNNING.",
+                "Error which is not critical. We decided to continue the process despite the mentioned error.",
+                "No results are present on a particular list page.",
+                "Success is reported, but some results may be missing due to errors",
+                "The user attempted to use a resource that requires a TOS they have not accepted.",
+                "Warning that a resource is in use.",
+                "One or more of the resources set to auto-delete could not be deleted because they were in use.",
+                "When a resource schema validation is ignored.",
+                "Instance template used in instance group manager is valid as such, but its application does not make a lot of sense, because it allows only single instance in instance group.",
+                "When undeclared properties in the schema are present",
+                "A given scope cannot be reached."
+              ],
+              "type": "string"
+            },
+            "data": {
+              "description": "[Output Only] Metadata about this warning in key: value format. For example: \"data\": [ { \"key\": \"scope\", \"value\": \"zones/us-east1-d\" } ",
+              "items": {
+                "properties": {
+                  "key": {
+                    "description": "[Output Only] A key that provides more detail on the warning being returned. For example, for warnings where there are no results in a list request for a particular zone, this key might be scope and the key value might be the zone name. Other examples might be a key indicating a deprecated resource and a suggested replacement, or a warning about invalid network settings (for example, if an instance attempts to perform IP forwarding but is not enabled for IP forwarding).",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "[Output Only] A warning data value corresponding to the key.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "message": {
+              "description": "[Output Only] A human-readable description of the warning code.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "InterconnectRemoteLocationPermittedConnections": {
+      "id": "InterconnectRemoteLocationPermittedConnections",
+      "properties": {
+        "interconnectLocation": {
+          "description": "[Output Only] URL of an Interconnect location that is permitted to connect to this Interconnect remote location.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "InterconnectsGetDiagnosticsResponse": {
       "description": "Response for the InterconnectsGetDiagnosticsRequest.",
       "id": "InterconnectsGetDiagnosticsResponse",
@@ -48464,7 +49318,7 @@
                 "type": "integer"
               },
               "guestAcceleratorType": {
-                "description": "The accelerator type resource name, not a full URL, e.g. 'nvidia-tesla-k80'.",
+                "description": "The accelerator type resource name, not a full URL, e.g. nvidia-tesla-t4.",
                 "type": "string"
               }
             },
@@ -48971,7 +49825,7 @@
             "TERMINATED"
           ],
           "enumDescriptions": [
-            "The Nanny is halted and we are performing tear down tasks like network deprogramming, releasing quota, IP, tearing down disks etc.",
+            "The instance is halted and we are performing tear down tasks like network deprogramming, releasing quota, IP, tearing down disks etc.",
             "Resources are being allocated for the instance.",
             "The instance is in repair.",
             "The instance is running.",
@@ -49236,7 +50090,7 @@
           "type": "string"
         },
         "gatewayIPv4": {
-          "description": "[Output Only] The gateway address for default routing out of the network, selected by GCP.",
+          "description": "[Output Only] The gateway address for default routing out of the network, selected by Google Cloud.",
           "pattern": "[0-9]{1,3}(?:\\.[0-9]{1,3}){3}",
           "type": "string"
         },
@@ -49343,7 +50197,7 @@
           "type": "string"
         },
         "fingerprint": {
-          "description": "[Output Only] Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. An up-to-date fingerprint must be provided in order to patch.",
+          "description": "Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. An up-to-date fingerprint must be provided in order to patch.",
           "format": "byte",
           "type": "string"
         },
@@ -49368,7 +50222,7 @@
           "type": "string"
         },
         "network": {
-          "description": "[Output Only] The URL of the network which the Network Attachment belongs to.",
+          "description": "[Output Only] The URL of the network which the Network Attachment belongs to. Practically it is inferred by fetching the network of the first subnetwork associated. Because it is required that all the subnetworks must be from the same network, it is assured that the Network Attachment belongs to the same network as all the subnetworks.",
           "type": "string"
         },
         "producerAcceptLists": {
@@ -49532,7 +50386,7 @@
       "id": "NetworkAttachmentConnectedEndpoint",
       "properties": {
         "ipAddress": {
-          "description": "The IP address assigned to the producer instance network interface. This value will be a range in case of Serverless.",
+          "description": "The IPv4 address assigned to the producer instance network interface. This value will be a range in case of Serverless.",
           "type": "string"
         },
         "projectIdOrNum": {
@@ -49540,7 +50394,7 @@
           "type": "string"
         },
         "secondaryIpCidrRanges": {
-          "description": "Alias IP ranges from the same subnetwork",
+          "description": "Alias IP ranges from the same subnetwork.",
           "items": {
             "type": "string"
           },
@@ -50919,7 +51773,7 @@
           "type": "integer"
         },
         "stackType": {
-          "description": "The stack type for this network interface to identify whether the IPv6 feature is enabled or not. If not specified, IPV4_ONLY will be used. This field can be both set at instance creation and update network interface operations.",
+          "description": "The stack type for this network interface. To assign only IPv4 addresses, use IPV4_ONLY. To assign both IPv4 and IPv6 addresses, use IPV4_IPV6. If not specified, IPV4_ONLY is used. This field can be both set at instance creation and update network interface operations.",
           "enum": [
             "IPV4_IPV6",
             "IPV4_ONLY"
@@ -52004,6 +52858,19 @@
         "nodeTemplate": {
           "description": "Full or partial URL of the node template resource to be updated for this node group.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "NodeGroupsSimulateMaintenanceEventRequest": {
+      "id": "NodeGroupsSimulateMaintenanceEventRequest",
+      "properties": {
+        "nodes": {
+          "description": "Names of the nodes to go under maintenance simulation.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -55474,6 +56341,7 @@
             "COMMITTED_NVIDIA_A100_80GB_GPUS",
             "COMMITTED_NVIDIA_A100_GPUS",
             "COMMITTED_NVIDIA_K80_GPUS",
+            "COMMITTED_NVIDIA_L4_GPUS",
             "COMMITTED_NVIDIA_P100_GPUS",
             "COMMITTED_NVIDIA_P4_GPUS",
             "COMMITTED_NVIDIA_T4_GPUS",
@@ -55525,11 +56393,15 @@
             "NETWORK_ATTACHMENTS",
             "NETWORK_ENDPOINT_GROUPS",
             "NETWORK_FIREWALL_POLICIES",
+            "NET_LB_SECURITY_POLICIES_PER_REGION",
+            "NET_LB_SECURITY_POLICY_RULES_PER_REGION",
+            "NET_LB_SECURITY_POLICY_RULE_ATTRIBUTES_PER_REGION",
             "NODE_GROUPS",
             "NODE_TEMPLATES",
             "NVIDIA_A100_80GB_GPUS",
             "NVIDIA_A100_GPUS",
             "NVIDIA_K80_GPUS",
+            "NVIDIA_L4_GPUS",
             "NVIDIA_P100_GPUS",
             "NVIDIA_P100_VWS_GPUS",
             "NVIDIA_P4_GPUS",
@@ -55544,6 +56416,7 @@
             "PREEMPTIBLE_NVIDIA_A100_80GB_GPUS",
             "PREEMPTIBLE_NVIDIA_A100_GPUS",
             "PREEMPTIBLE_NVIDIA_K80_GPUS",
+            "PREEMPTIBLE_NVIDIA_L4_GPUS",
             "PREEMPTIBLE_NVIDIA_P100_GPUS",
             "PREEMPTIBLE_NVIDIA_P100_VWS_GPUS",
             "PREEMPTIBLE_NVIDIA_P4_GPUS",
@@ -55567,6 +56440,7 @@
             "ROUTES",
             "SECURITY_POLICIES",
             "SECURITY_POLICIES_PER_REGION",
+            "SECURITY_POLICY_ADVANCED_RULES_PER_REGION",
             "SECURITY_POLICY_CEVAL_RULES",
             "SECURITY_POLICY_RULES",
             "SECURITY_POLICY_RULES_PER_REGION",
@@ -55624,7 +56498,14 @@
             "",
             "",
             "",
+            "",
             "Guest CPUs",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
             "",
             "",
             "",
@@ -55864,6 +56745,20 @@
             "type": "string"
           },
           "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "RegionAddressesMoveRequest": {
+      "id": "RegionAddressesMoveRequest",
+      "properties": {
+        "description": {
+          "description": "An optional destination address description if intended to be different from the source.",
+          "type": "string"
+        },
+        "destinationAddress": {
+          "description": "The URL of the destination address to move to. This can be a full or partial URL. For example, the following are all valid URLs to a address: - https://www.googleapis.com/compute/v1/projects/project/regions/region /addresses/address - projects/project/regions/region/addresses/address Note that destination project must be different from the source project. So /regions/region/addresses/address is not valid partial url.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -59465,7 +60360,7 @@
           "type": "array"
         },
         "sourceSubnetworkIpRangesToNat": {
-          "description": "Specify the Nat option, which can take one of the following values: - ALL_SUBNETWORKS_ALL_IP_RANGES: All of the IP ranges in every Subnetwork are allowed to Nat. - ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES: All of the primary IP ranges in every Subnetwork are allowed to Nat. - LIST_OF_SUBNETWORKS: A list of Subnetworks are allowed to Nat (specified in the field subnetwork below) The default is SUBNETWORK_IP_RANGE_TO_NAT_OPTION_UNSPECIFIED. Note that if this field contains ALL_SUBNETWORKS_ALL_IP_RANGES or ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES, then there should not be any other Router.Nat section in any Router for this network in this region.",
+          "description": "Specify the Nat option, which can take one of the following values: - ALL_SUBNETWORKS_ALL_IP_RANGES: All of the IP ranges in every Subnetwork are allowed to Nat. - ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES: All of the primary IP ranges in every Subnetwork are allowed to Nat. - LIST_OF_SUBNETWORKS: A list of Subnetworks are allowed to Nat (specified in the field subnetwork below) The default is SUBNETWORK_IP_RANGE_TO_NAT_OPTION_UNSPECIFIED. Note that if this field contains ALL_SUBNETWORKS_ALL_IP_RANGES then there should not be any other Router.Nat section in any Router for this network in this region.",
           "enum": [
             "ALL_SUBNETWORKS_ALL_IP_RANGES",
             "ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES",
@@ -60675,6 +61570,18 @@
           "description": "[Output only] Type of the resource. Always compute#securityPolicyfor security policies",
           "type": "string"
         },
+        "labelFingerprint": {
+          "description": "A fingerprint for the labels being applied to this security policy, which is essentially a hash of the labels set used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after every request to modify or update labels. You must always provide an up-to-date fingerprint hash in order to update or change labels. To see the latest fingerprint, make get() request to the security policy.",
+          "format": "byte",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for this resource. These can only be added or modified by the setLabels method. Each label key/value pair must comply with RFC1035. Label values may be empty.",
+          "type": "object"
+        },
         "name": {
           "description": "Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply with RFC1035. Specifically, the name must be 1-63 characters long and match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means the first character must be a lowercase letter, and all following characters must be a dash, lowercase letter, or digit, except the last character, which cannot be a dash.",
           "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
@@ -60727,15 +61634,15 @@
       "type": "object"
     },
     "SecurityPolicyAdaptiveProtectionConfigLayer7DdosDefenseConfig": {
-      "description": "Configuration options for L7 DDoS detection.",
+      "description": "Configuration options for L7 DDoS detection. This field is only supported in Global Security Policies of type CLOUD_ARMOR.",
       "id": "SecurityPolicyAdaptiveProtectionConfigLayer7DdosDefenseConfig",
       "properties": {
         "enable": {
-          "description": "If set to true, enables CAAP for L7 DDoS detection.",
+          "description": "If set to true, enables CAAP for L7 DDoS detection. This field is only supported in Global Security Policies of type CLOUD_ARMOR.",
           "type": "boolean"
         },
         "ruleVisibility": {
-          "description": "Rule visibility can be one of the following: STANDARD - opaque rules. (default) PREMIUM - transparent rules.",
+          "description": "Rule visibility can be one of the following: STANDARD - opaque rules. (default) PREMIUM - transparent rules. This field is only supported in Global Security Policies of type CLOUD_ARMOR.",
           "enum": [
             "PREMIUM",
             "STANDARD"
@@ -60930,7 +61837,7 @@
       "id": "SecurityPolicyRecaptchaOptionsConfig",
       "properties": {
         "redirectSiteKey": {
-          "description": "An optional field to supply a reCAPTCHA site key to be used for all the rules using the redirect action with the type of GOOGLE_RECAPTCHA under the security policy. The specified site key needs to be created from the reCAPTCHA API. The user is responsible for the validity of the specified site key. If not specified, a Google-managed site key is used.",
+          "description": "An optional field to supply a reCAPTCHA site key to be used for all the rules using the redirect action with the type of GOOGLE_RECAPTCHA under the security policy. The specified site key needs to be created from the reCAPTCHA API. The user is responsible for the validity of the specified site key. If not specified, a Google-managed site key is used. This field is only supported in Global Security Policies of type CLOUD_ARMOR.",
           "type": "string"
         }
       },
@@ -60950,7 +61857,7 @@
       "id": "SecurityPolicyRule",
       "properties": {
         "action": {
-          "description": "The Action to perform when the rule is matched. The following are the valid actions: - allow: allow access to target. - deny(STATUS): deny access to target, returns the HTTP response code specified. Valid values for `STATUS` are 403, 404, and 502. - rate_based_ban: limit client traffic to the configured threshold and ban the client if the traffic exceeds the threshold. Configure parameters for this action in RateLimitOptions. Requires rate_limit_options to be set. - redirect: redirect to a different target. This can either be an internal reCAPTCHA redirect, or an external URL-based redirect via a 302 response. Parameters for this action can be configured via redirectOptions. - throttle: limit client traffic to the configured threshold. Configure parameters for this action in rateLimitOptions. Requires rate_limit_options to be set for this. ",
+          "description": "The Action to perform when the rule is matched. The following are the valid actions: - allow: allow access to target. - deny(STATUS): deny access to target, returns the HTTP response code specified. Valid values for `STATUS` are 403, 404, and 502. - rate_based_ban: limit client traffic to the configured threshold and ban the client if the traffic exceeds the threshold. Configure parameters for this action in RateLimitOptions. Requires rate_limit_options to be set. - redirect: redirect to a different target. This can either be an internal reCAPTCHA redirect, or an external URL-based redirect via a 302 response. Parameters for this action can be configured via redirectOptions. This action is only supported in Global Security Policies of type CLOUD_ARMOR. - throttle: limit client traffic to the configured threshold. Configure parameters for this action in rateLimitOptions. Requires rate_limit_options to be set for this. ",
           "type": "string"
         },
         "description": {
@@ -60959,7 +61866,7 @@
         },
         "headerAction": {
           "$ref": "SecurityPolicyRuleHttpHeaderAction",
-          "description": "Optional, additional actions that are performed on headers."
+          "description": "Optional, additional actions that are performed on headers. This field is only supported in Global Security Policies of type CLOUD_ARMOR."
         },
         "kind": {
           "default": "compute#securityPolicyRule",
@@ -60989,7 +61896,7 @@
         },
         "redirectOptions": {
           "$ref": "SecurityPolicyRuleRedirectOptions",
-          "description": "Parameters defining the redirect action. Cannot be specified for any other actions."
+          "description": "Parameters defining the redirect action. Cannot be specified for any other actions. This field is only supported in Global Security Policies of type CLOUD_ARMOR."
         }
       },
       "type": "object"
@@ -61031,7 +61938,7 @@
         },
         "expr": {
           "$ref": "Expr",
-          "description": "User defined CEVAL expression. A CEVAL expression is used to specify match criteria such as origin.ip, source.region_code and contents in the request header."
+          "description": "User defined CEVAL expression. A CEVAL expression is used to specify match criteria such as origin.ip, source.region_code and contents in the request header. Expressions containing `evaluateThreatIntelligence` require Cloud Armor Managed Protection Plus tier and are not supported in Edge Policies nor in Regional Policies. Expressions containing `evaluatePreconfiguredExpr('sourceiplist-*')` require Cloud Armor Managed Protection Plus tier and are only supported in Global Security Policies."
         },
         "versionedExpr": {
           "description": "Preconfigured versioned expression. If this field is specified, config must also be specified. Available preconfigured expressions along with their requirements are: SRC_IPS_V1 - must specify the corresponding src_ip_range field in config.",
@@ -61185,21 +62092,62 @@
           ],
           "type": "string"
         },
+        "enforceOnKeyConfigs": {
+          "description": "If specified, any combination of values of enforce_on_key_type/enforce_on_key_name is treated as the key on which ratelimit threshold/action is enforced. You can specify up to 3 enforce_on_key_configs. If enforce_on_key_configs is specified, enforce_on_key must not be specified.",
+          "items": {
+            "$ref": "SecurityPolicyRuleRateLimitOptionsEnforceOnKeyConfig"
+          },
+          "type": "array"
+        },
         "enforceOnKeyName": {
           "description": "Rate limit key name applicable only for the following key types: HTTP_HEADER -- Name of the HTTP header whose value is taken as the key value. HTTP_COOKIE -- Name of the HTTP cookie whose value is taken as the key value.",
           "type": "string"
         },
         "exceedAction": {
-          "description": "Action to take for requests that are above the configured rate limit threshold, to either deny with a specified HTTP response code, or redirect to a different endpoint. Valid options are `deny(STATUS)`, where valid values for `STATUS` are 403, 404, 429, and 502, and `redirect`, where the redirect parameters come from `exceedRedirectOptions` below.",
+          "description": "Action to take for requests that are above the configured rate limit threshold, to either deny with a specified HTTP response code, or redirect to a different endpoint. Valid options are `deny(STATUS)`, where valid values for `STATUS` are 403, 404, 429, and 502, and `redirect`, where the redirect parameters come from `exceedRedirectOptions` below. The `redirect` action is only supported in Global Security Policies of type CLOUD_ARMOR.",
           "type": "string"
         },
         "exceedRedirectOptions": {
           "$ref": "SecurityPolicyRuleRedirectOptions",
-          "description": "Parameters defining the redirect action that is used as the exceed action. Cannot be specified if the exceed action is not redirect."
+          "description": "Parameters defining the redirect action that is used as the exceed action. Cannot be specified if the exceed action is not redirect. This field is only supported in Global Security Policies of type CLOUD_ARMOR."
         },
         "rateLimitThreshold": {
           "$ref": "SecurityPolicyRuleRateLimitOptionsThreshold",
           "description": "Threshold at which to begin ratelimiting."
+        }
+      },
+      "type": "object"
+    },
+    "SecurityPolicyRuleRateLimitOptionsEnforceOnKeyConfig": {
+      "id": "SecurityPolicyRuleRateLimitOptionsEnforceOnKeyConfig",
+      "properties": {
+        "enforceOnKeyName": {
+          "description": "Rate limit key name applicable only for the following key types: HTTP_HEADER -- Name of the HTTP header whose value is taken as the key value. HTTP_COOKIE -- Name of the HTTP cookie whose value is taken as the key value.",
+          "type": "string"
+        },
+        "enforceOnKeyType": {
+          "description": "Determines the key to enforce the rate_limit_threshold on. Possible values are: - ALL: A single rate limit threshold is applied to all the requests matching this rule. This is the default value if \"enforceOnKeyConfigs\" is not configured. - IP: The source IP address of the request is the key. Each IP has this limit enforced separately. - HTTP_HEADER: The value of the HTTP header whose name is configured under \"enforceOnKeyName\". The key value is truncated to the first 128 bytes of the header value. If no such header is present in the request, the key type defaults to ALL. - XFF_IP: The first IP address (i.e. the originating client IP address) specified in the list of IPs under X-Forwarded-For HTTP header. If no such header is present or the value is not a valid IP, the key defaults to the source IP address of the request i.e. key type IP. - HTTP_COOKIE: The value of the HTTP cookie whose name is configured under \"enforceOnKeyName\". The key value is truncated to the first 128 bytes of the cookie value. If no such cookie is present in the request, the key type defaults to ALL. - HTTP_PATH: The URL path of the HTTP request. The key value is truncated to the first 128 bytes. - SNI: Server name indication in the TLS session of the HTTPS request. The key value is truncated to the first 128 bytes. The key type defaults to ALL on a HTTP session. - REGION_CODE: The country/region from which the request originates. ",
+          "enum": [
+            "ALL",
+            "HTTP_COOKIE",
+            "HTTP_HEADER",
+            "HTTP_PATH",
+            "IP",
+            "REGION_CODE",
+            "SNI",
+            "XFF_IP"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
         }
       },
       "type": "object"
@@ -61247,11 +62195,11 @@
       "id": "SecuritySettings",
       "properties": {
         "clientTlsPolicy": {
-          "description": "Optional. A URL referring to a networksecurity.ClientTlsPolicy resource that describes how clients should authenticate with this service's backends. clientTlsPolicy only applies to a global BackendService with the loadBalancingScheme set to INTERNAL_SELF_MANAGED. If left blank, communications are not encrypted. Note: This field currently has no impact.",
+          "description": "Optional. A URL referring to a networksecurity.ClientTlsPolicy resource that describes how clients should authenticate with this service's backends. clientTlsPolicy only applies to a global BackendService with the loadBalancingScheme set to INTERNAL_SELF_MANAGED. If left blank, communications are not encrypted.",
           "type": "string"
         },
         "subjectAltNames": {
-          "description": "Optional. A list of Subject Alternative Names (SANs) that the client verifies during a mutual TLS handshake with an server/endpoint for this BackendService. When the server presents its X.509 certificate to the client, the client inspects the certificate's subjectAltName field. If the field contains one of the specified values, the communication continues. Otherwise, it fails. This additional check enables the client to verify that the server is authorized to run the requested service. Note that the contents of the server certificate's subjectAltName field are configured by the Public Key Infrastructure which provisions server identities. Only applies to a global BackendService with loadBalancingScheme set to INTERNAL_SELF_MANAGED. Only applies when BackendService has an attached clientTlsPolicy with clientCertificate (mTLS mode). Note: This field currently has no impact.",
+          "description": "Optional. A list of Subject Alternative Names (SANs) that the client verifies during a mutual TLS handshake with an server/endpoint for this BackendService. When the server presents its X.509 certificate to the client, the client inspects the certificate's subjectAltName field. If the field contains one of the specified values, the communication continues. Otherwise, it fails. This additional check enables the client to verify that the server is authorized to run the requested service. Note that the contents of the server certificate's subjectAltName field are configured by the Public Key Infrastructure which provisions server identities. Only applies to a global BackendService with loadBalancingScheme set to INTERNAL_SELF_MANAGED. Only applies when BackendService has an attached clientTlsPolicy with clientCertificate (mTLS mode).",
           "items": {
             "type": "string"
           },
@@ -61328,7 +62276,7 @@
       "type": "object"
     },
     "ServiceAttachment": {
-      "description": "Represents a ServiceAttachment resource. A service attachment represents a service that a producer has exposed. It encapsulates the load balancer which fronts the service runs and a list of NAT IP ranges that the producers uses to represent the consumers connecting to the service. next tag = 20",
+      "description": "Represents a ServiceAttachment resource. A service attachment represents a service that a producer has exposed. It encapsulates the load balancer which fronts the service runs and a list of NAT IP ranges that the producers uses to represent the consumers connecting to the service.",
       "id": "ServiceAttachment",
       "properties": {
         "connectedEndpoints": {
@@ -61424,6 +62372,10 @@
         "pscServiceAttachmentId": {
           "$ref": "Uint128",
           "description": "[Output Only] An 128-bit global unique ID of the PSC service attachment."
+        },
+        "reconcileConnections": {
+          "description": "This flag determines whether a consumer accept/reject list change can reconcile the statuses of existing ACCEPTED or REJECTED PSC endpoints. - If false, connection policy update will only affect existing PENDING PSC endpoints. Existing ACCEPTED/REJECTED endpoints will remain untouched regardless how the connection policy is modified . - If true, update will affect both PENDING and ACCEPTED/REJECTED PSC endpoints. For example, an ACCEPTED PSC endpoint will be moved to REJECTED if its project is added to the reject list. For newly created service attachment, this boolean defaults to true.",
+          "type": "boolean"
         },
         "region": {
           "description": "[Output Only] URL of the region where the service attachment resides. This field applies only to the region resource. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body.",
@@ -62059,6 +63011,7 @@
         "name": {
           "annotations": {
             "required": [
+              "compute.disks.createSnapshot",
               "compute.snapshots.insert"
             ]
           },
@@ -63499,7 +64452,7 @@
           "type": "string"
         },
         "enableFlowLogs": {
-          "description": "Whether to enable flow logging for this subnetwork. If this field is not explicitly set, it will not appear in get listings. If not set the default behavior is determined by the org policy, if there is no org policy specified, then it will default to disabled. This field isn't supported with the purpose field set to INTERNAL_HTTPS_LOAD_BALANCER.",
+          "description": "Whether to enable flow logging for this subnetwork. If this field is not explicitly set, it will not appear in get listings. If not set the default behavior is determined by the org policy, if there is no org policy specified, then it will default to disabled. This field isn't supported if the subnet purpose field is set to REGIONAL_MANAGED_PROXY.",
           "type": "boolean"
         },
         "externalIpv6Prefix": {
@@ -63581,7 +64534,7 @@
           "type": "string"
         },
         "purpose": {
-          "description": "The purpose of the resource. This field can be either PRIVATE_RFC_1918 or INTERNAL_HTTPS_LOAD_BALANCER. A subnetwork with purpose set to INTERNAL_HTTPS_LOAD_BALANCER is a user-created subnetwork that is reserved for Internal HTTP(S) Load Balancing. If unspecified, the purpose defaults to PRIVATE_RFC_1918. The enableFlowLogs field isn't supported with the purpose field set to INTERNAL_HTTPS_LOAD_BALANCER.",
+          "description": "The purpose of the resource. This field can be either PRIVATE, REGIONAL_MANAGED_PROXY, PRIVATE_SERVICE_CONNECT, or INTERNAL_HTTPS_LOAD_BALANCER. PRIVATE is the default purpose for user-created subnets or subnets that are automatically created in auto mode networks. A subnet with purpose set to REGIONAL_MANAGED_PROXY is a user-created subnetwork that is reserved for regional Envoy-based load balancers. A subnet with purpose set to PRIVATE_SERVICE_CONNECT is used to publish services using Private Service Connect. A subnet with purpose set to INTERNAL_HTTPS_LOAD_BALANCER is a proxy-only subnet that can be used only by regional internal HTTP(S) load balancers. Note that REGIONAL_MANAGED_PROXY is the preferred setting for all regional Envoy load balancers. If unspecified, the subnet purpose defaults to PRIVATE. The enableFlowLogs field isn't supported if the subnet purpose field is set to REGIONAL_MANAGED_PROXY.",
           "enum": [
             "INTERNAL_HTTPS_LOAD_BALANCER",
             "PRIVATE",
@@ -63603,7 +64556,7 @@
           "type": "string"
         },
         "role": {
-          "description": "The role of subnetwork. Currently, this field is only used when purpose = INTERNAL_HTTPS_LOAD_BALANCER. The value can be set to ACTIVE or BACKUP. An ACTIVE subnetwork is one that is currently being used for Internal HTTP(S) Load Balancing. A BACKUP subnetwork is one that is ready to be promoted to ACTIVE or is currently draining. This field can be updated with a patch request.",
+          "description": "The role of subnetwork. Currently, this field is only used when purpose = REGIONAL_MANAGED_PROXY. The value can be set to ACTIVE or BACKUP. An ACTIVE subnetwork is one that is currently being used for Envoy-based load balancers in a region. A BACKUP subnetwork is one that is ready to be promoted to ACTIVE or is currently draining. This field can be updated with a patch request.",
           "enum": [
             "ACTIVE",
             "BACKUP"
@@ -63924,7 +64877,7 @@
           "type": "string"
         },
         "enable": {
-          "description": "Whether to enable flow logging for this subnetwork. If this field is not explicitly set, it will not appear in get listings. If not set the default behavior is determined by the org policy, if there is no org policy specified, then it will default to disabled.",
+          "description": "Whether to enable flow logging for this subnetwork. If this field is not explicitly set, it will not appear in get listings. If not set the default behavior is determined by the org policy, if there is no org policy specified, then it will default to disabled. Flow logging isn't supported if the subnet purpose field is set to REGIONAL_MANAGED_PROXY.",
           "type": "boolean"
         },
         "filterExpr": {
@@ -64775,7 +65728,7 @@
       "id": "TargetHttpsProxiesSetCertificateMapRequest",
       "properties": {
         "certificateMap": {
-          "description": "URL of the Certificate Map to associate with this TargetHttpsProxy.",
+          "description": "URL of the Certificate Map to associate with this TargetHttpsProxy. Accepted format is //certificatemanager.googleapis.com/projects/{project }/locations/{location}/certificateMaps/{resourceName}.",
           "type": "string"
         }
       },
@@ -64823,7 +65776,7 @@
           "type": "string"
         },
         "certificateMap": {
-          "description": "URL of a certificate map that identifies a certificate map associated with the given target proxy. This field can only be set for global target proxies. If set, sslCertificates will be ignored.",
+          "description": "URL of a certificate map that identifies a certificate map associated with the given target proxy. This field can only be set for global target proxies. If set, sslCertificates will be ignored. Accepted format is //certificatemanager.googleapis.com/projects/{project }/locations/{location}/certificateMaps/{resourceName}.",
           "type": "string"
         },
         "creationTimestamp": {
@@ -64881,7 +65834,7 @@
           "type": "string"
         },
         "serverTlsPolicy": {
-          "description": "Optional. A URL referring to a networksecurity.ServerTlsPolicy resource that describes how the proxy should authenticate inbound traffic. serverTlsPolicy only applies to a global TargetHttpsProxy attached to globalForwardingRules with the loadBalancingScheme set to INTERNAL_SELF_MANAGED. If left blank, communications are not encrypted. Note: This field currently has no impact.",
+          "description": "Optional. A URL referring to a networksecurity.ServerTlsPolicy resource that describes how the proxy should authenticate inbound traffic. serverTlsPolicy only applies to a global TargetHttpsProxy attached to globalForwardingRules with the loadBalancingScheme set to INTERNAL_SELF_MANAGED or EXTERNAL or EXTERNAL_MANAGED. For details which ServerTlsPolicy resources are accepted with INTERNAL_SELF_MANAGED and which with EXTERNAL, EXTERNAL_MANAGED loadBalancingScheme consult ServerTlsPolicy documentation. If left blank, communications are not encrypted.",
           "type": "string"
         },
         "sslCertificates": {
@@ -66080,7 +67033,7 @@
       "id": "TargetSslProxiesSetCertificateMapRequest",
       "properties": {
         "certificateMap": {
-          "description": "URL of the Certificate Map to associate with this TargetSslProxy.",
+          "description": "URL of the Certificate Map to associate with this TargetSslProxy. Accepted format is //certificatemanager.googleapis.com/projects/{project }/locations/{location}/certificateMaps/{resourceName}.",
           "type": "string"
         }
       },
@@ -66122,7 +67075,7 @@
       "id": "TargetSslProxy",
       "properties": {
         "certificateMap": {
-          "description": "URL of a certificate map that identifies a certificate map associated with the given target proxy. This field can only be set for global target proxies. If set, sslCertificates will be ignored.",
+          "description": "URL of a certificate map that identifies a certificate map associated with the given target proxy. This field can only be set for global target proxies. If set, sslCertificates will be ignored. Accepted format is //certificatemanager.googleapis.com/projects/{project }/locations/{location}/certificateMaps/{resourceName}.",
           "type": "string"
         },
         "creationTimestamp": {
@@ -66765,6 +67718,18 @@
           "default": "compute#targetVpnGateway",
           "description": "[Output Only] Type of resource. Always compute#targetVpnGateway for target VPN gateways.",
           "type": "string"
+        },
+        "labelFingerprint": {
+          "description": "A fingerprint for the labels being applied to this TargetVpnGateway, which is essentially a hash of the labels set used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after every request to modify or update labels. You must always provide an up-to-date fingerprint hash in order to update or change labels, otherwise the request will fail with error 412 conditionNotMet. To see the latest fingerprint, make a get() request to retrieve a TargetVpnGateway.",
+          "format": "byte",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for this resource. These can only be added or modified by the setLabels method. Each label key/value pair must comply with RFC1035. Label values may be empty.",
+          "type": "object"
         },
         "name": {
           "annotations": {
@@ -67821,6 +68786,10 @@
         "pathPrefixRewrite": {
           "description": "Before forwarding the request to the selected backend service, the matching portion of the request's path is replaced by pathPrefixRewrite. The value must be from 1 to 1024 characters.",
           "type": "string"
+        },
+        "pathTemplateRewrite": {
+          "description": " If specified, the pattern rewrites the URL path (based on the :path header) using the HTTP template syntax. A corresponding path_template_match must be specified. Any template variables must exist in the path_template_match field. - -At least one variable must be specified in the path_template_match field - You can omit variables from the rewritten URL - The * and ** operators cannot be matched unless they have a corresponding variable name - e.g. {format=*} or {var=**}. For example, a path_template_match of /static/{format=**} could be rewritten as /static/content/{format} to prefix /content to the URL. Variables can also be re-ordered in a rewrite, so that /{country}/{format}/{suffix=**} can be rewritten as /content/{format}/{country}/{suffix}. At least one non-empty routeRules[].matchRules[].path_template_match is required. Only one of path_prefix_rewrite or path_template_rewrite may be specified.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -67858,7 +68827,7 @@
           "type": "string"
         },
         "purpose": {
-          "description": "The purpose of the resource. This field can be either PRIVATE_RFC_1918 or INTERNAL_HTTPS_LOAD_BALANCER. A subnetwork with purpose set to INTERNAL_HTTPS_LOAD_BALANCER is a user-created subnetwork that is reserved for Internal HTTP(S) Load Balancing. If unspecified, the purpose defaults to PRIVATE_RFC_1918. The enableFlowLogs field isn't supported with the purpose field set to INTERNAL_HTTPS_LOAD_BALANCER.",
+          "description": "The purpose of the resource. This field can be either PRIVATE, REGIONAL_MANAGED_PROXY, PRIVATE_SERVICE_CONNECT, or INTERNAL_HTTPS_LOAD_BALANCER. PRIVATE is the default purpose for user-created subnets or subnets that are automatically created in auto mode networks. A subnet with purpose set to REGIONAL_MANAGED_PROXY is a user-created subnetwork that is reserved for regional Envoy-based load balancers. A subnet with purpose set to PRIVATE_SERVICE_CONNECT is used to publish services using Private Service Connect. A subnet with purpose set to INTERNAL_HTTPS_LOAD_BALANCER is a proxy-only subnet that can be used only by regional internal HTTP(S) load balancers. Note that REGIONAL_MANAGED_PROXY is the preferred setting for all regional Envoy load balancers. If unspecified, the subnet purpose defaults to PRIVATE. The enableFlowLogs field isn't supported if the subnet purpose field is set to REGIONAL_MANAGED_PROXY.",
           "enum": [
             "INTERNAL_HTTPS_LOAD_BALANCER",
             "PRIVATE",
@@ -67876,7 +68845,7 @@
           "type": "string"
         },
         "role": {
-          "description": "The role of subnetwork. Currently, this field is only used when purpose = INTERNAL_HTTPS_LOAD_BALANCER. The value can be set to ACTIVE or BACKUP. An ACTIVE subnetwork is one that is currently being used for Internal HTTP(S) Load Balancing. A BACKUP subnetwork is one that is ready to be promoted to ACTIVE or is currently draining. This field can be updated with a patch request.",
+          "description": "The role of subnetwork. Currently, this field is only used when purpose = REGIONAL_MANAGED_PROXY. The value can be set to ACTIVE or BACKUP. An ACTIVE subnetwork is one that is currently being used for Envoy-based load balancers in a region. A BACKUP subnetwork is one that is ready to be promoted to ACTIVE or is currently draining. This field can be updated with a patch request.",
           "enum": [
             "ACTIVE",
             "BACKUP"
@@ -68663,7 +69632,7 @@
           "type": "integer"
         },
         "peerGatewayInterface": {
-          "description": "The peer gateway interface this VPN tunnel is connected to, the peer gateway could either be an external VPN gateway or GCP VPN gateway.",
+          "description": "The peer gateway interface this VPN tunnel is connected to, the peer gateway could either be an external VPN gateway or a Google Cloud VPN gateway.",
           "format": "uint32",
           "type": "integer"
         },
@@ -68675,7 +69644,7 @@
       "type": "object"
     },
     "VpnGatewayStatusVpnConnection": {
-      "description": "A VPN connection contains all VPN tunnels connected from this VpnGateway to the same peer gateway. The peer gateway could either be a external VPN gateway or GCP VPN gateway.",
+      "description": "A VPN connection contains all VPN tunnels connected from this VpnGateway to the same peer gateway. The peer gateway could either be an external VPN gateway or a Google Cloud VPN gateway.",
       "id": "VpnGatewayStatusVpnConnection",
       "properties": {
         "peerExternalGateway": {
@@ -68861,6 +69830,18 @@
           "default": "compute#vpnTunnel",
           "description": "[Output Only] Type of resource. Always compute#vpnTunnel for VPN tunnels.",
           "type": "string"
+        },
+        "labelFingerprint": {
+          "description": "A fingerprint for the labels being applied to this VpnTunnel, which is essentially a hash of the labels set used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after every request to modify or update labels. You must always provide an up-to-date fingerprint hash in order to update or change labels, otherwise the request will fail with error 412 conditionNotMet. To see the latest fingerprint, make a get() request to retrieve a VpnTunnel.",
+          "format": "byte",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for this resource. These can only be added or modified by the setLabels method. Each label key/value pair must comply with RFC1035. Label values may be empty.",
+          "type": "object"
         },
         "localTrafficSelector": {
           "description": "Local traffic selector to use when establishing the VPN tunnel with the peer VPN gateway. The value should be a CIDR formatted string, for example: 192.168.0.0/16. The ranges must be disjoint. Only IPv4 is supported.",

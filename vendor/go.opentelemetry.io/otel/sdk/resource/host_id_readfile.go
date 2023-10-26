@@ -21,7 +21,7 @@ import "os"
 func readFile(filename string) (string, error) {
 	b, err := os.ReadFile(filename)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return string(b), nil
