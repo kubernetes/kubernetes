@@ -26,16 +26,19 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+// Appends attachable legacy provider volumes if legacy cloud providers are compiled.
 func appendAttachableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	// no-op when compiled without legacy cloud providers
 	return allPlugins, nil
 }
 
+// Appends expandable legacy provider volumes if legacy cloud providers are compiled.
 func appendExpandableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	// no-op when compiled without legacy cloud providers
 	return allPlugins, nil
 }
 
+// Appends legacy provider volumes if legacy cloud providers are compiled.
 func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	// no-op when compiled without legacy cloud providers
 	return allPlugins, nil

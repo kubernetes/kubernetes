@@ -24,6 +24,7 @@ import (
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 )
 
+// TestCertSpecified tests correct certificate selection based on config.
 func TestCertSpecified(t *testing.T) {
 	allConfig := csrsigningconfig.CSRSigningControllerConfiguration{
 		ClusterSigningCertFile: "/cluster-signing-cert",

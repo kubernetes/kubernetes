@@ -76,6 +76,7 @@ const (
 	defaultNodeMaskCIDRIPv6 = 64
 )
 
+// Initializes and starts the service controller, handling potential errors gracefully.
 func startServiceController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	serviceController, err := servicecontroller.New(
 		controllerContext.Cloud,
@@ -94,6 +95,7 @@ func startServiceController(ctx context.Context, controllerContext ControllerCon
 	return nil, true, nil
 }
 
+// Initializes and starts the node IPAM (IP Address Management) controller with the given context and configuration.
 func startNodeIpamController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
@@ -166,6 +168,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 	return nil, true, nil
 }
 
+// Initializes and starts the node lifecycle controller with the provided context and configuration.
 func startNodeLifecycleController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
 		ctx,
@@ -190,6 +193,7 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+// Starts the cloud node lifecycle controller.
 func startCloudNodeLifecycleController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
@@ -210,6 +214,7 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 	return nil, true, nil
 }
 
+// Starts the route controller for configuring cloud provider routes.
 func startRouteController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	if !controllerContext.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !controllerContext.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
@@ -240,6 +245,7 @@ func startRouteController(ctx context.Context, controllerContext ControllerConte
 	return nil, true, nil
 }
 
+// Starts the PV binder controller for volume management.
 func startPersistentVolumeBinderController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	plugins, err := ProbeControllerVolumePlugins(logger, controllerContext.Cloud, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
@@ -268,6 +274,7 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 	return nil, true, nil
 }
 
+// Starts the attach/detach controller for volume management.
 func startAttachDetachController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	csiNodeInformer := controllerContext.InformerFactory.Storage().V1().CSINodes()
@@ -304,6 +311,7 @@ func startAttachDetachController(ctx context.Context, controllerContext Controll
 	return nil, true, nil
 }
 
+// startVolumeExpandController starts the volume expand controller for expanding volumes.
 func startVolumeExpandController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	plugins, err := ProbeExpandableVolumePlugins(logger, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
@@ -329,6 +337,7 @@ func startVolumeExpandController(ctx context.Context, controllerContext Controll
 
 }
 
+// Starts the ephemeral volume controller for managing ephemeral volumes.
 func startEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	ephemeralController, err := ephemeral.NewController(
 		controllerContext.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
@@ -343,6 +352,7 @@ func startEphemeralVolumeController(ctx context.Context, controllerContext Contr
 
 const defaultResourceClaimControllerWorkers = 10
 
+// Starts the resource claim controller for managing resource claims.
 func startResourceClaimController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	ephemeralController, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
@@ -358,6 +368,7 @@ func startResourceClaimController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+// Begins the endpoint controller for managing endpoints.
 func startEndpointController(ctx context.Context, controllerCtx ControllerContext) (controller.Interface, bool, error) {
 	go endpointcontroller.NewEndpointController(
 		controllerCtx.InformerFactory.Core().V1().Pods(),
@@ -369,6 +380,7 @@ func startEndpointController(ctx context.Context, controllerCtx ControllerContex
 	return nil, true, nil
 }
 
+// Starts the replication controller for managing ReplicationControllers.
 func startReplicationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go replicationcontroller.NewReplicationManager(
 		klog.FromContext(ctx),
@@ -380,6 +392,7 @@ func startReplicationController(ctx context.Context, controllerContext Controlle
 	return nil, true, nil
 }
 
+// Starts the Pod Garbage Collector controller.
 func startPodGCController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go podgc.NewPodGC(
 		ctx,
@@ -391,6 +404,7 @@ func startPodGCController(ctx context.Context, controllerContext ControllerConte
 	return nil, true, nil
 }
 
+// startResourceQuotaController initiates the Resource Quota Controller.
 func startResourceQuotaController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	resourceQuotaControllerClient := controllerContext.ClientBuilder.ClientOrDie("resourcequota-controller")
 	resourceQuotaControllerDiscoveryClient := controllerContext.ClientBuilder.DiscoveryClientOrDie("resourcequota-controller")
@@ -422,6 +436,7 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+// Starts the Namespace Controller with modified rate limiting to improve performance.
 func startNamespaceController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
@@ -433,6 +448,7 @@ func startNamespaceController(ctx context.Context, controllerContext ControllerC
 	return startModifiedNamespaceController(ctx, controllerContext, namespaceKubeClient, nsKubeconfig)
 }
 
+// Starts the modified Namespace Controller with custom rate limiting and options.
 func startModifiedNamespaceController(ctx context.Context, controllerContext ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (controller.Interface, bool, error) {
 
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
@@ -456,6 +472,7 @@ func startModifiedNamespaceController(ctx context.Context, controllerContext Con
 	return nil, true, nil
 }
 
+// Starts the Service Account Controller.
 func startServiceAccountController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
@@ -470,6 +487,7 @@ func startServiceAccountController(ctx context.Context, controllerContext Contro
 	return nil, true, nil
 }
 
+// Starts the Time-to-Live (TTL) Controller.
 func startTTLController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go ttlcontroller.NewTTLController(
 		ctx,
@@ -479,6 +497,7 @@ func startTTLController(ctx context.Context, controllerContext ControllerContext
 	return nil, true, nil
 }
 
+// Starts the Garbage Collector Controller to manage resource cleanup.
 func startGarbageCollectorController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	if !controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
 		return nil, false, nil
@@ -523,6 +542,7 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 	return garbageCollector, true, nil
 }
 
+// Starts the Persistent Volume Claim (PVC) Protection Controller for managing PVC protection.
 func startPVCProtectionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
 		klog.FromContext(ctx),
@@ -537,6 +557,7 @@ func startPVCProtectionController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+// Starts the Persistent Volume (PV) Protection Controller for managing PV protection.
 func startPVProtectionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go pvprotection.NewPVProtectionController(
 		klog.FromContext(ctx),
@@ -546,6 +567,7 @@ func startPVProtectionController(ctx context.Context, controllerContext Controll
 	return nil, true, nil
 }
 
+// Starts the Time To Live (TTL) After Finished Controller for managing TTL settings after job completion.
 func startTTLAfterFinishedController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go ttlafterfinished.New(
 		ctx,
@@ -555,6 +577,7 @@ func startTTLAfterFinishedController(ctx context.Context, controllerContext Cont
 	return nil, true, nil
 }
 
+// Starts the Legacy Service Account Token Cleaner for managing service account token cleanup.
 func startLegacySATokenCleaner(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	cleanUpPeriod := controllerContext.ComponentConfig.LegacySATokenCleaner.CleanUpPeriod.Duration
 	legacySATokenCleaner, err := serviceaccountcontroller.NewLegacySATokenCleaner(
@@ -690,6 +713,7 @@ func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, cl
 	return sortedSizes(ipv4Mask, ipv6Mask), nil
 }
 
+// Starts the Storage Version Garbage Collector for managing storage version resources.
 func startStorageVersionGCController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go storageversiongc.NewStorageVersionGC(
 		ctx,

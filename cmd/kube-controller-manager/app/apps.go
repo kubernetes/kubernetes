@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
+// startDaemonSetController initializes and starts the DaemonSet controller.
 func startDaemonSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	dsc, err := daemon.NewDaemonSetsController(
 		ctx,
@@ -50,6 +51,7 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 	return nil, true, nil
 }
 
+// startStatefulSetController initializes and starts the StatefulSet controller.
 func startStatefulSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go statefulset.NewStatefulSetController(
 		ctx,
@@ -62,6 +64,7 @@ func startStatefulSetController(ctx context.Context, controllerContext Controlle
 	return nil, true, nil
 }
 
+// startReplicaSetController initializes and starts the ReplicaSet controller.
 func startReplicaSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go replicaset.NewReplicaSetController(
 		klog.FromContext(ctx),
@@ -73,6 +76,7 @@ func startReplicaSetController(ctx context.Context, controllerContext Controller
 	return nil, true, nil
 }
 
+// startDeploymentController initializes and starts the Deployment controller.
 func startDeploymentController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	dc, err := deployment.NewDeploymentController(
 		ctx,

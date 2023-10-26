@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 )
 
+// startJobController initializes and starts the Job controller.
 func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	jobController, err := job.NewController(
 		ctx,
@@ -42,6 +43,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 	return nil, true, nil
 }
 
+// startCronJobController initializes and starts the CronJob controller version 2.
 func startCronJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),

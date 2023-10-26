@@ -35,10 +35,12 @@ import (
 	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
+// startHPAController delegates the initialization and start of the HPA controller using its REST client.
 func startHPAController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	return startHPAControllerWithRESTClient(ctx, controllerContext)
 }
 
+// Initializes and starts the HPA controller using its REST client to fetch metrics for autoscaling.
 func startHPAControllerWithRESTClient(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 
 	clientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
@@ -60,6 +62,7 @@ func startHPAControllerWithRESTClient(ctx context.Context, controllerContext Con
 	return startHPAControllerWithMetricsClient(ctx, controllerContext, metricsClient)
 }
 
+// Initializes and starts the Horizontal Pod Autoscaler (HPA) controller with a specific metrics client.
 func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext ControllerContext, metricsClient metrics.MetricsClient) (controller.Interface, bool, error) {
 
 	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")

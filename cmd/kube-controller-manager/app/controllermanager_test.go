@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
+// Tests naming consistency of known controllers against a defined regex pattern.
 func TestControllerNamesConsistency(t *testing.T) {
 	controllerNameRegexp := regexp.MustCompile("^[a-z]([-a-z]*[a-z])?$")
 
@@ -40,6 +41,7 @@ func TestControllerNamesConsistency(t *testing.T) {
 	}
 }
 
+// Tests if all known controllers are declared in the predefined set of controller names.
 func TestControllerNamesDeclaration(t *testing.T) {
 	declaredControllers := sets.New(
 		names.ServiceAccountTokenController,

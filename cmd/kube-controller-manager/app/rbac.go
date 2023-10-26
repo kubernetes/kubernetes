@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
 
+// Starts the ClusterRoleAggregation controller to manage the aggregation of cluster roles.
 func startClusterRoleAggregrationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),

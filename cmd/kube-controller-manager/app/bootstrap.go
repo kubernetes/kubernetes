@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
 
+// startBootstrapSignerController initializes and starts the Bootstrap Signer controller.
 func startBootstrapSignerController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	bsc, err := bootstrap.NewSigner(
 		controllerContext.ClientBuilder.ClientOrDie("bootstrap-signer"),
@@ -38,6 +39,7 @@ func startBootstrapSignerController(ctx context.Context, controllerContext Contr
 	return nil, true, nil
 }
 
+// startTokenCleanerController initializes and starts the Token Cleaner controller.
 func startTokenCleanerController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	tcc, err := bootstrap.NewTokenCleaner(
 		controllerContext.ClientBuilder.ClientOrDie("token-cleaner"),
