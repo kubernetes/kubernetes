@@ -97,6 +97,11 @@ type Config struct {
 	// This takes precedent over the GetDefinitions function
 	Definitions map[string]OpenAPIDefinition
 
+	// Provides an additional set of definitions for models used by routes.
+	// This is unioned with Definitions when building the spec, and allows
+	// the Definitions map to be reused across different builders.
+	AdditionalDefinitions map[string]OpenAPIDefinition
+
 	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
 	//
 	// Deprecated: GetOperationIDAndTagsFromRoute should be used instead. This cannot be specified if using the new Route
@@ -150,6 +155,11 @@ type OpenAPIV3Config struct {
 	// Provides the definition for all models used by routes. One of GetDefinitions or Definitions must be defined to generate a spec.
 	// This takes precedent over the GetDefinitions function
 	Definitions map[string]OpenAPIDefinition
+
+	// Provides an additional set of definitions for models used by routes.
+	// This is unioned with Definitions when building the spec, and allows
+	// the Definitions map to be reused across different builders.
+	AdditionalDefinitions map[string]OpenAPIDefinition
 
 	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
 	//

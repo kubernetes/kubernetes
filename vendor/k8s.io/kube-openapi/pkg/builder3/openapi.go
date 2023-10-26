@@ -37,9 +37,23 @@ const (
 )
 
 type openAPI struct {
-	config      *common.OpenAPIV3Config
-	spec        *spec3.OpenAPI
-	definitions map[string]common.OpenAPIDefinition
+	config                *common.OpenAPIV3Config
+	spec                  *spec3.OpenAPI
+	definitions           map[string]common.OpenAPIDefinition
+	additionalDefinitions map[string]common.OpenAPIDefinition
+}
+
+// getDefinition is a getter that checks two maps for the existence of a key
+func (o *openAPI) getDefinition(key string) (common.OpenAPIDefinition, bool) {
+	val, ok := o.definitions[key]
+	if ok {
+		return val, ok
+	}
+	if o.additionalDefinitions != nil {
+		val, ok = o.additionalDefinitions[key]
+		return val, ok
+	}
+	return common.OpenAPIDefinition{}, false
 }
 
 func groupRoutesByPath(routes []common.Route) map[string][]common.Route {
@@ -235,6 +249,10 @@ func newOpenAPI(config *common.OpenAPIV3Config) openAPI {
 			defName, _ := o.config.GetDefinitionName(name)
 			return spec.MustCreateRef("#/components/schemas/" + common.EscapeJsonPointer(defName))
 		})
+	}
+
+	if o.config.AdditionalDefinitions != nil {
+		o.additionalDefinitions = o.config.AdditionalDefinitions
 	}
 
 	return o
@@ -433,7 +451,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 	if _, ok := o.spec.Components.Schemas[uniqueName]; ok {
 		return nil
 	}
-	if item, ok := o.definitions[name]; ok {
+	if item, ok := o.getDefinition(name); ok {
 		schema := &spec.Schema{
 			VendorExtensible:   item.Schema.VendorExtensible,
 			SchemaProps:        item.Schema.SchemaProps,

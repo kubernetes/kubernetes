@@ -35,10 +35,24 @@ const (
 )
 
 type openAPI struct {
-	config       *common.Config
-	swagger      *spec.Swagger
-	protocolList []string
-	definitions  map[string]common.OpenAPIDefinition
+	config                *common.Config
+	swagger               *spec.Swagger
+	protocolList          []string
+	definitions           map[string]common.OpenAPIDefinition
+	additionalDefinitions map[string]common.OpenAPIDefinition
+}
+
+// getDefinition is a getter that checks two maps for the existence of a key
+func (o *openAPI) getDefinition(key string) (common.OpenAPIDefinition, bool) {
+	val, ok := o.definitions[key]
+	if ok {
+		return val, ok
+	}
+	if o.additionalDefinitions != nil {
+		val, ok = o.additionalDefinitions[key]
+		return val, ok
+	}
+	return common.OpenAPIDefinition{}, false
 }
 
 // BuildOpenAPISpec builds OpenAPI spec given a list of route containers and common.Config to customize it.
@@ -127,10 +141,19 @@ func newOpenAPI(config *common.Config) openAPI {
 			return name[strings.LastIndex(name, "/")+1:], nil
 		}
 	}
-	o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
-		defName, _ := o.config.GetDefinitionName(name)
-		return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(defName))
-	})
+	if o.config.Definitions != nil {
+		o.definitions = o.config.Definitions
+	} else {
+		o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
+			defName, _ := o.config.GetDefinitionName(name)
+			return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(defName))
+		})
+	}
+
+	if o.config.AdditionalDefinitions != nil {
+		o.additionalDefinitions = o.config.AdditionalDefinitions
+	}
+
 	if o.config.CommonResponses == nil {
 		o.config.CommonResponses = map[int]spec.Response{}
 	}
@@ -160,7 +183,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 	if _, ok := o.swagger.Definitions[uniqueName]; ok {
 		return nil
 	}
-	if item, ok := o.definitions[name]; ok {
+	if item, ok := o.getDefinition(name); ok {
 		schema := spec.Schema{
 			VendorExtensible:   item.Schema.VendorExtensible,
 			SchemaProps:        item.Schema.SchemaProps,
