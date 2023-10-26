@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 # Usage: `hack/local-up-cluster.sh`.
 
 DOCKER_OPTS=${DOCKER_OPTS:-""}
-export DOCKER=(docker "${DOCKER_OPTS[@]}")
+export DOCKER=("${DOCKER:-docker}" "${DOCKER_OPTS[@]}")
 DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}

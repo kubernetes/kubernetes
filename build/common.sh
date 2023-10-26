@@ -28,7 +28,7 @@ USER_ID=$(id -u)
 GROUP_ID=$(id -g)
 
 DOCKER_OPTS=${DOCKER_OPTS:-""}
-IFS=" " read -r -a DOCKER <<< "docker ${DOCKER_OPTS}"
+IFS=" " read -r -a DOCKER <<< "${DOCKER:-docker} ${DOCKER_OPTS}"
 DOCKER_HOST=${DOCKER_HOST:-""}
 GOPROXY=${GOPROXY:-""}
 
@@ -226,7 +226,7 @@ function kube::build::ensure_rsync() {
 }
 
 function kube::build::ensure_docker_in_path() {
-  if [[ -z "$(which docker)" ]]; then
+  if [[ -z "$(which ${DOCKER[0]})" ]]; then
     kube::log::error "Can't find 'docker' in PATH, please fix and retry."
     kube::log::error "See https://docs.docker.com/installation/#installation for installation instructions."
     return 1
@@ -255,7 +255,7 @@ function kube::build::ensure_tar() {
 }
 
 function kube::build::has_docker() {
-  which docker &> /dev/null
+  which "${DOCKER[0]}" &> /dev/null
 }
 
 function kube::build::has_ip() {
@@ -439,7 +439,7 @@ function kube::build::ensure_data_container() {
   local ret=0
   local code=0
 
-  code=$(docker inspect \
+  code=$("${DOCKER[@]}" inspect \
       -f '{{.State.ExitCode}}' \
       "${KUBE_DATA_CONTAINER_NAME}" 2>/dev/null) || ret=$?
   if [[ "${ret}" == 0 && "${code}" != 0 ]]; then

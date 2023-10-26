@@ -615,9 +615,10 @@ function kube::util::list_staging_repos() {
 
 # Determines if docker can be run, failures may simply require that the user be added to the docker group.
 function kube::util::ensure_docker_daemon_connectivity {
+  DOCKER=${DOCKER:-docker}
   DOCKER_OPTS=${DOCKER_OPTS:-""}
   IFS=" " read -ra docker_opts <<< "${DOCKER_OPTS}"
-  if ! docker "${docker_opts[@]:+"${docker_opts[@]}"}" info > /dev/null 2>&1 ; then
+  if ! "${DOCKER}" "${docker_opts[@]:+"${docker_opts[@]}"}" info > /dev/null 2>&1 ; then
     cat <<'EOF' >&2
 Can't connect to 'docker' daemon.  please fix and retry.
 
@@ -729,8 +730,9 @@ function kube::util::ensure-cfssl {
 # Check if we have "docker buildx" commands available
 #
 function kube::util::ensure-docker-buildx {
+  DOCKER=${DOCKER:-docker}
   # podman returns 0 on `docker buildx version`, docker on `docker buildx`. One of them must succeed.
-  if docker buildx version >/dev/null 2>&1 || docker buildx >/dev/null 2>&1; then
+  if "${DOCKER}" buildx version >/dev/null 2>&1 || "${DOCKER}" buildx >/dev/null 2>&1; then
     return 0
   else
     echo "ERROR: docker buildx not available. Docker 19.03 or higher is required with experimental features enabled"
