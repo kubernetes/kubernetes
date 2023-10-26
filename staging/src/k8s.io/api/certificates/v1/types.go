@@ -154,6 +154,12 @@ const (
 	// Can be issued by the "csrsigning" controller in kube-controller-manager.
 	KubeAPIServerClientKubeletSignerName = "kubernetes.io/kube-apiserver-client-kubelet"
 
+	// "kubernetes.io/kube-apiserver-client-pod" issues client certificates that pods can use to authenticate to kube-apiserver.
+	// Pods can only obtain these certificates by using PodCertificate projected volumes.
+	// Can be auto-approved by the "csrapproving" controller in kube-controller-manager.
+	// Can be issued by the "csrsigning" controller in kube-controller-manager.
+	KubeAPIServerClientPodSignerName = "kubernetes.io/kube-apiserver-client-pod"
+
 	// "kubernetes.io/kubelet-serving" issues serving certificates that kubelets use to serve TLS endpoints,
 	// which kube-apiserver can connect to securely.
 	// Never auto-approved by kube-controller-manager.
