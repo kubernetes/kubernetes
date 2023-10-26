@@ -76,3 +76,12 @@ func (ca *CertificateAuthority) Sign(crDER []byte, policy SigningPolicy) ([]byte
 	}
 	return der, nil
 }
+
+func (ca *CertificateAuthority) SignCertificate(tmpl *x509.Certificate, publicKey any) ([]byte, error) {
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca.Certificate, publicKey, ca.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("while signing certificate: %w", err)
+	}
+
+	return der, nil
+}
