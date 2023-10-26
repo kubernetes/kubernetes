@@ -18,44 +18,17 @@ package cacher
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/apis/example"
-	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
-	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 )
-
-func newPod() runtime.Object { return &example.Pod{} }
-
-func computePodKey(obj *example.Pod) string {
-	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
-}
-
-func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(
-		server.V3Client,
-		apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion),
-		newPod, prefix,
-		schema.GroupResource{Resource: "pods"},
-		identity.NewEncryptCheckTransformer(),
-		true,
-		etcd3.NewDefaultLeaseManagerConfig())
-	return server, storage
-}
 
 func TestCacherListerWatcher(t *testing.T) {
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := newEtcdTestStorage(t, prefix, true)
 	defer server.Terminate(t)
 
 	objects := []*example.Pod{
@@ -89,7 +62,7 @@ func TestCacherListerWatcher(t *testing.T) {
 func TestCacherListerWatcherPagination(t *testing.T) {
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := newEtcdTestStorage(t, prefix, true)
 	defer server.Terminate(t)
 
 	// We need the list to be sorted by name to later check the alphabetical order of

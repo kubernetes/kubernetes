@@ -52,3 +52,32 @@ func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state *fram
 	}
 	return result, status
 }
+
+type instrumentedPreScorePlugin struct {
+	framework.PreScorePlugin
+
+	metric compbasemetrics.CounterMetric
+}
+
+var _ framework.PreScorePlugin = &instrumentedPreScorePlugin{}
+
+func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	status := p.PreScorePlugin.PreScore(ctx, state, pod, nodes)
+	if !status.IsSkip() {
+		p.metric.Inc()
+	}
+	return status
+}
+
+type instrumentedScorePlugin struct {
+	framework.ScorePlugin
+
+	metric compbasemetrics.CounterMetric
+}
+
+var _ framework.ScorePlugin = &instrumentedScorePlugin{}
+
+func (p *instrumentedScorePlugin) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	p.metric.Inc()
+	return p.ScorePlugin.Score(ctx, state, pod, nodeName)
+}

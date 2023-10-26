@@ -22,12 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
-	pvc            string = "PersistentVolumeClaim"
-	volumeSnapshot string = "VolumeSnapshot"
+	pvc                                  string = "PersistentVolumeClaim"
+	volumeSnapshot                       string = "VolumeSnapshot"
+	deprecatedStorageClassAnnotationsMsg        = `deprecated since v1.8; use "storageClassName" attribute instead`
 )
 
 // DropDisabledFields removes disabled fields from the pvc spec.
@@ -94,11 +96,11 @@ func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.Persisten
 
 func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
-		if !allocatedResourcesInUse(oldPVC) {
+		if !helper.ClaimContainsAllocatedResources(oldPVC) {
 			pvc.Status.AllocatedResources = nil
 		}
-		if !resizeStatusInUse(oldPVC) {
-			pvc.Status.ResizeStatus = nil
+		if !helper.ClaimContainsAllocatedResourceStatus(oldPVC) {
+			pvc.Status.AllocatedResourceStatuses = nil
 		}
 	}
 }
@@ -174,34 +176,26 @@ func NormalizeDataSources(pvcSpec *core.PersistentVolumeClaimSpec) {
 	}
 }
 
-func resizeStatusInUse(oldPVC *core.PersistentVolumeClaim) bool {
-	if oldPVC == nil {
-		return false
-	}
-	if oldPVC.Status.ResizeStatus != nil {
-		return true
-	}
-	return false
-}
-
-func allocatedResourcesInUse(oldPVC *core.PersistentVolumeClaim) bool {
-	if oldPVC == nil {
-		return false
-	}
-
-	if oldPVC.Status.AllocatedResources != nil {
-		return true
-	}
-
-	return false
-}
-
 func GetWarningsForPersistentVolumeClaim(pv *core.PersistentVolumeClaim) []string {
+	var warnings []string
+
 	if pv == nil {
 		return nil
 	}
 
-	return GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec"), pv.Spec)
+	if _, ok := pv.ObjectMeta.Annotations[core.BetaStorageClassAnnotation]; ok {
+		warnings = append(warnings,
+			fmt.Sprintf(
+				"%s: %s",
+				field.NewPath("metadata", "annotations").Key(core.BetaStorageClassAnnotation),
+				deprecatedStorageClassAnnotationsMsg,
+			),
+		)
+	}
+
+	warnings = append(warnings, GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec"), pv.Spec)...)
+
+	return warnings
 }
 
 func GetWarningsForPersistentVolumeClaimSpec(fieldPath *field.Path, pvSpec core.PersistentVolumeClaimSpec) []string {

@@ -31,6 +31,8 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	celschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -4067,6 +4069,258 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "oneOf[0]", "x-kubernetes-validations"),
 			},
 		},
+		{
+			name: "x-kubernetes-validations should have valid reason and fieldPath",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "self.a > 0",
+									Reason: func() *apiextensions.FieldValueErrorReason {
+										r := apiextensions.FieldValueErrorReason("InternalError")
+										return &r
+									}(),
+									FieldPath: ".a",
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type: "number",
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueRequired
+												return &r
+											}(),
+										},
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueInvalid
+												return &r
+											}(),
+										},
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueDuplicate
+												return &r
+											}(),
+										},
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueForbidden
+												return &r
+											}(),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				unsupported("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[0]", "reason"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations should have valid fieldPath for array",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:      "true",
+									FieldPath: ".foo['b.c']['c\\a']",
+								},
+								{
+									Rule:      "true",
+									FieldPath: "['a.c']",
+								},
+								{
+									Rule:      "true",
+									FieldPath: ".a.c",
+								},
+								{
+									Rule:      "true",
+									FieldPath: ".list[0]",
+								},
+								{
+									Rule:      "true",
+									FieldPath: "   ",
+								},
+								{
+									Rule:      "true",
+									FieldPath: ".",
+								},
+								{
+									Rule:      "true",
+									FieldPath: "..",
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a.c": {
+									Type: "number",
+								},
+								"foo": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"b.c": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"c\a": {
+													Type: "number",
+												},
+											},
+										},
+									},
+								},
+								"list": {
+									Type: "array",
+									Items: &apiextensions.JSONSchemaPropsOrArray{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"a": {
+													Type: "number",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[2]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[3]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[4]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[4]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[5]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[6]", "fieldPath"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations have invalid fieldPath",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:      "self.a.b.c > 0.0",
+									FieldPath: ".list[0].b",
+								},
+								{
+									Rule:      "self.a.b.c > 0.0",
+									FieldPath: ".list[0.b",
+								},
+								{
+									Rule:      "self.a.b.c > 0.0",
+									FieldPath: ".list0].b",
+								},
+								{
+									Rule:      "self.a.b.c > 0.0",
+									FieldPath: ".a.c",
+								},
+								{
+									Rule:      "self.a.b.c > 0.0",
+									FieldPath: ".a.b.d",
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"b": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"c": {
+													Type: "number",
+												},
+											},
+										},
+									},
+								},
+								"list": {
+									Type: "array",
+									Items: &apiextensions.JSONSchemaPropsOrArray{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"a": {
+													Type: "number",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[0]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[1]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[2]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[3]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[4]", "fieldPath"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -4099,6 +4353,246 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				if !seen {
 					t.Errorf("unexpected error: %v", errs[i])
 				}
+			}
+		})
+	}
+}
+
+func TestValidateFieldPath(t *testing.T) {
+	schema := apiextensions.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensions.JSONSchemaProps{
+			"foo": {
+				Type: "object",
+				AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+					Schema: &apiextensions.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"f1": {
+								Type: "number",
+							},
+						},
+					},
+				},
+			},
+			"a": {
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"bbb": {
+						Type: "object",
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"c": {
+								Type: "number",
+							},
+							"34": {
+								Type: "number",
+							},
+						},
+					},
+					"bbb.c": {
+						Type: "object",
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"a-b34": {
+								Type: "number",
+							},
+						},
+					},
+				},
+			},
+			"list": {
+				Type: "array",
+				Items: &apiextensions.JSONSchemaPropsOrArray{
+					Schema: &apiextensions.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"a": {
+								Type: "number",
+							},
+							"a-b.34": {
+								Type: "number",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	path := field.NewPath("")
+
+	tests := []struct {
+		name            string
+		fieldPath       string
+		pathOfFieldPath *field.Path
+		schema          *apiextensions.JSONSchemaProps
+		errMsg          string
+	}{
+		{
+			name:            "Valid .a",
+			fieldPath:       ".a",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .a.b",
+			fieldPath:       ".a.bbb",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .foo.f1",
+			fieldPath:       ".foo.f1",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Invalid map syntax .a.b",
+			fieldPath:       ".a['bbb']",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .a['bbb.c']",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .a['bbb.c'].a-b34",
+			fieldPath:       ".a['bbb.c'].a-b34",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .a['bbb.c']['a-b34']",
+			fieldPath:       ".a['bbb.c']['a-b34']",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .a.bbb.c",
+			fieldPath:       ".a.bbb.c",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .a.bbb.34",
+			fieldPath:       ".a.bbb['34']",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Invalid map key",
+			fieldPath:       ".a.foo",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "does not refer to a valid field",
+		},
+		{
+			name:            "Malformed map key",
+			fieldPath:       ".a.bbb[0]",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "expected single quoted string but got 0",
+		},
+		{
+			name:            "number in field names",
+			fieldPath:       ".a.bbb.34",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Special field names",
+			fieldPath:       ".a.bbb['34']",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Valid .list",
+			fieldPath:       ".list",
+			pathOfFieldPath: path,
+			schema:          &schema,
+		},
+		{
+			name:            "Invalid .list[1]",
+			fieldPath:       ".list[1]",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "expected single quoted string but got 1",
+		},
+		{
+			name:            "Unsopported .list.a",
+			fieldPath:       ".list.a",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "does not refer to a valid field",
+		},
+		{
+			name:            "Unsupported .list['a-b.34']",
+			fieldPath:       ".list['a-b.34']",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "does not refer to a valid field",
+		},
+		{
+			name:            "Invalid .list.a-b.34",
+			fieldPath:       ".list.a-b.34",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "does not refer to a valid field",
+		},
+		{
+			name:            "Missing leading dot",
+			fieldPath:       "a",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "expected [ or . but got: a",
+		},
+		{
+			name:            "Nonexistent field",
+			fieldPath:       ".c",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "does not refer to a valid field",
+		},
+		{
+			name:            "Duplicate dots",
+			fieldPath:       ".a..b",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "does not refer to a valid field",
+		},
+		{
+			name:            "Negative array index",
+			fieldPath:       ".list[-1]",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "expected single quoted string but got -1",
+		},
+		{
+			name:            "Floating-point array index",
+			fieldPath:       ".list[1.0]",
+			pathOfFieldPath: path,
+			schema:          &schema,
+			errMsg:          "expected single quoted string but got 1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ss, err := structuralschema.NewStructural(tc.schema)
+			if err != nil {
+				t.Fatalf("error when converting schema to structural schema: %v", err)
+			}
+			_, err = celschema.ValidFieldPath(tc.fieldPath, ss)
+			if err == nil && tc.errMsg != "" {
+				t.Errorf("expected err contains: %v but get nil", tc.errMsg)
+			}
+			if err != nil && tc.errMsg == "" {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tc.errMsg) {
+				t.Errorf("expected error to contain: %v, but get: %v", tc.errMsg, err)
 			}
 		})
 	}

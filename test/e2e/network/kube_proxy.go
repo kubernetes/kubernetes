@@ -51,7 +51,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 	)
 
 	fr := framework.NewDefaultFramework("kube-proxy")
-	fr.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	fr.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func(ctx context.Context) {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, fr.ClientSet, 2)

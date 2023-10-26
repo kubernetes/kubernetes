@@ -344,8 +344,12 @@ func failureDescriptionForUnstructuredReporters(spec types.SpecReport) string {
 }
 
 func systemErrForUnstructuredReporters(spec types.SpecReport) string {
+	return RenderTimeline(spec, true)
+}
+
+func RenderTimeline(spec types.SpecReport, noColor bool) string {
 	out := &strings.Builder{}
-	NewDefaultReporter(types.ReporterConfig{NoColor: true, VeryVerbose: true}, out).emitTimeline(0, spec, spec.Timeline())
+	NewDefaultReporter(types.ReporterConfig{NoColor: noColor, VeryVerbose: true}, out).emitTimeline(0, spec, spec.Timeline())
 	return out.String()
 }
 

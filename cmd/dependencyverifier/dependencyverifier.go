@@ -25,6 +25,8 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type Unwanted struct {
@@ -269,6 +271,7 @@ func main() {
 	if !bytes.Equal(expected, actual) {
 		log.Printf("Expected status of\n%s", string(expected))
 		log.Printf("Got status of\n%s", string(actual))
+		log.Fatal("Status diff:\n", cmp.Diff(actual, expected))
 	}
 	for expectedRef, expectedFrom := range configFromFile.Status.UnwantedReferences {
 		actualFrom, ok := config.Status.UnwantedReferences[expectedRef]

@@ -34,18 +34,15 @@ import (
 	serviceaccountapiserver "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	unionauthz "k8s.io/apiserver/pkg/authorization/union"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientinformers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/keyutil"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -55,8 +52,6 @@ import (
 const (
 	readOnlyServiceAccountName  = "ro"
 	readWriteServiceAccountName = "rw"
-
-	dateFormat = "2006-01-02"
 )
 
 func TestServiceAccountAutoCreate(t *testing.T) {
@@ -64,7 +59,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
+	c, _, stopFunc, _, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -105,7 +100,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	c, _, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
+	c, _, stopFunc, _, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -151,7 +146,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
+	c, config, stopFunc, _, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -232,8 +227,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.LegacyServiceAccountTokenTracking, true)()
-	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
+	c, config, stopFunc, _, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
@@ -351,7 +345,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 
 // startServiceAccountTestServerAndWaitForCaches returns a started server
 // It is the responsibility of the caller to ensure the returned stopFunc is called
-func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testing.T) (clientset.Interface, *restclient.Config, func(), error) {
+func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testing.T) (clientset.Interface, *restclient.Config, func(), clientinformers.SharedInformerFactory, error) {
 	var serviceAccountKey interface{}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -408,7 +402,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 	// Start the service account and service account token controllers
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)
 	if err != nil {
-		return rootClientset, clientConfig, stop, err
+		return rootClientset, clientConfig, stop, informers, err
 	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
 		informers.Core().V1().ServiceAccounts(),
@@ -419,7 +413,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		},
 	)
 	if err != nil {
-		return rootClientset, clientConfig, stop, err
+		return rootClientset, clientConfig, stop, informers, err
 	}
 	go tokenController.Run(ctx, 1)
 
@@ -430,7 +424,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	)
 	if err != nil {
-		return rootClientset, clientConfig, stop, err
+		return rootClientset, clientConfig, stop, informers, err
 	}
 	informers.Start(ctx.Done())
 	go serviceAccountController.Run(ctx, 5)
@@ -441,7 +435,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 	// thus we wait until caches have synced
 	informers.WaitForCacheSync(ctx.Done())
 
-	return rootClientset, clientConfig, stop, nil
+	return rootClientset, clientConfig, stop, informers, nil
 }
 
 func getServiceAccount(c clientset.Interface, ns string, name string, shouldWait bool) (*v1.ServiceAccount, error) {

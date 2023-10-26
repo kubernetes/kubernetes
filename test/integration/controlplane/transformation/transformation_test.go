@@ -33,6 +33,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,34 +85,47 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string) (*transformTest, error) {
+func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+	if storageConfig == nil {
+		storageConfig = framework.SharedEtcd()
+	}
 	e := transformTest{
 		logger:            l,
 		transformerConfig: transformerConfigYAML,
-		storageConfig:     framework.SharedEtcd(),
+		storageConfig:     storageConfig,
 	}
 
 	var err error
 	// create config dir with provided config yaml
 	if transformerConfigYAML != "" && configDir == "" {
 		if e.configDir, err = e.createEncryptionConfig(); err != nil {
-			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %v", err)
+			e.cleanUp()
+			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %w", err)
 		}
 	} else {
 		// configDir already exists. api-server must be restarting with existing encryption config
 		e.configDir = configDir
 	}
+	configFile := filepath.Join(e.configDir, encryptionConfigFileName)
+	_, err = os.ReadFile(configFile)
+	if err != nil {
+		e.cleanUp()
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
 
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
-		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
+		e.cleanUp()
+		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
 	}
 	klog.Infof("Started kube-apiserver %v", e.kubeAPIServer.ClientConfig.Host)
 
 	if e.restClient, err = kubernetes.NewForConfig(e.kubeAPIServer.ClientConfig); err != nil {
-		return nil, fmt.Errorf("error while creating rest client: %v", err)
+		e.cleanUp()
+		return nil, fmt.Errorf("error while creating rest client: %w", err)
 	}
 
 	if e.ns, err = e.createNamespace(testNamespace); err != nil {
+		e.cleanUp()
 		return nil, err
 	}
 
@@ -128,7 +142,9 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 }
 
 func (e *transformTest) cleanUp() {
-	os.RemoveAll(e.configDir)
+	if e.configDir != "" {
+		os.RemoveAll(e.configDir)
+	}
 
 	if e.kubeAPIServer.ClientConfig != nil {
 		e.shutdownAPIServer()
@@ -136,7 +152,6 @@ func (e *transformTest) cleanUp() {
 }
 
 func (e *transformTest) shutdownAPIServer() {
-	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
 	e.kubeAPIServer.TearDownFn()
 }
 
@@ -189,7 +204,7 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 
 	// Data should be un-enveloped on direct reads from Kube API Server.
 	if resource == "secrets" {
-		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testSecret, metav1.GetOptions{})
+		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			l.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
 		}
@@ -300,7 +315,14 @@ func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) 
 	}
 
 	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
-		return nil, fmt.Errorf("unable to create testing namespace %v", err)
+		if errors.IsAlreadyExists(err) {
+			existingNs, err := e.restClient.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("unable to get testing namespace, err: [%v]", err)
+			}
+			return existingNs, nil
+		}
+		return nil, fmt.Errorf("unable to create testing namespace, err: [%v]", err)
 	}
 
 	return ns, nil

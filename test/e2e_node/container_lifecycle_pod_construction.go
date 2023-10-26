@@ -38,6 +38,9 @@ type execCommand struct {
 	StartDelay int
 	// Delay is how long the container should delay before exiting
 	Delay int
+	// TerminationSeconds is the time it takes for the container before
+	// terminating if it catches SIGTERM.
+	TerminationSeconds int
 }
 
 // ExecCommand returns the command to execute in the container that implements execCommand and logs activities to a container
@@ -57,19 +60,28 @@ func ExecCommand(name string, c execCommand) []string {
 	fmt.Fprintf(&cmd, "cat %s >> /dev/termination-log; ", containerLog)
 
 	fmt.Fprintf(&cmd, "echo %s '%s Starting %d' | tee -a %s >> /dev/termination-log; ", timeCmd, name, c.StartDelay, containerLog)
+	fmt.Fprintf(&cmd, "_term() { sleep %d; echo %s '%s Exiting' | tee -a %s >> /dev/termination-log; exit %d; }; ", c.TerminationSeconds, timeCmd, name, containerLog, c.ExitCode)
+	fmt.Fprintf(&cmd, "trap _term TERM; ")
 	if c.StartDelay != 0 {
-		fmt.Fprintf(&cmd, "sleep %d; ", c.StartDelay)
+		fmt.Fprint(&cmd, sleepCommand(c.StartDelay))
 	}
 	// You can check started file to see if the container has started
 	fmt.Fprintf(&cmd, "touch started; ")
 	fmt.Fprintf(&cmd, "echo %s '%s Started' | tee -a %s >> /dev/termination-log; ", timeCmd, name, containerLog)
 	fmt.Fprintf(&cmd, "echo %s '%s Delaying %d' | tee -a %s >> /dev/termination-log; ", timeCmd, name, c.Delay, containerLog)
 	if c.Delay != 0 {
-		fmt.Fprintf(&cmd, "sleep %d; ", c.Delay)
+		fmt.Fprint(&cmd, sleepCommand(c.Delay))
 	}
 	fmt.Fprintf(&cmd, "echo %s '%s Exiting'  | tee -a %s >> /dev/termination-log; ", timeCmd, name, containerLog)
 	fmt.Fprintf(&cmd, "exit %d", c.ExitCode)
 	return []string{"sh", "-c", cmd.String()}
+}
+
+// sleepCommand returns a command that sleeps for the given number of seconds
+// in background and waits for it to finish so that the parent process can
+// handle signals.
+func sleepCommand(seconds int) string {
+	return fmt.Sprintf("exec sleep %d & wait $!; ", seconds)
 }
 
 type containerOutput struct {

@@ -51,9 +51,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -169,6 +171,7 @@ func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
 }
 
 func TestControllerExpectations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	ttl := 30 * time.Second
 	e, fakeClock := NewFakeControllerExpectationsLookup(ttl)
 	// In practice we can't really have add and delete expectations since we only either create or
@@ -181,26 +184,26 @@ func TestControllerExpectations(t *testing.T) {
 	rcKey, err := KeyFunc(rc)
 	assert.NoError(t, err, "Couldn't get key for object %#v: %v", rc, err)
 
-	e.SetExpectations(rcKey, adds, dels)
+	e.SetExpectations(logger, rcKey, adds, dels)
 	var wg sync.WaitGroup
 	for i := 0; i < adds+1; i++ {
 		wg.Add(1)
 		go func() {
 			// In prod this can happen either because of a failed create by the rc
 			// or after having observed a create via informer
-			e.CreationObserved(rcKey)
+			e.CreationObserved(logger, rcKey)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
 
 	// There are still delete expectations
-	assert.False(t, e.SatisfiedExpectations(rcKey), "Rc will sync before expectations are met")
+	assert.False(t, e.SatisfiedExpectations(logger, rcKey), "Rc will sync before expectations are met")
 
 	for i := 0; i < dels+1; i++ {
 		wg.Add(1)
 		go func() {
-			e.DeletionObserved(rcKey)
+			e.DeletionObserved(logger, rcKey)
 			wg.Done()
 		}()
 	}
@@ -214,10 +217,10 @@ func TestControllerExpectations(t *testing.T) {
 	add, del := podExp.GetExpectations()
 	assert.Equal(t, int64(-1), add, "Unexpected pod expectations %#v", podExp)
 	assert.Equal(t, int64(-1), del, "Unexpected pod expectations %#v", podExp)
-	assert.True(t, e.SatisfiedExpectations(rcKey), "Expectations are met but the rc will not sync")
+	assert.True(t, e.SatisfiedExpectations(logger, rcKey), "Expectations are met but the rc will not sync")
 
 	// Next round of rc sync, old expectations are cleared
-	e.SetExpectations(rcKey, 1, 2)
+	e.SetExpectations(logger, rcKey, 1, 2)
 	podExp, exists, err = e.GetExpectations(rcKey)
 	assert.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
 	assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
@@ -228,11 +231,12 @@ func TestControllerExpectations(t *testing.T) {
 
 	// Expectations have expired because of ttl
 	fakeClock.Step(ttl + 1)
-	assert.True(t, e.SatisfiedExpectations(rcKey),
+	assert.True(t, e.SatisfiedExpectations(logger, rcKey),
 		"Expectations should have expired but didn't")
 }
 
 func TestUIDExpectations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
 	rcList := []*v1.ReplicationController{
 		newReplicationController(2),
@@ -260,24 +264,24 @@ func TestUIDExpectations(t *testing.T) {
 			rcPodNames = append(rcPodNames, PodKey(p))
 		}
 		rcToPods[rcKey] = rcPodNames
-		uidExp.ExpectDeletions(rcKey, rcPodNames)
+		uidExp.ExpectDeletions(logger, rcKey, rcPodNames)
 	}
 	for i := range rcKeys {
 		j := rand.Intn(i + 1)
 		rcKeys[i], rcKeys[j] = rcKeys[j], rcKeys[i]
 	}
 	for _, rcKey := range rcKeys {
-		assert.False(t, uidExp.SatisfiedExpectations(rcKey),
+		assert.False(t, uidExp.SatisfiedExpectations(logger, rcKey),
 			"Controller %v satisfied expectations before deletion", rcKey)
 
 		for _, p := range rcToPods[rcKey] {
-			uidExp.DeletionObserved(rcKey, p)
+			uidExp.DeletionObserved(logger, rcKey, p)
 		}
 
-		assert.True(t, uidExp.SatisfiedExpectations(rcKey),
+		assert.True(t, uidExp.SatisfiedExpectations(logger, rcKey),
 			"Controller %v didn't satisfy expectations after deletion", rcKey)
 
-		uidExp.DeleteExpectations(rcKey)
+		uidExp.DeleteExpectations(logger, rcKey)
 
 		assert.Nil(t, uidExp.GetUIDs(rcKey),
 			"Failed to delete uid expectations for %v", rcKey)
@@ -376,7 +380,33 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(err))
 }
 
+func TestCountTerminatingPods(t *testing.T) {
+	now := metav1.Now()
+
+	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
+	rc := newReplicationController(0)
+	podList := newPodList(nil, 7, v1.PodRunning, rc)
+	podList.Items[0].Status.Phase = v1.PodSucceeded
+	podList.Items[1].Status.Phase = v1.PodFailed
+	podList.Items[2].Status.Phase = v1.PodPending
+	podList.Items[2].SetDeletionTimestamp(&now)
+	podList.Items[3].Status.Phase = v1.PodRunning
+	podList.Items[3].SetDeletionTimestamp(&now)
+	var podPointers []*v1.Pod
+	for i := range podList.Items {
+		podPointers = append(podPointers, &podList.Items[i])
+	}
+
+	terminatingPods := CountTerminatingPods(podPointers)
+
+	assert.Equal(t, terminatingPods, int32(2))
+
+	terminatingList := FilterTerminatingPods(podPointers)
+	assert.Equal(t, len(terminatingList), int(2))
+}
+
 func TestActivePodFiltering(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
 	podList := newPodList(nil, 5, v1.PodRunning, rc)
@@ -391,16 +421,15 @@ func TestActivePodFiltering(t *testing.T) {
 	for i := range podList.Items {
 		podPointers = append(podPointers, &podList.Items[i])
 	}
-	got := FilterActivePods(podPointers)
+	got := FilterActivePods(logger, podPointers)
 	gotNames := sets.NewString()
 	for _, pod := range got {
 		gotNames.Insert(pod.Name)
 	}
 
-	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
-	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
+	if diff := cmp.Diff(expectedNames.List(), gotNames.List()); diff != "" {
+		t.Errorf("Active pod names (-want,+got):\n%s", diff)
+	}
 }
 
 func TestSortingActivePods(t *testing.T) {
@@ -618,10 +647,9 @@ func TestActiveReplicaSetsFiltering(t *testing.T) {
 		gotNames.Insert(rs.Name)
 	}
 
-	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
-	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
+	if diff := cmp.Diff(expectedNames.List(), gotNames.List()); diff != "" {
+		t.Errorf("Active replica set names (-want,+got):\n%s", diff)
+	}
 }
 
 func TestComputeHash(t *testing.T) {
@@ -838,6 +866,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		taintsToAdd    []*v1.Taint
 		expectedTaints []v1.Taint
 		requestCount   int
+		expectedErr    error
 	}{
 		{
 			name: "add one taint on node",
@@ -1026,9 +1055,35 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 			},
 			requestCount: 5,
 		},
+		{
+			name: "add taint to non-exist node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "node1",
+							ResourceVersion: "1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName:    "node2",
+			taintsToAdd: []*v1.Taint{{Key: "key2", Value: "value2", Effect: "NoExecute"}},
+			expectedErr: apierrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, "node2"),
+		},
 	}
 	for _, test := range tests {
 		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		if test.expectedErr != nil {
+			assert.Equal(t, test.expectedErr, err, "AddOrUpdateTaintOnNode get unexpected error")
+			continue
+		}
 		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})

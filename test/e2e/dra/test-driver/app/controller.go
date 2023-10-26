@@ -38,20 +38,22 @@ import (
 )
 
 type Resources struct {
-	NodeLocal      bool
-	Nodes          []string
-	MaxAllocations int
-	Shareable      bool
+	DontSetReservedFor bool
+	NodeLocal          bool
+	Nodes              []string
+	MaxAllocations     int
+	Shareable          bool
 
 	// AllocateWrapper, if set, gets called for each Allocate call.
 	AllocateWrapper AllocateWrapperType
 }
 
-type AllocateWrapperType func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{},
-	class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string,
-	handler func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{},
-		class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error),
-) (result *resourcev1alpha2.AllocationResult, err error)
+type AllocateWrapperType func(ctx context.Context, claimAllocations []*controller.ClaimAllocation,
+	selectedNode string,
+	handler func(ctx context.Context,
+		claimAllocations []*controller.ClaimAllocation,
+		selectedNode string),
+)
 
 type ExampleController struct {
 	clientset  kubernetes.Interface
@@ -79,6 +81,7 @@ func NewController(clientset kubernetes.Interface, driverName string, resources 
 func (c *ExampleController) Run(ctx context.Context, workers int) {
 	informerFactory := informers.NewSharedInformerFactory(c.clientset, 0 /* resync period */)
 	ctrl := controller.New(ctx, c.driverName, c, c.clientset, informerFactory)
+	ctrl.SetReservedFor(!c.resources.DontSetReservedFor)
 	informerFactory.Start(ctx.Done())
 	ctrl.Run(workers)
 	// If we get here, the context was canceled and we can wait for informer factory goroutines.
@@ -152,15 +155,30 @@ func (c *ExampleController) readParametersFromConfigMap(ctx context.Context, nam
 	return configMap.Data, nil
 }
 
-func (c *ExampleController) Allocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error) {
+func (c *ExampleController) Allocate(ctx context.Context, claimAllocations []*controller.ClaimAllocation, selectedNode string) {
+
 	if c.resources.AllocateWrapper != nil {
-		return c.resources.AllocateWrapper(ctx, claim, claimParameters, class, classParameters, selectedNode, c.allocate)
+		c.resources.AllocateWrapper(ctx, claimAllocations, selectedNode, c.allocateOneByOne)
+	} else {
+		c.allocateOneByOne(ctx, claimAllocations, selectedNode)
 	}
-	return c.allocate(ctx, claim, claimParameters, class, classParameters, selectedNode)
+
+	return
+}
+
+func (c *ExampleController) allocateOneByOne(ctx context.Context, claimAllocations []*controller.ClaimAllocation, selectedNode string) {
+	for _, ca := range claimAllocations {
+		allocationResult, err := c.allocateOne(ctx, ca.Claim, ca.ClaimParameters, ca.Class, ca.ClassParameters, selectedNode)
+		if err != nil {
+			ca.Error = fmt.Errorf("failed allocating claim %v", ca.Claim.UID)
+			continue
+		}
+		ca.Allocation = allocationResult
+	}
 }
 
 // allocate simply copies parameters as JSON map into a ResourceHandle.
-func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error) {
+func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Allocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	defer func() {
 		logger.V(3).Info("done", "result", result, "err", err)

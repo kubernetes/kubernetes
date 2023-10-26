@@ -17,7 +17,6 @@ limitations under the License.
 package resource
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 )
@@ -44,12 +43,16 @@ func NewFallbackQueryParamVerifier(primary Verifier, secondary Verifier) Verifie
 // HasSupport returns an error if the passed GVK does not support the
 // query param (fieldValidation), as determined by the primary and
 // secondary OpenAPI endpoints. The primary endoint is checked first,
-// but if it not found, the secondary attempts to determine support.
-// If the GVK supports the query param, nil is returned.
+// but if there is an error retrieving the OpenAPI V3 document, the
+// secondary attempts to determine support. If the GVK supports the query param,
+// nil is returned.
 func (f *fallbackQueryParamVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 	err := f.primary.HasSupport(gvk)
-	if errors.IsNotFound(err) {
-		klog.V(7).Infoln("openapi v3 endpoint not found...falling back to legacy")
+	// If an error was returned from the primary OpenAPI endpoint,
+	// we fallback to check the secondary OpenAPI endpoint for
+	// any error *except* "paramUnsupportedError".
+	if err != nil && !IsParamUnsupportedError(err) {
+		klog.V(7).Infof("openapi v3 error...falling back to legacy: %s", err)
 		err = f.secondary.HasSupport(gvk)
 	}
 	return err

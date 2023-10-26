@@ -30,9 +30,13 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/clock"
 
+	"k8s.io/apiserver/pkg/authentication/user"
+	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
@@ -183,6 +187,7 @@ type uniformScenario struct {
 	expectedAverages                         []float64
 	expectedEpochAdvances                    int
 	seatDemandIntegratorSubject              fq.Integrator
+	dontDump                                 bool
 }
 
 func (us uniformScenario) exercise(t *testing.T) {
@@ -275,7 +280,10 @@ func (ust *uniformScenarioThread) callK(k int) {
 	maxWidth := float64(uint64max(ust.uc.initialSeats, ust.uc.finalSeats))
 	ust.uss.seatDemandIntegratorCheck.Add(maxWidth)
 	returnSeatDemand := func(time.Time) { ust.uss.seatDemandIntegratorCheck.Add(-maxWidth) }
-	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
+	ctx := context.Background()
+	username := fmt.Sprintf("%d:%d:%d", ust.i, ust.j, k)
+	ctx = genericrequest.WithUser(ctx, &user.DefaultInfo{Name: username})
+	req, idle := ust.uss.qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
@@ -285,6 +293,9 @@ func (ust *uniformScenarioThread) callK(k int) {
 	}
 	if idle {
 		ust.uss.t.Error("got request but QueueSet reported idle")
+	}
+	if (!ust.uss.dontDump) && k%100 == 0 {
+		insistRequestFromUser(ust.uss.t, ust.uss.qs, username)
 	}
 	var executed bool
 	var returnTime time.Time
@@ -309,6 +320,26 @@ func (ust *uniformScenarioThread) callK(k int) {
 	} else if now != returnTime {
 		ust.uss.t.Errorf("%s: %d, %d, %d returnTime=%s", now.Format(nsTimeFmt), ust.i, ust.j, k, returnTime.Format(nsTimeFmt))
 	}
+}
+
+func insistRequestFromUser(t *testing.T, qs fq.QueueSet, username string) {
+	qsd := qs.Dump(true)
+	goodRequest := func(rd debug.RequestDump) bool {
+		return rd.UserName == username
+	}
+	goodSliceOfRequests := SliceMapReduce(goodRequest, or)
+	if goodSliceOfRequests(qsd.QueuelessExecutingRequests) {
+		t.Logf("Found user %s among queueless requests", username)
+		return
+	}
+	goodQueueDump := func(qd debug.QueueDump) bool {
+		return goodSliceOfRequests(qd.Requests) || goodSliceOfRequests(qd.RequestsExecuting)
+	}
+	if SliceMapReduce(goodQueueDump, or)(qsd.Queues) {
+		t.Logf("Found user %s among queued requests", username)
+		return
+	}
+	t.Errorf("Failed to find request from user %s", username)
 }
 
 func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, margin float64) {
@@ -379,7 +410,7 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 	if uss.evalInqueueMetrics {
 		e := `
-				# HELP apiserver_flowcontrol_current_inqueue_requests [ALPHA] Number of requests currently pending in queues of the API Priority and Fairness subsystem
+				# HELP apiserver_flowcontrol_current_inqueue_requests [BETA] Number of requests currently pending in queues of the API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_current_inqueue_requests gauge
 ` + uss.expectedInqueue
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_inqueue_requests")
@@ -402,7 +433,7 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 	if uss.evalExecutingMetrics && len(uss.expectedExecuting) > 0 {
 		e := `
-				# HELP apiserver_flowcontrol_current_executing_requests [ALPHA] Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution stage in the API Priority and Fairness subsystem
+				# HELP apiserver_flowcontrol_current_executing_requests [BETA] Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution stage in the API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_current_executing_requests gauge
 ` + uss.expectedExecuting
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_executing_requests")
@@ -426,7 +457,7 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 	if uss.evalExecutingMetrics && len(expectedRejects) > 0 {
 		e := `
-				# HELP apiserver_flowcontrol_rejected_requests_total [ALPHA] Number of requests rejected by API Priority and Fairness subsystem
+				# HELP apiserver_flowcontrol_rejected_requests_total [BETA] Number of requests rejected by API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_rejected_requests_total counter
 ` + expectedRejects
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_rejected_requests_total")
@@ -491,6 +522,7 @@ func TestNoRestraint(t *testing.T) {
 				expectAllRequests:      true,
 				clk:                    clk,
 				counter:                counter,
+				dontDump:               true,
 			}.exercise(t)
 		})
 	}
@@ -514,7 +546,7 @@ func TestBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -532,6 +564,47 @@ func TestBaseline(t *testing.T) {
 		counter:                     counter,
 		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
+}
+
+func TestExampt(t *testing.T) {
+	metrics.Register()
+	for concurrencyLimit := 0; concurrencyLimit <= 2; concurrencyLimit += 2 {
+		t.Run(fmt.Sprintf("concurrency=%d", concurrencyLimit), func(t *testing.T) {
+			now := time.Now()
+			clk, counter := testeventclock.NewFake(now, 0, nil)
+			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+			qCfg := fq.QueuingConfig{
+				Name:             "TestBaseline",
+				DesiredNumQueues: -1,
+				QueueLengthLimit: 2,
+				HandSize:         3,
+				RequestWaitLimit: 10 * time.Minute,
+			}
+			seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, "seatDemandSubject")
+			qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
+			if err != nil {
+				t.Fatal(err)
+			}
+			qs := qsComplete(qsc, concurrencyLimit)
+			uniformScenario{name: qCfg.Name,
+				qs: qs,
+				clients: []uniformClient{
+					newUniformClient(1001001001, 5, 20, time.Second, time.Second).setInitWidth(3),
+				},
+				concurrencyLimit:            1,
+				evalDuration:                time.Second * 40,
+				expectedFair:                []bool{true}, // "fair" is a bit odd-sounding here, but it "expectFair" here means expect `expectedAverages`
+				expectedAverages:            []float64{7.5},
+				expectedFairnessMargin:      []float64{0.00000001},
+				expectAllRequests:           true,
+				evalInqueueMetrics:          false,
+				evalExecutingMetrics:        true,
+				clk:                         clk,
+				counter:                     counter,
+				seatDemandIntegratorSubject: seatDemandIntegratorSubject,
+			}.exercise(t)
+		})
+	}
 }
 
 func TestSeparations(t *testing.T) {
@@ -585,7 +658,7 @@ func TestSeparations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: seps.conc})
+			qs := qsComplete(qsc, seps.conc)
 			uniformScenario{name: qCfg.Name,
 				qs: qs,
 				clients: []uniformClient{
@@ -626,7 +699,7 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -665,7 +738,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
@@ -703,7 +776,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -724,7 +797,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	}.exercise(t)
 }
 
-// TestSeatSecondsRollover checks that there is not a problem with SeatSecons overflow.
+// TestSeatSecondsRollover checks that there is not a problem with SeatSeconds overflow.
 func TestSeatSecondsRollover(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
@@ -745,7 +818,7 @@ func TestSeatSecondsRollover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 2000})
+	qs := qsComplete(qsc, 2000)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -785,7 +858,7 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
+	qs := qsComplete(qsc, 3)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -824,7 +897,7 @@ func TestDifferentWidths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
+	qs := qsComplete(qsc, 6)
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
@@ -862,7 +935,7 @@ func TestTooWide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
+	qs := qsComplete(qsc, 6)
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
@@ -925,7 +998,7 @@ func TestWindup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
+			qs := qsComplete(qsc, 3)
 
 			uniformScenario{name: qCfg.Name, qs: qs,
 				clients: []uniformClient{
@@ -962,7 +1035,7 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -1000,7 +1073,7 @@ func TestTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -1053,7 +1126,7 @@ func TestContextCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 	counter.Add(1) // account for main activity of the goroutine running this test
 	ctx1 := context.Background()
 	pZero := func() *int32 { var zero int32; return &zero }
@@ -1159,7 +1232,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 	counter.Add(1) // account for the goroutine running this test
 
 	queue, ok := qs.(*queueSet)
@@ -1227,13 +1300,14 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
 				},
@@ -1250,9 +1324,10 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			attempts:              1,
@@ -1267,15 +1342,17 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 50})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			attempts:              1,
@@ -1290,15 +1367,17 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 10})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			attempts:              3,
@@ -1313,15 +1392,17 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 10})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			beforeSelectQueueLocked: func(attempt int, qs *queueSet) {
@@ -1416,23 +1497,25 @@ func TestFinishRequestLocked(t *testing.T) {
 				seatDemandIntegrator:     fq.NewNamedIntegrator(clk, "seatDemandSubject"),
 			}
 			queue := &queue{
-				requests: newRequestFIFO(),
+				requestsWaiting:   newRequestFIFO(),
+				requestsExecuting: sets.New[*request](),
 			}
 			r := &request{
 				qs:           qs,
 				queue:        queue,
 				workEstimate: qs.completeWorkEstimate(&test.workEstimate),
 			}
+			rOther := &request{qs: qs, queue: queue}
 
 			qs.totRequestsExecuting = 111
 			qs.totSeatsInUse = 222
-			queue.requestsExecuting = 11
+			queue.requestsExecuting = sets.New(r, rOther)
 			queue.seatsInUse = 22
 
 			var (
 				queuesetTotalRequestsExecutingExpected = qs.totRequestsExecuting - 1
 				queuesetTotalSeatsInUseExpected        = qs.totSeatsInUse - test.workEstimate.MaxSeats()
-				queueRequestsExecutingExpected         = queue.requestsExecuting - 1
+				queueRequestsExecutingExpected         = sets.New(rOther)
 				queueSeatsInUseExpected                = queue.seatsInUse - test.workEstimate.MaxSeats()
 			)
 
@@ -1447,8 +1530,8 @@ func TestFinishRequestLocked(t *testing.T) {
 			if queuesetTotalSeatsInUseExpected != qs.totSeatsInUse {
 				t.Errorf("Expected total seats in use: %d, but got: %d", queuesetTotalSeatsInUseExpected, qs.totSeatsInUse)
 			}
-			if queueRequestsExecutingExpected != queue.requestsExecuting {
-				t.Errorf("Expected requests executing for queue: %d, but got: %d", queueRequestsExecutingExpected, queue.requestsExecuting)
+			if !queueRequestsExecutingExpected.Equal(queue.requestsExecuting) {
+				t.Errorf("Expected requests executing for queue: %v, but got: %v", queueRequestsExecutingExpected, queue.requestsExecuting)
 			}
 			if queueSeatsInUseExpected != queue.seatsInUse {
 				t.Errorf("Expected seats in use for queue: %d, but got: %d", queueSeatsInUseExpected, queue.seatsInUse)
@@ -1544,4 +1627,12 @@ func float64NaNTo0(x float64) float64 {
 		return 0
 	}
 	return x
+}
+
+func qsComplete(qsc fq.QueueSetCompleter, concurrencyLimit int) fq.QueueSet {
+	concurrencyDenominator := concurrencyLimit
+	if concurrencyDenominator <= 0 {
+		concurrencyDenominator = 1
+	}
+	return qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: concurrencyLimit, ConcurrencyDenominator: concurrencyDenominator})
 }

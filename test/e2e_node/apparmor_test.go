@@ -55,7 +55,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 		})
 		ginkgo.Context("when running with AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
-			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+			f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject an unloaded profile", func(ctx context.Context) {
 				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
@@ -86,7 +86,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 	} else {
 		ginkgo.Context("when running without AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
-			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+			f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func(ctx context.Context) {
 				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileRuntimeDefault)

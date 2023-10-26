@@ -223,7 +223,7 @@ func logContainers(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests", func(ctx context.Context) {
 		testNvidiaGPUs(ctx, f)
 	})
@@ -325,7 +325,7 @@ var _ = SIGDescribe("GPUDevicePluginAcrossRecreate [Feature:Recreate]", func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 	f := framework.NewDefaultFramework("device-plugin-gpus-recreate")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests with a recreation", func(ctx context.Context) {
 		testNvidiaGPUsJob(ctx, f)
 	})

@@ -74,6 +74,8 @@ func NewCertificateAuthority(config *CertConfig) (*x509.Certificate, crypto.Sign
 		return nil, nil, errors.Wrap(err, "unable to create private key while generating CA certificate")
 	}
 
+	// backdate CA certificate to allow small time jumps
+	config.Config.NotBefore = time.Now().Add(-kubeadmconstants.CertificateBackdate)
 	cert, err := certutil.NewSelfSignedCACert(config.Config, key)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create self-signed CA certificate")

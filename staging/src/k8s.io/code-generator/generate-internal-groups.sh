@@ -51,6 +51,10 @@ EXT_APIS_PKG="$4"
 GROUPS_WITH_VERSIONS="$5"
 shift 5
 
+echo "WARNING: $(basename "$0") is deprecated."
+echo "WARNING: Please use k8s.io/code-generator/kube_codegen.sh instead."
+echo
+
 if [ "${GENS}" = "all" ] || grep -qw "all" <<<"${GENS}"; then
     ALL="client,conversion,deepcopy,defaulter,informer,lister,openapi"
     echo "WARNING: Specifying \"all\" as a generator is deprecated."

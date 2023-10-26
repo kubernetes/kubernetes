@@ -18,7 +18,6 @@ limitations under the License.
 package kmsv2
 
 import (
-	"context"
 	"crypto/sha256"
 	"hash"
 	"sync"
@@ -30,17 +29,10 @@ import (
 	"k8s.io/utils/clock"
 )
 
-// prevent decryptTransformer from drifting from value.Transformer
-var _ decryptTransformer = value.Transformer(nil)
-
-// decryptTransformer is the decryption subset of value.Transformer.
-// this exists purely to statically enforce that transformers placed in the cache are not used for encryption.
+// simpleCache stores the decryption subset of value.Transformer (value.Read).
+// this statically enforces that transformers placed in the cache are not used for encryption.
 // this is relevant in the context of nonce collision since transformers that are created
 // from encrypted DEKs retrieved from etcd cannot maintain their nonce counter state.
-type decryptTransformer interface {
-	TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error)
-}
-
 type simpleCache struct {
 	cache *utilcache.Expiring
 	ttl   time.Duration
@@ -50,8 +42,10 @@ type simpleCache struct {
 }
 
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
+	cache := utilcache.NewExpiringWithClock(clock)
+	cache.AllowExpiredGet = true // for a given key, the value (the decryptTransformer) is always the same
 	return &simpleCache{
-		cache: utilcache.NewExpiringWithClock(clock),
+		cache: cache,
 		ttl:   ttl,
 		hashPool: &sync.Pool{
 			New: func() interface{} {
@@ -62,16 +56,16 @@ func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
 }
 
 // given a key, return the transformer, or nil if it does not exist in the cache
-func (c *simpleCache) get(key []byte) decryptTransformer {
+func (c *simpleCache) get(key []byte) value.Read {
 	record, ok := c.cache.Get(c.keyFunc(key))
 	if !ok {
 		return nil
 	}
-	return record.(decryptTransformer)
+	return record.(value.Read)
 }
 
 // set caches the record for the key
-func (c *simpleCache) set(key []byte, transformer decryptTransformer) {
+func (c *simpleCache) set(key []byte, transformer value.Read) {
 	if len(key) == 0 {
 		panic("key must not be empty")
 	}

@@ -520,7 +520,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 				hasNamespaceParam := false
 				hasNameParam := false
 				for _, param := range path.Parameters {
-					if param.In == "path" && param.Name == "namespace" {
+					if strings.HasPrefix(param.Ref.String(), "#/parameters/namespace-") {
 						hasNamespaceParam = true
 					}
 					if param.In == "path" && param.Name == "name" {

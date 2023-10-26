@@ -20,18 +20,26 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/containerd/cgroups"
+	cadvisorv1 "github.com/google/cadvisor/info/v1"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -46,7 +54,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-		libcontainercgroups.IsCgroup2UnifiedMode() {
+		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
 	cl, err := m.generateLinuxContainerConfig(container, pod, uid, username, nsTarget, enforceMemoryQoS)
@@ -55,7 +63,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	}
 	config.Linux = cl
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.UserNamespacesStatelessPodsSupport) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.UserNamespacesSupport) {
 		if cl.SecurityContext.NamespaceOptions.UsernsOptions != nil {
 			for _, mount := range config.Mounts {
 				mount.UidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Uids
@@ -99,21 +107,17 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 
 	lcr.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+	if swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo); utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
 		// NOTE(ehashman): Behaviour is defined in the opencontainers runtime spec:
 		// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 		switch m.memorySwapBehavior {
-		case kubelettypes.UnlimitedSwap:
-			// -1 = unlimited swap
-			lcr.MemorySwapLimitInBytes = -1
 		case kubelettypes.LimitedSwap:
-			fallthrough
+			swapConfigurationHelper.ConfigureLimitedSwap(lcr, pod, container)
 		default:
-			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
-			// Some swapping is still possible.
-			// Note that if memory limit is 0, memory swap limit is ignored.
-			lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes
+			swapConfigurationHelper.ConfigureUnlimitedSwap(lcr)
 		}
+	} else {
+		swapConfigurationHelper.ConfigureNoSwap(lcr)
 	}
 
 	// Set memory.min and memory.high to enforce MemoryQoS
@@ -122,7 +126,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		memoryRequest := container.Resources.Requests.Memory().Value()
 		memoryLimit := container.Resources.Limits.Memory().Value()
 		if memoryRequest != 0 {
-			unified[cm.MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+			unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
 		}
 
 		// Guaranteed pods by their QoS definition requires that memory request equals memory limit and cpu request must equal cpu limit.
@@ -148,7 +152,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 				}
 			}
 			if memoryHigh != 0 && memoryHigh > memoryRequest {
-				unified[cm.MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+				unified[cm.Cgroup2MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
 			}
 		}
 		if len(unified) > 0 {
@@ -171,7 +175,7 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-		libcontainercgroups.IsCgroup2UnifiedMode() {
+		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
 	return &runtimeapi.ContainerResources{
@@ -215,6 +219,15 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		resources.CpuPeriod = cpuPeriod
 	}
 
+	// runc requires cgroupv2 for unified mode
+	if isCgroup2UnifiedMode() {
+		resources.Unified = map[string]string{
+			// Ask the kernel to kill all processes in the container cgroup in case of OOM.
+			// See memory.oom.group in https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html for
+			// more info.
+			"memory.oom.group": "1",
+		}
+	}
 	return &resources
 }
 
@@ -288,4 +301,127 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 		}
 	}
 	return cStatusResources
+}
+
+// Note: this function variable is being added here so it would be possible to mock
+// the cgroup version for unit tests by assigning a new mocked function into it. Without it,
+// the cgroup version would solely depend on the environment running the test.
+var isCgroup2UnifiedMode = func() bool {
+	return libcontainercgroups.IsCgroup2UnifiedMode()
+}
+
+var (
+	swapControllerAvailability     bool
+	swapControllerAvailabilityOnce sync.Once
+)
+
+func swapControllerAvailable() bool {
+	// See https://github.com/containerd/containerd/pull/7838/
+	swapControllerAvailabilityOnce.Do(func() {
+		const warn = "Failed to detect the availability of the swap controller, assuming not available"
+		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
+			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
+			if err != nil {
+				klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+				return
+			}
+			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+		}
+		if _, err := os.Stat(p); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				klog.V(5).ErrorS(err, warn)
+			}
+			return
+		}
+		swapControllerAvailability = true
+	})
+	return swapControllerAvailability
+}
+
+type swapConfigurationHelper struct {
+	machineInfo cadvisorv1.MachineInfo
+}
+
+func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo) *swapConfigurationHelper {
+	return &swapConfigurationHelper{machineInfo: machineInfo}
+}
+
+func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+	podQos := kubeapiqos.GetPodQOS(pod)
+	containerDoesNotRequestMemory := container.Resources.Requests.Memory().IsZero() && container.Resources.Limits.Memory().IsZero()
+	memoryRequestEqualsToLimit := container.Resources.Requests.Memory().Cmp(*container.Resources.Limits.Memory()) == 0
+
+	if podQos != v1.PodQOSBurstable || containerDoesNotRequestMemory || !isCgroup2UnifiedMode() || memoryRequestEqualsToLimit {
+		m.ConfigureNoSwap(lcr)
+		return
+	}
+
+	containerMemoryRequest := container.Resources.Requests.Memory()
+	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
+
+	if err != nil {
+		klog.ErrorS(err, "cannot calculate swap allocation amount; disallowing swap")
+		m.ConfigureNoSwap(lcr)
+		return
+	}
+
+	m.configureSwap(lcr, swapLimit)
+}
+
+func (m swapConfigurationHelper) ConfigureNoSwap(lcr *runtimeapi.LinuxContainerResources) {
+	if !isCgroup2UnifiedMode() {
+		if swapControllerAvailable() {
+			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
+			// Some swapping is still possible.
+			// Note that if memory limit is 0, memory swap limit is ignored.
+			lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes
+		}
+		return
+	}
+
+	m.configureSwap(lcr, 0)
+}
+
+func (m swapConfigurationHelper) ConfigureUnlimitedSwap(lcr *runtimeapi.LinuxContainerResources) {
+	if !isCgroup2UnifiedMode() {
+		m.ConfigureNoSwap(lcr)
+		return
+	}
+
+	if lcr.Unified == nil {
+		lcr.Unified = map[string]string{}
+	}
+
+	lcr.Unified[cm.Cgroup2MaxSwapFilename] = "max"
+}
+
+func (m swapConfigurationHelper) configureSwap(lcr *runtimeapi.LinuxContainerResources, swapMemory int64) {
+	if !isCgroup2UnifiedMode() {
+		klog.ErrorS(fmt.Errorf("swap configuration is not supported with cgroup v1"), "swap configuration under cgroup v1 is unexpected")
+		return
+	}
+
+	if lcr.Unified == nil {
+		lcr.Unified = map[string]string{}
+	}
+
+	lcr.Unified[cm.Cgroup2MaxSwapFilename] = fmt.Sprintf("%d", swapMemory)
+}
+
+// The swap limit is calculated as (<containerMemoryRequest>/<nodeTotalMemory>)*<totalPodsSwapAvailable>.
+// For more info, please look at the following KEP: https://kep.k8s.io/2400
+func calcSwapForBurstablePods(containerMemoryRequest, nodeTotalMemory, totalPodsSwapAvailable int64) (int64, error) {
+	if nodeTotalMemory <= 0 {
+		return 0, fmt.Errorf("total node memory is 0")
+	}
+	if containerMemoryRequest > nodeTotalMemory {
+		return 0, fmt.Errorf("container request %d is larger than total node memory %d", containerMemoryRequest, nodeTotalMemory)
+	}
+
+	containerMemoryProportion := float64(containerMemoryRequest) / float64(nodeTotalMemory)
+	swapAllocation := containerMemoryProportion * float64(totalPodsSwapAvailable)
+
+	return int64(swapAllocation), nil
 }

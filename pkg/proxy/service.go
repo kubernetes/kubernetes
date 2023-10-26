@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // BaseServicePortInfo contains base information that defines a service.
@@ -44,7 +44,7 @@ type BaseServicePortInfo struct {
 	port                     int
 	protocol                 v1.Protocol
 	nodePort                 int
-	loadBalancerStatus       v1.LoadBalancerStatus
+	loadBalancerVIPs         []string
 	sessionAffinityType      v1.ServiceAffinity
 	stickyMaxAgeSeconds      int
 	externalIPs              []string
@@ -108,13 +108,9 @@ func (bsvcPortInfo *BaseServicePortInfo) ExternalIPStrings() []string {
 	return bsvcPortInfo.externalIPs
 }
 
-// LoadBalancerIPStrings is part of ServicePort interface.
-func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerIPStrings() []string {
-	var ips []string
-	for _, ing := range bsvcPortInfo.loadBalancerStatus.Ingress {
-		ips = append(ips, ing.IP)
-	}
-	return ips
+// LoadBalancerVIPStrings is part of ServicePort interface.
+func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerVIPStrings() []string {
+	return bsvcPortInfo.loadBalancerVIPs
 }
 
 // ExternalPolicyLocal is part of ServicePort interface.
@@ -139,7 +135,7 @@ func (bsvcPortInfo *BaseServicePortInfo) HintsAnnotation() string {
 
 // ExternallyAccessible is part of ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) ExternallyAccessible() bool {
-	return bsvcPortInfo.nodePort != 0 || len(bsvcPortInfo.loadBalancerStatus.Ingress) != 0 || len(bsvcPortInfo.externalIPs) != 0
+	return bsvcPortInfo.nodePort != 0 || len(bsvcPortInfo.loadBalancerVIPs) != 0 || len(bsvcPortInfo.externalIPs) != 0
 }
 
 // UsesClusterEndpoints is part of ServicePort interface.
@@ -165,7 +161,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 
-	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
+	clusterIP := proxyutil.GetClusterIPByFamily(sct.ipFamily, service)
 	info := &BaseServicePortInfo{
 		clusterIP:             netutils.ParseIPSloppy(clusterIP),
 		port:                  int(port.Port),
@@ -194,42 +190,38 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	// services, this is actually expected. Hence we downgraded from reporting by events
 	// to just log lines with high verbosity
 
-	ipFamilyMap := utilproxy.MapIPsByIPFamily(service.Spec.ExternalIPs)
+	ipFamilyMap := proxyutil.MapIPsByIPFamily(service.Spec.ExternalIPs)
 	info.externalIPs = ipFamilyMap[sct.ipFamily]
 
 	// Log the IPs not matching the ipFamily
-	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
+	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
 			"ipFamily", sct.ipFamily, "externalIPs", strings.Join(ips, ", "), "service", klog.KObj(service))
 	}
 
-	ipFamilyMap = utilproxy.MapCIDRsByIPFamily(loadBalancerSourceRanges)
+	ipFamilyMap = proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
 	info.loadBalancerSourceRanges = ipFamilyMap[sct.ipFamily]
 	// Log the CIDRs not matching the ipFamily
-	if cidrs, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
+	if cidrs, ok := ipFamilyMap[proxyutil.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
 			"ipFamily", sct.ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ", "), "service", klog.KObj(service))
 	}
 
-	// Obtain Load Balancer Ingress IPs
-	var ips []string
+	// Obtain Load Balancer Ingress
+	var invalidIPs []string
 	for _, ing := range service.Status.LoadBalancer.Ingress {
-		if ing.IP != "" {
-			ips = append(ips, ing.IP)
+		if ing.IP == "" {
+			continue
+		}
+		if ipFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ipFamily == sct.ipFamily && proxyutil.IsVIPMode(ing) {
+			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ing.IP)
+		} else {
+			invalidIPs = append(invalidIPs, ing.IP)
 		}
 	}
-
-	if len(ips) > 0 {
-		ipFamilyMap = utilproxy.MapIPsByIPFamily(ips)
-
-		if ipList, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ipList) > 0 {
-			klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
-				"ipFamily", sct.ipFamily, "loadBalancerIngressIps", strings.Join(ipList, ", "), "service", klog.KObj(service))
-		}
-		// Create the LoadBalancerStatus with the filtered IPs
-		for _, ip := range ipFamilyMap[sct.ipFamily] {
-			info.loadBalancerStatus.Ingress = append(info.loadBalancerStatus.Ingress, v1.LoadBalancerIngress{IP: ip})
-		}
+	if len(invalidIPs) > 0 {
+		klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
+			"ipFamily", sct.ipFamily, "loadBalancerIngressIPs", strings.Join(invalidIPs, ", "), "service", klog.KObj(service))
 	}
 
 	if apiservice.NeedsHealthCheck(service) {
@@ -381,11 +373,11 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 		return nil
 	}
 
-	if utilproxy.ShouldSkipService(service) {
+	if proxyutil.ShouldSkipService(service) {
 		return nil
 	}
 
-	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
+	clusterIP := proxyutil.GetClusterIPByFamily(sct.ipFamily, service)
 	if clusterIP == "" {
 		return nil
 	}

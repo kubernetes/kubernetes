@@ -56,9 +56,11 @@ func (ns Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 
 // Run runs the filter on a single node rather than a slice
 func (ns Filter) run(node *yaml.RNode) (*yaml.RNode, error) {
-	// Special handling for metadata.namespace -- :(
+	// Special handling for metadata.namespace and metadata.name -- :(
 	// never let SetEntry handle metadata.namespace--it will incorrectly include cluster-scoped resources
-	ns.FsSlice = ns.removeMetaNamespaceFieldSpecs(ns.FsSlice)
+	// only update metadata.name if api version is expected one--so-as it leaves other resources of kind namespace alone
+	apiVersion := node.GetApiVersion()
+	ns.FsSlice = ns.removeUnneededMetaFieldSpecs(apiVersion, ns.FsSlice)
 	gvk := resid.GvkFromNode(node)
 	if err := ns.metaNamespaceHack(node, gvk); err != nil {
 		return nil, err
@@ -186,10 +188,13 @@ func (ns Filter) removeRoleBindingSubjectFieldSpecs(fs types.FsSlice) types.FsSl
 	return val
 }
 
-func (ns Filter) removeMetaNamespaceFieldSpecs(fs types.FsSlice) types.FsSlice {
+func (ns Filter) removeUnneededMetaFieldSpecs(apiVersion string, fs types.FsSlice) types.FsSlice {
 	var val types.FsSlice
 	for i := range fs {
 		if fs[i].Path == types.MetadataNamespacePath {
+			continue
+		}
+		if apiVersion != types.MetadataNamespaceApiVersion && fs[i].Path == types.MetadataNamePath {
 			continue
 		}
 		val = append(val, fs[i])

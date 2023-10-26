@@ -41,6 +41,8 @@ import (
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/google/go-cmp/cmp"
 
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
@@ -86,7 +88,7 @@ func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (aut
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(kubecfgFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, kubecfgFile)
 	config := v1.Config{
 		Clusters: []v1.NamedCluster{
 			{

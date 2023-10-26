@@ -54,7 +54,7 @@ import (
 
 var _ = SIGDescribe("Pods Extended", func() {
 	f := framework.NewDefaultFramework("pods")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("Delete Grace Period", func() {
 		var podClient *e2epod.PodClient

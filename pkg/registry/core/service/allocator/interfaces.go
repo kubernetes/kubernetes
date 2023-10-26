@@ -23,11 +23,7 @@ type Interface interface {
 	AllocateNext() (int, bool, error)
 	Release(int) error
 	ForEach(func(int))
-
-	// For testing
 	Has(int) bool
-
-	// For testing
 	Free() int
 
 	// Destroy shuts down all internal structures.

@@ -40,7 +40,7 @@ var _ = SIGDescribe("[Feature:WindowsHyperVContainers] HyperV containers", func(
 	})
 
 	f := framework.NewDefaultFramework("windows-hyperv-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should start a hyperv isolated container", func(ctx context.Context) {
 

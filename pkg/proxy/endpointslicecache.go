@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -290,7 +290,7 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		if (cache.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(endpoint.Addresses[0]) {
 			// Emit event on the corresponding service which had a different IP
 			// version than the endpoint.
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], svcPortName.NamespacedName.Namespace, svcPortName.NamespacedName.Name, "")
+			proxyutil.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], svcPortName.NamespacedName.Namespace, svcPortName.NamespacedName.Name, "")
 			continue
 		}
 

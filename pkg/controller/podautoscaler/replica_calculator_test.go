@@ -1322,6 +1322,21 @@ func TestReplicaCalcEmptyCPURequest(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestPlainMetricReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 5,
+		metric: &metricInfo{
+			name:          "qps",
+			levels:        []int64{20000, 19000, 21000},
+			targetUsage:   20000,
+			expectedUsage: 20000,
+			metricType:    podMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  2,

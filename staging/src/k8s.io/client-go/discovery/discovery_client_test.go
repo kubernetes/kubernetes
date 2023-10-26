@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
-	openapi_v3 "github.com/google/gnostic/openapiv3"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

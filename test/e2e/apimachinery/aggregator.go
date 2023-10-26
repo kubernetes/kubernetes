@@ -69,7 +69,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	var aggrclient *aggregatorclient.Clientset
 
 	f := framework.NewDefaultFramework("aggregator")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach

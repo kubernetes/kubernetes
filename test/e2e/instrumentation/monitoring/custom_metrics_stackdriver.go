@@ -54,7 +54,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for old resource model [Feature:StackdriverCustomMetrics]", func(ctx context.Context) {
 		kubeClient := f.ClientSet

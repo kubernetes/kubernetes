@@ -36,7 +36,8 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -76,6 +77,7 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 	kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 	cmd.AddCommand(newCmdConfigPrint(out))
 	cmd.AddCommand(newCmdConfigMigrate(out))
+	cmd.AddCommand(newCmdConfigValidate(out))
 	cmd.AddCommand(newCmdConfigImages(out))
 	return cmd
 }
@@ -92,6 +94,7 @@ func newCmdConfigPrint(out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(newCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintJoinDefaults(out))
+	cmd.AddCommand(newCmdConfigPrintResetDefaults(out))
 	return cmd
 }
 
@@ -103,6 +106,11 @@ func newCmdConfigPrintInitDefaults(out io.Writer) *cobra.Command {
 // newCmdConfigPrintJoinDefaults returns cobra.Command for "kubeadm config print join-defaults" command
 func newCmdConfigPrintJoinDefaults(out io.Writer) *cobra.Command {
 	return newCmdConfigPrintActionDefaults(out, "join", getDefaultNodeConfigBytes)
+}
+
+// newCmdConfigPrintResetDefaults returns cobra.Command for "kubeadm config print reset-defaults" command
+func newCmdConfigPrintResetDefaults(out io.Writer) *cobra.Command {
+	return newCmdConfigPrintActionDefaults(out, "reset", getDefaultResetConfigBytes)
 }
 
 func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesProc func() ([]byte, error)) *cobra.Command {
@@ -198,19 +206,19 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 		return []byte{}, err
 	}
 
-	return configutil.MarshalKubeadmConfigObject(internalcfg)
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1old.SchemeGroupVersion)
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
-		Discovery: kubeadmapiv1.Discovery{
-			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1old.JoinConfiguration{
+		Discovery: kubeadmapiv1old.Discovery{
+			BootstrapToken: &kubeadmapiv1old.BootstrapTokenDiscovery{
 				Token:                    configutil.PlaceholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},
-		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+		NodeRegistration: kubeadmapiv1old.NodeRegistrationOptions{
 			CRISocket: constants.DefaultCRISocket, // avoid CRI detection
 		},
 	})
@@ -218,12 +226,25 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 		return []byte{}, err
 	}
 
-	return configutil.MarshalKubeadmConfigObject(internalcfg)
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1old.SchemeGroupVersion)
+}
+
+func getDefaultResetConfigBytes() ([]byte, error) {
+	internalcfg, err := configutil.DefaultedResetConfiguration(&kubeadmapiv1.ResetConfiguration{
+		CRISocket: constants.DefaultCRISocket, // avoid CRI detection
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1.SchemeGroupVersion)
 }
 
 // newCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
 func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 	var oldCfgPath, newCfgPath string
+	var allowExperimental bool
+
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Read an older version of the kubeadm configuration API types from a file, and output the similar config object for the newer version",
@@ -240,7 +261,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1.SchemeGroupVersion, kubeadmapiv1.SchemeGroupVersion),
+		`), kubeadmapiv1old.SchemeGroupVersion, kubeadmapiv1old.SchemeGroupVersion),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(oldCfgPath) == 0 {
 				return errors.New("the --old-config flag is mandatory")
@@ -251,7 +272,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			outputBytes, err := configutil.MigrateOldConfig(oldCfgBytes)
+			outputBytes, err := configutil.MigrateOldConfig(oldCfgBytes, allowExperimental)
 			if err != nil {
 				return err
 			}
@@ -269,6 +290,49 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&oldCfgPath, "old-config", "", "Path to the kubeadm config file that is using an old API version and should be converted. This flag is mandatory.")
 	cmd.Flags().StringVar(&newCfgPath, "new-config", "", "Path to the resulting equivalent kubeadm config file using the new API version. Optional, if not specified output will be sent to STDOUT.")
+	cmd.Flags().BoolVar(&allowExperimental, options.AllowExperimentalAPI, false, "Allow migration to experimental, unreleased APIs.")
+	return cmd
+}
+
+// newCmdConfigValidate returns cobra.Command for the "kubeadm config validate" command
+func newCmdConfigValidate(out io.Writer) *cobra.Command {
+	var cfgPath string
+	var allowExperimental bool
+
+	cmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Read a file containing the kubeadm configuration API and report any validation problems",
+		Long: fmt.Sprintf(dedent.Dedent(`
+			This command lets you validate a kubeadm configuration API file and report any warnings and errors.
+			If there are no errors the exit status will be zero, otherwise it will be non-zero.
+			Any unmarshaling problems such as unknown API fields will trigger errors. Unknown API versions and
+			fields with invalid values will also trigger errors. Any other errors or warnings may be reported
+			depending on contents of the input file.
+
+			In this version of kubeadm, the following API versions are supported:
+			- %s
+		`), kubeadmapiv1old.SchemeGroupVersion),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(cfgPath) == 0 {
+				return errors.Errorf("the --%s flag is mandatory", options.CfgPath)
+			}
+
+			cfgBytes, err := os.ReadFile(cfgPath)
+			if err != nil {
+				return err
+			}
+
+			if err := configutil.ValidateConfig(cfgBytes, allowExperimental); err != nil {
+				return err
+			}
+			fmt.Fprintln(out, "ok")
+
+			return nil
+		},
+		Args: cobra.NoArgs,
+	}
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
+	cmd.Flags().BoolVar(&allowExperimental, options.AllowExperimentalAPI, false, "Allow validation of experimental, unreleased APIs.")
 	return cmd
 }
 
@@ -286,9 +350,9 @@ func newCmdConfigImages(out io.Writer) *cobra.Command {
 
 // newCmdConfigImagesPull returns the `kubeadm config images pull` command
 func newCmdConfigImagesPull() *cobra.Command {
-	externalClusterCfg := &kubeadmapiv1.ClusterConfiguration{}
+	externalClusterCfg := &kubeadmapiv1old.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalClusterCfg)
-	externalInitCfg := &kubeadmapiv1.InitConfiguration{}
+	externalInitCfg := &kubeadmapiv1old.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalInitCfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -333,7 +397,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 
 // newCmdConfigImagesList returns the "kubeadm config images list" command
 func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
-	externalcfg := &kubeadmapiv1.ClusterConfiguration{}
+	externalcfg := &kubeadmapiv1old.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -375,7 +439,7 @@ func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 }
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
-func NewImagesList(cfgPath string, cfg *kubeadmapiv1.ClusterConfiguration) (*ImagesList, error) {
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1old.ClusterConfiguration) (*ImagesList, error) {
 	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
@@ -430,7 +494,7 @@ func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1old.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)

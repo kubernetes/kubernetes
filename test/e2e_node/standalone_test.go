@@ -46,7 +46,7 @@ import (
 
 var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 	f := framework.NewDefaultFramework("static-pod")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when creating a static pod", func() {
 		var ns, podPath, staticPodName string
 
@@ -88,7 +88,7 @@ var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 					return nil
 				}
 				return fmt.Errorf("pod (%v/%v) still exists", ns, staticPodName)
-			})
+			}).Should(gomega.Succeed())
 		})
 	})
 })

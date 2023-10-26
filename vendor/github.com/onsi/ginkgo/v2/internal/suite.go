@@ -937,6 +937,12 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 			gracePeriodChannel = time.After(gracePeriod)
 		case <-interruptStatus.Channel:
 			interruptStatus = suite.interruptHandler.Status()
+			// ignore interruption from other process if we are cleaning up or reporting
+			if interruptStatus.Cause == interrupt_handler.InterruptCauseAbortByOtherProcess &&
+				node.NodeType.Is(types.NodeTypesAllowedDuringReportInterrupt|types.NodeTypesAllowedDuringCleanupInterrupt) {
+				continue
+			}
+
 			deadlineChannel = nil // don't worry about deadlines, time's up now
 
 			failureTimelineLocation := suite.generateTimelineLocation()

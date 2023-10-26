@@ -38,10 +38,10 @@ func PollUntilContextCancel(ctx context.Context, interval time.Duration, immedia
 // a deadline and is equivalent to:
 //
 //	deadlineCtx, deadlineCancel := context.WithTimeout(ctx, timeout)
-//	err := PollUntilContextCancel(ctx, interval, immediate, condition)
+//	err := PollUntilContextCancel(deadlineCtx, interval, immediate, condition)
 //
 // The deadline context will be cancelled if the Poll succeeds before the timeout, simplifying
-// inline usage. All other behavior is identical to PollUntilContextTimeout.
+// inline usage. All other behavior is identical to PollUntilContextCancel.
 func PollUntilContextTimeout(ctx context.Context, interval, timeout time.Duration, immediate bool, condition ConditionWithContextFunc) error {
 	deadlineCtx, deadlineCancel := context.WithTimeout(ctx, timeout)
 	defer deadlineCancel()

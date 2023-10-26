@@ -398,7 +398,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -469,7 +470,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta3.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -571,7 +573,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -641,7 +644,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -685,7 +689,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -804,7 +809,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta3.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -926,7 +932,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -1040,7 +1047,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta3.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -1179,7 +1187,8 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1.SchemeGroupVersion.String(),
 				},
-				Parallelism: 16,
+				Parallelism:           16,
+				DelayCacheUntilActive: false,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,

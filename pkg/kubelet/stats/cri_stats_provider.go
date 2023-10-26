@@ -206,6 +206,7 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 		cs := p.makeContainerStats(stats, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
 		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		p.addSwapStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 		p.addProcessStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
@@ -247,15 +248,7 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(ctx context.Context, upda
 			continue
 		}
 		ps := buildPodStats(podSandbox)
-		for _, criContainerStat := range criSandboxStat.Linux.Containers {
-			container, found := containerMap[criContainerStat.Attributes.Id]
-			if !found {
-				continue
-			}
-			// Fill available stats for full set of required pod stats
-			cs := p.makeContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
-			ps.Containers = append(ps.Containers, *cs)
-		}
+		p.addCRIPodContainerStats(criSandboxStat, ps, fsIDtoInfo, containerMap, podSandbox, rootFsInfo, updateCPUNanoCoreUsage)
 		addCRIPodNetworkStats(ps, criSandboxStat)
 		addCRIPodCPUStats(ps, criSandboxStat)
 		addCRIPodMemoryStats(ps, criSandboxStat)
@@ -548,6 +541,31 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 	}
 }
 
+func (p *criStatsProvider) addSwapStats(
+	ps *statsapi.PodStats,
+	podUID types.UID,
+	allInfos map[string]cadvisorapiv2.ContainerInfo,
+	cs *statsapi.ContainerStats,
+) {
+	// try get cpu and memory stats from cadvisor first.
+	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
+	if podCgroupInfo != nil {
+		ps.Swap = cadvisorInfoToSwapStats(podCgroupInfo)
+		return
+	}
+
+	// Sum Pod cpu and memory stats from containers stats.
+	if cs.Swap != nil {
+		if ps.Swap == nil {
+			ps.Swap = &statsapi.SwapStats{Time: cs.Swap.Time}
+		}
+		swapAvailableBytes := getUint64Value(cs.Swap.SwapAvailableBytes) + getUint64Value(ps.Swap.SwapAvailableBytes)
+		swapUsageBytes := getUint64Value(cs.Swap.SwapUsageBytes) + getUint64Value(ps.Swap.SwapUsageBytes)
+		ps.Swap.SwapAvailableBytes = &swapAvailableBytes
+		ps.Swap.SwapUsageBytes = &swapUsageBytes
+	}
+}
+
 func (p *criStatsProvider) addProcessStats(
 	ps *statsapi.PodStats,
 	podUID types.UID,
@@ -577,6 +595,7 @@ func (p *criStatsProvider) makeContainerStats(
 		CPU:       &statsapi.CPUStats{},
 		Memory:    &statsapi.MemoryStats{},
 		Rootfs:    &statsapi.FsStats{},
+		Swap:      &statsapi.SwapStats{},
 		// UserDefinedMetrics is not supported by CRI.
 	}
 	if stats.Cpu != nil {
@@ -606,6 +625,19 @@ func (p *criStatsProvider) makeContainerStats(
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = uint64Ptr(0)
+	}
+	if stats.Swap != nil {
+		result.Swap.Time = metav1.NewTime(time.Unix(0, stats.Swap.Timestamp))
+		if stats.Swap.SwapUsageBytes != nil {
+			result.Swap.SwapUsageBytes = &stats.Swap.SwapUsageBytes.Value
+		}
+		if stats.Swap.SwapAvailableBytes != nil {
+			result.Swap.SwapAvailableBytes = &stats.Swap.SwapAvailableBytes.Value
+		}
+	} else {
+		result.Swap.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
+		result.Swap.SwapUsageBytes = uint64Ptr(0)
+		result.Swap.SwapAvailableBytes = uint64Ptr(0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
@@ -914,22 +946,6 @@ func extractIDFromCgroupPath(cgroupPath string) string {
 	return id
 }
 
-func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
-	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Network == nil {
-		return
-	}
-	criNetwork := criPodStat.Linux.Network
-	iStats := statsapi.NetworkStats{
-		Time:           metav1.NewTime(time.Unix(0, criNetwork.Timestamp)),
-		InterfaceStats: criInterfaceToSummary(criNetwork.DefaultInterface),
-		Interfaces:     make([]statsapi.InterfaceStats, 0, len(criNetwork.Interfaces)),
-	}
-	for _, iface := range criNetwork.Interfaces {
-		iStats.Interfaces = append(iStats.Interfaces, criInterfaceToSummary(iface))
-	}
-	ps.Network = &iStats
-}
-
 func criInterfaceToSummary(criIface *runtimeapi.NetworkInterfaceUsage) statsapi.InterfaceStats {
 	return statsapi.InterfaceStats{
 		Name:     criIface.Name,
@@ -937,43 +953,6 @@ func criInterfaceToSummary(criIface *runtimeapi.NetworkInterfaceUsage) statsapi.
 		RxErrors: valueOfUInt64Value(criIface.RxErrors),
 		TxBytes:  valueOfUInt64Value(criIface.TxBytes),
 		TxErrors: valueOfUInt64Value(criIface.TxErrors),
-	}
-}
-
-func addCRIPodCPUStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
-	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Cpu == nil {
-		return
-	}
-	criCPU := criPodStat.Linux.Cpu
-	ps.CPU = &statsapi.CPUStats{
-		Time:                 metav1.NewTime(time.Unix(0, criCPU.Timestamp)),
-		UsageNanoCores:       valueOfUInt64Value(criCPU.UsageNanoCores),
-		UsageCoreNanoSeconds: valueOfUInt64Value(criCPU.UsageCoreNanoSeconds),
-	}
-}
-
-func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
-	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Memory == nil {
-		return
-	}
-	criMemory := criPodStat.Linux.Memory
-	ps.Memory = &statsapi.MemoryStats{
-		Time:            metav1.NewTime(time.Unix(0, criMemory.Timestamp)),
-		AvailableBytes:  valueOfUInt64Value(criMemory.AvailableBytes),
-		UsageBytes:      valueOfUInt64Value(criMemory.UsageBytes),
-		WorkingSetBytes: valueOfUInt64Value(criMemory.WorkingSetBytes),
-		RSSBytes:        valueOfUInt64Value(criMemory.RssBytes),
-		PageFaults:      valueOfUInt64Value(criMemory.PageFaults),
-		MajorPageFaults: valueOfUInt64Value(criMemory.MajorPageFaults),
-	}
-}
-
-func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
-	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Process == nil {
-		return
-	}
-	ps.ProcessStats = &statsapi.ProcessStats{
-		ProcessCount: valueOfUInt64Value(criPodStat.Linux.Process.ProcessCount),
 	}
 }
 

@@ -836,6 +836,9 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 // underlying storage will be destroyed on this servers shutdown.
 func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) error {
 	for _, apiGroupInfo := range apiGroupInfos {
+		if len(apiGroupInfo.PrioritizedVersions) == 0 {
+			return fmt.Errorf("no version priority set for %#v", *apiGroupInfo)
+		}
 		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
 		// Catching these here places the error  much closer to its origin
 		if len(apiGroupInfo.PrioritizedVersions[0].Group) == 0 {
@@ -908,9 +911,22 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 }
 
 func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) *genericapi.APIGroupVersion {
+
+	allServedVersionsByResource := map[string][]string{}
+	for version, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+		for resource := range resourcesInVersion {
+			if len(groupVersion.Group) == 0 {
+				allServedVersionsByResource[resource] = append(allServedVersionsByResource[resource], version)
+			} else {
+				allServedVersionsByResource[resource] = append(allServedVersionsByResource[resource], fmt.Sprintf("%s/%s", groupVersion.Group, version))
+			}
+		}
+	}
+
 	return &genericapi.APIGroupVersion{
-		GroupVersion:     groupVersion,
-		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
+		GroupVersion:                groupVersion,
+		AllServedVersionsByResource: allServedVersionsByResource,
+		MetaGroupVersion:            apiGroupInfo.MetaGroupVersion,
 
 		ParameterCodec:        apiGroupInfo.ParameterCodec,
 		Serializer:            apiGroupInfo.NegotiatedSerializer,

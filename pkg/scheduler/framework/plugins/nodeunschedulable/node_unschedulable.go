@@ -46,9 +46,9 @@ const (
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint},
+func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}},
 	}
 }
 
@@ -60,9 +60,7 @@ func (pl *NodeUnschedulable) Name() string {
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnknownCondition)
-	}
+
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
 	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,

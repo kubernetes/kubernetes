@@ -86,6 +86,7 @@ var (
 	procDeleteService                                        = modadvapi32.NewProc("DeleteService")
 	procDeregisterEventSource                                = modadvapi32.NewProc("DeregisterEventSource")
 	procDuplicateTokenEx                                     = modadvapi32.NewProc("DuplicateTokenEx")
+	procEnumDependentServicesW                               = modadvapi32.NewProc("EnumDependentServicesW")
 	procEnumServicesStatusExW                                = modadvapi32.NewProc("EnumServicesStatusExW")
 	procEqualSid                                             = modadvapi32.NewProc("EqualSid")
 	procFreeSid                                              = modadvapi32.NewProc("FreeSid")
@@ -728,6 +729,14 @@ func DeregisterEventSource(handle Handle) (err error) {
 
 func DuplicateTokenEx(existingToken Token, desiredAccess uint32, tokenAttributes *SecurityAttributes, impersonationLevel uint32, tokenType uint32, newToken *Token) (err error) {
 	r1, _, e1 := syscall.Syscall6(procDuplicateTokenEx.Addr(), 6, uintptr(existingToken), uintptr(desiredAccess), uintptr(unsafe.Pointer(tokenAttributes)), uintptr(impersonationLevel), uintptr(tokenType), uintptr(unsafe.Pointer(newToken)))
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func EnumDependentServices(service Handle, activityState uint32, services *ENUM_SERVICE_STATUS, buffSize uint32, bytesNeeded *uint32, servicesReturned *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procEnumDependentServicesW.Addr(), 6, uintptr(service), uintptr(activityState), uintptr(unsafe.Pointer(services)), uintptr(buffSize), uintptr(unsafe.Pointer(bytesNeeded)), uintptr(unsafe.Pointer(servicesReturned)))
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
@@ -3507,12 +3516,8 @@ func EnumProcessModulesEx(process Handle, module *Handle, cb uint32, cbNeeded *u
 	return
 }
 
-func EnumProcesses(processIds []uint32, bytesReturned *uint32) (err error) {
-	var _p0 *uint32
-	if len(processIds) > 0 {
-		_p0 = &processIds[0]
-	}
-	r1, _, e1 := syscall.Syscall(procEnumProcesses.Addr(), 3, uintptr(unsafe.Pointer(_p0)), uintptr(len(processIds)), uintptr(unsafe.Pointer(bytesReturned)))
+func enumProcesses(processIds *uint32, nSize uint32, bytesReturned *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procEnumProcesses.Addr(), 3, uintptr(unsafe.Pointer(processIds)), uintptr(nSize), uintptr(unsafe.Pointer(bytesReturned)))
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}

@@ -41,7 +41,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// This cost is set to allow for only two authorization checks per expression
 		cost := uint64(350000)
 		return &cost
-	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "denied", "reason":
+	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "reason", "error", "errored":
 		// All authorization builder and accessor functions have a nominal cost
 		cost := uint64(1)
 		return &cost
@@ -91,7 +91,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		// An authorization check has a fixed cost
 		// This cost is set to allow for only two authorization checks per expression
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 350000, Max: 350000}}
-	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "denied", "reason":
+	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "reason", "error", "errored":
 		// All authorization builder and accessor functions have a nominal cost
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":

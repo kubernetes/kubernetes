@@ -442,7 +442,6 @@ func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, sync
 		false,
 		5*time.Second,
 		timers,
-		nil, /* filteredDialOptions */
 	)
 
 	if err != nil {

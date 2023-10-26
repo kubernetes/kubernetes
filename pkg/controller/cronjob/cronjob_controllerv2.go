@@ -601,6 +601,9 @@ func (jm *ControllerV2) syncCronJob(
 	jobResp, err := jm.jobControl.CreateJob(cronJob.Namespace, jobReq)
 	switch {
 	case errors.HasStatusCause(err, corev1.NamespaceTerminatingCause):
+		// if the namespace is being terminated, we don't have to do
+		// anything because any creation will fail
+		return cronJob, nil, updateStatus, err
 	case errors.IsAlreadyExists(err):
 		// If the job is created by other actor, assume  it has updated the cronjob status accordingly
 		logger.Info("Job already exists", "cronjob", klog.KObj(cronJob), "job", klog.KObj(jobReq))

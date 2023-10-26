@@ -37,7 +37,7 @@ import (
 
 var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 	f := framework.NewDefaultFramework("pvc-retroactive-storageclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var (
 		client    clientset.Interface

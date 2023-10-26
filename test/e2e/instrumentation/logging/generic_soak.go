@@ -45,7 +45,7 @@ var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("logging-soak")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Not a global constant (irrelevant outside this test), also not a parameter (if you want more logs, use --scale=).
 	kbRateInSeconds := 1 * time.Second

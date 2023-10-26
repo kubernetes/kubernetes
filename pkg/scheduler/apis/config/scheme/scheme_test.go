@@ -999,7 +999,8 @@ profiles:
 			name:    "v1beta3 in-tree and out-of-tree plugins from internal",
 			version: v1beta3.SchemeGroupVersion,
 			obj: &config.KubeSchedulerConfiguration{
-				Parallelism: 8,
+				Parallelism:           8,
+				DelayCacheUntilActive: true,
 				Profiles: []config.KubeSchedulerProfile{
 					{
 						PluginConfig: []config.PluginConfig{
@@ -1219,7 +1220,8 @@ profiles:
 			name:    "v1 in-tree and out-of-tree plugins from internal",
 			version: v1.SchemeGroupVersion,
 			obj: &config.KubeSchedulerConfiguration{
-				Parallelism: 8,
+				Parallelism:           8,
+				DelayCacheUntilActive: true,
 				Profiles: []config.KubeSchedulerProfile{
 					{
 						PluginConfig: []config.PluginConfig{
@@ -1265,6 +1267,7 @@ clientConnection:
   contentType: ""
   kubeconfig: ""
   qps: 0
+delayCacheUntilActive: true
 enableContentionProfiling: false
 enableProfiling: false
 kind: KubeSchedulerConfiguration
@@ -1315,7 +1318,8 @@ profiles:
 			name:    "v1 ignorePreferredTermsOfExistingPods is enabled",
 			version: v1.SchemeGroupVersion,
 			obj: &config.KubeSchedulerConfiguration{
-				Parallelism: 8,
+				Parallelism:           8,
+				DelayCacheUntilActive: true,
 				Profiles: []config.KubeSchedulerProfile{
 					{
 						PluginConfig: []config.PluginConfig{
@@ -1337,6 +1341,7 @@ clientConnection:
   contentType: ""
   kubeconfig: ""
   qps: 0
+delayCacheUntilActive: true
 enableContentionProfiling: false
 enableProfiling: false
 kind: KubeSchedulerConfiguration

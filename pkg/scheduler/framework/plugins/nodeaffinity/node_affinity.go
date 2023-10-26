@@ -81,9 +81,9 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
 	}
 }
 
@@ -149,9 +149,7 @@ func (pl *NodeAffinity) PreFilterExtensions() framework.PreFilterExtensions {
 // the plugin's added affinity.
 func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
+
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(node) {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonEnforced)
 	}

@@ -40,7 +40,7 @@ import (
 var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
 	f := framework.NewDefaultFramework("csi-mock-volumes-attach")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI attach test using mock driver", func() {

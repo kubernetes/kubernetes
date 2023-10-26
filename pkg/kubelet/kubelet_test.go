@@ -92,7 +92,6 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/gcepd"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
 	volumesecret "k8s.io/kubernetes/pkg/volume/secret"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -110,6 +109,7 @@ func init() {
 const (
 	testKubeletHostname = "127.0.0.1"
 	testKubeletHostIP   = "127.0.0.1"
+	testKubeletHostIPv6 = "::1"
 
 	// TODO(harry) any global place for these two?
 	// Reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
@@ -233,6 +233,10 @@ func newTestKubeletWithImageList(
 							Type:    v1.NodeInternalIP,
 							Address: testKubeletHostIP,
 						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: testKubeletHostIPv6,
+						},
 					},
 					VolumesAttached: []v1.AttachedVolume{
 						{
@@ -260,7 +264,8 @@ func newTestKubeletWithImageList(
 	kubelet.secretManager = secretManager
 	configMapManager := configmap.NewSimpleConfigMapManager(kubelet.kubeClient)
 	kubelet.configMapManager = configMapManager
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
+	kubelet.mirrorPodClient = fakeMirrorClient
+	kubelet.podManager = kubepod.NewBasicPodManager()
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, kubelet.getRootDir())
 
@@ -339,7 +344,7 @@ func newTestKubeletWithImageList(
 	}
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{},
-		killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.podManager.GetMirrorPodByPod, kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
+		killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
 
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
@@ -367,7 +372,6 @@ func newTestKubeletWithImageList(
 	if initFakeVolumePlugin {
 		allPlugins = append(allPlugins, plug)
 	} else {
-		allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, volumesecret.ProbeVolumePlugins()...)
 	}
 
@@ -597,7 +601,11 @@ func TestDispatchWorkOfCompletedPod(t *testing.T) {
 		},
 	}
 	for _, pod := range pods {
-		kubelet.dispatchWork(pod, kubetypes.SyncPodSync, nil, time.Now())
+		kubelet.podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodSync,
+			StartTime:  time.Now(),
+		})
 		if !got {
 			t.Errorf("Should not skip completed pod %q", pod.Name)
 		}
@@ -651,7 +659,11 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 	}
 
 	for _, pod := range pods {
-		kubelet.dispatchWork(pod, kubetypes.SyncPodSync, nil, time.Now())
+		kubelet.podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodSync,
+			StartTime:  time.Now(),
+		})
 		if !got {
 			t.Errorf("Should not skip active pod %q", pod.Name)
 		}
@@ -2521,9 +2533,9 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		testPod2.UID: true,
 		testPod3.UID: true,
 	}
-	defer kubelet.podManager.DeletePod(testPod3)
-	defer kubelet.podManager.DeletePod(testPod2)
-	defer kubelet.podManager.DeletePod(testPod1)
+	defer kubelet.podManager.RemovePod(testPod3)
+	defer kubelet.podManager.RemovePod(testPod2)
+	defer kubelet.podManager.RemovePod(testPod1)
 
 	tests := []struct {
 		name                string

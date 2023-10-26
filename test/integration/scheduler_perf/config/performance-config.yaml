@@ -1,5 +1,18 @@
+# The following labels are used in this file:
+# - fast: short execution time, ideally less than 30 seconds
+# - integration-test: used to select workloads that
+#   run in pull-kubernetes-integration. Choosing those tests
+#   is a tradeoff between code coverage and overall runtime.
+# - performance: used to select workloads that run
+#   in ci-benchmark-scheduler-perf. Such workloads
+#   must run long enough (ideally, longer than 10 seconds)
+#   to provide meaningful samples for the pod scheduling
+#   rate.
+#
+# Combining "performance" and "fast" selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
 - name: SchedulingBasic
-  labels: [performance]
   defaultPodTemplatePath: config/pod-default.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -11,19 +24,19 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 1000
       measurePods: 1000
 
 - name: SchedulingPodAntiAffinity
-  labels: [performance]
   defaultPodTemplatePath: config/pod-with-pod-anti-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -40,19 +53,19 @@
     namespace: sched-1
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 100
       measurePods: 400
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 1000
       measurePods: 1000
 
 - name: SchedulingSecrets
-  labels: [performance]
   defaultPodTemplatePath: config/pod-with-secret-volume.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -70,6 +83,7 @@
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 5000
@@ -161,7 +175,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -173,7 +187,6 @@
       measurePods: 1000
 
 - name: SchedulingPodAffinity
-  labels: [performance]
   defaultPodTemplatePath: config/pod-with-pod-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -200,6 +213,7 @@
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 5000
@@ -223,7 +237,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -235,7 +249,6 @@
       measurePods: 1000
 
 - name: SchedulingPreferredPodAntiAffinity
-  labels: [performance]
   defaultPodTemplatePath: config/pod-with-preferred-pod-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -258,13 +271,13 @@
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 5000
       measurePods: 1000
 
 - name: SchedulingNodeAffinity
-  labels: [performance]
   defaultPodTemplatePath: config/pod-with-node-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -286,13 +299,13 @@
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 5000
       measurePods: 1000
 
 - name: TopologySpreading
-  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -309,12 +322,13 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 1000
       measurePods: 1000
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 5000
@@ -386,7 +400,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 200
@@ -411,6 +425,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [fast]
     params:
       initNodes: 500
       initPods: 2000
@@ -455,7 +470,6 @@
 #      measurePods: 5000
 
 - name: Unschedulable
-  labels: [performance]
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -475,6 +489,7 @@
       initPods: 200
       measurePods: 1000
   - name: 5000Nodes/200InitPods
+    labels: [performance, fast]
     params:
       initNodes: 5000
       initPods: 200
@@ -503,16 +518,18 @@
     collectMetrics: true
   workloads:
   - name: 1000Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 1000
       measurePods: 1000
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       initNodes: 5000
       measurePods: 2000
 
 - name: SchedulingRequiredPodAntiAffinityWithNSSelector
+  labels: [performance]
   defaultPodTemplatePath: config/pod-anti-affinity-ns-selector.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -536,6 +553,13 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
   - name: 5000Nodes
     params:
       initNodes: 5000
@@ -544,6 +568,7 @@
       measurePods: 1000
 
 - name: SchedulingPreferredAntiAffinityWithNSSelector
+  labels: [performance]
   defaultPodTemplatePath: config/pod-preferred-anti-affinity-ns-selector.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -567,6 +592,13 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
   - name: 5000Nodes
     params:
       initNodes: 5000
@@ -575,6 +607,7 @@
       measurePods: 1000
 
 - name: SchedulingRequiredPodAffinityWithNSSelector
+  labels: [performance]
   defaultPodTemplatePath: config/pod-affinity-ns-selector.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -601,6 +634,13 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
   - name: 5000Nodes
     params:
       initNodes: 5000
@@ -609,6 +649,7 @@
       measurePods: 1000
 
 - name: SchedulingPreferredAffinityWithNSSelector
+  labels: [performance]
   defaultPodTemplatePath: config/pod-preferred-affinity-ns-selector.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -632,6 +673,13 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
   - name: 5000Nodes
     params:
       initNodes: 5000
@@ -660,6 +708,7 @@
       normalNodes: 400
       measurePods: 400
   - name: 5000Nodes
+    labels: [performance, fast]
     params:
       taintNodes: 1000
       normalNodes: 4000
@@ -699,6 +748,7 @@
     collectMetrics: true
   workloads:
   - name: fast
+    labels: [integration-test, fast]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -708,7 +758,7 @@
       measurePods: 10
       maxClaimsPerNode: 10
   - name: 2000pods_100nodes
-    labels: [performance,fast]
+    labels: [performance, fast]
     params:
       # In this testcase, the number of nodes is smaller
       # than the limit for the PodScheduling slices.

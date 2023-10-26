@@ -263,6 +263,9 @@ func TestValidationExpressions(t *testing.T) {
 			errors: map[string]string{
 				// Invalid regex with a string constant regex pattern is compile time error
 				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				// strings version 0 does not have format or join
+				// TODO: Replace this error test with valid tests when the string version is bumped.
+				"'%s %i'.format('a', 1) == 'a 1'": "undeclared reference to 'format'",
 			},
 		},
 		{name: "escaped strings",
@@ -1842,6 +1845,88 @@ func TestValidationExpressions(t *testing.T) {
 				"authorizer.path('/healthz').check('get').allowed()": "undeclared reference to 'authorizer'",
 			},
 		},
+		{name: "optionals", // https://github.com/google/cel-spec/wiki/proposal-246
+			obj: map[string]interface{}{
+				"presentObj": map[string]interface{}{
+					"presentStr": "value",
+				},
+				"m": map[string]interface{}{"k": "v"},
+				"l": []interface{}{"a"},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"presentObj": objectType(map[string]schema.Structural{
+					"presentStr": stringType,
+				}),
+				"absentObj": objectType(map[string]schema.Structural{
+					"absentStr": stringType,
+				}),
+				"m": mapType(&stringType),
+				"l": listType(&stringType),
+			}),
+			valid: []string{
+				"self.?presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr.or(optional.of('nope')) == optional.of('value')",
+				"self.presentObj.?presentStr.orValue('') == 'value'",
+				"self.presentObj.?presentStr.hasValue() == true",
+				"self.presentObj.?presentStr.optMap(v, v == 'value').hasValue()",
+				"self.?absentObj.?absentStr == optional.none()",
+				"self.?absentObj.?absentStr.or(optional.of('nope')) == optional.of('nope')",
+				"self.?absentObj.?absentStr.orValue('nope') == 'nope'",
+				"self.?absentObj.?absentStr.hasValue() == false",
+				"self.?absentObj.?absentStr.optMap(v, v == 'value').hasValue() == false",
+
+				"self.m[?'k'] == optional.of('v')",
+				"self.m[?'k'].or(optional.of('nope')) == optional.of('v')",
+				"self.m[?'k'].orValue('') == 'v'",
+				"self.m[?'k'].hasValue() == true",
+				"self.m[?'k'].optMap(v, v == 'v').hasValue()",
+				"self.m[?'x'] == optional.none()",
+				"self.m[?'x'].or(optional.of('nope')) == optional.of('nope')",
+				"self.m[?'x'].orValue('nope') == 'nope'",
+				"self.m[?'x'].hasValue() == false",
+				"self.m[?'x'].hasValue() == false",
+
+				"self.l[?0] == optional.of('a')",
+				"self.l[?1] == optional.none()",
+				"self.l[?0].orValue('') == 'a'",
+				"self.l[?0].hasValue() == true",
+				"self.l[?0].optMap(v, v == 'a').hasValue()",
+				"self.l[?1] == optional.none()",
+				"self.l[?1].or(optional.of('nope')) == optional.of('nope')",
+				"self.l[?1].orValue('nope') == 'nope'",
+				"self.l[?1].hasValue() == false",
+				"self.l[?1].hasValue() == false",
+
+				"optional.ofNonZeroValue(1).hasValue()",
+				"optional.ofNonZeroValue(uint(1)).hasValue()",
+				"optional.ofNonZeroValue(1.1).hasValue()",
+				"optional.ofNonZeroValue('a').hasValue()",
+				"optional.ofNonZeroValue(true).hasValue()",
+				"optional.ofNonZeroValue(['a']).hasValue()",
+				"optional.ofNonZeroValue({'k': 'v'}).hasValue()",
+				"optional.ofNonZeroValue(timestamp('2011-08-18T00:00:00.000+01:00')).hasValue()",
+				"optional.ofNonZeroValue(duration('19h3m37s10ms')).hasValue()",
+				"optional.ofNonZeroValue(null) == optional.none()",
+				"optional.ofNonZeroValue(0) == optional.none()",
+				"optional.ofNonZeroValue(uint(0)) == optional.none()",
+				"optional.ofNonZeroValue(0.0) == optional.none()",
+				"optional.ofNonZeroValue('') == optional.none()",
+				"optional.ofNonZeroValue(false) == optional.none()",
+				"optional.ofNonZeroValue([]) == optional.none()",
+				"optional.ofNonZeroValue({}) == optional.none()",
+				"optional.ofNonZeroValue(timestamp('0001-01-01T00:00:00.000+00:00')) == optional.none()",
+				"optional.ofNonZeroValue(duration('0s')) == optional.none()",
+
+				"{?'k': optional.none(), 'k2': 'v2'} == {'k2': 'v2'}",
+				"{?'k': optional.of('v'), 'k2': 'v2'} == {'k': 'v', 'k2': 'v2'}",
+				"['a', ?optional.none(), 'c'] == ['a', 'c']",
+				"['a', ?optional.of('v'), 'c'] == ['a', 'v', 'c']",
+			},
+			errors: map[string]string{
+				"self.absentObj.?absentStr == optional.none()": "no such key: absentObj", // missing ?. operator on first deref is an error
+			},
+		},
 	}
 
 	for i := range tests {
@@ -2262,7 +2347,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 
 // This is the most recursive operations we expect to be able to include in an expression.
 // This number could get larger with more improvements in the grammar or ANTLR stack, but should *never* decrease or previously valid expressions could be treated as invalid.
-const maxValidDepth = 243
+const maxValidDepth = 250
 
 // TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
 func TestCELMaxRecursionDepth(t *testing.T) {
@@ -2397,7 +2482,7 @@ func TestMessageExpression(t *testing.T) {
 			message:                 "message not messageExpression",
 			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
 			costBudget:              50,
-			expectedLogErr:          "messageExpression evaluation failed due to: index '4' out of range in list size '4'",
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
 			expectedValidationErr:   "message not messageExpression",
 			expectedRemainingBudget: 47,
 		},
@@ -2405,7 +2490,7 @@ func TestMessageExpression(t *testing.T) {
 			name:                    "runtime cost preserved if messageExpression fails during evaluation (no message set)",
 			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
 			costBudget:              50,
-			expectedLogErr:          "messageExpression evaluation failed due to: index '4' out of range in list size '4'",
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
 			expectedValidationErr:   "failed rule",
 			expectedRemainingBudget: 47,
 		},
@@ -2501,6 +2586,427 @@ func TestMessageExpression(t *testing.T) {
 				if tt.expectedRemainingBudget != remainingBudget {
 					t.Fatalf("expected %d cost left, got %d", tt.expectedRemainingBudget, remainingBudget)
 				}
+			}
+		})
+	}
+}
+
+func TestReasonAndFldPath(t *testing.T) {
+	forbiddenReason := func() *apiextensions.FieldValueErrorReason {
+		r := apiextensions.FieldValueForbidden
+		return &r
+	}()
+	tests := []struct {
+		name      string
+		schema    *schema.Structural
+		obj       interface{}
+		errors    []string
+		errorType field.ErrorType
+	}{
+		{name: "Return error based on input reason",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f: Forbidden"},
+		},
+		{name: "Return error default is invalid",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", nil),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeInvalid,
+			errors:    []string{"root.f: Invalid"},
+		},
+		{name: "Return error based on input fieldPath",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ".m", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f.m: Forbidden"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, nil, celconfig.RuntimeCELCostBudget)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != tt.errorType {
+					t.Errorf("expected error type %v, but got: %v", tt.errorType, err.Type)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func TestValidateFieldPath(t *testing.T) {
+	sts := schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"foo": {
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{
+						Structural: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "object",
+							},
+							Properties: map[string]schema.Structural{
+								"subAdd": {
+									Generic: schema.Generic{
+										Type: "number",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"white space": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
+			"'foo'bar": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
+			"a": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"foo's": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"test\a": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bb[b": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bbb": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"c": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+							"34": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+					"bbb.c": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"a-b.3'4": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+				},
+			},
+			"list": {
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "object",
+					},
+					Properties: map[string]schema.Structural{
+						"a": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+						"a-b.3'4": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	path := field.NewPath("")
+
+	tests := []struct {
+		name            string
+		fieldPath       string
+		pathOfFieldPath *field.Path
+		schema          *schema.Structural
+		errDetail       string
+		validFieldPath  *field.Path
+	}{
+		{
+			name:            "Valid .a",
+			fieldPath:       ".a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a"),
+		},
+		{
+			name:            "Valid 'foo'bar",
+			fieldPath:       "['\\'foo\\'bar']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("'foo'bar"),
+		},
+		{
+			name:            "Invalid 'foo'bar",
+			fieldPath:       ".\\'foo\\'bar",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Invalid with whitespace",
+			fieldPath:       ". a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       ".white space",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       "['white space']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "invalid dot annotation",
+			fieldPath:       ".a.bb[b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "valid with .",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a", "bbb.c"),
+		},
+		{
+			name:            "Unclosed ]",
+			fieldPath:       ".a['bbb.c'",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
+		},
+		{
+			name:            "Unexpected end of JSON path",
+			fieldPath:       ".",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
+		},
+		{
+			name:            "Valid map syntax .a.bbb",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("bbb.c"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo.subAdd",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo['subAdd']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Invalid",
+			fieldPath:       ".a.foo's",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['foo\\'s']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("foo's"),
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['test\\a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("test\a"),
+		},
+
+		{
+			name:            "Invalid map key",
+			fieldPath:       ".a.foo",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Malformed map key",
+			fieldPath:       ".a.bbb[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected single quoted string but got 0",
+		},
+		{
+			name:            "Valid refer for name has number",
+			fieldPath:       ".a.bbb.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Map syntax for special field names",
+			fieldPath:       ".a.bbb['34']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			//errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Valid .list",
+			fieldPath:       ".list",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("list"),
+		},
+		{
+			name:            "Invalid list index",
+			fieldPath:       ".list[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected single quoted string but got 0",
+		},
+		{
+			name:            "Invalid list reference",
+			fieldPath:       ".list. a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Invalid .list.a",
+			fieldPath:       ".list['a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Missing leading dot",
+			fieldPath:       "a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected [ or . but got: a",
+		},
+		{
+			name:            "Nonexistent field",
+			fieldPath:       ".c",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Duplicate dots",
+			fieldPath:       ".a..b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "object of array",
+			fieldPath:       ".list.a-b.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
+
+			if err == nil && tc.errDetail != "" {
+				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
+			}
+			if err != nil && tc.errDetail == "" {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tc.errDetail) {
+				t.Errorf("expected error to contain: %v, but get: %v", tc.errDetail, err)
+			}
+			if tc.validFieldPath != nil && tc.validFieldPath.String() != path.Child(validField.String()).String() {
+				t.Errorf("expected %v, got %v", tc.validFieldPath, path.Child(validField.String()))
 			}
 		})
 	}
@@ -2802,6 +3308,17 @@ func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, mes
 			Rule:              rule,
 			Message:           message,
 			MessageExpression: messageExpression,
+		},
+	}
+	return s
+}
+
+func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *apiextensions.FieldValueErrorReason) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:      rule,
+			FieldPath: jsonPath,
+			Reason:    reason,
 		},
 	}
 	return s

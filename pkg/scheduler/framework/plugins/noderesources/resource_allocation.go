@@ -52,9 +52,7 @@ func (r *resourceAllocationScorer) score(
 	podRequests []int64) (int64, *framework.Status) {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
-	if node == nil {
-		return 0, framework.NewStatus(framework.Error, "node not found")
-	}
+
 	// resources not set, nothing scheduled,
 	if len(r.resources) == 0 {
 		return 0, framework.NewStatus(framework.Error, "resources not found")

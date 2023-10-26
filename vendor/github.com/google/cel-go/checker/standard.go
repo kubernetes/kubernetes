@@ -287,6 +287,8 @@ func init() {
 			decls.NewInstanceOverload(overloads.EndsWithString,
 				[]*exprpb.Type{decls.String, decls.String}, decls.Bool)),
 		decls.NewFunction(overloads.Matches,
+			decls.NewOverload(overloads.Matches,
+				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
 			decls.NewInstanceOverload(overloads.MatchesString,
 				[]*exprpb.Type{decls.String, decls.String}, decls.Bool)),
 		decls.NewFunction(overloads.StartsWith,

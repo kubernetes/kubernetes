@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"runtime"
 	"sync"
 	"time"
 
@@ -51,7 +52,7 @@ const (
 // before test running so that the image pulling won't fail in actual test.
 var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
-	"gcr.io/cadvisor/cadvisor:v0.43.0",
+	"gcr.io/cadvisor/cadvisor:v0.47.2",
 	"registry.k8s.io/stress:v1",
 	busyboxImage,
 	"registry.k8s.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
@@ -61,7 +62,6 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetPauseImageName(),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
-	imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep),
 	imageutils.GetE2EImage(imageutils.Etcd),
 )
 
@@ -70,6 +70,11 @@ var NodePrePullImageList = sets.NewString(
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
 func updateImageAllowList(ctx context.Context) {
+	// Architecture-specific image
+	if !isRunningOnArm64() {
+		// NodePerfTfWideDeep is only supported on x86_64, pulling in arm64 will fail
+		NodePrePullImageList = NodePrePullImageList.Insert(imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep))
+	}
 	// Union NodePrePullImageList and PrePulledImages into the framework image pre-pull list.
 	e2epod.ImagePrePullList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
@@ -96,8 +101,12 @@ func updateImageAllowList(ctx context.Context) {
 	}
 }
 
+func isRunningOnArm64() bool {
+	return runtime.GOARCH == "arm64"
+}
+
 func getNodeProblemDetectorImage() string {
-	const defaultImage string = "registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.7"
+	const defaultImage string = "registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.13"
 	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
 	if image == "" {
 		image = defaultImage

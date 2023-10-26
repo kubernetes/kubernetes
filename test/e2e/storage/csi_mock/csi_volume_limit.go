@@ -36,7 +36,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-limit")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI volume limit information using mock driver", func() {

@@ -92,7 +92,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	})
 
 	f = framework.NewDefaultFramework("reboot")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("each node by ordering clean reboot and ensure they function upon restart", func(ctx context.Context) {
 		// clean shutdown and restart

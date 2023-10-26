@@ -89,7 +89,7 @@ var (
 		# Request a token bound to an instance of a Secret object
 		kubectl create token myapp --bound-object-kind Secret --bound-object-name mysecret
 
-		# Request a token bound to an instance of a Secret object with a specific uid
+		# Request a token bound to an instance of a Secret object with a specific UID
 		kubectl create token myapp --bound-object-kind Secret --bound-object-name mysecret --bound-object-uid 0d4691ed-659b-4935-a832-355f77ee47cc
 `)
 

@@ -98,7 +98,7 @@ func WaitForPodReady(ctx context.Context, c clientset.Interface, set *appsv1.Sta
 
 // WaitForStatusReadyReplicas waits for the ss.Status.ReadyReplicas to be equal to expectedReplicas
 func WaitForStatusReadyReplicas(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, expectedReplicas int32) {
-	framework.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
+	framework.Logf("Waiting for statefulset status.readyReplicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
@@ -111,13 +111,13 @@ func WaitForStatusReadyReplicas(ctx context.Context, c clientset.Interface, ss *
 				return false, nil
 			}
 			if ssGet.Status.ReadyReplicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
+				framework.Logf("Waiting for statefulset status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for stateful set status.readyReplicas updated to %d: %v", expectedReplicas, pollErr)
+		framework.Failf("Failed waiting for statefulset status.readyReplicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
@@ -136,13 +136,13 @@ func WaitForStatusAvailableReplicas(ctx context.Context, c clientset.Interface, 
 				return false, nil
 			}
 			if ssGet.Status.AvailableReplicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.AvailableReplicas)
+				framework.Logf("Waiting for statefulset status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.AvailableReplicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for stateful set status.AvailableReplicas updated to %d: %v", expectedReplicas, pollErr)
+		framework.Failf("Failed waiting for statefulset status.AvailableReplicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
@@ -161,13 +161,13 @@ func WaitForStatusReplicas(ctx context.Context, c clientset.Interface, ss *appsv
 				return false, nil
 			}
 			if ssGet.Status.Replicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+				framework.Logf("Waiting for statefulset status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for stateful set status.replicas updated to %d: %v", expectedReplicas, pollErr)
+		framework.Failf("Failed waiting for statefulset status.replicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 

@@ -66,6 +66,10 @@ func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 		for j := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[j]
 			for k := range container.Ports {
+				// Only return ports with a host port specified.
+				if container.Ports[k].HostPort <= 0 {
+					continue
+				}
 				ports = append(ports, &container.Ports[k])
 			}
 		}
@@ -76,6 +80,10 @@ func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 // PreFilter invoked at the prefilter extension point.
 func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	s := getContainerPorts(pod)
+	// Skip if a pod has no ports.
+	if len(s) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
+	}
 	cycleState.Write(preFilterStateKey, preFilterState(s))
 	return nil, nil
 }
@@ -101,11 +109,11 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodePorts) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *NodePorts) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
-		{Resource: framework.Pod, ActionType: framework.Delete},
-		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
 	}
 }
 

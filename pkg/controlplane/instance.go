@@ -27,6 +27,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -47,7 +48,6 @@ import (
 	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
 	nodev1 "k8s.io/api/node/v1"
 	policyapiv1 "k8s.io/api/policy/v1"
-	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
@@ -62,11 +62,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
+	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -77,11 +79,14 @@ import (
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
@@ -155,6 +160,23 @@ type ExtraConfig struct {
 
 	EnableLogsSupport bool
 	ProxyTransport    *http.Transport
+
+	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
+	// that can not be served locally
+	PeerProxy utilpeerproxy.Interface
+
+	// PeerEndpointLeaseReconciler updates the peer endpoint leases
+	PeerEndpointLeaseReconciler peerreconcilers.PeerEndpointLeaseReconciler
+
+	// PeerCAFile is the ca bundle used by this kube-apiserver to verify peer apiservers'
+	// serving certs when routing a request to the peer in the case the request can not be served
+	// locally due to version skew.
+	PeerCAFile string
+
+	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
+	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
+	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
+	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
 
 	// Values to build the IP addresses used by discovery
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
@@ -295,7 +317,7 @@ func (c *Config) Complete() CompletedConfig {
 		&c.ExtraConfig,
 	}
 
-	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
+	serviceIPRange, apiServerServiceIP, err := options.ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
@@ -393,12 +415,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
 
-	// install legacy rest storage
-
-	if err := m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter); err != nil {
-		return nil, err
-	}
-
 	clientset, err := kubernetes.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
@@ -406,6 +422,32 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	// TODO: update to a version that caches success but will recheck on failure, unlike memcache discovery
 	discoveryClientForAdmissionRegistration := clientset.Discovery()
+
+	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
+		GenericConfig: corerest.GenericConfig{
+			StorageFactory:              c.ExtraConfig.StorageFactory,
+			EventTTL:                    c.ExtraConfig.EventTTL,
+			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
+			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
+			Informers:                   c.ExtraConfig.VersionedInformers,
+		},
+		Proxy: corerest.ProxyConfig{
+			Transport:           c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig: c.ExtraConfig.KubeletClientConfig,
+		},
+		Services: corerest.ServicesConfig{
+			ClusterIPRange:          c.ExtraConfig.ServiceIPRange,
+			SecondaryClusterIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+			NodePortRange:           c.ExtraConfig.ServiceNodePortRange,
+			IPRepairInterval:        c.ExtraConfig.RepairServicesInterval,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
@@ -415,6 +457,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
+		legacyRESTStorageProvider,
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
@@ -441,12 +484,67 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
-	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		go systemnamespaces.NewController(clientset, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
+		return nil
+	})
+
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
+		PublicIP: c.GenericConfig.PublicAddress,
+
+		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
+
+		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
+		ServicePort:               c.ExtraConfig.APIServerServicePort,
+		PublicServicePort:         publicServicePort,
+		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
+	}, clientset, c.ExtraConfig.VersionedInformers.Core().V1().Services())
+	m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		kubernetesServiceCtrl.Start(hookContext.StopCh)
+		return nil
+	})
+	m.GenericAPIServer.AddPreShutdownHookOrDie("stop-kubernetes-service-controller", func() error {
+		kubernetesServiceCtrl.Stop()
+		return nil
+	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		peeraddress := getPeerAddress(c.ExtraConfig.PeerAdvertiseAddress, c.GenericConfig.PublicAddress, publicServicePort)
+		peerEndpointCtrl := peerreconcilers.New(
+			c.GenericConfig.APIServerID,
+			peeraddress,
+			c.ExtraConfig.PeerEndpointLeaseReconciler,
+			c.ExtraConfig.EndpointReconcilerConfig.Interval,
+			clientset)
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("failed to create peer endpoint lease controller: %w", err)
 		}
-		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
+		m.GenericAPIServer.AddPostStartHookOrDie("peer-endpoint-reconciler-controller",
+			func(hookContext genericapiserver.PostStartHookContext) error {
+				peerEndpointCtrl.Start(hookContext.StopCh)
+				return nil
+			})
+		m.GenericAPIServer.AddPreShutdownHookOrDie("peer-endpoint-reconciler-controller",
+			func() error {
+				peerEndpointCtrl.Stop()
+				return nil
+			})
+		// Add PostStartHooks for Unknown Version Proxy filter.
+		if c.ExtraConfig.PeerProxy != nil {
+			m.GenericAPIServer.AddPostStartHookOrDie("unknown-version-proxy-filter", func(context genericapiserver.PostStartHookContext) error {
+				err := c.ExtraConfig.PeerProxy.WaitForCacheSync(context.StopCh)
+				return err
+			})
+		}
+	}
+
+	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, clientset)
 
 		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 		// TODO: See if we can pass ctx to the current method
@@ -492,6 +590,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			leaseName := m.GenericAPIServer.APIServerID
 			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
 
+			peeraddress := getPeerAddress(c.ExtraConfig.PeerAdvertiseAddress, c.GenericConfig.PublicAddress, publicServicePort)
+			// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
 			controller := lease.NewController(
 				clock.RealClock{},
 				kubeClient,
@@ -502,7 +602,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				leaseName,
 				metav1.NamespaceSystem,
 				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
-				labelAPIServerHeartbeatFunc(KubeAPIServer))
+				labelAPIServerHeartbeatFunc(KubeAPIServer, peeraddress))
 			go controller.Run(ctx)
 			return nil
 		})
@@ -550,10 +650,14 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	return m, nil
 }
 
-func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
+func labelAPIServerHeartbeatFunc(identity string, peeraddress string) lease.ProcessLeaseFunc {
 	return func(lease *coordinationapiv1.Lease) error {
 		if lease.Labels == nil {
 			lease.Labels = map[string]string{}
+		}
+
+		if lease.Annotations == nil {
+			lease.Annotations = map[string]string{}
 		}
 
 		// This label indiciates the identity of the lease object.
@@ -566,55 +670,15 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 
 		// convenience label to easily map a lease object to a specific apiserver
 		lease.Labels[apiv1.LabelHostname] = hostname
+
+		// Include apiserver network location <ip_port> used by peers to proxy requests between kube-apiservers
+		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+			if peeraddress != "" {
+				lease.Annotations[apiv1.AnnotationPeerAdvertiseAddress] = peeraddress
+			}
+		}
 		return nil
 	}
-}
-
-// InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
-func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
-	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:              c.ExtraConfig.StorageFactory,
-		ProxyTransport:              c.ExtraConfig.ProxyTransport,
-		KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
-		EventTTL:                    c.ExtraConfig.EventTTL,
-		ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
-		SecondaryServiceIPRange:     c.ExtraConfig.SecondaryServiceIPRange,
-		ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
-		LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
-		ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-		ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
-		ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-		APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-		Informers:                   c.ExtraConfig.VersionedInformers,
-	}
-	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
-	if err != nil {
-		return fmt.Errorf("error building core storage: %v", err)
-	}
-	if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 { // if all core storage is disabled, return.
-		return nil
-	}
-
-	controllerName := "bootstrap-controller"
-	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	// Kubernetes clusters contains the following system namespaces:
-	// kube-system, kube-node-lease, kube-public, default
-	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		go systemnamespaces.NewController(client, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
-		return nil
-	})
-
-	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, client)
-	if err != nil {
-		return fmt.Errorf("error creating bootstrap controller: %v", err)
-	}
-	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
-	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
-
-	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
-		return fmt.Errorf("error in registering group versions: %v", err)
-	}
-	return nil
 }
 
 // RESTStorageProvider is a factory type for REST storage.
@@ -625,7 +689,7 @@ type RESTStorageProvider interface {
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
-	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
+	nonLegacy := []*genericapiserver.APIGroupInfo{}
 
 	// used later in the loop to filter the served resource by those that have expired.
 	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*m.GenericAPIServer.Version)
@@ -665,10 +729,18 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
 
-		apiGroupsInfo = append(apiGroupsInfo, &apiGroupInfo)
+		if len(groupName) == 0 {
+			// the legacy group for core APIs is special that it is installed into /api via this special install method.
+			if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
+				return fmt.Errorf("error in registering legacy API: %w", err)
+			}
+		} else {
+			// everything else goes to /apis
+			nonLegacy = append(nonLegacy, &apiGroupInfo)
+		}
 	}
 
-	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
+	if err := m.GenericAPIServer.InstallAPIGroups(nonLegacy...); err != nil {
 		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
@@ -709,8 +781,8 @@ var (
 	}
 	// betaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions.
 	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		admissionregistrationv1beta1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
-		policyapiv1beta1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta2.SchemeGroupVersion,
@@ -744,4 +816,14 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.EnableResources(legacyBetaEnabledByDefaultResources...)
 
 	return ret
+}
+
+// utility function to get the apiserver address that is used by peer apiservers to proxy
+// requests to this apiserver in case the peer is incapable of serving the request
+func getPeerAddress(peerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress, publicAddress net.IP, publicServicePort int) string {
+	if peerAdvertiseAddress.PeerAdvertiseIP != "" && peerAdvertiseAddress.PeerAdvertisePort != "" {
+		return net.JoinHostPort(peerAdvertiseAddress.PeerAdvertiseIP, peerAdvertiseAddress.PeerAdvertisePort)
+	} else {
+		return net.JoinHostPort(publicAddress.String(), strconv.Itoa(publicServicePort))
+	}
 }

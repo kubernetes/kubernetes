@@ -41,7 +41,7 @@ const (
 
 var _ = common.SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.25

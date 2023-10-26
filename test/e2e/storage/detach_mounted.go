@@ -46,7 +46,7 @@ var (
 
 var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 

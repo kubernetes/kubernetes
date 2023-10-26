@@ -16,13 +16,10 @@ package strfmt
 
 import (
 	"encoding"
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"k8s.io/kube-openapi/pkg/validation/errors"
 )
 
@@ -50,7 +47,6 @@ type Registry interface {
 	ContainsName(string) bool
 	Validates(string, string) bool
 	Parse(string, string) (interface{}, error)
-	MapStructureHookFunc() mapstructure.DecodeHookFunc
 }
 
 type knownFormat struct {
@@ -89,83 +85,6 @@ func NewSeededFormats(seeds []knownFormat, normalizer NameNormalizer) Registry {
 	return &defaultFormats{
 		data:          d,
 		normalizeName: normalizer,
-	}
-}
-
-// MapStructureHookFunc is a decode hook function for mapstructure
-func (f *defaultFormats) MapStructureHookFunc() mapstructure.DecodeHookFunc {
-	return func(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
-		if from.Kind() != reflect.String {
-			return data, nil
-		}
-		for _, v := range f.data {
-			tpe, _ := f.GetType(v.Name)
-			if to == tpe {
-				switch v.Name {
-				case "date":
-					d, err := time.Parse(RFC3339FullDate, data.(string))
-					if err != nil {
-						return nil, err
-					}
-					return Date(d), nil
-				case "datetime":
-					input := data.(string)
-					if len(input) == 0 {
-						return nil, fmt.Errorf("empty string is an invalid datetime format")
-					}
-					return ParseDateTime(input)
-				case "duration":
-					dur, err := ParseDuration(data.(string))
-					if err != nil {
-						return nil, err
-					}
-					return Duration(dur), nil
-				case "uri":
-					return URI(data.(string)), nil
-				case "email":
-					return Email(data.(string)), nil
-				case "uuid":
-					return UUID(data.(string)), nil
-				case "uuid3":
-					return UUID3(data.(string)), nil
-				case "uuid4":
-					return UUID4(data.(string)), nil
-				case "uuid5":
-					return UUID5(data.(string)), nil
-				case "hostname":
-					return Hostname(data.(string)), nil
-				case "ipv4":
-					return IPv4(data.(string)), nil
-				case "ipv6":
-					return IPv6(data.(string)), nil
-				case "cidr":
-					return CIDR(data.(string)), nil
-				case "mac":
-					return MAC(data.(string)), nil
-				case "isbn":
-					return ISBN(data.(string)), nil
-				case "isbn10":
-					return ISBN10(data.(string)), nil
-				case "isbn13":
-					return ISBN13(data.(string)), nil
-				case "creditcard":
-					return CreditCard(data.(string)), nil
-				case "ssn":
-					return SSN(data.(string)), nil
-				case "hexcolor":
-					return HexColor(data.(string)), nil
-				case "rgbcolor":
-					return RGBColor(data.(string)), nil
-				case "byte":
-					return Base64(data.(string)), nil
-				case "password":
-					return Password(data.(string)), nil
-				default:
-					return nil, errors.InvalidTypeName(v.Name)
-				}
-			}
-		}
-		return data, nil
 	}
 }
 

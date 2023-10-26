@@ -822,6 +822,11 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 				},
 			},
 		},
+		Status: api.PodStatus{
+			ResourceClaimStatuses: []api.PodResourceClaimStatus{
+				{Name: "my-claim", ResourceClaimName: pointer.String("pod-my-claim")},
+			},
+		},
 	}
 	podWithoutClaims := &api.Pod{
 		Spec: api.PodSpec{
@@ -944,107 +949,6 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 	}
 }
 
-func TestDropProbeGracePeriod(t *testing.T) {
-	podWithProbeGracePeriod := func() *api.Pod {
-		livenessGracePeriod := int64(10)
-		livenessProbe := api.Probe{TerminationGracePeriodSeconds: &livenessGracePeriod}
-		startupGracePeriod := int64(10)
-		startupProbe := api.Probe{TerminationGracePeriodSeconds: &startupGracePeriod}
-		return &api.Pod{
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyNever,
-				Containers:    []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &livenessProbe, StartupProbe: &startupProbe}},
-			},
-		}
-	}
-	podWithoutProbeGracePeriod := func() *api.Pod {
-		p := podWithProbeGracePeriod()
-		p.Spec.Containers[0].LivenessProbe.TerminationGracePeriodSeconds = nil
-		p.Spec.Containers[0].StartupProbe.TerminationGracePeriodSeconds = nil
-		return p
-	}
-
-	podInfo := []struct {
-		description    string
-		hasGracePeriod bool
-		pod            func() *api.Pod
-	}{
-		{
-			description:    "has probe-level terminationGracePeriod",
-			hasGracePeriod: true,
-			pod:            podWithProbeGracePeriod,
-		},
-		{
-			description:    "does not have probe-level terminationGracePeriod",
-			hasGracePeriod: false,
-			pod:            podWithoutProbeGracePeriod,
-		},
-		{
-			description:    "only has liveness probe-level terminationGracePeriod",
-			hasGracePeriod: true,
-			pod: func() *api.Pod {
-				p := podWithProbeGracePeriod()
-				p.Spec.Containers[0].StartupProbe.TerminationGracePeriodSeconds = nil
-				return p
-			},
-		},
-		{
-			description:    "is nil",
-			hasGracePeriod: false,
-			pod:            func() *api.Pod { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasGracePeriod, oldPod := oldPodInfo.hasGracePeriod, oldPodInfo.pod()
-				newPodHasGracePeriod, newPod := newPodInfo.hasGracePeriod, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeTerminationGracePeriod, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasGracePeriod:
-						// new pod should not be changed if the feature is enabled, or if the old pod had terminationGracePeriod
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasGracePeriod:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have terminationGracePeriod
-						if !reflect.DeepEqual(newPod, podWithoutProbeGracePeriod()) {
-							t.Errorf("new pod had probe-level terminationGracePeriod: %v", cmp.Diff(newPod, podWithoutProbeGracePeriod()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
 func TestValidatePodDeletionCostOption(t *testing.T) {
 	testCases := []struct {
 		name                            string
@@ -1089,365 +993,6 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, nil, nil, tc.oldPodMeta)
 			if tc.wantAllowInvalidPodDeletionCost != gotOptions.AllowInvalidPodDeletionCost {
 				t.Errorf("unexpected diff, want: %v, got: %v", tc.wantAllowInvalidPodDeletionCost, gotOptions.AllowInvalidPodDeletionCost)
-			}
-		})
-	}
-}
-
-func TestHaveSameExpandedDNSConfig(t *testing.T) {
-	testCases := []struct {
-		desc       string
-		podSpec    *api.PodSpec
-		oldPodSpec *api.PodSpec
-		want       bool
-	}{
-		{
-			desc:       "nil DNSConfig",
-			podSpec:    &api.PodSpec{},
-			oldPodSpec: &api.PodSpec{},
-			want:       false,
-		},
-		{
-			desc: "empty DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{},
-			},
-			want: false,
-		},
-		{
-			desc: "same legacy DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "update legacy DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"baz.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "same expanded DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			want: true,
-		},
-		{
-			desc: "update expanded DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"baz.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "update to legacy DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"baz.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "update to expanded DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"baz.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			want: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			got := haveSameExpandedDNSConfig(tc.podSpec, tc.oldPodSpec)
-			if tc.want != got {
-				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, got)
 			}
 		})
 	}
@@ -1618,6 +1163,112 @@ func TestDropDisabledTopologySpreadConstraintsFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDropDisabledPodStatusFields(t *testing.T) {
+	podWithHostIPs := func() *api.PodStatus {
+		return &api.PodStatus{
+			HostIPs: makeHostIPs("10.0.0.1", "fd00:10::1"),
+		}
+	}
+
+	podWithoutHostIPs := func() *api.PodStatus {
+		return &api.PodStatus{
+			HostIPs: nil,
+		}
+	}
+
+	tests := []struct {
+		name           string
+		podStatus      *api.PodStatus
+		oldPodStatus   *api.PodStatus
+		wantPodStatus  *api.PodStatus
+		featureEnabled bool
+	}{
+		{
+			name:           "gate off, old=without, new=without",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate off, old=without, new=with",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate off, old=with, new=without",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate off, old=with, new=with",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithHostIPs(),
+		},
+		{
+			name:           "gate on, old=without, new=without",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate on, old=without, new=with",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithHostIPs(),
+		},
+		{
+			name:           "gate on, old=with, new=without",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate on, old=with, new=with",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithHostIPs(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, tt.featureEnabled)()
+
+			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
+
+			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
+				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
+			}
+		})
+	}
+}
+
+func makeHostIPs(ips ...string) []api.HostIP {
+	ret := []api.HostIP{}
+	for _, ip := range ips {
+		ret = append(ret, api.HostIP{IP: ip})
+	}
+	return ret
 }
 
 func TestDropNodeInclusionPolicyFields(t *testing.T) {
@@ -2059,7 +1710,7 @@ func TestDropHostUsers(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesStatelessPodsSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, enabled)()
 
 					DropDisabledPodFields(newPod, oldPod)
 
@@ -2398,6 +2049,109 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 						// new pod should not have ResizePolicy
 						if !reflect.DeepEqual(newPod, podWithoutInPlaceVerticalScaling()) {
 							t.Errorf("new pod has ResizePolicy: %v", cmp.Diff(newPod, podWithoutInPlaceVerticalScaling()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropSidecarContainers(t *testing.T) {
+	containerRestartPolicyAlways := api.ContainerRestartPolicyAlways
+
+	podWithSidecarContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "c1",
+						Image:         "image",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+		}
+	}
+
+	podWithoutSidecarContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description         string
+		hasSidecarContainer bool
+		pod                 func() *api.Pod
+	}{
+		{
+			description:         "has a sidecar container",
+			hasSidecarContainer: true,
+			pod:                 podWithSidecarContainers,
+		},
+		{
+			description:         "does not have a sidecar container",
+			hasSidecarContainer: false,
+			pod:                 podWithoutSidecarContainers,
+		},
+		{
+			description:         "is nil",
+			hasSidecarContainer: false,
+			pod:                 func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasSidecarContainer, oldPod := oldPodInfo.hasSidecarContainer, oldPodInfo.pod()
+				newPodHasSidecarContainer, newPod := newPodInfo.hasSidecarContainer, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasSidecarContainer:
+						// new pod shouldn't change if feature enabled or if old pod has
+						// any sidecar container
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasSidecarContainer:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have any sidecar container
+						if !reflect.DeepEqual(newPod, podWithoutSidecarContainers()) {
+							t.Errorf("new pod has a sidecar container: %v", cmp.Diff(newPod, podWithoutSidecarContainers()))
 						}
 					default:
 						// new pod should not need to be changed

@@ -815,9 +815,11 @@ func printPodList(podList *api.PodList, options printers.GenerateOptions) ([]met
 
 func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	restarts := 0
+	restartableInitContainerRestarts := 0
 	totalContainers := len(pod.Spec.Containers)
 	readyContainers := 0
 	lastRestartDate := metav1.NewTime(time.Time{})
+	lastRestartableInitContainerRestartDate := metav1.NewTime(time.Time{})
 
 	reason := string(pod.Status.Phase)
 	if pod.Status.Reason != "" {
@@ -842,6 +844,14 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		row.Conditions = podFailedConditions
 	}
 
+	initContainers := make(map[string]*api.Container)
+	for i := range pod.Spec.InitContainers {
+		initContainers[pod.Spec.InitContainers[i].Name] = &pod.Spec.InitContainers[i]
+		if isRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+			totalContainers++
+		}
+	}
+
 	initializing := false
 	for i := range pod.Status.InitContainerStatuses {
 		container := pod.Status.InitContainerStatuses[i]
@@ -852,8 +862,23 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 				lastRestartDate = terminatedDate
 			}
 		}
+		if isRestartableInitContainer(initContainers[container.Name]) {
+			restartableInitContainerRestarts += int(container.RestartCount)
+			if container.LastTerminationState.Terminated != nil {
+				terminatedDate := container.LastTerminationState.Terminated.FinishedAt
+				if lastRestartableInitContainerRestartDate.Before(&terminatedDate) {
+					lastRestartableInitContainerRestartDate = terminatedDate
+				}
+			}
+		}
 		switch {
 		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
+			continue
+		case isRestartableInitContainer(initContainers[container.Name]) &&
+			container.Started != nil && *container.Started:
+			if container.Ready {
+				readyContainers++
+			}
 			continue
 		case container.State.Terminated != nil:
 			// initialization is failed
@@ -876,8 +901,10 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		}
 		break
 	}
-	if !initializing {
-		restarts = 0
+
+	if !initializing || isPodInitializedConditionTrue(&pod.Status) {
+		restarts = restartableInitContainerRestarts
+		lastRestartDate = lastRestartableInitContainerRestartDate
 		hasRunning := false
 		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 			container := pod.Status.ContainerStatuses[i]
@@ -922,7 +949,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	}
 
 	restartsStr := strconv.Itoa(restarts)
-	if !lastRestartDate.IsZero() {
+	if restarts != 0 && !lastRestartDate.IsZero() {
 		restartsStr = fmt.Sprintf("%d (%s ago)", restarts, translateTimestampSince(lastRestartDate))
 	}
 
@@ -1646,13 +1673,18 @@ func printValidatingAdmissionPolicyBinding(obj *admissionregistration.Validating
 		Object: runtime.RawExtension{Object: obj},
 	}
 	paramName := "<unset>"
-	if obj.Spec.ParamRef != nil {
-		if obj.Spec.ParamRef.Namespace != "" {
-			paramName = obj.Spec.ParamRef.Namespace + "/" + obj.Spec.ParamRef.Name
-		} else {
-			paramName = obj.Spec.ParamRef.Name
+	if pr := obj.Spec.ParamRef; pr != nil {
+		if len(pr.Name) > 0 {
+			if pr.Namespace != "" {
+				paramName = pr.Namespace + "/" + pr.Name
+			} else {
+				// Can't tell from here if param is cluster-scoped, so all
+				// params without names get * namespace
+				paramName = "*/" + pr.Name
+			}
+		} else if pr.Selector != nil {
+			paramName = pr.Selector.String()
 		}
-
 	}
 	row.Cells = append(row.Cells, obj.Name, obj.Spec.PolicyName, paramName, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
@@ -2995,4 +3027,23 @@ func (list SortableResourceNames) Swap(i, j int) {
 
 func (list SortableResourceNames) Less(i, j int) bool {
 	return list[i] < list[j]
+}
+
+func isRestartableInitContainer(initContainer *api.Container) bool {
+	if initContainer.RestartPolicy == nil {
+		return false
+	}
+
+	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
+}
+
+func isPodInitializedConditionTrue(status *api.PodStatus) bool {
+	for _, condition := range status.Conditions {
+		if condition.Type != api.PodInitialized {
+			continue
+		}
+
+		return condition.Status == api.ConditionTrue
+	}
+	return false
 }

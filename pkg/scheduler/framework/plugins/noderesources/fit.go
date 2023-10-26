@@ -84,6 +84,7 @@ type Fit struct {
 	ignoredResources                sets.Set[string]
 	ignoredResourceGroups           sets.Set[string]
 	enableInPlacePodVerticalScaling bool
+	enableSidecarContainers         bool
 	handle                          framework.Handle
 	resourceAllocationScorer
 }
@@ -167,6 +168,7 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 		ignoredResources:                sets.New(args.IgnoredResources...),
 		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
 		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
+		enableSidecarContainers:         fts.EnableSidecarContainers,
 		handle:                          h,
 		resourceAllocationScorer:        *scorePlugin(args),
 	}, nil
@@ -234,16 +236,16 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *Fit) EventsToRegister() []framework.ClusterEvent {
+func (f *Fit) EventsToRegister() []framework.ClusterEventWithHint {
 	podActionType := framework.Delete
 	if f.enableInPlacePodVerticalScaling {
 		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodUpdate event should be registered
 		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
 		podActionType |= framework.Update
 	}
-	return []framework.ClusterEvent{
-		{Resource: framework.Pod, ActionType: podActionType},
-		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
 	}
 }
 
@@ -251,6 +253,15 @@ func (f *Fit) EventsToRegister() []framework.ClusterEvent {
 // Checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 // It returns a list of insufficient resources, if empty, then the node has all the resources requested by the pod.
 func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
+		// Scheduler will calculate resources usage for a Pod containing
+		// restartable init containers that will be equal or more than kubelet will
+		// require to run the Pod. So there will be no overbooking. However, to
+		// avoid the inconsistency in resource calculation between the scheduler
+		// and the older (before v1.28) kubelet, make the Pod unschedulable.
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled")
+	}
+
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -267,6 +278,15 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 		return framework.NewStatus(framework.Unschedulable, failureReasons...)
 	}
 	return nil
+}
+
+func hasRestartableInitContainer(pod *v1.Pod) bool {
+	for _, c := range pod.Spec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
+			return true
+		}
+	}
+	return false
 }
 
 // InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.

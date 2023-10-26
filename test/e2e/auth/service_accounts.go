@@ -54,7 +54,7 @@ const rootCAConfigMapName = "kube-root-ca.crt"
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("no secret-based service account token should be auto-generated", func(ctx context.Context) {
 		{

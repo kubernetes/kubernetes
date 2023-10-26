@@ -172,13 +172,13 @@ func getPersistentVolumeClaimRetentionPolicy(set *apps.StatefulSet) apps.Statefu
 
 // claimOwnerMatchesSetAndPod returns false if the ownerRefs of the claim are not set consistently with the
 // PVC deletion policy for the StatefulSet.
-func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+func claimOwnerMatchesSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
 	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
 	default:
-		klog.Errorf("Unknown policy %v; treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		logger.Error(nil, "Unknown policy, treating as Retain", "policy", set.Spec.PersistentVolumeClaimRetentionPolicy)
 		fallthrough
 	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
 		if hasOwnerRef(claim, set) ||
@@ -214,7 +214,7 @@ func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.State
 
 // updateClaimOwnerRefForSetAndPod updates the ownerRefs for the claim according to the deletion policy of
 // the StatefulSet. Returns true if the claim was changed and should be updated and false otherwise.
-func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+func updateClaimOwnerRefForSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
 	needsUpdate := false
 	// Sometimes the version and kind are not set {pod,set}.TypeMeta. These are necessary for the ownerRef.
 	// This is the case both in real clusters and the unittests.
@@ -240,7 +240,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
 	default:
-		klog.Errorf("Unknown policy %v, treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		logger.Error(nil, "Unknown policy, treating as Retain", "policy", set.Spec.PersistentVolumeClaimRetentionPolicy)
 		fallthrough
 	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
 		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
@@ -390,12 +390,16 @@ func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 // updateIdentity updates pod's name, hostname, and subdomain, and StatefulSetPodNameLabel to conform to set's name
 // and headless service.
 func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
-	pod.Name = getPodName(set, getOrdinal(pod))
+	ordinal := getOrdinal(pod)
+	pod.Name = getPodName(set, ordinal)
 	pod.Namespace = set.Namespace
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
+	}
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
@@ -600,6 +604,23 @@ func (ao ascendingOrdinal) Swap(i, j int) {
 
 func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
+}
+
+// descendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted
+// from the Pod. Pod's that have not been constructed by StatefulSet's have an ordinal of -1, and are therefore pushed
+// to the end of the list.
+type descendingOrdinal []*v1.Pod
+
+func (do descendingOrdinal) Len() int {
+	return len(do)
+}
+
+func (do descendingOrdinal) Swap(i, j int) {
+	do[i], do[j] = do[j], do[i]
+}
+
+func (do descendingOrdinal) Less(i, j int) bool {
+	return getOrdinal(do[i]) > getOrdinal(do[j])
 }
 
 // getStatefulSetMaxUnavailable calculates the real maxUnavailable number according to the replica count

@@ -70,7 +70,7 @@ type AnnotateFlags struct {
 // NewAnnotateFlags returns a default AnnotateFlags
 func NewAnnotateFlags(streams genericiooptions.IOStreams) *AnnotateFlags {
 	return &AnnotateFlags{
-		PrintFlags:  genericclioptions.NewPrintFlags("annotate").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("annotated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		IOStreams:   streams,
 	}

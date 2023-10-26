@@ -117,8 +117,8 @@ func TestReconstructVolumes(t *testing.T) {
 			for i := range tc.expectedVolumesNeedDevicePath {
 				expectedVolumes[i] = v1.UniqueVolumeName(tc.expectedVolumesNeedDevicePath[i])
 			}
-			if !reflect.DeepEqual(expectedVolumes, rcInstance.volumesNeedDevicePath) {
-				t.Errorf("Expected expectedVolumesNeedDevicePath:\n%v\n got:\n%v", expectedVolumes, rcInstance.volumesNeedDevicePath)
+			if !reflect.DeepEqual(expectedVolumes, rcInstance.volumesNeedUpdateFromNodeStatus) {
+				t.Errorf("Expected expectedVolumesNeedDevicePath:\n%v\n got:\n%v", expectedVolumes, rcInstance.volumesNeedUpdateFromNodeStatus)
 			}
 
 			expectedVolumes = make([]v1.UniqueVolumeName, len(tc.expectedVolumesNeedReportedInUse))
@@ -333,7 +333,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 				return true
 			}
 			// Mark devices paths as reconciled to allow unmounting of volumes.
-			rcInstance.volumesNeedDevicePath = nil
+			rcInstance.volumesNeedUpdateFromNodeStatus = nil
 
 			// Act 2 - reconcile once
 			rcInstance.reconcileNew()

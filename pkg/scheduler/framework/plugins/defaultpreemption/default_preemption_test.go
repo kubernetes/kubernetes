@@ -352,15 +352,17 @@ func TestPostFilter(t *testing.T) {
 			if tt.extender != nil {
 				extenders = append(extenders, tt.extender)
 			}
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			f, err := st.NewFramework(registeredPlugins, "", ctx.Done(),
+			f, err := st.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1087,14 +1089,17 @@ func TestDryRunPreemption(t *testing.T) {
 				parallelism = 1
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
-				registeredPlugins, "", ctx.Done(),
+				ctx,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1342,15 +1347,16 @@ func TestSelectBestCandidate(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
+				ctx,
 				[]st.RegisterPluginFunc{
 					tt.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1480,6 +1486,9 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			var nodes []*v1.Node
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
@@ -1488,10 +1497,9 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			f, err := st.NewFramework(registeredPlugins, "", stopCh,
+			f, err := st.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1689,12 +1697,13 @@ func TestPreempt(t *testing.T) {
 				return true, nil, nil
 			})
 
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
-				cache.AddPod(pod)
+				cache.AddPod(logger, pod)
 			}
 			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodes := make([]*v1.Node, len(test.nodeNames))
@@ -1707,7 +1716,7 @@ func TestPreempt(t *testing.T) {
 					node.ObjectMeta.Labels[labelKeys[i]] = label
 				}
 				node.Name = node.ObjectMeta.Labels["hostname"]
-				cache.AddNode(node)
+				cache.AddNode(logger, node)
 				nodes[i] = node
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
@@ -1722,19 +1731,20 @@ func TestPreempt(t *testing.T) {
 				extenders = append(extenders, extender)
 			}
 			fwk, err := st.NewFramework(
+				ctx,
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				ctx.Done(),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)

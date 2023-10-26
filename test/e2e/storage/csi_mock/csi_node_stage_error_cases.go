@@ -36,7 +36,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-node-stage")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI NodeStage error cases [Slow]", func() {

@@ -80,6 +80,7 @@ type fakeApfFilter struct {
 	postDequeue  func()
 
 	utilflowcontrol.WatchTracker
+	utilflowcontrol.MaxSeatsTracker
 }
 
 func (t fakeApfFilter) Handle(ctx context.Context,
@@ -146,10 +147,11 @@ func newApfServerWithSingleRequest(t *testing.T, decision mockDecision) *httptes
 
 func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postExecute, postEnqueue, postDequeue func()) *httptest.Server {
 	fakeFilter := fakeApfFilter{
-		mockDecision: decision,
-		postEnqueue:  postEnqueue,
-		postDequeue:  postDequeue,
-		WatchTracker: utilflowcontrol.NewWatchTracker(),
+		mockDecision:    decision,
+		postEnqueue:     postEnqueue,
+		postDequeue:     postDequeue,
+		WatchTracker:    utilflowcontrol.NewWatchTracker(),
+		MaxSeatsTracker: utilflowcontrol.NewMaxSeatsTracker(),
 	}
 	return newApfServerWithFilter(t, fakeFilter, onExecute, postExecute)
 }
@@ -349,22 +351,25 @@ type fakeWatchApfFilter struct {
 	preExecutePanic  bool
 
 	utilflowcontrol.WatchTracker
+	utilflowcontrol.MaxSeatsTracker
 }
 
 func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
 	return &fakeWatchApfFilter{
-		capacity:     capacity,
-		WatchTracker: utilflowcontrol.NewWatchTracker(),
+		capacity:        capacity,
+		WatchTracker:    utilflowcontrol.NewWatchTracker(),
+		MaxSeatsTracker: utilflowcontrol.NewMaxSeatsTracker(),
 	}
 }
 
 func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 	_ func() fcrequest.WorkEstimate,
 	_ fq.QueueNoteFn,
 	execFn func(),
 ) {
+	noteFn(bootstrap.SuggestedFlowSchemaGlobalDefault, bootstrap.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
 	canExecute := false
 	func() {
 		f.lock.Lock()

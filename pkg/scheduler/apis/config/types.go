@@ -96,6 +96,12 @@ type KubeSchedulerConfiguration struct {
 	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
 	// with the extender. These extenders are shared by all scheduler profiles.
 	Extenders []Extender
+
+	// DelayCacheUntilActive specifies when to start caching. If this is true and leader election is enabled,
+	// the scheduler will wait to fill informer caches until it is the leader. Doing so will have slower
+	// failover with the benefit of lower memory overhead while waiting to become leader.
+	// Defaults to false.
+	DelayCacheUntilActive bool
 }
 
 // KubeSchedulerProfile is a scheduling profile.

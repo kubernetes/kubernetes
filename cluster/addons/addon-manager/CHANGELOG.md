@@ -1,3 +1,7 @@
+### Version 9.1.7 (Thu May 15 2023 Paco Xu <paco.xu@daocloud.io>)
+- Update kubectl to v1.27.1.
+- Use `--prune-allowlist` instead of deprecated `--prune-whitelist`.
+
 ### Version 9.1.6 (Thu February 24 2022 Shihang Zhang <zshihang@google.com>)
  - Clean up the wait check for service account (https://github.com/kubernetes/kubernetes/pull/108313)
 

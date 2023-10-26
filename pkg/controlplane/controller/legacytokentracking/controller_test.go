@@ -22,15 +22,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/time/rate"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -40,7 +38,6 @@ func TestSyncConfigMap(t *testing.T) {
 	now := time.Now().UTC()
 	tests := []struct {
 		name              string
-		enabled           bool
 		nextCreateAt      []time.Time
 		clientObjects     []runtime.Object
 		existingConfigMap *corev1.ConfigMap
@@ -50,15 +47,13 @@ func TestSyncConfigMap(t *testing.T) {
 	}{
 		{
 			name:          "create configmap [no cache, no live object]",
-			enabled:       true,
 			clientObjects: []runtime.Object{},
 			expectedActions: []core.Action{
 				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(dateFormat)}}),
 			},
 		},
 		{
-			name:    "create configmap should ignore AlreadyExists error [no cache, live object exists]",
-			enabled: true,
+			name: "create configmap should ignore AlreadyExists error [no cache, live object exists]",
 			clientObjects: []runtime.Object{
 				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(dateFormat)}},
 			},
@@ -68,7 +63,6 @@ func TestSyncConfigMap(t *testing.T) {
 		},
 		{
 			name:          "create configmap throttled [no cache, no live object]",
-			enabled:       true,
 			nextCreateAt:  []time.Time{now.Add(throttlePeriod - 2*time.Second), now.Add(throttlePeriod - time.Second)},
 			clientObjects: []runtime.Object{},
 			expectedActions: []core.Action{
@@ -77,7 +71,6 @@ func TestSyncConfigMap(t *testing.T) {
 		},
 		{
 			name:          "create configmap after throttle period [no cache, no live object]",
-			enabled:       true,
 			nextCreateAt:  []time.Time{now.Add(throttlePeriod - 2*time.Second), now.Add(throttlePeriod - time.Second), now.Add(throttlePeriod + time.Second)},
 			clientObjects: []runtime.Object{},
 			expectedActions: []core.Action{
@@ -86,8 +79,7 @@ func TestSyncConfigMap(t *testing.T) {
 			},
 		},
 		{
-			name:    "skip update configmap [cache with expected date format exists, live object exists]",
-			enabled: true,
+			name: "skip update configmap [cache with expected date format exists, live object exists]",
 			clientObjects: []runtime.Object{
 				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(dateFormat)}},
 			},
@@ -98,8 +90,7 @@ func TestSyncConfigMap(t *testing.T) {
 			expectedActions: []core.Action{},
 		},
 		{
-			name:    "update configmap [cache with unexpected date format, live object exists]",
-			enabled: true,
+			name: "update configmap [cache with unexpected date format, live object exists]",
 			clientObjects: []runtime.Object{
 				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(time.RFC3339)}},
 			},
@@ -112,8 +103,20 @@ func TestSyncConfigMap(t *testing.T) {
 			},
 		},
 		{
-			name:    "update configmap should ignore NotFound error [cache with unexpected date format, no live object]",
-			enabled: true,
+			name: "update configmap with no data",
+			clientObjects: []runtime.Object{
+				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: nil},
+			},
+			existingConfigMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
+				Data:       nil,
+			},
+			expectedActions: []core.Action{
+				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(dateFormat)}}),
+			},
+		},
+		{
+			name: "update configmap should ignore NotFound error [cache with unexpected date format, no live object]",
 			existingConfigMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
 				Data:       map[string]string{ConfigMapDataKey: "BAD_TIMESTAMP"},
@@ -122,49 +125,9 @@ func TestSyncConfigMap(t *testing.T) {
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(dateFormat)}}),
 			},
 		},
-		{
-			name:            "delete configmap [no cache, no live object]",
-			expectedActions: []core.Action{},
-		},
-		{
-			name: "delete configmap [cache exists, live object exists]",
-			clientObjects: []runtime.Object{
-				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(time.RFC3339)}},
-			},
-			existingConfigMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
-				Data:       map[string]string{ConfigMapDataKey: now.Format(dateFormat)},
-			},
-			expectedActions: []core.Action{
-				core.NewDeleteAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, ConfigMapName),
-			},
-		},
-		{
-			name: "delete configmap that's alrady being deleted [cache exists, live object exists]",
-			clientObjects: []runtime.Object{
-				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(time.RFC3339)}},
-			},
-			existingConfigMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName, DeletionTimestamp: &metav1.Time{Time: time.Now()}},
-				Data:       map[string]string{ConfigMapDataKey: now.Format(dateFormat)},
-			},
-			expectedActions: []core.Action{},
-		},
-		{
-			name: "delete configmap should ignore NotFound error [cache exists, no live object]",
-			existingConfigMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
-				Data:       map[string]string{ConfigMapDataKey: now.Format(dateFormat)},
-			},
-			expectedActions: []core.Action{
-				core.NewDeleteAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, ConfigMapName),
-			},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LegacyServiceAccountTokenTracking, test.enabled)()
-
 			client := fake.NewSimpleClientset(test.clientObjects...)
 			limiter := rate.NewLimiter(rate.Every(throttlePeriod), 1)
 			controller := newController(client, testingclock.NewFakeClock(now), limiter)

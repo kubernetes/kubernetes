@@ -74,10 +74,10 @@ func (pl *CSILimits) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *CSILimits) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
-		{Resource: framework.CSINode, ActionType: framework.Add},
-		{Resource: framework.Pod, ActionType: framework.Delete},
+func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
 	}
 }
 
@@ -109,9 +109,6 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
 
 	// If CSINode doesn't exist, the predicate may read the limits from Node object
 	csiNode, err := pl.csiNodeLister.Get(node.Name)

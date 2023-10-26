@@ -151,7 +151,7 @@ install-protobuild:
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
-	@$(GO) test -i ${TESTFLAGS} ${TESTPACKAGES} 2> /dev/null
+	@$(GO) test ${TESTFLAGS} ${TESTPACKAGES} 2> /dev/null
 	@( for pkg in ${PACKAGES}; do \
 		$(GO) test ${TESTFLAGS} \
 			-cover \

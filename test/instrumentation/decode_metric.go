@@ -144,7 +144,7 @@ func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric, error) {
 		return *m, newDecodeErrorf(ce, "can't decode const labels")
 	}
 	m.ConstLabels = cLabels
-	sl, err := decodeStabilityLevel(ce.Args[4], "metrics")
+	sl, err := decodeStabilityLevel(ce.Args[4], c.kubeMetricsImportName)
 	if err != nil {
 		return *m, newDecodeErrorf(ce, "can't decode stability level")
 	}

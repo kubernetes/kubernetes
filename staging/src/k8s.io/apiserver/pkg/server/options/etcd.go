@@ -36,9 +36,10 @@ import (
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/klog/v2"
 )
 
@@ -63,11 +64,6 @@ type EtcdOptions struct {
 	DefaultWatchCacheSize int
 	// WatchCacheSizes represents override to a given resource
 	WatchCacheSizes []string
-
-	// complete guards fields that must be initialized via Complete before the Apply methods can be used.
-	complete               bool
-	resourceTransformers   encryptionconfig.ResourceTransformers
-	kmsPluginHealthzChecks []healthz.HealthChecker
 
 	// SkipHealthEndpoints, when true, causes the Apply methods to not set up health endpoints.
 	// This allows multiple invocations of the Apply methods without duplication of said endpoints.
@@ -212,92 +208,18 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"The time in seconds that each lease is reused. A lower value could avoid large number of objects reusing the same lease. Notice that a too small value may cause performance problems at storage layer.")
 }
 
-// Complete must be called exactly once before using any of the Apply methods.  It is responsible for setting
-// up objects that must be created once and reused across multiple invocations such as storage transformers.
-// This method mutates the receiver (EtcdOptions).  It must never mutate the inputs.
-func (s *EtcdOptions) Complete(
-	storageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker,
-	stopCh <-chan struct{},
-	addPostStartHook func(name string, hook server.PostStartHookFunc) error,
-) error {
-	if s == nil {
-		return nil
-	}
-
-	if s.complete {
-		return fmt.Errorf("EtcdOptions.Complete called more than once")
-	}
-
-	if len(s.EncryptionProviderConfigFilepath) != 0 {
-		ctxServer := wait.ContextForChannel(stopCh)
-		// nolint:govet // The only code path where closeTransformers does not get called is when it gets stored in dynamicTransformers.
-		ctxTransformers, closeTransformers := context.WithCancel(ctxServer)
-
-		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(ctxTransformers, s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload)
-		if err != nil {
-			// in case of error, we want to close partially initialized (if any) transformers
-			closeTransformers()
-			return err
-		}
-
-		// enable kms hot reload controller only if the config file is set to be automatically reloaded
-		if s.EncryptionProviderConfigAutomaticReload {
-			// with reload=true we will always have 1 health check
-			if len(encryptionConfiguration.HealthChecks) != 1 {
-				// in case of error, we want to close partially initialized (if any) transformers
-				closeTransformers()
-				return fmt.Errorf("failed to start kms encryption config hot reload controller. only 1 health check should be available when reload is enabled")
-			}
-
-			// Here the dynamic transformers take ownership of the transformers and their cancellation.
-			dynamicTransformers := encryptionconfig.NewDynamicTransformers(encryptionConfiguration.Transformers, encryptionConfiguration.HealthChecks[0], closeTransformers, encryptionConfiguration.KMSCloseGracePeriod)
-
-			// add post start hook to start hot reload controller
-			// adding this hook here will ensure that it gets configured exactly once
-			err = addPostStartHook(
-				"start-encryption-provider-config-automatic-reload",
-				func(_ server.PostStartHookContext) error {
-					dynamicEncryptionConfigController := encryptionconfigcontroller.NewDynamicEncryptionConfiguration(
-						"encryption-provider-config-automatic-reload-controller",
-						s.EncryptionProviderConfigFilepath,
-						dynamicTransformers,
-						encryptionConfiguration.EncryptionFileContentHash,
-					)
-
-					go dynamicEncryptionConfigController.Run(ctxServer)
-
-					return nil
-				},
-			)
-			if err != nil {
-				// in case of error, we want to close partially initialized (if any) transformers
-				closeTransformers()
-				return fmt.Errorf("failed to add post start hook for kms encryption config hot reload controller: %w", err)
-			}
-
-			s.resourceTransformers = dynamicTransformers
-			s.kmsPluginHealthzChecks = []healthz.HealthChecker{dynamicTransformers}
-		} else {
-			s.resourceTransformers = encryptionconfig.StaticTransformers(encryptionConfiguration.Transformers)
-			s.kmsPluginHealthzChecks = encryptionConfiguration.HealthChecks
-		}
-	}
-
-	s.StorageConfig.StorageObjectCountTracker = storageObjectCountTracker
-
-	s.complete = true
-
-	// nolint:govet // The only code path where closeTransformers does not get called is when it gets stored in dynamicTransformers.
-	return nil
-}
-
 // ApplyTo mutates the provided server.Config.  It must never mutate the receiver (EtcdOptions).
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if s == nil {
 		return nil
 	}
 
-	return s.ApplyWithStorageFactoryTo(&SimpleStorageFactory{StorageConfig: s.StorageConfig}, c)
+	storageConfigCopy := s.StorageConfig
+	if storageConfigCopy.StorageObjectCountTracker == nil {
+		storageConfigCopy.StorageObjectCountTracker = c.StorageObjectCountTracker
+	}
+
+	return s.ApplyWithStorageFactoryTo(&SimpleStorageFactory{StorageConfig: storageConfigCopy}, c)
 }
 
 // ApplyWithStorageFactoryTo mutates the provided server.Config.  It must never mutate the receiver (EtcdOptions).
@@ -306,24 +228,118 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 		return nil
 	}
 
-	if !s.complete {
-		return fmt.Errorf("EtcdOptions.Apply called without completion")
-	}
-
 	if !s.SkipHealthEndpoints {
 		if err := s.addEtcdHealthEndpoint(c); err != nil {
 			return err
 		}
 	}
 
-	if s.resourceTransformers != nil {
+	// setup encryption
+	if err := s.maybeApplyResourceTransformers(c); err != nil {
+		return err
+	}
+
+	metrics.SetStorageMonitorGetter(monitorGetter(factory))
+
+	c.RESTOptionsGetter = s.CreateRESTOptionsGetter(factory, c.ResourceTransformers)
+	return nil
+}
+
+func monitorGetter(factory serverstorage.StorageFactory) func() (monitors []metrics.Monitor, err error) {
+	return func() (monitors []metrics.Monitor, err error) {
+		defer func() {
+			if err != nil {
+				for _, m := range monitors {
+					m.Close()
+				}
+			}
+		}()
+
+		var m metrics.Monitor
+		for _, cfg := range factory.Configs() {
+			m, err = storagefactory.CreateMonitor(cfg)
+			if err != nil {
+				return nil, err
+			}
+			monitors = append(monitors, m)
+		}
+		return monitors, nil
+	}
+}
+
+func (s *EtcdOptions) CreateRESTOptionsGetter(factory serverstorage.StorageFactory, resourceTransformers storagevalue.ResourceTransformers) generic.RESTOptionsGetter {
+	if resourceTransformers != nil {
 		factory = &transformerStorageFactory{
 			delegate:             factory,
-			resourceTransformers: s.resourceTransformers,
+			resourceTransformers: resourceTransformers,
+		}
+	}
+	return &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+}
+
+func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err error) {
+	if c.ResourceTransformers != nil {
+		return nil
+	}
+	if len(s.EncryptionProviderConfigFilepath) == 0 {
+		return nil
+	}
+
+	ctxServer := wait.ContextForChannel(c.DrainedNotify())
+	ctxTransformers, closeTransformers := context.WithCancel(ctxServer)
+	defer func() {
+		// in case of error, we want to close partially initialized (if any) transformers
+		if err != nil {
+			closeTransformers()
+		}
+	}()
+
+	encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(ctxTransformers, s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload)
+	if err != nil {
+		return err
+	}
+
+	if s.EncryptionProviderConfigAutomaticReload {
+		// with reload=true we will always have 1 health check
+		if len(encryptionConfiguration.HealthChecks) != 1 {
+			return fmt.Errorf("failed to start kms encryption config hot reload controller. only 1 health check should be available when reload is enabled")
+		}
+
+		// Here the dynamic transformers take ownership of the transformers and their cancellation.
+		dynamicTransformers := encryptionconfig.NewDynamicTransformers(encryptionConfiguration.Transformers, encryptionConfiguration.HealthChecks[0], closeTransformers, encryptionConfiguration.KMSCloseGracePeriod)
+
+		// add post start hook to start hot reload controller
+		// adding this hook here will ensure that it gets configured exactly once
+		err = c.AddPostStartHook(
+			"start-encryption-provider-config-automatic-reload",
+			func(_ server.PostStartHookContext) error {
+				dynamicEncryptionConfigController := encryptionconfigcontroller.NewDynamicEncryptionConfiguration(
+					"encryption-provider-config-automatic-reload-controller",
+					s.EncryptionProviderConfigFilepath,
+					dynamicTransformers,
+					encryptionConfiguration.EncryptionFileContentHash,
+				)
+
+				go dynamicEncryptionConfigController.Run(ctxServer)
+
+				return nil
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to add post start hook for kms encryption config hot reload controller: %w", err)
+		}
+
+		c.ResourceTransformers = dynamicTransformers
+		if !s.SkipHealthEndpoints {
+			c.AddHealthChecks(dynamicTransformers)
+		}
+	} else {
+		c.ResourceTransformers = encryptionconfig.StaticTransformers(encryptionConfiguration.Transformers)
+		if !s.SkipHealthEndpoints {
+			c.AddHealthChecks(encryptionConfiguration.HealthChecks...)
 		}
 	}
 
-	c.RESTOptionsGetter = &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
 	return nil
 }
 
@@ -343,8 +359,6 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 	c.AddReadyzChecks(healthz.NamedCheck("etcd-readiness", func(r *http.Request) error {
 		return readyCheck()
 	}))
-
-	c.AddHealthChecks(s.kmsPluginHealthzChecks...)
 
 	return nil
 }
@@ -444,6 +458,10 @@ func (s *SimpleStorageFactory) ResourcePrefix(resource schema.GroupResource) str
 	return resource.Group + "/" + resource.Resource
 }
 
+func (s *SimpleStorageFactory) Configs() []storagebackend.Config {
+	return serverstorage.Configs(s.StorageConfig)
+}
+
 func (s *SimpleStorageFactory) Backends() []serverstorage.Backend {
 	// nothing should ever call this method but we still provide a functional implementation
 	return serverstorage.Backends(s.StorageConfig)
@@ -453,7 +471,7 @@ var _ serverstorage.StorageFactory = &transformerStorageFactory{}
 
 type transformerStorageFactory struct {
 	delegate             serverstorage.StorageFactory
-	resourceTransformers encryptionconfig.ResourceTransformers
+	resourceTransformers storagevalue.ResourceTransformers
 }
 
 func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
@@ -472,6 +490,10 @@ func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*s
 
 func (t *transformerStorageFactory) ResourcePrefix(resource schema.GroupResource) string {
 	return t.delegate.ResourcePrefix(resource)
+}
+
+func (t *transformerStorageFactory) Configs() []storagebackend.Config {
+	return t.delegate.Configs()
 }
 
 func (t *transformerStorageFactory) Backends() []serverstorage.Backend {

@@ -262,7 +262,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 					},
 					Selector: map[string]string{
@@ -295,7 +295,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 					},
 					Selector: map[string]string{

@@ -426,8 +426,8 @@ type FeatureGate string
 
 const (
 	ApplySet              FeatureGate = "KUBECTL_APPLYSET"
-	ExplainOpenapiV3      FeatureGate = "KUBECTL_EXPLAIN_OPENAPIV3"
 	CmdPluginAsSubcommand FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
+	InteractiveDelete     FeatureGate = "KUBECTL_INTERACTIVE_DELETE"
 )
 
 func (f FeatureGate) IsEnabled() bool {

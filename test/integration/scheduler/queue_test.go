@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -144,7 +145,7 @@ func TestSchedulingGates(t *testing.T) {
 
 			// Pop the expected pods out. They should be de-queueable.
 			for _, wantPod := range tt.want {
-				podInfo := nextPodOrDie(t, testCtx)
+				podInfo := testutils.NextPodOrDie(t, testCtx)
 				if got := podInfo.Pod.Name; got != wantPod {
 					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
 				}
@@ -163,7 +164,7 @@ func TestSchedulingGates(t *testing.T) {
 			}
 			// Pop the expected pods out. They should be de-queueable.
 			for _, wantPod := range tt.wantPostGatesRemoval {
-				podInfo := nextPodOrDie(t, testCtx)
+				podInfo := testutils.NextPodOrDie(t, testCtx)
 				if got := podInfo.Pod.Name; got != wantPod {
 					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
 				}
@@ -221,7 +222,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 	// Pop the three pods out. They should be unschedulable.
 	for i := 0; i < 3; i++ {
-		podInfo := nextPodOrDie(t, testCtx)
+		podInfo := testutils.NextPodOrDie(t, testCtx)
 		fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 		if !ok {
 			t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
@@ -242,7 +243,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo := nextPodOrDie(t, testCtx)
+	podInfo := testutils.NextPodOrDie(t, testCtx)
 	if podInfo.Attempts != 2 {
 		t.Fatalf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}
@@ -254,7 +255,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	// - Although the failure reason has been lifted, Pod2 still won't be moved to active due to
 	//   the node event's preCheckForNode().
 	// - Regarding Pod3, the NodeTaintChange event is irrelevant with its scheduling failure.
-	podInfo = nextPod(t, testCtx)
+	podInfo = testutils.NextPod(t, testCtx)
 	if podInfo != nil {
 		t.Fatalf("Unexpected pod %v get popped out", podInfo.Pod.Name)
 	}
@@ -275,9 +276,9 @@ func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *fakeCRPlugin) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
-		{Resource: "foos.v1.example.com", ActionType: framework.All},
+func (f *fakeCRPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: "foos.v1.example.com", ActionType: framework.All}},
 	}
 }
 
@@ -378,6 +379,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -400,7 +402,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Pop fake-pod out. It should be unschedulable.
-	podInfo := nextPodOrDie(t, testCtx)
+	podInfo := testutils.NextPodOrDie(t, testCtx)
 	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
@@ -415,7 +417,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
+	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
 
 	// Trigger a Custom Resource event.
 	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
@@ -432,7 +434,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo = nextPodOrDie(t, testCtx)
+	podInfo = testutils.NextPodOrDie(t, testCtx)
 	if podInfo.Attempts != 2 {
 		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}

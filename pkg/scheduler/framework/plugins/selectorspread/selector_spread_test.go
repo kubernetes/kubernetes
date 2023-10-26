@@ -28,9 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -397,13 +397,14 @@ func TestSelectorSpreadScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
 			snapshot := cache.NewSnapshot(test.pods, nodes)
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
 			}
-			fh, err := frameworkruntime.NewFramework(nil, nil, ctx.Done(), frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}
@@ -655,13 +656,14 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
 			snapshot := cache.NewSnapshot(test.pods, nodes)
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
 			}
-			fh, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}
