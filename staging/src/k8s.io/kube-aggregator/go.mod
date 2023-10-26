@@ -7,7 +7,7 @@ go 1.21.3
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
