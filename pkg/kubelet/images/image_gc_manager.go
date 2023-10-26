@@ -40,7 +40,7 @@ import (
 )
 
 var (
-	errNoImageToCleanup = goerrors.New("NoImageToCleanup")
+	errNoImageToCleanup = goerrors.New("no images to cleanup")
 )
 
 // instrumentationScope is OpenTelemetry instrumentation scope name
