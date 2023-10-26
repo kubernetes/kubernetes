@@ -143,6 +143,19 @@ func TestEviction(t *testing.T) {
 			expectError:  "name in URL does not match name in Eviction object: BadRequest",
 			podName:      "t7",
 		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, empty selector",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+			}},
+			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t8", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError: "Cannot evict pod as it would violate the pod's disruption budget.: TooManyRequests: The disruption budget foo needs 0 healthy pods and has 0 currently",
+			podPhase:    api.PodRunning,
+			podName:     "t8",
+			policies:    []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget)}, // AlwaysAllow would terminate the pod since Running pods are not guarded by this policy
+		},
 	}
 
 	for _, unhealthyPodEvictionPolicy := range []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget), unhealthyPolicyPtr(policyv1.AlwaysAllow)} {
@@ -484,6 +497,28 @@ func TestEvictionIgnorePDB(t *testing.T) {
 			prc: &api.PodCondition{
 				Type:   api.PodReady,
 				Status: api.ConditionFalse,
+			},
+		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, pod healthy, empty selector, pod not deleted by honoring the PDB",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     3,
+					DesiredHealthy:     3,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t11", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         "Cannot evict pod as it would violate the pod's disruption budget.: TooManyRequests: The disruption budget foo needs 3 healthy pods and has 3 currently",
+			podName:             "t11",
+			expectedDeleteCount: 0,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
 			},
 		},
 	}

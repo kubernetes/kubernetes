@@ -585,6 +585,7 @@ func (jm *ControllerV2) syncCronJob(
 		}
 	}
 
+	jobAlreadyExists := false
 	jobReq, err := getJobFromTemplate2(cronJob, *scheduledTime)
 	if err != nil {
 		logger.Error(err, "Unable to make Job from template", "cronjob", klog.KObj(cronJob))
@@ -597,18 +598,41 @@ func (jm *ControllerV2) syncCronJob(
 		// anything because any creation will fail
 		return nil, updateStatus, err
 	case errors.IsAlreadyExists(err):
-		// If the job is created by other actor, assume  it has updated the cronjob status accordingly
-		logger.Info("Job already exists", "cronjob", klog.KObj(cronJob), "job", klog.KObj(jobReq))
-		return nil, updateStatus, err
+		// If the job is created by other actor, assume it has updated the cronjob status accordingly.
+		// However, if the job was created by cronjob controller, this means we've previously created the job
+		// but failed to update the active list in the status, in which case we should reattempt to add the job
+		// into the active list and update the status.
+		jobAlreadyExists = true
+		job, err := jm.jobControl.GetJob(jobReq.GetNamespace(), jobReq.GetName())
+		if err != nil {
+			return nil, updateStatus, err
+		}
+		jobResp = job
+
+		// check that this job is owned by cronjob controller, otherwise do nothing and assume external controller
+		// is updating the status.
+		if !metav1.IsControlledBy(job, cronJob) {
+			return nil, updateStatus, nil
+		}
+
+		// Recheck if the job is missing from the active list before attempting to update the status again.
+		found := inActiveList(cronJob, job.ObjectMeta.UID)
+		if found {
+			return nil, updateStatus, nil
+		}
 	case err != nil:
 		// default error handling
 		jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
 		return nil, updateStatus, err
 	}
 
-	metrics.CronJobCreationSkew.Observe(jobResp.ObjectMeta.GetCreationTimestamp().Sub(*scheduledTime).Seconds())
-	logger.V(4).Info("Created Job", "job", klog.KObj(jobResp), "cronjob", klog.KObj(cronJob))
-	jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
+	if jobAlreadyExists {
+		logger.Info("Job already exists", "cronjob", klog.KObj(cronJob), "job", klog.KObj(jobReq))
+	} else {
+		metrics.CronJobCreationSkew.Observe(jobResp.ObjectMeta.GetCreationTimestamp().Sub(*scheduledTime).Seconds())
+		logger.V(4).Info("Created Job", "job", klog.KObj(jobResp), "cronjob", klog.KObj(cronJob))
+		jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
+	}
 
 	// ------------------------------------------------------------------ //
 
