@@ -8895,7 +8895,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -8977,7 +8976,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nominalConcurrencyShares
       type:
         scalar: numeric
-      default: 0
 - name: io.k8s.api.flowcontrol.v1.NonResourcePolicyRule
   map:
     fields:
@@ -9041,7 +9039,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
