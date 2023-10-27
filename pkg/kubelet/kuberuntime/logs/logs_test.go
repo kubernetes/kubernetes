@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -214,12 +215,12 @@ func TestReadLogs(t *testing.T) {
 }
 
 func TestReadRotatedLog(t *testing.T) {
+	var mu sync.RWMutex
 	tmpDir := t.TempDir()
 	file, err := os.CreateTemp(tmpDir, "logfile")
 	if err != nil {
 		assert.NoErrorf(t, err, "unable to create temp file")
 	}
-
 	stdoutBuf := &bytes.Buffer{}
 	stderrBuf := &bytes.Buffer{}
 	containerID := "fake-container-id"
@@ -240,7 +241,10 @@ func TestReadRotatedLog(t *testing.T) {
 			Follow: true,
 		}
 		opts := NewLogOptions(&podLogOptions, time.Now())
-		ReadLogs(ctx, file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+		mu.Lock()
+		path := file.Name()
+		mu.Unlock()
+		ReadLogs(ctx, path, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 	}(ctx)
 
 	// log in stdout
@@ -254,6 +258,7 @@ func TestReadRotatedLog(t *testing.T) {
 	// Write 10 lines to log file.
 	// Let ReadLogs start.
 	time.Sleep(50 * time.Millisecond)
+
 	for line := 0; line < 10; line++ {
 		// Write the first three lines to log file
 		now := time.Now().Format(types.RFC3339NanoLenient)
@@ -277,10 +282,13 @@ func TestReadRotatedLog(t *testing.T) {
 			}
 
 			newF := filepath.Join(dir, baseName)
+			mu.Lock()
 			if file, err = os.Create(newF); err != nil {
+				mu.Unlock()
 				assert.NoError(t, err, "unable to create new log file")
 				return
 			}
+			mu.Unlock()
 			time.Sleep(20 * time.Millisecond)
 		}
 	}
