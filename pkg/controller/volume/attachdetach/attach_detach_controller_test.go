@@ -73,44 +73,42 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	}
 }
 
-func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
+func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	podInformer := informerFactory.Core().V1().Pods()
-	nodeInformer := informerFactory.Core().V1().Nodes()
-	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
-	pvInformer := informerFactory.Core().V1().PersistentVolumes()
-	volumeAttachmentInformer := informerFactory.Storage().V1().VolumeAttachments()
 
-	adc := &attachDetachController{
-		kubeClient:             fakeKubeClient,
-		pvcLister:              pvcInformer.Lister(),
-		pvcsSynced:             pvcInformer.Informer().HasSynced,
-		pvLister:               pvInformer.Lister(),
-		pvsSynced:              pvInformer.Informer().HasSynced,
-		podLister:              podInformer.Lister(),
-		podsSynced:             podInformer.Informer().HasSynced,
-		nodeLister:             nodeInformer.Lister(),
-		nodesSynced:            nodeInformer.Informer().HasSynced,
-		volumeAttachmentLister: volumeAttachmentInformer.Lister(),
-		volumeAttachmentSynced: volumeAttachmentInformer.Informer().HasSynced,
-		cloud:                  nil,
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	adcObj, err := NewAttachDetachController(
+		logger,
+		fakeKubeClient,
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Storage().V1().CSINodes(),
+		informerFactory.Storage().V1().CSIDrivers(),
+		informerFactory.Storage().V1().VolumeAttachments(),
+		nil, /* cloud */
+		controllervolumetesting.CreateTestPlugin(),
+		nil, /* prober */
+		false,
+		5*time.Second,
+		DefaultTimerConfig,
+	)
+
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
+	adc := adcObj.(*attachDetachController)
 
 	// Act
-	plugins := controllervolumetesting.CreateTestPlugin()
-	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 
-	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
-		t.Fatalf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
-	}
-
-	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
-	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
-
-	logger, _ := ktesting.NewTestContext(t)
-	err := adc.populateActualStateOfWorld(logger)
+	err = adc.populateActualStateOfWorld(logger)
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
