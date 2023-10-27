@@ -151,6 +151,15 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			Namespace: "test",
 		},
 	}
+	invalidAutoSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-rsa-secret",
+			Namespace: "test",
+			Labels: map[string]string{
+				"kubernetes.io/legacy-token-invalid-since": "2022-12-20",
+			},
+		},
+	}
 	ecdsaSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-ecdsa-secret",
@@ -175,6 +184,20 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	checkJSONWebSignatureHasKeyID(t, rsaToken, rsaKeyID)
+
+	// Generate RSA token with invalidAutoSecret
+	invalidAutoSecretToken, err := rsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *invalidAutoSecret))
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(invalidAutoSecretToken) == 0 {
+		t.Fatalf("no token generated")
+	}
+	invalidAutoSecret.Data = map[string][]byte{
+		"token": []byte(invalidAutoSecretToken),
+	}
+
+	checkJSONWebSignatureHasKeyID(t, invalidAutoSecretToken, rsaKeyID)
 
 	// Generate the ECDSA token
 	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
@@ -326,6 +349,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
 			ExpectedErr: true,
 			ExpectedOK:  false,
+		},
+		"secret is marked as invalid": {
+			Token:       invalidAutoSecretToken,
+			Client:      fake.NewSimpleClientset(serviceAccount, invalidAutoSecret),
+			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
+			ExpectedErr: true,
 		},
 	}
 

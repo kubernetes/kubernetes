@@ -18,6 +18,7 @@ package serviceaccount
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -26,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -47,7 +50,7 @@ func configuredConfigMap(label string) *v1.ConfigMap {
 	}
 }
 
-func configuredServiceAccountTokenSecret(label, creationTimeString, serviceAccountName, serviceAccountUID, deletionTimeString string) *v1.Secret {
+func configuredServiceAccountTokenSecret(lastUsedLabel, invalidSinceLabel, creationTimeString, serviceAccountName, serviceAccountUID, deletionTimeString string) *v1.Secret {
 	var deletionTime *metav1.Time
 	if deletionTimeString == "" {
 		deletionTime = nil
@@ -56,8 +59,11 @@ func configuredServiceAccountTokenSecret(label, creationTimeString, serviceAccou
 	}
 	creationTime, _ := time.Parse(dateFormat, creationTimeString)
 	labels := map[string]string{}
-	if label != "" {
-		labels[serviceaccount.LastUsedLabelKey] = label
+	if lastUsedLabel != "" {
+		labels[serviceaccount.LastUsedLabelKey] = lastUsedLabel
+	}
+	if invalidSinceLabel != "" {
+		labels[serviceaccount.InvalidSinceLabelKey] = invalidSinceLabel
 	}
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -108,6 +114,11 @@ func configuredPod(withSecretMount bool) *v1.Pod {
 	}
 }
 
+func patchContent(namespace, name, invalidSince string, uID types.UID) []byte {
+	patch, _ := json.Marshal(applyv1.Secret(name, namespace).WithUID(uID).WithLabels(map[string]string{serviceaccount.InvalidSinceLabelKey: invalidSince}))
+	return patch
+}
+
 func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 	testcases := map[string]struct {
 		LegacyTokenCleanUpPeriod time.Duration
@@ -120,7 +131,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 		ExpectedActions []core.Action
 	}{
 		"configmap does not exist": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2022-12-28"),
@@ -129,7 +140,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"configmap exists, but the configmap does not have tracked-since label": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("")},
@@ -139,7 +150,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"configmap exists, the time period since 'tracked-since' is smaller than the CleanUpPeriod": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-29")},
@@ -149,7 +160,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"configmap exists, the 'tracked-since' cannot be parsed": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27-1")},
@@ -169,7 +180,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"secret is not referenced by serviceaccount": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(emptySecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
@@ -179,7 +190,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"auto-generated secret has a late creation time": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-30", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-30", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
@@ -189,7 +200,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"auto-generated secret has a deletion time": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", "deleted"),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", "deleted"),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
@@ -199,7 +210,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"auto-generated secret has a late last-used time": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-30", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-30", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
@@ -209,7 +220,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"auto-generated secret has a last-used label, but it can not be parsed": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27-1", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27-1", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
@@ -219,7 +230,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"secret-referenced service account does not exist": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
 			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2022-12-29"),
@@ -228,7 +239,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"secret-referenced service account uid does not match": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "123456", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "123456", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
@@ -238,7 +249,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			},
 		},
 		"secret-referenced service account name is empty": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-27")},
@@ -247,24 +258,66 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
 			},
 		},
-		"auto-generated secret does not have 'last-used' label": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("", "2022-12-27", "default", "12345", ""),
+		"auto-generated secret does not have 'last-used' label, has not been marked as invalid": {
+			ExistingSecret:           configuredServiceAccountTokenSecret("", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
 			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2022-12-30"),
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
+				core.NewPatchAction(
+					schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+					metav1.NamespaceDefault, "token-secret-1",
+					types.MergePatchType,
+					patchContent(metav1.NamespaceDefault, "token-secret-1", time.Now().UTC().Format(dateFormat), types.UID("23456")),
+				),
+			},
+		},
+		"auto-generated secret does not have 'last-used' label, has been marked as invalid, invalid_since label can not be parsed": {
+			ExistingSecret:           configuredServiceAccountTokenSecret("", "2022-12-29-1", "2022-12-27", "default", "12345", ""),
+			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
+			ExistingPod:              configuredPod(false),
+			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
+			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2022-12-30"),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
+				core.NewPatchAction(
+					schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+					metav1.NamespaceDefault, "token-secret-1",
+					types.MergePatchType,
+					patchContent(metav1.NamespaceDefault, "token-secret-1", time.Now().UTC().Format(dateFormat), types.UID("23456")),
+				),
+			},
+		},
+		"auto-generated secret does not have 'last-used' label, has been marked as invalid, time period since invalid is less than CleanUpPeriod": {
+			ExistingSecret:           configuredServiceAccountTokenSecret("", "2023-01-01", "2022-12-27", "default", "12345", ""),
+			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
+			ExistingPod:              configuredPod(false),
+			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
+			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2022-12-29"),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
+			},
+		},
+		"auto-generated secret does not have 'last-used' label, has been marked as invalid, time period since invalid is larger than CleanUpPeriod": {
+			ExistingSecret:           configuredServiceAccountTokenSecret("", "2022-12-29", "2022-12-27", "default", "12345", ""),
+			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
+			ExistingPod:              configuredPod(false),
+			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
+			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2023-01-01"),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
 				core.NewDeleteActionWithOptions(
 					schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 					metav1.NamespaceDefault, "token-secret-1",
 					metav1.DeleteOptions{
-						Preconditions: &metav1.Preconditions{ResourceVersion: &configuredServiceAccountTokenSecret("", "2022-12-27", "default", "12345", "").ResourceVersion},
+						Preconditions: &metav1.Preconditions{ResourceVersion: &configuredServiceAccountTokenSecret("", "2022-12-29", "2022-12-27", "default", "12345", "").ResourceVersion},
 					}),
 			},
 		},
 		"auto-generated secret is mounted by the pod": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(true),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
@@ -273,20 +326,45 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
 			},
 		},
-		"auto-generated secret has 'last-used' label, the time period since last-used is larger than CleanUpPeriod": {
-			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", ""),
+		"auto-generated secret has 'last-used' label, the time period since last-used is larger than CleanUpPeriod, secret has not been marked as invalid": {
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "", "2022-12-27", "default", "12345", ""),
 			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
 			ExistingPod:              configuredPod(false),
 			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
 			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2022-12-30"),
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
+				core.NewPatchAction(
+					schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
+					metav1.NamespaceDefault, "token-secret-1",
+					types.MergePatchType,
+					patchContent(metav1.NamespaceDefault, "token-secret-1", time.Now().UTC().Format(dateFormat), types.UID("23456")),
+				),
+			},
+		},
+		"auto-generated secret has 'last-used' label, the time period since last-used is larger than CleanUpPeriod, secret has been marked as invalid, time peroid since invalid is less than CleanUpPeriod": {
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2023-05-01", "2022-12-27", "default", "12345", ""),
+			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
+			ExistingPod:              configuredPod(false),
+			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
+			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2022-12-30"),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
+			},
+		},
+		"auto-generated secret has 'last-used' label, the time period since last-used is larger than CleanUpPeriod, secret has been marked as invalid, time peroid since invalid is larger than CleanUpPeriod": {
+			ExistingSecret:           configuredServiceAccountTokenSecret("2022-12-27", "2023-01-05", "2022-12-27", "default", "12345", ""),
+			ExistingServiceAccount:   serviceAccount(tokenSecretReferences()),
+			ExistingPod:              configuredPod(false),
+			ClientObjects:            []runtime.Object{configuredConfigMap("2022-12-28")},
+			LegacyTokenCleanUpPeriod: configuredLegacyTokenCleanUpPeriod("2023-05-01"),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, legacytokentracking.ConfigMapName),
 				core.NewDeleteActionWithOptions(
 					schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 					metav1.NamespaceDefault, "token-secret-1",
-					metav1.DeleteOptions{Preconditions: &metav1.Preconditions{
-						ResourceVersion: &configuredServiceAccountTokenSecret("2022-12-27", "2022-12-27", "default", "12345", "").ResourceVersion,
-					},
+					metav1.DeleteOptions{
+						Preconditions: &metav1.Preconditions{ResourceVersion: &configuredServiceAccountTokenSecret("", "2023-01-05", "2022-12-27", "default", "12345", "").ResourceVersion},
 					}),
 			},
 		},

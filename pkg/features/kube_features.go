@@ -475,6 +475,7 @@ const (
 	// owner: @yt2985
 	// kep: http://kep.k8s.io/2800
 	// alpha: v1.28
+	// beta: v1.29
 	//
 	// Enables cleaning up of secret-based service account tokens.
 	LegacyServiceAccountTokenCleanUp featuregate.Feature = "LegacyServiceAccountTokenCleanUp"
@@ -1014,7 +1015,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	LegacyServiceAccountTokenTracking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
-	LegacyServiceAccountTokenCleanUp: {Default: false, PreRelease: featuregate.Alpha},
+	LegacyServiceAccountTokenCleanUp: {Default: true, PreRelease: featuregate.Beta},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
