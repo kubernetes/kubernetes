@@ -177,7 +177,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				}
 
 				var calls []drivers.MockCSICall
-				err = wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
+				err = wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
 					c, index, err := compareCSICalls(ctx, deterministicCalls, expected, m.driver.GetCalls)
 					if err != nil {
 						return true, fmt.Errorf("error waiting for expected CSI calls: %w", err)
