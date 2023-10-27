@@ -1,3 +1,17 @@
+## 1.29.0
+
+### Features
+- MatchError can now take an optional func(error) bool + description [2b39142]
+
+## 1.28.1
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.12.0 to 2.13.0 [635d196]
+- Bump github.com/google/go-cmp from 0.5.9 to 0.6.0 [14f8859]
+- Bump golang.org/x/net from 0.14.0 to 0.17.0 [d8a6508]
+- #703 doc(matchers): HaveEach() doc comment updated [2705bdb]
+- Minor typos (#699) [375648c]
+
 ## 1.28.0
 
 ### Features

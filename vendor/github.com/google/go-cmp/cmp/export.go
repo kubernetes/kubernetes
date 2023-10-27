@@ -2,17 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !purego
-// +build !purego
-
 package cmp
 
 import (
 	"reflect"
 	"unsafe"
 )
-
-const supportExporters = true
 
 // retrieveUnexportedField uses unsafe to forcibly retrieve any field from
 // a struct such that the value has read-write permissions.
