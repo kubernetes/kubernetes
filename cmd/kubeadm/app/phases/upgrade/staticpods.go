@@ -497,6 +497,20 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 			// if not error, but not renewed because of external CA detected, inform the user
 			fmt.Printf("[upgrade/staticpods] External CA detected, %s certificate can't be renewed\n", constants.AdminKubeConfigFileName)
 		}
+
+		// Do the same for super-admin.conf, but only if it exists
+		if _, err := os.Stat(filepath.Join(pathMgr.KubernetesDir(), constants.SuperAdminKubeConfigFileName)); err == nil {
+			// renew the certificate embedded in the super-admin.conf file
+			renewed, err := certsRenewMgr.RenewUsingLocalCA(constants.SuperAdminKubeConfigFileName)
+			if err != nil {
+				return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to upgrade the %s certificates", constants.SuperAdminKubeConfigFileName), pathMgr, false)
+			}
+
+			if !renewed {
+				// if not error, but not renewed because of external CA detected, inform the user
+				fmt.Printf("[upgrade/staticpods] External CA detected, %s certificate can't be renewed\n", constants.SuperAdminKubeConfigFileName)
+			}
+		}
 	}
 
 	// Remove the temporary directories used on a best-effort (don't fail if the calls error out)

@@ -329,9 +329,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				waitForHashChange:    nil,
 				waitForPodsWithLabel: nil,
 			},
-			moveFileFunc: func(oldPath, newPath string) error {
-				return os.Rename(oldPath, newPath)
-			},
+			moveFileFunc:         os.Rename,
 			expectedErr:          false,
 			manifestShouldChange: true,
 		},
@@ -342,9 +340,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				waitForHashChange:    nil,
 				waitForPodsWithLabel: nil,
 			},
-			moveFileFunc: func(oldPath, newPath string) error {
-				return os.Rename(oldPath, newPath)
-			},
+			moveFileFunc:         os.Rename,
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
@@ -355,9 +351,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				waitForHashChange:    errors.New("boo! failed"),
 				waitForPodsWithLabel: nil,
 			},
-			moveFileFunc: func(oldPath, newPath string) error {
-				return os.Rename(oldPath, newPath)
-			},
+			moveFileFunc:         os.Rename,
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
@@ -368,9 +362,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				waitForHashChange:    nil,
 				waitForPodsWithLabel: errors.New("boo! failed"),
 			},
-			moveFileFunc: func(oldPath, newPath string) error {
-				return os.Rename(oldPath, newPath)
-			},
+			moveFileFunc:         os.Rename,
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
@@ -432,9 +424,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				waitForHashChange:    nil,
 				waitForPodsWithLabel: nil,
 			},
-			moveFileFunc: func(oldPath, newPath string) error {
-				return os.Rename(oldPath, newPath)
-			},
+			moveFileFunc:         os.Rename,
 			skipKubeConfig:       constants.SchedulerKubeConfigFileName,
 			expectedErr:          true,
 			manifestShouldChange: false,
@@ -446,12 +436,33 @@ func TestStaticPodControlPlane(t *testing.T) {
 				waitForHashChange:    nil,
 				waitForPodsWithLabel: nil,
 			},
-			moveFileFunc: func(oldPath, newPath string) error {
-				return os.Rename(oldPath, newPath)
-			},
+			moveFileFunc:         os.Rename,
 			skipKubeConfig:       constants.AdminKubeConfigFileName,
 			expectedErr:          true,
 			manifestShouldChange: false,
+		},
+		{
+			description: "super-admin.conf is renewed if it exists",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			moveFileFunc:         os.Rename,
+			expectedErr:          false,
+			manifestShouldChange: true,
+		},
+		{
+			description: "no error is thrown if super-admin.conf does not exist",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			moveFileFunc:         os.Rename,
+			skipKubeConfig:       constants.SuperAdminKubeConfigFileName,
+			expectedErr:          false,
+			manifestShouldChange: true,
 		},
 	}
 
@@ -494,6 +505,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 
 			for _, kubeConfig := range []string{
 				constants.AdminKubeConfigFileName,
+				constants.SuperAdminKubeConfigFileName,
 				constants.SchedulerKubeConfigFileName,
 				constants.ControllerManagerKubeConfigFileName,
 			} {
