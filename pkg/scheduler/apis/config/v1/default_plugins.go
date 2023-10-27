@@ -26,6 +26,8 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+var GetDefaultPlugins = getDefaultPlugins()
+
 // getDefaultPlugins returns the default set of plugins.
 func getDefaultPlugins() *v1.Plugins {
 	plugins := &v1.Plugins{
