@@ -69,7 +69,6 @@
       "cloud.google.com/go": [
         "cloud.google.com/go/compute",
         "github.com/google/cadvisor",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/bigquery": [
@@ -78,6 +77,8 @@
       ],
       "cloud.google.com/go/compute": [
         "cloud.google.com/go/compute/metadata",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "golang.org/x/oauth2",
         "google.golang.org/genproto",
         "google.golang.org/grpc"
       ],
@@ -181,11 +182,9 @@
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/pkg/v3",
         "go.etcd.io/etcd/server/v3",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
         "google.golang.org/api",
         "google.golang.org/genproto/googleapis/api",
+        "google.golang.org/genproto/googleapis/rpc",
         "google.golang.org/grpc",
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ]

@@ -30,6 +30,7 @@ import (
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+	"google.golang.org/grpc/internal/grpclog"
 	"google.golang.org/grpc/internal/grpcutil"
 	"google.golang.org/grpc/status"
 )
@@ -39,7 +40,7 @@ var updateHeaderTblSize = func(e *hpack.Encoder, v uint32) {
 }
 
 type itemNode struct {
-	it   interface{}
+	it   any
 	next *itemNode
 }
 
@@ -48,7 +49,7 @@ type itemList struct {
 	tail *itemNode
 }
 
-func (il *itemList) enqueue(i interface{}) {
+func (il *itemList) enqueue(i any) {
 	n := &itemNode{it: i}
 	if il.tail == nil {
 		il.head, il.tail = n, n
@@ -60,11 +61,11 @@ func (il *itemList) enqueue(i interface{}) {
 
 // peek returns the first item in the list without removing it from the
 // list.
-func (il *itemList) peek() interface{} {
+func (il *itemList) peek() any {
 	return il.head.it
 }
 
-func (il *itemList) dequeue() interface{} {
+func (il *itemList) dequeue() any {
 	if il.head == nil {
 		return nil
 	}
@@ -335,7 +336,7 @@ func (c *controlBuffer) put(it cbItem) error {
 	return err
 }
 
-func (c *controlBuffer) executeAndPut(f func(it interface{}) bool, it cbItem) (bool, error) {
+func (c *controlBuffer) executeAndPut(f func(it any) bool, it cbItem) (bool, error) {
 	var wakeUp bool
 	c.mu.Lock()
 	if c.err != nil {
@@ -372,7 +373,7 @@ func (c *controlBuffer) executeAndPut(f func(it interface{}) bool, it cbItem) (b
 }
 
 // Note argument f should never be nil.
-func (c *controlBuffer) execute(f func(it interface{}) bool, it interface{}) (bool, error) {
+func (c *controlBuffer) execute(f func(it any) bool, it any) (bool, error) {
 	c.mu.Lock()
 	if c.err != nil {
 		c.mu.Unlock()
@@ -386,7 +387,7 @@ func (c *controlBuffer) execute(f func(it interface{}) bool, it interface{}) (bo
 	return true, nil
 }
 
-func (c *controlBuffer) get(block bool) (interface{}, error) {
+func (c *controlBuffer) get(block bool) (any, error) {
 	for {
 		c.mu.Lock()
 		if c.err != nil {
@@ -488,12 +489,13 @@ type loopyWriter struct {
 	bdpEst        *bdpEstimator
 	draining      bool
 	conn          net.Conn
+	logger        *grpclog.PrefixLogger
 
 	// Side-specific handlers
 	ssGoAwayHandler func(*goAway) (bool, error)
 }
 
-func newLoopyWriter(s side, fr *framer, cbuf *controlBuffer, bdpEst *bdpEstimator, conn net.Conn) *loopyWriter {
+func newLoopyWriter(s side, fr *framer, cbuf *controlBuffer, bdpEst *bdpEstimator, conn net.Conn, logger *grpclog.PrefixLogger) *loopyWriter {
 	var buf bytes.Buffer
 	l := &loopyWriter{
 		side:          s,
@@ -507,6 +509,7 @@ func newLoopyWriter(s side, fr *framer, cbuf *controlBuffer, bdpEst *bdpEstimato
 		hEnc:          hpack.NewEncoder(&buf),
 		bdpEst:        bdpEst,
 		conn:          conn,
+		logger:        logger,
 	}
 	return l
 }
@@ -536,8 +539,8 @@ const minBatchSize = 1000
 // left open to allow the I/O error to be encountered by the reader instead.
 func (l *loopyWriter) run() (err error) {
 	defer func() {
-		if logger.V(logLevel) {
-			logger.Infof("transport: loopyWriter exiting with error: %v", err)
+		if l.logger.V(logLevel) {
+			l.logger.Infof("loopyWriter exiting with error: %v", err)
 		}
 		if !isIOError(err) {
 			l.framer.writer.Flush()
@@ -636,8 +639,8 @@ func (l *loopyWriter) headerHandler(h *headerFrame) error {
 	if l.side == serverSide {
 		str, ok := l.estdStreams[h.streamID]
 		if !ok {
-			if logger.V(logLevel) {
-				logger.Warningf("transport: loopy doesn't recognize the stream: %d", h.streamID)
+			if l.logger.V(logLevel) {
+				l.logger.Infof("Unrecognized streamID %d in loopyWriter", h.streamID)
 			}
 			return nil
 		}
@@ -692,8 +695,8 @@ func (l *loopyWriter) writeHeader(streamID uint32, endStream bool, hf []hpack.He
 	l.hBuf.Reset()
 	for _, f := range hf {
 		if err := l.hEnc.WriteField(f); err != nil {
-			if logger.V(logLevel) {
-				logger.Warningf("transport: loopyWriter.writeHeader encountered error while encoding headers: %v", err)
+			if l.logger.V(logLevel) {
+				l.logger.Warningf("Encountered error while encoding headers: %v", err)
 			}
 		}
 	}
@@ -827,7 +830,7 @@ func (l *loopyWriter) goAwayHandler(g *goAway) error {
 	return nil
 }
 
-func (l *loopyWriter) handle(i interface{}) error {
+func (l *loopyWriter) handle(i any) error {
 	switch i := i.(type) {
 	case *incomingWindowUpdate:
 		l.incomingWindowUpdateHandler(i)

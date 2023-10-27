@@ -14,45 +14,42 @@
 
 module-sets:
   stable-v1:
-    version: v1.10.0
+    version: v1.19.0
     modules:
       - go.opentelemetry.io/otel
       - go.opentelemetry.io/otel/bridge/opentracing
+      - go.opentelemetry.io/otel/bridge/opentracing/test
+      - go.opentelemetry.io/otel/example/dice
       - go.opentelemetry.io/otel/example/fib
-      - go.opentelemetry.io/otel/example/jaeger
       - go.opentelemetry.io/otel/example/namedtracer
       - go.opentelemetry.io/otel/example/otel-collector
       - go.opentelemetry.io/otel/example/passthrough
       - go.opentelemetry.io/otel/example/zipkin
-      - go.opentelemetry.io/otel/exporters/jaeger
-      - go.opentelemetry.io/otel/exporters/zipkin
       - go.opentelemetry.io/otel/exporters/otlp/otlptrace
       - go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
       - go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
-      - go.opentelemetry.io/otel/exporters/otlp/internal/retry
       - go.opentelemetry.io/otel/exporters/stdout/stdouttrace
-      - go.opentelemetry.io/otel/trace
+      - go.opentelemetry.io/otel/exporters/zipkin
+      - go.opentelemetry.io/otel/metric
       - go.opentelemetry.io/otel/sdk
+      - go.opentelemetry.io/otel/sdk/metric
+      - go.opentelemetry.io/otel/trace
   experimental-metrics:
-    version: v0.31.0
+    version: v0.42.0
     modules:
+      - go.opentelemetry.io/otel/bridge/opencensus
+      - go.opentelemetry.io/otel/bridge/opencensus/test
+      - go.opentelemetry.io/otel/example/opencensus
       - go.opentelemetry.io/otel/example/prometheus
+      - go.opentelemetry.io/otel/example/view
       - go.opentelemetry.io/otel/exporters/otlp/otlpmetric
       - go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc
       - go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
       - go.opentelemetry.io/otel/exporters/prometheus
       - go.opentelemetry.io/otel/exporters/stdout/stdoutmetric
-      - go.opentelemetry.io/otel/metric
-      - go.opentelemetry.io/otel/sdk/metric
   experimental-schema:
-    version: v0.0.3
+    version: v0.0.7
     modules:
       - go.opentelemetry.io/otel/schema
-  bridge:
-    version: v0.31.0
-    modules:
-      - go.opentelemetry.io/otel/bridge/opencensus
-      - go.opentelemetry.io/otel/bridge/opencensus/test
-      - go.opentelemetry.io/otel/example/opencensus
 excluded-modules:
   - go.opentelemetry.io/otel/internal/tools

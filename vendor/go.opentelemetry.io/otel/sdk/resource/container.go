@@ -22,7 +22,7 @@ import (
 	"os"
 	"regexp"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 type containerIDProvider func() (string, error)
@@ -47,7 +47,7 @@ func (cgroupContainerIDDetector) Detect(ctx context.Context) (*Resource, error) 
 	if containerID == "" {
 		return Empty(), nil
 	}
-	return NewWithAttributes(semconv.SchemaURL, semconv.ContainerIDKey.String(containerID)), nil
+	return NewWithAttributes(semconv.SchemaURL, semconv.ContainerID(containerID)), nil
 }
 
 var (

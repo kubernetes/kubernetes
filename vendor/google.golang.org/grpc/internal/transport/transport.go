@@ -43,10 +43,6 @@ import (
 	"google.golang.org/grpc/tap"
 )
 
-// ErrNoHeaders is used as a signal that a trailers only response was received,
-// and is not a real error.
-var ErrNoHeaders = errors.New("stream has no headers")
-
 const logLevel = 2
 
 type bufferPool struct {
@@ -56,7 +52,7 @@ type bufferPool struct {
 func newBufferPool() *bufferPool {
 	return &bufferPool{
 		pool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return new(bytes.Buffer)
 			},
 		},
@@ -390,12 +386,8 @@ func (s *Stream) Header() (metadata.MD, error) {
 	}
 	s.waitOnHeader()
 
-	if !s.headerValid {
+	if !s.headerValid || s.noHeaders {
 		return nil, s.status.Err()
-	}
-
-	if s.noHeaders {
-		return nil, ErrNoHeaders
 	}
 
 	return s.header.Copy(), nil
@@ -559,6 +551,7 @@ type ServerConfig struct {
 	InitialConnWindowSize int32
 	WriteBufferSize       int
 	ReadBufferSize        int
+	SharedWriteBuffer     bool
 	ChannelzParentID      *channelz.Identifier
 	MaxHeaderListSize     *uint32
 	HeaderTableSize       *uint32
@@ -592,6 +585,8 @@ type ConnectOptions struct {
 	WriteBufferSize int
 	// ReadBufferSize sets the size of read buffer, which in turn determines how much data can be read at most for one read syscall.
 	ReadBufferSize int
+	// SharedWriteBuffer indicates whether connections should reuse write buffer
+	SharedWriteBuffer bool
 	// ChannelzParentID sets the addrConn id which initiate the creation of this client transport.
 	ChannelzParentID *channelz.Identifier
 	// MaxHeaderListSize sets the max (uncompressed) size of header list that is prepared to be received.
@@ -726,7 +721,7 @@ type ServerTransport interface {
 	RemoteAddr() net.Addr
 
 	// Drain notifies the client this ServerTransport stops accepting new RPCs.
-	Drain()
+	Drain(debugData string)
 
 	// IncrMsgSent increments the number of message sent through this transport.
 	IncrMsgSent()
@@ -736,7 +731,7 @@ type ServerTransport interface {
 }
 
 // connectionErrorf creates an ConnectionError with the specified error description.
-func connectionErrorf(temp bool, e error, format string, a ...interface{}) ConnectionError {
+func connectionErrorf(temp bool, e error, format string, a ...any) ConnectionError {
 	return ConnectionError{
 		Desc: fmt.Sprintf(format, a...),
 		temp: temp,
