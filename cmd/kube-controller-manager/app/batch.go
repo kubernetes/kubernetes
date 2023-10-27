@@ -24,11 +24,20 @@ import (
 	"fmt"
 
 	"k8s.io/controller-manager/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 )
 
-func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newJobControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.JobController,
+		aliases:  []string{"job"},
+		initFunc: startJobController,
+	}
+}
+
+func startJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	jobController, err := job.NewController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
@@ -42,7 +51,15 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 	return nil, true, nil
 }
 
-func startCronJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newCronJobControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.CronJobController,
+		aliases:  []string{"cronjob"},
+		initFunc: startCronJobController,
+	}
+}
+
+func startCronJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),
 		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),

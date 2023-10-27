@@ -21,14 +21,26 @@ import (
 
 	pluginvalidatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
-func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.ValidatingAdmissionPolicyStatusController,
+		initFunc: startValidatingAdmissionPolicyStatusController,
+		requiredFeatureGates: []featuregate.Feature{
+			genericfeatures.ValidatingAdmissionPolicy,
+		},
+	}
+}
+
+func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	// KCM won't start the controller without the feature gate set.
 	typeChecker := &pluginvalidatingadmissionpolicy.TypeChecker{
 		SchemaResolver: resolver.NewDefinitionsSchemaResolver(scheme.Scheme, openapi.GetOpenAPIDefinitions),
