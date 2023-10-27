@@ -344,6 +344,61 @@ var _ = SIGDescribe("Job", func() {
 		}
 	})
 
+	ginkgo.It("should recreate pods only after they have failed if pod replacement policy is set to Failed", func(ctx context.Context) {
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJob("", "pod-recreate-failed", v1.RestartPolicyNever, 1, 1, nil, 1)
+		job.Spec.PodReplacementPolicy = ptr.To(batchv1.Failed)
+		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", `_term(){
+	sleep 5
+	exit 143
+}
+trap _term SIGTERM
+while true; do
+	sleep 1
+done`}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, job.Name, 1)
+		framework.ExpectNoError(err, "failed to wait for job pod to become running in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Deleting job pod")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job %s in namespace: %s", job.Name, f.Namespace.Name)
+
+		framework.ExpectNoError(e2epod.DeletePodsWithGracePeriod(ctx, f.ClientSet, pods.Items, 30), "failed to delete pods in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pod does not get recreated while it is in terminating state")
+		err = e2ejob.WaitForJobState(ctx, f.ClientSet, f.Namespace.Name, job.Name, f.Timeouts.PodDelete, func(job *batchv1.Job) string {
+			if job.Status.Active == 0 && job.Status.Failed == 0 && *job.Status.Terminating == 1 {
+				return ""
+			} else {
+				return fmt.Sprintf(
+					"expected job to have 0 active pod, 0 failed pod and 1 terminating pods, but got %d active pods, %d failed pods and %d terminating pods",
+					job.Status.Active,
+					job.Status.Failed,
+					*job.Status.Terminating,
+				)
+			}
+		})
+		framework.ExpectNoError(err, "failed to ensure pod is not recreated while it is in terminating state")
+
+		ginkgo.By("Ensuring pod gets recreated after it has failed")
+		err = e2ejob.WaitForJobState(ctx, f.ClientSet, f.Namespace.Name, job.Name, f.Timeouts.PodDelete, func(job *batchv1.Job) string {
+			if job.Status.Active == 1 && job.Status.Failed == 1 && *job.Status.Terminating == 0 {
+				return ""
+			} else {
+				return fmt.Sprintf(
+					"expected job to have 1 active pods, 1 failed pods and 0 terminating pod, but got %d active pods, %d failed pods and %d terminating pods",
+					job.Status.Active,
+					job.Status.Failed,
+					*job.Status.Terminating,
+				)
+			}
+		})
+		framework.ExpectNoError(err, "failed to wait for pod to get recreated")
+	})
+
 	/*
 		  Release: v1.24
 			Testname: Ensure Pods of an Indexed Job get a unique index.
