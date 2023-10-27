@@ -1,0 +1,28 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: my-app
+spec:
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /mypath
+    backendRefs:
+    - name: my-service-1
+      port: 8080
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /mypath-012
+    backendRefs:
+    - name: my-service-2
+      port: 8080
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /my%20path/123
+    backendRefs:
+    - name: my-service-3
+      port: 8080
+
