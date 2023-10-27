@@ -275,14 +275,29 @@ func TestStartupProbeSuccessThreshold(t *testing.T) {
 	failureThreshold := 3
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
 	m.statusManager.SetPodStatus(w.pod, getTestNotRunningStatus())
-
 	m.prober.exec = fakeExecProber{probe.Success, nil}
 
 	for i := 0; i < successThreshold+1; i++ {
+		if i < successThreshold {
+			// Probe should not be on hold and will continue to be excuted
+			// until successThreshold is met
+			if w.onHold {
+				t.Errorf("Prober should not be on hold")
+			}
+		} else {
+			// Probe should be on hold and will not be executed anymore
+			// when successThreshold is met
+			if !w.onHold {
+				t.Errorf("Prober should be on hold because successThreshold is exceeded")
+			}
+		}
 		msg := fmt.Sprintf("%d success", successThreshold)
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Success, msg)
-		expectResultRun(t, w, 0, msg)
+		// Meeting or exceeding successThreshold should cause resultRun to reset to 0
+		if w.resultRun != 0 {
+			t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+		}
 	}
 }
 
@@ -293,19 +308,48 @@ func TestStartupProbeFailureThreshold(t *testing.T) {
 	failureThreshold := 3
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
 	m.statusManager.SetPodStatus(w.pod, getTestNotRunningStatus())
-
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 
 	for i := 0; i < failureThreshold+1; i++ {
-		msg := fmt.Sprintf("%d failure", i+1)
-		expectContinue(t, w, w.doProbe(ctx), msg)
 		if i < failureThreshold-1 {
+			// Probe should not be on hold and will continue to be excuted
+			// until failureThreshold is met
+			if w.onHold {
+				t.Errorf("Prober should not be on hold")
+			}
+			msg := fmt.Sprintf("%d failure", i+1)
+			expectContinue(t, w, w.doProbe(ctx), msg)
 			expectResult(t, w, results.Unknown, msg)
-			expectResultRun(t, w, i+1, msg)
-		} else {
-			msg := fmt.Sprintf("%d failure", failureThreshold)
+			// resultRun should be incremented until failureThreshold is met
+			if w.resultRun != i+1 {
+				t.Errorf("Prober resultRun should be %d, but %d", i+1, w.resultRun)
+			}
+		} else if i < failureThreshold {
+			// Probe should not be on hold and will continue to be excuted
+			// until failureThreshold is met
+			if w.onHold {
+				t.Errorf("Prober should not be on hold")
+			}
+			msg := fmt.Sprintf("%d failure", i+1)
+			expectContinue(t, w, w.doProbe(ctx), msg)
 			expectResult(t, w, results.Failure, msg)
-			expectResultRun(t, w, 0, msg)
+			// Meeting failureThreshold should cause resultRun to reset to 0
+			if w.resultRun != 0 {
+				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+			}
+		} else {
+			// Probe should be on hold and will not be executed anymore
+			// when failureThreshold is met
+			if !w.onHold {
+				t.Errorf("Prober should be on hold because failureThreshold is exceeded")
+			}
+			msg := fmt.Sprintf("%d failure", failureThreshold)
+			expectContinue(t, w, w.doProbe(ctx), msg)
+			expectResult(t, w, results.Failure, msg)
+			// Exceeding failureThreshold should cause resultRun to reset to 0
+			if w.resultRun != 0 {
+				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+			}
 		}
 	}
 }
@@ -354,13 +398,6 @@ func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg st
 	} else if result != expectedResult {
 		t.Errorf("[%s - %s] Expected result to be %v, but was %v",
 			w.probeType, msg, expectedResult, result)
-	}
-}
-
-func expectResultRun(t *testing.T, w *worker, expectedResultRun int, msg string) {
-	if w.resultRun != expectedResultRun {
-		t.Errorf("[%s - %s] Expected result to be %v, but was %v",
-			w.probeType, msg, expectedResultRun, w.resultRun)
 	}
 }
 
