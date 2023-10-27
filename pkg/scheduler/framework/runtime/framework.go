@@ -545,7 +545,22 @@ func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *con
 	return nil
 }
 
+func shouldHaveEnqueueExtensions(p framework.Plugin) bool {
+	switch p.(type) {
+	// Only PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins can (should) have EnqueueExtensions.
+	// See the comment of EnqueueExtensions for more detailed reason here.
+	case framework.PreEnqueuePlugin, framework.PreFilterPlugin, framework.FilterPlugin, framework.ReservePlugin, framework.PermitPlugin:
+		return true
+	}
+	return false
+}
+
 func (f *frameworkImpl) fillEnqueueExtensions(p framework.Plugin) {
+	if !shouldHaveEnqueueExtensions(p) {
+		// Ignore EnqueueExtensions from plugin which isn't PreEnqueue, PreFilter, Filter, Reserve, and Permit.
+		return
+	}
+
 	ext, ok := p.(framework.EnqueueExtensions)
 	if !ok {
 		// If interface EnqueueExtensions is not implemented, register the default enqueue extensions
