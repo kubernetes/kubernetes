@@ -70,7 +70,7 @@ type cacheWatcher struct {
 
 	// drainInputBuffer indicates whether we should delay closing this watcher
 	// and send all event in the input buffer.
-	drainInputBuffer bool
+	drainInputBuffer *bool
 
 	// bookmarkAfterResourceVersion holds an RV that indicates
 	// when we should start delivering bookmark events.
@@ -124,10 +124,16 @@ func (c *cacheWatcher) Stop() {
 
 // we rely on the fact that stopLocked is actually protected by Cacher.Lock()
 func (c *cacheWatcher) stopLocked() {
+	var drainInputBuffer bool
+
+	if c.drainInputBuffer != nil {
+		drainInputBuffer = *c.drainInputBuffer
+	}
+
 	if !c.stopped {
 		c.stopped = true
 		// stop without draining the input channel was requested.
-		if !c.drainInputBuffer {
+		if !drainInputBuffer {
 			close(c.done)
 		}
 		close(c.input)
@@ -139,7 +145,7 @@ func (c *cacheWatcher) stopLocked() {
 	// processing goroutine if it will be trying to put more objects
 	// into result channel, the channel will be full and there will
 	// already be noone on the processing the events on the receiving end.
-	if !c.drainInputBuffer && !c.isDoneChannelClosedLocked() {
+	if !drainInputBuffer && !c.isDoneChannelClosedLocked() {
 		close(c.done)
 	}
 }
@@ -329,8 +335,24 @@ func (c *cacheWatcher) setBookmarkAfterResourceVersion(bookmarkAfterResourceVers
 
 // setDrainInputBufferLocked if set to true indicates that we should delay closing this watcher
 // until we send all events residing in the input buffer.
+//
+// Note that this function can be called multiple times.
+// We allow overwriting the drain policy only when
+// the subsequent request wants to stop draining the buffer.
 func (c *cacheWatcher) setDrainInputBufferLocked(drain bool) {
-	c.drainInputBuffer = drain
+	if c.drainInputBuffer == nil {
+		c.drainInputBuffer = &drain
+		return
+	}
+
+	// allow overwriting
+	// our motivation here is that there
+	// is no point of trying to send buffered
+	// events to a possibly disconnected client
+	if *c.drainInputBuffer && !drain {
+		c.drainInputBuffer = &drain
+		return
+	}
 }
 
 // isDoneChannelClosed checks if c.done channel is closed
