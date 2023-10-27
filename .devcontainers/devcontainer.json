@@ -1,0 +1,41 @@
+// For format details, see https:https://containers.dev/implementors/spec/. For config options, see the README at:
+// https://github.com/devcontainers/images/tree/main/src/base-debian
+{
+    "name": "Kubernetes with e2e testing image build and push",
+    "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+    // Setup the go environment and mount into the dev container at the expected location
+    "hostRequirements": {
+        "cpus": 4
+    },
+    // Copy over welcome message and install pyyaml
+    "onCreateCommand": "bash .devcontainer/setup.sh",
+    // for Kubernetes testing, suppress extraneous forwarding messages
+    "otherPortsAttributes": {
+        "onAutoForward": "silent"
+    },
+    "remoteUser": "root",
+    // Install utils, go, docker-in-docker, and other tools
+    // For more info about dev container Features see https://containers.dev/features
+    "features": {
+        "ghcr.io/devcontainers/features/go:1": {
+            "version": "1.21.1",
+            "username": "root"
+        },
+        // Install kubectl, but skip minikube and helm
+        "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+            "version": "latest",
+            "helm": "none",
+            "minikube": "none"
+        },
+        // Enable running docker in docker
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/sshd:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        // Python required for some hack tools
+        "ghcr.io/devcontainers/features/python:1": {},
+        // TO DO - move these features from local to their projects, and publish them
+        "./local-features/kubectl-kind": {},
+        "./local-features/etcd": {},
+        "./local-features/kubetest2": {}
+    }
+}

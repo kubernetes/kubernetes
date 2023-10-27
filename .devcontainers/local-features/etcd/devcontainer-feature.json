@@ -1,0 +1,21 @@
+{
+    "id": "etcd",
+    "name": "ETCD",
+    "descrption": "Operating etcd clusters for Kubernetes",
+    "options": {
+        "version": {
+            "type": "string",
+            "proposals": [
+                "latest"
+            ],
+            "default": "latest",
+            "description": "Select or enter a version."
+        }
+    },
+    "containerEnv": {
+        "PATH": "/usr/local/etcd:${PATH}"
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}
