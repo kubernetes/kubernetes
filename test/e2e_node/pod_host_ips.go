@@ -158,10 +158,10 @@ var _ = common.SIGDescribe("Dual Stack Host IP [Feature:PodHostIPs]", func() {
 			framework.ExpectNoError(err)
 			for _, node := range nodeList.Items {
 				if node.Name == p.Spec.NodeName {
-					nodeIPs := []string{}
+					nodeIPs := []v1.HostIP{}
 					for _, address := range node.Status.Addresses {
 						if address.Type == v1.NodeInternalIP {
-							nodeIPs = append(nodeIPs, address.Address)
+							nodeIPs = append(nodeIPs, v1.HostIP{IP: address.Address})
 						}
 					}
 					gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(nodeIPs))
@@ -214,10 +214,10 @@ var _ = common.SIGDescribe("Dual Stack Host IP [Feature:PodHostIPs]", func() {
 			framework.ExpectNoError(err)
 			for _, node := range nodeList.Items {
 				if node.Name == p.Spec.NodeName {
-					nodeIPs := []string{}
+					nodeIPs := []v1.HostIP{}
 					for _, address := range node.Status.Addresses {
 						if address.Type == v1.NodeInternalIP {
-							nodeIPs = append(nodeIPs, address.Address)
+							nodeIPs = append(nodeIPs, v1.HostIP{IP: address.Address})
 						}
 					}
 					gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(nodeIPs))
