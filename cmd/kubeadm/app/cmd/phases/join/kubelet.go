@@ -38,6 +38,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -216,6 +218,21 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	if err := waitForTLSBootstrappedClient(cfg.Timeouts.TLSBootstrap.Duration); err != nil {
 		fmt.Printf(kubeadmJoinFailMsg, err)
 		return err
+	}
+
+	if cfg.ControlPlane != nil && features.Enabled(initCfg.FeatureGates, features.WaitForAllControlPlaneComponents) {
+		fmt.Println("[kubelet-start] Wait for control plane components")
+		timeout := 40 * time.Second
+		err := controlplane.WaitForControlPlaneComponents(
+			controlplane.ControlPlaneComponents,
+			timeout,
+			data.ManifestDir(),
+			data.KubeletDir(),
+			initCfg.CertificatesDir)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
