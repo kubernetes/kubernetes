@@ -28,6 +28,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
@@ -93,6 +95,23 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		" from directory %q\n",
 		data.ManifestDir())
 
+	waitForControlPlaneComponentsFunc := func() error {
+		waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
+		return waiter.WaitForAPI()
+	}
+
+	clusterConfig := data.Cfg().ClusterConfiguration
+	if features.Enabled(clusterConfig.FeatureGates, features.WaitForAllControlPlaneComponents) {
+		waitForControlPlaneComponentsFunc = func() error {
+			return controlplane.WaitForControlPlaneComponents(
+				controlplane.ControlPlaneComponents,
+				data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration,
+				data.ManifestDir(),
+				data.KubeletDir(),
+				clusterConfig.CertificatesDir)
+		}
+	}
+
 	handleError := func(err error) error {
 		context := struct {
 			Error  string
@@ -111,8 +130,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return handleError(err)
 	}
 
-	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
-	if err := waiter.WaitForAPI(); err != nil {
+	if err := waitForControlPlaneComponentsFunc(); err != nil {
 		return handleError(err)
 	}
 
