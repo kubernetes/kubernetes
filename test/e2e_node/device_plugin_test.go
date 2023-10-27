@@ -242,7 +242,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(v1ResourcesForOurPod.Containers[0].Devices[0].DeviceIds).To(gomega.HaveLen(1))
 		})
 
-		ginkgo.It("can make a CDI device accessible in a container", func(ctx context.Context) {
+		ginkgo.It("[NodeSpecialFeature:CDI] can make a CDI device accessible in a container", func(ctx context.Context) {
 			e2eskipper.SkipUnlessFeatureGateEnabled(features.DevicePluginCDIDevices)
 			// check if CDI_DEVICE env variable is set
 			// and only one correspondent device node /tmp/<CDI_DEVICE> is available inside a container
