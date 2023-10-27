@@ -1061,7 +1061,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
-	SidecarContainers: {Default: false, PreRelease: featuregate.Alpha},
+	SidecarContainers: {Default: true, PreRelease: featuregate.Beta},
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
 
