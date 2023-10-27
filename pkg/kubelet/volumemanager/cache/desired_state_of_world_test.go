@@ -613,10 +613,12 @@ func Test_AddPodToVolume_Positive_SELinuxNoRWOP(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	// Arrange
 	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeBasicVolumePlugin{
-			Plugin: volumetesting.FakeVolumePlugin{
-				PluginName:      "basic",
-				SupportsSELinux: true,
+		&volumetesting.FakeDeviceMountableVolumePlugin{
+			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+				Plugin: volumetesting.FakeVolumePlugin{
+					PluginName:      "basic",
+					SupportsSELinux: true,
+				},
 			},
 		},
 	}
@@ -694,10 +696,12 @@ func Test_AddPodToVolume_Positive_NoSELinuxPlugin(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	// Arrange
 	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeBasicVolumePlugin{
-			Plugin: volumetesting.FakeVolumePlugin{
-				PluginName:      "basic",
-				SupportsSELinux: false,
+		&volumetesting.FakeDeviceMountableVolumePlugin{
+			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+				Plugin: volumetesting.FakeVolumePlugin{
+					PluginName:      "basic",
+					SupportsSELinux: false,
+				},
 			},
 		},
 	}
@@ -776,10 +780,12 @@ func Test_AddPodToVolume_Positive_ExistingPodSameSELinuxRWOP(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	// Arrange
 	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeBasicVolumePlugin{
-			Plugin: volumetesting.FakeVolumePlugin{
-				PluginName:      "basic",
-				SupportsSELinux: true,
+		&volumetesting.FakeDeviceMountableVolumePlugin{
+			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+				Plugin: volumetesting.FakeVolumePlugin{
+					PluginName:      "basic",
+					SupportsSELinux: true,
+				},
 			},
 		},
 	}
@@ -877,10 +883,12 @@ func Test_AddPodToVolume_Negative_ExistingPodDifferentSELinuxRWOP(t *testing.T) 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	// Arrange
 	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeBasicVolumePlugin{
-			Plugin: volumetesting.FakeVolumePlugin{
-				PluginName:      "basic",
-				SupportsSELinux: true,
+		&volumetesting.FakeDeviceMountableVolumePlugin{
+			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+				Plugin: volumetesting.FakeVolumePlugin{
+					PluginName:      "basic",
+					SupportsSELinux: true,
+				},
 			},
 		},
 	}
@@ -961,7 +969,7 @@ func Test_AddPodToVolume_Negative_ExistingPodDifferentSELinuxRWOP(t *testing.T) 
 	pod2.Name = "pod2"
 	pod2.UID = "pod2uid"
 	pod2.Spec.SecurityContext.SELinuxOptions = &seLinux2
-	pod2Name := util.GetUniquePodName(pod)
+	pod2Name := util.GetUniquePodName(pod2)
 
 	// Act
 	_, err = dsw.AddPodToVolume(
@@ -971,7 +979,7 @@ func Test_AddPodToVolume_Negative_ExistingPodDifferentSELinuxRWOP(t *testing.T) 
 		t.Fatalf("Second AddPodToVolume succeeded, expected a failure")
 	}
 	// Verify the original SELinux context is still in DSW
-	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
+	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
 }
 
 func verifyVolumeExistsDsw(
