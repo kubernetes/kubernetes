@@ -34,8 +34,6 @@ type UpdaterBuilder struct {
 	Converter     Converter
 	IgnoredFields map[fieldpath.APIVersion]*fieldpath.Set
 
-	EnableUnions bool
-
 	// Stop comparing the new object with old object after applying.
 	// This was initially used to avoid spurious etcd update, but
 	// since that's vastly inefficient, we've come-up with a better
@@ -49,7 +47,6 @@ func (u *UpdaterBuilder) BuildUpdater() *Updater {
 	return &Updater{
 		Converter:         u.Converter,
 		IgnoredFields:     u.IgnoredFields,
-		enableUnions:      u.EnableUnions,
 		returnInputOnNoop: u.ReturnInputOnNoop,
 	}
 }
@@ -63,17 +60,7 @@ type Updater struct {
 	// Deprecated: This will eventually become private.
 	IgnoredFields map[fieldpath.APIVersion]*fieldpath.Set
 
-	enableUnions bool
-
 	returnInputOnNoop bool
-}
-
-// EnableUnionFeature turns on union handling. It is disabled by default until the
-// feature is complete.
-//
-// Deprecated: Use the builder instead.
-func (s *Updater) EnableUnionFeature() {
-	s.enableUnions = true
 }
 
 func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, *typed.Comparison, error) {
@@ -160,12 +147,6 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}
-	if s.enableUnions {
-		newObject, err = liveObject.NormalizeUnions(newObject)
-		if err != nil {
-			return nil, fieldpath.ManagedFields{}, err
-		}
-	}
 	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, true)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
@@ -179,7 +160,7 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 		ignored = fieldpath.NewSet()
 	}
 	managers[manager] = fieldpath.NewVersionedSet(
-		managers[manager].Set().Union(compare.Modified).Union(compare.Added).Difference(compare.Removed).RecursiveDifference(ignored),
+		managers[manager].Set().Difference(compare.Removed).Union(compare.Modified).Union(compare.Added).RecursiveDifference(ignored),
 		version,
 		false,
 	)
@@ -198,21 +179,9 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}
-	if s.enableUnions {
-		configObject, err = configObject.NormalizeUnionsApply(configObject)
-		if err != nil {
-			return nil, fieldpath.ManagedFields{}, err
-		}
-	}
 	newObject, err := liveObject.Merge(configObject)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
-	}
-	if s.enableUnions {
-		newObject, err = configObject.NormalizeUnionsApply(newObject)
-		if err != nil {
-			return nil, fieldpath.ManagedFields{}, err
-		}
 	}
 	lastSet := managers[manager]
 	set, err := configObject.ToFieldSet()
