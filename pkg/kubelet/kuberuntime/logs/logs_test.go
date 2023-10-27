@@ -244,7 +244,7 @@ func TestReadRotatedLog(t *testing.T) {
 		mu.Lock()
 		path := file.Name()
 		mu.Unlock()
-		ReadLogs(ctx, path, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+		_ = ReadLogs(ctx, path, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 	}(ctx)
 
 	// log in stdout
