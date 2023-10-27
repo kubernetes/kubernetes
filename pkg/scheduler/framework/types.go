@@ -748,12 +748,12 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
 }
 
-func removeFromSlice(s []*PodInfo, k string) ([]*PodInfo, bool) {
+func removeFromSlice(logger klog.Logger, s []*PodInfo, k string) ([]*PodInfo, bool) {
 	var removed bool
 	for i := range s {
 		tmpKey, err := GetPodKey(s[i].Pod)
 		if err != nil {
-			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
+			logger.Error(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
 			continue
 		}
 		if k == tmpKey {
@@ -772,20 +772,20 @@ func removeFromSlice(s []*PodInfo, k string) ([]*PodInfo, bool) {
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
-func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
+func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 	k, err := GetPodKey(pod)
 	if err != nil {
 		return err
 	}
 	if podWithAffinity(pod) {
-		n.PodsWithAffinity, _ = removeFromSlice(n.PodsWithAffinity, k)
+		n.PodsWithAffinity, _ = removeFromSlice(logger, n.PodsWithAffinity, k)
 	}
 	if podWithRequiredAntiAffinity(pod) {
-		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(n.PodsWithRequiredAntiAffinity, k)
+		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredAntiAffinity, k)
 	}
 
 	var removed bool
-	if n.Pods, removed = removeFromSlice(n.Pods, k); removed {
+	if n.Pods, removed = removeFromSlice(logger, n.Pods, k); removed {
 		n.update(pod, -1)
 		return nil
 	}

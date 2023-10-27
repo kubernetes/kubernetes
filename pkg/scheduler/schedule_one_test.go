@@ -767,7 +767,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			sched := &Scheduler{
 				Cache:  cache,
 				client: client,
-				NextPod: func() (*framework.QueuedPodInfo, error) {
+				NextPod: func(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 					return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, item.sendPod)}, nil
 				},
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
@@ -3413,7 +3413,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		client:                   client,
 		nodeInfoSnapshot:         internalcache.NewEmptySnapshot(),
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-		NextPod: func() (*framework.QueuedPodInfo, error) {
+		NextPod: func(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(queuedPodStore).(*v1.Pod))}, nil
 		},
 		SchedulingQueue: schedulingQueue,

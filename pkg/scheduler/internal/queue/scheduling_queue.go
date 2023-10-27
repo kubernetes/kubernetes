@@ -104,7 +104,7 @@ type SchedulingQueue interface {
 	SchedulingCycle() int64
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
-	Pop() (*framework.QueuedPodInfo, error)
+	Pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	// Done must be called for pod returned by Pop. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
@@ -859,7 +859,7 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 // Pop removes the head of the active queue and returns it. It blocks if the
 // activeQ is empty and waits until a new item is added to the queue. It
 // increments scheduling cycle when a pod is popped.
-func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
+func (p *PriorityQueue) Pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	for p.activeQ.Len() == 0 {
@@ -867,7 +867,7 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 		// When Close() is called, the p.closed is set and the condition is broadcast,
 		// which causes this loop to continue and return from the Pop().
 		if p.closed {
-			klog.V(2).InfoS("Scheduling queue is closed")
+			logger.V(2).Info("Scheduling queue is closed")
 			return nil, nil
 		}
 		p.cond.Wait()

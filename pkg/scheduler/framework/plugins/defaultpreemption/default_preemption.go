@@ -146,7 +146,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	logger := klog.FromContext(ctx)
 	var potentialVictims []*framework.PodInfo
 	removePod := func(rpi *framework.PodInfo) error {
-		if err := nodeInfo.RemovePod(rpi.Pod); err != nil {
+		if err := nodeInfo.RemovePod(logger, rpi.Pod); err != nil {
 			return err
 		}
 		status := pl.fh.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
