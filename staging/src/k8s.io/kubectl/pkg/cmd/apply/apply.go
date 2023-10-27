@@ -288,7 +288,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 	openAPISchema, _ := f.OpenAPISchema()
 	var openAPIV3Root openapi3.Root
 	openAPIV3Client, err := f.OpenAPIV3Client()
-	if err == nil {
+	if err == nil && !cmdutil.OpenAPIV3Apply.IsDisabled() {
 		cachedOpenAPIV3Client := cachedopenapi.NewClient(openAPIV3Client)
 		openAPIV3Root = openapi3.NewRoot(cachedOpenAPIV3Client)
 	}
