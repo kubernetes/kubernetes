@@ -52,8 +52,10 @@ func init() {
 }
 
 const (
-	// KMSAPIVersion is the version of the KMS API.
-	KMSAPIVersion = "v2beta1"
+	// KMSAPIVersionv2 is a version of the KMS API.
+	KMSAPIVersionv2 = "v2"
+	// KMSAPIVersionv2beta1 is a version of the KMS API.
+	KMSAPIVersionv2beta1 = "v2beta1"
 	// annotationsMaxSize is the maximum size of the annotations.
 	annotationsMaxSize = 32 * 1024 // 32 kB
 	// KeyIDMaxSize is the maximum size of the keyID.

@@ -111,7 +111,7 @@ func (s *pkcs11RemoteService) Decrypt(ctx context.Context, uid string, req *serv
 
 func (s *pkcs11RemoteService) Status(ctx context.Context) (*service.StatusResponse, error) {
 	return &service.StatusResponse{
-		Version: "v2beta1",
+		Version: "v2",
 		Healthz: "ok",
 		KeyID:   s.keyID,
 	}, nil
