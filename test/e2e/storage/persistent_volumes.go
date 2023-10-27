@@ -452,14 +452,18 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 			pvNamePrefix := ns + "-"
 			pvHostPathConfig := e2epv.PersistentVolumeConfig{
-				NamePrefix: pvNamePrefix,
-				Labels:     volLabel,
+				NamePrefix:       pvNamePrefix,
+				Labels:           volLabel,
+				StorageClassName: ns,
 				PVSource: v1.PersistentVolumeSource{
 					CSI: &v1.CSIPersistentVolumeSource{
 						Driver:       csiDriver.Name,
 						VolumeHandle: "e2e-conformance",
 					},
 				},
+			}
+			pvcConfig := e2epv.PersistentVolumeClaimConfig{
+				StorageClassName: &ns,
 			}
 
 			numPVs, numPVCs := 1, 1
@@ -678,6 +682,10 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 						VolumeHandle: "e2e-status-conformance",
 					},
 				},
+			}
+
+			pvcConfig := e2epv.PersistentVolumeClaimConfig{
+				StorageClassName: &ns,
 			}
 
 			numPVs, numPVCs := 1, 1
