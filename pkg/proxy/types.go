@@ -111,7 +111,7 @@ type Endpoint interface {
 	// IP returns IP part of the endpoint.
 	IP() string
 	// Port returns the Port part of the endpoint.
-	Port() (int, error)
+	Port() int
 
 	// IsLocal returns true if the endpoint is running on the same host as kube-proxy.
 	IsLocal() bool

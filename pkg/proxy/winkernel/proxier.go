@@ -325,8 +325,8 @@ func (info *endpointInfo) IP() string {
 }
 
 // Port returns just the Port part of the endpoint.
-func (info *endpointInfo) Port() (int, error) {
-	return int(info.port), nil
+func (info *endpointInfo) Port() int {
+	return int(info.port)
 }
 
 // Uses mac prefix and IPv4 address to return a mac address
@@ -436,15 +436,9 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 // returns a new proxy.Endpoint which abstracts a endpointInfo
 func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, _ *proxy.ServicePortName) proxy.Endpoint {
 
-	portNumber, err := baseInfo.Port()
-
-	if err != nil {
-		portNumber = 0
-	}
-
 	info := &endpointInfo{
 		ip:         baseInfo.IP(),
-		port:       uint16(portNumber),
+		port:       uint16(baseInfo.Port()),
 		isLocal:    baseInfo.IsLocal(),
 		macAddress: conjureMac("02-11", netutils.ParseIPSloppy(baseInfo.IP())),
 		refCount:   new(uint16),

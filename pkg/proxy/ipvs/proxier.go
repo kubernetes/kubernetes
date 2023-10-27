@@ -1066,9 +1066,9 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 			epIP := ep.IP()
-			epPort, err := ep.Port()
+			epPort := ep.Port()
 			// Error parsing this endpoint has been logged. Skip to next endpoint.
-			if epIP == "" || err != nil {
+			if epIP == "" || epPort == 0 {
 				continue
 			}
 			entry := &utilipset.Entry{

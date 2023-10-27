@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 var supportedEndpointSliceAddressTypes = sets.New[string](
@@ -43,7 +42,11 @@ var supportedEndpointSliceAddressTypes = sets.New[string](
 // or can be used for constructing a more specific EndpointInfo struct
 // defined by the proxier if needed.
 type BaseEndpointInfo struct {
-	endpoint string // TODO: should be an endpointString type
+	// Cache this values to improve performance
+	ip   string
+	port int
+	// endpoint is the same as net.JoinHostPort(ip,port)
+	endpoint string
 
 	// isLocal indicates whether the endpoint is running on same host as kube-proxy.
 	isLocal bool
@@ -73,12 +76,12 @@ func (info *BaseEndpointInfo) String() string {
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) IP() string {
-	return proxyutil.IPPart(info.endpoint)
+	return info.ip
 }
 
 // Port returns just the Port part of the endpoint.
-func (info *BaseEndpointInfo) Port() (int, error) {
-	return proxyutil.PortPart(info.endpoint)
+func (info *BaseEndpointInfo) Port() int {
+	return info.port
 }
 
 // IsLocal is part of proxy.Endpoint interface.
@@ -110,6 +113,8 @@ func (info *BaseEndpointInfo) ZoneHints() sets.Set[string] {
 
 func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
+		ip:          ip,
+		port:        port,
 		endpoint:    net.JoinHostPort(ip, strconv.Itoa(port)),
 		isLocal:     isLocal,
 		ready:       ready,
