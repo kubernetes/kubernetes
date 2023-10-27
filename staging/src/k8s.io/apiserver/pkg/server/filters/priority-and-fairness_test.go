@@ -52,6 +52,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	clocktesting "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -1307,7 +1308,7 @@ func newConfiguration(fsName, plName, user string, concurrency int32, queueLengt
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: concurrency,
+				NominalConcurrencyShares: ptr.To(concurrency),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type:    responseType,
 					Queuing: qcfg,

@@ -36,6 +36,7 @@ import (
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 )
 
 type borrowingTestConstraints struct {
@@ -115,7 +116,7 @@ func TestBorrowing(t *testing.T) {
 					Spec: flowcontrol.PriorityLevelConfigurationSpec{
 						Type: flowcontrol.PriorityLevelEnablementLimited,
 						Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-							NominalConcurrencyShares: 100,
+							NominalConcurrencyShares: ptr.To(int32(100)),
 							LendablePercent:          &testCase.constraints[flow].lendable,
 							BorrowingLimitPercent:    &testCase.constraints[flow].borrowing,
 							LimitResponse: flowcontrol.LimitResponse{

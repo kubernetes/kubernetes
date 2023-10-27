@@ -57,7 +57,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 					Type: flowcontrolv1.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
-						NominalConcurrencyShares: 5,
+						NominalConcurrencyShares: ptr.To(int32(5)),
 						LimitResponse: flowcontrolv1.LimitResponse{
 							Type: flowcontrolv1.LimitResponseTypeReject,
 						},
@@ -68,7 +68,59 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 					Type: flowcontrolv1.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
-						NominalConcurrencyShares: 5,
+						NominalConcurrencyShares: ptr.To(int32(5)),
+						LendablePercent:          ptr.To(int32(0)),
+						LimitResponse: flowcontrolv1.LimitResponse{
+							Type: flowcontrolv1.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "NominalConcurrencyShares is not specified in Limited, should default to 30",
+			original: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: nil,
+						LimitResponse: flowcontrolv1.LimitResponse{
+							Type: flowcontrolv1.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+			expected: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: ptr.To(int32(PriorityLevelConfigurationDefaultNominalConcurrencyShares)),
+						LendablePercent:          ptr.To(int32(0)),
+						LimitResponse: flowcontrolv1.LimitResponse{
+							Type: flowcontrolv1.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "NominalConcurrencyShares is set to zero in Limited, no defaulting should be applied",
+			original: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: ptr.To(int32(0)),
+						LimitResponse: flowcontrolv1.LimitResponse{
+							Type: flowcontrolv1.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+			expected: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: ptr.To(int32(0)),
 						LendablePercent:          ptr.To(int32(0)),
 						LimitResponse: flowcontrolv1.LimitResponse{
 							Type: flowcontrolv1.LimitResponseTypeReject,

@@ -702,7 +702,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 			state.quiescing = false
 		}
 		nominalConcurrencyShares, _, _ := plSpecCommons(state.pl)
-		meal.shareSum += float64(nominalConcurrencyShares)
+		meal.shareSum += float64(*nominalConcurrencyShares)
 		meal.haveExemptPL = meal.haveExemptPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameCatchAll
 	}
@@ -807,7 +807,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 		// allocation determined by all the share values in the
 		// regular way.
 		nominalConcurrencyShares, _, _ := plSpecCommons(plState.pl)
-		meal.shareSum += float64(nominalConcurrencyShares)
+		meal.shareSum += float64(*nominalConcurrencyShares)
 		meal.haveExemptPL = meal.haveExemptPL || plName == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || plName == flowcontrol.PriorityLevelConfigurationNameCatchAll
 		meal.newPLStates[plName] = plState
@@ -823,7 +823,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 		// The use of math.Ceil here means that the results might sum
 		// to a little more than serverConcurrencyLimit but the
 		// difference will be negligible.
-		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(nominalConcurrencyShares) / meal.shareSum))
+		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(*nominalConcurrencyShares) / meal.shareSum))
 		var lendableCL, borrowingCL int
 		if lendablePercent != nil {
 			lendableCL = int(math.Round(float64(concurrencyLimit) * float64(*lendablePercent) / 100))
@@ -974,7 +974,7 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration) {
 		seatDemandRatioedGauge: seatDemandRatioedGauge,
 	}
 	nominalConcurrencyShares, _, _ := plSpecCommons(proto)
-	meal.shareSum += float64(nominalConcurrencyShares)
+	meal.shareSum += float64(*nominalConcurrencyShares)
 }
 
 // startRequest classifies and, if appropriate, enqueues the request.
@@ -1112,7 +1112,7 @@ func relDiff(x, y float64) float64 {
 }
 
 // plSpecCommons returns the (NominalConcurrencyShares, LendablePercent, BorrowingLimitPercent) of the given priority level config
-func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (int32, *int32, *int32) {
+func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (*int32, *int32, *int32) {
 	if limiter := pl.Spec.Limited; limiter != nil {
 		return limiter.NominalConcurrencyShares, limiter.LendablePercent, limiter.BorrowingLimitPercent
 	}
@@ -1121,5 +1121,5 @@ func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (int32, *int32, *
 	if limiter.NominalConcurrencyShares != nil {
 		nominalConcurrencyShares = *limiter.NominalConcurrencyShares
 	}
-	return nominalConcurrencyShares, limiter.LendablePercent, nil
+	return &nominalConcurrencyShares, limiter.LendablePercent, nil
 }

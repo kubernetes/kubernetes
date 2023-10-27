@@ -40,6 +40,7 @@ import (
 	clientsideflowcontrol "k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -260,7 +261,7 @@ func createPriorityLevel(ctx context.Context, f *framework.Framework, priorityLe
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: nominalConcurrencyShares,
+					NominalConcurrencyShares: ptr.To(nominalConcurrencyShares),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 					},

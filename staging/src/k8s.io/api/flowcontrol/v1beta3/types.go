@@ -103,6 +103,20 @@ const (
 	AutoUpdateAnnotationKey = "apf.kubernetes.io/autoupdate-spec"
 )
 
+const (
+	// This annotation applies to v1beta3 only.
+	//
+	// The presence of this annotation in a v1beta3 object means that
+	// a zero value in the 'NominalConcurrencyShares' field means zero
+	// rather than the old default of 30.
+	//
+	// To set a zero value for the 'NominalConcurrencyShares' field in v1beta3,
+	// set the annotation to an empty string:
+	//   "flowcontrol.k8s.io/concurrency-shares-defaults-to-zero": ""
+	//
+	PriorityLevelConcurrencyShareDefaultKey = "flowcontrol.k8s.io/concurrency-shares-defaults-to-zero"
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

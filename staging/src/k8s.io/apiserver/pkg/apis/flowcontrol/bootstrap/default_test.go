@@ -89,7 +89,7 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 			t.Errorf("bootstrap PriorityLevelConfiguration %q is not %q", test.name, flowcontrol.PriorityLevelEnablementLimited)
 			continue
 		}
-		if test.nominalSharesExpected != bootstrapPL.Spec.Limited.NominalConcurrencyShares {
+		if test.nominalSharesExpected != *bootstrapPL.Spec.Limited.NominalConcurrencyShares {
 			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected NominalConcurrencyShares: %d, but got: %d", test.name, test.nominalSharesExpected, bootstrapPL.Spec.Limited.NominalConcurrencyShares)
 		}
 		if test.lendablePercentexpected != *bootstrapPL.Spec.Limited.LendablePercent {

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -247,7 +248,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: int32(concurrencyShares),
+				NominalConcurrencyShares: ptr.To(int32(concurrencyShares)),
 				BorrowingLimitPercent:    &i0,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,

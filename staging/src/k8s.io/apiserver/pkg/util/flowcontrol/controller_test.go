@@ -41,6 +41,7 @@ import (
 	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 // Some tests print a lot of debug logs which slows down tests considerably,
@@ -357,7 +358,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 10,
+				NominalConcurrencyShares: ptr.To(int32(10)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},

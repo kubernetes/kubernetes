@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 )
 
 // Test_GetMaxSeats tests max seats retrieved from MaxSeatsTracker
@@ -120,7 +121,7 @@ func Test_GetMaxSeats(t *testing.T) {
 				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 					Type: flowcontrolv1.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
-						NominalConcurrencyShares: 10000,
+						NominalConcurrencyShares: ptr.To(int32(10000)),
 						LimitResponse: flowcontrolv1.LimitResponse{
 							Queuing: &flowcontrolv1.QueuingConfiguration{
 								HandSize: testcase.handSize,

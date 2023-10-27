@@ -30,6 +30,7 @@ import (
 	toolscache "k8s.io/client-go/tools/cache"
 	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -265,7 +266,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 			Type: flowcontrolv1.PriorityLevelEnablementLimited,
 			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 1,
+				NominalConcurrencyShares: ptr.To(int32(1)),
 			},
 		},
 	}
@@ -273,7 +274,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 			Type: flowcontrolv1.PriorityLevelEnablementLimited,
 			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: flowcontrolapisv1.PriorityLevelConfigurationDefaultNominalConcurrencyShares,
+				NominalConcurrencyShares: ptr.To(flowcontrolapisv1.PriorityLevelConfigurationDefaultNominalConcurrencyShares),
 				LendablePercent:          pointer.Int32(0),
 				LimitResponse: flowcontrolv1.LimitResponse{
 					Type: flowcontrolv1.LimitResponseTypeReject,
@@ -306,7 +307,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 			Type: flowcontrolv1.PriorityLevelEnablementLimited,
 			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 1,
+				NominalConcurrencyShares: ptr.To(int32(1)),
 			},
 		},
 	}
@@ -486,7 +487,7 @@ func (b *plBuilder) WithAutoUpdateAnnotation(value string) *plBuilder {
 func (b *plBuilder) WithLimited(nominalConcurrencyShares int32) *plBuilder {
 	b.object.Spec.Type = flowcontrolv1.PriorityLevelEnablementLimited
 	b.object.Spec.Limited = &flowcontrolv1.LimitedPriorityLevelConfiguration{
-		NominalConcurrencyShares: nominalConcurrencyShares,
+		NominalConcurrencyShares: ptr.To(nominalConcurrencyShares),
 		LendablePercent:          pointer.Int32(0),
 		LimitResponse: flowcontrolv1.LimitResponse{
 			Type: flowcontrolv1.LimitResponseTypeReject,

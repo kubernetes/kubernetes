@@ -18,6 +18,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/flowcontrol/v1"
+	"k8s.io/utils/ptr"
 )
 
 // Default settings for flow-schema
@@ -52,8 +53,8 @@ func SetDefaults_ExemptPriorityLevelConfiguration(eplc *v1.ExemptPriorityLevelCo
 }
 
 func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1.LimitedPriorityLevelConfiguration) {
-	if lplc.NominalConcurrencyShares == 0 {
-		lplc.NominalConcurrencyShares = PriorityLevelConfigurationDefaultNominalConcurrencyShares
+	if lplc.NominalConcurrencyShares == nil {
+		lplc.NominalConcurrencyShares = ptr.To(PriorityLevelConfigurationDefaultNominalConcurrencyShares)
 	}
 	if lplc.LendablePercent == nil {
 		lplc.LendablePercent = new(int32)
