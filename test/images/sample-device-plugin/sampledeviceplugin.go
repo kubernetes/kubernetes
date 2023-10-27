@@ -162,7 +162,7 @@ func main() {
 
 		err = watcher.Add(triggerPath)
 		if err != nil {
-			klog.Errorf("Failed to add watch to %q: %w", triggerPath, err)
+			klog.Errorf("Failed to add watch to %q: %v", triggerPath, err)
 			panic(err)
 		}
 		for {
