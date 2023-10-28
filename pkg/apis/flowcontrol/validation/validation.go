@@ -39,14 +39,14 @@ var ValidateFlowSchemaName = apimachineryvalidation.NameIsDNSSubdomain
 // ValidatePriorityLevelConfigurationName validates name for priority-level-configuration.
 var ValidatePriorityLevelConfigurationName = apimachineryvalidation.NameIsDNSSubdomain
 
-var supportedDistinguisherMethods = sets.NewString(
+var supportedDistinguisherMethods = sets.New[string](
 	string(flowcontrol.FlowDistinguisherMethodByNamespaceType),
 	string(flowcontrol.FlowDistinguisherMethodByUserType),
 )
 
 var priorityLevelConfigurationQueuingMaxQueues int32 = 10 * 1000 * 1000 // 10^7
 
-var supportedVerbs = sets.NewString(
+var supportedVerbs = sets.New[string](
 	"get",
 	"list",
 	"create",
@@ -58,18 +58,18 @@ var supportedVerbs = sets.NewString(
 	"proxy",
 )
 
-var supportedSubjectKinds = sets.NewString(
+var supportedSubjectKinds = sets.New[string](
 	string(flowcontrol.SubjectKindServiceAccount),
 	string(flowcontrol.SubjectKindGroup),
 	string(flowcontrol.SubjectKindUser),
 )
 
-var supportedPriorityLevelEnablement = sets.NewString(
+var supportedPriorityLevelEnablement = sets.New[string](
 	string(flowcontrol.PriorityLevelEnablementExempt),
 	string(flowcontrol.PriorityLevelEnablementLimited),
 )
 
-var supportedLimitResponseType = sets.NewString(
+var supportedLimitResponseType = sets.New[string](
 	string(flowcontrol.LimitResponseTypeQueue),
 	string(flowcontrol.LimitResponseTypeReject),
 )
@@ -111,7 +111,7 @@ func ValidateFlowSchemaSpec(fsName string, spec *flowcontrol.FlowSchemaSpec, fld
 	}
 	if spec.DistinguisherMethod != nil {
 		if !supportedDistinguisherMethods.Has(string(spec.DistinguisherMethod.Type)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("distinguisherMethod").Child("type"), spec.DistinguisherMethod, supportedDistinguisherMethods.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("distinguisherMethod").Child("type"), spec.DistinguisherMethod, sets.List[string](supportedDistinguisherMethods)))
 		}
 	}
 	if len(spec.PriorityLevelConfiguration.Name) > 0 {
@@ -179,7 +179,7 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'"))
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), subject.Kind, supportedSubjectKinds.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), subject.Kind, sets.List[string](supportedSubjectKinds)))
 	}
 	return allErrs
 }
@@ -243,9 +243,9 @@ func ValidateFlowSchemaNonResourcePolicyRule(rule *flowcontrol.NonResourcePolicy
 		if len(rule.Verbs) > 1 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("verbs"), rule.Verbs, "if '*' is present, must not specify other verbs"))
 		}
-	} else if !supportedVerbs.IsSuperset(sets.NewString(rule.Verbs...)) {
+	} else if !supportedVerbs.IsSuperset(sets.New[string](rule.Verbs...)) {
 		// only supported verbs are allowed
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("verbs"), rule.Verbs, supportedVerbs.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("verbs"), rule.Verbs, sets.List[string](supportedVerbs)))
 	}
 
 	if len(rule.NonResourceURLs) == 0 {
@@ -275,9 +275,9 @@ func ValidateFlowSchemaResourcePolicyRule(rule *flowcontrol.ResourcePolicyRule, 
 		if len(rule.Verbs) > 1 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("verbs"), rule.Verbs, "if '*' is present, must not specify other verbs"))
 		}
-	} else if !supportedVerbs.IsSuperset(sets.NewString(rule.Verbs...)) {
+	} else if !supportedVerbs.IsSuperset(sets.New[string](rule.Verbs...)) {
 		// only supported verbs are allowed
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("verbs"), rule.Verbs, supportedVerbs.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("verbs"), rule.Verbs, sets.List[string](supportedVerbs)))
 	}
 
 	if len(rule.APIGroups) == 0 {
@@ -314,7 +314,7 @@ const nsErrIntro = "each member of this list must be '*' or a DNS-1123 label; "
 // ValidateFlowSchemaStatus validates status for the flow-schema.
 func ValidateFlowSchemaStatus(status *flowcontrol.FlowSchemaStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	keys := sets.NewString()
+	keys := sets.New[string]()
 	for i, condition := range status.Conditions {
 		if keys.Has(string(condition.Type)) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Child("conditions").Index(i).Child("type"), condition.Type))
@@ -404,7 +404,7 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"))...)
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, sets.List[string](supportedPriorityLevelEnablement)))
 	}
 	return allErrs
 }
@@ -463,7 +463,7 @@ func ValidateLimitResponse(lr flowcontrol.LimitResponse, fldPath *field.Path) fi
 			allErrs = append(allErrs, ValidatePriorityLevelQueuingConfiguration(lr.Queuing, fldPath.Child("queuing"))...)
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), lr.Type, supportedLimitResponseType.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), lr.Type, sets.List[string](supportedLimitResponseType)))
 	}
 	return allErrs
 }
@@ -498,7 +498,7 @@ func ValidatePriorityLevelQueuingConfiguration(queuing *flowcontrol.QueuingConfi
 // ValidatePriorityLevelConfigurationStatus validates priority-level-configuration's status.
 func ValidatePriorityLevelConfigurationStatus(status *flowcontrol.PriorityLevelConfigurationStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	keys := sets.NewString()
+	keys := sets.New[string]()
 	for i, condition := range status.Conditions {
 		if keys.Has(string(condition.Type)) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Child("conditions").Index(i).Child("type"), condition.Type))

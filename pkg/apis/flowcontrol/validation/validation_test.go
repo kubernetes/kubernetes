@@ -28,6 +28,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -443,7 +444,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("kind"), flowcontrol.SubjectKind("FooKind"), supportedSubjectKinds.List()),
+			field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("kind"), flowcontrol.SubjectKind("FooKind"), sets.List[string](supportedSubjectKinds)),
 		},
 	}, {
 		name: "flow-schema w/ invalid verb should fail",
@@ -471,7 +472,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("verbs"), []string{"feed"}, supportedVerbs.List()),
+			field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("verbs"), []string{"feed"}, sets.List[string](supportedVerbs)),
 		},
 	}, {
 		name: "flow-schema w/ invalid priority level configuration name should fail",
@@ -556,7 +557,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("kind"), flowcontrol.SubjectKind(""), supportedSubjectKinds.List()),
+			field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("kind"), flowcontrol.SubjectKind(""), sets.List[string](supportedSubjectKinds)),
 		},
 	}, {
 		name: "Omitted ResourceRule.Namespaces should fail",

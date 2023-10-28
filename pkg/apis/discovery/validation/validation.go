@@ -31,12 +31,12 @@ import (
 )
 
 var (
-	supportedAddressTypes = sets.NewString(
+	supportedAddressTypes = sets.New[string](
 		string(discovery.AddressTypeIPv4),
 		string(discovery.AddressTypeIPv6),
 		string(discovery.AddressTypeFQDN),
 	)
-	supportedPortProtocols = sets.NewString(
+	supportedPortProtocols = sets.New[string](
 		string(api.ProtocolTCP),
 		string(api.ProtocolUDP),
 		string(api.ProtocolSCTP),
@@ -145,7 +145,7 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		return allErrs
 	}
 
-	portNames := sets.String{}
+	portNames := sets.Set[string]{}
 	for i, endpointPort := range endpointPorts {
 		idxPath := fldPath.Index(i)
 
@@ -162,7 +162,7 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		if endpointPort.Protocol == nil {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
 		} else if !supportedPortProtocols.Has(string(*endpointPort.Protocol)) {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), *endpointPort.Protocol, supportedPortProtocols.List()))
+			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), *endpointPort.Protocol, sets.List[string](supportedPortProtocols)))
 		}
 
 		if endpointPort.AppProtocol != nil {
@@ -179,7 +179,7 @@ func validateAddressType(addressType discovery.AddressType) field.ErrorList {
 	if addressType == "" {
 		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
 	} else if !supportedAddressTypes.Has(string(addressType)) {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, supportedAddressTypes.List()))
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, sets.List[string](supportedAddressTypes)))
 	}
 
 	return allErrs
@@ -194,7 +194,7 @@ func validateHints(endpointHints *discovery.EndpointHints, fldPath *field.Path) 
 		return allErrs
 	}
 
-	zoneNames := sets.String{}
+	zoneNames := sets.Set[string]{}
 	for i, forZone := range endpointHints.ForZones {
 		zonePath := fzPath.Index(i).Child("name")
 		if zoneNames.Has(forZone.Name) {

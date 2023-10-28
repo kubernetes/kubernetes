@@ -73,8 +73,8 @@ func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1bet
 	return certificates.IsKubeletClientCSR(req, usagesToSet(usages))
 }
 
-func usagesToSet(usages []certificatesv1beta1.KeyUsage) sets.String {
-	result := sets.NewString()
+func usagesToSet(usages []certificatesv1beta1.KeyUsage) sets.Set[string] {
+	result := sets.New[string]()
 	for _, usage := range usages {
 		result.Insert(string(usage))
 	}

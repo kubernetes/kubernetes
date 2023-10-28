@@ -298,8 +298,8 @@ func validAPIServerClientUsages(usages []capi.KeyUsage) error {
 	return nil
 }
 
-func usagesToSet(usages []capi.KeyUsage) sets.String {
-	result := sets.NewString()
+func usagesToSet(usages []capi.KeyUsage) sets.Set[string] {
+	result := sets.New[string]()
 	for _, usage := range usages {
 		result.Insert(string(usage))
 	}

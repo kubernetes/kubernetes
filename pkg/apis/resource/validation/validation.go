@@ -43,12 +43,12 @@ func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.
 	}
 	allErrs = append(allErrs, validateResourceClaimParameters(spec.ParametersRef, fldPath.Child("parametersRef"))...)
 	if !supportedAllocationModes.Has(string(spec.AllocationMode)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("allocationMode"), spec.AllocationMode, supportedAllocationModes.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("allocationMode"), spec.AllocationMode, sets.List[string](supportedAllocationModes)))
 	}
 	return allErrs
 }
 
-var supportedAllocationModes = sets.NewString(string(resource.AllocationModeImmediate), string(resource.AllocationModeWaitForFirstConsumer))
+var supportedAllocationModes = sets.New[string](string(resource.AllocationModeImmediate), string(resource.AllocationModeWaitForFirstConsumer))
 
 // It would have been nice to use Go generics to reuse the same validation
 // function for Kind and Name in both types, but generics cannot be used to
@@ -300,7 +300,7 @@ func validatePodSchedulingStatus(status *resource.PodSchedulingContextStatus, fl
 
 func validatePodSchedulingClaims(claimStatuses []resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	names := sets.NewString()
+	names := sets.New[string]()
 	for i, claimStatus := range claimStatuses {
 		allErrs = append(allErrs, validatePodSchedulingClaim(claimStatus, fldPath.Index(i))...)
 		if names.Has(claimStatus.Name) {

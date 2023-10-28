@@ -122,7 +122,7 @@ type PolicyRuleBuilder struct {
 // NewRule returns new PolicyRule made by input verbs.
 func NewRule(verbs ...string) *PolicyRuleBuilder {
 	return &PolicyRuleBuilder{
-		PolicyRule: PolicyRule{Verbs: sets.NewString(verbs...).List()},
+		PolicyRule: PolicyRule{Verbs: sets.List[string](sets.New[string](verbs...))},
 	}
 }
 
@@ -160,9 +160,9 @@ func (r *PolicyRuleBuilder) RuleOrDie() PolicyRule {
 }
 
 func combine(s1, s2 []string) []string {
-	s := sets.NewString(s1...)
+	s := sets.New[string](s1...)
 	s.Insert(s2...)
-	return s.List()
+	return sets.List[string](s)
 }
 
 // Rule returns PolicyRule and error.

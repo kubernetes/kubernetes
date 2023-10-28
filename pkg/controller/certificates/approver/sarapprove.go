@@ -162,8 +162,8 @@ func isSelfNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.Cert
 	return isNodeClientCert(csr, x509cr)
 }
 
-func usagesToSet(usages []capi.KeyUsage) sets.String {
-	result := sets.NewString()
+func usagesToSet(usages []capi.KeyUsage) sets.Set[string] {
+	result := sets.New[string]()
 	for _, usage := range usages {
 		result.Insert(string(usage))
 	}

@@ -51,21 +51,21 @@ var (
 )
 
 var (
-	kubeletServingRequiredUsages = sets.NewString(
+	kubeletServingRequiredUsages = sets.New[string](
 		string(UsageDigitalSignature),
 		string(UsageKeyEncipherment),
 		string(UsageServerAuth),
 	)
-	kubeletServingRequiredUsagesNoRSA = sets.NewString(
+	kubeletServingRequiredUsagesNoRSA = sets.New[string](
 		string(UsageDigitalSignature),
 		string(UsageServerAuth),
 	)
 )
 
-func IsKubeletServingCSR(req *x509.CertificateRequest, usages sets.String) bool {
+func IsKubeletServingCSR(req *x509.CertificateRequest, usages sets.Set[string]) bool {
 	return ValidateKubeletServingCSR(req, usages) == nil
 }
-func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.String) error {
+func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.Set[string]) error {
 	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
 		return organizationNotSystemNodesErr
 	}
@@ -83,7 +83,7 @@ func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.String)
 	}
 
 	if !kubeletServingRequiredUsages.Equal(usages) && !kubeletServingRequiredUsagesNoRSA.Equal(usages) {
-		return fmt.Errorf("usages did not match %v", kubeletServingRequiredUsages.List())
+		return fmt.Errorf("usages did not match %v", sets.List[string](kubeletServingRequiredUsages))
 	}
 
 	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
@@ -94,21 +94,21 @@ func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.String)
 }
 
 var (
-	kubeletClientRequiredUsagesNoRSA = sets.NewString(
+	kubeletClientRequiredUsagesNoRSA = sets.New[string](
 		string(UsageDigitalSignature),
 		string(UsageClientAuth),
 	)
-	kubeletClientRequiredUsages = sets.NewString(
+	kubeletClientRequiredUsages = sets.New[string](
 		string(UsageDigitalSignature),
 		string(UsageKeyEncipherment),
 		string(UsageClientAuth),
 	)
 )
 
-func IsKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) bool {
+func IsKubeletClientCSR(req *x509.CertificateRequest, usages sets.Set[string]) bool {
 	return ValidateKubeletClientCSR(req, usages) == nil
 }
-func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) error {
+func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages sets.Set[string]) error {
 	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
 		return organizationNotSystemNodesErr
 	}
@@ -131,7 +131,7 @@ func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) 
 	}
 
 	if !kubeletClientRequiredUsages.Equal(usages) && !kubeletClientRequiredUsagesNoRSA.Equal(usages) {
-		return fmt.Errorf("usages did not match %v", kubeletClientRequiredUsages.List())
+		return fmt.Errorf("usages did not match %v", sets.List[string](kubeletClientRequiredUsages))
 	}
 
 	return nil

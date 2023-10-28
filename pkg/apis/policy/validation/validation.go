@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
-var supportedUnhealthyPodEvictionPolicies = sets.NewString(
+var supportedUnhealthyPodEvictionPolicies = sets.New[string](
 	string(policy.IfHealthyBudget),
 	string(policy.AlwaysAllow),
 )
@@ -69,7 +69,7 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, opts P
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOptions, fldPath.Child("selector"))...)
 
 	if spec.UnhealthyPodEvictionPolicy != nil && !supportedUnhealthyPodEvictionPolicies.Has(string(*spec.UnhealthyPodEvictionPolicy)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("unhealthyPodEvictionPolicy"), *spec.UnhealthyPodEvictionPolicy, supportedUnhealthyPodEvictionPolicies.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("unhealthyPodEvictionPolicy"), *spec.UnhealthyPodEvictionPolicy, sets.List[string](supportedUnhealthyPodEvictionPolicies)))
 	}
 
 	return allErrs

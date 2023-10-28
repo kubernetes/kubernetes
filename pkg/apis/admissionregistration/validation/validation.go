@@ -60,9 +60,9 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 	}
 
 	// x/*
-	resourcesWithWildcardSubresoures := sets.String{}
+	resourcesWithWildcardSubresoures := sets.Set[string]{}
 	// */x
-	subResourcesWithWildcardResource := sets.String{}
+	subResourcesWithWildcardResource := sets.Set[string]{}
 	// */*
 	hasDoubleWildcard := false
 	// *
@@ -128,7 +128,7 @@ func validateResourcesNoSubResources(resources []string, fldPath *field.Path) fi
 	return allErrors
 }
 
-var validScopes = sets.NewString(
+var validScopes = sets.New[string](
 	string(admissionregistration.ClusterScope),
 	string(admissionregistration.NamespacedScope),
 	string(admissionregistration.AllScopes),
@@ -160,7 +160,7 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSu
 		allErrors = append(allErrors, validateResourcesNoSubResources(rule.Resources, fldPath.Child("resources"))...)
 	}
 	if rule.Scope != nil && !validScopes.Has(string(*rule.Scope)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scope"), *rule.Scope, validScopes.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scope"), *rule.Scope, sets.List[string](validScopes)))
 	}
 	return allErrors
 }
@@ -226,7 +226,7 @@ func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 
 func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	hookNames := sets.NewString()
+	hookNames := sets.New[string]()
 	for i, hook := range e.Webhooks {
 		allErrors = append(allErrors, validateValidatingWebhook(&hook, opts, field.NewPath("webhooks").Index(i))...)
 		allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, opts.requireRecognizedAdmissionReviewVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
@@ -319,7 +319,7 @@ func findValidatingPolicyPreexistingExpressions(validatingPolicy *admissionregis
 func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 
-	hookNames := sets.NewString()
+	hookNames := sets.New[string]()
 	for i, hook := range e.Webhooks {
 		allErrors = append(allErrors, validateMutatingWebhook(&hook, opts, field.NewPath("webhooks").Index(i))...)
 		allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, opts.requireRecognizedAdmissionReviewVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
@@ -346,20 +346,20 @@ func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, op
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)
 	}
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, sets.List[string](supportedFailurePolicies)))
 	}
 	if hook.MatchPolicy != nil && !supportedMatchPolicies.Has(string(*hook.MatchPolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, supportedMatchPolicies.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, sets.List[string](supportedMatchPolicies)))
 	}
 	allowedSideEffects := supportedSideEffectClasses
 	if opts.requireNoSideEffects {
 		allowedSideEffects = noSideEffectClasses
 	}
 	if hook.SideEffects == nil {
-		allErrors = append(allErrors, field.Required(fldPath.Child("sideEffects"), fmt.Sprintf("must specify one of %v", strings.Join(allowedSideEffects.List(), ", "))))
+		allErrors = append(allErrors, field.Required(fldPath.Child("sideEffects"), fmt.Sprintf("must specify one of %v", strings.Join(sets.List[string](allowedSideEffects), ", "))))
 	}
 	if hook.SideEffects != nil && !allowedSideEffects.Has(string(*hook.SideEffects)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, allowedSideEffects.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, sets.List[string](allowedSideEffects)))
 	}
 	if hook.TimeoutSeconds != nil && (*hook.TimeoutSeconds > 30 || *hook.TimeoutSeconds < 1) {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("timeoutSeconds"), *hook.TimeoutSeconds, "the timeout value must be between 1 and 30 seconds"))
@@ -402,20 +402,20 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)
 	}
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, sets.List[string](supportedFailurePolicies)))
 	}
 	if hook.MatchPolicy != nil && !supportedMatchPolicies.Has(string(*hook.MatchPolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, supportedMatchPolicies.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, sets.List[string](supportedMatchPolicies)))
 	}
 	allowedSideEffects := supportedSideEffectClasses
 	if opts.requireNoSideEffects {
 		allowedSideEffects = noSideEffectClasses
 	}
 	if hook.SideEffects == nil {
-		allErrors = append(allErrors, field.Required(fldPath.Child("sideEffects"), fmt.Sprintf("must specify one of %v", strings.Join(allowedSideEffects.List(), ", "))))
+		allErrors = append(allErrors, field.Required(fldPath.Child("sideEffects"), fmt.Sprintf("must specify one of %v", strings.Join(sets.List[string](allowedSideEffects), ", "))))
 	}
 	if hook.SideEffects != nil && !allowedSideEffects.Has(string(*hook.SideEffects)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, allowedSideEffects.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, sets.List[string](allowedSideEffects)))
 	}
 	if hook.TimeoutSeconds != nil && (*hook.TimeoutSeconds > 30 || *hook.TimeoutSeconds < 1) {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("timeoutSeconds"), *hook.TimeoutSeconds, "the timeout value must be between 1 and 30 seconds"))
@@ -428,7 +428,7 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, labelSelectorValidationOpts, fldPath.Child("objectSelector"))...)
 	}
 	if hook.ReinvocationPolicy != nil && !supportedReinvocationPolicies.Has(string(*hook.ReinvocationPolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *hook.ReinvocationPolicy, supportedReinvocationPolicies.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *hook.ReinvocationPolicy, sets.List[string](supportedReinvocationPolicies)))
 	}
 
 	cc := hook.ClientConfig
@@ -448,29 +448,29 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 	return allErrors
 }
 
-var supportedFailurePolicies = sets.NewString(
+var supportedFailurePolicies = sets.New[string](
 	string(admissionregistration.Ignore),
 	string(admissionregistration.Fail),
 )
 
-var supportedMatchPolicies = sets.NewString(
+var supportedMatchPolicies = sets.New[string](
 	string(admissionregistration.Exact),
 	string(admissionregistration.Equivalent),
 )
 
-var supportedSideEffectClasses = sets.NewString(
+var supportedSideEffectClasses = sets.New[string](
 	string(admissionregistration.SideEffectClassUnknown),
 	string(admissionregistration.SideEffectClassNone),
 	string(admissionregistration.SideEffectClassSome),
 	string(admissionregistration.SideEffectClassNoneOnDryRun),
 )
 
-var noSideEffectClasses = sets.NewString(
+var noSideEffectClasses = sets.New[string](
 	string(admissionregistration.SideEffectClassNone),
 	string(admissionregistration.SideEffectClassNoneOnDryRun),
 )
 
-var supportedOperations = sets.NewString(
+var supportedOperations = sets.New[string](
 	string(admissionregistration.OperationAll),
 	string(admissionregistration.Create),
 	string(admissionregistration.Update),
@@ -478,12 +478,12 @@ var supportedOperations = sets.NewString(
 	string(admissionregistration.Connect),
 )
 
-var supportedReinvocationPolicies = sets.NewString(
+var supportedReinvocationPolicies = sets.New[string](
 	string(admissionregistration.NeverReinvocationPolicy),
 	string(admissionregistration.IfNeededReinvocationPolicy),
 )
 
-var supportedValidationPolicyReason = sets.NewString(
+var supportedValidationPolicyReason = sets.New[string](
 	string(metav1.StatusReasonForbidden),
 	string(metav1.StatusReasonInvalid),
 	string(metav1.StatusReasonRequestEntityTooLarge),
@@ -508,7 +508,7 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 	}
 	for i, operation := range ruleWithOperations.Operations {
 		if !supportedOperations.Has(string(operation)) {
-			allErrors = append(allErrors, field.NotSupported(fldPath.Child("operations").Index(i), operation, supportedOperations.List()))
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("operations").Index(i), operation, sets.List[string](supportedOperations)))
 		}
 	}
 	allowSubResource := true
@@ -593,7 +593,7 @@ func ignoreValidatingAdmissionPolicyMatchConditions(new, old *admissionregistrat
 
 // mutatingHasUniqueWebhookNames returns true if all webhooks have unique names
 func mutatingHasUniqueWebhookNames(webhooks []admissionregistration.MutatingWebhook) bool {
-	names := sets.NewString()
+	names := sets.New[string]()
 	for _, hook := range webhooks {
 		if names.Has(hook.Name) {
 			return false
@@ -605,7 +605,7 @@ func mutatingHasUniqueWebhookNames(webhooks []admissionregistration.MutatingWebh
 
 // validatingHasUniqueWebhookNames returns true if all webhooks have unique names
 func validatingHasUniqueWebhookNames(webhooks []admissionregistration.ValidatingWebhook) bool {
-	names := sets.NewString()
+	names := sets.New[string]()
 	for _, hook := range webhooks {
 		if names.Has(hook.Name) {
 			return false
@@ -735,7 +735,7 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 	if spec.FailurePolicy == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("failurePolicy"), ""))
 	} else if !supportedFailurePolicies.Has(string(*spec.FailurePolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *spec.FailurePolicy, supportedFailurePolicies.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *spec.FailurePolicy, sets.List[string](supportedFailurePolicies)))
 	}
 	if spec.ParamKind != nil {
 		opts.allowParamsInMatchConditions = true
@@ -766,7 +766,7 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 			allErrors = append(allErrors, validateValidation(getCompiler(), &validation, spec.ParamKind, opts, fldPath.Child("validations").Index(i))...)
 		}
 		if spec.AuditAnnotations != nil {
-			keys := sets.NewString()
+			keys := sets.New[string]()
 			if len(spec.AuditAnnotations) > maxAuditAnnotations {
 				allErrors = append(allErrors, field.Invalid(fldPath.Child("auditAnnotations"), spec.AuditAnnotations, fmt.Sprintf("must not have more than %d auditAnnotations", maxAuditAnnotations)))
 			}
@@ -844,7 +844,7 @@ func validateMatchResources(mc *admissionregistration.MatchResources, fldPath *f
 	if mc.MatchPolicy == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("matchPolicy"), ""))
 	} else if !supportedMatchPolicies.Has(string(*mc.MatchPolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *mc.MatchPolicy, supportedMatchPolicies.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *mc.MatchPolicy, sets.List[string](supportedMatchPolicies)))
 	}
 	if mc.NamespaceSelector == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("namespaceSelector"), ""))
@@ -870,7 +870,7 @@ func validateMatchResources(mc *admissionregistration.MatchResources, fldPath *f
 	return allErrors
 }
 
-var validValidationActions = sets.NewString(
+var validValidationActions = sets.New[string](
 	string(admissionregistration.Deny),
 	string(admissionregistration.Warn),
 	string(admissionregistration.Audit),
@@ -878,10 +878,10 @@ var validValidationActions = sets.NewString(
 
 func validateValidationActions(va []admissionregistration.ValidationAction, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-	actions := sets.NewString()
+	actions := sets.New[string]()
 	for i, action := range va {
 		if !validValidationActions.Has(string(action)) {
-			allErrors = append(allErrors, field.NotSupported(fldPath.Index(i), action, validValidationActions.List()))
+			allErrors = append(allErrors, field.NotSupported(fldPath.Index(i), action, sets.List[string](validValidationActions)))
 		}
 		if actions.Has(string(action)) {
 			allErrors = append(allErrors, field.Duplicate(fldPath.Index(i), action))
@@ -899,7 +899,7 @@ func validateValidationActions(va []admissionregistration.ValidationAction, fldP
 
 func validateNamedRuleWithOperations(n *admissionregistration.NamedRuleWithOperations, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-	resourceNames := sets.NewString()
+	resourceNames := sets.New[string]()
 	for i, rName := range n.ResourceNames {
 		for _, msg := range path.ValidatePathSegmentName(rName, false) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("resourceNames").Index(i), rName, msg))
@@ -916,7 +916,7 @@ func validateNamedRuleWithOperations(n *admissionregistration.NamedRuleWithOpera
 
 func validateMatchConditions(m []admissionregistration.MatchCondition, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-	conditionNames := sets.NewString()
+	conditionNames := sets.New[string]()
 	if len(m) > 64 {
 		allErrors = append(allErrors, field.TooMany(fldPath, len(m), 64))
 	}
@@ -1009,7 +1009,7 @@ func validateValidation(compiler plugincel.Compiler, v *admissionregistration.Va
 		allErrors = append(allErrors, field.Required(fldPath.Child("message"), "message must be specified if expression contains line breaks"))
 	}
 	if v.Reason != nil && !supportedValidationPolicyReason.Has(string(*v.Reason)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reason"), *v.Reason, supportedValidationPolicyReason.List()))
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reason"), *v.Reason, sets.List[string](supportedValidationPolicyReason)))
 	}
 	return allErrors
 }
@@ -1266,7 +1266,7 @@ func createCompiler(allowComposition bool) plugincel.Compiler {
 }
 
 var celIdentRegex = regexp.MustCompile("^[_a-zA-Z][_a-zA-Z0-9]*$")
-var celReserved = sets.NewString("true", "false", "null", "in",
+var celReserved = sets.New[string]("true", "false", "null", "in",
 	"as", "break", "const", "continue", "else",
 	"for", "function", "if", "import", "let",
 	"loop", "package", "namespace", "return",

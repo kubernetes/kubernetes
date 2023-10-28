@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -187,8 +188,8 @@ func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fld
 	return allErrs
 }
 
-var validSelectPolicyTypes = sets.NewString(string(autoscaling.MaxPolicySelect), string(autoscaling.MinPolicySelect), string(autoscaling.DisabledPolicySelect))
-var validSelectPolicyTypesList = validSelectPolicyTypes.List()
+var validSelectPolicyTypes = sets.New[string](string(autoscaling.MaxPolicySelect), string(autoscaling.MinPolicySelect), string(autoscaling.DisabledPolicySelect))
+var validSelectPolicyTypesList = sets.List[string](validSelectPolicyTypes)
 
 func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -217,8 +218,8 @@ func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Pat
 	return allErrs
 }
 
-var validPolicyTypes = sets.NewString(string(autoscaling.PodsScalingPolicy), string(autoscaling.PercentScalingPolicy))
-var validPolicyTypesList = validPolicyTypes.List()
+var validPolicyTypes = sets.New[string](string(autoscaling.PodsScalingPolicy), string(autoscaling.PercentScalingPolicy))
+var validPolicyTypesList = sets.List[string](validPolicyTypes)
 
 func validateScalingPolicy(policy autoscaling.HPAScalingPolicy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -238,11 +239,11 @@ func validateScalingPolicy(policy autoscaling.HPAScalingPolicy, fldPath *field.P
 	return allErrs
 }
 
-var validMetricSourceTypes = sets.NewString(
+var validMetricSourceTypes = sets.New[string](
 	string(autoscaling.ObjectMetricSourceType), string(autoscaling.PodsMetricSourceType),
 	string(autoscaling.ResourceMetricSourceType), string(autoscaling.ExternalMetricSourceType),
 	string(autoscaling.ContainerResourceMetricSourceType))
-var validMetricSourceTypesList = validMetricSourceTypes.List()
+var validMetricSourceTypesList = sets.List[string](validMetricSourceTypes)
 
 func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -255,7 +256,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, validMetricSourceTypesList))
 	}
 
-	typesPresent := sets.NewString()
+	typesPresent := sets.New[string]()
 	if spec.Object != nil {
 		typesPresent.Insert("object")
 		if typesPresent.Len() == 1 {

@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	supportedPathTypes = sets.NewString(
+	supportedPathTypes = sets.New[string](
 		string(networking.PathTypeExact),
 		string(networking.PathTypePrefix),
 		string(networking.PathTypeImplementationSpecific),
@@ -49,7 +49,7 @@ var (
 	invalidPathSequences = []string{"//", "/./", "/../", "%2f", "%2F"}
 	invalidPathSuffixes  = []string{"/..", "/."}
 
-	supportedIngressClassParametersReferenceScopes = sets.NewString(
+	supportedIngressClassParametersReferenceScopes = sets.New[string](
 		networking.IngressClassParametersReferenceScopeNamespace,
 		networking.IngressClassParametersReferenceScopeCluster,
 	)
@@ -168,7 +168,7 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, opts NetworkP
 		}
 	}
 	// Validate PolicyTypes
-	allowed := sets.NewString(string(networking.PolicyTypeIngress), string(networking.PolicyTypeEgress))
+	allowed := sets.New[string](string(networking.PolicyTypeIngress), string(networking.PolicyTypeEgress))
 	if len(spec.PolicyTypes) > len(allowed) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("policyTypes"), &spec.PolicyTypes, "may not specify more than two policyTypes"))
 		return allErrs
@@ -453,7 +453,7 @@ func validateHTTPIngressPath(path *networking.HTTPIngressPath, fldPath *field.Pa
 			}
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("pathType"), *path.PathType, supportedPathTypes.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("pathType"), *path.PathType, sets.List[string](supportedPathTypes)))
 	}
 	allErrs = append(allErrs, validateIngressBackend(&path.Backend, fldPath.Child("backend"), opts)...)
 	return allErrs
@@ -597,7 +597,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 
 	if !supportedIngressClassParametersReferenceScopes.Has(scope) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,
-			supportedIngressClassParametersReferenceScopes.List()))
+			sets.List[string](supportedIngressClassParametersReferenceScopes)))
 	} else {
 		if scope == networking.IngressClassParametersReferenceScopeNamespace {
 			if params.Namespace == nil {

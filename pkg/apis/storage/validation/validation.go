@@ -117,7 +117,7 @@ func validateParameters(params map[string]string, fldPath *field.Path) field.Err
 	return allErrs
 }
 
-var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRetain))
+var supportedReclaimPolicy = sets.New[string](string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRetain))
 
 // validateReclaimPolicy tests that the reclaim policy is one of the supported. It is up to the volume plugin to reject
 // provisioning for storage classes with impossible reclaim policies, e.g. EBS is not Recyclable
@@ -125,7 +125,7 @@ func validateReclaimPolicy(reclaimPolicy *api.PersistentVolumeReclaimPolicy, fld
 	allErrs := field.ErrorList{}
 	if len(string(*reclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(*reclaimPolicy)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath, reclaimPolicy, supportedReclaimPolicy.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath, reclaimPolicy, sets.List[string](supportedReclaimPolicy)))
 		}
 	}
 	return allErrs
@@ -248,7 +248,7 @@ func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.Er
 	return allErrs
 }
 
-var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImmediate), string(storage.VolumeBindingWaitForFirstConsumer))
+var supportedVolumeBindingModes = sets.New[string](string(storage.VolumeBindingImmediate), string(storage.VolumeBindingWaitForFirstConsumer))
 
 // validateVolumeBindingMode tests that VolumeBindingMode specifies valid values.
 func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.Path) field.ErrorList {
@@ -256,7 +256,7 @@ func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.P
 	if mode == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else if !supportedVolumeBindingModes.Has(string(*mode)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath, mode, supportedVolumeBindingModes.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath, mode, sets.List[string](supportedVolumeBindingModes)))
 	}
 
 	return allErrs
@@ -270,7 +270,7 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 		return allErrs
 	}
 
-	rawTopologies := make([]map[string]sets.String, len(topologies))
+	rawTopologies := make([]map[string]sets.Set[string], len(topologies))
 	for i, term := range topologies {
 		idxPath := fldPath.Index(i)
 		exprMap, termErrs := apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))
@@ -467,7 +467,7 @@ func validateStorageCapacity(storageCapacity *bool, fldPath *field.Path) field.E
 	return allErrs
 }
 
-var supportedFSGroupPolicy = sets.NewString(string(storage.ReadWriteOnceWithFSTypeFSGroupPolicy), string(storage.FileFSGroupPolicy), string(storage.NoneFSGroupPolicy))
+var supportedFSGroupPolicy = sets.New[string](string(storage.ReadWriteOnceWithFSTypeFSGroupPolicy), string(storage.FileFSGroupPolicy), string(storage.NoneFSGroupPolicy))
 
 // validateFSGroupPolicy tests if FSGroupPolicy contains an appropriate value.
 func validateFSGroupPolicy(fsGroupPolicy *storage.FSGroupPolicy, fldPath *field.Path) field.ErrorList {
@@ -478,7 +478,7 @@ func validateFSGroupPolicy(fsGroupPolicy *storage.FSGroupPolicy, fldPath *field.
 	}
 
 	if !supportedFSGroupPolicy.Has(string(*fsGroupPolicy)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath, fsGroupPolicy, supportedFSGroupPolicy.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath, fsGroupPolicy, sets.List[string](supportedFSGroupPolicy)))
 	}
 
 	return allErrs

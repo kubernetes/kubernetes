@@ -37,14 +37,14 @@ import (
 
 var (
 	// trueConditionTypes is the set of condition types which may only have a status of True if present
-	trueConditionTypes = sets.NewString(
+	trueConditionTypes = sets.New[string](
 		string(certificates.CertificateApproved),
 		string(certificates.CertificateDenied),
 		string(certificates.CertificateFailed),
 	)
 
-	trueStatusOnly  = sets.NewString(string(v1.ConditionTrue))
-	allStatusValues = sets.NewString(string(v1.ConditionTrue), string(v1.ConditionFalse), string(v1.ConditionUnknown))
+	trueStatusOnly  = sets.New[string](string(v1.ConditionTrue))
+	allStatusValues = sets.New[string](string(v1.ConditionTrue), string(v1.ConditionFalse), string(v1.ConditionUnknown))
 )
 
 type certificateValidationOptions struct {
@@ -140,7 +140,7 @@ func ValidateCertificateSigningRequestCreate(csr *certificates.CertificateSignin
 }
 
 var (
-	allValidUsages = sets.NewString(
+	allValidUsages = sets.New[string](
 		string(certificates.UsageSigning),
 		string(certificates.UsageDigitalSignature),
 		string(certificates.UsageContentCommitment),
@@ -182,7 +182,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	if !opts.allowUnknownUsages {
 		for i, usage := range csr.Spec.Usages {
 			if !allValidUsages.Has(string(usage)) {
-				allErrs = append(allErrs, field.NotSupported(specPath.Child("usages").Index(i), usage, allValidUsages.List()))
+				allErrs = append(allErrs, field.NotSupported(specPath.Child("usages").Index(i), usage, sets.List[string](allValidUsages)))
 			}
 		}
 	}
@@ -237,7 +237,7 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 		case c.Status == "":
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("status"), ""))
 		case !allowedStatusValues.Has(string(c.Status)):
-			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("status"), c.Status, allowedStatusValues.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("status"), c.Status, sets.List[string](allowedStatusValues)))
 		}
 
 		if !opts.allowBothApprovedAndDenied {

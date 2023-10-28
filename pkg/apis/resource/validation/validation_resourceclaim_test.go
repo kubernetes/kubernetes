@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -199,7 +200,7 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 		},
 		"bad-mode": {
-			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "allocationMode"), invalidMode, supportedAllocationModes.List())},
+			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "allocationMode"), invalidMode, sets.List[string](supportedAllocationModes))},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, goodClaimSpec)
 				claim.Spec.AllocationMode = invalidMode

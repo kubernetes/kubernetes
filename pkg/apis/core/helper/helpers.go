@@ -113,7 +113,7 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 )
 
-var standardResourceQuotaScopes = sets.NewString(
+var standardResourceQuotaScopes = sets.New[string](
 	string(core.ResourceQuotaScopeTerminating),
 	string(core.ResourceQuotaScopeNotTerminating),
 	string(core.ResourceQuotaScopeBestEffort),
@@ -126,11 +126,11 @@ func IsStandardResourceQuotaScope(str string) bool {
 	return standardResourceQuotaScopes.Has(str) || str == string(core.ResourceQuotaScopeCrossNamespacePodAffinity)
 }
 
-var podObjectCountQuotaResources = sets.NewString(
+var podObjectCountQuotaResources = sets.New[string](
 	string(core.ResourcePods),
 )
 
-var podComputeQuotaResources = sets.NewString(
+var podComputeQuotaResources = sets.New[string](
 	string(core.ResourceCPU),
 	string(core.ResourceMemory),
 	string(core.ResourceLimitsCPU),
@@ -152,7 +152,7 @@ func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resourc
 	}
 }
 
-var standardContainerResources = sets.NewString(
+var standardContainerResources = sets.New[string](
 	string(core.ResourceCPU),
 	string(core.ResourceMemory),
 	string(core.ResourceEphemeralStorage),
@@ -196,7 +196,7 @@ func IsOvercommitAllowed(name core.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
-var standardLimitRangeTypes = sets.NewString(
+var standardLimitRangeTypes = sets.New[string](
 	string(core.LimitTypePod),
 	string(core.LimitTypeContainer),
 	string(core.LimitTypePersistentVolumeClaim),
@@ -207,7 +207,7 @@ func IsStandardLimitRangeType(str string) bool {
 	return standardLimitRangeTypes.Has(str)
 }
 
-var standardQuotaResources = sets.NewString(
+var standardQuotaResources = sets.New[string](
 	string(core.ResourceCPU),
 	string(core.ResourceMemory),
 	string(core.ResourceEphemeralStorage),
@@ -235,7 +235,7 @@ func IsStandardQuotaResourceName(str string) bool {
 	return standardQuotaResources.Has(str) || IsQuotaHugePageResourceName(core.ResourceName(str))
 }
 
-var standardResources = sets.NewString(
+var standardResources = sets.New[string](
 	string(core.ResourceCPU),
 	string(core.ResourceMemory),
 	string(core.ResourceEphemeralStorage),
@@ -263,7 +263,7 @@ func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str) || IsQuotaHugePageResourceName(core.ResourceName(str))
 }
 
-var integerResources = sets.NewString(
+var integerResources = sets.New[string](
 	string(core.ResourcePods),
 	string(core.ResourceQuotas),
 	string(core.ResourceServices),
@@ -289,7 +289,7 @@ func IsServiceIPSet(service *core.Service) bool {
 		service.Spec.ClusterIP != core.ClusterIPNone
 }
 
-var standardFinalizers = sets.NewString(
+var standardFinalizers = sets.New[string](
 	string(core.FinalizerKubernetes),
 	metav1.FinalizerOrphanDependents,
 	metav1.FinalizerDeleteDependents,

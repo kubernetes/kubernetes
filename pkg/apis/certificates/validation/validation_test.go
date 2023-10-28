@@ -353,8 +353,8 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()),
-				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()),
+				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), sets.List[string](allValidUsages)),
+				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), sets.List[string](allValidUsages)),
 				field.Duplicate(specPath.Child("usages").Index(1), capi.KeyUsage("unknown")),
 			},
 		},
@@ -586,15 +586,15 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotErrs := sets.NewString()
+			gotErrs := sets.New[string]()
 			for _, err := range ValidateCertificateSigningRequestUpdate(tt.newCSR, tt.oldCSR) {
 				gotErrs.Insert(err.Error())
 			}
-			wantErrs := sets.NewString(tt.errs...)
-			for _, missing := range wantErrs.Difference(gotErrs).List() {
+			wantErrs := sets.New[string](tt.errs...)
+			for _, missing := range sets.List[string](wantErrs.Difference(gotErrs)) {
 				t.Errorf("missing expected error: %s", missing)
 			}
-			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
+			for _, unexpected := range sets.List[string](gotErrs.Difference(wantErrs)) {
 				t.Errorf("unexpected error: %s", unexpected)
 			}
 		})
@@ -722,15 +722,15 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotErrs := sets.NewString()
+			gotErrs := sets.New[string]()
 			for _, err := range ValidateCertificateSigningRequestStatusUpdate(tt.newCSR, tt.oldCSR) {
 				gotErrs.Insert(err.Error())
 			}
-			wantErrs := sets.NewString(tt.errs...)
-			for _, missing := range wantErrs.Difference(gotErrs).List() {
+			wantErrs := sets.New[string](tt.errs...)
+			for _, missing := range sets.List[string](wantErrs.Difference(gotErrs)) {
 				t.Errorf("missing expected error: %s", missing)
 			}
-			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
+			for _, unexpected := range sets.List[string](gotErrs.Difference(wantErrs)) {
 				t.Errorf("unexpected error: %s", unexpected)
 			}
 		})
@@ -822,15 +822,15 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotErrs := sets.NewString()
+			gotErrs := sets.New[string]()
 			for _, err := range ValidateCertificateSigningRequestApprovalUpdate(tt.newCSR, tt.oldCSR) {
 				gotErrs.Insert(err.Error())
 			}
-			wantErrs := sets.NewString(tt.errs...)
-			for _, missing := range wantErrs.Difference(gotErrs).List() {
+			wantErrs := sets.New[string](tt.errs...)
+			for _, missing := range sets.List[string](wantErrs.Difference(gotErrs)) {
 				t.Errorf("missing expected error: %s", missing)
 			}
-			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
+			for _, unexpected := range sets.List[string](gotErrs.Difference(wantErrs)) {
 				t.Errorf("unexpected error: %s", unexpected)
 			}
 		})
@@ -1013,7 +1013,7 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 			}
 
 			// make sure the strict options produce the expected errors
-			gotErrs := sets.NewString()
+			gotErrs := sets.New[string]()
 			for _, err := range validateCertificateSigningRequest(tt.csr, certificateValidationOptions{}) {
 				gotErrs.Insert(err.Error())
 			}
@@ -1021,7 +1021,7 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 			// filter errors matching strictRegexes and ensure every strictRegex matches at least one error
 			for _, expectedRegex := range tt.strictRegexes {
 				matched := false
-				for _, err := range gotErrs.List() {
+				for _, err := range sets.List[string](gotErrs) {
 					if expectedRegex.MatchString(err) {
 						gotErrs.Delete(err)
 						matched = true
@@ -1032,11 +1032,11 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 				}
 			}
 
-			wantErrs := sets.NewString(tt.strictErrs...)
-			for _, missing := range wantErrs.Difference(gotErrs).List() {
+			wantErrs := sets.New[string](tt.strictErrs...)
+			for _, missing := range sets.List[string](wantErrs.Difference(gotErrs)) {
 				t.Errorf("missing expected strict error: %s", missing)
 			}
-			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
+			for _, unexpected := range sets.List[string](gotErrs.Difference(wantErrs)) {
 				t.Errorf("unexpected errors: %s", unexpected)
 			}
 		})

@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/utils/pointer"
@@ -197,7 +198,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"bad-mode": {
-			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "spec", "allocationMode"), invalidMode, supportedAllocationModes.List())},
+			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "spec", "allocationMode"), invalidMode, sets.List[string](supportedAllocationModes))},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
 				template.Spec.Spec.AllocationMode = invalidMode
