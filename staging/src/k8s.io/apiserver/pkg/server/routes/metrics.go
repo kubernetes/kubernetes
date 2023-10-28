@@ -17,6 +17,7 @@ limitations under the License.
 package routes
 
 import (
+	handlersmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
 	cachermetrics "k8s.io/apiserver/pkg/storage/cacher/metrics"
@@ -52,4 +53,5 @@ func register() {
 	etcd3metrics.Register()
 	flowcontrolmetrics.Register()
 	peerproxymetrics.Register()
+	handlersmetrics.Register()
 }
