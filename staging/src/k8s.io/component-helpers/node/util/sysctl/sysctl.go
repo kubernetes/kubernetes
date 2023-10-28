@@ -98,3 +98,34 @@ func (*procSysctl) GetSysctl(sysctl string) (int, error) {
 func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
 	return os.WriteFile(path.Join(sysctlBase, sysctl), []byte(strconv.Itoa(newVal)), 0640)
 }
+
+// NormalizeName can return sysctl variables in dots separator format.
+// The '/' separator is also accepted in place of a '.'.
+// Convert the sysctl variables to dots separator format for validation.
+// More info:
+//
+//	https://man7.org/linux/man-pages/man8/sysctl.8.html
+//	https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+func NormalizeName(val string) string {
+	if val == "" {
+		return val
+	}
+	firstSepIndex := strings.IndexAny(val, "./")
+	// if the first found is `.` like `net.ipv4.conf.eno2/100.rp_filter`
+	if firstSepIndex == -1 || val[firstSepIndex] == '.' {
+		return val
+	}
+
+	// for `net/ipv4/conf/eno2.100/rp_filter`, swap the use of `.` and `/`
+	// to `net.ipv4.conf.eno2/100.rp_filter`
+	f := func(r rune) rune {
+		switch r {
+		case '.':
+			return '/'
+		case '/':
+			return '.'
+		}
+		return r
+	}
+	return strings.Map(f, val)
+}

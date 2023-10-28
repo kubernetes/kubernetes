@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,16 +20,16 @@ import (
 	"testing"
 )
 
-func TestNamespacedBy(t *testing.T) {
+func TestNamespacedOf(t *testing.T) {
 	tests := map[string]Namespace{
-		"kernel.shm_rmid_forced": ipcNamespace,
-		"net.a.b.c":              netNamespace,
-		"fs.mqueue.a.b.c":        ipcNamespace,
-		"foo":                    unknownNamespace,
+		"kernel.shm_rmid_forced": IPCNamespace,
+		"net.a.b.c":              NetNamespace,
+		"fs.mqueue.a.b.c":        IPCNamespace,
+		"foo":                    UnknownNamespace,
 	}
 
 	for sysctl, ns := range tests {
-		if got := NamespacedBy(sysctl); got != ns {
+		if got := namespaceOf(sysctl); got != ns {
 			t.Errorf("wrong namespace for %q: got=%s want=%s", sysctl, got, ns)
 		}
 	}

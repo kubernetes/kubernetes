@@ -365,6 +365,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
+		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 	}
 
 	if oldPodSpec != nil {
@@ -377,6 +378,17 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
 		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
+
+		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
+		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
+			for _, s := range oldPodSpec.SecurityContext.Sysctls {
+				err := apivalidation.ValidateHostSysctl(s.Name, oldPodSpec.SecurityContext, nil)
+				if err != nil {
+					opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
+					break
+				}
+			}
+		}
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
