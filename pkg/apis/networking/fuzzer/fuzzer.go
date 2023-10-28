@@ -87,10 +87,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(obj *networking.ServiceCIDR, c fuzz.Continue) {
 			c.FuzzNoCustom(obj) // fuzz self without calling this function again
-			cidrv4 := generateRandomCIDR(false, c)
-			obj.Spec.IPv4 = cidrv4
-			cidrv6 := generateRandomCIDR(true, c)
-			obj.Spec.IPv6 = cidrv6
+			boolean := []bool{false, true}
+
+			is6 := boolean[c.Rand.Intn(2)]
+			primary := generateRandomCIDR(is6, c)
+			obj.Spec.CIDRs = []string{primary}
+
+			if boolean[c.Rand.Intn(2)] {
+				obj.Spec.CIDRs = append(obj.Spec.CIDRs, generateRandomCIDR(!is6, c))
+			}
 		},
 	}
 }

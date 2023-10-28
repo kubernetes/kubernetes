@@ -647,8 +647,8 @@ type IPAddressList struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64).
-// This range is used by the cluster to allocate the ClusterIPs associated to the Services object.
+// ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
+// This range is used to allocate ClusterIPs to Service objects.
 type ServiceCIDR struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
@@ -665,16 +665,12 @@ type ServiceCIDR struct {
 	Status ServiceCIDRStatus
 }
 
-// ServiceCIDRSpec describe how the ServiceCIDR's specification looks like.
 type ServiceCIDRSpec struct {
-	// IPv4 defines an IPv4 IP block in CIDR notation (e.g. "192.168.0.0/24").
+	// CIDRs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
+	// from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family.
 	// This field is immutable.
 	// +optional
-	IPv4 string
-	// IPv6 defines an IPv6 IP block in CIDR notation (e.g. "2001:db8::/64").
-	// This field is immutable.
-	// +optional
-	IPv6 string
+	CIDRs []string
 }
 
 // ServiceCIDRStatus describes the current state of the ServiceCIDR.

@@ -726,46 +726,46 @@ var ValidateServiceCIDRName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&cidrConfig.ObjectMeta, false, ValidateServiceCIDRName, field.NewPath("metadata"))
+	fieldPath := field.NewPath("spec", "cidrs")
 
-	if cidrConfig.Spec.IPv4 == "" && cidrConfig.Spec.IPv6 == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("Spec"), cidrConfig.Spec, "at least one CIDR required"))
+	if len(cidrConfig.Spec.CIDRs) == 0 {
+		allErrs = append(allErrs, field.Required(fieldPath, "at least one CIDR required"))
 		return allErrs
 	}
 
-	if cidrConfig.Spec.IPv4 != "" {
-		prefix, err := netip.ParsePrefix(cidrConfig.Spec.IPv4)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, err.Error()))
-		} else {
-			if prefix.Addr() != prefix.Masked().Addr() {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, "wrong CIDR format, IP doesn't match network IP address"))
-			}
-			if prefix.String() != cidrConfig.Spec.IPv4 {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, "CIDR not in canonical format"))
-			}
-			if !prefix.Addr().Is4() {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, "not IPv4 family CIDR"))
-			}
+	if len(cidrConfig.Spec.CIDRs) > 2 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may only hold up to 2 values"))
+		return allErrs
+	}
+	// validate cidrs are dual stack, one of each IP family
+	if len(cidrConfig.Spec.CIDRs) == 2 {
+		isDual, err := netutils.IsDualStackCIDRStrings(cidrConfig.Spec.CIDRs)
+		if err != nil || !isDual {
+			allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
+			return allErrs
 		}
 	}
 
-	if cidrConfig.Spec.IPv6 != "" {
-		prefix, err := netip.ParsePrefix(cidrConfig.Spec.IPv6)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, err.Error()))
-		} else {
-			if prefix.Addr() != prefix.Masked().Addr() {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, "wrong CIDR format, IP doesn't match network IP address"))
-			}
-			if prefix.String() != cidrConfig.Spec.IPv6 {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, "CIDR not in RFC 5952 canonical format"))
-			}
-			if !prefix.Addr().Is6() {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, "not IPv6 family CIDR"))
-			}
-		}
+	for i, cidr := range cidrConfig.Spec.CIDRs {
+		allErrs = append(allErrs, validateCIDR(cidr, fieldPath.Index(i))...)
 	}
 
+	return allErrs
+}
+
+func validateCIDR(cidr string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	prefix, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, cidr, err.Error()))
+	} else {
+		if prefix.Addr() != prefix.Masked().Addr() {
+			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "wrong CIDR format, IP doesn't match network IP address"))
+		}
+		if prefix.String() != cidr {
+			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "CIDR not in RFC 5952 canonical format"))
+		}
+	}
 	return allErrs
 }
 
@@ -773,8 +773,7 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 func ValidateServiceCIDRUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.IPv4, old.Spec.IPv4, field.NewPath("spec").Child("ipv4"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.IPv6, old.Spec.IPv6, field.NewPath("spec").Child("ipv6"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.CIDRs, old.Spec.CIDRs, field.NewPath("spec").Child("cidrs"))...)
 
 	return allErrs
 }
