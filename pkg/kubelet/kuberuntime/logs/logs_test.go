@@ -24,7 +24,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -215,7 +214,6 @@ func TestReadLogs(t *testing.T) {
 }
 
 func TestReadRotatedLog(t *testing.T) {
-	var mu sync.RWMutex
 	tmpDir := t.TempDir()
 	file, err := os.CreateTemp(tmpDir, "logfile")
 	if err != nil {
@@ -236,15 +234,13 @@ func TestReadRotatedLog(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// Start to follow the container's log.
+	fileName := file.Name()
 	go func(ctx context.Context) {
 		podLogOptions := v1.PodLogOptions{
 			Follow: true,
 		}
 		opts := NewLogOptions(&podLogOptions, time.Now())
-		mu.Lock()
-		path := file.Name()
-		mu.Unlock()
-		_ = ReadLogs(ctx, path, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+		_ = ReadLogs(ctx, fileName, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 	}(ctx)
 
 	// log in stdout
@@ -282,13 +278,10 @@ func TestReadRotatedLog(t *testing.T) {
 			}
 
 			newF := filepath.Join(dir, baseName)
-			mu.Lock()
 			if file, err = os.Create(newF); err != nil {
-				mu.Unlock()
 				assert.NoError(t, err, "unable to create new log file")
 				return
 			}
-			mu.Unlock()
 			time.Sleep(20 * time.Millisecond)
 		}
 	}
