@@ -230,7 +230,11 @@ func TestMigrateServiceCIDR(t *testing.T) {
 			return false, err
 		}
 
-		if cidr.Spec.IPv4 != cidr2 {
+		if len(cidr.Spec.CIDRs) == 0 {
+			return false, nil
+		}
+
+		if cidr.Spec.CIDRs[0] != cidr2 {
 			return false, nil
 		}
 

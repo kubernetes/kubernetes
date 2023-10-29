@@ -304,15 +304,16 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 }
 
-func makeServiceCIDR(name, ipv4, ipv6 string) *networkingv1alpha1.ServiceCIDR {
+func makeServiceCIDR(name, primary, secondary string) *networkingv1alpha1.ServiceCIDR {
 	serviceCIDR := &networkingv1alpha1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: networkingv1alpha1.ServiceCIDRSpec{
-			IPv4: ipv4,
-			IPv6: ipv6,
-		},
+		Spec: networkingv1alpha1.ServiceCIDRSpec{},
+	}
+	serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, primary)
+	if secondary != "" {
+		serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, secondary)
 	}
 	return serviceCIDR
 }
