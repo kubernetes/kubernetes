@@ -5944,16 +5944,46 @@ func TestDescribeServiceCIDR(t *testing.T) {
 					Name: "foo.123",
 				},
 				Spec: networkingv1alpha1.ServiceCIDRSpec{
-					IPv4: "10.1.0.0/16",
-					IPv6: "fd00:1:1::/64",
+					CIDRs: []string{"10.1.0.0/16", "fd00:1:1::/64"},
 				},
 			}),
 
 			output: `Name:         foo.123
 Labels:       <none>
 Annotations:  <none>
-IPv4:         10.1.0.0/16
-IPv6:         fd00:1:1::/64
+CIDRs:        10.1.0.0/16, fd00:1:1::/64
+Events:       <none>` + "\n",
+		},
+		"ServiceCIDR v1alpha1 IPv4": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ServiceCIDRSpec{
+					CIDRs: []string{"10.1.0.0/16"},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+CIDRs:        10.1.0.0/16
+Events:       <none>` + "\n",
+		},
+		"ServiceCIDR v1alpha1 IPv6": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ServiceCIDRSpec{
+					CIDRs: []string{"fd00:1:1::/64"},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+CIDRs:        fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
 	}

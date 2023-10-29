@@ -2870,13 +2870,7 @@ func (c *ServiceCIDRDescriber) describeServiceCIDRV1alpha1(svc *networkingv1alph
 		printLabelsMultiline(w, "Labels", svc.Labels)
 		printAnnotationsMultiline(w, "Annotations", svc.Annotations)
 
-		if svc.Spec.IPv4 != "" {
-			w.Write(LEVEL_0, "IPv4:\t%s\n", svc.Spec.IPv4)
-		}
-
-		if svc.Spec.IPv6 != "" {
-			w.Write(LEVEL_0, "IPv6:\t%s\n", svc.Spec.IPv6)
-		}
+		w.Write(LEVEL_0, "CIDRs:\t%v\n", strings.Join(svc.Spec.CIDRs, ", "))
 
 		if len(svc.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Status:\n")
