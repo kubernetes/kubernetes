@@ -69,8 +69,8 @@ type MetaAllocator struct {
 
 var _ Interface = &MetaAllocator{}
 
-// NewMetaAllocator returns an IP allocator associated to a network range
-// that use the IPAddress and ServiceCIDR objects to track the assigned IP addresses,
+// NewMetaAllocator returns an IP allocator that use the IPAddress
+// and ServiceCIDR objects to track the assigned IP addresses,
 // using an informer cache as storage.
 func NewMetaAllocator(
 	client networkingv1alpha1client.NetworkingV1alpha1Interface,
@@ -79,6 +79,7 @@ func NewMetaAllocator(
 	isIPv6 bool,
 ) (*MetaAllocator, error) {
 
+	// TODO: make the NewMetaAllocator agnostic of the IP family
 	family := api.IPv4Protocol
 	if isIPv6 {
 		family = api.IPv6Protocol
@@ -186,20 +187,18 @@ func (c *MetaAllocator) syncTree() error {
 	}
 
 	cidrsSet := sets.New[string]()
-	cidrState := map[string]bool{}
-	for _, cidr := range serviceCIDRs {
+	cidrReady := map[string]bool{}
+	for _, serviceCIDR := range serviceCIDRs {
 		ready := true
-		if !isReady(cidr) || !cidr.DeletionTimestamp.IsZero() {
+		if !isReady(serviceCIDR) || !serviceCIDR.DeletionTimestamp.IsZero() {
 			ready = false
 		}
 
-		if c.ipFamily == api.IPv4Protocol && cidr.Spec.IPv4 != "" {
-			cidrsSet.Insert(cidr.Spec.IPv4)
-			cidrState[cidr.Spec.IPv4] = ready
-		}
-		if c.ipFamily == api.IPv6Protocol && cidr.Spec.IPv6 != "" {
-			cidrsSet.Insert(cidr.Spec.IPv6)
-			cidrState[cidr.Spec.IPv6] = ready
+		for _, cidr := range serviceCIDR.Spec.CIDRs {
+			if c.ipFamily == api.IPFamily(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))) {
+				cidrsSet.Insert(cidr)
+				cidrReady[cidr] = ready
+			}
 		}
 	}
 
@@ -207,7 +206,7 @@ func (c *MetaAllocator) syncTree() error {
 	treeSet := sets.New[string]()
 	c.muTree.Lock()
 	c.tree.DepthFirstWalk(c.ipFamily == api.IPv6Protocol, func(k netip.Prefix, v *Allocator) bool {
-		v.ready.Store(cidrState[k.String()])
+		v.ready.Store(cidrReady[k.String()])
 		treeSet.Insert(k.String())
 		return false
 	})
@@ -228,7 +227,7 @@ func (c *MetaAllocator) syncTree() error {
 			errs = append(errs, err)
 			continue
 		}
-		allocator.ready.Store(cidrState[cidr])
+		allocator.ready.Store(cidrReady[cidr])
 		prefix, err := netip.ParsePrefix(cidr)
 		if err != nil {
 			return err
@@ -252,12 +251,8 @@ func (c *MetaAllocator) getAllocator(ip net.IP) (*Allocator, error) {
 	c.muTree.Lock()
 	defer c.muTree.Unlock()
 
-	var prefix netip.Prefix
-	if c.ipFamily == api.IPv4Protocol {
-		prefix = netip.PrefixFrom(ipToAddr(ip), 32)
-	} else {
-		prefix = netip.PrefixFrom(ipToAddr(ip), 128)
-	}
+	address := ipToAddr(ip)
+	prefix := netip.PrefixFrom(address, address.BitLen())
 	// Use the largest subnet to allocate addresses because
 	// all the other subnets will be contained.
 	_, allocator, ok := c.tree.ShortestPrefixMatch(prefix)
@@ -432,8 +427,7 @@ func isReady(serviceCIDR *networkingv1alpha1.ServiceCIDR) bool {
 			return condition.Status == metav1.ConditionStatus(metav1.ConditionTrue)
 		}
 	}
-	// if condition is not found assume it is ready to handle scenarios
-	// where the kube-controller-manager is not running
+	// assume the ServiceCIDR is Ready, in order to handle scenarios where kcm is not running
 	return true
 }
 
@@ -451,4 +445,18 @@ func ipToAddr(ip net.IP) netip.Addr {
 	// AddrFromSlice returns Addr{}, false if the input is invalid.
 	address, _ := netip.AddrFromSlice(bytes)
 	return address
+}
+
+// Convert netutils.IPFamily to v1.IPFamily
+// TODO: consolidate helpers
+// copied from pkg/proxy/util/utils.go
+func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
+	switch ipFamily {
+	case netutils.IPv4:
+		return v1.IPv4Protocol
+	case netutils.IPv6:
+		return v1.IPv6Protocol
+	}
+
+	return v1.IPFamilyUnknown
 }

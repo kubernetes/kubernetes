@@ -468,13 +468,14 @@ func TestCIDRAllocateShrink(t *testing.T) {
 
 }
 
-func newServiceCIDR(name, cidrV4 string) *networkingv1alpha1.ServiceCIDR {
+// TODO: add IPv6 and dual stack test cases
+func newServiceCIDR(name, cidr string) *networkingv1alpha1.ServiceCIDR {
 	return &networkingv1alpha1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: networkingv1alpha1.ServiceCIDRSpec{
-			IPv4: cidrV4,
+			CIDRs: []string{cidr},
 		},
 		Status: networkingv1alpha1.ServiceCIDRStatus{
 			Conditions: []metav1.Condition{
