@@ -362,7 +362,7 @@ fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
 
 # MutatingAdmissionWebhook should be the last controller that modifies the
 # request object, otherwise users will be confused if the mutating webhooks'
