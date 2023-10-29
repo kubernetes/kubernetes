@@ -290,6 +290,7 @@ type Zones interface {
 }
 
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
+// DEPRECATED: PVLabeler is deprecated in favor of CSI topology feature.
 type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
 }
