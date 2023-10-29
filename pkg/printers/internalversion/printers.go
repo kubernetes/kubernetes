@@ -656,8 +656,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "IPv4", Type: "string", Description: networkingv1alpha1.ServiceCIDRSpec{}.SwaggerDoc()["ipv4"]},
-		{Name: "IPv6", Type: "string", Description: networkingv1alpha1.ServiceCIDRSpec{}.SwaggerDoc()["ipv6"]},
+		{Name: "CIDRs", Type: "string", Description: networkingv1alpha1.ServiceCIDRSpec{}.SwaggerDoc()["cidrs"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
@@ -2852,17 +2851,9 @@ func printServiceCIDR(obj *networking.ServiceCIDR, options printers.GenerateOpti
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	ipv4 := "<none>"
-	ipv6 := "<none>"
 
-	if obj.Spec.IPv4 != "" {
-		ipv4 = obj.Spec.IPv4
-	}
-	if obj.Spec.IPv6 != "" {
-		ipv6 = obj.Spec.IPv6
-	}
-
-	row.Cells = append(row.Cells, obj.Name, ipv4, ipv6, translateTimestampSince(obj.CreationTimestamp))
+	cidrs := strings.Join(obj.Spec.CIDRs, ",")
+	row.Cells = append(row.Cells, obj.Name, cidrs, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
 }
 

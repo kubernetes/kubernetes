@@ -6589,37 +6589,36 @@ func TestPrintServiceCIDR(t *testing.T) {
 			ccc: networking.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
 				Spec: networking.ServiceCIDRSpec{
-					IPv4: ipv4CIDR,
+					CIDRs: []string{ipv4CIDR},
 				},
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, IPv4, IPv6, Age.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", ipv4CIDR, "<none>", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", ipv4CIDR, "<unknown>"}}},
 		},
 		{
 			// Test name, IPv6 only.
 			ccc: networking.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
 				Spec: networking.ServiceCIDRSpec{
-					IPv6: ipv6CIDR,
+					CIDRs: []string{ipv6CIDR},
 				},
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "<none>", ipv6CIDR, "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", ipv6CIDR, "<unknown>"}}},
 		},
 		{
 			// Test name, DualStack.
 			ccc: networking.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{Name: "test9"},
 				Spec: networking.ServiceCIDRSpec{
-					IPv4: ipv4CIDR,
-					IPv6: ipv6CIDR,
+					CIDRs: []string{ipv4CIDR, ipv6CIDR},
 				},
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test9", ipv4CIDR, ipv6CIDR, "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test9", ipv4CIDR + "," + ipv6CIDR, "<unknown>"}}},
 		},
 	}
 
@@ -6643,15 +6642,13 @@ func TestPrintServiceCIDRList(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "ccc1"},
 				Spec: networking.ServiceCIDRSpec{
-					IPv4: "10.1.0.0/16",
-					IPv6: "fd00:1:1::/64",
+					CIDRs: []string{"10.1.0.0/16", "fd00:1:1::/64"},
 				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "ccc2"},
 				Spec: networking.ServiceCIDRSpec{
-					IPv4: "10.2.0.0/16",
-					IPv6: "fd00:2:1::/64",
+					CIDRs: []string{"10.2.0.0/16", "fd00:2:1::/64"},
 				},
 			},
 		},
@@ -6666,17 +6663,17 @@ func TestPrintServiceCIDRList(t *testing.T) {
 			options: printers.GenerateOptions{Wide: false},
 			expected: []metav1.TableRow{
 				// Columns: Name, IPv4, IPv6, Age.
-				{Cells: []interface{}{"ccc1", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>"}},
-				{Cells: []interface{}{"ccc2", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>"}},
+				{Cells: []interface{}{"ccc1", "10.1.0.0/16,fd00:1:1::/64", "<unknown>"}},
+				{Cells: []interface{}{"ccc2", "10.2.0.0/16,fd00:2:1::/64", "<unknown>"}},
 			},
 		},
 		{
 			// Test name, DualStack with node selector, wide.
 			options: printers.GenerateOptions{Wide: true},
 			expected: []metav1.TableRow{
-				// Columns: Name, IPv4, IPv6, Age.
-				{Cells: []interface{}{"ccc1", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>"}},
-				{Cells: []interface{}{"ccc2", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>"}},
+				// Columns: Name, CIDRs, Age.
+				{Cells: []interface{}{"ccc1", "10.1.0.0/16,fd00:1:1::/64", "<unknown>"}},
+				{Cells: []interface{}{"ccc2", "10.2.0.0/16,fd00:2:1::/64", "<unknown>"}},
 			},
 		},
 	}
