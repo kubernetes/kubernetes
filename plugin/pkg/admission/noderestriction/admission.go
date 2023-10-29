@@ -34,9 +34,12 @@ import (
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-helpers/kubernetesx509"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
+	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -112,6 +115,7 @@ var (
 	svcacctResource = api.Resource("serviceaccounts")
 	leaseResource   = coordapi.Resource("leases")
 	csiNodeResource = storage.Resource("csinodes")
+	csrResource     = certificatesapi.Resource("certificatesigningrequests")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
@@ -156,6 +160,9 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 
 	case svcacctResource:
 		return p.admitServiceAccount(nodeName, a)
+
+	case csrResource:
+		return p.admitCertificateSigningRequest(nodeName, a)
 
 	case leaseResource:
 		return p.admitLease(nodeName, a)
@@ -564,6 +571,58 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	}
 	if pod.Spec.NodeName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node requested token bound to a pod scheduled on a different node"))
+	}
+
+	return nil
+}
+
+func (p *Plugin) admitCertificateSigningRequest(nodeName string, a admission.Attributes) error {
+	if a.GetOperation() != admission.Create {
+		return nil
+	}
+
+	csr, ok := a.GetObject().(*certificatesapi.CertificateSigningRequest)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	// If the CertificateSigningRequest uses the Kubernetes X.509 PodIdentity
+	// extension, then the data in that extension must be consistent with the
+	// requesting node, and denote a pod actually running on that node.
+
+	x509cr, err := capihelper.ParseCSR(csr.Spec.Request)
+	if err != nil {
+		return fmt.Errorf("unable to parse csr %q: %v", csr.Name, err)
+	}
+
+	podIdentity, err := kubernetesx509.PodIdentityFromCertificateRequest(x509cr)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("while extracting Kubernetes X.509 PodIdentity extension: %w", err))
+	}
+
+	if podIdentity == nil {
+		return nil
+	}
+
+	if podIdentity.NodeName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("PodIdentity extension contains NodeName=%q, which is not the requesting node %q", podIdentity.NodeName, nodeName))
+	}
+
+	pod, err := p.podsGetter.Pods(podIdentity.Namespace).Get(podIdentity.PodName)
+	if errors.IsNotFound(err) {
+		return fmt.Errorf("while retrieving pod %s/%s named in the PodIdentity extension", podIdentity.Namespace, podIdentity.PodName)
+	}
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("while retrieving pod %s/%s named in the PodIdentity extension", podIdentity.Namespace, podIdentity.PodName))
+	}
+
+	if podIdentity.PodUID != string(pod.ObjectMeta.UID) {
+		// We cannot outright forbid because our informer could be running behind.
+		return fmt.Errorf("PodIdentity extension for pod %s/%s contains UID (%s) which differs from running pod %s", podIdentity.Namespace, podIdentity.PodName, podIdentity.PodUID, string(pod.ObjectMeta.UID))
+	}
+	if podIdentity.ServiceAccountName != string(pod.Spec.ServiceAccountName) {
+		// We can outright forbid because this cannot be caused by informer lag (the UIDs match)
+		return admission.NewForbidden(a, fmt.Errorf("PodIdentity extension for pod %s/%s contains serviceAccountName (%s) that differs from running pod (%s)", podIdentity.Namespace, podIdentity.PodName, podIdentity.ServiceAccountName, pod.Spec.ServiceAccountName))
 	}
 
 	return nil
