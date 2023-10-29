@@ -19,6 +19,7 @@ package defaultservicecidr
 import (
 	"context"
 	"net"
+	"reflect"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -64,15 +64,9 @@ func NewController(
 	}
 
 	// obtain configuration from flags
-	if netutils.IsIPv4CIDR(&primaryRange) {
-		c.ipv4CIDR = primaryRange.String()
-	} else if netutils.IsIPv4CIDR(&secondaryRange) {
-		c.ipv4CIDR = secondaryRange.String()
-	}
-	if netutils.IsIPv6CIDR(&primaryRange) {
-		c.ipv6CIDR = primaryRange.String()
-	} else if netutils.IsIPv6CIDR(&secondaryRange) {
-		c.ipv6CIDR = secondaryRange.String()
+	c.cidrs = append(c.cidrs, primaryRange.String())
+	if secondaryRange.IP != nil {
+		c.cidrs = append(c.cidrs, secondaryRange.String())
 	}
 	// instead of using the shared informers from the controlplane instance, we construct our own informer
 	// because we need such a small subset of the information available, only the kubernetes.default ServiceCIDR
@@ -95,8 +89,7 @@ func NewController(
 
 // Controller manages selector-based service ipAddress.
 type Controller struct {
-	ipv4CIDR string
-	ipv6CIDR string
+	cidrs []string // order matters, first cidr defines the default IP family
 
 	client           clientset.Interface
 	eventBroadcaster record.EventBroadcaster
@@ -152,14 +145,13 @@ func (c *Controller) sync() {
 	}
 
 	// default ServiceCIDR does not exist
-	klog.Infof("Creating default ServiceCIDR, ipv4: %q ipv6: %q", c.ipv4CIDR, c.ipv6CIDR)
+	klog.Infof("Creating default ServiceCIDR with CIDRs: %v", c.cidrs)
 	serviceCIDR = &networkingapiv1alpha1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: DefaultServiceCIDRName,
 		},
 		Spec: networkingapiv1alpha1.ServiceCIDRSpec{
-			IPv4: c.ipv4CIDR,
-			IPv6: c.ipv6CIDR,
+			CIDRs: c.cidrs,
 		},
 	}
 	serviceCIDR, err = c.client.NetworkingV1alpha1().ServiceCIDRs().Create(context.Background(), serviceCIDR, metav1.CreateOptions{})
@@ -201,8 +193,7 @@ func (c *Controller) syncStatus(serviceCIDR *networkingapiv1alpha1.ServiceCIDR) 
 		}
 	}
 	// set status to ready if the ServiceCIDR matches this configuration
-	if c.ipv4CIDR == serviceCIDR.Spec.IPv4 &&
-		c.ipv6CIDR == serviceCIDR.Spec.IPv6 {
+	if reflect.DeepEqual(c.cidrs, serviceCIDR.Spec.CIDRs) {
 		klog.Infof("Setting default ServiceCIDR condition Ready to True")
 		svcApplyStatus := networkingapiv1alpha1apply.ServiceCIDRStatus().WithConditions(
 			metav1apply.Condition().

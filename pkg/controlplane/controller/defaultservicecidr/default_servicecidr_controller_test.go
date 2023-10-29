@@ -52,8 +52,7 @@ func newController(t *testing.T, objects []*networkingapiv1alpha1.ServiceCIDR) (
 	c := &Controller{
 		client:             client,
 		interval:           time.Second,
-		ipv4CIDR:           defaultIPv4CIDR,
-		ipv6CIDR:           defaultIPv6CIDR,
+		cidrs:              []string{defaultIPv4CIDR, defaultIPv6CIDR},
 		eventRecorder:      record.NewFakeRecorder(100),
 		serviceCIDRLister:  serviceCIDRInformer.Lister(),
 		serviceCIDRsSynced: func() bool { return true },
@@ -81,8 +80,7 @@ func TestControllerSync(t *testing.T) {
 						Name: DefaultServiceCIDRName,
 					},
 					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
-						IPv4: defaultIPv4CIDR,
-						IPv6: defaultIPv6CIDR,
+						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
 			},
@@ -96,8 +94,7 @@ func TestControllerSync(t *testing.T) {
 						Name: DefaultServiceCIDRName,
 					},
 					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
-						IPv4: "",
-						IPv6: "fd00::/112",
+						CIDRs: []string{"fd00::/112"},
 					},
 				},
 			},
@@ -110,8 +107,7 @@ func TestControllerSync(t *testing.T) {
 						Name: DefaultServiceCIDRName,
 					},
 					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
-						IPv4: defaultIPv4CIDR,
-						IPv6: defaultIPv6CIDR,
+						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 					Status: networkingapiv1alpha1.ServiceCIDRStatus{
 						Conditions: []metav1.Condition{
@@ -133,8 +129,7 @@ func TestControllerSync(t *testing.T) {
 						DeletionTimestamp: ptr.To(metav1.Now()),
 					},
 					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
-						IPv4: defaultIPv4CIDR,
-						IPv6: defaultIPv6CIDR,
+						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
 			},
@@ -147,8 +142,7 @@ func TestControllerSync(t *testing.T) {
 						Name: "non-default-cidr",
 					},
 					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
-						IPv4: defaultIPv4CIDR,
-						IPv6: defaultIPv6CIDR,
+						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
 			},
