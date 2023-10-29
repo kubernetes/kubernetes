@@ -128,7 +128,7 @@ func TestControllerSync(t *testing.T) {
 			actions:    [][]string{{"patch", "servicecidrs", ""}},
 		},
 		{
-			name: "service CIDR being deleted but withing the grace period must be requeued not remove the finalizer", // TODO: assert is actually requeued
+			name: "service CIDR being deleted but within the grace period must be requeued not remove the finalizer", // TODO: assert is actually requeued
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
 				deletingServiceCIDR,
 			},
@@ -244,15 +244,16 @@ func TestControllerSync(t *testing.T) {
 	}
 }
 
-func makeServiceCIDR(name, ipv4, ipv6 string) *networkingapiv1alpha1.ServiceCIDR {
+func makeServiceCIDR(name, primary, secondary string) *networkingapiv1alpha1.ServiceCIDR {
 	serviceCIDR := &networkingapiv1alpha1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: networkingapiv1alpha1.ServiceCIDRSpec{
-			IPv4: ipv4,
-			IPv6: ipv6,
-		},
+		Spec: networkingapiv1alpha1.ServiceCIDRSpec{},
+	}
+	serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, primary)
+	if secondary != "" {
+		serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, secondary)
 	}
 	return serviceCIDR
 }

@@ -557,14 +557,12 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
 	register(newTaintEvictionControllerDescriptor())
+	register(newServiceCIDRsControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
 		}
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MultiCIDRServiceAllocator) {
-		register(names.ServiceCIDRController, startServiceCIDRsController)
 	}
 
 	return controllers
