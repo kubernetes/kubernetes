@@ -109,14 +109,6 @@ func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceLis
 	return pod, podStats
 }
 
-func makePodWithPIDStats(name string, priority int32, processCount uint64) (*v1.Pod, statsapi.PodStats) {
-	pod := newPod(name, priority, []v1.Container{
-		newContainer(name, nil, nil),
-	}, nil)
-	podStats := newPodProcessStats(pod, processCount)
-	return pod, podStats
-}
-
 func makePodWithDiskStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*v1.Pod, statsapi.PodStats) {
 	pod := newPod(name, priority, []v1.Container{
 		newContainer(name, requests, limits),
@@ -149,32 +141,6 @@ func makePodWithLocalStorageCapacityIsolationOpen(name string, priority int32, r
 		podStats = newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
 	}
 	return pod, podStats
-}
-
-func makePIDStats(nodeAvailablePIDs string, numberOfRunningProcesses string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
-	val := resource.MustParse(nodeAvailablePIDs)
-	availablePIDs := int64(val.Value())
-
-	parsed := resource.MustParse(numberOfRunningProcesses)
-	NumberOfRunningProcesses := int64(parsed.Value())
-	result := &statsapi.Summary{
-		Node: statsapi.NodeStats{
-			Rlimit: &statsapi.RlimitStats{
-				MaxPID:                &availablePIDs,
-				NumOfRunningProcesses: &NumberOfRunningProcesses,
-			},
-			SystemContainers: []statsapi.ContainerStats{
-				{
-					Name: statsapi.SystemContainerPods,
-				},
-			},
-		},
-		Pods: []statsapi.PodStats{},
-	}
-	for _, podStat := range podStats {
-		result.Pods = append(result.Pods, podStat)
-	}
-	return result
 }
 
 func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
@@ -333,105 +299,6 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 						Status:  "True",
 						Reason:  "TerminationByKubelet",
 						Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
-					})
-				}
-
-				// verify the pod status after applying the status update function
-				podKiller.statusFn(&podKiller.pod.Status)
-				if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
-					t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
-				}
-			})
-		}
-	}
-}
-
-func TestPIDPressure_VerifyPodStatus(t *testing.T) {
-	testCases := map[string]struct {
-		wantPodStatus v1.PodStatus
-	}{
-		"eviction due to pid pressure": {
-			wantPodStatus: v1.PodStatus{
-				Phase:   v1.PodFailed,
-				Reason:  "Evicted",
-				Message: "The node was low on resource: pids. Threshold quantity: 1200, available: 500. ",
-			},
-		},
-	}
-	for name, tc := range testCases {
-		for _, enablePodDisruptionConditions := range []bool{true, false} {
-			t.Run(fmt.Sprintf("%s;PodDisruptionConditions=%v", name, enablePodDisruptionConditions), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
-
-				podMaker := makePodWithPIDStats
-				summaryStatsMaker := makePIDStats
-				podsToMake := []podToMake{
-					{name: "below-requests"},
-					{name: "above-requests"},
-				}
-				pods := []*v1.Pod{}
-				podStats := map[*v1.Pod]statsapi.PodStats{}
-				for _, podToMake := range podsToMake {
-					pod, podStat := podMaker(podToMake.name, podToMake.priority, 2)
-					pods = append(pods, pod)
-					podStats[pod] = podStat
-				}
-				activePodsFunc := func() []*v1.Pod {
-					return pods
-				}
-
-				fakeClock := testingclock.NewFakeClock(time.Now())
-				podKiller := &mockPodKiller{}
-				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-				diskGC := &mockDiskGC{err: nil}
-				nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-
-				config := Config{
-					PressureTransitionPeriod: time.Minute * 5,
-					Thresholds: []evictionapi.Threshold{
-						{
-							Signal:   evictionapi.SignalPIDAvailable,
-							Operator: evictionapi.OpLessThan,
-							Value: evictionapi.ThresholdValue{
-								Quantity: quantityMustParse("1200"),
-							},
-						},
-					},
-				}
-				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500", "1000", podStats)}
-				manager := &managerImpl{
-					clock:                        fakeClock,
-					killPodFunc:                  podKiller.killPodNow,
-					imageGC:                      diskGC,
-					containerGC:                  diskGC,
-					config:                       config,
-					recorder:                     &record.FakeRecorder{},
-					summaryProvider:              summaryProvider,
-					nodeRef:                      nodeRef,
-					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
-					thresholdsFirstObservedAt:    thresholdsObservedAt{},
-				}
-
-				// synchronize to detect the memory pressure
-				manager.synchronize(diskInfoProvider, activePodsFunc)
-
-				// verify pid pressure is detected
-				if !manager.IsUnderPIDPressure() {
-					t.Fatalf("Manager should have detected PID pressure")
-				}
-
-				// verify a pod is selected for eviction
-				if podKiller.pod == nil {
-					t.Fatalf("Manager should have selected a pod for eviction")
-				}
-
-				wantPodStatus := tc.wantPodStatus.DeepCopy()
-				if enablePodDisruptionConditions {
-					wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
-						Type:    "DisruptionTarget",
-						Status:  "True",
-						Reason:  "TerminationByKubelet",
-						Message: "The node was low on resource: pids. Threshold quantity: 1200, available: 500. ",
 					})
 				}
 
