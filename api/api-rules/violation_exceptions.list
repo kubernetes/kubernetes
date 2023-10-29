@@ -179,7 +179,6 @@ API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyIngr
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicySpec,Egress
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicySpec,Ingress
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicySpec,PolicyTypes
-API rule violation: list_type_missing,k8s.io/api/networking/v1alpha1,ServiceCIDRSpec,CIDRs
 API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,HTTPIngressRuleValue,Paths
 API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,IngressLoadBalancerStatus,Ingress
 API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,IngressSpec,Rules

@@ -38373,7 +38373,7 @@ func schema_k8sio_api_networking_v1alpha1_ServiceCIDR(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64). This range is used by the cluster to allocate the ClusterIPs associated to the Services object.",
+				Description: "ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64). This range is used to allocate ClusterIPs to Service objects.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -38477,18 +38477,19 @@ func schema_k8sio_api_networking_v1alpha1_ServiceCIDRSpec(ref common.ReferenceCa
 				Description: "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"ipv4": {
+					"cidrs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "IPv4 defines an IPv4 IP block in CIDR notation (e.g. \"192.168.0.0/24\"). This field is immutable.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"ipv6": {
-						SchemaProps: spec.SchemaProps{
-							Description: "IPv6 defines an IPv6 IP block in CIDR notation (e.g. \"2001:db8::/64\"). This field is immutable.",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
 						},
 					},
 				},

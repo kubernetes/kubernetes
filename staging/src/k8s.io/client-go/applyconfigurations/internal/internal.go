@@ -10612,12 +10612,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.networking.v1alpha1.ServiceCIDRSpec
   map:
     fields:
-    - name: ipv4
+    - name: cidrs
       type:
-        scalar: string
-    - name: ipv6
-      type:
-        scalar: string
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.api.networking.v1alpha1.ServiceCIDRStatus
   map:
     fields:

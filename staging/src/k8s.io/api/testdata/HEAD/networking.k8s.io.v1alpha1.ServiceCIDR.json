@@ -44,8 +44,9 @@
     ]
   },
   "spec": {
-    "ipv4": "ipv4Value",
-    "ipv6": "ipv6Value"
+    "cidrs": [
+      "cidrsValue"
+    ]
   },
   "status": {
     "conditions": [

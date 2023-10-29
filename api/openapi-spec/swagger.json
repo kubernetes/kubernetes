@@ -13843,7 +13843,7 @@
       "type": "object"
     },
     "io.k8s.api.networking.v1alpha1.ServiceCIDR": {
-      "description": "ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64). This range is used by the cluster to allocate the ClusterIPs associated to the Services object.",
+      "description": "ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64). This range is used to allocate ClusterIPs to Service objects.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13913,13 +13913,12 @@
     "io.k8s.api.networking.v1alpha1.ServiceCIDRSpec": {
       "description": "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
       "properties": {
-        "ipv4": {
-          "description": "IPv4 defines an IPv4 IP block in CIDR notation (e.g. \"192.168.0.0/24\"). This field is immutable.",
-          "type": "string"
-        },
-        "ipv6": {
-          "description": "IPv6 defines an IPv6 IP block in CIDR notation (e.g. \"2001:db8::/64\"). This field is immutable.",
-          "type": "string"
+        "cidrs": {
+          "description": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"

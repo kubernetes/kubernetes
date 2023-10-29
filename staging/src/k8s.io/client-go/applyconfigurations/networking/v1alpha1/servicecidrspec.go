@@ -21,8 +21,7 @@ package v1alpha1
 // ServiceCIDRSpecApplyConfiguration represents an declarative configuration of the ServiceCIDRSpec type for use
 // with apply.
 type ServiceCIDRSpecApplyConfiguration struct {
-	IPv4 *string `json:"ipv4,omitempty"`
-	IPv6 *string `json:"ipv6,omitempty"`
+	CIDRs []string `json:"cidrs,omitempty"`
 }
 
 // ServiceCIDRSpecApplyConfiguration constructs an declarative configuration of the ServiceCIDRSpec type for use with
@@ -31,18 +30,12 @@ func ServiceCIDRSpec() *ServiceCIDRSpecApplyConfiguration {
 	return &ServiceCIDRSpecApplyConfiguration{}
 }
 
-// WithIPv4 sets the IPv4 field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the IPv4 field is set to the value of the last call.
-func (b *ServiceCIDRSpecApplyConfiguration) WithIPv4(value string) *ServiceCIDRSpecApplyConfiguration {
-	b.IPv4 = &value
-	return b
-}
-
-// WithIPv6 sets the IPv6 field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the IPv6 field is set to the value of the last call.
-func (b *ServiceCIDRSpecApplyConfiguration) WithIPv6(value string) *ServiceCIDRSpecApplyConfiguration {
-	b.IPv6 = &value
+// WithCIDRs adds the given value to the CIDRs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the CIDRs field.
+func (b *ServiceCIDRSpecApplyConfiguration) WithCIDRs(values ...string) *ServiceCIDRSpecApplyConfiguration {
+	for i := range values {
+		b.CIDRs = append(b.CIDRs, values[i])
+	}
 	return b
 }

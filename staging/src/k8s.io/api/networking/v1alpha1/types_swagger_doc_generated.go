@@ -69,7 +69,7 @@ func (ParentReference) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCIDR = map[string]string{
-	"":         "ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64). This range is used by the cluster to allocate the ClusterIPs associated to the Services object.",
+	"":         "ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64). This range is used to allocate ClusterIPs to Service objects.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec is the desired state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 	"status":   "status represents the current state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
@@ -90,9 +90,8 @@ func (ServiceCIDRList) SwaggerDoc() map[string]string {
 }
 
 var map_ServiceCIDRSpec = map[string]string{
-	"":     "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
-	"ipv4": "IPv4 defines an IPv4 IP block in CIDR notation (e.g. \"192.168.0.0/24\"). This field is immutable.",
-	"ipv6": "IPv6 defines an IPv6 IP block in CIDR notation (e.g. \"2001:db8::/64\"). This field is immutable.",
+	"":      "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
+	"cidrs": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
 }
 
 func (ServiceCIDRSpec) SwaggerDoc() map[string]string {

@@ -270,8 +270,7 @@ func Convert_networking_ServiceCIDRList_To_v1alpha1_ServiceCIDRList(in *networki
 }
 
 func autoConvert_v1alpha1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *v1alpha1.ServiceCIDRSpec, out *networking.ServiceCIDRSpec, s conversion.Scope) error {
-	out.IPv4 = in.IPv4
-	out.IPv6 = in.IPv6
+	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
 	return nil
 }
 
@@ -281,8 +280,7 @@ func Convert_v1alpha1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *v1alpha1
 }
 
 func autoConvert_networking_ServiceCIDRSpec_To_v1alpha1_ServiceCIDRSpec(in *networking.ServiceCIDRSpec, out *v1alpha1.ServiceCIDRSpec, s conversion.Scope) error {
-	out.IPv4 = in.IPv4
-	out.IPv6 = in.IPv6
+	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
 	return nil
 }
 
