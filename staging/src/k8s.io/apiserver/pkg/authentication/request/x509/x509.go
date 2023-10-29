@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-helpers/kubernetesx509"
 )
 
 /*
@@ -114,18 +115,18 @@ type VerifyOptionFunc func() (x509.VerifyOptions, bool)
 // Authenticator implements request.Authenticator by extracting user info from verified client certificates
 type Authenticator struct {
 	verifyOptionsFn VerifyOptionFunc
-	user            UserConversion
+	user            []UserConversion
 }
 
 // New returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptions, and converts valid certificate chains into user.Info using the provided UserConversion
-func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
+func New(opts x509.VerifyOptions, user []UserConversion) *Authenticator {
 	return NewDynamic(StaticVerifierFn(opts), user)
 }
 
 // NewDynamic returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptionFunc (which may be dynamic), and converts valid certificate chains into user.Info using the provided UserConversion
-func NewDynamic(verifyOptionsFn VerifyOptionFunc, user UserConversion) *Authenticator {
+func NewDynamic(verifyOptionsFn VerifyOptionFunc, user []UserConversion) *Authenticator {
 	return &Authenticator{verifyOptionsFn, user}
 }
 
@@ -188,14 +189,16 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 	var errlist []error
 	for _, chain := range chains {
-		user, ok, err := a.user.User(chain)
-		if err != nil {
-			errlist = append(errlist, err)
-			continue
-		}
+		for _, userConversion := range a.user {
+			user, ok, err := userConversion.User(chain)
+			if err != nil {
+				errlist = append(errlist, err)
+				continue
+			}
 
-		if ok {
-			return user, ok, err
+			if ok {
+				return user, ok, err
+			}
 		}
 	}
 	return nil, false, utilerrors.NewAggregate(errlist)
@@ -280,6 +283,27 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 		User: &user.DefaultInfo{
 			Name:   chain[0].Subject.CommonName,
 			Groups: chain[0].Subject.Organization,
+		},
+	}, true, nil
+})
+
+var KubernetesPodIdentityUserConversion = UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, error) {
+	podIdentity, err := kubernetesx509.PodIdentityFromCertificate(chain[0])
+	if err != nil {
+		return nil, false, fmt.Errorf("while extracting Kubernetes X.509 PodIdentity extension: %w", err)
+	}
+
+	if podIdentity == nil {
+		return nil, false, nil
+	}
+
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name: fmt.Sprintf("system:serviceaccount:%s:%s", podIdentity.Namespace, podIdentity.ServiceAccountName),
+			Extra: map[string][]string{
+				"authentication.kubernetes.io/pod-name": {podIdentity.PodName},
+				"authentication.kubernetes.io/pod-uid":  {podIdentity.PodUID},
+			},
 		},
 	}, true, nil
 })
