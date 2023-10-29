@@ -7864,6 +7864,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: serviceAccountToken
       type:
         namedType: io.k8s.api.core.v1.ServiceAccountTokenProjection
+    - name: workloadCertificate
+      type:
+        namedType: io.k8s.api.core.v1.WorkloadCertificateProjection
 - name: io.k8s.api.core.v1.VolumeResourceRequirements
   map:
     fields:
@@ -7917,6 +7920,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: boolean
     - name: runAsUserName
+      type:
+        scalar: string
+- name: io.k8s.api.core.v1.WorkloadCertificateProjection
+  map:
+    fields:
+    - name: credentialBundlePath
+      type:
+        scalar: string
+    - name: keyType
+      type:
+        scalar: string
+    - name: signerName
       type:
         scalar: string
 - name: io.k8s.api.discovery.v1.Endpoint

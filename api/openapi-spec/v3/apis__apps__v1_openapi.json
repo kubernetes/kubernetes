@@ -4987,6 +4987,14 @@
               }
             ],
             "description": "serviceAccountToken is information about the serviceAccountToken data to project"
+          },
+          "workloadCertificate": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.WorkloadCertificateProjection"
+              }
+            ],
+            "description": "WorkloadCertificate gives the pod a private key and corresponding X.509 certificate chain.  Kubelet generates a keypair of the specified type, and requests a corresponding certificate from the named signer.\n\nKubelet will begin trying to rotat"
           }
         },
         "type": "object"
@@ -5079,6 +5087,21 @@
           },
           "runAsUserName": {
             "description": "The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.WorkloadCertificateProjection": {
+        "description": "WorkloadCertificateProjection provides a private key and X.509 certificate in a combined file.",
+        "properties": {
+          "credentialBundlePath": {
+            "type": "string"
+          },
+          "keyType": {
+            "type": "string"
+          },
+          "signerName": {
             "type": "string"
           }
         },

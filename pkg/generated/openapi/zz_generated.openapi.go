@@ -574,6 +574,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.VsphereVirtualDiskVolumeSource":                                                     schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref),
 		"k8s.io/api/core/v1.WeightedPodAffinityTerm":                                                            schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref),
 		"k8s.io/api/core/v1.WindowsSecurityContextOptions":                                                      schema_k8sio_api_core_v1_WindowsSecurityContextOptions(ref),
+		"k8s.io/api/core/v1.WorkloadCertificateProjection":                                                      schema_k8sio_api_core_v1_WorkloadCertificateProjection(ref),
 		"k8s.io/api/discovery/v1.Endpoint":                                                                      schema_k8sio_api_discovery_v1_Endpoint(ref),
 		"k8s.io/api/discovery/v1.EndpointConditions":                                                            schema_k8sio_api_discovery_v1_EndpointConditions(ref),
 		"k8s.io/api/discovery/v1.EndpointHints":                                                                 schema_k8sio_api_discovery_v1_EndpointHints(ref),
@@ -29214,11 +29215,17 @@ func schema_k8sio_api_core_v1_VolumeProjection(ref common.ReferenceCallback) com
 							Ref:         ref("k8s.io/api/core/v1.ServiceAccountTokenProjection"),
 						},
 					},
+					"workloadCertificate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WorkloadCertificate gives the pod a private key and corresponding X.509 certificate chain.  Kubelet generates a keypair of the specified type, and requests a corresponding certificate from the named signer.\n\nKubelet will begin trying to rotat",
+							Ref:         ref("k8s.io/api/core/v1.WorkloadCertificateProjection"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ConfigMapProjection", "k8s.io/api/core/v1.DownwardAPIProjection", "k8s.io/api/core/v1.SecretProjection", "k8s.io/api/core/v1.ServiceAccountTokenProjection"},
+			"k8s.io/api/core/v1.ConfigMapProjection", "k8s.io/api/core/v1.DownwardAPIProjection", "k8s.io/api/core/v1.SecretProjection", "k8s.io/api/core/v1.ServiceAccountTokenProjection", "k8s.io/api/core/v1.WorkloadCertificateProjection"},
 	}
 }
 
@@ -29561,6 +29568,37 @@ func schema_k8sio_api_core_v1_WindowsSecurityContextOptions(ref common.Reference
 							Description: "HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.",
 							Type:        []string{"boolean"},
 							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_WorkloadCertificateProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCertificateProjection provides a private key and X.509 certificate in a combined file.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"signerName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"keyType": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"credentialBundlePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
 				},

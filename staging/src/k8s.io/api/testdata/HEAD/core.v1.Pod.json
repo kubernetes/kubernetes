@@ -282,6 +282,11 @@
                 "audience": "audienceValue",
                 "expirationSeconds": 2,
                 "path": "pathValue"
+              },
+              "workloadCertificate": {
+                "signerName": "signerNameValue",
+                "keyType": "keyTypeValue",
+                "credentialBundlePath": "credentialBundlePathValue"
               }
             }
           ],

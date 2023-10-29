@@ -2579,6 +2579,7 @@ var map_VolumeProjection = map[string]string{
 	"downwardAPI":         "downwardAPI information about the downwardAPI data to project",
 	"configMap":           "configMap information about the configMap data to project",
 	"serviceAccountToken": "serviceAccountToken is information about the serviceAccountToken data to project",
+	"workloadCertificate": "WorkloadCertificate gives the pod a private key and corresponding X.509 certificate chain.  Kubelet generates a keypair of the specified type, and requests a corresponding certificate from the named signer.\n\nKubelet will begin trying to rotat",
 }
 
 func (VolumeProjection) SwaggerDoc() map[string]string {
@@ -2664,6 +2665,14 @@ var map_WindowsSecurityContextOptions = map[string]string{
 
 func (WindowsSecurityContextOptions) SwaggerDoc() map[string]string {
 	return map_WindowsSecurityContextOptions
+}
+
+var map_WorkloadCertificateProjection = map[string]string{
+	"": "WorkloadCertificateProjection provides a private key and X.509 certificate in a combined file.",
+}
+
+func (WorkloadCertificateProjection) SwaggerDoc() map[string]string {
+	return map_WorkloadCertificateProjection
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

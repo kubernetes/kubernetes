@@ -25,6 +25,7 @@ type VolumeProjectionApplyConfiguration struct {
 	DownwardAPI         *DownwardAPIProjectionApplyConfiguration         `json:"downwardAPI,omitempty"`
 	ConfigMap           *ConfigMapProjectionApplyConfiguration           `json:"configMap,omitempty"`
 	ServiceAccountToken *ServiceAccountTokenProjectionApplyConfiguration `json:"serviceAccountToken,omitempty"`
+	WorkloadCertificate *WorkloadCertificateProjectionApplyConfiguration `json:"workloadCertificate,omitempty"`
 }
 
 // VolumeProjectionApplyConfiguration constructs an declarative configuration of the VolumeProjection type for use with
@@ -62,5 +63,13 @@ func (b *VolumeProjectionApplyConfiguration) WithConfigMap(value *ConfigMapProje
 // If called multiple times, the ServiceAccountToken field is set to the value of the last call.
 func (b *VolumeProjectionApplyConfiguration) WithServiceAccountToken(value *ServiceAccountTokenProjectionApplyConfiguration) *VolumeProjectionApplyConfiguration {
 	b.ServiceAccountToken = value
+	return b
+}
+
+// WithWorkloadCertificate sets the WorkloadCertificate field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the WorkloadCertificate field is set to the value of the last call.
+func (b *VolumeProjectionApplyConfiguration) WithWorkloadCertificate(value *WorkloadCertificateProjectionApplyConfiguration) *VolumeProjectionApplyConfiguration {
+	b.WorkloadCertificate = value
 	return b
 }

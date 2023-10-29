@@ -955,6 +955,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.WeightedPodAffinityTermApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("WindowsSecurityContextOptions"):
 		return &applyconfigurationscorev1.WindowsSecurityContextOptionsApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("WorkloadCertificateProjection"):
+		return &applyconfigurationscorev1.WorkloadCertificateProjectionApplyConfiguration{}
 
 		// Group=discovery.k8s.io, Version=v1
 	case discoveryv1.SchemeGroupVersion.WithKind("Endpoint"):

@@ -6007,6 +6007,15 @@ message VolumeProjection {
   // serviceAccountToken is information about the serviceAccountToken data to project
   // +optional
   optional ServiceAccountTokenProjection serviceAccountToken = 4;
+
+  // WorkloadCertificate gives the pod a private key and corresponding X.509
+  // certificate chain.  Kubelet generates a keypair of the specified type,
+  // and requests a corresponding certificate from the named signer.
+  //
+  // Kubelet will begin trying to rotat
+  //
+  // +featureGate=WorkloadCertificateProjection +optional
+  optional WorkloadCertificateProjection workloadCertificate = 6;
 }
 
 // VolumeResourceRequirements describes the storage resource requirements for a volume.
@@ -6246,5 +6255,15 @@ message WindowsSecurityContextOptions {
   // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
+}
+
+// WorkloadCertificateProjection provides a private key and X.509 certificate in
+// a combined file.
+message WorkloadCertificateProjection {
+  optional string signerName = 1;
+
+  optional string keyType = 2;
+
+  optional string credentialBundlePath = 3;
 }
 
