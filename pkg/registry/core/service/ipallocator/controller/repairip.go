@@ -367,7 +367,7 @@ func (r *RepairIPAddress) syncService(key string) error {
 		r.muTree.Unlock()
 		if len(prefixes) == 0 {
 			// ClusterIP is out of range
-			r.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPOutOfRange", "ClusterIPAllocation", "Cluster IP [%v]: %s is not within the configured Service CIDR; please recreate service", family, ip)
+			r.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPOutOfRange", "ClusterIPAllocation", "Cluster IP [%v]: %s is not within any configured Service CIDR; please recreate service", family, ip)
 			runtime.HandleError(fmt.Errorf("the ClusterIP [%v]: %s for Service %s/%s is not within any service CIDR; please recreate", family, ip, svc.Namespace, svc.Name))
 			continue
 		}
@@ -585,18 +585,17 @@ func (r *RepairIPAddress) handleCIDRErr(err error, key interface{}) {
 
 // syncCIDRs rebuilds the radix tree based from the informers cache
 func (r *RepairIPAddress) syncCIDRs() error {
-	cidrList, err := r.serviceCIDRLister.List(labels.Everything())
+	serviceCIDRList, err := r.serviceCIDRLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 
 	tree := iptree.New[string]()
-	for _, cidr := range cidrList {
-		if prefix, err := netip.ParsePrefix(cidr.Spec.IPv4); err == nil { // if is empty err will not be nil
-			tree.InsertPrefix(prefix, cidr.Name)
-		}
-		if prefix, err := netip.ParsePrefix(cidr.Spec.IPv6); err == nil { // if is empty err will not be nil
-			tree.InsertPrefix(prefix, cidr.Name)
+	for _, serviceCIDR := range serviceCIDRList {
+		for _, cidr := range serviceCIDR.Spec.CIDRs {
+			if prefix, err := netip.ParsePrefix(cidr); err == nil { // it can not fail since is already validated
+				tree.InsertPrefix(prefix, serviceCIDR.Name)
+			}
 		}
 	}
 	r.muTree.Lock()

@@ -213,7 +213,7 @@ func TestRepairServiceIP(t *testing.T) {
 			},
 			expectedIPs: []string{"2001:db8::10"},
 			actions:     [][]string{},
-			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv4]: 192.168.1.1 is not within the configured Service CIDR; please recreate service"},
+			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv4]: 192.168.1.1 is not within any configured Service CIDR; please recreate service"},
 		},
 		{
 			name: "one IP orphan",
@@ -237,7 +237,7 @@ func TestRepairServiceIP(t *testing.T) {
 			},
 			expectedIPs: []string{"10.0.0.0"},
 			actions:     [][]string{},
-			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv4]: 10.0.0.0 is not within the configured Service CIDR; please recreate service"},
+			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv4]: 10.0.0.0 is not within any configured Service CIDR; please recreate service"},
 		},
 		{
 			name: "one IP out of range matching the broadcast address",
@@ -250,7 +250,7 @@ func TestRepairServiceIP(t *testing.T) {
 			},
 			expectedIPs: []string{"10.0.255.255"},
 			actions:     [][]string{},
-			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv4]: 10.0.255.255 is not within the configured Service CIDR; please recreate service"},
+			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv4]: 10.0.255.255 is not within any configured Service CIDR; please recreate service"},
 		},
 		{
 			name: "one IPv6 out of range matching the subnet address",
@@ -263,7 +263,7 @@ func TestRepairServiceIP(t *testing.T) {
 			},
 			expectedIPs: []string{"2001:db8::"},
 			actions:     [][]string{},
-			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv6]: 2001:db8:: is not within the configured Service CIDR; please recreate service"},
+			events:      []string{"Warning ClusterIPOutOfRange Cluster IP [IPv6]: 2001:db8:: is not within any configured Service CIDR; please recreate service"},
 		},
 		{
 			name: "one IPv6 matching the broadcast address",
@@ -526,15 +526,16 @@ func newService(name string, ips []string) *v1.Service {
 	return svc
 }
 
-func newServiceCIDR(name, ipv4, ipv6 string) *networkingv1alpha1.ServiceCIDR {
+func newServiceCIDR(name, primary, secondary string) *networkingv1alpha1.ServiceCIDR {
 	serviceCIDR := &networkingv1alpha1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: networkingv1alpha1.ServiceCIDRSpec{
-			IPv4: ipv4,
-			IPv6: ipv6,
-		},
+		Spec: networkingv1alpha1.ServiceCIDRSpec{},
+	}
+	serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, primary)
+	if secondary != "" {
+		serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, secondary)
 	}
 	return serviceCIDR
 }
