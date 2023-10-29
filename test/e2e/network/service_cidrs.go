@@ -66,7 +66,7 @@ var _ = common.SIGDescribe("[Feature:ServiceCIDRs]", func() {
 				Name: "test-svc-cidr",
 			},
 			Spec: networkingv1alpha1.ServiceCIDRSpec{
-				IPv4: "10.196.196.0/24",
+				CIDRs: []string{"10.196.196.0/24"},
 			},
 		}
 		_, err := cs.NetworkingV1alpha1().ServiceCIDRs().Create(context.TODO(), svcCIDR, metav1.CreateOptions{})
