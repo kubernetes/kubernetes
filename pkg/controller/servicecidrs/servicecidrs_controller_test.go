@@ -19,6 +19,7 @@ package servicecidrs
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 type testController struct {
@@ -79,10 +81,17 @@ func newController(t *testing.T, cidrs []*networkingapiv1alpha1.ServiceCIDR, ips
 }
 
 func TestControllerSync(t *testing.T) {
+	now := time.Now()
+
+	// ServiceCIDR that is just being deleted
 	deletingServiceCIDR := makeServiceCIDR("deleting-cidr", "192.168.0.0/24", "2001:db2::/64")
-	now := metav1.Now()
 	deletingServiceCIDR.Finalizers = []string{ServiceCIDRProtectionFinalizer}
-	deletingServiceCIDR.DeletionTimestamp = &now
+	deletingServiceCIDR.DeletionTimestamp = ptr.To[metav1.Time](metav1.Now())
+
+	// ServiceCIDR that has been deleted for longer than the deletionGracePeriod
+	deletedServiceCIDR := makeServiceCIDR("deleted-cidr", "192.168.0.0/24", "2001:db2::/64")
+	deletedServiceCIDR.Finalizers = []string{ServiceCIDRProtectionFinalizer}
+	deletedServiceCIDR.DeletionTimestamp = ptr.To[metav1.Time](metav1.NewTime(now.Add(-deletionGracePeriod - 1*time.Second)))
 
 	testCases := []struct {
 		name       string
@@ -113,104 +122,111 @@ func TestControllerSync(t *testing.T) {
 		{
 			name: "service CIDR being deleted must remove the finalizer",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
+				deletedServiceCIDR,
+			},
+			cidrSynced: deletedServiceCIDR.Name,
+			actions:    [][]string{{"patch", "servicecidrs", ""}},
+		},
+		{
+			name: "service CIDR being deleted but withing the grace period must be requeued not remove the finalizer", // TODO: assert is actually requeued
+			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
 				deletingServiceCIDR,
 			},
 			cidrSynced: deletingServiceCIDR.Name,
-			actions:    [][]string{{"patch", "servicecidrs", ""}},
+			actions:    [][]string{},
 		},
 		{
 			name: "service CIDR being deleted with IPv4 addresses should update the status",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", "status"}},
 		},
 		{
 			name: "service CIDR being deleted and overlapping same range and IPv4 addresses should remove the finalizer",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", ""}},
 		},
 		{
 			name: "service CIDR being deleted and overlapping and IPv4 addresses should remove the finalizer",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/64"),
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", ""}},
 		},
 		{
 			name: "service CIDR being deleted and not overlapping and IPv4 addresses should update the status",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.255.0/26", "2001:db2::/64"),
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", "status"}},
 		},
-
 		{
 			name: "service CIDR being deleted with IPv6 addresses should update the status",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", "status"}},
 		},
 		{
 			name: "service CIDR being deleted and overlapping same range and IPv6 addresses should remove the finalizer",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", ""}},
 		},
 		{
 			name: "service CIDR being deleted and overlapping and IPv6 addresses should remove the finalizer",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/48"),
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", ""}},
 		},
 		{
 			name: "service CIDR being deleted and not overlapping and IPv6 addresses should update the status",
 			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
-				deletingServiceCIDR,
+				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.255.0/26", "2001:db2:a:b::/64"),
 			},
 			ips: []*networkingapiv1alpha1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
-			cidrSynced: deletingServiceCIDR.Name,
+			cidrSynced: deletedServiceCIDR.Name,
 			actions:    [][]string{{"patch", "servicecidrs", "status"}},
 		},
 	}
