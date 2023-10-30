@@ -154,13 +154,8 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 		return validation.NullSchema{}, nil
 	}
 
-	resources, err := f.OpenAPISchema()
-	if err != nil {
-		return nil, err
-	}
-
 	schema := validation.ConjunctiveSchema{
-		validation.NewSchemaValidation(resources),
+		validation.NewSchemaValidation(f),
 		validation.NoDoubleKeySchema{},
 	}
 
