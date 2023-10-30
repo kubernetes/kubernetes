@@ -49,8 +49,11 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		// Can't use TLSv1.1 because of RC4 cipher usage
 		MinVersion: s.MinTLSVersion,
 		MaxVersion: s.MaxTLSVersion,
+	}
+
+	if s.MaxTLSVersion > tls.VersionTLS12 {
 		// enable HTTP2 for go's 1.7 HTTP Server
-		NextProtos: []string{"h2", "http/1.1"},
+		tls.Config.NextProtos = []string{"h2", "http/1.1"}
 	}
 
 	// these are static aspects of the tls.Config
