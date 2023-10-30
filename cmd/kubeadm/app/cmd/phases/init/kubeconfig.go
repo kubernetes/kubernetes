@@ -41,11 +41,6 @@ var (
 			short: "Generate a kubeconfig file for the admin to use and for kubeadm itself",
 			long:  "Generate the kubeconfig file for the admin and for kubeadm itself, and save it to %s file.",
 		},
-		kubeadmconstants.SuperAdminKubeConfigFileName: {
-			name:  "super-admin",
-			short: "Generate a kubeconfig file for the super-admin",
-			long:  "Generate a kubeconfig file for the super-admin, and save it to %s file.",
-		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			name:  "kubelet",
 			short: "Generate a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
@@ -82,7 +77,6 @@ func NewKubeConfigPhase() workflow.Phase {
 				RunAllSiblings: true,
 			},
 			NewKubeConfigFilePhase(kubeadmconstants.AdminKubeConfigFileName),
-			NewKubeConfigFilePhase(kubeadmconstants.SuperAdminKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.KubeletKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.ControllerManagerKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.SchedulerKubeConfigFileName),

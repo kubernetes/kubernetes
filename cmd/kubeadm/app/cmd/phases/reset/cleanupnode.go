@@ -169,7 +169,6 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 
 	filesToClean := []string{
 		filepath.Join(configPathDir, kubeadmconstants.AdminKubeConfigFileName),
-		filepath.Join(configPathDir, kubeadmconstants.SuperAdminKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.KubeletKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
