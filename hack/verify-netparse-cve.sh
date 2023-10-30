@@ -38,6 +38,7 @@ find_files() {
         -o -wholename './_output' \
         -o -wholename './release' \
         -o -wholename './target' \
+        -o -wholename './staging/src/k8s.io/apimachinery/pkg/util/ip/*' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
       \) -prune \
