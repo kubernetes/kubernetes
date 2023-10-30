@@ -75,7 +75,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -557,10 +556,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newResourceClaimControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
-	if utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		// register the flag only if the SeparateTaintEvictionController flag is enabled
-		register(newTaintEvictionControllerDescriptor())
-	}
+	register(newTaintEvictionControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {
