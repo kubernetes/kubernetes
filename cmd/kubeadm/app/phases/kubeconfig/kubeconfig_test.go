@@ -18,7 +18,6 @@ package kubeconfig
 
 import (
 	"bytes"
-	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
@@ -27,24 +26,14 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
-	rbac "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientset "k8s.io/client-go/kubernetes"
-	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -130,11 +119,6 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			{
 				kubeConfigFile: kubeadmconstants.AdminKubeConfigFileName,
 				clientName:     "kubernetes-admin",
-				organizations:  []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
-			},
-			{
-				kubeConfigFile: kubeadmconstants.SuperAdminKubeConfigFileName,
-				clientName:     "kubernetes-super-admin",
 				organizations:  []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 			{
@@ -190,7 +174,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 				}
 
 				switch assertion.kubeConfigFile {
-				case kubeadmconstants.AdminKubeConfigFileName, kubeadmconstants.SuperAdminKubeConfigFileName, kubeadmconstants.KubeletKubeConfigFileName:
+				case kubeadmconstants.AdminKubeConfigFileName, kubeadmconstants.KubeletKubeConfigFileName:
 					if spec.APIServer != controlPlaneEndpoint {
 						t.Errorf("expected getKubeConfigSpecs for %s to set cfg.APIServer to %s, got %s",
 							assertion.kubeConfigFile, controlPlaneEndpoint, spec.APIServer)
@@ -631,9 +615,8 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		},
 		"some files don't exist": {
 			filesToWrite: map[string]*clientcmdapi.Config{
-				kubeadmconstants.AdminKubeConfigFileName:      config,
-				kubeadmconstants.SuperAdminKubeConfigFileName: config,
-				kubeadmconstants.KubeletKubeConfigFileName:    config,
+				kubeadmconstants.AdminKubeConfigFileName:   config,
+				kubeadmconstants.KubeletKubeConfigFileName: config,
 			},
 			initConfig:    initConfig,
 			expectedError: true,
@@ -641,7 +624,6 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"some files have invalid CA": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.SuperAdminKubeConfigFileName:        config,
 				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: configWithAnotherClusterCa,
 				kubeadmconstants.SchedulerKubeConfigFileName:         config,
@@ -652,7 +634,6 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"some files have a different Server URL": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.SuperAdminKubeConfigFileName:        config,
 				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         configWithAnotherServerURL,
@@ -662,7 +643,6 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"all files are valid": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.SuperAdminKubeConfigFileName:        config,
 				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         config,
@@ -734,197 +714,4 @@ func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APISe
 	}
 
 	return config
-}
-
-func TestEnsureAdminClusterRoleBinding(t *testing.T) {
-	dir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dir)
-
-	cfg := testutil.GetDefaultInternalConfig(t)
-	cfg.CertificatesDir = dir
-
-	ca := certsphase.KubeadmCertRootCA()
-	_, _, err := ca.CreateAsCA(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := []struct {
-		name                  string
-		expectedRBACError     bool
-		expectedError         bool
-		missingAdminConf      bool
-		missingSuperAdminConf bool
-	}{
-		{
-			name: "no errors",
-		},
-		{
-			name:              "expect RBAC error",
-			expectedRBACError: true,
-			expectedError:     true,
-		},
-		{
-			name:             "admin.conf is missing",
-			missingAdminConf: true,
-			expectedError:    true,
-		},
-		{
-			name:                  "super-admin.conf is missing",
-			missingSuperAdminConf: true,
-			expectedError:         false, // The file is optional.
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			ensureRBACFunc := func(_ context.Context, adminClient clientset.Interface, superAdminClient clientset.Interface,
-				_ time.Duration, _ time.Duration) (clientset.Interface, error) {
-
-				if tc.expectedRBACError {
-					return nil, errors.New("ensureRBACFunc error")
-				}
-				return adminClient, nil
-			}
-
-			// Create the admin.conf and super-admin.conf so that EnsureAdminClusterRoleBinding
-			// can create clients from the files.
-			os.Remove(filepath.Join(dir, kubeadmconstants.AdminKubeConfigFileName))
-			if !tc.missingAdminConf {
-				if err := CreateKubeConfigFile(kubeadmconstants.AdminKubeConfigFileName, dir, cfg); err != nil {
-					t.Fatal(err)
-				}
-			}
-			os.Remove(filepath.Join(dir, kubeadmconstants.SuperAdminKubeConfigFileName))
-			if !tc.missingSuperAdminConf {
-				if err := CreateKubeConfigFile(kubeadmconstants.SuperAdminKubeConfigFileName, dir, cfg); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			client, err := EnsureAdminClusterRoleBinding(dir, ensureRBACFunc)
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got: %v, error: %v", err != nil, tc.expectedError, err)
-			}
-
-			if err == nil && client == nil {
-				t.Fatal("got nil client")
-			}
-		})
-	}
-}
-
-func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
-	tests := []struct {
-		name                  string
-		setupAdminClient      func(*clientsetfake.Clientset)
-		setupSuperAdminClient func(*clientsetfake.Clientset)
-		expectedError         bool
-	}{
-		{
-			name: "admin.conf: handle forbidden errors when the super-admin.conf client is nil",
-			setupAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewForbidden(
-						schema.GroupResource{}, "name", errors.New(""))
-				})
-			},
-			expectedError: true,
-		},
-		{
-			// A "create" call against a real server can return a forbidden error and a non-nil CRB
-			name: "admin.conf: handle forbidden error and returned CRBs, when the super-admin.conf client is nil",
-			setupAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, &rbac.ClusterRoleBinding{}, apierrors.NewForbidden(
-						schema.GroupResource{}, "name", errors.New(""))
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "admin.conf: CRB already exists, use the admin.conf client",
-			setupAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(
-						schema.GroupResource{}, "name")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "admin.conf: handle other errors, such as a server timeout",
-			setupAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewServerTimeout(
-						schema.GroupResource{}, "create", 0)
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "admin.conf: CRB exists, return a client from admin.conf",
-			setupAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, &rbac.ClusterRoleBinding{}, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "super-admin.conf: error while creating CRB",
-			setupAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewForbidden(
-						schema.GroupResource{}, "name", errors.New(""))
-				})
-			},
-			setupSuperAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewServerTimeout(
-						schema.GroupResource{}, "create", 0)
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "super-admin.conf: admin.conf cannot create CRB, create CRB with super-admin.conf, return client from admin.conf",
-			setupAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewForbidden(
-						schema.GroupResource{}, "name", errors.New(""))
-				})
-			},
-			setupSuperAdminClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, &rbac.ClusterRoleBinding{}, nil
-				})
-			},
-			expectedError: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			adminClient := clientsetfake.NewSimpleClientset()
-			tc.setupAdminClient(adminClient)
-
-			var superAdminClient clientset.Interface // ensure superAdminClient is nil by default
-			if tc.setupSuperAdminClient != nil {
-				fakeSuperAdminClient := clientsetfake.NewSimpleClientset()
-				tc.setupSuperAdminClient(fakeSuperAdminClient)
-				superAdminClient = fakeSuperAdminClient
-			}
-
-			client, err := EnsureAdminClusterRoleBindingImpl(
-				context.Background(), adminClient, superAdminClient, time.Millisecond*50, time.Millisecond*1000)
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
-
-			if err == nil && client == nil {
-				t.Fatal("got nil client")
-			}
-		})
-	}
 }
