@@ -51,11 +51,6 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		MaxVersion: s.MaxTLSVersion,
 	}
 
-	if s.MaxTLSVersion > tls.VersionTLS12 {
-		// enable HTTP2 for go's 1.7 HTTP Server
-		tls.Config.NextProtos = []string{"h2", "http/1.1"}
-	}
-
 	// these are static aspects of the tls.Config
 	if s.DisableHTTP2 {
 		klog.Info("Forcing use of http/1.1 only")
@@ -72,6 +67,20 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 				if s.CipherSuites[i] == cipherID {
 					klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
 				}
+			}
+		}
+	}
+
+	// "h2" in NextProtos is necessary for enabling HTTP2 in go's HTTP server
+	if len(tlsConfig.CipherSuites) == 0 || tlsConfig.MinVersion == tls.VersionTLS13 {
+		cfg.NextProtos = []string{"h2", "http/1.1"}
+	} else {
+		for _, c := range tlsConfig.CipherSuites {
+			switch c {
+			case tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
+				// H2 can only be used if one of the above CipherSuites are set.
+				cfg.NextProtos = []string{"h2", "http/1.1"}
+				break
 			}
 		}
 	}
