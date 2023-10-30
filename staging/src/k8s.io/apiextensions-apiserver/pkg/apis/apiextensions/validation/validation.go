@@ -128,6 +128,13 @@ type validationOptions struct {
 	requireMapListKeysMapSetValidation bool
 	// preexistingExpressions tracks which CEL expressions existed in an object before an update. May be nil for create.
 	preexistingExpressions preexistingExpressions
+	// versionsWithUnchangedSchemas tracks schemas of which versions are unchanged when updating a CRD.
+	// Does not apply to creation or deletion.
+	// Some checks use this to avoid rejecting previously accepted versions due to a control plane upgrade/downgrade.
+	versionsWithUnchangedSchemas sets.Set[string]
+	// suppressPerExpressionCost indicates whether CEL per-expression cost limit should be suppressed.
+	// It will be automatically set during Versions validation if the version is in versionsWithUnchangedSchemas.
+	suppressPerExpressionCost bool
 
 	celEnvironmentSet *environment.EnvSet
 }
@@ -176,6 +183,37 @@ func findPreexistingExpressionsInSchema(schema *apiextensions.JSONSchemaProps, e
 	})
 }
 
+// findVersionsWithUnchangedSchemas finds each version that is in the new CRD object and differs from that of the old CRD object.
+// It returns a set of the names of mutated versions.
+// This function does not check for duplicated versions, top-level version not in versions, or coexistence of
+// top-level and per-version schemas, as further validations will check for these problems.
+func findVersionsWithUnchangedSchemas(obj, oldObject *apiextensions.CustomResourceDefinition) sets.Set[string] {
+	versionsWithUnchangedSchemas := sets.New[string]()
+	for _, version := range obj.Spec.Versions {
+		newSchema, err := apiextensions.GetSchemaForVersion(obj, version.Name)
+		if err != nil {
+			continue
+		}
+		oldSchema, err := apiextensions.GetSchemaForVersion(oldObject, version.Name)
+		if err != nil {
+			continue
+		}
+		if apiequality.Semantic.DeepEqual(newSchema, oldSchema) {
+			versionsWithUnchangedSchemas.Insert(version.Name)
+		}
+	}
+	return versionsWithUnchangedSchemas
+}
+
+// suppressExpressionCostForUnchangedSchema returns a copy of opts with suppressPerExpressionCost set to true if
+// the specified version's schema is unchanged.
+func suppressExpressionCostForUnchangedSchema(opts validationOptions, version string) validationOptions {
+	if opts.versionsWithUnchangedSchemas.Has(version) {
+		opts.suppressPerExpressionCost = true
+	}
+	return opts
+}
+
 // ValidateCustomResourceDefinitionUpdate statically validates
 // context is passed for supporting context cancellation during cel validation when validating defaults
 func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
@@ -190,6 +228,7 @@ func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *ap
 		requireAtomicSetType:                     requireAtomicSetType(&oldObj.Spec),
 		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
+		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
 		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
@@ -246,6 +285,7 @@ func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiex
 	for _, err := range validateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecationWarning"), version.DeprecationWarning, err))
 	}
+	opts = suppressExpressionCostForUnchangedSchema(opts, version.Name)
 	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	for i := range version.AdditionalPrinterColumns {
@@ -404,7 +444,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 	}
 
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&spec.Names, fldPath.Child("names"))...)
-	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, spec.Validation, hasAnyStatusEnabled(spec), opts, fldPath.Child("validation"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, spec.Validation, hasAnyStatusEnabled(spec), suppressExpressionCostForUnchangedSchema(opts, spec.Version), fldPath.Child("validation"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(spec.Subresources, fldPath.Child("subresources"))...)
 
 	for i := range spec.AdditionalPrinterColumns {
@@ -1115,7 +1155,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				} else {
 					for i, cr := range compResults {
 						expressionCost := getExpressionCost(cr, celContext)
-						if expressionCost > StaticEstimatedCostLimit {
+						if !opts.suppressPerExpressionCost && expressionCost > StaticEstimatedCostLimit {
 							costErrorMsg := getCostErrorMessage("estimated rule cost", expressionCost, StaticEstimatedCostLimit)
 							allErrs.CELErrors = append(allErrs.CELErrors, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
 						}
@@ -1133,7 +1173,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 							allErrs.CELErrors = append(allErrs.CELErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), schema.XValidations[i], cr.MessageExpressionError.Detail))
 						} else {
 							if cr.MessageExpression != nil {
-								if cr.MessageExpressionMaxCost > StaticEstimatedCostLimit {
+								if !opts.suppressPerExpressionCost && cr.MessageExpressionMaxCost > StaticEstimatedCostLimit {
 									costErrorMsg := getCostErrorMessage("estimated messageExpression cost", cr.MessageExpressionMaxCost, StaticEstimatedCostLimit)
 									allErrs.CELErrors = append(allErrs.CELErrors, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), costErrorMsg))
 								}

@@ -6698,6 +6698,259 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[bar]", "items", "nullable"),
 			},
 		},
+		{
+			name: "suppress per-expression cost limit in pre-existing versions",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "v1",
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"f": {
+											Type: "array",
+											Items: &apiextensions.JSONSchemaPropsOrArray{
+												Schema: &apiextensions.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule:              "true",
+													MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7]`,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "v2",
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"f": {
+											Type: "array",
+											Items: &apiextensions.JSONSchemaPropsOrArray{
+												Schema: &apiextensions.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule:              "true",
+													MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7]`,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"v1"}},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "v1", // unchanged
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"f": {
+											Type: "array",
+											Items: &apiextensions.JSONSchemaPropsOrArray{
+												Schema: &apiextensions.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule:              "true",
+													MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7]`,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "v2", // touched
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"f": {
+											Type: "array",
+											Items: &apiextensions.JSONSchemaPropsOrArray{
+												Schema: &apiextensions.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule:              "true",
+													MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7] + self[8]`,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "v3", // new
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"f": {
+											Type: "array",
+											Items: &apiextensions.JSONSchemaPropsOrArray{
+												Schema: &apiextensions.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule:              "true",
+													MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7]`,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"v1"}},
+			},
+			errors: []validationMatch{
+				// versions[0] is exempted because it existed in oldObject
+				forbidden("spec", "versions[1]", "schema", "openAPIV3Schema", "properties[f]", "x-kubernetes-validations[0]", "messageExpression"),
+				forbidden("spec", "versions[2]", "schema", "openAPIV3Schema", "properties[f]", "x-kubernetes-validations[0]", "messageExpression"),
+			},
+		},
+		{
+			name: "suppress per-expression cost limit in new object during top-level schema to Versions extraction",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names:   apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Version: "v1",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"f": {
+									Type: "array",
+									Items: &apiextensions.JSONSchemaPropsOrArray{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule:              "true",
+											MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7]`,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"v1"}},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "v1", // unchanged, was top-level
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"f": {
+											Type: "array",
+											Items: &apiextensions.JSONSchemaPropsOrArray{
+												Schema: &apiextensions.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule:              "true",
+													MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7]`,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "v2", // new
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"f": {
+											Type: "array",
+											Items: &apiextensions.JSONSchemaPropsOrArray{
+												Schema: &apiextensions.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule:              "true",
+													MessageExpression: `self[0] + self[1] + self[2] + self[3] + self[4] + self[5] + self[6] + self[7] + self[8]`,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"v1"}},
+			},
+			errors: []validationMatch{
+				// versions[0] is exempted because it existed in oldObject as top-level schema.
+				forbidden("spec", "versions[1]", "schema", "openAPIV3Schema", "properties[f]", "x-kubernetes-validations[0]", "messageExpression"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
