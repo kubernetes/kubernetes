@@ -110,7 +110,7 @@ type DiffOptions struct {
 
 	Concurrency      int
 	Selector         string
-	OpenAPISchema    openapi.Resources
+	OpenAPIGetter    openapi.OpenAPIResourcesGetter
 	OpenAPIV3Root    openapi3.Root
 	DynamicClient    dynamic.Interface
 	CmdNamespace     string
@@ -325,7 +325,7 @@ type InfoObject struct {
 	LocalObj        runtime.Object
 	Info            *resource.Info
 	Encoder         runtime.Encoder
-	OpenAPI         openapi.Resources
+	OpenAPIGetter   openapi.OpenAPIResourcesGetter
 	OpenAPIV3Root   openapi3.Root
 	Force           bool
 	ServerSideApply bool
@@ -398,7 +398,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		Helper:          helper,
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
-		OpenapiSchema:   obj.OpenAPI,
+		OpenAPIGetter:   obj.OpenAPIGetter,
 		OpenAPIV3Root:   obj.OpenAPIV3Root,
 		ResourceVersion: resourceVersion,
 	}
@@ -641,15 +641,15 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 
 	if !o.ServerSideApply {
-		o.OpenAPISchema, err = f.OpenAPISchema()
-		if err != nil {
-			return err
+		o.OpenAPIGetter = f
+		if !cmdutil.OpenAPIV3Patch.IsDisabled() {
+			openAPIV3Client, err := f.OpenAPIV3Client()
+			if err == nil {
+				o.OpenAPIV3Root = openapi3.NewRoot(openAPIV3Client)
+			} else {
+				klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
+			}
 		}
-		openAPIV3Client, err := f.OpenAPIV3Client()
-		if err != nil {
-			return err
-		}
-		o.OpenAPIV3Root = openapi3.NewRoot(openAPIV3Client)
 	}
 
 	o.DynamicClient, err = f.DynamicClient()
@@ -730,7 +730,7 @@ func (o *DiffOptions) Run() error {
 				LocalObj:        local,
 				Info:            info,
 				Encoder:         scheme.DefaultJSONEncoder(),
-				OpenAPI:         o.OpenAPISchema,
+				OpenAPIGetter:   o.OpenAPIGetter,
 				OpenAPIV3Root:   o.OpenAPIV3Root,
 				Force:           force,
 				ServerSideApply: o.ServerSideApply,

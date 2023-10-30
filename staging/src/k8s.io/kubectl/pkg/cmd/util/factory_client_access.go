@@ -214,5 +214,5 @@ func (f *factoryImpl) OpenAPIV3Client() (openapiclient.Client, error) {
 		return nil, err
 	}
 
-	return discovery.OpenAPIV3(), nil
+	return cached.NewClient(discovery.OpenAPIV3()), nil
 }

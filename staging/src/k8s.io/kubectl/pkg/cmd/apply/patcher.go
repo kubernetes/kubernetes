@@ -80,14 +80,17 @@ type Patcher struct {
 	// Number of retries to make if the patch fails with conflict
 	Retries int
 
-	OpenapiSchema openapi.Resources
+	OpenAPIGetter openapi.OpenAPIResourcesGetter
 	OpenAPIV3Root openapi3.Root
 }
 
 func newPatcher(o *ApplyOptions, info *resource.Info, helper *resource.Helper) (*Patcher, error) {
-	var openapiSchema openapi.Resources
+	var openAPIGetter openapi.OpenAPIResourcesGetter
+	var openAPIV3Root openapi3.Root
+
 	if o.OpenAPIPatch {
-		openapiSchema = o.OpenAPISchema
+		openAPIGetter = o.OpenAPIGetter
+		openAPIV3Root = o.OpenAPIV3Root
 	}
 
 	return &Patcher{
@@ -99,8 +102,8 @@ func newPatcher(o *ApplyOptions, info *resource.Info, helper *resource.Helper) (
 		CascadingStrategy: o.DeleteOptions.CascadingStrategy,
 		Timeout:           o.DeleteOptions.Timeout,
 		GracePeriod:       o.DeleteOptions.GracePeriod,
-		OpenapiSchema:     openapiSchema,
-		OpenAPIV3Root:     o.OpenAPIV3Root,
+		OpenAPIGetter:     openAPIGetter,
+		OpenAPIV3Root:     openAPIV3Root,
 		Retries:           maxPatchRetry,
 	}, nil
 }
@@ -135,34 +138,34 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 			// with OpenAPI V3 not present in V2.
 			klog.V(5).Infof("warning: OpenAPI V3 path does not exist - group: %s, version %s, kind %s\n",
 				p.Mapping.GroupVersionKind.Group, p.Mapping.GroupVersionKind.Version, p.Mapping.GroupVersionKind.Kind)
-		} else {
-			if gvkSupported {
-				patch, err = p.buildStrategicMergePatchFromOpenAPIV3(original, modified, current)
-				if err != nil {
-					// Fall back to OpenAPI V2 if there is a problem
-					// We should remove the fallback in the future,
-					// but for the first release it might be beneficial
-					// to fall back to OpenAPI V2 while logging the error
-					// and seeing if we get any bug reports.
-					fmt.Fprintf(errOut, "warning: error calculating patch from openapi v3 spec: %v\n", err)
-				} else {
-					patchType = types.StrategicMergePatchType
-				}
+		} else if gvkSupported {
+			patch, err = p.buildStrategicMergePatchFromOpenAPIV3(original, modified, current)
+			if err != nil {
+				// Fall back to OpenAPI V2 if there is a problem
+				// We should remove the fallback in the future,
+				// but for the first release it might be beneficial
+				// to fall back to OpenAPI V2 while logging the error
+				// and seeing if we get any bug reports.
+				fmt.Fprintf(errOut, "warning: error calculating patch from openapi v3 spec: %v\n", err)
 			} else {
-				klog.V(5).Infof("warning: OpenAPI V3 path does not support strategic merge patch - group: %s, version %s, kind %s\n",
-					p.Mapping.GroupVersionKind.Group, p.Mapping.GroupVersionKind.Version, p.Mapping.GroupVersionKind.Kind)
+				patchType = types.StrategicMergePatchType
 			}
+		} else {
+			klog.V(5).Infof("warning: OpenAPI V3 path does not support strategic merge patch - group: %s, version %s, kind %s\n",
+				p.Mapping.GroupVersionKind.Group, p.Mapping.GroupVersionKind.Version, p.Mapping.GroupVersionKind.Kind)
 		}
 	}
 
-	if patch == nil && p.OpenapiSchema != nil {
-		// if openapischema is used, we'll try to get required patch type for this GVK from Open API.
-		// if it fails or could not find any patch type, fall back to baked-in patch type determination.
-		if patchType, err = p.getPatchTypeFromOpenAPI(p.Mapping.GroupVersionKind); err == nil && patchType == types.StrategicMergePatchType {
-			patch, err = p.buildStrategicMergeFromOpenAPI(original, modified, current)
-			if err != nil {
-				// Warn user about problem and continue strategic merge patching using builtin types.
-				fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
+	if patch == nil {
+		if openAPISchema, err := p.OpenAPIGetter.OpenAPISchema(); err == nil && openAPISchema != nil {
+			// if openapischema is used, we'll try to get required patch type for this GVK from Open API.
+			// if it fails or could not find any patch type, fall back to baked-in patch type determination.
+			if patchType, err = p.getPatchTypeFromOpenAPI(openAPISchema, p.Mapping.GroupVersionKind); err == nil && patchType == types.StrategicMergePatchType {
+				patch, err = p.buildStrategicMergeFromOpenAPI(openAPISchema, original, modified, current)
+				if err != nil {
+					// Warn user about problem and continue strategic merge patching using builtin types.
+					fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
+				}
 			}
 		}
 	}
@@ -222,7 +225,6 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte) ([]byte, e
 // gvkSupportsPatchOpenAPIV3 checks if a particular GVK supports the patch operation.
 // It returns an error if the OpenAPI V3 could not be downloaded.
 func (p *Patcher) gvkSupportsPatchOpenAPIV3(gvk schema.GroupVersionKind) (bool, error) {
-	// Bypassing root to save apiserver memory.
 	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
 		Group:   p.Mapping.GroupVersionKind.Group,
 		Version: p.Mapping.GroupVersionKind.Version,
@@ -306,8 +308,8 @@ func (p *Patcher) buildStrategicMergePatchFromOpenAPIV3(original, modified, curr
 
 // buildStrategicMergeFromOpenAPI builds patch from OpenAPI if it is enabled.
 // This is used for core types which is published in openapi.
-func (p *Patcher) buildStrategicMergeFromOpenAPI(original, modified, current []byte) ([]byte, error) {
-	schema := p.OpenapiSchema.LookupResource(p.Mapping.GroupVersionKind)
+func (p *Patcher) buildStrategicMergeFromOpenAPI(openAPISchema openapi.Resources, original, modified, current []byte) ([]byte, error) {
+	schema := openAPISchema.LookupResource(p.Mapping.GroupVersionKind)
 	if schema == nil {
 		// Missing schema returns nil patch; also no error.
 		return nil, nil
@@ -321,8 +323,8 @@ func (p *Patcher) buildStrategicMergeFromOpenAPI(original, modified, current []b
 }
 
 // getPatchTypeFromOpenAPI looks up patch types supported by given GroupVersionKind in Open API.
-func (p *Patcher) getPatchTypeFromOpenAPI(gvk schema.GroupVersionKind) (types.PatchType, error) {
-	if pc := p.OpenapiSchema.GetConsumes(p.Mapping.GroupVersionKind, "PATCH"); pc != nil {
+func (p *Patcher) getPatchTypeFromOpenAPI(openAPISchema openapi.Resources, gvk schema.GroupVersionKind) (types.PatchType, error) {
+	if pc := openAPISchema.GetConsumes(p.Mapping.GroupVersionKind, "PATCH"); pc != nil {
 		for _, c := range pc {
 			if c == string(types.StrategicMergePatchType) {
 				return types.StrategicMergePatchType, nil

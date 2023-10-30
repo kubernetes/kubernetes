@@ -428,7 +428,7 @@ const (
 	ApplySet                FeatureGate = "KUBECTL_APPLYSET"
 	CmdPluginAsSubcommand   FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
 	InteractiveDelete       FeatureGate = "KUBECTL_INTERACTIVE_DELETE"
-	OpenAPIV3Apply          FeatureGate = "KUBECTL_OPENAPIV3_APPLY"
+	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 )
 
