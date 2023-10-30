@@ -67,7 +67,7 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.runtimeConfig, func(t *testing.T) {
 			options := &Options{
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{
+				Features: &genericoptions.FeatureOptions{
 					EnablePriorityAndFairness: true,
 				},
 				APIEnablement: genericoptions.NewAPIEnablementOptions(),
@@ -192,6 +192,7 @@ func TestValidateOptions(t *testing.T) {
 				APIEnablement:                genericoptions.NewAPIEnablementOptions(),
 				Metrics:                      &basemetrics.Options{},
 				ServiceAccountSigningKeyFile: "",
+				Features:                     &genericoptions.FeatureOptions{},
 			},
 		},
 		{
@@ -215,6 +216,7 @@ func TestValidateOptions(t *testing.T) {
 				APIEnablement:                genericoptions.NewAPIEnablementOptions(),
 				Metrics:                      &basemetrics.Options{},
 				ServiceAccountSigningKeyFile: "",
+				Features:                     &genericoptions.FeatureOptions{},
 			},
 		},
 	}
