@@ -79,7 +79,7 @@ func TestTypeResolver(t *testing.T) {
 		}
 	}(crd)
 	discoveryResolver := &resolver.ClientDiscoveryResolver{Discovery: client.Discovery()}
-	definitionsResolver := resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, openapi.GetOpenAPIDefinitions)
+	definitionsResolver := resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme)
 	// wait until the CRD schema is published at the OpenAPI v3 endpoint
 	err = wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
 		p, err := client.OpenAPIV3().Paths()
@@ -330,7 +330,7 @@ func TestBuiltinResolution(t *testing.T) {
 	}{
 		{
 			name:     "definitions",
-			resolver: resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, openapi.GetOpenAPIDefinitions),
+			resolver: resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme),
 			scheme:   buildTestScheme(),
 		},
 		{
