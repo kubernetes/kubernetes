@@ -160,7 +160,7 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
-	// tlsMaxVersion is the maximumTLS version supported.
+	// tlsMaxVersion is the maximum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	// Default: ""
 	// +optional
