@@ -33,8 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	klog "k8s.io/klog/v2"
@@ -131,6 +133,113 @@ func (e *watchEmbeddedEncoder) embeddedIdentifier() runtime.Identifier {
 	result, err := json.Marshal(identifier)
 	if err != nil {
 		klog.Fatalf("Failed marshaling identifier for watchEmbeddedEncoder: %v", err)
+	}
+	return runtime.Identifier(result)
+}
+
+// watchEncoder performs encoding of the watch events.
+//
+// NOTE: watchEncoder is NOT thread-safe.
+type watchEncoder struct {
+	ctx             context.Context
+	kind            schema.GroupVersionKind
+	embeddedEncoder runtime.Encoder
+	encoder         runtime.Encoder
+	framer          io.Writer
+
+	buffer      runtime.Splice
+	eventBuffer runtime.Splice
+
+	currentEmbeddedIdentifier runtime.Identifier
+	identifiers               map[watch.EventType]runtime.Identifier
+}
+
+func newWatchEncoder(ctx context.Context, kind schema.GroupVersionKind, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer) *watchEncoder {
+	return &watchEncoder{
+		ctx:             ctx,
+		kind:            kind,
+		embeddedEncoder: embeddedEncoder,
+		encoder:         encoder,
+		framer:          framer,
+		buffer:          runtime.NewSpliceBuffer(),
+		eventBuffer:     runtime.NewSpliceBuffer(),
+	}
+}
+
+// Encode encodes a given watch event.
+// NOTE: if events object is implementing the CacheableObject interface,
+//
+//	the serialized version is cached in that object [not the event itself].
+func (e *watchEncoder) Encode(event watch.Event) error {
+	encodeFunc := func(obj runtime.Object, w io.Writer) error {
+		return e.doEncode(obj, event, w)
+	}
+	if co, ok := event.Object.(runtime.CacheableObject); ok {
+		return co.CacheEncode(e.identifier(event.Type), encodeFunc, e.framer)
+	}
+	return encodeFunc(event.Object, e.framer)
+}
+
+func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writer) error {
+	defer e.buffer.Reset()
+
+	if err := e.embeddedEncoder.Encode(obj, e.buffer); err != nil {
+		return fmt.Errorf("unable to encode watch object %T: %v", obj, err)
+	}
+
+	// ContentType is not required here because we are defaulting to the serializer type.
+	outEvent := &metav1.WatchEvent{
+		Type:   string(event.Type),
+		Object: runtime.RawExtension{Raw: e.buffer.Bytes()},
+	}
+	metrics.WatchEventsSizes.WithContext(e.ctx).WithLabelValues(e.kind.Group, e.kind.Version, e.kind.Kind).Observe(float64(len(outEvent.Object.Raw)))
+
+	defer e.eventBuffer.Reset()
+	if err := e.encoder.Encode(outEvent, e.eventBuffer); err != nil {
+		return fmt.Errorf("unable to encode watch object %T: %v (%#v)", outEvent, err, e)
+	}
+
+	_, err := w.Write(e.eventBuffer.Bytes())
+	return err
+}
+
+type watchEncoderIdentifier struct {
+	Name            string `json:"name,omitempty"`
+	EmbeddedEncoder string `json:"embeddedEncoder,omitempty"`
+	Encoder         string `json:"encoder,omitempty"`
+	EventType       string `json:"eventType,omitempty"`
+}
+
+func (e *watchEncoder) identifier(eventType watch.EventType) runtime.Identifier {
+	// We need to take into account that in embeddedEncoder includes table
+	// transformer, then its identifier is dynamic. As a result, whenever
+	// the identifier of embeddedEncoder changes, we need to invalidate the
+	// whole identifiers cache.
+	// TODO(wojtek-t): Can we optimize it somehow?
+	if e.currentEmbeddedIdentifier != e.embeddedEncoder.Identifier() {
+		e.currentEmbeddedIdentifier = e.embeddedEncoder.Identifier()
+		e.identifiers = map[watch.EventType]runtime.Identifier{}
+	}
+	if _, ok := e.identifiers[eventType]; !ok {
+		e.identifiers[eventType] = e.typeIdentifier(eventType)
+	}
+	return e.identifiers[eventType]
+}
+
+func (e *watchEncoder) typeIdentifier(eventType watch.EventType) runtime.Identifier {
+	// The eventType is a non-standard pattern. This is coming from the fact
+	// that we're effectively serializing the whole watch event, but storing
+	// it in serializations of the Object within the watch event.
+	identifier := watchEncoderIdentifier{
+		Name:            "watch",
+		EmbeddedEncoder: string(e.embeddedEncoder.Identifier()),
+		Encoder:         string(e.encoder.Identifier()),
+		EventType:       string(eventType),
+	}
+
+	result, err := json.Marshal(identifier)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for watchEncoder: %v", err)
 	}
 	return runtime.Identifier(result)
 }
