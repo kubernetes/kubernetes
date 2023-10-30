@@ -328,6 +328,12 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	UserNamespacesSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesSupport"))
 
+	// Owned by SIG Node
+	// Can be used when the UserNamespacesPodSecurityStandards kubelet feature
+	// gate is enabled to relax the application of Pod Security Standards in a
+	// controlled way.
+	UserNamespacesPodSecurityStandards = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesPodSecurityStandards"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ValidatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
 
