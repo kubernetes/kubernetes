@@ -160,6 +160,11 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
+	// tlsMaxVersion is the maximumTLS version supported.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	// Default: ""
+	// +optional
+	TLSMaxVersion string `json:"tlsMaxVersion,omitempty"`
 	// rotateCertificates enables client certificate rotation. The Kubelet will request a
 	// new certificate from the certificates.k8s.io API. This requires an approver to approve the
 	// certificate signing requests.

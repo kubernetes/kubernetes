@@ -89,6 +89,15 @@ type Cluster struct {
 	// This will make your HTTPS connections insecure.
 	// +optional
 	InsecureSkipTLSVerify bool
+	// TLSCipherSuites specifies which ciphers will be used for establishing the TLS session.
+	// +optional
+	TLSCipherSuites []uint16
+	// TLSMaxVersion specifies the maximum version the TLS will negotiate with
+	// +optional
+	TLSMaxVersion uint16
+	// TLSMinVersion specifies the minimum version the TLS will negotiate with
+	// +optional
+	TLSMinVersion uint16
 	// CAData contains PEM-encoded certificate authority certificates.
 	// If empty, system roots should be used.
 	// +listType=atomic

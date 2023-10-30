@@ -89,10 +89,21 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 		// Can't use TLSv1.1 because of RC4 cipher usage
-		MinVersion:         tls.VersionTLS12,
+		MinVersion:         c.TLS.MinVersion,
+		MaxVersion:         c.TLS.MaxVersion,
 		InsecureSkipVerify: c.TLS.Insecure,
 		ServerName:         c.TLS.ServerName,
 		NextProtos:         c.TLS.NextProtos,
+	}
+
+	// Enforce a minimum of TLS12
+	if tlsConfig.MinVersion < tls.VersionTLS12 {
+		tlsConfig.MinVersion = tls.VersionTLS12
+	}
+
+	// Enforce a maximum for TLS
+	if tlsConfig.MaxVersion != 0 && tlsConfig.MaxVersion < tlsConfig.MinVersion {
+		return nil, fmt.Errorf("set TLS maximum version is smaller than the minimum version")
 	}
 
 	if c.HasCA() {
