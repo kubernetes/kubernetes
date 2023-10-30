@@ -56,11 +56,11 @@ func PodPVCIndexFunc() func(obj interface{}) ([]string, error) {
 
 // AddPodPVCIndexerIfNotPresent adds the PodPVCIndexFunc.
 func AddPodPVCIndexerIfNotPresent(indexer cache.Indexer) error {
-	return AddIndexerIfNotPresent(indexer, PodPVCIndex, PodPVCIndexFunc())
+	return addIndexerIfNotPresent(indexer, PodPVCIndex, PodPVCIndexFunc())
 }
 
-// AddIndexerIfNotPresent adds the index function with the name into the cache indexer if not present
-func AddIndexerIfNotPresent(indexer cache.Indexer, indexName string, indexFunc cache.IndexFunc) error {
+// addIndexerIfNotPresent adds the index function with the name into the cache indexer if not present
+func addIndexerIfNotPresent(indexer cache.Indexer, indexName string, indexFunc cache.IndexFunc) error {
 	indexers := indexer.GetIndexers()
 	if _, ok := indexers[indexName]; ok {
 		return nil
