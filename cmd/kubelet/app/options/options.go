@@ -418,6 +418,9 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.StringVar(&c.TLSMinVersion, "tls-min-version", c.TLSMinVersion,
 		"Minimum TLS version supported. "+
 			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
+	fs.StringVar(&c.TLSMaxVersion, "tls-max-version", c.TLSMaxVersion,
+		"Maximum TLS version supported. "+
+			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
 	fs.BoolVar(&c.RotateCertificates, "rotate-certificates", c.RotateCertificates, "Auto rotate the kubelet client certificates by requesting new certificates from the kube-apiserver when the certificate expiration approaches.")
 
 	fs.Int32Var(&c.RegistryPullQPS, "registry-qps", c.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited.")

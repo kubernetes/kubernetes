@@ -65,6 +65,9 @@ type SecureServingOptions struct {
 	// MinTLSVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	MinTLSVersion string
+	// MaxTLSVersion is the maximum TLS version supported.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	MaxTLSVersion string
 
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
@@ -187,6 +190,9 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,
 		"Minimum TLS version supported. "+
+			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
+	fs.StringVar(&s.MaxTLSVersion, "tls-max-version", s.MaxTLSVersion,
+		"Maximum TLS version supported. "+
 			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
 
 	fs.Var(cliflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
@@ -313,6 +319,10 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 
 	var err error
 	c.MinTLSVersion, err = cliflag.TLSVersion(s.MinTLSVersion)
+	if err != nil {
+		return err
+	}
+	c.MaxTLSVersion, err = cliflag.TLSMaxVersion(s.MaxTLSVersion)
 	if err != nil {
 		return err
 	}
