@@ -34,6 +34,7 @@ func NodeSelectorTerm() *NodeSelectorTermApplyConfiguration {
 // WithMatchExpressions adds the given value to the MatchExpressions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MatchExpressions field.
+// Deprecated: WithMatchExpressions does not replace existing list for atomic list type. Use WithNewMatchExpressions instead.
 func (b *NodeSelectorTermApplyConfiguration) WithMatchExpressions(values ...*NodeSelectorRequirementApplyConfiguration) *NodeSelectorTermApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -44,13 +45,42 @@ func (b *NodeSelectorTermApplyConfiguration) WithMatchExpressions(values ...*Nod
 	return b
 }
 
+// WithNewMatchExpressions replaces the MatchExpressions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MatchExpressions field is set to the values of the last call.
+func (b *NodeSelectorTermApplyConfiguration) WithNewMatchExpressions(values ...*NodeSelectorRequirementApplyConfiguration) *NodeSelectorTermApplyConfiguration {
+	b.MatchExpressions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewMatchExpressions")
+		}
+		b.MatchExpressions = append(b.MatchExpressions, *values[i])
+	}
+	return b
+}
+
 // WithMatchFields adds the given value to the MatchFields field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MatchFields field.
+// Deprecated: WithMatchFields does not replace existing list for atomic list type. Use WithNewMatchFields instead.
 func (b *NodeSelectorTermApplyConfiguration) WithMatchFields(values ...*NodeSelectorRequirementApplyConfiguration) *NodeSelectorTermApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithMatchFields")
+		}
+		b.MatchFields = append(b.MatchFields, *values[i])
+	}
+	return b
+}
+
+// WithNewMatchFields replaces the MatchFields field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MatchFields field is set to the values of the last call.
+func (b *NodeSelectorTermApplyConfiguration) WithNewMatchFields(values ...*NodeSelectorRequirementApplyConfiguration) *NodeSelectorTermApplyConfiguration {
+	b.MatchFields = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewMatchFields")
 		}
 		b.MatchFields = append(b.MatchFields, *values[i])
 	}

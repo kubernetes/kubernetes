@@ -213,6 +213,7 @@ func (b *RoleBindingApplyConfiguration) WithAnnotations(entries map[string]strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
+// Deprecated: WithOwnerReferences does not replace existing list for atomic list type. Use WithNewOwnerReferences instead.
 func (b *RoleBindingApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *RoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
@@ -224,14 +225,40 @@ func (b *RoleBindingApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 	return b
 }
 
+// WithNewOwnerReferences replaces the OwnerReferences field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the OwnerReferences field is set to the values of the last call.
+func (b *RoleBindingApplyConfiguration) WithNewOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *RoleBindingApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.OwnerReferences = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewOwnerReferences")
+		}
+		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+	}
+	return b
+}
+
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
+// Deprecated: WithFinalizers does not replace existing list for atomic list type. Use WithNewFinalizers instead.
 func (b *RoleBindingApplyConfiguration) WithFinalizers(values ...string) *RoleBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
+	return b
+}
+
+// WithNewFinalizers replaces the Finalizers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Finalizers field is set to the values of the last call.
+func (b *RoleBindingApplyConfiguration) WithNewFinalizers(values ...string) *RoleBindingApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.Finalizers = make([]string, len(values))
+	copy(b.Finalizers, values)
 	return b
 }
 
@@ -244,10 +271,25 @@ func (b *RoleBindingApplyConfiguration) ensureObjectMetaApplyConfigurationExists
 // WithSubjects adds the given value to the Subjects field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Subjects field.
+// Deprecated: WithSubjects does not replace existing list for atomic list type. Use WithNewSubjects instead.
 func (b *RoleBindingApplyConfiguration) WithSubjects(values ...*SubjectApplyConfiguration) *RoleBindingApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithSubjects")
+		}
+		b.Subjects = append(b.Subjects, *values[i])
+	}
+	return b
+}
+
+// WithNewSubjects replaces the Subjects field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Subjects field is set to the values of the last call.
+func (b *RoleBindingApplyConfiguration) WithNewSubjects(values ...*SubjectApplyConfiguration) *RoleBindingApplyConfiguration {
+	b.Subjects = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewSubjects")
 		}
 		b.Subjects = append(b.Subjects, *values[i])
 	}

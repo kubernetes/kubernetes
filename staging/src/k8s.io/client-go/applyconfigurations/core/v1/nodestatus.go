@@ -71,6 +71,7 @@ func (b *NodeStatusApplyConfiguration) WithPhase(value v1.NodePhase) *NodeStatus
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
+// Deprecated: WithConditions does not replace existing list for atomic list type. Use WithNewConditions instead.
 func (b *NodeStatusApplyConfiguration) WithConditions(values ...*NodeConditionApplyConfiguration) *NodeStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -81,13 +82,42 @@ func (b *NodeStatusApplyConfiguration) WithConditions(values ...*NodeConditionAp
 	return b
 }
 
+// WithNewConditions replaces the Conditions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Conditions field is set to the values of the last call.
+func (b *NodeStatusApplyConfiguration) WithNewConditions(values ...*NodeConditionApplyConfiguration) *NodeStatusApplyConfiguration {
+	b.Conditions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewConditions")
+		}
+		b.Conditions = append(b.Conditions, *values[i])
+	}
+	return b
+}
+
 // WithAddresses adds the given value to the Addresses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Addresses field.
+// Deprecated: WithAddresses does not replace existing list for atomic list type. Use WithNewAddresses instead.
 func (b *NodeStatusApplyConfiguration) WithAddresses(values ...*NodeAddressApplyConfiguration) *NodeStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithAddresses")
+		}
+		b.Addresses = append(b.Addresses, *values[i])
+	}
+	return b
+}
+
+// WithNewAddresses replaces the Addresses field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Addresses field is set to the values of the last call.
+func (b *NodeStatusApplyConfiguration) WithNewAddresses(values ...*NodeAddressApplyConfiguration) *NodeStatusApplyConfiguration {
+	b.Addresses = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewAddresses")
 		}
 		b.Addresses = append(b.Addresses, *values[i])
 	}
@@ -113,6 +143,7 @@ func (b *NodeStatusApplyConfiguration) WithNodeInfo(value *NodeSystemInfoApplyCo
 // WithImages adds the given value to the Images field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Images field.
+// Deprecated: WithImages does not replace existing list for atomic list type. Use WithNewImages instead.
 func (b *NodeStatusApplyConfiguration) WithImages(values ...*ContainerImageApplyConfiguration) *NodeStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -123,9 +154,24 @@ func (b *NodeStatusApplyConfiguration) WithImages(values ...*ContainerImageApply
 	return b
 }
 
+// WithNewImages replaces the Images field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Images field is set to the values of the last call.
+func (b *NodeStatusApplyConfiguration) WithNewImages(values ...*ContainerImageApplyConfiguration) *NodeStatusApplyConfiguration {
+	b.Images = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewImages")
+		}
+		b.Images = append(b.Images, *values[i])
+	}
+	return b
+}
+
 // WithVolumesInUse adds the given value to the VolumesInUse field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumesInUse field.
+// Deprecated: WithVolumesInUse does not replace existing list for atomic list type. Use WithNewVolumesInUse instead.
 func (b *NodeStatusApplyConfiguration) WithVolumesInUse(values ...v1.UniqueVolumeName) *NodeStatusApplyConfiguration {
 	for i := range values {
 		b.VolumesInUse = append(b.VolumesInUse, values[i])
@@ -133,13 +179,37 @@ func (b *NodeStatusApplyConfiguration) WithVolumesInUse(values ...v1.UniqueVolum
 	return b
 }
 
+// WithNewVolumesInUse replaces the VolumesInUse field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumesInUse field is set to the values of the last call.
+func (b *NodeStatusApplyConfiguration) WithNewVolumesInUse(values ...v1.UniqueVolumeName) *NodeStatusApplyConfiguration {
+	b.VolumesInUse = make([]v1.UniqueVolumeName, len(values))
+	copy(b.VolumesInUse, values)
+	return b
+}
+
 // WithVolumesAttached adds the given value to the VolumesAttached field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumesAttached field.
+// Deprecated: WithVolumesAttached does not replace existing list for atomic list type. Use WithNewVolumesAttached instead.
 func (b *NodeStatusApplyConfiguration) WithVolumesAttached(values ...*AttachedVolumeApplyConfiguration) *NodeStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVolumesAttached")
+		}
+		b.VolumesAttached = append(b.VolumesAttached, *values[i])
+	}
+	return b
+}
+
+// WithNewVolumesAttached replaces the VolumesAttached field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumesAttached field is set to the values of the last call.
+func (b *NodeStatusApplyConfiguration) WithNewVolumesAttached(values ...*AttachedVolumeApplyConfiguration) *NodeStatusApplyConfiguration {
+	b.VolumesAttached = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVolumesAttached")
 		}
 		b.VolumesAttached = append(b.VolumesAttached, *values[i])
 	}

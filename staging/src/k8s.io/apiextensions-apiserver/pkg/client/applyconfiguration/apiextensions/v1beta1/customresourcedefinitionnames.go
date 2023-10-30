@@ -54,10 +54,20 @@ func (b *CustomResourceDefinitionNamesApplyConfiguration) WithSingular(value str
 // WithShortNames adds the given value to the ShortNames field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ShortNames field.
+// Deprecated: WithShortNames does not replace existing list for atomic list type. Use WithNewShortNames instead.
 func (b *CustomResourceDefinitionNamesApplyConfiguration) WithShortNames(values ...string) *CustomResourceDefinitionNamesApplyConfiguration {
 	for i := range values {
 		b.ShortNames = append(b.ShortNames, values[i])
 	}
+	return b
+}
+
+// WithNewShortNames replaces the ShortNames field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ShortNames field is set to the values of the last call.
+func (b *CustomResourceDefinitionNamesApplyConfiguration) WithNewShortNames(values ...string) *CustomResourceDefinitionNamesApplyConfiguration {
+	b.ShortNames = make([]string, len(values))
+	copy(b.ShortNames, values)
 	return b
 }
 
@@ -80,9 +90,19 @@ func (b *CustomResourceDefinitionNamesApplyConfiguration) WithListKind(value str
 // WithCategories adds the given value to the Categories field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Categories field.
+// Deprecated: WithCategories does not replace existing list for atomic list type. Use WithNewCategories instead.
 func (b *CustomResourceDefinitionNamesApplyConfiguration) WithCategories(values ...string) *CustomResourceDefinitionNamesApplyConfiguration {
 	for i := range values {
 		b.Categories = append(b.Categories, values[i])
 	}
+	return b
+}
+
+// WithNewCategories replaces the Categories field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Categories field is set to the values of the last call.
+func (b *CustomResourceDefinitionNamesApplyConfiguration) WithNewCategories(values ...string) *CustomResourceDefinitionNamesApplyConfiguration {
+	b.Categories = make([]string, len(values))
+	copy(b.Categories, values)
 	return b
 }

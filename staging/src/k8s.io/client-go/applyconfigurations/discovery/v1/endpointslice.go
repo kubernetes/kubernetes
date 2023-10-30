@@ -214,6 +214,7 @@ func (b *EndpointSliceApplyConfiguration) WithAnnotations(entries map[string]str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
+// Deprecated: WithOwnerReferences does not replace existing list for atomic list type. Use WithNewOwnerReferences instead.
 func (b *EndpointSliceApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *EndpointSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
@@ -225,14 +226,40 @@ func (b *EndpointSliceApplyConfiguration) WithOwnerReferences(values ...*v1.Owne
 	return b
 }
 
+// WithNewOwnerReferences replaces the OwnerReferences field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the OwnerReferences field is set to the values of the last call.
+func (b *EndpointSliceApplyConfiguration) WithNewOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *EndpointSliceApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.OwnerReferences = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewOwnerReferences")
+		}
+		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+	}
+	return b
+}
+
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
+// Deprecated: WithFinalizers does not replace existing list for atomic list type. Use WithNewFinalizers instead.
 func (b *EndpointSliceApplyConfiguration) WithFinalizers(values ...string) *EndpointSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
+	return b
+}
+
+// WithNewFinalizers replaces the Finalizers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Finalizers field is set to the values of the last call.
+func (b *EndpointSliceApplyConfiguration) WithNewFinalizers(values ...string) *EndpointSliceApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.Finalizers = make([]string, len(values))
+	copy(b.Finalizers, values)
 	return b
 }
 
@@ -253,6 +280,7 @@ func (b *EndpointSliceApplyConfiguration) WithAddressType(value discoveryv1.Addr
 // WithEndpoints adds the given value to the Endpoints field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Endpoints field.
+// Deprecated: WithEndpoints does not replace existing list for atomic list type. Use WithNewEndpoints instead.
 func (b *EndpointSliceApplyConfiguration) WithEndpoints(values ...*EndpointApplyConfiguration) *EndpointSliceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -263,13 +291,42 @@ func (b *EndpointSliceApplyConfiguration) WithEndpoints(values ...*EndpointApply
 	return b
 }
 
+// WithNewEndpoints replaces the Endpoints field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Endpoints field is set to the values of the last call.
+func (b *EndpointSliceApplyConfiguration) WithNewEndpoints(values ...*EndpointApplyConfiguration) *EndpointSliceApplyConfiguration {
+	b.Endpoints = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewEndpoints")
+		}
+		b.Endpoints = append(b.Endpoints, *values[i])
+	}
+	return b
+}
+
 // WithPorts adds the given value to the Ports field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Ports field.
+// Deprecated: WithPorts does not replace existing list for atomic list type. Use WithNewPorts instead.
 func (b *EndpointSliceApplyConfiguration) WithPorts(values ...*EndpointPortApplyConfiguration) *EndpointSliceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithPorts")
+		}
+		b.Ports = append(b.Ports, *values[i])
+	}
+	return b
+}
+
+// WithNewPorts replaces the Ports field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Ports field is set to the values of the last call.
+func (b *EndpointSliceApplyConfiguration) WithNewPorts(values ...*EndpointPortApplyConfiguration) *EndpointSliceApplyConfiguration {
+	b.Ports = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewPorts")
 		}
 		b.Ports = append(b.Ports, *values[i])
 	}

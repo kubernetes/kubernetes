@@ -34,10 +34,25 @@ func ProjectedVolumeSource() *ProjectedVolumeSourceApplyConfiguration {
 // WithSources adds the given value to the Sources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Sources field.
+// Deprecated: WithSources does not replace existing list for atomic list type. Use WithNewSources instead.
 func (b *ProjectedVolumeSourceApplyConfiguration) WithSources(values ...*VolumeProjectionApplyConfiguration) *ProjectedVolumeSourceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithSources")
+		}
+		b.Sources = append(b.Sources, *values[i])
+	}
+	return b
+}
+
+// WithNewSources replaces the Sources field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Sources field is set to the values of the last call.
+func (b *ProjectedVolumeSourceApplyConfiguration) WithNewSources(values ...*VolumeProjectionApplyConfiguration) *ProjectedVolumeSourceApplyConfiguration {
+	b.Sources = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewSources")
 		}
 		b.Sources = append(b.Sources, *values[i])
 	}

@@ -35,6 +35,7 @@ func PolicyRulesWithSubjects() *PolicyRulesWithSubjectsApplyConfiguration {
 // WithSubjects adds the given value to the Subjects field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Subjects field.
+// Deprecated: WithSubjects does not replace existing list for atomic list type. Use WithNewSubjects instead.
 func (b *PolicyRulesWithSubjectsApplyConfiguration) WithSubjects(values ...*SubjectApplyConfiguration) *PolicyRulesWithSubjectsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -45,9 +46,24 @@ func (b *PolicyRulesWithSubjectsApplyConfiguration) WithSubjects(values ...*Subj
 	return b
 }
 
+// WithNewSubjects replaces the Subjects field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Subjects field is set to the values of the last call.
+func (b *PolicyRulesWithSubjectsApplyConfiguration) WithNewSubjects(values ...*SubjectApplyConfiguration) *PolicyRulesWithSubjectsApplyConfiguration {
+	b.Subjects = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewSubjects")
+		}
+		b.Subjects = append(b.Subjects, *values[i])
+	}
+	return b
+}
+
 // WithResourceRules adds the given value to the ResourceRules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ResourceRules field.
+// Deprecated: WithResourceRules does not replace existing list for atomic list type. Use WithNewResourceRules instead.
 func (b *PolicyRulesWithSubjectsApplyConfiguration) WithResourceRules(values ...*ResourcePolicyRuleApplyConfiguration) *PolicyRulesWithSubjectsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -58,13 +74,42 @@ func (b *PolicyRulesWithSubjectsApplyConfiguration) WithResourceRules(values ...
 	return b
 }
 
+// WithNewResourceRules replaces the ResourceRules field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ResourceRules field is set to the values of the last call.
+func (b *PolicyRulesWithSubjectsApplyConfiguration) WithNewResourceRules(values ...*ResourcePolicyRuleApplyConfiguration) *PolicyRulesWithSubjectsApplyConfiguration {
+	b.ResourceRules = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewResourceRules")
+		}
+		b.ResourceRules = append(b.ResourceRules, *values[i])
+	}
+	return b
+}
+
 // WithNonResourceRules adds the given value to the NonResourceRules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the NonResourceRules field.
+// Deprecated: WithNonResourceRules does not replace existing list for atomic list type. Use WithNewNonResourceRules instead.
 func (b *PolicyRulesWithSubjectsApplyConfiguration) WithNonResourceRules(values ...*NonResourcePolicyRuleApplyConfiguration) *PolicyRulesWithSubjectsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithNonResourceRules")
+		}
+		b.NonResourceRules = append(b.NonResourceRules, *values[i])
+	}
+	return b
+}
+
+// WithNewNonResourceRules replaces the NonResourceRules field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the NonResourceRules field is set to the values of the last call.
+func (b *PolicyRulesWithSubjectsApplyConfiguration) WithNewNonResourceRules(values ...*NonResourcePolicyRuleApplyConfiguration) *PolicyRulesWithSubjectsApplyConfiguration {
+	b.NonResourceRules = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewNonResourceRules")
 		}
 		b.NonResourceRules = append(b.NonResourceRules, *values[i])
 	}

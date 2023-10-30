@@ -232,10 +232,20 @@ func (b *JSONSchemaPropsApplyConfiguration) WithMultipleOf(value float64) *JSONS
 // WithEnum adds the given value to the Enum field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Enum field.
+// Deprecated: WithEnum does not replace existing list for atomic list type. Use WithNewEnum instead.
 func (b *JSONSchemaPropsApplyConfiguration) WithEnum(values ...v1.JSON) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		b.Enum = append(b.Enum, values[i])
 	}
+	return b
+}
+
+// WithNewEnum replaces the Enum field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Enum field is set to the values of the last call.
+func (b *JSONSchemaPropsApplyConfiguration) WithNewEnum(values ...v1.JSON) *JSONSchemaPropsApplyConfiguration {
+	b.Enum = make([]v1.JSON, len(values))
+	copy(b.Enum, values)
 	return b
 }
 
@@ -258,10 +268,20 @@ func (b *JSONSchemaPropsApplyConfiguration) WithMinProperties(value int64) *JSON
 // WithRequired adds the given value to the Required field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Required field.
+// Deprecated: WithRequired does not replace existing list for atomic list type. Use WithNewRequired instead.
 func (b *JSONSchemaPropsApplyConfiguration) WithRequired(values ...string) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		b.Required = append(b.Required, values[i])
 	}
+	return b
+}
+
+// WithNewRequired replaces the Required field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Required field is set to the values of the last call.
+func (b *JSONSchemaPropsApplyConfiguration) WithNewRequired(values ...string) *JSONSchemaPropsApplyConfiguration {
+	b.Required = make([]string, len(values))
+	copy(b.Required, values)
 	return b
 }
 
@@ -276,6 +296,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithItems(value v1.JSONSchemaPropsOr
 // WithAllOf adds the given value to the AllOf field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AllOf field.
+// Deprecated: WithAllOf does not replace existing list for atomic list type. Use WithNewAllOf instead.
 func (b *JSONSchemaPropsApplyConfiguration) WithAllOf(values ...*JSONSchemaPropsApplyConfiguration) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -286,9 +307,24 @@ func (b *JSONSchemaPropsApplyConfiguration) WithAllOf(values ...*JSONSchemaProps
 	return b
 }
 
+// WithNewAllOf replaces the AllOf field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the AllOf field is set to the values of the last call.
+func (b *JSONSchemaPropsApplyConfiguration) WithNewAllOf(values ...*JSONSchemaPropsApplyConfiguration) *JSONSchemaPropsApplyConfiguration {
+	b.AllOf = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewAllOf")
+		}
+		b.AllOf = append(b.AllOf, *values[i])
+	}
+	return b
+}
+
 // WithOneOf adds the given value to the OneOf field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OneOf field.
+// Deprecated: WithOneOf does not replace existing list for atomic list type. Use WithNewOneOf instead.
 func (b *JSONSchemaPropsApplyConfiguration) WithOneOf(values ...*JSONSchemaPropsApplyConfiguration) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -299,13 +335,42 @@ func (b *JSONSchemaPropsApplyConfiguration) WithOneOf(values ...*JSONSchemaProps
 	return b
 }
 
+// WithNewOneOf replaces the OneOf field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the OneOf field is set to the values of the last call.
+func (b *JSONSchemaPropsApplyConfiguration) WithNewOneOf(values ...*JSONSchemaPropsApplyConfiguration) *JSONSchemaPropsApplyConfiguration {
+	b.OneOf = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewOneOf")
+		}
+		b.OneOf = append(b.OneOf, *values[i])
+	}
+	return b
+}
+
 // WithAnyOf adds the given value to the AnyOf field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AnyOf field.
+// Deprecated: WithAnyOf does not replace existing list for atomic list type. Use WithNewAnyOf instead.
 func (b *JSONSchemaPropsApplyConfiguration) WithAnyOf(values ...*JSONSchemaPropsApplyConfiguration) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithAnyOf")
+		}
+		b.AnyOf = append(b.AnyOf, *values[i])
+	}
+	return b
+}
+
+// WithNewAnyOf replaces the AnyOf field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the AnyOf field is set to the values of the last call.
+func (b *JSONSchemaPropsApplyConfiguration) WithNewAnyOf(values ...*JSONSchemaPropsApplyConfiguration) *JSONSchemaPropsApplyConfiguration {
+	b.AnyOf = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewAnyOf")
 		}
 		b.AnyOf = append(b.AnyOf, *values[i])
 	}
@@ -431,10 +496,20 @@ func (b *JSONSchemaPropsApplyConfiguration) WithXIntOrString(value bool) *JSONSc
 // WithXListMapKeys adds the given value to the XListMapKeys field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the XListMapKeys field.
+// Deprecated: WithXListMapKeys does not replace existing list for atomic list type. Use WithNewXListMapKeys instead.
 func (b *JSONSchemaPropsApplyConfiguration) WithXListMapKeys(values ...string) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		b.XListMapKeys = append(b.XListMapKeys, values[i])
 	}
+	return b
+}
+
+// WithNewXListMapKeys replaces the XListMapKeys field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the XListMapKeys field is set to the values of the last call.
+func (b *JSONSchemaPropsApplyConfiguration) WithNewXListMapKeys(values ...string) *JSONSchemaPropsApplyConfiguration {
+	b.XListMapKeys = make([]string, len(values))
+	copy(b.XListMapKeys, values)
 	return b
 }
 

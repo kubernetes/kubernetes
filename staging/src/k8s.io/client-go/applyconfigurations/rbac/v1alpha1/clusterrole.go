@@ -211,6 +211,7 @@ func (b *ClusterRoleApplyConfiguration) WithAnnotations(entries map[string]strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
+// Deprecated: WithOwnerReferences does not replace existing list for atomic list type. Use WithNewOwnerReferences instead.
 func (b *ClusterRoleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
@@ -222,14 +223,40 @@ func (b *ClusterRoleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 	return b
 }
 
+// WithNewOwnerReferences replaces the OwnerReferences field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the OwnerReferences field is set to the values of the last call.
+func (b *ClusterRoleApplyConfiguration) WithNewOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ClusterRoleApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.OwnerReferences = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewOwnerReferences")
+		}
+		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+	}
+	return b
+}
+
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
+// Deprecated: WithFinalizers does not replace existing list for atomic list type. Use WithNewFinalizers instead.
 func (b *ClusterRoleApplyConfiguration) WithFinalizers(values ...string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
+	return b
+}
+
+// WithNewFinalizers replaces the Finalizers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Finalizers field is set to the values of the last call.
+func (b *ClusterRoleApplyConfiguration) WithNewFinalizers(values ...string) *ClusterRoleApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.Finalizers = make([]string, len(values))
+	copy(b.Finalizers, values)
 	return b
 }
 
@@ -242,10 +269,25 @@ func (b *ClusterRoleApplyConfiguration) ensureObjectMetaApplyConfigurationExists
 // WithRules adds the given value to the Rules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Rules field.
+// Deprecated: WithRules does not replace existing list for atomic list type. Use WithNewRules instead.
 func (b *ClusterRoleApplyConfiguration) WithRules(values ...*PolicyRuleApplyConfiguration) *ClusterRoleApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithRules")
+		}
+		b.Rules = append(b.Rules, *values[i])
+	}
+	return b
+}
+
+// WithNewRules replaces the Rules field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Rules field is set to the values of the last call.
+func (b *ClusterRoleApplyConfiguration) WithNewRules(values ...*PolicyRuleApplyConfiguration) *ClusterRoleApplyConfiguration {
+	b.Rules = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewRules")
 		}
 		b.Rules = append(b.Rules, *values[i])
 	}

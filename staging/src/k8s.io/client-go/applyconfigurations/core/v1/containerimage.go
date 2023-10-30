@@ -34,10 +34,20 @@ func ContainerImage() *ContainerImageApplyConfiguration {
 // WithNames adds the given value to the Names field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Names field.
+// Deprecated: WithNames does not replace existing list for atomic list type. Use WithNewNames instead.
 func (b *ContainerImageApplyConfiguration) WithNames(values ...string) *ContainerImageApplyConfiguration {
 	for i := range values {
 		b.Names = append(b.Names, values[i])
 	}
+	return b
+}
+
+// WithNewNames replaces the Names field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Names field is set to the values of the last call.
+func (b *ContainerImageApplyConfiguration) WithNewNames(values ...string) *ContainerImageApplyConfiguration {
+	b.Names = make([]string, len(values))
+	copy(b.Names, values)
 	return b
 }
 

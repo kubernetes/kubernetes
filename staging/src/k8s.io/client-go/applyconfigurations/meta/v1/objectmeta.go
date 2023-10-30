@@ -150,6 +150,7 @@ func (b *ObjectMetaApplyConfiguration) WithAnnotations(entries map[string]string
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
+// Deprecated: WithOwnerReferences does not replace existing list for atomic list type. Use WithNewOwnerReferences instead.
 func (b *ObjectMetaApplyConfiguration) WithOwnerReferences(values ...*OwnerReferenceApplyConfiguration) *ObjectMetaApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -160,12 +161,36 @@ func (b *ObjectMetaApplyConfiguration) WithOwnerReferences(values ...*OwnerRefer
 	return b
 }
 
+// WithNewOwnerReferences replaces the OwnerReferences field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the OwnerReferences field is set to the values of the last call.
+func (b *ObjectMetaApplyConfiguration) WithNewOwnerReferences(values ...*OwnerReferenceApplyConfiguration) *ObjectMetaApplyConfiguration {
+	b.OwnerReferences = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewOwnerReferences")
+		}
+		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+	}
+	return b
+}
+
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
+// Deprecated: WithFinalizers does not replace existing list for atomic list type. Use WithNewFinalizers instead.
 func (b *ObjectMetaApplyConfiguration) WithFinalizers(values ...string) *ObjectMetaApplyConfiguration {
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
+	return b
+}
+
+// WithNewFinalizers replaces the Finalizers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Finalizers field is set to the values of the last call.
+func (b *ObjectMetaApplyConfiguration) WithNewFinalizers(values ...string) *ObjectMetaApplyConfiguration {
+	b.Finalizers = make([]string, len(values))
+	copy(b.Finalizers, values)
 	return b
 }

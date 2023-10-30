@@ -60,10 +60,20 @@ func (b *CSIDriverSpecApplyConfiguration) WithPodInfoOnMount(value bool) *CSIDri
 // WithVolumeLifecycleModes adds the given value to the VolumeLifecycleModes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeLifecycleModes field.
+// Deprecated: WithVolumeLifecycleModes does not replace existing list for atomic list type. Use WithNewVolumeLifecycleModes instead.
 func (b *CSIDriverSpecApplyConfiguration) WithVolumeLifecycleModes(values ...v1beta1.VolumeLifecycleMode) *CSIDriverSpecApplyConfiguration {
 	for i := range values {
 		b.VolumeLifecycleModes = append(b.VolumeLifecycleModes, values[i])
 	}
+	return b
+}
+
+// WithNewVolumeLifecycleModes replaces the VolumeLifecycleModes field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumeLifecycleModes field is set to the values of the last call.
+func (b *CSIDriverSpecApplyConfiguration) WithNewVolumeLifecycleModes(values ...v1beta1.VolumeLifecycleMode) *CSIDriverSpecApplyConfiguration {
+	b.VolumeLifecycleModes = make([]v1beta1.VolumeLifecycleMode, len(values))
+	copy(b.VolumeLifecycleModes, values)
 	return b
 }
 
@@ -86,10 +96,25 @@ func (b *CSIDriverSpecApplyConfiguration) WithFSGroupPolicy(value v1beta1.FSGrou
 // WithTokenRequests adds the given value to the TokenRequests field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the TokenRequests field.
+// Deprecated: WithTokenRequests does not replace existing list for atomic list type. Use WithNewTokenRequests instead.
 func (b *CSIDriverSpecApplyConfiguration) WithTokenRequests(values ...*TokenRequestApplyConfiguration) *CSIDriverSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTokenRequests")
+		}
+		b.TokenRequests = append(b.TokenRequests, *values[i])
+	}
+	return b
+}
+
+// WithNewTokenRequests replaces the TokenRequests field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the TokenRequests field is set to the values of the last call.
+func (b *CSIDriverSpecApplyConfiguration) WithNewTokenRequests(values ...*TokenRequestApplyConfiguration) *CSIDriverSpecApplyConfiguration {
+	b.TokenRequests = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewTokenRequests")
 		}
 		b.TokenRequests = append(b.TokenRequests, *values[i])
 	}

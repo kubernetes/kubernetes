@@ -45,10 +45,20 @@ func PersistentVolumeClaimSpec() *PersistentVolumeClaimSpecApplyConfiguration {
 // WithAccessModes adds the given value to the AccessModes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AccessModes field.
+// Deprecated: WithAccessModes does not replace existing list for atomic list type. Use WithNewAccessModes instead.
 func (b *PersistentVolumeClaimSpecApplyConfiguration) WithAccessModes(values ...v1.PersistentVolumeAccessMode) *PersistentVolumeClaimSpecApplyConfiguration {
 	for i := range values {
 		b.AccessModes = append(b.AccessModes, values[i])
 	}
+	return b
+}
+
+// WithNewAccessModes replaces the AccessModes field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the AccessModes field is set to the values of the last call.
+func (b *PersistentVolumeClaimSpecApplyConfiguration) WithNewAccessModes(values ...v1.PersistentVolumeAccessMode) *PersistentVolumeClaimSpecApplyConfiguration {
+	b.AccessModes = make([]v1.PersistentVolumeAccessMode, len(values))
+	copy(b.AccessModes, values)
 	return b
 }
 

@@ -54,6 +54,7 @@ func (b *EphemeralContainerApplyConfiguration) WithImage(value string) *Ephemera
 // WithCommand adds the given value to the Command field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Command field.
+// Deprecated: WithCommand does not replace existing list for atomic list type. Use WithNewCommand instead.
 func (b *EphemeralContainerApplyConfiguration) WithCommand(values ...string) *EphemeralContainerApplyConfiguration {
 	for i := range values {
 		b.Command = append(b.Command, values[i])
@@ -61,13 +62,32 @@ func (b *EphemeralContainerApplyConfiguration) WithCommand(values ...string) *Ep
 	return b
 }
 
+// WithNewCommand replaces the Command field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Command field is set to the values of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithNewCommand(values ...string) *EphemeralContainerApplyConfiguration {
+	b.Command = make([]string, len(values))
+	copy(b.Command, values)
+	return b
+}
+
 // WithArgs adds the given value to the Args field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Args field.
+// Deprecated: WithArgs does not replace existing list for atomic list type. Use WithNewArgs instead.
 func (b *EphemeralContainerApplyConfiguration) WithArgs(values ...string) *EphemeralContainerApplyConfiguration {
 	for i := range values {
 		b.Args = append(b.Args, values[i])
 	}
+	return b
+}
+
+// WithNewArgs replaces the Args field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Args field is set to the values of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithNewArgs(values ...string) *EphemeralContainerApplyConfiguration {
+	b.Args = make([]string, len(values))
+	copy(b.Args, values)
 	return b
 }
 
@@ -95,6 +115,7 @@ func (b *EphemeralContainerApplyConfiguration) WithPorts(values ...*ContainerPor
 // WithEnvFrom adds the given value to the EnvFrom field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the EnvFrom field.
+// Deprecated: WithEnvFrom does not replace existing list for atomic list type. Use WithNewEnvFrom instead.
 func (b *EphemeralContainerApplyConfiguration) WithEnvFrom(values ...*EnvFromSourceApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -105,13 +126,42 @@ func (b *EphemeralContainerApplyConfiguration) WithEnvFrom(values ...*EnvFromSou
 	return b
 }
 
+// WithNewEnvFrom replaces the EnvFrom field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the EnvFrom field is set to the values of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithNewEnvFrom(values ...*EnvFromSourceApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	b.EnvFrom = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewEnvFrom")
+		}
+		b.EnvFrom = append(b.EnvFrom, *values[i])
+	}
+	return b
+}
+
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
+// Deprecated: WithEnv does not replace existing list for atomic list type. Use WithNewEnv instead.
 func (b *EphemeralContainerApplyConfiguration) WithEnv(values ...*EnvVarApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithEnv")
+		}
+		b.Env = append(b.Env, *values[i])
+	}
+	return b
+}
+
+// WithNewEnv replaces the Env field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Env field is set to the values of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithNewEnv(values ...*EnvVarApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	b.Env = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewEnv")
 		}
 		b.Env = append(b.Env, *values[i])
 	}
@@ -129,10 +179,25 @@ func (b *EphemeralContainerApplyConfiguration) WithResources(value *ResourceRequ
 // WithResizePolicy adds the given value to the ResizePolicy field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ResizePolicy field.
+// Deprecated: WithResizePolicy does not replace existing list for atomic list type. Use WithNewResizePolicy instead.
 func (b *EphemeralContainerApplyConfiguration) WithResizePolicy(values ...*ContainerResizePolicyApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithResizePolicy")
+		}
+		b.ResizePolicy = append(b.ResizePolicy, *values[i])
+	}
+	return b
+}
+
+// WithNewResizePolicy replaces the ResizePolicy field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ResizePolicy field is set to the values of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithNewResizePolicy(values ...*ContainerResizePolicyApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	b.ResizePolicy = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewResizePolicy")
 		}
 		b.ResizePolicy = append(b.ResizePolicy, *values[i])
 	}
@@ -150,6 +215,7 @@ func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value corev1.Co
 // WithVolumeMounts adds the given value to the VolumeMounts field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeMounts field.
+// Deprecated: WithVolumeMounts does not replace existing list for atomic list type. Use WithNewVolumeMounts instead.
 func (b *EphemeralContainerApplyConfiguration) WithVolumeMounts(values ...*VolumeMountApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -160,13 +226,42 @@ func (b *EphemeralContainerApplyConfiguration) WithVolumeMounts(values ...*Volum
 	return b
 }
 
+// WithNewVolumeMounts replaces the VolumeMounts field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumeMounts field is set to the values of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithNewVolumeMounts(values ...*VolumeMountApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	b.VolumeMounts = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVolumeMounts")
+		}
+		b.VolumeMounts = append(b.VolumeMounts, *values[i])
+	}
+	return b
+}
+
 // WithVolumeDevices adds the given value to the VolumeDevices field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeDevices field.
+// Deprecated: WithVolumeDevices does not replace existing list for atomic list type. Use WithNewVolumeDevices instead.
 func (b *EphemeralContainerApplyConfiguration) WithVolumeDevices(values ...*VolumeDeviceApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVolumeDevices")
+		}
+		b.VolumeDevices = append(b.VolumeDevices, *values[i])
+	}
+	return b
+}
+
+// WithNewVolumeDevices replaces the VolumeDevices field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumeDevices field is set to the values of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithNewVolumeDevices(values ...*VolumeDeviceApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	b.VolumeDevices = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVolumeDevices")
 		}
 		b.VolumeDevices = append(b.VolumeDevices, *values[i])
 	}

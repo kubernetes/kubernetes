@@ -34,6 +34,7 @@ func NetworkPolicyEgressRule() *NetworkPolicyEgressRuleApplyConfiguration {
 // WithPorts adds the given value to the Ports field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Ports field.
+// Deprecated: WithPorts does not replace existing list for atomic list type. Use WithNewPorts instead.
 func (b *NetworkPolicyEgressRuleApplyConfiguration) WithPorts(values ...*NetworkPolicyPortApplyConfiguration) *NetworkPolicyEgressRuleApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -44,13 +45,42 @@ func (b *NetworkPolicyEgressRuleApplyConfiguration) WithPorts(values ...*Network
 	return b
 }
 
+// WithNewPorts replaces the Ports field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Ports field is set to the values of the last call.
+func (b *NetworkPolicyEgressRuleApplyConfiguration) WithNewPorts(values ...*NetworkPolicyPortApplyConfiguration) *NetworkPolicyEgressRuleApplyConfiguration {
+	b.Ports = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewPorts")
+		}
+		b.Ports = append(b.Ports, *values[i])
+	}
+	return b
+}
+
 // WithTo adds the given value to the To field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the To field.
+// Deprecated: WithTo does not replace existing list for atomic list type. Use WithNewTo instead.
 func (b *NetworkPolicyEgressRuleApplyConfiguration) WithTo(values ...*NetworkPolicyPeerApplyConfiguration) *NetworkPolicyEgressRuleApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTo")
+		}
+		b.To = append(b.To, *values[i])
+	}
+	return b
+}
+
+// WithNewTo replaces the To field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the To field is set to the values of the last call.
+func (b *NetworkPolicyEgressRuleApplyConfiguration) WithNewTo(values ...*NetworkPolicyPeerApplyConfiguration) *NetworkPolicyEgressRuleApplyConfiguration {
+	b.To = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewTo")
 		}
 		b.To = append(b.To, *values[i])
 	}

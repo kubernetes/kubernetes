@@ -35,10 +35,25 @@ func ImageReviewSpec() *ImageReviewSpecApplyConfiguration {
 // WithContainers adds the given value to the Containers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Containers field.
+// Deprecated: WithContainers does not replace existing list for atomic list type. Use WithNewContainers instead.
 func (b *ImageReviewSpecApplyConfiguration) WithContainers(values ...*ImageReviewContainerSpecApplyConfiguration) *ImageReviewSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithContainers")
+		}
+		b.Containers = append(b.Containers, *values[i])
+	}
+	return b
+}
+
+// WithNewContainers replaces the Containers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Containers field is set to the values of the last call.
+func (b *ImageReviewSpecApplyConfiguration) WithNewContainers(values ...*ImageReviewContainerSpecApplyConfiguration) *ImageReviewSpecApplyConfiguration {
+	b.Containers = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewContainers")
 		}
 		b.Containers = append(b.Containers, *values[i])
 	}

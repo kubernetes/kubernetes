@@ -33,10 +33,25 @@ func TopologySelectorTerm() *TopologySelectorTermApplyConfiguration {
 // WithMatchLabelExpressions adds the given value to the MatchLabelExpressions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MatchLabelExpressions field.
+// Deprecated: WithMatchLabelExpressions does not replace existing list for atomic list type. Use WithNewMatchLabelExpressions instead.
 func (b *TopologySelectorTermApplyConfiguration) WithMatchLabelExpressions(values ...*TopologySelectorLabelRequirementApplyConfiguration) *TopologySelectorTermApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithMatchLabelExpressions")
+		}
+		b.MatchLabelExpressions = append(b.MatchLabelExpressions, *values[i])
+	}
+	return b
+}
+
+// WithNewMatchLabelExpressions replaces the MatchLabelExpressions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MatchLabelExpressions field is set to the values of the last call.
+func (b *TopologySelectorTermApplyConfiguration) WithNewMatchLabelExpressions(values ...*TopologySelectorLabelRequirementApplyConfiguration) *TopologySelectorTermApplyConfiguration {
+	b.MatchLabelExpressions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewMatchLabelExpressions")
 		}
 		b.MatchLabelExpressions = append(b.MatchLabelExpressions, *values[i])
 	}

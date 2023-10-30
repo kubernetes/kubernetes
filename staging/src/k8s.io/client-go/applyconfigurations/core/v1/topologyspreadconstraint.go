@@ -101,9 +101,19 @@ func (b *TopologySpreadConstraintApplyConfiguration) WithNodeTaintsPolicy(value 
 // WithMatchLabelKeys adds the given value to the MatchLabelKeys field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MatchLabelKeys field.
+// Deprecated: WithMatchLabelKeys does not replace existing list for atomic list type. Use WithNewMatchLabelKeys instead.
 func (b *TopologySpreadConstraintApplyConfiguration) WithMatchLabelKeys(values ...string) *TopologySpreadConstraintApplyConfiguration {
 	for i := range values {
 		b.MatchLabelKeys = append(b.MatchLabelKeys, values[i])
 	}
+	return b
+}
+
+// WithNewMatchLabelKeys replaces the MatchLabelKeys field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MatchLabelKeys field is set to the values of the last call.
+func (b *TopologySpreadConstraintApplyConfiguration) WithNewMatchLabelKeys(values ...string) *TopologySpreadConstraintApplyConfiguration {
+	b.MatchLabelKeys = make([]string, len(values))
+	copy(b.MatchLabelKeys, values)
 	return b
 }

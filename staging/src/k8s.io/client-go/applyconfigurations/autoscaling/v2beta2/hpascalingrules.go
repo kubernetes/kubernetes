@@ -55,10 +55,25 @@ func (b *HPAScalingRulesApplyConfiguration) WithSelectPolicy(value v2beta2.Scali
 // WithPolicies adds the given value to the Policies field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Policies field.
+// Deprecated: WithPolicies does not replace existing list for atomic list type. Use WithNewPolicies instead.
 func (b *HPAScalingRulesApplyConfiguration) WithPolicies(values ...*HPAScalingPolicyApplyConfiguration) *HPAScalingRulesApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithPolicies")
+		}
+		b.Policies = append(b.Policies, *values[i])
+	}
+	return b
+}
+
+// WithNewPolicies replaces the Policies field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Policies field is set to the values of the last call.
+func (b *HPAScalingRulesApplyConfiguration) WithNewPolicies(values ...*HPAScalingPolicyApplyConfiguration) *HPAScalingRulesApplyConfiguration {
+	b.Policies = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewPolicies")
 		}
 		b.Policies = append(b.Policies, *values[i])
 	}

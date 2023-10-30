@@ -229,10 +229,20 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithCSI(value *CSIPersistentVol
 // WithAccessModes adds the given value to the AccessModes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AccessModes field.
+// Deprecated: WithAccessModes does not replace existing list for atomic list type. Use WithNewAccessModes instead.
 func (b *PersistentVolumeSpecApplyConfiguration) WithAccessModes(values ...v1.PersistentVolumeAccessMode) *PersistentVolumeSpecApplyConfiguration {
 	for i := range values {
 		b.AccessModes = append(b.AccessModes, values[i])
 	}
+	return b
+}
+
+// WithNewAccessModes replaces the AccessModes field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the AccessModes field is set to the values of the last call.
+func (b *PersistentVolumeSpecApplyConfiguration) WithNewAccessModes(values ...v1.PersistentVolumeAccessMode) *PersistentVolumeSpecApplyConfiguration {
+	b.AccessModes = make([]v1.PersistentVolumeAccessMode, len(values))
+	copy(b.AccessModes, values)
 	return b
 }
 
@@ -263,10 +273,20 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithStorageClassName(value stri
 // WithMountOptions adds the given value to the MountOptions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MountOptions field.
+// Deprecated: WithMountOptions does not replace existing list for atomic list type. Use WithNewMountOptions instead.
 func (b *PersistentVolumeSpecApplyConfiguration) WithMountOptions(values ...string) *PersistentVolumeSpecApplyConfiguration {
 	for i := range values {
 		b.MountOptions = append(b.MountOptions, values[i])
 	}
+	return b
+}
+
+// WithNewMountOptions replaces the MountOptions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MountOptions field is set to the values of the last call.
+func (b *PersistentVolumeSpecApplyConfiguration) WithNewMountOptions(values ...string) *PersistentVolumeSpecApplyConfiguration {
+	b.MountOptions = make([]string, len(values))
+	copy(b.MountOptions, values)
 	return b
 }
 

@@ -42,9 +42,19 @@ func (b *PodSchedulingContextSpecApplyConfiguration) WithSelectedNode(value stri
 // WithPotentialNodes adds the given value to the PotentialNodes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PotentialNodes field.
+// Deprecated: WithPotentialNodes does not replace existing list for atomic list type. Use WithNewPotentialNodes instead.
 func (b *PodSchedulingContextSpecApplyConfiguration) WithPotentialNodes(values ...string) *PodSchedulingContextSpecApplyConfiguration {
 	for i := range values {
 		b.PotentialNodes = append(b.PotentialNodes, values[i])
 	}
+	return b
+}
+
+// WithNewPotentialNodes replaces the PotentialNodes field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the PotentialNodes field is set to the values of the last call.
+func (b *PodSchedulingContextSpecApplyConfiguration) WithNewPotentialNodes(values ...string) *PodSchedulingContextSpecApplyConfiguration {
+	b.PotentialNodes = make([]string, len(values))
+	copy(b.PotentialNodes, values)
 	return b
 }

@@ -42,9 +42,19 @@ func (b *IPBlockApplyConfiguration) WithCIDR(value string) *IPBlockApplyConfigur
 // WithExcept adds the given value to the Except field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Except field.
+// Deprecated: WithExcept does not replace existing list for atomic list type. Use WithNewExcept instead.
 func (b *IPBlockApplyConfiguration) WithExcept(values ...string) *IPBlockApplyConfiguration {
 	for i := range values {
 		b.Except = append(b.Except, values[i])
 	}
+	return b
+}
+
+// WithNewExcept replaces the Except field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Except field is set to the values of the last call.
+func (b *IPBlockApplyConfiguration) WithNewExcept(values ...string) *IPBlockApplyConfiguration {
+	b.Except = make([]string, len(values))
+	copy(b.Except, values)
 	return b
 }

@@ -44,10 +44,20 @@ func CertificateSigningRequestSpec() *CertificateSigningRequestSpecApplyConfigur
 // WithRequest adds the given value to the Request field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Request field.
+// Deprecated: WithRequest does not replace existing list for atomic list type. Use WithNewRequest instead.
 func (b *CertificateSigningRequestSpecApplyConfiguration) WithRequest(values ...byte) *CertificateSigningRequestSpecApplyConfiguration {
 	for i := range values {
 		b.Request = append(b.Request, values[i])
 	}
+	return b
+}
+
+// WithNewRequest replaces the Request field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Request field is set to the values of the last call.
+func (b *CertificateSigningRequestSpecApplyConfiguration) WithNewRequest(values ...byte) *CertificateSigningRequestSpecApplyConfiguration {
+	b.Request = make([]byte, len(values))
+	copy(b.Request, values)
 	return b
 }
 
@@ -70,10 +80,20 @@ func (b *CertificateSigningRequestSpecApplyConfiguration) WithExpirationSeconds(
 // WithUsages adds the given value to the Usages field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Usages field.
+// Deprecated: WithUsages does not replace existing list for atomic list type. Use WithNewUsages instead.
 func (b *CertificateSigningRequestSpecApplyConfiguration) WithUsages(values ...v1beta1.KeyUsage) *CertificateSigningRequestSpecApplyConfiguration {
 	for i := range values {
 		b.Usages = append(b.Usages, values[i])
 	}
+	return b
+}
+
+// WithNewUsages replaces the Usages field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Usages field is set to the values of the last call.
+func (b *CertificateSigningRequestSpecApplyConfiguration) WithNewUsages(values ...v1beta1.KeyUsage) *CertificateSigningRequestSpecApplyConfiguration {
+	b.Usages = make([]v1beta1.KeyUsage, len(values))
+	copy(b.Usages, values)
 	return b
 }
 
@@ -96,10 +116,20 @@ func (b *CertificateSigningRequestSpecApplyConfiguration) WithUID(value string) 
 // WithGroups adds the given value to the Groups field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Groups field.
+// Deprecated: WithGroups does not replace existing list for atomic list type. Use WithNewGroups instead.
 func (b *CertificateSigningRequestSpecApplyConfiguration) WithGroups(values ...string) *CertificateSigningRequestSpecApplyConfiguration {
 	for i := range values {
 		b.Groups = append(b.Groups, values[i])
 	}
+	return b
+}
+
+// WithNewGroups replaces the Groups field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Groups field is set to the values of the last call.
+func (b *CertificateSigningRequestSpecApplyConfiguration) WithNewGroups(values ...string) *CertificateSigningRequestSpecApplyConfiguration {
+	b.Groups = make([]string, len(values))
+	copy(b.Groups, values)
 	return b
 }
 

@@ -34,10 +34,25 @@ func DownwardAPIVolumeSource() *DownwardAPIVolumeSourceApplyConfiguration {
 // WithItems adds the given value to the Items field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Items field.
+// Deprecated: WithItems does not replace existing list for atomic list type. Use WithNewItems instead.
 func (b *DownwardAPIVolumeSourceApplyConfiguration) WithItems(values ...*DownwardAPIVolumeFileApplyConfiguration) *DownwardAPIVolumeSourceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithItems")
+		}
+		b.Items = append(b.Items, *values[i])
+	}
+	return b
+}
+
+// WithNewItems replaces the Items field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Items field is set to the values of the last call.
+func (b *DownwardAPIVolumeSourceApplyConfiguration) WithNewItems(values ...*DownwardAPIVolumeFileApplyConfiguration) *DownwardAPIVolumeSourceApplyConfiguration {
+	b.Items = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewItems")
 		}
 		b.Items = append(b.Items, *values[i])
 	}

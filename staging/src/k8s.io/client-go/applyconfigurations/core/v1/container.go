@@ -76,6 +76,7 @@ func (b *ContainerApplyConfiguration) WithImage(value string) *ContainerApplyCon
 // WithCommand adds the given value to the Command field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Command field.
+// Deprecated: WithCommand does not replace existing list for atomic list type. Use WithNewCommand instead.
 func (b *ContainerApplyConfiguration) WithCommand(values ...string) *ContainerApplyConfiguration {
 	for i := range values {
 		b.Command = append(b.Command, values[i])
@@ -83,13 +84,32 @@ func (b *ContainerApplyConfiguration) WithCommand(values ...string) *ContainerAp
 	return b
 }
 
+// WithNewCommand replaces the Command field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Command field is set to the values of the last call.
+func (b *ContainerApplyConfiguration) WithNewCommand(values ...string) *ContainerApplyConfiguration {
+	b.Command = make([]string, len(values))
+	copy(b.Command, values)
+	return b
+}
+
 // WithArgs adds the given value to the Args field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Args field.
+// Deprecated: WithArgs does not replace existing list for atomic list type. Use WithNewArgs instead.
 func (b *ContainerApplyConfiguration) WithArgs(values ...string) *ContainerApplyConfiguration {
 	for i := range values {
 		b.Args = append(b.Args, values[i])
 	}
+	return b
+}
+
+// WithNewArgs replaces the Args field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Args field is set to the values of the last call.
+func (b *ContainerApplyConfiguration) WithNewArgs(values ...string) *ContainerApplyConfiguration {
+	b.Args = make([]string, len(values))
+	copy(b.Args, values)
 	return b
 }
 
@@ -117,6 +137,7 @@ func (b *ContainerApplyConfiguration) WithPorts(values ...*ContainerPortApplyCon
 // WithEnvFrom adds the given value to the EnvFrom field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the EnvFrom field.
+// Deprecated: WithEnvFrom does not replace existing list for atomic list type. Use WithNewEnvFrom instead.
 func (b *ContainerApplyConfiguration) WithEnvFrom(values ...*EnvFromSourceApplyConfiguration) *ContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -127,13 +148,42 @@ func (b *ContainerApplyConfiguration) WithEnvFrom(values ...*EnvFromSourceApplyC
 	return b
 }
 
+// WithNewEnvFrom replaces the EnvFrom field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the EnvFrom field is set to the values of the last call.
+func (b *ContainerApplyConfiguration) WithNewEnvFrom(values ...*EnvFromSourceApplyConfiguration) *ContainerApplyConfiguration {
+	b.EnvFrom = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewEnvFrom")
+		}
+		b.EnvFrom = append(b.EnvFrom, *values[i])
+	}
+	return b
+}
+
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
+// Deprecated: WithEnv does not replace existing list for atomic list type. Use WithNewEnv instead.
 func (b *ContainerApplyConfiguration) WithEnv(values ...*EnvVarApplyConfiguration) *ContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithEnv")
+		}
+		b.Env = append(b.Env, *values[i])
+	}
+	return b
+}
+
+// WithNewEnv replaces the Env field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Env field is set to the values of the last call.
+func (b *ContainerApplyConfiguration) WithNewEnv(values ...*EnvVarApplyConfiguration) *ContainerApplyConfiguration {
+	b.Env = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewEnv")
 		}
 		b.Env = append(b.Env, *values[i])
 	}
@@ -151,10 +201,25 @@ func (b *ContainerApplyConfiguration) WithResources(value *ResourceRequirementsA
 // WithResizePolicy adds the given value to the ResizePolicy field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ResizePolicy field.
+// Deprecated: WithResizePolicy does not replace existing list for atomic list type. Use WithNewResizePolicy instead.
 func (b *ContainerApplyConfiguration) WithResizePolicy(values ...*ContainerResizePolicyApplyConfiguration) *ContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithResizePolicy")
+		}
+		b.ResizePolicy = append(b.ResizePolicy, *values[i])
+	}
+	return b
+}
+
+// WithNewResizePolicy replaces the ResizePolicy field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ResizePolicy field is set to the values of the last call.
+func (b *ContainerApplyConfiguration) WithNewResizePolicy(values ...*ContainerResizePolicyApplyConfiguration) *ContainerApplyConfiguration {
+	b.ResizePolicy = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewResizePolicy")
 		}
 		b.ResizePolicy = append(b.ResizePolicy, *values[i])
 	}
@@ -172,6 +237,7 @@ func (b *ContainerApplyConfiguration) WithRestartPolicy(value corev1.ContainerRe
 // WithVolumeMounts adds the given value to the VolumeMounts field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeMounts field.
+// Deprecated: WithVolumeMounts does not replace existing list for atomic list type. Use WithNewVolumeMounts instead.
 func (b *ContainerApplyConfiguration) WithVolumeMounts(values ...*VolumeMountApplyConfiguration) *ContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -182,13 +248,42 @@ func (b *ContainerApplyConfiguration) WithVolumeMounts(values ...*VolumeMountApp
 	return b
 }
 
+// WithNewVolumeMounts replaces the VolumeMounts field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumeMounts field is set to the values of the last call.
+func (b *ContainerApplyConfiguration) WithNewVolumeMounts(values ...*VolumeMountApplyConfiguration) *ContainerApplyConfiguration {
+	b.VolumeMounts = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVolumeMounts")
+		}
+		b.VolumeMounts = append(b.VolumeMounts, *values[i])
+	}
+	return b
+}
+
 // WithVolumeDevices adds the given value to the VolumeDevices field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeDevices field.
+// Deprecated: WithVolumeDevices does not replace existing list for atomic list type. Use WithNewVolumeDevices instead.
 func (b *ContainerApplyConfiguration) WithVolumeDevices(values ...*VolumeDeviceApplyConfiguration) *ContainerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVolumeDevices")
+		}
+		b.VolumeDevices = append(b.VolumeDevices, *values[i])
+	}
+	return b
+}
+
+// WithNewVolumeDevices replaces the VolumeDevices field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumeDevices field is set to the values of the last call.
+func (b *ContainerApplyConfiguration) WithNewVolumeDevices(values ...*VolumeDeviceApplyConfiguration) *ContainerApplyConfiguration {
+	b.VolumeDevices = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVolumeDevices")
 		}
 		b.VolumeDevices = append(b.VolumeDevices, *values[i])
 	}

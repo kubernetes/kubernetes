@@ -34,6 +34,7 @@ func PodAntiAffinity() *PodAntiAffinityApplyConfiguration {
 // WithRequiredDuringSchedulingIgnoredDuringExecution adds the given value to the RequiredDuringSchedulingIgnoredDuringExecution field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the RequiredDuringSchedulingIgnoredDuringExecution field.
+// Deprecated: WithRequiredDuringSchedulingIgnoredDuringExecution does not replace existing list for atomic list type. Use WithNewRequiredDuringSchedulingIgnoredDuringExecution instead.
 func (b *PodAntiAffinityApplyConfiguration) WithRequiredDuringSchedulingIgnoredDuringExecution(values ...*PodAffinityTermApplyConfiguration) *PodAntiAffinityApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -44,13 +45,42 @@ func (b *PodAntiAffinityApplyConfiguration) WithRequiredDuringSchedulingIgnoredD
 	return b
 }
 
+// WithNewRequiredDuringSchedulingIgnoredDuringExecution replaces the RequiredDuringSchedulingIgnoredDuringExecution field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the RequiredDuringSchedulingIgnoredDuringExecution field is set to the values of the last call.
+func (b *PodAntiAffinityApplyConfiguration) WithNewRequiredDuringSchedulingIgnoredDuringExecution(values ...*PodAffinityTermApplyConfiguration) *PodAntiAffinityApplyConfiguration {
+	b.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewRequiredDuringSchedulingIgnoredDuringExecution")
+		}
+		b.RequiredDuringSchedulingIgnoredDuringExecution = append(b.RequiredDuringSchedulingIgnoredDuringExecution, *values[i])
+	}
+	return b
+}
+
 // WithPreferredDuringSchedulingIgnoredDuringExecution adds the given value to the PreferredDuringSchedulingIgnoredDuringExecution field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PreferredDuringSchedulingIgnoredDuringExecution field.
+// Deprecated: WithPreferredDuringSchedulingIgnoredDuringExecution does not replace existing list for atomic list type. Use WithNewPreferredDuringSchedulingIgnoredDuringExecution instead.
 func (b *PodAntiAffinityApplyConfiguration) WithPreferredDuringSchedulingIgnoredDuringExecution(values ...*WeightedPodAffinityTermApplyConfiguration) *PodAntiAffinityApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithPreferredDuringSchedulingIgnoredDuringExecution")
+		}
+		b.PreferredDuringSchedulingIgnoredDuringExecution = append(b.PreferredDuringSchedulingIgnoredDuringExecution, *values[i])
+	}
+	return b
+}
+
+// WithNewPreferredDuringSchedulingIgnoredDuringExecution replaces the PreferredDuringSchedulingIgnoredDuringExecution field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the PreferredDuringSchedulingIgnoredDuringExecution field is set to the values of the last call.
+func (b *PodAntiAffinityApplyConfiguration) WithNewPreferredDuringSchedulingIgnoredDuringExecution(values ...*WeightedPodAffinityTermApplyConfiguration) *PodAntiAffinityApplyConfiguration {
+	b.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewPreferredDuringSchedulingIgnoredDuringExecution")
 		}
 		b.PreferredDuringSchedulingIgnoredDuringExecution = append(b.PreferredDuringSchedulingIgnoredDuringExecution, *values[i])
 	}

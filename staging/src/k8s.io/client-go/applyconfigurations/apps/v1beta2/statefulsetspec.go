@@ -73,10 +73,25 @@ func (b *StatefulSetSpecApplyConfiguration) WithTemplate(value *corev1.PodTempla
 // WithVolumeClaimTemplates adds the given value to the VolumeClaimTemplates field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeClaimTemplates field.
+// Deprecated: WithVolumeClaimTemplates does not replace existing list for atomic list type. Use WithNewVolumeClaimTemplates instead.
 func (b *StatefulSetSpecApplyConfiguration) WithVolumeClaimTemplates(values ...*corev1.PersistentVolumeClaimApplyConfiguration) *StatefulSetSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVolumeClaimTemplates")
+		}
+		b.VolumeClaimTemplates = append(b.VolumeClaimTemplates, *values[i])
+	}
+	return b
+}
+
+// WithNewVolumeClaimTemplates replaces the VolumeClaimTemplates field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the VolumeClaimTemplates field is set to the values of the last call.
+func (b *StatefulSetSpecApplyConfiguration) WithNewVolumeClaimTemplates(values ...*corev1.PersistentVolumeClaimApplyConfiguration) *StatefulSetSpecApplyConfiguration {
+	b.VolumeClaimTemplates = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVolumeClaimTemplates")
 		}
 		b.VolumeClaimTemplates = append(b.VolumeClaimTemplates, *values[i])
 	}

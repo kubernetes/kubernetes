@@ -35,6 +35,7 @@ func EndpointSubset() *EndpointSubsetApplyConfiguration {
 // WithAddresses adds the given value to the Addresses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Addresses field.
+// Deprecated: WithAddresses does not replace existing list for atomic list type. Use WithNewAddresses instead.
 func (b *EndpointSubsetApplyConfiguration) WithAddresses(values ...*EndpointAddressApplyConfiguration) *EndpointSubsetApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -45,9 +46,24 @@ func (b *EndpointSubsetApplyConfiguration) WithAddresses(values ...*EndpointAddr
 	return b
 }
 
+// WithNewAddresses replaces the Addresses field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Addresses field is set to the values of the last call.
+func (b *EndpointSubsetApplyConfiguration) WithNewAddresses(values ...*EndpointAddressApplyConfiguration) *EndpointSubsetApplyConfiguration {
+	b.Addresses = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewAddresses")
+		}
+		b.Addresses = append(b.Addresses, *values[i])
+	}
+	return b
+}
+
 // WithNotReadyAddresses adds the given value to the NotReadyAddresses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the NotReadyAddresses field.
+// Deprecated: WithNotReadyAddresses does not replace existing list for atomic list type. Use WithNewNotReadyAddresses instead.
 func (b *EndpointSubsetApplyConfiguration) WithNotReadyAddresses(values ...*EndpointAddressApplyConfiguration) *EndpointSubsetApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -58,13 +74,42 @@ func (b *EndpointSubsetApplyConfiguration) WithNotReadyAddresses(values ...*Endp
 	return b
 }
 
+// WithNewNotReadyAddresses replaces the NotReadyAddresses field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the NotReadyAddresses field is set to the values of the last call.
+func (b *EndpointSubsetApplyConfiguration) WithNewNotReadyAddresses(values ...*EndpointAddressApplyConfiguration) *EndpointSubsetApplyConfiguration {
+	b.NotReadyAddresses = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewNotReadyAddresses")
+		}
+		b.NotReadyAddresses = append(b.NotReadyAddresses, *values[i])
+	}
+	return b
+}
+
 // WithPorts adds the given value to the Ports field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Ports field.
+// Deprecated: WithPorts does not replace existing list for atomic list type. Use WithNewPorts instead.
 func (b *EndpointSubsetApplyConfiguration) WithPorts(values ...*EndpointPortApplyConfiguration) *EndpointSubsetApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithPorts")
+		}
+		b.Ports = append(b.Ports, *values[i])
+	}
+	return b
+}
+
+// WithNewPorts replaces the Ports field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Ports field is set to the values of the last call.
+func (b *EndpointSubsetApplyConfiguration) WithNewPorts(values ...*EndpointPortApplyConfiguration) *EndpointSubsetApplyConfiguration {
+	b.Ports = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewPorts")
 		}
 		b.Ports = append(b.Ports, *values[i])
 	}

@@ -74,10 +74,25 @@ func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithDesiredReplicas(va
 // WithCurrentMetrics adds the given value to the CurrentMetrics field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the CurrentMetrics field.
+// Deprecated: WithCurrentMetrics does not replace existing list for atomic list type. Use WithNewCurrentMetrics instead.
 func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithCurrentMetrics(values ...*MetricStatusApplyConfiguration) *HorizontalPodAutoscalerStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithCurrentMetrics")
+		}
+		b.CurrentMetrics = append(b.CurrentMetrics, *values[i])
+	}
+	return b
+}
+
+// WithNewCurrentMetrics replaces the CurrentMetrics field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the CurrentMetrics field is set to the values of the last call.
+func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithNewCurrentMetrics(values ...*MetricStatusApplyConfiguration) *HorizontalPodAutoscalerStatusApplyConfiguration {
+	b.CurrentMetrics = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewCurrentMetrics")
 		}
 		b.CurrentMetrics = append(b.CurrentMetrics, *values[i])
 	}

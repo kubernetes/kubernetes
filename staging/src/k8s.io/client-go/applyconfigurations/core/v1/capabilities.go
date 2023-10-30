@@ -38,6 +38,7 @@ func Capabilities() *CapabilitiesApplyConfiguration {
 // WithAdd adds the given value to the Add field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Add field.
+// Deprecated: WithAdd does not replace existing list for atomic list type. Use WithNewAdd instead.
 func (b *CapabilitiesApplyConfiguration) WithAdd(values ...v1.Capability) *CapabilitiesApplyConfiguration {
 	for i := range values {
 		b.Add = append(b.Add, values[i])
@@ -45,12 +46,31 @@ func (b *CapabilitiesApplyConfiguration) WithAdd(values ...v1.Capability) *Capab
 	return b
 }
 
+// WithNewAdd replaces the Add field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Add field is set to the values of the last call.
+func (b *CapabilitiesApplyConfiguration) WithNewAdd(values ...v1.Capability) *CapabilitiesApplyConfiguration {
+	b.Add = make([]v1.Capability, len(values))
+	copy(b.Add, values)
+	return b
+}
+
 // WithDrop adds the given value to the Drop field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Drop field.
+// Deprecated: WithDrop does not replace existing list for atomic list type. Use WithNewDrop instead.
 func (b *CapabilitiesApplyConfiguration) WithDrop(values ...v1.Capability) *CapabilitiesApplyConfiguration {
 	for i := range values {
 		b.Drop = append(b.Drop, values[i])
 	}
+	return b
+}
+
+// WithNewDrop replaces the Drop field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Drop field is set to the values of the last call.
+func (b *CapabilitiesApplyConfiguration) WithNewDrop(values ...v1.Capability) *CapabilitiesApplyConfiguration {
+	b.Drop = make([]v1.Capability, len(values))
+	copy(b.Drop, values)
 	return b
 }

@@ -42,9 +42,19 @@ func (b *ResourceClaimSchedulingStatusApplyConfiguration) WithName(value string)
 // WithUnsuitableNodes adds the given value to the UnsuitableNodes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the UnsuitableNodes field.
+// Deprecated: WithUnsuitableNodes does not replace existing list for atomic list type. Use WithNewUnsuitableNodes instead.
 func (b *ResourceClaimSchedulingStatusApplyConfiguration) WithUnsuitableNodes(values ...string) *ResourceClaimSchedulingStatusApplyConfiguration {
 	for i := range values {
 		b.UnsuitableNodes = append(b.UnsuitableNodes, values[i])
 	}
+	return b
+}
+
+// WithNewUnsuitableNodes replaces the UnsuitableNodes field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the UnsuitableNodes field is set to the values of the last call.
+func (b *ResourceClaimSchedulingStatusApplyConfiguration) WithNewUnsuitableNodes(values ...string) *ResourceClaimSchedulingStatusApplyConfiguration {
+	b.UnsuitableNodes = make([]string, len(values))
+	copy(b.UnsuitableNodes, values)
 	return b
 }

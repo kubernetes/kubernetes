@@ -33,10 +33,25 @@ func EndpointHints() *EndpointHintsApplyConfiguration {
 // WithForZones adds the given value to the ForZones field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ForZones field.
+// Deprecated: WithForZones does not replace existing list for atomic list type. Use WithNewForZones instead.
 func (b *EndpointHintsApplyConfiguration) WithForZones(values ...*ForZoneApplyConfiguration) *EndpointHintsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithForZones")
+		}
+		b.ForZones = append(b.ForZones, *values[i])
+	}
+	return b
+}
+
+// WithNewForZones replaces the ForZones field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ForZones field is set to the values of the last call.
+func (b *EndpointHintsApplyConfiguration) WithNewForZones(values ...*ForZoneApplyConfiguration) *EndpointHintsApplyConfiguration {
+	b.ForZones = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewForZones")
 		}
 		b.ForZones = append(b.ForZones, *values[i])
 	}

@@ -37,9 +37,19 @@ func NamespaceSpec() *NamespaceSpecApplyConfiguration {
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
+// Deprecated: WithFinalizers does not replace existing list for atomic list type. Use WithNewFinalizers instead.
 func (b *NamespaceSpecApplyConfiguration) WithFinalizers(values ...v1.FinalizerName) *NamespaceSpecApplyConfiguration {
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
+	return b
+}
+
+// WithNewFinalizers replaces the Finalizers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Finalizers field is set to the values of the last call.
+func (b *NamespaceSpecApplyConfiguration) WithNewFinalizers(values ...v1.FinalizerName) *NamespaceSpecApplyConfiguration {
+	b.Finalizers = make([]v1.FinalizerName, len(values))
+	copy(b.Finalizers, values)
 	return b
 }
