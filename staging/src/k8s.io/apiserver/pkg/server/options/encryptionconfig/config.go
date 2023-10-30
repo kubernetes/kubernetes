@@ -27,6 +27,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -447,7 +448,7 @@ func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
 	state := *h.state.Load()
 
 	if state.Transformer == nil {
-		return envelopekmsv2.State{}, fmt.Errorf("got unexpected nil transformer")
+		return envelopekmsv2.State{}, fmt.Errorf("got unexpected nil transformer:\n%s", string(debug.Stack()))
 	}
 
 	encryptedObjectCopy := state.EncryptedObject
