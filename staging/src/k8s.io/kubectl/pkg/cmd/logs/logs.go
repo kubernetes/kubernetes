@@ -124,6 +124,8 @@ type LogsOptions struct {
 	SinceTime                    string
 	SinceSeconds                 time.Duration
 	Follow                       bool
+	Retry                        bool
+	FollowWithRetry              bool
 	Previous                     bool
 	Timestamps                   bool
 	IgnoreLogErrors              bool
@@ -131,7 +133,6 @@ type LogsOptions struct {
 	Tail                         int64
 	Container                    string
 	InsecureSkipTLSVerifyBackend bool
-	FollowWithWait               bool
 
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
@@ -186,7 +187,8 @@ func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers' logs in the pod(s).")
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
-	cmd.Flags().BoolVarP(&o.FollowWithWait, "follow-with-wait", "F", o.FollowWithWait, "Wait for the container to be in running state when the logs are streaming")
+	cmd.Flags().BoolVar(&o.Retry, "retry", o.Retry, "Retry obtaining logs until available.")
+	cmd.Flags().BoolVarP(&o.FollowWithRetry, "follow-with-retry", "F", o.FollowWithRetry, "Same as --follow --retry")
 	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64Var(&o.LimitBytes, "limit-bytes", o.LimitBytes, "Maximum bytes of logs to return. Defaults to no limit.")
 	cmd.Flags().BoolVarP(&o.Previous, "previous", "p", o.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists.")
@@ -274,8 +276,9 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	if o.FollowWithWait {
+	if o.FollowWithRetry {
 		o.Follow = true
+		o.Retry = true
 	}
 
 	o.Options, err = o.ToLogOptions()
@@ -342,12 +345,16 @@ func (o LogsOptions) Validate() error {
 		return fmt.Errorf("--tail must be greater than or equal to -1")
 	}
 
+	if o.Retry && !o.Follow {
+		return fmt.Errorf("--retry must be used with --follow")
+	}
+
 	return nil
 }
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() error {
-	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.FollowWithWait)
+	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.Retry)
 	if err != nil {
 		return err
 	}
@@ -382,7 +389,7 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 				default:
 					isRequestWithPrevious = false
 				}
-				if o.FollowWithWait && !isRequestWithPrevious {
+				if o.Retry && !isRequestWithPrevious {
 					for {
 						err := o.waitForContainer(objRef)
 						if err != nil {
@@ -436,7 +443,7 @@ func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReferenc
 			default:
 				isRequestWithPrevious = false
 			}
-			if o.FollowWithWait && !isRequestWithPrevious {
+			if o.Retry && !isRequestWithPrevious {
 				for {
 					err := o.waitForContainer(objRef)
 					if err != nil {
