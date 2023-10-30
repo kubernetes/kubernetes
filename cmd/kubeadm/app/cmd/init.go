@@ -66,6 +66,17 @@ type initOptions struct {
 	skipCRIDetect           bool
 }
 
+const (
+	// CoreDNSPhase is the name of CoreDNS subphase in "kubeadm init"
+	coreDNSPhase = "addon/coredns"
+
+	// KubeProxyPhase is the name of kube-proxy subphase during "kubeadm init"
+	kubeProxyPhase = "addon/kube-proxy"
+
+	// AddonPhase is the name of addon phase during "kubeadm init"
+	addonPhase = "addon"
+)
+
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ phases.InitData = &initData{}
 
@@ -164,6 +175,8 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 		if len(initRunner.Options.SkipPhases) == 0 {
 			initRunner.Options.SkipPhases = data.cfg.SkipPhases
 		}
+
+		initRunner.Options.SkipPhases = manageSkippedAddons(&data.cfg.ClusterConfiguration, initRunner.Options.SkipPhases)
 		return data, nil
 	})
 
@@ -537,4 +550,44 @@ func (d *initData) PatchesDir() string {
 		return d.cfg.Patches.Directory
 	}
 	return ""
+}
+
+// manageSkippedAddons syncs proxy and DNS "Disabled" status and skipPhases.
+func manageSkippedAddons(cfg *kubeadmapi.ClusterConfiguration, skipPhases []string) []string {
+	var (
+		skipDNSPhase   = false
+		skipProxyPhase = false
+	)
+	// If the DNS or Proxy addons are disabled, skip the corresponding phase.
+	// Alternatively, update the proxy and DNS "Disabled" status based on skipped addon phases.
+	if isPhaseInSkipPhases(addonPhase, skipPhases) {
+		skipDNSPhase = true
+		skipProxyPhase = true
+		cfg.DNS.Disabled = true
+		cfg.Proxy.Disabled = true
+	}
+	if isPhaseInSkipPhases(coreDNSPhase, skipPhases) {
+		skipDNSPhase = true
+		cfg.DNS.Disabled = true
+	}
+	if isPhaseInSkipPhases(kubeProxyPhase, skipPhases) {
+		skipProxyPhase = true
+		cfg.Proxy.Disabled = true
+	}
+	if cfg.DNS.Disabled && !skipDNSPhase {
+		skipPhases = append(skipPhases, coreDNSPhase)
+	}
+	if cfg.Proxy.Disabled && !skipProxyPhase {
+		skipPhases = append(skipPhases, kubeProxyPhase)
+	}
+	return skipPhases
+}
+
+func isPhaseInSkipPhases(phase string, skipPhases []string) bool {
+	for _, item := range skipPhases {
+		if item == phase {
+			return true
+		}
+	}
+	return false
 }

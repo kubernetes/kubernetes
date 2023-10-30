@@ -235,9 +235,9 @@ func TestConfigImagesListOutput(t *testing.T) {
 registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
 registry.k8s.io/kube-scheduler:{{.KubeVersion}}
 registry.k8s.io/kube-proxy:{{.KubeVersion}}
+registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 registry.k8s.io/pause:{{.PauseVersion}}
 registry.k8s.io/etcd:{{.EtcdVersion}}
-registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -254,9 +254,9 @@ registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
         "registry.k8s.io/kube-controller-manager:{{.KubeVersion}}",
         "registry.k8s.io/kube-scheduler:{{.KubeVersion}}",
         "registry.k8s.io/kube-proxy:{{.KubeVersion}}",
+        "registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}",
         "registry.k8s.io/pause:{{.PauseVersion}}",
-        "registry.k8s.io/etcd:{{.EtcdVersion}}",
-        "registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}"
+        "registry.k8s.io/etcd:{{.EtcdVersion}}"
     ]
 }
 `,
@@ -273,9 +273,9 @@ images:
 - registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
 - registry.k8s.io/kube-scheduler:{{.KubeVersion}}
 - registry.k8s.io/kube-proxy:{{.KubeVersion}}
+- registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 - registry.k8s.io/pause:{{.PauseVersion}}
 - registry.k8s.io/etcd:{{.EtcdVersion}}
-- registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 kind: Images
 `,
 		},
@@ -289,9 +289,9 @@ kind: Images
 registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
 registry.k8s.io/kube-scheduler:{{.KubeVersion}}
 registry.k8s.io/kube-proxy:{{.KubeVersion}}
+registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 registry.k8s.io/pause:{{.PauseVersion}}
 registry.k8s.io/etcd:{{.EtcdVersion}}
-registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -301,7 +301,7 @@ registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
 			expectedOutput: "registry.k8s.io/kube-apiserver:{{.KubeVersion}} registry.k8s.io/kube-controller-manager:{{.KubeVersion}} registry.k8s.io/kube-scheduler:{{.KubeVersion}} " +
-				"registry.k8s.io/kube-proxy:{{.KubeVersion}} registry.k8s.io/pause:{{.PauseVersion}} registry.k8s.io/etcd:{{.EtcdVersion}} registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}} ",
+				"registry.k8s.io/kube-proxy:{{.KubeVersion}} registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}} registry.k8s.io/pause:{{.PauseVersion}} registry.k8s.io/etcd:{{.EtcdVersion}} ",
 		},
 	}
 

@@ -120,6 +120,9 @@ type ClusterConfiguration struct {
 	// DNS defines the options for the DNS add-on installed in the cluster.
 	DNS DNS
 
+	// Proxy defines the options for the proxy add-on installed in the cluster.
+	Proxy Proxy
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
 
@@ -175,8 +178,17 @@ type APIServer struct {
 
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
-	// ImageMeta allows to customize the image used for the DNS component
+	// ImageMeta allows to customize the image used for the DNS addon
 	ImageMeta `json:",inline"`
+
+	// Disabled specifies whether to disable this addon in the cluster
+	Disabled bool
+}
+
+// Proxy defines the proxy addon that should be used in the cluster
+type Proxy struct {
+	// Disabled specifies whether to disable this addon in the cluster
+	Disabled bool
 }
 
 // ImageMeta allows to customize the image used for components that are not
