@@ -100,6 +100,7 @@ const (
 	// kep: https://kep.k8s.io/2876
 	// alpha: v1.23
 	// beta: v1.25
+	// stable: v1.29
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
@@ -277,7 +278,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
-	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

@@ -40,40 +40,6 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// TestCustomResourceValidatorsWithDisabledFeatureGate test that x-kubernetes-validations work as expected when the
-// feature gate is disabled.
-func TestCustomResourceValidatorsWithDisabledFeatureGate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, false)()
-
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.TearDownFn()
-	config := server.ClientConfig
-
-	apiExtensionClient, err := clientset.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("x-kubernetes-validations fields MUST be dropped from CRDs that are created when feature gate is disabled", func(t *testing.T) {
-		schemaWithFeatureGateOff := crdWithSchema(t, "WithFeatureGateOff", structuralSchemaWithValidators)
-		crdWithFeatureGateOff, err := fixtures.CreateNewV1CustomResourceDefinition(schemaWithFeatureGateOff, apiExtensionClient, dynamicClient)
-		if err != nil {
-			t.Fatal(err)
-		}
-		s := crdWithFeatureGateOff.Spec.Versions[0].Schema.OpenAPIV3Schema
-		if len(s.XValidations) != 0 {
-			t.Errorf("Expected CRD to have no x-kubernetes-validatons rules but got: %v", s.XValidations)
-		}
-	})
-}
-
 // TestCustomResourceValidators tests x-kubernetes-validations compile and validate as expected when the feature gate
 // is enabled.
 func TestCustomResourceValidators(t *testing.T) {
