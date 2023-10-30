@@ -52,7 +52,7 @@ func SetDefaults_PriorityLevelConfiguration(in *v1beta3.PriorityLevelConfigurati
 		// field only when:
 		//   a) NominalConcurrencyShares == 0, and
 		//   b) the roundtrip annotation is not set
-		if _, ok := in.Annotations[v1beta3.PriorityLevelConcurrencyShareDefaultKey]; !ok && limited.NominalConcurrencyShares == 0 {
+		if _, ok := in.Annotations[v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey]; !ok && limited.NominalConcurrencyShares == 0 {
 			limited.NominalConcurrencyShares = PriorityLevelConfigurationDefaultNominalConcurrencyShares
 		}
 	}

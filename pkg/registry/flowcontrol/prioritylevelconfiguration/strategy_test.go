@@ -66,7 +66,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		}
 		if isZero && v == 0 {
 			obj.ObjectMeta.Annotations = map[string]string{}
-			obj.ObjectMeta.Annotations[flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey] = ""
+			obj.ObjectMeta.Annotations[flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey] = ""
 		}
 		return obj
 	}
@@ -272,7 +272,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			errExpected:        nil,
 		},
 		{
-			name:               "v1beta3, feature enabled, update, zero value, existing has non-zero, error expected",
+			name:               "v1beta3, feature enabled, update, zero value, existing has non-zero, no error expected",
 			obj:                v1beta3ObjFn(0, true),
 			old:                internalObjFn(1),
 			zeroFeatureEnabled: true,

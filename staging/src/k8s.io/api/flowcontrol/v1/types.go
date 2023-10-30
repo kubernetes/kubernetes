@@ -475,7 +475,7 @@ type LimitedPriorityLevelConfiguration struct {
 	//
 	// If not specified, this field defaults to a value of 30.
 	//
-	// Setting this field to zero allows for the construction of a
+	// Setting this field to zero supports the construction of a
 	// "jail" for this priority level that is used to hold some request(s)
 	//
 	// +optional

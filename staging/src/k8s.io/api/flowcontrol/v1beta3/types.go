@@ -104,7 +104,7 @@ const (
 )
 
 const (
-	// This annotation applies to v1beta3 only.
+	// This annotation is only for use in v1beta3.
 	//
 	// The presence of this annotation in a v1beta3 object means that
 	// a zero value in the 'NominalConcurrencyShares' field means zero
@@ -112,9 +112,9 @@ const (
 	//
 	// To set a zero value for the 'NominalConcurrencyShares' field in v1beta3,
 	// set the annotation to an empty string:
-	//   "flowcontrol.k8s.io/concurrency-shares-defaults-to-zero": ""
+	//   "flowcontrol.k8s.io/v1beta3-preserve-zero-concurrency-shares": ""
 	//
-	PriorityLevelConcurrencyShareDefaultKey = "flowcontrol.k8s.io/concurrency-shares-defaults-to-zero"
+	PriorityLevelPreserveZeroConcurrencySharesKey = "flowcontrol.k8s.io/v1beta3-preserve-zero-concurrency-shares"
 )
 
 // +genclient

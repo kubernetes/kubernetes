@@ -1107,12 +1107,12 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "should not be greater than queues (7)"),
 		},
 	}, {
-		name: "the roundtrip annotation is not forbidden in v1beta3",
+		name: "the roundtrip annotation is forbidden",
 		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "with-forbidden-annotation",
 				Annotations: map[string]string{
-					flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+					flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 				},
 			},
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
@@ -1124,8 +1124,11 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				},
 			},
 		},
-		requestGV:      &flowcontrolv1beta3.SchemeGroupVersion,
-		expectedErrors: field.ErrorList{},
+		// the internal object should never have the round trip annotation
+		requestGV: &schema.GroupVersion{},
+		expectedErrors: field.ErrorList{
+			field.Forbidden(field.NewPath("metadata").Child("annotations"), fmt.Sprintf("annotation '%s' is forbidden", flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)),
+		},
 	}}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {

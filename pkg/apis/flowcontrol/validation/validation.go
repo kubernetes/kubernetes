@@ -22,6 +22,7 @@ import (
 
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -350,6 +351,13 @@ func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fld
 // ValidatePriorityLevelConfiguration validates priority-level-configuration.
 func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration, requestGV schema.GroupVersion, opts PriorityLevelValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
+
+	// the roundtrip annotation is only for use in v1beta3, and after
+	// conversion, the internal object should not have the roundtrip
+	// annotation, so we should forbid it, if it's set.
+	if _, ok := pl.ObjectMeta.Annotations[flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey]; ok {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations"), fmt.Sprintf("annotation '%s' is forbidden", flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)))
+	}
 
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, requestGV, pl.Name, specPath, opts)...)

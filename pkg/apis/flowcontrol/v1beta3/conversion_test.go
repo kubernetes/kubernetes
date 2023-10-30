@@ -69,7 +69,7 @@ func TestConvert_v1beta3_PriorityLevelConfiguration_To_flowcontrol_PriorityLevel
 			name: "v1beta3 object, the roundtrip annotation is set, NominalConcurrencyShares is zero; the internal object should not have the roundtrip annotation set",
 			in: inObjFn(0, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 			}),
 			expected: outObjFn(0, map[string]string{
 				"foo": "bar",
@@ -81,7 +81,7 @@ func TestConvert_v1beta3_PriorityLevelConfiguration_To_flowcontrol_PriorityLevel
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"foo": "bar",
-						v1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+						v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 					},
 				},
 			},
@@ -169,7 +169,7 @@ func TestConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta3_PriorityLevel
 			}),
 			expected: outObjFn(0, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 			}),
 		},
 		{
@@ -185,33 +185,33 @@ func TestConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta3_PriorityLevel
 			name: "internal object, the roundtrip annotation is set, NominalConcurrencyShares is 0, no error expected",
 			in: inObjFn(0, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 			}),
 			expected: outObjFn(0, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 			}),
 		},
 		{
 			name: "internal object, the roundtrip annotation is set with a non-empty value, NominalConcurrencyShares is 0, the annotation value should be preserved",
 			in: inObjFn(0, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "non-empty",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "non-empty",
 			}),
 			expected: outObjFn(0, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "non-empty",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "non-empty",
 			}),
 		},
 		{
 			name: "internal object, the roundtrip annotation is set with a non-empty value, NominalConcurrencyShares is not 0, the annotation value should be preserved",
 			in: inObjFn(1, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "non-empty",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "non-empty",
 			}),
 			expected: outObjFn(1, map[string]string{
 				"foo": "bar",
-				v1beta3.PriorityLevelConcurrencyShareDefaultKey: "non-empty",
+				v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "non-empty",
 			}),
 		},
 	}

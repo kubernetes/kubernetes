@@ -141,7 +141,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 					},
 				},
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
@@ -157,7 +157,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 					},
 				},
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
@@ -177,7 +177,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 					},
 				},
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
@@ -193,7 +193,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 					},
 				},
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
@@ -213,7 +213,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 					},
 				},
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
@@ -229,7 +229,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						flowcontrolv1beta3.PriorityLevelConcurrencyShareDefaultKey: "",
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
 					},
 				},
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{

@@ -57,22 +57,22 @@ func Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta3_PriorityLevelConf
 }
 
 func dropPriorityLevelConcurrencyShareDefaultAnnotation(in map[string]string) (map[string]string, bool) {
-	if _, ok := in[v1beta3.PriorityLevelConcurrencyShareDefaultKey]; !ok {
+	if _, ok := in[v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey]; !ok {
 		return in, false
 	}
 
 	out := copyStringMap(in)
-	delete(out, v1beta3.PriorityLevelConcurrencyShareDefaultKey)
+	delete(out, v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)
 	return out, true
 }
 
 func addPriorityLevelConcurrencyShareDefaultAnnotation(in map[string]string) (map[string]string, bool) {
-	if _, ok := in[v1beta3.PriorityLevelConcurrencyShareDefaultKey]; ok {
+	if _, ok := in[v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey]; ok {
 		return in, false
 	}
 
 	out := copyStringMap(in)
-	out[v1beta3.PriorityLevelConcurrencyShareDefaultKey] = ""
+	out[v1beta3.PriorityLevelPreserveZeroConcurrencySharesKey] = ""
 	return out, true
 }
 
