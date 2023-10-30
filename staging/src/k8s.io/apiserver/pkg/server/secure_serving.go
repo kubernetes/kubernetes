@@ -47,7 +47,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 		// Can't use TLSv1.1 because of RC4 cipher usage
-		MinVersion: s.MinTLSVersion,
+		MinVersion: tls.VersionTLS12,
 		MaxVersion: s.MaxTLSVersion,
 	}
 
@@ -55,6 +55,8 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 	if s.MinTLSVersion > 0 {
 		tlsConfig.MinVersion = s.MinTLSVersion
 	}
+
+	// if CipherSuites are provided, set then and warn against insecure ciphers
 	if len(s.CipherSuites) > 0 {
 		tlsConfig.CipherSuites = s.CipherSuites
 		insecureCiphers := flag.InsecureTLSCiphers()
@@ -67,6 +69,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		}
 	}
 
+	// enable h2 unless explicitly disabled or ciphers don't allow
 	if s.DisableHTTP2 {
 		klog.Info("Forcing use of http/1.1 only")
 		tlsConfig.NextProtos = []string{"http/1.1"}

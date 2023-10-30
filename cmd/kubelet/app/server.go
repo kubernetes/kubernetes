@@ -1130,7 +1130,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 	}
 
 	if minTLSVersion > maxTLSVersion {
-		return nil, fmt.Errorf("tls min version must be less than or equal to tls max version")
+		return nil, fmt.Errorf("TLS min version must be less than or equal to TLS max version")
 	}
 
 	if minTLSVersion == tls.VersionTLS13 {
