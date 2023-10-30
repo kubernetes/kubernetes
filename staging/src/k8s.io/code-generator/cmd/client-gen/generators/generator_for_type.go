@@ -176,6 +176,8 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"TypeClientWithList":         c.Universe.Type(types.Name{Package: "k8s.io/client-go/generic", Name: "TypeClientWithList"}),
 		"TypeClientWithApply":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/generic", Name: "TypeClientWithApply"}),
 		"TypeClientWithListAndApply": c.Universe.Type(types.Name{Package: "k8s.io/client-go/generic", Name: "TypeClientWithListAndApply"}),
+		"Interface":                  c.Universe.Type(types.Name{Package: "k8s.io/client-go/generic", Name: "Interface"}),
+		"InterfaceWithApply":         c.Universe.Type(types.Name{Package: "k8s.io/client-go/generic", Name: "InterfaceWithApply"}),
 	}
 
 	if generateApply {
@@ -200,6 +202,10 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		interfaceSuffix := ""
 		if len(extendedMethods) > 0 {
 			interfaceSuffix = "\n"
+		}
+		if hasAllDefaultVerbs(tags) {
+			sw.Do(commonInterface, m)
+			skipDefaultVerbs(defaultVerbTemplates)
 		}
 		sw.Do("\n"+generateInterface(defaultVerbTemplates, tags)+interfaceSuffix, m)
 		// add extended verbs into interface
@@ -384,7 +390,7 @@ func buildDefaultVerbTemplates(generateApply bool) map[string]string {
 		"create": `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
 		"update": `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
 		"updateStatus": `// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
+generic.StatusUpdater[*$.inputType|raw$]`,
 		"delete":           `Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error`,
 		"deleteCollection": `DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
 		"get":              `Get(ctx context.Context, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
@@ -393,11 +399,28 @@ UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.Upda
 		"patch":            `Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error)`,
 	}
 	if generateApply {
-		m["apply"] = `Apply(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
+		m["apply"] = `generic.Applier[*$.resultType|raw$, *$.inputApplyConfig|raw$]`
 		m["applyStatus"] = `// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
+generic.StatusApplier[*$.resultType|raw$, *$.inputApplyConfig|raw$]`
 	}
 	return m
+}
+
+func hasAllDefaultVerbs(tags util.Tags) bool {
+	// This must match the basic Interface in generic/type.go
+	for _, verb := range []string{"create", "update", "delete", "deleteCollection", "get", "list", "watch", "patch"} {
+		if !tags.HasVerb(verb) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func skipDefaultVerbs(verbTemplates map[string]string) {
+	for _, verb := range []string{"create", "update", "delete", "deleteCollection", "get", "list", "watch", "patch"} {
+		delete(verbTemplates, verb)
+	}
 }
 
 // group client will implement this interface.
@@ -421,6 +444,9 @@ type $.type|publicPlural$Getter interface {
 var interfaceTemplate1 = `
 // $.type|public$Interface has methods to work with $.type|public$ resources.
 type $.type|public$Interface interface {`
+
+var commonInterface = `
+	generic.Interface[*$.resultType|raw$, *$.resultType|raw$List]`
 
 var interfaceTemplate4 = `
 	$.type|public$Expansion

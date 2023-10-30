@@ -41,6 +41,29 @@ type namedObject interface {
 	GetName() *string
 }
 
+type Interface[T objectWithMeta, L runtime.Object] interface {
+	Create(ctx context.Context, obj T, opts metav1.CreateOptions) (T, error)
+	Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (T, error)
+	List(ctx context.Context, opts metav1.ListOptions) (L, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (T, error)
+}
+
+type StatusUpdater[T objectWithMeta] interface {
+	UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error)
+}
+
+type Applier[T objectWithMeta, C namedObject] interface {
+	Apply(ctx context.Context, conf C, opts metav1.ApplyOptions) (T, error)
+}
+
+type StatusApplier[T objectWithMeta, C namedObject] interface {
+	ApplyStatus(ctx context.Context, conf C, opts metav1.ApplyOptions) (T, error)
+}
+
 // TypeClient represents a client, optionally namespaced, with no support for lists or apply declarative configurations.
 type TypeClient[T objectWithMeta] struct {
 	Resource       string
