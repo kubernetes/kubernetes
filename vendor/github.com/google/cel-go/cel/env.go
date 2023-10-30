@@ -119,6 +119,7 @@ type Env struct {
 	appliedFeatures map[int]bool
 	libraries       map[string]bool
 	validators      []ASTValidator
+	costOptions     []checker.CostOption
 
 	// Internal parser representation
 	prsr     *parser.Parser
@@ -181,6 +182,7 @@ func NewCustomEnv(opts ...EnvOption) (*Env, error) {
 		libraries:       map[string]bool{},
 		validators:      []ASTValidator{},
 		progOpts:        []ProgramOption{},
+		costOptions:     []checker.CostOption{},
 	}).configure(opts)
 }
 
@@ -356,6 +358,8 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	}
 	validatorsCopy := make([]ASTValidator, len(e.validators))
 	copy(validatorsCopy, e.validators)
+	costOptsCopy := make([]checker.CostOption, len(e.costOptions))
+	copy(costOptsCopy, e.costOptions)
 
 	ext := &Env{
 		Container:       e.Container,
@@ -371,6 +375,7 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 		provider:        provider,
 		chkOpts:         chkOptsCopy,
 		prsrOpts:        prsrOptsCopy,
+		costOptions:     costOptsCopy,
 	}
 	return ext.configure(opts)
 }
@@ -557,7 +562,10 @@ func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator, opts ...ch
 		TypeMap:      ast.typeMap,
 		ReferenceMap: ast.refMap,
 	}
-	return checker.Cost(checked, estimator, opts...)
+	extendedOpts := make([]checker.CostOption, 0, len(e.costOptions))
+	extendedOpts = append(extendedOpts, opts...)
+	extendedOpts = append(extendedOpts, e.costOptions...)
+	return checker.Cost(checked, estimator, extendedOpts...)
 }
 
 // configure applies a series of EnvOptions to the current environment.

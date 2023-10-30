@@ -20,6 +20,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cel:go_default_library",
+        "//checker:go_default_library",
         "//checker/decls:go_default_library",
         "//common/overloads:go_default_library",
         "//common/types:go_default_library",

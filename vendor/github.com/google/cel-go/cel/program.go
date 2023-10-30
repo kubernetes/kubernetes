@@ -106,7 +106,7 @@ func (ed *EvalDetails) State() interpreter.EvalState {
 // ActualCost returns the tracked cost through the course of execution when `CostTracking` is enabled.
 // Otherwise, returns nil if the cost was not enabled.
 func (ed *EvalDetails) ActualCost() *uint64 {
-	if ed.costTracker == nil {
+	if ed == nil || ed.costTracker == nil {
 		return nil
 	}
 	cost := ed.costTracker.ActualCost()
@@ -130,10 +130,14 @@ type prog struct {
 	// Interpretable configured from an Ast and aggregate decorator set based on program options.
 	interpretable     interpreter.Interpretable
 	callCostEstimator interpreter.ActualCostEstimator
+	costOptions       []interpreter.CostTrackerOption
 	costLimit         *uint64
 }
 
 func (p *prog) clone() *prog {
+	costOptsCopy := make([]interpreter.CostTrackerOption, len(p.costOptions))
+	copy(costOptsCopy, p.costOptions)
+
 	return &prog{
 		Env:                     p.Env,
 		evalOpts:                p.evalOpts,
@@ -155,9 +159,10 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 	// Ensure the default attribute factory is set after the adapter and provider are
 	// configured.
 	p := &prog{
-		Env:        e,
-		decorators: []interpreter.InterpretableDecorator{},
-		dispatcher: disp,
+		Env:         e,
+		decorators:  []interpreter.InterpretableDecorator{},
+		dispatcher:  disp,
+		costOptions: []interpreter.CostTrackerOption{},
 	}
 
 	// Configure the program via the ProgramOption values.
@@ -242,6 +247,12 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 		factory := func(state interpreter.EvalState, costTracker *interpreter.CostTracker) (Program, error) {
 			costTracker.Estimator = p.callCostEstimator
 			costTracker.Limit = p.costLimit
+			for _, costOpt := range p.costOptions {
+				err := costOpt(costTracker)
+				if err != nil {
+					return nil, err
+				}
+			}
 			// Limit capacity to guarantee a reallocation when calling 'append(decs, ...)' below. This
 			// prevents the underlying memory from being shared between factory function calls causing
 			// undesired mutations.
@@ -371,7 +382,11 @@ type progGen struct {
 // the test is successful.
 func newProgGen(factory progFactory) (Program, error) {
 	// Test the factory to make sure that configuration errors are spotted at config
-	_, err := factory(interpreter.NewEvalState(), &interpreter.CostTracker{})
+	tracker, err := interpreter.NewCostTracker(nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = factory(interpreter.NewEvalState(), tracker)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +399,10 @@ func (gen *progGen) Eval(input any) (ref.Val, *EvalDetails, error) {
 	// new EvalState instance for each call to ensure that unique evaluations yield unique stateful
 	// results.
 	state := interpreter.NewEvalState()
-	costTracker := &interpreter.CostTracker{}
+	costTracker, err := interpreter.NewCostTracker(nil)
+	if err != nil {
+		return nil, nil, err
+	}
 	det := &EvalDetails{state: state, costTracker: costTracker}
 
 	// Generate a new instance of the interpretable using the factory configured during the call to
@@ -412,7 +430,10 @@ func (gen *progGen) ContextEval(ctx context.Context, input any) (ref.Val, *EvalD
 	// new EvalState instance for each call to ensure that unique evaluations yield unique stateful
 	// results.
 	state := interpreter.NewEvalState()
-	costTracker := &interpreter.CostTracker{}
+	costTracker, err := interpreter.NewCostTracker(nil)
+	if err != nil {
+		return nil, nil, err
+	}
 	det := &EvalDetails{state: state, costTracker: costTracker}
 
 	// Generate a new instance of the interpretable using the factory configured during the call to
