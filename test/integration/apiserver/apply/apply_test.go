@@ -3670,3 +3670,284 @@ func TestApplyFormerlyAtomicFields(t *testing.T) {
 		t.Fatalf("unexpected managed fields: %v", cmp.Diff(expectedManagedFields, managedFields))
 	}
 }
+
+func TestDuplicatesInAssociativeLists(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ds := []byte(`{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "example-daemonset",
+    "labels": {
+      "app": "example"
+    }
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "app": "example"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "example"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "nginx",
+            "image": "nginx",
+            "ports": [
+              {
+              	"name": "port1",
+                "containerPort": 80
+              },
+              {
+              	"name": "port2",
+                "containerPort": 80
+              }
+            ],
+            "env": [
+              {
+                 "name": "PATH",
+                "value": "/bin"
+              },
+              {
+                "name": "PATH",
+                "value": "$PATH:/usr/bin"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}`)
+	// Create the object
+	obj, err := client.AppsV1().RESTClient().
+		Post().
+		Namespace("default").
+		Param("fieldManager", "create").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create the object: %v", err)
+	}
+	daemon := obj.(*appsv1.DaemonSet)
+	if want, got := 2, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 2, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+	if want, got := 1, len(daemon.ManagedFields); want != got {
+		t.Fatalf("Expected %v ManagedFields, got %v", want, got)
+	}
+	m, err := json.Marshal(daemon.ManagedFields)
+	if err != nil {
+		t.Fatalf("Failed to serialize managed fields")
+	}
+	t.Logf("Managed fields after creation: %v", string(m))
+
+	// Apply unrelated fields, fieldmanager should be strictly additive.
+	ds = []byte(`
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example-daemonset
+  labels:
+    app: example
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - name: port3
+              containerPort: 443
+          env:
+            - name: HOME
+              value: "/usr/home"
+`)
+	obj, err = client.AppsV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Namespace("default").
+		Name("example-daemonset").
+		Param("fieldManager", "apply").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to aply the first object: %v", err)
+	}
+	daemon = obj.(*appsv1.DaemonSet)
+	if want, got := 3, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 3, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+	if want, got := 2, len(daemon.ManagedFields); want != got {
+		t.Fatalf("Expected %v ManagedFields, got %v", want, got)
+	}
+	m, err = json.Marshal(daemon.ManagedFields)
+	if err != nil {
+		t.Fatalf("Failed to serialize managed fields")
+	}
+	t.Logf("Managed fields after firsy apply: %v", string(m))
+
+	// Change name of some ports.
+	ds = []byte(`{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "example-daemonset",
+    "labels": {
+      "app": "example"
+    }
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "app": "example"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "example"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "nginx",
+            "image": "nginx",
+            "ports": [
+              {
+              	"name": "port3",
+                "containerPort": 443
+              },
+              {
+              	"name": "port4",
+                "containerPort": 80
+              },
+              {
+              	"name": "port5",
+                "containerPort": 80
+              }
+            ],
+            "env": [
+              {
+                "name": "PATH",
+                "value": "/bin"
+              },
+              {
+                "name": "PATH",
+                "value": "$PATH:/usr/bin:/usr/local/bin"
+              },
+              {
+                "name": "HOME",
+                "value": "/usr/home"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}`)
+	obj, err = client.AppsV1().RESTClient().
+		Put().
+		Namespace("default").
+		Name("example-daemonset").
+		Param("fieldManager", "update").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to update the object: %v", err)
+	}
+	daemon = obj.(*appsv1.DaemonSet)
+	if want, got := 3, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 3, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+	if want, got := 3, len(daemon.ManagedFields); want != got {
+		t.Fatalf("Expected %v ManagedFields, got %v", want, got)
+	}
+	m, err = json.Marshal(daemon.ManagedFields)
+	if err != nil {
+		t.Fatalf("Failed to serialize managed fields")
+	}
+	t.Logf("Managed fields after update: %v", string(m))
+
+	// Replaces envvars and paths.
+	ds = []byte(`
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example-daemonset
+  labels:
+    app: example
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - name: port80
+              containerPort: 80
+          env:
+            - name: PATH
+              value: "/bin:/usr/bin:/usr/local/bin"
+`)
+	obj, err = client.AppsV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Namespace("default").
+		Name("example-daemonset").
+		Param("fieldManager", "apply").
+		Param("force", "true").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply the second object: %v", err)
+	}
+
+	daemon = obj.(*appsv1.DaemonSet)
+	// HOME is removed, PATH is replaced with 1.
+	if want, got := 1, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 1, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+	if want, got := 3, len(daemon.ManagedFields); want != got {
+		t.Fatalf("Expected %v ManagedFields, got %v", want, got)
+	}
+	m, err = json.Marshal(daemon.ManagedFields)
+	if err != nil {
+		t.Fatalf("Failed to serialize managed fields")
+	}
+	t.Logf("Managed fields after last apply: %v", string(m))
+}
