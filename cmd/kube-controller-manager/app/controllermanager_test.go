@@ -28,8 +28,9 @@ import (
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/strings/slices"
 )
 
 func TestControllerNamesConsistency(t *testing.T) {
@@ -73,6 +74,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.TokenCleanerController,
 		names.NodeIpamController,
 		names.NodeLifecycleController,
+		names.TaintEvictionController,
 		cpnames.ServiceLBController,
 		cpnames.NodeRouteController,
 		cpnames.CloudNodeLifecycleController,
@@ -154,5 +156,19 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 		if areAllRequiredFeaturesAlpha {
 			t.Errorf("alias check failed: controller name %q should not be aliased as it is still guarded by alpha feature gates (%v) and thus should have only a canonical name", name, requiredFeatureGates)
 		}
+	}
+}
+
+// TestTaintEvictionControllerDeclaration ensures that it is possible to run taint-manager as a separated controller
+// only when the SeparateTaintEvictionController feature is enabled
+func TestTaintEvictionControllerDeclaration(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, true)()
+	if !slices.Contains(KnownControllers(), names.TaintEvictionController) {
+		t.Errorf("TaintEvictionController should be a registered controller when the SeparateTaintEvictionController feature is enabled")
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, false)()
+	if slices.Contains(KnownControllers(), names.TaintEvictionController) {
+		t.Errorf("TaintEvictionController should not be a registered controller when the SeparateTaintEvictionController feature is disabled")
 	}
 }

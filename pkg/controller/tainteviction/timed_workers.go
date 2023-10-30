@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package tainteviction
 
 import (
 	"context"
@@ -38,7 +38,9 @@ func (w *WorkArgs) KeyFromWorkArgs() string {
 
 // NewWorkArgs is a helper function to create new `WorkArgs`
 func NewWorkArgs(name, namespace string) *WorkArgs {
-	return &WorkArgs{types.NamespacedName{Namespace: namespace, Name: name}}
+	return &WorkArgs{
+		NamespacedName: types.NamespacedName{Namespace: namespace, Name: name},
+	}
 }
 
 // TimedWorker is a responsible for executing a function no earlier than at FireAt time.
@@ -50,13 +52,13 @@ type TimedWorker struct {
 }
 
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
-func createWorker(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
+func createWorker(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, fireAt time.Time, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
 	delay := fireAt.Sub(createdAt)
 	logger := klog.FromContext(ctx)
 	fWithErrorLogging := func() {
-		err := f(ctx, args)
+		err := f(ctx, fireAt, args)
 		if err != nil {
-			logger.Error(err, "NodeLifecycle: timed worker failed")
+			logger.Error(err, "TaintEvictionController: timed worker failed")
 		}
 	}
 	if delay <= 0 {
@@ -84,13 +86,13 @@ type TimedWorkerQueue struct {
 	sync.Mutex
 	// map of workers keyed by string returned by 'KeyFromWorkArgs' from the given worker.
 	workers  map[string]*TimedWorker
-	workFunc func(ctx context.Context, args *WorkArgs) error
+	workFunc func(ctx context.Context, fireAt time.Time, args *WorkArgs) error
 	clock    clock.WithDelayedExecution
 }
 
 // CreateWorkerQueue creates a new TimedWorkerQueue for workers that will execute
 // given function `f`.
-func CreateWorkerQueue(f func(ctx context.Context, args *WorkArgs) error) *TimedWorkerQueue {
+func CreateWorkerQueue(f func(ctx context.Context, fireAt time.Time, args *WorkArgs) error) *TimedWorkerQueue {
 	return &TimedWorkerQueue{
 		workers:  make(map[string]*TimedWorker),
 		workFunc: f,
@@ -98,9 +100,9 @@ func CreateWorkerQueue(f func(ctx context.Context, args *WorkArgs) error) *Timed
 	}
 }
 
-func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Context, args *WorkArgs) error {
-	return func(ctx context.Context, args *WorkArgs) error {
-		err := q.workFunc(ctx, args)
+func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+	return func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+		err := q.workFunc(ctx, fireAt, args)
 		q.Lock()
 		defer q.Unlock()
 		if err == nil {

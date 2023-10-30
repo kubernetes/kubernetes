@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package tainteviction
 
 import (
 	"context"
@@ -31,7 +31,7 @@ func TestExecute(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(5)
-	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
@@ -59,7 +59,7 @@ func TestExecuteDelayed(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(5)
-	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
@@ -90,7 +90,7 @@ func TestCancel(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(3)
-	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
@@ -124,7 +124,7 @@ func TestCancelAndReadd(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(4)
-	queue := CreateWorkerQueue(func(ctx context.Context, args *WorkArgs) error {
+	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
 		return nil
