@@ -19,19 +19,41 @@ package resolver
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// populateRefs recursively replaces Refs in the schema with the referred one.
+// PopulateRefs recursively replaces Refs in the schema with the referred one.
 // schemaOf is the callback to find the corresponding schema by the ref.
 // This function will not mutate the original schema. If the schema needs to be
 // mutated, a copy will be returned, otherwise it returns the original schema.
-func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), schema *spec.Schema) (*spec.Schema, error) {
+func PopulateRefs(schemaOf func(ref string) (*spec.Schema, bool), rootRef string) (*spec.Schema, error) {
+	visitedRefs := sets.New[string]()
+	rootSchema, ok := schemaOf(rootRef)
+	visitedRefs.Insert(rootRef)
+	if !ok {
+		return nil, fmt.Errorf("internal error: cannot resolve Ref for root schema %q: %w", rootRef, ErrSchemaNotFound)
+	}
+	return populateRefs(schemaOf, visitedRefs, rootSchema)
+}
+
+func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), visited sets.Set[string], schema *spec.Schema) (*spec.Schema, error) {
 	result := *schema
 	changed := false
 
 	ref, isRef := refOf(schema)
 	if isRef {
+		if visited.Has(ref) {
+			return &spec.Schema{
+				// for circular ref, return an empty object as placeholder
+				SchemaProps: spec.SchemaProps{Type: []string{"object"}},
+			}, nil
+		}
+		visited.Insert(ref)
+		// restore visited state at the end of the recursion.
+		defer func() {
+			visited.Delete(ref)
+		}()
 		// replace the whole schema with the referred one.
 		resolved, ok := schemaOf(ref)
 		if !ok {
@@ -44,7 +66,7 @@ func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), schema *spec.S
 	props := make(map[string]spec.Schema, len(schema.Properties))
 	propsChanged := false
 	for name, prop := range result.Properties {
-		populated, err := populateRefs(schemaOf, &prop)
+		populated, err := populateRefs(schemaOf, visited, &prop)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +80,7 @@ func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), schema *spec.S
 		result.Properties = props
 	}
 	if result.AdditionalProperties != nil && result.AdditionalProperties.Schema != nil {
-		populated, err := populateRefs(schemaOf, result.AdditionalProperties.Schema)
+		populated, err := populateRefs(schemaOf, visited, result.AdditionalProperties.Schema)
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +91,7 @@ func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), schema *spec.S
 	}
 	// schema is a list, populate its items
 	if result.Items != nil && result.Items.Schema != nil {
-		populated, err := populateRefs(schemaOf, result.Items.Schema)
+		populated, err := populateRefs(schemaOf, visited, result.Items.Schema)
 		if err != nil {
 			return nil, err
 		}
