@@ -118,6 +118,8 @@ func getNodeProblemDetectorImage() string {
 type puller interface {
 	// Pull pulls an image by name
 	Pull(image string) ([]byte, error)
+	// Remove remves an image by name
+	Remove(image string) error
 	// Name returns the name of the specific puller implementation
 	Name() string
 }
@@ -137,6 +139,10 @@ func (rp *remotePuller) Pull(image string) ([]byte, error) {
 	}
 	_, err = rp.imageService.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: image}, nil, nil)
 	return nil, err
+}
+
+func (rp *remotePuller) Remove(image string) error {
+	return rp.imageService.RemoveImage(context.Background(), &runtimeapi.ImageSpec{Image: image})
 }
 
 func getPuller() (puller, error) {
@@ -216,6 +222,14 @@ func PrePullAllImages() error {
 
 	wg.Wait()
 	return utilerrors.NewAggregate(pullErrs)
+}
+
+func RemoveImage(image string) error {
+	puller, err := getPuller()
+	if err != nil {
+		return err
+	}
+	return puller.Remove(image)
 }
 
 // getGPUDevicePluginImage returns the image of GPU device plugin.

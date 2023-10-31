@@ -39,6 +39,7 @@ var (
 	ImageID                                = framework.WithNodeFeature(framework.ValidNodeFeatures.Add(" ImageID"))
 	KubeletConfigDropInDir                 = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletConfigDropInDir"))
 	LSCIQuotaMonitoring                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("LSCIQuotaMonitoring"))
+	MaxParallelImagePull                   = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("MaxParallelImagePull"))
 	NodeAllocatable                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeAllocatable"))
 	NodeProblemDetector                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeProblemDetector"))
 	OOMScoreAdj                            = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
