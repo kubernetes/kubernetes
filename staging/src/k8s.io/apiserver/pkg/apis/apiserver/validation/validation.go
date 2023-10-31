@@ -17,8 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"errors"
 	"fmt"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -27,10 +27,15 @@ import (
 
 	v1 "k8s.io/api/authorization/v1"
 	"k8s.io/api/authorization/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -334,24 +339,81 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{api.AuthorizationWebhookConnectionInfoTypeInCluster, api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile}))
 	}
 
-	// TODO: Remove this check and ensure that correct validations below for MatchConditions are added
-	// for i, condition := range c.MatchConditions {
-	//	 fldPath := fldPath.Child("matchConditions").Index(i).Child("expression")
-	//	 if len(strings.TrimSpace(condition.Expression)) == 0 {
-	//	     allErrs = append(allErrs, field.Required(fldPath, ""))
-	//	 } else {
-	//		 allErrs = append(allErrs, ValidateWebhookMatchCondition(fldPath, sampleSAR, condition.Expression)...)
-	//	 }
-	// }
-	if len(c.MatchConditions) != 0 {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("matchConditions"), c.MatchConditions, []string{}))
-	}
+	_, errs := compileMatchConditions(c.MatchConditions, fldPath, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
+	allErrs = append(allErrs, errs...)
 
 	return allErrs
 }
 
-func ValidateWebhookMatchCondition(fldPath *field.Path, sampleSAR runtime.Object, expression string) field.ErrorList {
-	allErrs := field.ErrorList{}
-	// TODO: typecheck CEL expression
-	return allErrs
+// ValidateAndCompileMatchConditions validates a given webhook's matchConditions.
+// This is exported for use in authz package.
+func ValidateAndCompileMatchConditions(matchConditions []api.WebhookMatchCondition) (*authorizationcel.CELMatcher, field.ErrorList) {
+	return compileMatchConditions(matchConditions, nil, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
+}
+
+func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath *field.Path, structuredAuthzFeatureEnabled bool) (*authorizationcel.CELMatcher, field.ErrorList) {
+	var allErrs field.ErrorList
+	// should fail when match conditions are used without feature enabled
+	if len(matchConditions) > 0 && !structuredAuthzFeatureEnabled {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchConditions"), "", "matchConditions are not supported when StructuredAuthorizationConfiguration feature gate is disabled"))
+	}
+	if len(matchConditions) > 64 {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("matchConditions"), len(matchConditions), 64))
+		return nil, allErrs
+	}
+
+	compiler := authorizationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	seenExpressions := sets.NewString()
+	var compilationResults []authorizationcel.CompilationResult
+
+	for i, condition := range matchConditions {
+		fldPath := fldPath.Child("matchConditions").Index(i).Child("expression")
+		if len(strings.TrimSpace(condition.Expression)) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath, ""))
+			continue
+		}
+		if seenExpressions.Has(condition.Expression) {
+			allErrs = append(allErrs, field.Duplicate(fldPath, condition.Expression))
+			continue
+		}
+		seenExpressions.Insert(condition.Expression)
+		compilationResult, err := compileMatchConditionsExpression(fldPath, compiler, condition.Expression)
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+		compilationResults = append(compilationResults, compilationResult)
+	}
+	if len(compilationResults) == 0 {
+		return nil, allErrs
+	}
+	return &authorizationcel.CELMatcher{
+		CompilationResults: compilationResults,
+	}, allErrs
+}
+
+func compileMatchConditionsExpression(fldPath *field.Path, compiler authorizationcel.Compiler, expression string) (authorizationcel.CompilationResult, *field.Error) {
+	authzExpression := &authorizationcel.SubjectAccessReviewMatchCondition{
+		Expression: expression,
+	}
+	compilationResult, err := compiler.CompileCELExpression(authzExpression)
+	if err != nil {
+		return compilationResult, convertCELErrorToValidationError(fldPath, authzExpression, err)
+	}
+	return compilationResult, nil
+}
+
+func convertCELErrorToValidationError(fldPath *field.Path, expression authorizationcel.ExpressionAccessor, err error) *field.Error {
+	var celErr *cel.Error
+	if errors.As(err, &celErr) {
+		switch celErr.Type {
+		case cel.ErrorTypeRequired:
+			return field.Required(fldPath, celErr.Detail)
+		case cel.ErrorTypeInvalid:
+			return field.Invalid(fldPath, expression.GetExpression(), celErr.Detail)
+		default:
+			return field.InternalError(fldPath, celErr)
+		}
+	}
+	return field.InternalError(fldPath, fmt.Errorf("error is not cel error: %w", err))
 }

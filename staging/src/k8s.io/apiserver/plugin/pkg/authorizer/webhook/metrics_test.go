@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
@@ -79,7 +80,7 @@ func TestAuthorizerMetrics(t *testing.T) {
 				RecordRequestTotal:   fakeAuthzMetrics.RequestTotal,
 				RecordRequestLatency: fakeAuthzMetrics.RequestLatency,
 			}
-			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, authzMetrics)
+			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, authzMetrics, []apiserver.WebhookMatchCondition{})
 			if err != nil {
 				t.Error("failed to create client")
 				return
