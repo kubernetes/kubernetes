@@ -26,8 +26,6 @@ import (
 	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfc "k8s.io/apiserver/pkg/util/flowcontrol"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -35,7 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 	testclocks "k8s.io/utils/clock/testing"
 )
@@ -170,7 +167,6 @@ func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {
 	}
 }
 func TestConfigConsumerFight(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	_, kubeConfig, closeFn := setup(t, 100, 100)
 	defer closeFn()
 	const teamSize = 3
