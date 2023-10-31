@@ -1072,6 +1072,10 @@ ETCD_APISERVER_SERVER_KEY: $(yaml-quote "${ETCD_APISERVER_SERVER_KEY_BASE64:-}")
 ETCD_APISERVER_SERVER_CERT: $(yaml-quote "${ETCD_APISERVER_SERVER_CERT_BASE64:-}")
 ETCD_APISERVER_CLIENT_KEY: $(yaml-quote "${ETCD_APISERVER_CLIENT_KEY_BASE64:-}")
 ETCD_APISERVER_CLIENT_CERT: $(yaml-quote "${ETCD_APISERVER_CLIENT_CERT_BASE64:-}")
+CLOUD_PVL_ADMISSION_CA_KEY: $(yaml-quote "${CLOUD_PVL_ADMISSION_CA_KEY_BASE64:-}")
+CLOUD_PVL_ADMISSION_CA_CERT: $(yaml-quote "${CLOUD_PVL_ADMISSION_CA_CERT_BASE64:-}")
+CLOUD_PVL_ADMISSION_CERT: $(yaml-quote "${CLOUD_PVL_ADMISSION_CERT_BASE64:-}")
+CLOUD_PVL_ADMISSION_KEY: $(yaml-quote "${CLOUD_PVL_ADMISSION_KEY_BASE64:-}")
 KONNECTIVITY_SERVER_CA_KEY: $(yaml-quote "${KONNECTIVITY_SERVER_CA_KEY_BASE64:-}")
 KONNECTIVITY_SERVER_CA_CERT: $(yaml-quote "${KONNECTIVITY_SERVER_CA_CERT_BASE64:-}")
 KONNECTIVITY_SERVER_CERT: $(yaml-quote "${KONNECTIVITY_SERVER_CERT_BASE64:-}")
@@ -1357,6 +1361,9 @@ KUBE_POD_LOG_READERS_GROUP: 2007
 KONNECTIVITY_SERVER_RUNASUSER: 2008
 KONNECTIVITY_SERVER_RUNASGROUP: 2008
 KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP: 2008
+CLOUD_CONTROLLER_MANAGER_RUNASUSER: 2009
+CLOUD_CONTROLLER_MANAGER_RUNASGROUP: 2009
+
 EOF
     # KUBE_APISERVER_REQUEST_TIMEOUT_SEC (if set) controls the --request-timeout
     # flag
@@ -1685,6 +1692,7 @@ function create-certs {
   PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
   AGGREGATOR_PRIMARY_CN="${primary_cn}" AGGREGATOR_SANS="${sans}" generate-aggregator-certs
   KONNECTIVITY_SERVER_PRIMARY_CN="${primary_cn}" KONNECTIVITY_SERVER_SANS="${sans}" generate-konnectivity-server-certs
+  CLOUD_PVL_ADMISSION_PRIMARY_CN="${primary_cn}" CLOUD_PVL_ADMISSION_SANS="${sans}" generate-cloud-pvl-admission-certs
 
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
@@ -1722,6 +1730,11 @@ function create-certs {
   KONNECTIVITY_AGENT_KEY_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/server.key" | tr -d '\r\n')
   KONNECTIVITY_AGENT_CLIENT_CERT_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/client.crt" | tr -d '\r\n')
   KONNECTIVITY_AGENT_CLIENT_KEY_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/client.key" | tr -d '\r\n')
+
+  CLOUD_PVL_ADMISSION_CA_KEY_BASE64=$(base64 "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/private/ca.key" | tr -d '\r\n')
+  CLOUD_PVL_ADMISSION_CA_CERT_BASE64=$(base64 "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
+  CLOUD_PVL_ADMISSION_CERT_BASE64=$(base64 "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/issued/server.crt" | tr -d '\r\n')
+  CLOUD_PVL_ADMISSION_KEY_BASE64=$(base64 "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/private/server.key" | tr -d '\r\n')
 }
 
 # Set up easy-rsa directory structure.
@@ -1743,12 +1756,15 @@ function setup-easyrsa {
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
     mkdir easy-rsa-master/aggregator
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator
+    mkdir easy-rsa-master/cloud-pvl-admission
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/cloud-pvl-admission
     mkdir easy-rsa-master/konnectivity-server
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/konnectivity-server
     mkdir easy-rsa-master/konnectivity-agent
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/konnectivity-agent) &>"${cert_create_debug_output}" || true
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/aggregator"
+  CLOUD_PVL_ADMISSION_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/cloud-pvl-admission"
   KONNECTIVITY_SERVER_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/konnectivity-server"
   KONNECTIVITY_AGENT_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/konnectivity-agent"
   if [ ! -x "${CERT_DIR}/easyrsa" ] || [ ! -x "${AGGREGATOR_CERT_DIR}/easyrsa" ]; then
@@ -1968,6 +1984,78 @@ function generate-konnectivity-server-certs {
   fi
 }
 
+# Runs the easy RSA commands to generate server side certificate files
+# for the cloud-pvl-admission webhook.
+# The generated files are in ${CLOUD_PVL_ADMISSION_CERT_DIR}
+#
+# Assumed vars
+#   KUBE_TEMP
+#   CLOUD_PVL_ADMISSION_CERT_DIR
+#   CLOUD_PVL_ADMISSION_PRIMARY_CN: Primary canonical name
+#   CLOUD_PVL_ADMISSION_SANS: Subject alternate names
+#
+function generate-cloud-pvl-admission-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    # Make the client <-> cloud-pvl-admission server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/cloud-pvl-admission"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${CLOUD_PVL_ADMISSION_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="IP:127.0.0.1,${CLOUD_PVL_ADMISSION_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
+    # create the cloud-pvl-admission cert with the correct groups
+    echo '{"CN":"cloud-pvl-admission","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare cloud-pvl-admission
+    rm -f "cloud-pvl-admission.csr"
+
+    # Make the cloud-pvl-admission server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/cloud-pvl-admission"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${CLOUD_PVL_ADMISSION_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${CLOUD_PVL_ADMISSION_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
+    # create the cloud-pvl-admission server cert with the correct groups
+    echo '{"CN":"cloud-pvl-admission","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
+    rm -f "konnectivity-agent.csr"
+
+    echo "completed main certificate section") &>"${cert_create_debug_output}" || true
+
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/private/ca.key" \
+    "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/ca.crt" \
+    "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/issued/server.crt" \
+    "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/private/server.key" \
+    "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/issued/client.crt" \
+    "${CLOUD_PVL_ADMISSION_CERT_DIR}/pki/private/client.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate cloud-pvl-admission certificates: Aborting ===" >&2
+    exit 2
+  fi
+}
+
 # Using provided master env, extracts value from provided key.
 #
 # Args:
@@ -2009,6 +2097,10 @@ function parse-master-env() {
   ETCD_APISERVER_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_SERVER_CERT")
   ETCD_APISERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_KEY")
   ETCD_APISERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_CERT")
+  CLOUD_PVL_ADMISSION_CA_KEY_BASE64=$(get-env-val "${master_env}" "CLOUD_PVL_ADMISSION_CA_KEY")
+  CLOUD_PVL_ADMISSION_CA_CERT_BASE64=$(get-env-val "${master_env}" "CLOUD_PVL_ADMISSION_CA_CERT")
+  CLOUD_PVL_ADMISSION_CERT_BASE64=$(get-env-val "${master_env}" "CLOUD_PVL_ADMISSION_CERT")
+  CLOUD_PVL_ADMISSION_KEY_BASE64=$(get-env-val "${master_env}" "CLOUD_PVL_ADMISSION_KEY")
   KONNECTIVITY_SERVER_CA_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CA_KEY")
   KONNECTIVITY_SERVER_CA_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CA_CERT")
   KONNECTIVITY_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CERT")

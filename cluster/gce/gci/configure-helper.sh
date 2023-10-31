@@ -781,6 +781,18 @@ function create-master-pki {
     KONNECTIVITY_AGENT_CERT_PATH="${pki_dir}/konnectivity-agent/server.crt"
     write-pki-data "${KONNECTIVITY_AGENT_CERT}" "${KONNECTIVITY_AGENT_CERT_PATH}"
   fi
+
+  if [[ -n "${CLOUD_PVL_ADMISSION_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/cloud-pvl-admission
+    CLOUD_PVL_ADMISSION_CA_CERT_PATH="${pki_dir}/cloud-pvl-admission/ca.crt"
+    write-pki-data "${CLOUD_PVL_ADMISSION_CA_CERT}" "${CLOUD_PVL_ADMISSION_CA_CERT_PATH}"
+
+    CLOUD_PVL_ADMISSION_KEY_PATH="${pki_dir}/cloud-pvl-admission/server.key"
+    write-pki-data "${CLOUD_PVL_ADMISSION_KEY}" "${CLOUD_PVL_ADMISSION_KEY_PATH}"
+
+    CLOUD_PVL_ADMISSION_CERT_PATH="${pki_dir}/cloud-pvl-admission/server.crt"
+    write-pki-data "${CLOUD_PVL_ADMISSION_CERT}" "${CLOUD_PVL_ADMISSION_CERT_PATH}"
+  fi
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
@@ -2380,6 +2392,9 @@ function start-cloud-controller-manager {
 
   echo "Writing manifest for cloud provider controller-manager"
   cp "${src_file}" /etc/kubernetes/manifests
+
+  setup-addon-manifests "addons" "cloud-pvl-admission"
+  setup-cloud-pvl-admission-manifest
 }
 
 # Starts kubernetes scheduler.
@@ -2996,6 +3011,11 @@ function setup-konnectivity-agent-manifest {
       sed -i "s|__EXTRA_VOL_MNTS__||g" "${manifest}"
       sed -i "s|__EXTRA_VOLS__||g" "${manifest}"
     fi
+}
+
+function setup-cloud-pvl-admission-manifest {
+  local -r manifest="/etc/kubernetes/addons/cloud-pvl-admission/mutating-webhook-configuration.yaml"
+  sed -i "s|__CLOUD_PVL_ADMISSION_CA_CERT__|${CLOUD_PVL_ADMISSION_CA_CERT}|g" "${manifest}"
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
