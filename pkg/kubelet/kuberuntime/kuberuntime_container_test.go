@@ -38,6 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -128,7 +129,7 @@ func TestKillContainer(t *testing.T) {
 
 	for _, test := range tests {
 		ctx := context.Background()
-		err := m.killContainer(ctx, test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
+		err := m.killContainer(ctx, test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride, nil)
 		if test.succeed != (err == nil) {
 			t.Errorf("%s: expected %v, got %v (%v)", test.caseName, test.succeed, (err == nil), err)
 		}
@@ -426,7 +427,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 	t.Run("PreStop-CMDExec", func(t *testing.T) {
 		ctx := context.Background()
 		testContainer.Lifecycle = cmdLifeCycle
-		m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
+		_ = m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod, nil)
 		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
 			t.Errorf("CMD Prestop hook was not invoked")
 		}
@@ -440,8 +441,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
 			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
 			testContainer.Lifecycle = httpLifeCycle
-			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
-
+			_ = m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod, nil)
 			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
 				t.Errorf("HTTP Prestop hook was not invoked")
 			}
@@ -451,8 +451,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 			defer func() { fakeHTTP.req = nil }()
 			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt32(80)
 			testContainer.Lifecycle = httpLifeCycle
-			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
-
+			_ = m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod, nil)
 			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
 				t.Errorf("HTTP Prestop hook was not invoked")
 			}
@@ -467,8 +466,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 		testPod.DeletionGracePeriodSeconds = &gracePeriodLocal
 		testPod.Spec.TerminationGracePeriodSeconds = &gracePeriodLocal
 
-		m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
-
+		_ = m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriodLocal, nil)
 		if fakeHTTP.req != nil {
 			t.Errorf("HTTP Prestop hook Should not execute when gracePeriod is 0")
 		}

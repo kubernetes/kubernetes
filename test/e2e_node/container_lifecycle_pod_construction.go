@@ -40,6 +40,9 @@ type execCommand struct {
 	StartDelay int
 	// Delay is how long the container should delay before exiting
 	Delay int
+	// LoopForever if set will cause the command to log once per second in a loop until
+	// terminated
+	LoopForever bool
 	// TerminationSeconds is the time it takes for the container before
 	// terminating if it catches SIGTERM.
 	TerminationSeconds int
@@ -86,6 +89,9 @@ func ExecCommand(name string, c execCommand) []string {
 	if c.Delay != 0 {
 		fmt.Fprint(&cmd, sleepCommand(c.Delay))
 	}
+	if c.LoopForever {
+		fmt.Fprintf(&cmd, "while true; do echo %s '%s Looping' | tee -a %s >> /proc/1/fd/1 ; sleep 1 ; done; ", timeCmd, name, containerLog)
+	}
 	fmt.Fprintf(&cmd, "echo %s '%s Exiting'  | tee -a %s >> /proc/1/fd/1; ", timeCmd, name, containerLog)
 	fmt.Fprintf(&cmd, "exit %d", c.ExitCode)
 	return []string{"sh", "-c", cmd.String()}
@@ -110,8 +116,8 @@ type containerOutputList []containerOutput
 
 func (o containerOutputList) String() string {
 	var b bytes.Buffer
-	for _, v := range o {
-		fmt.Fprintf(&b, "%s %f %s %s\n", v.timestamp, v.timeSinceBoot, v.containerName, v.command)
+	for i, v := range o {
+		fmt.Fprintf(&b, "%d) %s %f %s %s\n", i, v.timestamp, v.timeSinceBoot, v.containerName, v.command)
 	}
 	return b.String()
 }
@@ -186,10 +192,10 @@ func (o containerOutputList) ExitsBefore(lhs, rhs string) error {
 	}
 
 	// this works even for the same names (restart case)
-	rhsExit := o.findIndex(rhs, "Starting", lhsExit+1)
+	rhsExit := o.findIndex(rhs, "Exiting", lhsExit+1)
 
 	if rhsExit == -1 {
-		return fmt.Errorf("couldn't find that %s starting before %s exited, got\n%v", rhs, lhs, o)
+		return fmt.Errorf("couldn't find that %s starting before %s exited (starting at idx %d), got\n%v", rhs, lhs, lhsExit+1, o)
 	}
 	return nil
 }
@@ -277,6 +283,32 @@ func (o containerOutputList) findIndex(name string, command string, startIdx int
 		}
 	}
 	return -1
+}
+func (o containerOutputList) findLastIndex(name string, command string) int {
+	found := -1
+	for i, v := range o {
+		if v.containerName == name && v.command == command {
+			found = i
+		}
+	}
+	return found
+}
+
+// TimeOfStart returns the time since the node boot in floating point seconds that the specified container started.
+func (o containerOutputList) TimeOfStart(name string) (float64, error) {
+	idx := o.findIndex(name, "Starting", 0)
+	if idx == -1 {
+		return 0.0, fmt.Errorf("couldn't find that %s ever started, got\n%v", name, o)
+	}
+	return o[idx].timeSinceBoot, nil
+}
+
+func (o containerOutputList) TimeOfLastLoop(name string) (float64, error) {
+	idx := o.findLastIndex(name, "Looping")
+	if idx == -1 {
+		return 0.0, fmt.Errorf("couldn't find that %s ever looped, got\n%v", name, o)
+	}
+	return o[idx].timeSinceBoot, nil
 }
 
 // parseOutput combines the container log from all of the init and regular
