@@ -37,6 +37,10 @@ import (
 )
 
 func TestController(t *testing.T) {
+	origMinKMSPluginCloseGracePeriod := minKMSPluginCloseGracePeriod
+	t.Cleanup(func() { minKMSPluginCloseGracePeriod = origMinKMSPluginCloseGracePeriod })
+	minKMSPluginCloseGracePeriod = 300 * time.Millisecond
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
 	const expectedSuccessMetricValue = `
@@ -141,7 +145,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 							err:        fmt.Errorf("mockingly failing"),
 						},
 					},
-					KMSCloseGracePeriod:       time.Second,
+					KMSCloseGracePeriod:       0, // use minKMSPluginCloseGracePeriod
 					EncryptionFileContentHash: "anything different",
 				}, nil
 			},
@@ -255,14 +259,16 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			serverCtx, closeServer := context.WithCancel(context.Background())
+			ctxServer, closeServer := context.WithCancel(context.Background())
+			ctxTransformers, closeTransformers := context.WithCancel(ctxServer)
 			t.Cleanup(closeServer)
+			t.Cleanup(closeTransformers)
 
 			legacyregistry.Reset()
 
 			// load initial encryption config
 			encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(
-				serverCtx,
+				ctxTransformers,
 				"testdata/ec_config.yaml",
 				true,
 				"test-apiserver",
@@ -277,8 +283,8 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 				encryptionconfig.NewDynamicTransformers(
 					encryptionConfiguration.Transformers,
 					encryptionConfiguration.HealthChecks[0],
-					closeServer,
-					encryptionConfiguration.KMSCloseGracePeriod,
+					closeTransformers,
+					0, // set grace period to 0 so that the time.Sleep in DynamicTransformers.Set finishes quickly
 				),
 				encryptionConfiguration.EncryptionFileContentHash,
 				"test-apiserver",
@@ -303,7 +309,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 				return test.mockGetEncryptionConfigHash(ctx, filepath)
 			}
 
-			d.Run(serverCtx) // this should block and run exactly one iteration of the worker loop
+			d.Run(ctxServer) // this should block and run exactly one iteration of the worker loop
 
 			if test.wantECFileHash != d.lastLoadedEncryptionConfigHash {
 				t.Errorf("expected encryption config hash %q but got %q", test.wantECFileHash, d.lastLoadedEncryptionConfigHash)
