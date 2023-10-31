@@ -74,17 +74,6 @@ var _ = SIGDescribe("Pull Image [Serial]", func() {
 	}
 
 	ginkgo.Context("serialize image pull", func() {
-		// this is the default behavior now.
-		// tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-		// 	initialConfig.SerializeImagePulls = true
-		// 	initialConfig.MaxParallelImagePulls = ptr.To[int32](1)
-		// })
-
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			// ginkgo.By("cleanup images")
-			RemoveImage(nginxPodDesc.Spec.Containers[0].Image)
-			RemoveImage(nginxNewPodDesc.Spec.Containers[0].Image)
-		})
 
 		ginkgo.It("should be waiting more", func(ctx context.Context) {
 
