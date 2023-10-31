@@ -230,8 +230,8 @@ func TestCelCostStability(t *testing.T) {
 			},
 		},
 		{name: "listSets",
-			obj:    objs([]interface{}{"a", "b", "c"}, []interface{}{"a", "c", "b"}),
-			schema: schemas(listSetType(&stringType), listSetType(&stringType)),
+			obj:    objs([]interface{}{"a", "b", "c"}, []interface{}{"a", "c", "b"}, buildLargeArray(1000)),
+			schema: schemas(listSetType(&stringType), listSetType(&stringType), listSetType(&integerType)),
 			expectCost: map[string]int64{
 				// equal even though order is different
 				"self.val1 == ['c', 'b', 'a']":                   3,
@@ -241,6 +241,12 @@ func TestCelCostStability(t *testing.T) {
 				"!('x' in self.val1)":                            6,
 				"self.val1 + self.val2 == ['a', 'b', 'c']":       6,
 				"self.val1 + ['c', 'd'] == ['a', 'b', 'c', 'd']": 4,
+				"sets.contains(self.val1, ['a'])":                6,
+				"sets.equivalent(self.val1, ['a', 'b', 'c'])":    21,
+				"sets.intersects(self.val1, ['a'])":              6,
+				"sets.contains(self.val3, [1])":                  1003,
+				"!sets.equivalent(self.val3, [1, 2, 3])":         6004,
+				"sets.intersects(self.val3, [1])":                1003,
 			},
 		},
 		{name: "listMaps",
@@ -1155,6 +1161,14 @@ func TestCelCostStability(t *testing.T) {
 			}
 		})
 	}
+}
+
+func buildLargeArray(size int) []interface{} {
+	lArray := make([]interface{}, size)
+	for i := 0; i < len(lArray); i++ {
+		lArray[i] = i
+	}
+	return lArray
 }
 
 func TestCelEstimatedCostStability(t *testing.T) {
