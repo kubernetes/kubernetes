@@ -76,15 +76,14 @@
     "unwantedReferences": {
       "cloud.google.com/go": [
         "cloud.google.com/go/compute",
-        "github.com/google/cadvisor",
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/bigquery": [
-        "cloud.google.com/go/storage",
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/compute": [
         "cloud.google.com/go/compute/metadata",
+        "github.com/google/cadvisor",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "golang.org/x/oauth2",
         "google.golang.org/genproto",
@@ -92,9 +91,6 @@
       ],
       "cloud.google.com/go/firestore": [
         "google.golang.org/genproto"
-      ],
-      "cloud.google.com/go/storage": [
-        "cloud.google.com/go"
       ],
       "github.com/GoogleCloudPlatform/k8s-cloud-provider": [
         "k8s.io/kubernetes",
@@ -111,7 +107,6 @@
         "github.com/containerd/cgroups",
         "github.com/containerd/ttrpc",
         "github.com/containerd/typeurl",
-        "github.com/gogo/googleapis",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.etcd.io/etcd/api/v3",
@@ -148,10 +143,7 @@
         "google.golang.org/api"
       ],
       "github.com/googleapis/gax-go/v2": [
-        "cloud.google.com/go",
-        "cloud.google.com/go/bigquery",
-        "cloud.google.com/go/compute",
-        "cloud.google.com/go/storage"
+        "cloud.google.com/go/compute"
       ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
@@ -182,7 +174,6 @@
       ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hcsshim",
-        "github.com/aws/aws-sdk-go",
         "github.com/containerd/continuity",
         "github.com/containerd/fifo",
         "github.com/containerd/go-runc",
@@ -202,7 +193,6 @@
         "k8s.io/legacy-cloud-providers"
       ],
       "go.opencensus.io": [
-        "cloud.google.com/go",
         "cloud.google.com/go/compute",
         "github.com/Microsoft/hcsshim",
         "google.golang.org/api"
@@ -212,10 +202,7 @@
         "github.com/google/cel-go"
       ],
       "google.golang.org/api": [
-        "cloud.google.com/go",
-        "cloud.google.com/go/bigquery",
         "cloud.google.com/go/compute",
-        "cloud.google.com/go/storage",
         "github.com/GoogleCloudPlatform/k8s-cloud-provider",
         "github.com/googleapis/gax-go/v2",
         "k8s.io/kubernetes",
@@ -232,13 +219,9 @@
         "google.golang.org/grpc"
       ],
       "google.golang.org/genproto": [
-        "cloud.google.com/go",
-        "cloud.google.com/go/bigquery",
         "cloud.google.com/go/compute",
-        "cloud.google.com/go/storage",
         "github.com/container-storage-interface/spec",
         "github.com/containerd/ttrpc",
-        "github.com/google/cadvisor",
         "github.com/googleapis/gax-go/v2",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
