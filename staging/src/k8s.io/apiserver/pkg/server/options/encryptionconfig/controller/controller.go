@@ -38,8 +38,8 @@ const workqueueKey = "key"
 // EncryptionConfigFileChangePollDuration is exposed so that integration tests can crank up the reload speed.
 var EncryptionConfigFileChangePollDuration = time.Minute
 
-// DynamicKMSEncryptionConfigContent which can dynamically handle changes in encryption config file.
-type DynamicKMSEncryptionConfigContent struct {
+// DynamicEncryptionConfigContent which can dynamically handle changes in encryption config file.
+type DynamicEncryptionConfigContent struct {
 	name string
 
 	// filePath is the path of the file to read.
@@ -72,8 +72,8 @@ func NewDynamicEncryptionConfiguration(
 	dynamicTransformers *encryptionconfig.DynamicTransformers,
 	configContentHash string,
 	apiServerID string,
-) *DynamicKMSEncryptionConfigContent {
-	encryptionConfig := &DynamicKMSEncryptionConfigContent{
+) *DynamicEncryptionConfigContent {
+	return &DynamicEncryptionConfigContent{
 		name:                           name,
 		filePath:                       filePath,
 		lastLoadedEncryptionConfigHash: configContentHash,
@@ -85,13 +85,10 @@ func NewDynamicEncryptionConfiguration(
 		},
 		loadEncryptionConfig: encryptionconfig.LoadEncryptionConfig,
 	}
-	encryptionConfig.queue.Add(workqueueKey) // to avoid missing any file changes that occur in between the initial load and Run
-
-	return encryptionConfig
 }
 
 // Run starts the controller and blocks until ctx is canceled.
-func (d *DynamicKMSEncryptionConfigContent) Run(ctx context.Context) {
+func (d *DynamicEncryptionConfigContent) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	klog.InfoS("Starting controller", "name", d.name)
@@ -134,13 +131,13 @@ func (d *DynamicKMSEncryptionConfigContent) Run(ctx context.Context) {
 }
 
 // runWorker to process file content
-func (d *DynamicKMSEncryptionConfigContent) runWorker(ctx context.Context) {
+func (d *DynamicEncryptionConfigContent) runWorker(ctx context.Context) {
 	for d.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem processes file content when there is a message in the queue.
-func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx context.Context) bool {
+func (d *DynamicEncryptionConfigContent) processNextWorkItem(serverCtx context.Context) bool {
 	// key here is dummy item in the queue to trigger file content processing.
 	key, quit := d.queue.Get()
 	if quit {
@@ -153,7 +150,7 @@ func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx contex
 	return true
 }
 
-func (d *DynamicKMSEncryptionConfigContent) processWorkItem(serverCtx context.Context, workqueueKey interface{}) {
+func (d *DynamicEncryptionConfigContent) processWorkItem(serverCtx context.Context, workqueueKey interface{}) {
 	var (
 		updatedEffectiveConfig  bool
 		err                     error
@@ -219,7 +216,7 @@ func (d *DynamicKMSEncryptionConfigContent) processWorkItem(serverCtx context.Co
 }
 
 // loadEncryptionConfig processes the next set of content from the file.
-func (d *DynamicKMSEncryptionConfigContent) processEncryptionConfig(ctx context.Context) (
+func (d *DynamicEncryptionConfigContent) processEncryptionConfig(ctx context.Context) (
 	_ *encryptionconfig.EncryptionConfiguration,
 	configChanged bool,
 	_ error,
@@ -250,7 +247,10 @@ func (d *DynamicKMSEncryptionConfigContent) processEncryptionConfig(ctx context.
 	return encryptionConfiguration, true, nil
 }
 
-func (d *DynamicKMSEncryptionConfigContent) validateNewTransformersHealth(
+// minKMSPluginCloseGracePeriod can be lowered in unit tests to make the health check poll faster
+var minKMSPluginCloseGracePeriod = 10 * time.Second
+
+func (d *DynamicEncryptionConfigContent) validateNewTransformersHealth(
 	ctx context.Context,
 	kmsPluginHealthzCheck healthz.HealthChecker,
 	kmsPluginCloseGracePeriod time.Duration,
@@ -258,8 +258,8 @@ func (d *DynamicKMSEncryptionConfigContent) validateNewTransformersHealth(
 	// test if new transformers are healthy
 	var healthCheckError error
 
-	if kmsPluginCloseGracePeriod < 10*time.Second {
-		kmsPluginCloseGracePeriod = 10 * time.Second
+	if kmsPluginCloseGracePeriod < minKMSPluginCloseGracePeriod {
+		kmsPluginCloseGracePeriod = minKMSPluginCloseGracePeriod
 	}
 
 	// really make sure that the immediate check does not hang
