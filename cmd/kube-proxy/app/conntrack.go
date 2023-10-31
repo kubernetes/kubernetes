@@ -39,6 +39,8 @@ type Conntracker interface {
 	SetTCPEstablishedTimeout(seconds int) error
 	// SetTCPCloseWaitTimeout adjusts nf_conntrack_tcp_timeout_close_wait.
 	SetTCPCloseWaitTimeout(seconds int) error
+	// SetTCPBeLiberal adjusts nf_conntrack_tcp_be_liberal.
+	SetTCPBeLiberal(value int) error
 	// SetUDPTimeout adjusts nf_conntrack_udp_timeout.
 	SetUDPTimeout(seconds int) error
 	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
@@ -94,6 +96,10 @@ func (rct realConntracker) SetTCPEstablishedTimeout(seconds int) error {
 
 func (rct realConntracker) SetTCPCloseWaitTimeout(seconds int) error {
 	return rct.setIntSysCtl("nf_conntrack_tcp_timeout_close_wait", seconds)
+}
+
+func (rct realConntracker) SetTCPBeLiberal(value int) error {
+	return rct.setIntSysCtl("nf_conntrack_tcp_be_liberal", value)
 }
 
 func (rct realConntracker) SetUDPTimeout(seconds int) error {

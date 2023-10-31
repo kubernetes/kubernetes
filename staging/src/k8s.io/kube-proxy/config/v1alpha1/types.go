@@ -93,6 +93,10 @@ type KubeProxyConntrackConfiguration struct {
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
 	TCPCloseWaitTimeout *metav1.Duration `json:"tcpCloseWaitTimeout"`
+	// tcpBeLiberal, if true, kube-proxy will configure conntrack
+	// to run in liberal mode for TCP connections and packets with
+	// out-of-window sequence numbers won't be marked INVALID.
+	TCPBeLiberal bool `json:"tcpBeLiberal"`
 	// udpTimeout is how long an idle UDP conntrack entry in
 	// UNREPLIED state will remain in the conntrack table
 	// (e.g. '30s'). Must be greater than 0 to set.

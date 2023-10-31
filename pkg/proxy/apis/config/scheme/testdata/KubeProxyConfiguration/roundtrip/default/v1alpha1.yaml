@@ -12,6 +12,7 @@ configSyncPeriod: 15m0s
 conntrack:
   maxPerCore: 32768
   min: 131072
+  tcpBeLiberal: false
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
   udpStreamTimeout: 0s
