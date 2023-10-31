@@ -604,6 +604,103 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				framework.Fail(fmt.Sprintf("stale device assignment after pod deletion while kubelet was down allocated=%v error=%v", allocated, err))
 			}
 		})
+
+		ginkgo.It("Can schedule a pod with a restartable init container [NodeAlphaFeature:SidecarContainers]", func(ctx context.Context) {
+			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s"
+			sleepOneSecond := "1s"
+			rl := v1.ResourceList{v1.ResourceName(SampleDeviceResourceName): *resource.NewQuantity(1, resource.DecimalSI)}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "device-plugin-test-" + string(uuid.NewUUID())},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					InitContainers: []v1.Container{
+						{
+							Image:   busyboxImage,
+							Name:    "init-1",
+							Command: []string{"sh", "-c", fmt.Sprintf(podRECMD, sleepOneSecond)},
+							Resources: v1.ResourceRequirements{
+								Limits:   rl,
+								Requests: rl,
+							},
+						},
+						{
+							Image:   busyboxImage,
+							Name:    "restartable-init-2",
+							Command: []string{"sh", "-c", fmt.Sprintf(podRECMD, sleepIntervalForever)},
+							Resources: v1.ResourceRequirements{
+								Limits:   rl,
+								Requests: rl,
+							},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: []v1.Container{{
+						Image:   busyboxImage,
+						Name:    "regular-1",
+						Command: []string{"sh", "-c", fmt.Sprintf(podRECMD, sleepIntervalForever)},
+						Resources: v1.ResourceRequirements{
+							Limits:   rl,
+							Requests: rl,
+						},
+					}},
+				},
+			}
+
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			deviceIDRE := "stub devices: (Dev-[0-9]+)"
+
+			devID1, err := parseLog(ctx, f, pod1.Name, pod1.Spec.InitContainers[0].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod1.Name, pod1.Spec.InitContainers[0].Name)
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1's init container requested a device but started successfully without")
+
+			devID2, err := parseLog(ctx, f, pod1.Name, pod1.Spec.InitContainers[1].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod1.Name, pod1.Spec.InitContainers[1].Name)
+			gomega.Expect(devID2).To(gomega.Not(gomega.Equal("")), "pod1's restartable init container requested a device but started successfully without")
+
+			gomega.Expect(devID2).To(gomega.Equal(devID1), "pod1's init container and restartable init container should share the same device")
+
+			devID3, err := parseLog(ctx, f, pod1.Name, pod1.Spec.Containers[0].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod1.Name, pod1.Spec.Containers[0].Name)
+			gomega.Expect(devID3).To(gomega.Not(gomega.Equal("")), "pod1's regular container requested a device but started successfully without")
+
+			gomega.Expect(devID3).NotTo(gomega.Equal(devID2), "pod1's restartable init container and regular container should not share the same device")
+
+			podResources, err := getV1NodeDevices(ctx)
+			framework.ExpectNoError(err)
+
+			framework.Logf("PodResources.PodResources:%+v\n", podResources.PodResources)
+			framework.Logf("len(PodResources.PodResources):%+v", len(podResources.PodResources))
+
+			gomega.Expect(podResources.PodResources).To(gomega.HaveLen(2))
+
+			var resourcesForOurPod *kubeletpodresourcesv1.PodResources
+			for _, res := range podResources.GetPodResources() {
+				if res.Name == pod1.Name {
+					resourcesForOurPod = res
+				}
+			}
+
+			gomega.Expect(resourcesForOurPod).NotTo(gomega.BeNil())
+
+			gomega.Expect(resourcesForOurPod.Name).To(gomega.Equal(pod1.Name))
+			gomega.Expect(resourcesForOurPod.Namespace).To(gomega.Equal(pod1.Namespace))
+
+			// Note that the kubelet does not report resources for restartable
+			// init containers for now.
+			// See https://github.com/kubernetes/kubernetes/issues/120501.
+			// TODO: Fix this test to check the resources allocated to the
+			// restartable init container once the kubelet reports resources
+			// for restartable init containers.
+			gomega.Expect(resourcesForOurPod.Containers).To(gomega.HaveLen(1))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Name).To(gomega.Equal(pod1.Spec.Containers[0].Name))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Devices).To(gomega.HaveLen(1))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Devices[0].ResourceName).To(gomega.Equal(SampleDeviceResourceName))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Devices[0].DeviceIds).To(gomega.HaveLen(1))
+		})
 	})
 }
 
