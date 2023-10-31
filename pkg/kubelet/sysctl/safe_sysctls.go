@@ -17,12 +17,11 @@ limitations under the License.
 package sysctl
 
 import (
-	"fmt"
 	goruntime "runtime"
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/proxy/ipvs"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 )
 
 type sysctl struct {
@@ -44,27 +43,22 @@ var safeSysctls = []sysctl{
 	}, {
 		name: "net.ipv4.ip_unprivileged_port_start",
 	}, {
-		name: "net.ipv4.ip_local_reserved_ports",
-		// refer to https://github.com/torvalds/linux/commit/122ff243f5f104194750ecbc76d5946dd1eec934.
-		kernel: "3.16",
+		name:   "net.ipv4.ip_local_reserved_ports",
+		kernel: utilkernel.IPLocalReservedPortsNamespacedKernelVersion,
 	}, {
-		name: "net.ipv4.tcp_keepalive_time",
-		// refer to https://github.com/torvalds/linux/commit/13b287e8d1cad951634389f85b8c9b816bd3bb1e.
-		kernel: "4.5",
+		name:   "net.ipv4.tcp_keepalive_time",
+		kernel: utilkernel.TCPKeepAliveTimeNamespacedKernelVersion,
 	}, {
-		// refer to https://github.com/torvalds/linux/commit/1e579caa18b96f9eb18f4f5416658cd15f37c062.
 		name:   "net.ipv4.tcp_fin_timeout",
-		kernel: "4.6",
+		kernel: utilkernel.TCPFinTimeoutNamespacedKernelVersion,
 	},
 	{
-		// refer to https://github.com/torvalds/linux/commit/b840d15d39128d08ed4486085e5507d2617b9ae1.
 		name:   "net.ipv4.tcp_keepalive_intvl",
-		kernel: "4.5",
+		kernel: utilkernel.TCPKeepAliveIntervalNamespacedKernelVersion,
 	},
 	{
-		// refer to https://github.com/torvalds/linux/commit/9bd6861bd4326e3afd3f14a9ec8a723771fb20bb.
 		name:   "net.ipv4.tcp_keepalive_probes",
-		kernel: "4.5",
+		kernel: utilkernel.TCPKeepAliveProbesNamespacedKernelVersion,
 	},
 }
 
@@ -77,7 +71,8 @@ func SafeSysctlAllowlist() []string {
 	if goruntime.GOOS != "linux" {
 		return nil
 	}
-	return getSafeSysctlAllowlist(getKernelVersion)
+
+	return getSafeSysctlAllowlist(utilkernel.GetVersion)
 }
 
 func getSafeSysctlAllowlist(getVersion func() (*version.Version, error)) []string {
@@ -100,17 +95,4 @@ func getSafeSysctlAllowlist(getVersion func() (*version.Version, error)) []strin
 		}
 	}
 	return safeSysctlAllowlist
-}
-
-func getKernelVersion() (*version.Version, error) {
-	kernelVersionStr, err := ipvs.NewLinuxKernelHandler().GetKernelVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kernel version: %w", err)
-	}
-
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse kernel version: %w", err)
-	}
-	return kernelVersion, nil
 }
