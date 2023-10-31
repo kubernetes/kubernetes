@@ -26,17 +26,12 @@ import (
 	machinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolapply "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 )
 
 func TestConditionIsolation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
-	// NOTE: disabling the feature should fail the test
 	ctx, kubeConfig, closeFn := setup(t, 10, 10)
 	defer closeFn()
 

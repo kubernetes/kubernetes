@@ -22,9 +22,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -60,7 +58,7 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.DebugSocketPath, "debug-socket-path", o.DebugSocketPath,
 		"Use an unprotected (no authn/authz) unix-domain socket for profiling with the given path")
 	fs.BoolVar(&o.EnablePriorityAndFairness, "enable-priority-and-fairness", o.EnablePriorityAndFairness, ""+
-		"If true and the APIPriorityAndFairness feature gate is enabled, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
+		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 }
 
 func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interface, informers informers.SharedInformerFactory) error {
@@ -72,7 +70,7 @@ func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interfac
 	c.DebugSocketPath = o.DebugSocketPath
 	c.EnableContentionProfiling = o.EnableContentionProfiling
 
-	if o.EnablePriorityAndFairness && feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
+	if o.EnablePriorityAndFairness {
 		if c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight <= 0 {
 			return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight)
 

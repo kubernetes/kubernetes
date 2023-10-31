@@ -51,7 +51,7 @@ func validateTokenRequest(options *Options) []error {
 }
 
 func validateAPIPriorityAndFairness(options *Options) []error {
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.Features.EnablePriorityAndFairness {
+	if options.Features.EnablePriorityAndFairness {
 		// If none of the following runtime config options are specified,
 		// APF is assumed to be turned on. The internal APF controller uses
 		// v1 so it should be enabled.
@@ -59,7 +59,7 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1", "api/ga", "api/all"} // in the order of precedence
 		for _, testConfig := range testConfigs {
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
-				return []error{fmt.Errorf("--runtime-config=%s=false conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true", testConfig)}
+				return []error{fmt.Errorf("--runtime-config=%s=false conflicts with --enable-priority-and-fairness=true", testConfig)}
 			}
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=true", testConfig)) {
 				return nil
