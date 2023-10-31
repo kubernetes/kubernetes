@@ -208,7 +208,7 @@ func getTestArtifacts(host, testDir string) error {
 		return fmt.Errorf("failed to create log directory %q: %w", logPath, err)
 	}
 	// Copy logs (if any) to artifacts/hostname
-	if _, err := SSH(host, "ls", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIP(host), testDir)); err == nil {
+	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/*.log", testDir)); err == nil {
 		if _, err := runSSHCommand(host, "scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIP(host), testDir), logPath); err != nil {
 			return err
 		}
