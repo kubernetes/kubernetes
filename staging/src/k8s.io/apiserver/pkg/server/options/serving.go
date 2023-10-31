@@ -327,7 +327,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 		return err
 	}
 	if c.MinTLSVersion > c.MaxTLSVersion {
-		return fmt.Errorf("tls min version must be less than or equal to tls max version")
+		return fmt.Errorf("TLS min version must be less than or equal to TLS max version")
 	}
 
 	// load SNI certs
