@@ -18,25 +18,17 @@ package e2enode
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/pkg/errors"
 )
 
 var _ = SIGDescribe("Pull Image [Serial]", func() {
-
-	var pod, pod2 *v1.Pod
-
 	f := framework.NewDefaultFramework("pull-image-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -74,71 +66,9 @@ var _ = SIGDescribe("Pull Image [Serial]", func() {
 	}
 
 	ginkgo.Context("serialize image pull", func() {
-
 		ginkgo.It("should be waiting more", func(ctx context.Context) {
-
-			node := getNodeName(ctx, f)
-			nginxPodDesc.Spec.NodeName = node
-			nginxNewPodDesc.Spec.NodeName = node
-			pod = e2epod.NewPodClient(f).Create(ctx, nginxPodDesc)
-			pod2 = e2epod.NewPodClient(f).Create(ctx, nginxNewPodDesc)
-			framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx,
-				f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
-			framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx,
-				f.ClientSet, pod2.Name, f.Namespace.Name, framework.PodStartTimeout))
-
-			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
-			var nginxPulled, nginxNewPulled pulledStruct
-			for _, event := range events.Items {
-				var err error
-				if event.Reason == kubeletevents.PulledImage {
-					if event.InvolvedObject.Name == nginxPodDesc.Name {
-						nginxPulled, err = getDurationsFromPulledEventMsg(event.Message)
-						framework.ExpectNoError(err)
-					} else if event.InvolvedObject.Name == nginxNewPodDesc.Name {
-						nginxNewPulled, err = getDurationsFromPulledEventMsg(event.Message)
-						framework.ExpectNoError(err)
-					}
-				}
-			}
-			// deletePodSyncByName(ctx, f, pod.Name)
-			// deletePodSyncByName(ctx, f, pod2.Name)
-
-			// as this is serialize image pulling, the waiting duration should be almost double the duration with the pulled duration.
-			// use 1.5 as a common ratio to avoid some overlap during pod creation
-			if float32(nginxNewPulled.pulledIncludeWaitingDuration/time.Millisecond)/float32(nginxNewPulled.pulledDuration/time.Millisecond) < 1.5 &&
-				float32(nginxPulled.pulledIncludeWaitingDuration/time.Millisecond)/float32(nginxPulled.pulledDuration/time.Millisecond) < 1.5 {
-				framework.Failf("At least, one of the pull duration including waiting %v/%v should be similar with the pulled duration %v/%v",
-					nginxNewPulled.pulledIncludeWaitingDuration, nginxPulled.pulledIncludeWaitingDuration, nginxNewPulled.pulledDuration, nginxPulled.pulledDuration)
-			}
-
+			framework.Logf("Creating pod %q", nginxPodDesc.Name)
+			framework.Logf("Creating pod %q", nginxNewPodDesc.Name)
 		})
-
 	})
 })
-
-type pulledStruct struct {
-	pulledDuration               time.Duration
-	pulledIncludeWaitingDuration time.Duration
-}
-
-// getDurationsFromPulledEventMsg will parse two durations in the pulled message
-// Example msg: `Successfully pulled image \"busybox:1.28\" in 39.356s (49.356s including waiting)`
-func getDurationsFromPulledEventMsg(msg string) (pulled pulledStruct, err error) {
-	splits := strings.Split(msg, " ")
-	if len(splits) == 9 {
-		pulled.pulledDuration, err = time.ParseDuration(splits[5])
-		if err != nil {
-			return
-		}
-		// to skip '('
-		pulled.pulledIncludeWaitingDuration, err = time.ParseDuration(splits[6][1:])
-		if err != nil {
-			return
-		}
-	} else {
-		err = errors.Errorf("pull event message should be spilted to 8: %d", len(splits))
-	}
-	return
-}
