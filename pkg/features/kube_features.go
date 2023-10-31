@@ -736,6 +736,36 @@ const (
 	// Decouples Taint Eviction Controller, performing taint-based Pod eviction, from Node Lifecycle Controller.
 	SeparateTaintEvictionController featuregate.Feature = "SeparateTaintEvictionController"
 
+	// owner: @munnerz
+	// kep: http://kep.k8s.io/4193
+	// alpha: v1.29
+	//
+	// Controls whether JTIs (UUIDs) are embedded into generated service account tokens, and whether these JTIs are
+	// recorded into the audit log for future requests made by these tokens.
+	ServiceAccountTokenJTI featuregate.Feature = "ServiceAccountTokenJTI"
+
+	// owner: @munnerz
+	// kep: http://kep.k8s.io/4193
+	// alpha: v1.29
+	//
+	// Controls whether the apiserver supports binding service account tokens to Node objects.
+	ServiceAccountTokenNodeBinding featuregate.Feature = "ServiceAccountTokenNodeBinding"
+
+	// owner: @munnerz
+	// kep: http://kep.k8s.io/4193
+	// alpha: v1.29
+	//
+	// Controls whether the apiserver will validate Node claims in service account tokens.
+	ServiceAccountTokenNodeBindingValidation featuregate.Feature = "ServiceAccountTokenNodeBindingValidation"
+
+	// owner: @munnerz
+	// kep: http://kep.k8s.io/4193
+	// alpha: v1.29
+	//
+	// Controls whether the apiserver embeds the node name and uid for the associated node when issuing
+	// service account tokens bound to Pod objects.
+	ServiceAccountTokenPodNodeInfo featuregate.Feature = "ServiceAccountTokenPodNodeInfo"
+
 	// owner: @xuzhenglun
 	// kep: http://kep.k8s.io/3682
 	// alpha: v1.27
@@ -1101,6 +1131,14 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
 	SeparateTaintEvictionController: {Default: true, PreRelease: featuregate.Beta},
+
+	ServiceAccountTokenJTI: {Default: false, PreRelease: featuregate.Alpha},
+
+	ServiceAccountTokenPodNodeInfo: {Default: false, PreRelease: featuregate.Alpha},
+
+	ServiceAccountTokenNodeBinding: {Default: false, PreRelease: featuregate.Alpha},
+
+	ServiceAccountTokenNodeBindingValidation: {Default: false, PreRelease: featuregate.Alpha},
 
 	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
