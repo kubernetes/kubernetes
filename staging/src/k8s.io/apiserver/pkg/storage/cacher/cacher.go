@@ -112,8 +112,11 @@ func (wm watchersMap) addWatcher(w *cacheWatcher, number int) {
 	wm[number] = w
 }
 
-func (wm watchersMap) deleteWatcher(number int) {
-	delete(wm, number)
+func (wm watchersMap) deleteWatcher(number int, done func(*cacheWatcher)) {
+	if watcher, ok := wm[number]; ok {
+		delete(wm, number)
+		done(watcher)
+	}
 }
 
 func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
@@ -144,14 +147,14 @@ func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespac
 	}
 }
 
-func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool) {
+func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool, done func(*cacheWatcher)) {
 	if supported {
-		i.valueWatchers[value].deleteWatcher(number)
+		i.valueWatchers[value].deleteWatcher(number, done)
 		if len(i.valueWatchers[value]) == 0 {
 			delete(i.valueWatchers, value)
 		}
 	} else {
-		i.allWatchers[scope].deleteWatcher(number)
+		i.allWatchers[scope].deleteWatcher(number, done)
 		if len(i.allWatchers[scope]) == 0 {
 			delete(i.allWatchers, scope)
 		}
@@ -1220,8 +1223,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported)
-		c.stopWatcherLocked(w)
+		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported, c.stopWatcherLocked)
 	}
 }
 
