@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -52,6 +52,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	clocktesting "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -1119,7 +1120,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1(), serverConcurrency)
 
 	factory.Start(stopCh)
 
@@ -1307,7 +1308,7 @@ func newConfiguration(fsName, plName, user string, concurrency int32, queueLengt
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: concurrency,
+				NominalConcurrencyShares: ptr.To(concurrency),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type:    responseType,
 					Queuing: qcfg,

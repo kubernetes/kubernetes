@@ -44,7 +44,15 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 		},
 		{
 			runtimeConfig:    "api/beta=false",
+			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "api/ga=false",
 			errShouldContain: conflict,
+		},
+		{
+			runtimeConfig:    "api/ga=true",
+			errShouldContain: "",
 		},
 		{
 			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta1=false",
@@ -56,11 +64,23 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 		},
 		{
 			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=false",
-			errShouldContain: conflict,
+			errShouldContain: "",
 		},
 		{
 			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=true",
 			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1=true",
+			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1=false",
+			errShouldContain: conflict,
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=true,flowcontrol.apiserver.k8s.io/v1=false",
+			errShouldContain: conflict,
 		},
 	}
 
@@ -78,8 +98,16 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 			if errs := validateAPIPriorityAndFairness(options); len(errs) > 0 {
 				errMessageGot = errs[0].Error()
 			}
-			if !strings.Contains(errMessageGot, test.errShouldContain) {
-				t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
+
+			switch {
+			case len(test.errShouldContain) == 0:
+				if len(errMessageGot) > 0 {
+					t.Errorf("Expected no error, but got: %q", errMessageGot)
+				}
+			default:
+				if !strings.Contains(errMessageGot, test.errShouldContain) {
+					t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
+				}
 			}
 		})
 	}

@@ -21,23 +21,24 @@ import (
 	"reflect"
 	"testing"
 
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
-	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
+	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1"
 	toolscache "k8s.io/client-go/tools/cache"
-	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestEnsurePriorityLevel(t *testing.T) {
-	validExemptPL := func() *flowcontrolv1beta3.PriorityLevelConfiguration {
+	validExemptPL := func() *flowcontrolv1.PriorityLevelConfiguration {
 		copy := bootstrap.MandatoryPriorityLevelConfigurationExempt.DeepCopy()
-		copy.Annotations[flowcontrolv1beta3.AutoUpdateAnnotationKey] = "true"
+		copy.Annotations[flowcontrolv1.AutoUpdateAnnotationKey] = "true"
 		copy.Spec.Exempt.NominalConcurrencyShares = pointer.Int32(10)
 		copy.Spec.Exempt.LendablePercent = pointer.Int32(50)
 		return copy
@@ -45,29 +46,29 @@ func TestEnsurePriorityLevel(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		strategy  func() EnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration]
-		current   *flowcontrolv1beta3.PriorityLevelConfiguration
-		bootstrap *flowcontrolv1beta3.PriorityLevelConfiguration
-		expected  *flowcontrolv1beta3.PriorityLevelConfiguration
+		strategy  func() EnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration]
+		current   *flowcontrolv1.PriorityLevelConfiguration
+		bootstrap *flowcontrolv1.PriorityLevelConfiguration
+		expected  *flowcontrolv1.PriorityLevelConfiguration
 	}{
 		// for suggested configurations
 		{
 			name:      "suggested priority level configuration does not exist - the object should always be re-created",
-			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(10).Object(),
 			current:   nil,
 			expected:  newPLConfiguration("pl1").WithLimited(10).Object(),
 		},
 		{
 			name:      "suggested priority level configuration exists, auto update is enabled, spec does not match - current object should be updated",
-			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
 		},
 		{
 			name:      "suggested priority level configuration exists, auto update is disabled, spec does not match - current object should not be updated",
-			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
@@ -76,29 +77,29 @@ func TestEnsurePriorityLevel(t *testing.T) {
 		// for mandatory configurations
 		{
 			name:      "mandatory priority level configuration does not exist - new object should be created",
-			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(10).WithAutoUpdateAnnotation("true").Object(),
 			current:   nil,
 			expected:  newPLConfiguration("pl1").WithLimited(10).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
 			name:      "mandatory priority level configuration exists, annotation is missing - annotation is added",
-			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithLimited(20).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
 		},
 		{
 			name:      "mandatory priority level configuration exists, auto update is disabled, spec does not match - current object should be updated",
-			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
 		},
 		{
 			name:     "admin changes the Exempt field of the exempt priority level configuration",
-			strategy: NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
-			bootstrap: func() *flowcontrolv1beta3.PriorityLevelConfiguration {
+			strategy: NewMandatoryEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration],
+			bootstrap: func() *flowcontrolv1.PriorityLevelConfiguration {
 				return bootstrap.MandatoryPriorityLevelConfigurationExempt
 			}(),
 			current:  validExemptPL,
@@ -108,7 +109,7 @@ func TestEnsurePriorityLevel(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset().FlowcontrolV1beta3().PriorityLevelConfigurations()
+			client := fake.NewSimpleClientset().FlowcontrolV1().PriorityLevelConfigurations()
 			indexer := toolscache.NewIndexer(toolscache.MetaNamespaceKeyFunc, toolscache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
@@ -116,7 +117,7 @@ func TestEnsurePriorityLevel(t *testing.T) {
 			}
 
 			ops := NewPriorityLevelConfigurationOps(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer))
-			boots := []*flowcontrolv1beta3.PriorityLevelConfiguration{test.bootstrap}
+			boots := []*flowcontrolv1.PriorityLevelConfiguration{test.bootstrap}
 			strategy := test.strategy()
 
 			err := EnsureConfigurations(context.Background(), ops, boots, strategy)
@@ -144,9 +145,9 @@ func TestEnsurePriorityLevel(t *testing.T) {
 func TestSuggestedPLEnsureStrategy_ShouldUpdate(t *testing.T) {
 	tests := []struct {
 		name              string
-		current           *flowcontrolv1beta3.PriorityLevelConfiguration
-		bootstrap         *flowcontrolv1beta3.PriorityLevelConfiguration
-		newObjectExpected *flowcontrolv1beta3.PriorityLevelConfiguration
+		current           *flowcontrolv1.PriorityLevelConfiguration
+		bootstrap         *flowcontrolv1.PriorityLevelConfiguration
+		newObjectExpected *flowcontrolv1.PriorityLevelConfiguration
 	}{
 		{
 			name:              "auto update is enabled, first generation, spec does not match - spec update expected",
@@ -225,7 +226,7 @@ func TestSuggestedPLEnsureStrategy_ShouldUpdate(t *testing.T) {
 	ops := NewPriorityLevelConfigurationOps(nil, nil)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			strategy := NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration]()
+			strategy := NewSuggestedEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration]()
 			updatableGot, updateGot, err := strategy.ReviseIfNeeded(ops, test.current, test.bootstrap)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
@@ -251,75 +252,75 @@ func TestSuggestedPLEnsureStrategy_ShouldUpdate(t *testing.T) {
 }
 
 func TestPriorityLevelSpecChanged(t *testing.T) {
-	pl1 := &flowcontrolv1beta3.PriorityLevelConfiguration{
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-				LimitResponse: flowcontrolv1beta3.LimitResponse{
-					Type: flowcontrolv1beta3.LimitResponseTypeReject,
+	pl1 := &flowcontrolv1.PriorityLevelConfiguration{
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+				LimitResponse: flowcontrolv1.LimitResponse{
+					Type: flowcontrolv1.LimitResponseTypeReject,
 				},
 			},
 		},
 	}
-	pl2 := &flowcontrolv1beta3.PriorityLevelConfiguration{
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 1,
+	pl2 := &flowcontrolv1.PriorityLevelConfiguration{
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: ptr.To(int32(1)),
 			},
 		},
 	}
-	pl1Defaulted := &flowcontrolv1beta3.PriorityLevelConfiguration{
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: flowcontrolapisv1beta3.PriorityLevelConfigurationDefaultNominalConcurrencyShares,
+	pl1Defaulted := &flowcontrolv1.PriorityLevelConfiguration{
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: ptr.To(flowcontrolapisv1.PriorityLevelConfigurationDefaultNominalConcurrencyShares),
 				LendablePercent:          pointer.Int32(0),
-				LimitResponse: flowcontrolv1beta3.LimitResponse{
-					Type: flowcontrolv1beta3.LimitResponseTypeReject,
+				LimitResponse: flowcontrolv1.LimitResponse{
+					Type: flowcontrolv1.LimitResponseTypeReject,
 				},
 			},
 		},
 	}
-	ple1 := &flowcontrolv1beta3.PriorityLevelConfiguration{
+	ple1 := &flowcontrolv1.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
-			Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1.PriorityLevelEnablementExempt,
+			Exempt: &flowcontrolv1.ExemptPriorityLevelConfiguration{
 				NominalConcurrencyShares: pointer.Int32(42),
 				LendablePercent:          pointer.Int32(33),
 			},
 		},
 	}
-	ple2 := &flowcontrolv1beta3.PriorityLevelConfiguration{
+	ple2 := &flowcontrolv1.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
-			Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1.PriorityLevelEnablementExempt,
+			Exempt: &flowcontrolv1.ExemptPriorityLevelConfiguration{
 				NominalConcurrencyShares: pointer.Int32(24),
 				LendablePercent:          pointer.Int32(86),
 			},
 		},
 	}
-	pleWrong := &flowcontrolv1beta3.PriorityLevelConfiguration{
+	pleWrong := &flowcontrolv1.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 1,
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: ptr.To(int32(1)),
 			},
 		},
 	}
-	pleInvalid := &flowcontrolv1beta3.PriorityLevelConfiguration{
+	pleInvalid := &flowcontrolv1.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 			Type: "widget",
 		},
 	}
 	testCases := []struct {
 		name        string
-		expected    *flowcontrolv1beta3.PriorityLevelConfiguration
-		actual      *flowcontrolv1beta3.PriorityLevelConfiguration
+		expected    *flowcontrolv1.PriorityLevelConfiguration
+		actual      *flowcontrolv1.PriorityLevelConfiguration
 		specChanged bool
 	}{
 		{
@@ -373,7 +374,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 func TestRemovePriorityLevelConfiguration(t *testing.T) {
 	tests := []struct {
 		name           string
-		current        *flowcontrolv1beta3.PriorityLevelConfiguration
+		current        *flowcontrolv1.PriorityLevelConfiguration
 		bootstrapName  string
 		removeExpected bool
 	}{
@@ -422,7 +423,7 @@ func TestRemovePriorityLevelConfiguration(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset().FlowcontrolV1beta3().PriorityLevelConfigurations()
+			client := fake.NewSimpleClientset().FlowcontrolV1().PriorityLevelConfigurations()
 			indexer := toolscache.NewIndexer(toolscache.MetaNamespaceKeyFunc, toolscache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
@@ -430,7 +431,7 @@ func TestRemovePriorityLevelConfiguration(t *testing.T) {
 			}
 
 			boot := newPLConfiguration(test.bootstrapName).Object()
-			boots := []*flowcontrolv1beta3.PriorityLevelConfiguration{boot}
+			boots := []*flowcontrolv1.PriorityLevelConfiguration{boot}
 			ops := NewPriorityLevelConfigurationOps(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer))
 			err := RemoveUnwantedObjects(context.Background(), ops, boots)
 			if err != nil {
@@ -456,12 +457,12 @@ func TestRemovePriorityLevelConfiguration(t *testing.T) {
 }
 
 type plBuilder struct {
-	object *flowcontrolv1beta3.PriorityLevelConfiguration
+	object *flowcontrolv1.PriorityLevelConfiguration
 }
 
 func newPLConfiguration(name string) *plBuilder {
 	return &plBuilder{
-		object: &flowcontrolv1beta3.PriorityLevelConfiguration{
+		object: &flowcontrolv1.PriorityLevelConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
@@ -469,7 +470,7 @@ func newPLConfiguration(name string) *plBuilder {
 	}
 }
 
-func (b *plBuilder) Object() *flowcontrolv1beta3.PriorityLevelConfiguration {
+func (b *plBuilder) Object() *flowcontrolv1.PriorityLevelConfiguration {
 	return b.object
 }
 
@@ -484,12 +485,12 @@ func (b *plBuilder) WithAutoUpdateAnnotation(value string) *plBuilder {
 }
 
 func (b *plBuilder) WithLimited(nominalConcurrencyShares int32) *plBuilder {
-	b.object.Spec.Type = flowcontrolv1beta3.PriorityLevelEnablementLimited
-	b.object.Spec.Limited = &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-		NominalConcurrencyShares: nominalConcurrencyShares,
+	b.object.Spec.Type = flowcontrolv1.PriorityLevelEnablementLimited
+	b.object.Spec.Limited = &flowcontrolv1.LimitedPriorityLevelConfiguration{
+		NominalConcurrencyShares: ptr.To(nominalConcurrencyShares),
 		LendablePercent:          pointer.Int32(0),
-		LimitResponse: flowcontrolv1beta3.LimitResponse{
-			Type: flowcontrolv1beta3.LimitResponseTypeReject,
+		LimitResponse: flowcontrolv1.LimitResponse{
+			Type: flowcontrolv1.LimitResponseTypeReject,
 		},
 	}
 	return b
@@ -502,8 +503,8 @@ func (b *plBuilder) WithQueuing(queues, handSize, queueLengthLimit int32) *plBui
 		return b
 	}
 
-	limited.LimitResponse.Type = flowcontrolv1beta3.LimitResponseTypeQueue
-	limited.LimitResponse.Queuing = &flowcontrolv1beta3.QueuingConfiguration{
+	limited.LimitResponse.Type = flowcontrolv1.LimitResponseTypeQueue
+	limited.LimitResponse.Queuing = &flowcontrolv1.QueuingConfiguration{
 		Queues:           queues,
 		HandSize:         handSize,
 		QueueLengthLimit: queueLengthLimit,

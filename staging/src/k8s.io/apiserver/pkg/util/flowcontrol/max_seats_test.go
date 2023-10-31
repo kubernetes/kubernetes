@@ -20,13 +20,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/eventclock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 )
 
 // Test_GetMaxSeats tests max seats retrieved from MaxSeatsTracker
@@ -97,7 +98,7 @@ func Test_GetMaxSeats(t *testing.T) {
 		t.Run(testcase.name, func(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
-			flowcontrolClient := clientset.FlowcontrolV1beta3()
+			flowcontrolClient := clientset.FlowcontrolV1()
 			startTime := time.Now()
 			clk, _ := eventclock.NewFake(startTime, 0, nil)
 			c := newTestableController(TestableConfig{
@@ -113,23 +114,25 @@ func Test_GetMaxSeats(t *testing.T) {
 				QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 			})
 
-			testPriorityLevel := &v1beta3.PriorityLevelConfiguration{
+			testPriorityLevel := &flowcontrolv1.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-pl",
 				},
-				Spec: v1beta3.PriorityLevelConfigurationSpec{
-					Type: v1beta3.PriorityLevelEnablementLimited,
-					Limited: &v1beta3.LimitedPriorityLevelConfiguration{
-						NominalConcurrencyShares: 10000,
-						LimitResponse: v1beta3.LimitResponse{
-							Queuing: &v1beta3.QueuingConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: ptr.To(int32(10000)),
+						LimitResponse: flowcontrolv1.LimitResponse{
+							Queuing: &flowcontrolv1.QueuingConfiguration{
 								HandSize: testcase.handSize,
 							},
 						},
 					},
 				},
 			}
-			c.digestConfigObjects([]*v1beta3.PriorityLevelConfiguration{testPriorityLevel}, nil)
+			if _, err := c.digestConfigObjects([]*flowcontrolv1.PriorityLevelConfiguration{testPriorityLevel}, nil); err != nil {
+				t.Errorf("unexpected error from digestConfigObjects: %v", err)
+			}
 			maxSeats := c.GetMaxSeats("test-pl")
 			if maxSeats != testcase.expectedMaxSeats {
 				t.Errorf("unexpected max seats, got=%d, want=%d", maxSeats, testcase.expectedMaxSeats)

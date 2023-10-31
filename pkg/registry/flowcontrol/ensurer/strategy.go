@@ -22,7 +22,7 @@ import (
 	"strconv"
 
 	"github.com/google/go-cmp/cmp"
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -199,7 +199,7 @@ func (s *strategy[ObjectType]) ReviseIfNeeded(objectOps objectLocalOps[ObjectTyp
 // shouldUpdateSpec inspects the auto-update annotation key and generation field to determine
 // whether the config object should be auto-updated.
 func shouldUpdateSpec(accessor metav1.Object) bool {
-	value, _ := accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey]
+	value := accessor.GetAnnotations()[flowcontrolv1.AutoUpdateAnnotationKey]
 	if autoUpdate, err := strconv.ParseBool(value); err == nil {
 		return autoUpdate
 	}
@@ -219,7 +219,7 @@ func shouldUpdateSpec(accessor metav1.Object) bool {
 // shouldUpdateAnnotation determines whether the current value of the auto-update annotation
 // key matches the desired value.
 func shouldUpdateAnnotation(accessor metav1.Object, desired bool) bool {
-	if value, ok := accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey]; ok {
+	if value, ok := accessor.GetAnnotations()[flowcontrolv1.AutoUpdateAnnotationKey]; ok {
 		if current, err := strconv.ParseBool(value); err == nil && current == desired {
 			return false
 		}
@@ -234,7 +234,7 @@ func setAutoUpdateAnnotation(accessor metav1.Object, autoUpdate bool) {
 		accessor.SetAnnotations(map[string]string{})
 	}
 
-	accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
+	accessor.GetAnnotations()[flowcontrolv1.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
 }
 
 // EnsureConfigurations applies the given maintenance strategy to the given objects.
@@ -321,21 +321,21 @@ func RemoveUnwantedObjects[ObjectType configurationObjectType](ctx context.Conte
 		var value string
 		var ok, autoUpdate bool
 		var err error
-		if value, ok = object.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey]; !ok {
+		if value, ok = object.GetAnnotations()[flowcontrolv1.AutoUpdateAnnotationKey]; !ok {
 			// the configuration object does not have the annotation key,
 			// it's probably a user defined configuration object,
 			// so we can skip it.
-			klog.V(5).InfoS("Skipping deletion of APF object with no "+flowcontrolv1beta3.AutoUpdateAnnotationKey+" annotation", "name", name)
+			klog.V(5).InfoS("Skipping deletion of APF object with no "+flowcontrolv1.AutoUpdateAnnotationKey+" annotation", "name", name)
 			continue
 		}
 		autoUpdate, err = strconv.ParseBool(value)
 		if err != nil {
 			// Log this because it is not an expected situation.
-			klog.V(4).InfoS("Skipping deletion of APF object with malformed "+flowcontrolv1beta3.AutoUpdateAnnotationKey+" annotation", "name", name, "annotationValue", value, "parseError", err)
+			klog.V(4).InfoS("Skipping deletion of APF object with malformed "+flowcontrolv1.AutoUpdateAnnotationKey+" annotation", "name", name, "annotationValue", value, "parseError", err)
 			continue
 		}
 		if !autoUpdate {
-			klog.V(5).InfoS("Skipping deletion of APF object with "+flowcontrolv1beta3.AutoUpdateAnnotationKey+"=false annotation", "name", name)
+			klog.V(5).InfoS("Skipping deletion of APF object with "+flowcontrolv1.AutoUpdateAnnotationKey+"=false annotation", "name", name)
 			continue
 		}
 		// TODO: expectedResourceVersion := object.GetResourceVersion()

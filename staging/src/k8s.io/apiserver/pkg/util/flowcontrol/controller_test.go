@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,9 +38,10 @@ import (
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 // Some tests print a lot of debug logs which slows down tests considerably,
@@ -70,7 +71,7 @@ func (cfgCtlr *configController) hasPriorityLevelState(plName string) bool {
 type ctlrTestState struct {
 	t               *testing.T
 	cfgCtlr         *configController
-	fcIfc           fcclient.FlowcontrolV1beta3Interface
+	fcIfc           fcclient.FlowcontrolV1Interface
 	existingPLs     map[string]*flowcontrol.PriorityLevelConfiguration
 	existingFSs     map[string]*flowcontrol.FlowSchema
 	heldRequestsMap map[string][]heldRequest
@@ -236,7 +237,7 @@ func TestConfigConsumer(t *testing.T) {
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
-			flowcontrolClient := clientset.FlowcontrolV1beta3()
+			flowcontrolClient := clientset.FlowcontrolV1()
 			cts := &ctlrTestState{t: t,
 				fcIfc:           flowcontrolClient,
 				existingFSs:     map[string]*flowcontrol.FlowSchema{},
@@ -357,7 +358,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 10,
+				NominalConcurrencyShares: ptr.To(int32(10)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
@@ -367,7 +368,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 
 	clientset := clientsetfake.NewSimpleClientset(fs, pl)
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
-	flowcontrolClient := clientset.FlowcontrolV1beta3()
+	flowcontrolClient := clientset.FlowcontrolV1()
 	cts := &ctlrTestState{t: t,
 		fcIfc:           flowcontrolClient,
 		existingFSs:     map[string]*flowcontrol.FlowSchema{},
