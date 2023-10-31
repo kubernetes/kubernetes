@@ -363,6 +363,16 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
+	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+	// is not allowed. When this field is not set, it indicates that this volume does not belong to any
+	// VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
+	// after a volume has been updated successfully to a new class.
+	// For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
+	// PersistentVolumeClaims during the binding process.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,10,opt,name=volumeAttributesClassName"`
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -533,6 +543,21 @@ type PersistentVolumeClaimSpec struct {
 	// (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
 	// +optional
 	DataSourceRef *TypedObjectReference `json:"dataSourceRef,omitempty" protobuf:"bytes,8,opt,name=dataSourceRef"`
+	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+	// If specified, the CSI driver will create or update the volume with the attributes defined
+	// in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
+	// it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
+	// will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
+	// If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
+	// will be set by the persistentvolume controller if it exists.
+	// If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
+	// set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
+	// exists.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+	// (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,9,opt,name=volumeAttributesClassName"`
 }
 
 type TypedObjectReference struct {
@@ -561,6 +586,11 @@ const (
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
 	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
+
+	// Applying the target VolumeAttributesClass encountered an error
+	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
+	// Volume is being modified
+	PersistentVolumeClaimVolumeModifyingVolume PersistentVolumeClaimConditionType = "ModifyingVolume"
 )
 
 // +enum
@@ -586,6 +616,38 @@ const (
 	// State set when resizing has failed in kubelet with a terminal error. Transient errors don't set NodeResizeFailed
 	PersistentVolumeClaimNodeResizeFailed ClaimResourceStatus = "NodeResizeFailed"
 )
+
+// +enum
+// New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately
+type PersistentVolumeClaimModifyVolumeStatus string
+
+const (
+	// Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+	// the specified VolumeAttributesClass not existing
+	PersistentVolumeClaimModifyVolumePending PersistentVolumeClaimModifyVolumeStatus = "Pending"
+	// InProgress indicates that the volume is being modified
+	PersistentVolumeClaimModifyVolumeInProgress PersistentVolumeClaimModifyVolumeStatus = "InProgress"
+	// Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+	// resolve the error, a valid VolumeAttributesClass needs to be specified
+	PersistentVolumeClaimModifyVolumeInfeasible PersistentVolumeClaimModifyVolumeStatus = "Infeasible"
+)
+
+// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
+type ModifyVolumeStatus struct {
+	// targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+	TargetVolumeAttributesClassName string `json:"targetVolumeAttributesClassName,omitempty" protobuf:"bytes,1,opt,name=targetVolumeAttributesClassName"`
+	// status is the status of the ControllerModifyVolume operation. It can be in any of following states:
+	//  - Pending
+	//    Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+	//    the specified VolumeAttributesClass not existing.
+	//  - InProgress
+	//    InProgress indicates that the volume is being modified.
+	//  - Infeasible
+	//   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+	// 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
+	// Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+	Status PersistentVolumeClaimModifyVolumeStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=PersistentVolumeClaimModifyVolumeStatus"`
+}
 
 // PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimCondition struct {
@@ -693,6 +755,18 @@ type PersistentVolumeClaimStatus struct {
 	// +mapType=granular
 	// +optional
 	AllocatedResourceStatuses map[ResourceName]ClaimResourceStatus `json:"allocatedResourceStatuses,omitempty" protobuf:"bytes,7,rep,name=allocatedResourceStatuses"`
+	// currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
+	// When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	CurrentVolumeAttributesClassName *string `json:"currentVolumeAttributesClassName,omitempty" protobuf:"bytes,8,opt,name=currentVolumeAttributesClassName"`
+	// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
+	// When this is unset, there is no ModifyVolume operation being attempted.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	ModifyVolumeStatus *ModifyVolumeStatus `json:"modifyVolumeStatus,omitempty" protobuf:"bytes,9,opt,name=modifyVolumeStatus"`
 }
 
 // +enum

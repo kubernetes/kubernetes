@@ -54,6 +54,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CSIDriverList{},
 		&CSIStorageCapacity{},
 		&CSIStorageCapacityList{},
+		&VolumeAttributesClass{},
+		&VolumeAttributesClassList{},
 	)
 	return nil
 }

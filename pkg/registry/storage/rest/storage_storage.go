@@ -31,6 +31,7 @@ import (
 	csistoragecapacitystore "k8s.io/kubernetes/pkg/registry/storage/csistoragecapacity/storage"
 	storageclassstore "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage"
 	volumeattachmentstore "k8s.io/kubernetes/pkg/registry/storage/volumeattachment/storage"
+	volumeattributesclassstore "k8s.io/kubernetes/pkg/registry/storage/volumeattributesclass/storage"
 )
 
 type RESTStorageProvider struct {
@@ -70,6 +71,15 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 			return storage, err
 		}
 		storage[resource] = csiStorageStorage.CSIStorageCapacity
+	}
+
+	// register volumeattributesclasses
+	if resource := "volumeattributesclasses"; apiResourceConfigSource.ResourceEnabled(storageapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		volumeAttributesClassStorage, err := volumeattributesclassstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = volumeAttributesClassStorage
 	}
 
 	return storage, nil
