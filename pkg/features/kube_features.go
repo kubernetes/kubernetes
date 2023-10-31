@@ -236,6 +236,12 @@ const (
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
 
+	// owner: @HirazawaUi
+	// kep: http://kep.k8s.io/4004
+	// alpha: v1.29
+	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
+	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/3063
 	// alpha: v1.26
@@ -999,6 +1005,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 
 	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
+
+	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Alpha},
 
 	DevicePluginCDIDevices: {Default: true, PreRelease: featuregate.Beta},
 
