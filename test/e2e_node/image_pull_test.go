@@ -102,8 +102,8 @@ var _ = SIGDescribe("Pull Image [Serial]", func() {
 					}
 				}
 			}
-			deletePodSyncByName(ctx, f, pod.Name)
-			deletePodSyncByName(ctx, f, pod2.Name)
+			// deletePodSyncByName(ctx, f, pod.Name)
+			// deletePodSyncByName(ctx, f, pod2.Name)
 
 			// as this is serialize image pulling, the waiting duration should be almost double the duration with the pulled duration.
 			// use 1.5 as a common ratio to avoid some overlap during pod creation
