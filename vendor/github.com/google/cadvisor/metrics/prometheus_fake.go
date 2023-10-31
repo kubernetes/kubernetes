@@ -350,10 +350,11 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 								Unevictable: map[uint8]uint64{0: 8900, 1: 20000},
 							},
 						},
-						Cache:      14,
-						RSS:        15,
-						MappedFile: 16,
-						Swap:       8192,
+						Cache:       14,
+						RSS:         15,
+						MappedFile:  16,
+						KernelUsage: 17,
+						Swap:        8192,
 					},
 					Hugetlb: map[string]info.HugetlbStats{
 						"2Mi": {
