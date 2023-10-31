@@ -440,6 +440,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.LoadBalancerStatus":                                                                 schema_k8sio_api_core_v1_LoadBalancerStatus(ref),
 		"k8s.io/api/core/v1.LocalObjectReference":                                                               schema_k8sio_api_core_v1_LocalObjectReference(ref),
 		"k8s.io/api/core/v1.LocalVolumeSource":                                                                  schema_k8sio_api_core_v1_LocalVolumeSource(ref),
+		"k8s.io/api/core/v1.ModifyVolumeStatus":                                                                 schema_k8sio_api_core_v1_ModifyVolumeStatus(ref),
 		"k8s.io/api/core/v1.NFSVolumeSource":                                                                    schema_k8sio_api_core_v1_NFSVolumeSource(ref),
 		"k8s.io/api/core/v1.Namespace":                                                                          schema_k8sio_api_core_v1_Namespace(ref),
 		"k8s.io/api/core/v1.NamespaceCondition":                                                                 schema_k8sio_api_core_v1_NamespaceCondition(ref),
@@ -893,6 +894,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/storage/v1alpha1.VolumeAttachmentSource":                                                    schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSource(ref),
 		"k8s.io/api/storage/v1alpha1.VolumeAttachmentSpec":                                                      schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSpec(ref),
 		"k8s.io/api/storage/v1alpha1.VolumeAttachmentStatus":                                                    schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref),
+		"k8s.io/api/storage/v1alpha1.VolumeAttributesClass":                                                     schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref),
+		"k8s.io/api/storage/v1alpha1.VolumeAttributesClassList":                                                 schema_k8sio_api_storage_v1alpha1_VolumeAttributesClassList(ref),
 		"k8s.io/api/storage/v1alpha1.VolumeError":                                                               schema_k8sio_api_storage_v1alpha1_VolumeError(ref),
 		"k8s.io/api/storage/v1beta1.CSIDriver":                                                                  schema_k8sio_api_storage_v1beta1_CSIDriver(ref),
 		"k8s.io/api/storage/v1beta1.CSIDriverList":                                                              schema_k8sio_api_storage_v1beta1_CSIDriverList(ref),
@@ -21801,6 +21804,36 @@ func schema_k8sio_api_core_v1_LocalVolumeSource(ref common.ReferenceCallback) co
 	}
 }
 
+func schema_k8sio_api_core_v1_ModifyVolumeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"targetVolumeAttributesClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status is the status of the ControllerModifyVolume operation. It can be in any of following states:\n - Pending\n   Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as\n   the specified VolumeAttributesClass not existing.\n - InProgress\n   InProgress indicates that the volume is being modified.\n - Infeasible\n  Infeasible indicates that the request has been rejected as invalid by the CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass needs to be specified.\nNote: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.\n\nPossible enum values:\n - `\"InProgress\"` InProgress indicates that the volume is being modified\n - `\"Infeasible\"` Infeasible indicates that the request has been rejected as invalid by the CSI driver. To resolve the error, a valid VolumeAttributesClass needs to be specified\n - `\"Pending\"` Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as the specified VolumeAttributesClass not existing",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"InProgress", "Infeasible", "Pending"},
+						},
+					},
+				},
+				Required: []string{"status"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_NFSVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -23267,6 +23300,13 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/core/v1.TypedObjectReference"),
 						},
 					},
+					"volumeAttributesClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass will be applied to the claim but it's not allowed to reset this field to empty string once it is set. If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass will be set by the persistentvolume controller if it exists. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -23374,11 +23414,24 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 							},
 						},
 					},
+					"currentVolumeAttributesClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using. When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim This is an alpha field and requires enabling VolumeAttributesClass feature.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"modifyVolumeStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation. When this is unset, there is no ModifyVolume operation being attempted. This is an alpha field and requires enabling VolumeAttributesClass feature.",
+							Ref:         ref("k8s.io/api/core/v1.ModifyVolumeStatus"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.PersistentVolumeClaimCondition", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/core/v1.ModifyVolumeStatus", "k8s.io/api/core/v1.PersistentVolumeClaimCondition", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -23860,6 +23913,13 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 						SchemaProps: spec.SchemaProps{
 							Description: "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
 							Ref:         ref("k8s.io/api/core/v1.VolumeNodeAffinity"),
+						},
+					},
+					"volumeAttributesClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of VolumeAttributesClass to which this persistent volume belongs. Empty value is not allowed. When this field is not set, it indicates that this volume does not belong to any VolumeAttributesClass. This field is mutable and can be changed by the CSI driver after a volume has been updated successfully to a new class. For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound PersistentVolumeClaims during the binding process. This is an alpha field and requires enabling VolumeAttributesClass feature.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -44507,6 +44567,118 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref common.Referen
 		},
 		Dependencies: []string{
 			"k8s.io/api/storage/v1alpha1.VolumeError"},
+	}
+}
+
+func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "VolumeAttributesClass represents a specification of mutable volume attributes defined by the CSI driver. The class can be specified during dynamic provisioning of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"driverName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the CSI driver This field is immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parameters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "parameters hold volume attributes defined by the CSI driver. These values are opaque to the Kubernetes and are passed directly to the CSI driver. The underlying storage provider supports changing these attributes on an existing volume, however the parameters field itself is immutable. To invoke a volume update, a new VolumeAttributesClass should be created with new parameters, and the PersistentVolumeClaim should be updated to reference the new VolumeAttributesClass.\n\nThis field is required and must contain at least one key/value pair. The keys cannot be empty, and the maximum number of parameters is 512, with a cumulative max size of 256K. If the CSI driver rejects invalid parameters, the target PersistentVolumeClaim will be set to an \"Infeasible\" state in the modifyVolumeStatus field.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"driverName"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "VolumeAttributesClassList is a collection of VolumeAttributesClass objects.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is the list of VolumeAttributesClass objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/storage/v1alpha1.VolumeAttributesClass"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/storage/v1alpha1.VolumeAttributesClass", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 

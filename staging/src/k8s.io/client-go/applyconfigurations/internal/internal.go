@@ -5564,6 +5564,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.ModifyVolumeStatus
+  map:
+    fields:
+    - name: status
+      type:
+        scalar: string
+      default: ""
+    - name: targetVolumeAttributesClassName
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.NFSVolumeSource
   map:
     fields:
@@ -6040,6 +6050,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageClassName
       type:
         scalar: string
+    - name: volumeAttributesClassName
+      type:
+        scalar: string
     - name: volumeMode
       type:
         scalar: string
@@ -6079,6 +6092,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
+    - name: currentVolumeAttributesClassName
+      type:
+        scalar: string
+    - name: modifyVolumeStatus
+      type:
+        namedType: io.k8s.api.core.v1.ModifyVolumeStatus
     - name: phase
       type:
         scalar: string
@@ -6199,6 +6218,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageos
       type:
         namedType: io.k8s.api.core.v1.StorageOSPersistentVolumeSource
+    - name: volumeAttributesClassName
+      type:
+        scalar: string
     - name: volumeMode
       type:
         scalar: string
@@ -12214,6 +12236,28 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: detachError
       type:
         namedType: io.k8s.api.storage.v1alpha1.VolumeError
+- name: io.k8s.api.storage.v1alpha1.VolumeAttributesClass
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: driverName
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: parameters
+      type:
+        map:
+          elementType:
+            scalar: string
 - name: io.k8s.api.storage.v1alpha1.VolumeError
   map:
     fields:
