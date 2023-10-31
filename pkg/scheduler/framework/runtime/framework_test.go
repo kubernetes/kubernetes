@@ -1535,6 +1535,22 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "skipped prescore plugin number greater than the number of score plugins",
+			plugins:        buildScoreConfigDefaultWeights(scorePlugin1),
+			pluginConfigs:  nil,
+			skippedPlugins: sets.New(scorePlugin1, "score-plugin-unknown"),
+			want: []framework.NodePluginScores{
+				{
+					Name:   "node1",
+					Scores: []framework.PluginScore{},
+				},
+				{
+					Name:   "node2",
+					Scores: []framework.PluginScore{},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
