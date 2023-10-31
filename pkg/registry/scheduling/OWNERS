@@ -1,8 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - sig-storage-approvers
+  - sig-scheduling-maintainers
 reviewers:
-  - sig-storage-reviewers
+  - sig-scheduling
 labels:
-  - sig/storage
+  - sig/scheduling
