@@ -1665,6 +1665,8 @@ var allowedTemplateObjectMetaFields = map[string]bool{
 
 // PersistentVolumeSpecValidationOptions contains the different settings for PeristentVolume validation
 type PersistentVolumeSpecValidationOptions struct {
+	// Allow users to modify the class of volume attributes
+	EnableVolumeAttributesClass bool
 }
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
@@ -1685,7 +1687,13 @@ var supportedReclaimPolicy = sets.New(
 var supportedVolumeModes = sets.New(core.PersistentVolumeBlock, core.PersistentVolumeFilesystem)
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
-	return PersistentVolumeSpecValidationOptions{}
+	opts := PersistentVolumeSpecValidationOptions{
+		EnableVolumeAttributesClass: utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+	}
+	if oldPv != nil && oldPv.Spec.VolumeAttributesClassName != nil {
+		opts.EnableVolumeAttributesClass = true
+	}
+	return opts
 }
 
 func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName string, validateInlinePersistentVolumeSpec bool, fldPath *field.Path, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
@@ -1970,6 +1978,18 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			}
 		}
 	}
+	if pvSpec.VolumeAttributesClassName != nil && opts.EnableVolumeAttributesClass {
+		if len(*pvSpec.VolumeAttributesClassName) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("volumeAttributesClassName"), "an empty string is disallowed"))
+		} else {
+			for _, msg := range ValidateClassName(*pvSpec.VolumeAttributesClassName, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("volumeAttributesClassName"), *pvSpec.VolumeAttributesClassName, msg))
+			}
+		}
+		if pvSpec.CSI == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("csi"), "has to be specified when using volumeAttributesClassName"))
+		}
+	}
 	return allErrs
 }
 
@@ -2004,6 +2024,17 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 		allErrs = append(allErrs, validatePvNodeAffinity(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 
+	if !apiequality.Semantic.DeepEqual(oldPv.Spec.VolumeAttributesClassName, newPv.Spec.VolumeAttributesClassName) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
+		}
+		if opts.EnableVolumeAttributesClass {
+			if oldPv.Spec.VolumeAttributesClassName != nil && newPv.Spec.VolumeAttributesClassName == nil {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to nil is forbidden"))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -2023,12 +2054,15 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	AllowInvalidLabelValueInSelector bool
 	// Allow to validate the API group of the data source and data source reference
 	AllowInvalidAPIGroupInDataSourceOrRef bool
+	// Allow users to modify the class of volume attributes
+	EnableVolumeAttributesClass bool
 }
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
 		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 		AllowInvalidLabelValueInSelector:  false,
+		EnableVolumeAttributesClass:       utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
@@ -2037,6 +2071,11 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 
 	// If the old object had an invalid API group in the data source or data source reference, continue to allow it in the new object
 	opts.AllowInvalidAPIGroupInDataSourceOrRef = allowInvalidAPIGroupInDataSourceOrRef(&oldPvc.Spec)
+
+	if oldPvc.Spec.VolumeAttributesClassName != nil {
+		// If the old object had a volume attributes class, continue to validate it in the new object.
+		opts.EnableVolumeAttributesClass = true
+	}
 
 	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
 		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
@@ -2056,6 +2095,7 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTemplate *core.PersistentVolumeClaimTemplate) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
+		EnableVolumeAttributesClass:      utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
 	if oldClaimTemplate == nil {
 		// If there's no old PVC template, use the options based solely on feature enablement
@@ -2211,6 +2251,11 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 				"must match dataSourceRef"))
 		}
 	}
+	if spec.VolumeAttributesClassName != nil && len(*spec.VolumeAttributesClassName) > 0 && opts.EnableVolumeAttributesClass {
+		for _, msg := range ValidateClassName(*spec.VolumeAttributesClassName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("volumeAttributesClassName"), *spec.VolumeAttributesClassName, msg))
+		}
+	}
 
 	return allErrs
 }
@@ -2254,6 +2299,8 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.Resources.Requests != nil {
 		newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"] // +k8s:verify-mutation:reason=clone
 	}
+	// lets make sure volume attributes class name is same.
+	newPvcClone.Spec.VolumeAttributesClassName = oldPvcClone.Spec.VolumeAttributesClassName // +k8s:verify-mutation:reason=clone
 
 	oldSize := oldPvc.Spec.Resources.Requests["storage"]
 	newSize := newPvc.Spec.Resources.Requests["storage"]
@@ -2261,7 +2308,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 
 	if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
 		specDiff := cmp.Diff(oldPvcClone.Spec, newPvcClone.Spec)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests and volumeAttributesClassName for bound claims\n%v", specDiff)))
 	}
 	if newSize.Cmp(oldSize) < 0 {
 		if !opts.EnableRecoverFromExpansionFailure {
@@ -2277,6 +2324,21 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	}
 
 	allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+
+	if !apiequality.Semantic.DeepEqual(oldPvc.Spec.VolumeAttributesClassName, newPvc.Spec.VolumeAttributesClassName) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
+		}
+		if opts.EnableVolumeAttributesClass {
+			if oldPvc.Spec.VolumeAttributesClassName != nil {
+				if newPvc.Spec.VolumeAttributesClassName == nil {
+					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to nil is forbidden"))
+				} else if len(*newPvc.Spec.VolumeAttributesClassName) == 0 {
+					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to an empty string is forbidden"))
+				}
+			}
+		}
+	}
 
 	return allErrs
 }

@@ -294,6 +294,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/storage/v1alpha1
+		gvr("storage.k8s.io", "v1alpha1", "volumeattributesclasses"): {
+			Stub:             `{"metadata": {"name": "vac1"}, "driverName": "example.com/driver", "parameters": {"foo": "bar"}}`,
+			ExpectedEtcdPath: "/registry/volumeattributesclasses/vac1",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 		gvr("storage.k8s.io", "v1beta1", "csistoragecapacities"): {
 			Stub:             `{"metadata": {"name": "csc-12345-2"}, "storageClassName": "sc1"}`,

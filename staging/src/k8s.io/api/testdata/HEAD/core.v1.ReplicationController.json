@@ -458,7 +458,8 @@
                     "kind": "kindValue",
                     "name": "nameValue",
                     "namespace": "namespaceValue"
-                  }
+                  },
+                  "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
             }

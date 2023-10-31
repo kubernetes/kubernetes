@@ -868,6 +868,13 @@ const (
 	// Enables user namespace support for stateless pods.
 	UserNamespacesSupport featuregate.Feature = "UserNamespacesSupport"
 
+	// owner: @mattcarry, @sunnylovestiramisu
+	// kep: https://kep.k8s.io/3751
+	// alpha: v1.29
+	//
+	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
+	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
+
 	// owner: @cofyc
 	// alpha: v1.21
 	VolumeCapacityPriority featuregate.Feature = "VolumeCapacityPriority"
@@ -1169,6 +1176,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TopologyManagerPolicyOptions: {Default: true, PreRelease: featuregate.Beta},
 
 	UnknownVersionInteroperabilityProxy: {Default: false, PreRelease: featuregate.Alpha},
+
+	VolumeAttributesClass: {Default: false, PreRelease: featuregate.Alpha},
 
 	VolumeCapacityPriority: {Default: false, PreRelease: featuregate.Alpha},
 

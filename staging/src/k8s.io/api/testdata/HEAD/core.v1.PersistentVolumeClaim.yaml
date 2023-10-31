@@ -58,6 +58,7 @@ spec:
     matchLabels:
       matchLabelsKey: matchLabelsValue
   storageClassName: storageClassNameValue
+  volumeAttributesClassName: volumeAttributesClassNameValue
   volumeMode: volumeModeValue
   volumeName: volumeNameValue
 status:
@@ -76,4 +77,8 @@ status:
     reason: reasonValue
     status: statusValue
     type: typeValue
+  currentVolumeAttributesClassName: currentVolumeAttributesClassNameValue
+  modifyVolumeStatus:
+    status: statusValue
+    targetVolumeAttributesClassName: targetVolumeAttributesClassNameValue
   phase: phaseValue

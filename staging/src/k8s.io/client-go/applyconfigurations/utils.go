@@ -737,6 +737,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.LocalObjectReferenceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LocalVolumeSource"):
 		return &applyconfigurationscorev1.LocalVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ModifyVolumeStatus"):
+		return &applyconfigurationscorev1.ModifyVolumeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Namespace"):
 		return &applyconfigurationscorev1.NamespaceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NamespaceCondition"):
@@ -1565,6 +1567,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1alpha1.VolumeAttachmentSpecApplyConfiguration{}
 	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeAttachmentStatus"):
 		return &applyconfigurationsstoragev1alpha1.VolumeAttachmentStatusApplyConfiguration{}
+	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeAttributesClass"):
+		return &applyconfigurationsstoragev1alpha1.VolumeAttributesClassApplyConfiguration{}
 	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeError"):
 		return &applyconfigurationsstoragev1alpha1.VolumeErrorApplyConfiguration{}
 

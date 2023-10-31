@@ -303,7 +303,8 @@
               }
             ]
           }
-        }
+        },
+        "volumeAttributesClassName": "volumeAttributesClassNameValue"
       }
     },
     "nodeName": "nodeNameValue"
