@@ -687,9 +687,8 @@ func shouldIgnoreNodeUpdate(oldNode, curNode v1.Node) bool {
 	if !nodeInSameCondition(oldNode.Status.Conditions, curNode.Status.Conditions) {
 		return false
 	}
-	oldNode.ResourceVersion = curNode.ResourceVersion
-	oldNode.Status.Conditions = curNode.Status.Conditions
-	return apiequality.Semantic.DeepEqual(oldNode, curNode)
+	return apiequality.Semantic.DeepEqual(oldNode.GetLabels(), curNode.GetLabels()) &&
+		apiequality.Semantic.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints)
 }
 
 func (dsc *DaemonSetsController) updateNode(logger klog.Logger, old, cur interface{}) {
