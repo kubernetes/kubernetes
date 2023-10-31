@@ -351,7 +351,9 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 			return err
 		}
 		if !ok {
-			// update the status to indicate why the ServiceCIDR can not be deleted
+			// update the status to indicate why the ServiceCIDR can not be deleted,
+			// it will be reevaludated by an event on any ServiceCIDR or IPAddress related object
+			// that may remove this condition.
 			svcApplyStatus := networkingapiv1alpha1apply.ServiceCIDRStatus().WithConditions(
 				metav1apply.Condition().
 					WithType(networkingapiv1alpha1.ServiceCIDRConditionReady).
