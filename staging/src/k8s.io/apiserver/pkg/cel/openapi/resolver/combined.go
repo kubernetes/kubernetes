@@ -38,7 +38,7 @@ type combinedSchemaResolver struct {
 // If the DefinitionsSchemaResolver knows the gvk, the DefinitionsSchemaResolver handles the resolution,
 // otherwise, the secondary does.
 func (r *combinedSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.Schema, error) {
-	if _, ok := r.definitions.gvkToSchema[gvk]; ok {
+	if _, ok := r.definitions.gvkToRef[gvk]; ok {
 		return r.definitions.ResolveSchema(gvk)
 	}
 	return r.secondary.ResolveSchema(gvk)
