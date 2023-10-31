@@ -949,7 +949,31 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 	// have been executed at some point in the past.  However, they could have been removed
 	// from the container runtime now, and if we proceed, it would appear as if they
 	// never ran and will re-execute improperly except for the restartable init containers.
-	podHasInitialized := hasAnyRegularContainerCreated(pod, podStatus)
+	podHasInitialized := false
+	for _, container := range pod.Spec.Containers {
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil {
+			continue
+		}
+		switch status.State {
+		case kubecontainer.ContainerStateCreated,
+			kubecontainer.ContainerStateRunning:
+			podHasInitialized = true
+		case kubecontainer.ContainerStateExited:
+			// This is a workaround for the issue that the kubelet cannot
+			// differentiate the container statuses of the previous podSandbox
+			// from the current one.
+			// If the node is rebooted, all containers will be in the exited
+			// state and the kubelet will try to recreate a new podSandbox.
+			// In this case, the kubelet should not mistakenly think that
+			// the newly created podSandbox has been initialized.
+		default:
+			// Ignore other states
+		}
+		if podHasInitialized {
+			break
+		}
+	}
 
 	// isPreviouslyInitialized indicates if the current init container is
 	// previously initialized.
