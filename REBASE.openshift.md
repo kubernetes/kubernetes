@@ -77,8 +77,6 @@ Before incorporating upstream changes you may want to:
 - Find the best tool for resolving merge conflicts
 - Use diff3 conflict resolution strategy
    (https://blog.nilbus.com/take-the-pain-out-of-git-conflict-resolution-use-diff3/)
-- Teach Git to remember how you’ve resolved a conflict so that the next time it can
-  resolve it automatically (https://git-scm.com/book/en/v2/Git-Tools-Rerere)
 
 ## Send email announcing you're starting work
 
