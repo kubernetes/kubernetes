@@ -150,14 +150,6 @@ var (
 			// https://issues.redhat.com/browse/OCPBUGS-16760
 			`\[Feature:NodeLogQuery\]`,
 
-			// https://issues.redhat.com/browse/OCPBUGS-16922
-			`AdmissionWebhook \[Privileged:ClusterAdmin\] should reject mutating webhook configurations with invalid match conditions`,
-			`AdmissionWebhook \[Privileged:ClusterAdmin\] should be able to deny pod and configmap creation`,
-			`AdmissionWebhook \[Privileged:ClusterAdmin\] should be able to create and update validating webhook configurations with match conditions`,
-			`AdmissionWebhook \[Privileged:ClusterAdmin\] should be able to create and update mutating webhook configurations with match conditions`,
-			`AdmissionWebhook \[Privileged:ClusterAdmin\] should reject validating webhook configurations with invalid match conditions`,
-			`AdmissionWebhook \[Privileged:ClusterAdmin\] should mutate everything except 'skip-me' configmaps`,
-
 			// https://issues.redhat.com/browse/OCPBUGS-17194
 			`\[sig-node\] ImageCredentialProvider \[Feature:KubeletCredentialProviders\] should be able to create pod with image credentials fetched from external credential provider`,
 
