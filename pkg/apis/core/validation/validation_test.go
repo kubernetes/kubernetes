@@ -7526,8 +7526,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 
-	var PodRestartPolicy core.RestartPolicy
-	PodRestartPolicy = "Always"
+	var PodRestartPolicy core.RestartPolicy = "Always"
 	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
@@ -8230,8 +8229,7 @@ func TestValidateInitContainers(t *testing.T) {
 		},
 	},
 	}
-	var PodRestartPolicy core.RestartPolicy
-	PodRestartPolicy = "Never"
+	var PodRestartPolicy core.RestartPolicy = "Never"
 	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
@@ -18811,7 +18809,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 func TestValidateResourceNames(t *testing.T) {
 	table := []struct {
-		input   string
+		input   core.ResourceName
 		success bool
 		expect  string
 	}{
@@ -18832,8 +18830,8 @@ func TestValidateResourceNames(t *testing.T) {
 		{"my.favorite.app.co/_12345", false, ""},
 		{"my.favorite.app.co/12345_", false, ""},
 		{"kubernetes.io/..", false, ""},
-		{"kubernetes.io/" + strings.Repeat("a", 63), true, ""},
-		{"kubernetes.io/" + strings.Repeat("a", 64), false, ""},
+		{core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)), true, ""},
+		{core.ResourceName("kubernetes.io/" + strings.Repeat("a", 64)), false, ""},
 		{"kubernetes.io//", false, ""},
 		{"kubernetes.io", false, ""},
 		{"kubernetes.io/will/not/work/", false, ""},
@@ -22272,13 +22270,13 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone"},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), supportedScheduleActions.List())},
+		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), sets.List(supportedScheduleActions))},
 	}, {
 		name: "unsupported scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.UnsatisfiableConstraintAction("N/A")},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), supportedScheduleActions.List())},
+		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), sets.List(supportedScheduleActions))},
 	}, {
 		name: "multiple constraints ok with all required fields",
 		constraints: []core.TopologySpreadConstraint{
@@ -22322,7 +22320,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeTaintsPolicy:   &ignore,
 		}},
 		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeAffinityField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
+			field.NotSupported(nodeAffinityField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
 		},
 	}, {
 		name: "unsupported policy name set on NodeTaintsPolicy",
@@ -22334,7 +22332,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeTaintsPolicy:   &unknown,
 		}},
 		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeTaintsField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
+			field.NotSupported(nodeTaintsField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
 		},
 	}, {
 		name: "key in MatchLabelKeys isn't correctly defined",
