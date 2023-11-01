@@ -67,6 +67,16 @@ issues:
         - gocritic
       text: "ifElseChain: rewrite if-else to switch statement"
 
+    # Only packages listed here opt into the strict "exported symbols must be documented".
+    #
+    # Exclude texts from https://github.com/golangci/golangci-lint/blob/ab3c3cd69e602ff53bb4c3e2c188f0caeb80305d/pkg/config/issues.go#L11-L103
+    - linters:
+        - golint
+        - revive
+        - stylecheck
+      text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
+      path-except: cmd/kubeadm
+
 linters:
   disable-all: false
   enable: # please keep this alphabetized

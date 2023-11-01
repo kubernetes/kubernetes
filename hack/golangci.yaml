@@ -73,6 +73,16 @@ issues:
         - gocritic
       text: "ifElseChain: rewrite if-else to switch statement"
 
+    # Only packages listed here opt into the strict "exported symbols must be documented".
+    #
+    # Exclude texts from https://github.com/golangci/golangci-lint/blob/ab3c3cd69e602ff53bb4c3e2c188f0caeb80305d/pkg/config/issues.go#L11-L103
+    - linters:
+        - golint
+        - revive
+        - stylecheck
+      text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
+      path-except: cmd/kubeadm
+
     # The following issues were deemed "might be worth fixing, needs to be
     # decided on a case-by-case basis".  This was initially decided by a
     # majority of the developers who voted in
@@ -98,12 +108,6 @@ issues:
     - linters:
         - gosimple
       text: "S1033: unnecessary guard around call to delete"
-
-    # Only packages listed here opt into the strict "exported symbols must be documented".
-    - linters:
-        - revive
-      text: "(exported: exported .* or be unexported|exported: comment on exported.*should be of the form)"
-      path-except: cmd/kubeadm
 
     # Didn't make it into https://github.com/kubernetes/kubernetes/issues/117288.
     # Discussion on Slack concluded that "it's hard to have a universal policy for all
