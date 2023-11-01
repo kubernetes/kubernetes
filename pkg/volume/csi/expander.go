@@ -23,9 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -83,13 +81,12 @@ func (c *csiPlugin) nodeExpandWithClient(
 	}
 	nodeExpandSecrets := map[string]string{}
 	expandClient := c.host.GetKubeClient()
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeExpandSecret) {
-		if csiSource.NodeExpandSecretRef != nil {
-			nodeExpandSecrets, err = getCredentialsFromSecret(expandClient, csiSource.NodeExpandSecretRef)
-			if err != nil {
-				return false, fmt.Errorf("expander.NodeExpand failed to get NodeExpandSecretRef %s/%s: %v",
-					csiSource.NodeExpandSecretRef.Namespace, csiSource.NodeExpandSecretRef.Name, err)
-			}
+
+	if csiSource.NodeExpandSecretRef != nil {
+		nodeExpandSecrets, err = getCredentialsFromSecret(expandClient, csiSource.NodeExpandSecretRef)
+		if err != nil {
+			return false, fmt.Errorf("expander.NodeExpand failed to get NodeExpandSecretRef %s/%s: %v",
+				csiSource.NodeExpandSecretRef.Namespace, csiSource.NodeExpandSecretRef.Name, err)
 		}
 	}
 
