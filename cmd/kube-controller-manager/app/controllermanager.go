@@ -557,6 +557,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
 	register(newTaintEvictionControllerDescriptor())
+	register(newServiceCIDRsControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {

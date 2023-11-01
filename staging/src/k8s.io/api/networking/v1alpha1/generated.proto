@@ -85,3 +85,54 @@ message ParentReference {
   optional string name = 4;
 }
 
+// ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
+// This range is used to allocate ClusterIPs to Service objects.
+message ServiceCIDR {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // spec is the desired state of the ServiceCIDR.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional ServiceCIDRSpec spec = 2;
+
+  // status represents the current state of the ServiceCIDR.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional ServiceCIDRStatus status = 3;
+}
+
+// ServiceCIDRList contains a list of ServiceCIDR objects.
+message ServiceCIDRList {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of ServiceCIDRs.
+  repeated ServiceCIDR items = 2;
+}
+
+// ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.
+message ServiceCIDRSpec {
+  // CIDRs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
+  // from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family.
+  // This field is immutable.
+  // +optional
+  repeated string cidrs = 1;
+}
+
+// ServiceCIDRStatus describes the current state of the ServiceCIDR.
+message ServiceCIDRStatus {
+  // conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR.
+  // Current service state
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+}
+

@@ -656,7 +656,7 @@ func ValidateIPAddressName(name string, prefix bool) []string {
 	if err != nil {
 		errs = append(errs, err.Error())
 	} else if ip.String() != name {
-		errs = append(errs, "not a valid ip in canonical format")
+		errs = append(errs, "must be a canonical format IP address")
 
 	}
 	return errs
@@ -719,5 +719,67 @@ func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList 
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
+	return allErrs
+}
+
+var ValidateServiceCIDRName = apimachineryvalidation.NameIsDNSSubdomain
+
+func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&cidrConfig.ObjectMeta, false, ValidateServiceCIDRName, field.NewPath("metadata"))
+	fieldPath := field.NewPath("spec", "cidrs")
+
+	if len(cidrConfig.Spec.CIDRs) == 0 {
+		allErrs = append(allErrs, field.Required(fieldPath, "at least one CIDR required"))
+		return allErrs
+	}
+
+	if len(cidrConfig.Spec.CIDRs) > 2 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may only hold up to 2 values"))
+		return allErrs
+	}
+	// validate cidrs are dual stack, one of each IP family
+	if len(cidrConfig.Spec.CIDRs) == 2 {
+		isDual, err := netutils.IsDualStackCIDRStrings(cidrConfig.Spec.CIDRs)
+		if err != nil || !isDual {
+			allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
+			return allErrs
+		}
+	}
+
+	for i, cidr := range cidrConfig.Spec.CIDRs {
+		allErrs = append(allErrs, validateCIDR(cidr, fieldPath.Index(i))...)
+	}
+
+	return allErrs
+}
+
+func validateCIDR(cidr string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	prefix, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, cidr, err.Error()))
+	} else {
+		if prefix.Addr() != prefix.Masked().Addr() {
+			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "wrong CIDR format, IP doesn't match network IP address"))
+		}
+		if prefix.String() != cidr {
+			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "CIDR not in RFC 5952 canonical format"))
+		}
+	}
+	return allErrs
+}
+
+// ValidateServiceCIDRUpdate tests if an update to a ServiceCIDR is valid.
+func ValidateServiceCIDRUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.CIDRs, old.Spec.CIDRs, field.NewPath("spec").Child("cidrs"))...)
+
+	return allErrs
+}
+
+// ValidateServiceCIDRStatusUpdate tests if if an update to a ServiceCIDR Status is valid.
+func ValidateServiceCIDRStatusUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	return allErrs
 }

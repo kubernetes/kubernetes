@@ -642,3 +642,53 @@ type IPAddressList struct {
 	// Items is the list of IPAddress
 	Items []IPAddress
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
+// This range is used to allocate ClusterIPs to Service objects.
+type ServiceCIDR struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+	// spec is the desired state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec ServiceCIDRSpec
+	// status represents the current state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status ServiceCIDRStatus
+}
+
+type ServiceCIDRSpec struct {
+	// CIDRs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
+	// from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family.
+	// This field is immutable.
+	// +optional
+	CIDRs []string
+}
+
+// ServiceCIDRStatus describes the current state of the ServiceCIDR.
+type ServiceCIDRStatus struct {
+	// conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR.
+	Conditions []metav1.Condition
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.27
+
+// ServiceCIDRList contains a list of ServiceCIDR objects.
+type ServiceCIDRList struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+	// items is the list of ServiceCIDRs.
+	Items []ServiceCIDR
+}

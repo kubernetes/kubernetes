@@ -103,8 +103,8 @@ func TestClusterServiceIPRange(t *testing.T) {
 			gate:         true,
 		},
 		{
-			name:         "service cidr IPv6 is too big despuite gate enbled",
-			expectErrors: true,
+			name:         "service cidr IPv6 is too big and gate enbled",
+			expectErrors: false,
 			options:      makeOptionsWithCIDRs("2001:db8::/12", ""),
 			gate:         true,
 		},
@@ -112,6 +112,12 @@ func TestClusterServiceIPRange(t *testing.T) {
 			name:         "dual-stack secondary cidr too big",
 			expectErrors: true,
 			options:      makeOptionsWithCIDRs("10.0.0.0/16", "3000::/64"),
+		},
+		{
+			name:         "dual-stack secondary cidr too big gate enabled",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("10.0.0.0/16", "3000::/48"),
+			gate:         true,
 		},
 		{
 			name:         "more than two entries",
