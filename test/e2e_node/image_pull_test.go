@@ -19,8 +19,6 @@ package e2enode
 import (
 	"context"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -34,41 +32,41 @@ var _ = SIGDescribe("Pull Image [Serial]", func() {
 
 	nginxImage := imageutils.GetE2EImage(imageutils.Nginx)
 	nginxNewImage := imageutils.GetE2EImage(imageutils.NginxNew)
-	nginxPodDesc := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "nginx",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Name:            "nginx",
-				Image:           nginxImage,
-				ImagePullPolicy: v1.PullAlways,
-				Command:         []string{"sh"},
-			}},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-	nginxNewPodDesc := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "nginx",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Name:            "nginx-new",
-				Image:           nginxNewImage,
-				ImagePullPolicy: v1.PullAlways,
-				Command:         []string{"sh"},
-			}},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
+	// nginxPodDesc := &v1.Pod{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name:      "nginx",
+	// 		Namespace: f.Namespace.Name,
+	// 	},
+	// 	Spec: v1.PodSpec{
+	// 		Containers: []v1.Container{{
+	// 			Name:            "nginx",
+	// 			Image:           nginxImage,
+	// 			ImagePullPolicy: v1.PullAlways,
+	// 			Command:         []string{"sh"},
+	// 		}},
+	// 		RestartPolicy: v1.RestartPolicyNever,
+	// 	},
+	// }
+	// nginxNewPodDesc := &v1.Pod{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name:      "nginx",
+	// 		Namespace: f.Namespace.Name,
+	// 	},
+	// 	Spec: v1.PodSpec{
+	// 		Containers: []v1.Container{{
+	// 			Name:            "nginx-new",
+	// 			Image:           nginxNewImage,
+	// 			ImagePullPolicy: v1.PullAlways,
+	// 			Command:         []string{"sh"},
+	// 		}},
+	// 		RestartPolicy: v1.RestartPolicyNever,
+	// 	},
+	// }
 
 	ginkgo.Context("serialize image pull", func() {
 		ginkgo.It("should be waiting more", func(ctx context.Context) {
-			framework.Logf("Creating pod %q", nginxPodDesc.Name)
-			framework.Logf("Creating pod %q", nginxNewPodDesc.Name)
+			framework.Logf("Creating pod %q", nginxImage)
+			framework.Logf("Creating pod %q", nginxNewImage)
 		})
 	})
 })
