@@ -21,10 +21,10 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
-	go.etcd.io/etcd/api/v3 v3.5.9
-	go.etcd.io/etcd/client/pkg/v3 v3.5.9
-	go.etcd.io/etcd/client/v3 v3.5.9
-	go.etcd.io/etcd/server/v3 v3.5.9
+	go.etcd.io/etcd/api/v3 v3.5.10
+	go.etcd.io/etcd/client/pkg/v3 v3.5.10
+	go.etcd.io/etcd/client/v3 v3.5.10
+	go.etcd.io/etcd/server/v3 v3.5.10
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0
 	go.opentelemetry.io/otel v1.19.0
@@ -38,7 +38,7 @@ require (
 	golang.org/x/sys v0.13.0
 	golang.org/x/time v0.3.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230726155614-23370e0ffb3e
-	google.golang.org/grpc v1.58.2
+	google.golang.org/grpc v1.58.3
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -104,10 +104,10 @@ require (
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
-	go.etcd.io/bbolt v1.3.7 // indirect
-	go.etcd.io/etcd/client/v2 v2.305.9 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.5.9 // indirect
-	go.etcd.io/etcd/raft/v3 v3.5.9 // indirect
+	go.etcd.io/bbolt v1.3.8 // indirect
+	go.etcd.io/etcd/client/v2 v2.305.10 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.5.10 // indirect
+	go.etcd.io/etcd/raft/v3 v3.5.10 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0 // indirect
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect

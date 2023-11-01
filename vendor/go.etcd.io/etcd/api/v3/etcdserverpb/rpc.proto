@@ -217,7 +217,7 @@ service Maintenance {
   // It only iterates "key" bucket in backend storage.
   rpc HashKV(HashKVRequest) returns (HashKVResponse) {
       option (google.api.http) = {
-        post: "/v3/maintenance/hash"
+        post: "/v3/maintenance/hashkv"
         body: "*"
     };
   }

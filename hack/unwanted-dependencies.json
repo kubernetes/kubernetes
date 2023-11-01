@@ -228,7 +228,6 @@
         "github.com/grpc-ecosystem/grpc-gateway/v2",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/pkg/v3",
         "go.etcd.io/etcd/server/v3",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/api",

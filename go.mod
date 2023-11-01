@@ -67,9 +67,9 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vmware/govmomi v0.30.6
-	go.etcd.io/etcd/api/v3 v3.5.9
-	go.etcd.io/etcd/client/pkg/v3 v3.5.9
-	go.etcd.io/etcd/client/v3 v3.5.9
+	go.etcd.io/etcd/api/v3 v3.5.10
+	go.etcd.io/etcd/client/pkg/v3 v3.5.10
+	go.etcd.io/etcd/client/v3 v3.5.10
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.42.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.0
 	go.opentelemetry.io/otel v1.19.0
@@ -89,7 +89,7 @@ require (
 	golang.org/x/tools v0.12.0
 	google.golang.org/api v0.126.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d
-	google.golang.org/grpc v1.58.2
+	google.golang.org/grpc v1.58.3
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/gcfg.v1 v1.2.3
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -220,11 +220,11 @@ require (
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	go.etcd.io/bbolt v1.3.7 // indirect
-	go.etcd.io/etcd/client/v2 v2.305.9 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.5.9 // indirect
-	go.etcd.io/etcd/raft/v3 v3.5.9 // indirect
-	go.etcd.io/etcd/server/v3 v3.5.9 // indirect
+	go.etcd.io/bbolt v1.3.8 // indirect
+	go.etcd.io/etcd/client/v2 v2.305.10 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.5.10 // indirect
+	go.etcd.io/etcd/raft/v3 v3.5.10 // indirect
+	go.etcd.io/etcd/server/v3 v3.5.10 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0 // indirect
