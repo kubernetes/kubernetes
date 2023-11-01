@@ -62,6 +62,12 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
 				},
+				NFTables: kubeproxyconfigv1alpha1.KubeProxyNFTablesConfiguration{
+					MasqueradeBit: ptr.To[int32](14),
+					MasqueradeAll: false,
+					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+				},
 				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 					MaxPerCore:            &ctMaxPerCore,
@@ -101,6 +107,12 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 				},
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+				},
+				NFTables: kubeproxyconfigv1alpha1.KubeProxyNFTablesConfiguration{
+					MasqueradeBit: ptr.To[int32](14),
+					MasqueradeAll: false,
+					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
 				},
 				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{

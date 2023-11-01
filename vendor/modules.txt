@@ -179,6 +179,9 @@ github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/cyphar/filepath-securejoin v0.2.4
 ## explicit; go 1.13
 github.com/cyphar/filepath-securejoin
+# github.com/danwinship/knftables v0.0.13
+## explicit; go 1.20
+github.com/danwinship/knftables
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew

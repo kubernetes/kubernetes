@@ -31,6 +31,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	netutils "k8s.io/utils/net"
 )
@@ -47,8 +48,11 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, validateKubeProxyIPTablesConfiguration(config.IPTables, newPath.Child("KubeProxyIPTablesConfiguration"))...)
-	if config.Mode == kubeproxyconfig.ProxyModeIPVS {
+	switch config.Mode {
+	case kubeproxyconfig.ProxyModeIPVS:
 		allErrs = append(allErrs, validateKubeProxyIPVSConfiguration(config.IPVS, newPath.Child("KubeProxyIPVSConfiguration"))...)
+	case kubeproxyconfig.ProxyModeNFTables:
+		allErrs = append(allErrs, validateKubeProxyNFTablesConfiguration(config.NFTables, newPath.Child("KubeProxyNFTablesConfiguration"))...)
 	}
 	allErrs = append(allErrs, validateKubeProxyConntrackConfiguration(config.Conntrack, newPath.Child("KubeProxyConntrackConfiguration"))...)
 	allErrs = append(allErrs, validateProxyMode(config.Mode, newPath.Child("Mode"))...)
@@ -152,6 +156,28 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 	return allErrs
 }
 
+func validateKubeProxyNFTablesConfiguration(config kubeproxyconfig.KubeProxyNFTablesConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if config.MasqueradeBit != nil && (*config.MasqueradeBit < 0 || *config.MasqueradeBit > 31) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
+	}
+
+	if config.SyncPeriod.Duration <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
+	}
+
+	if config.MinSyncPeriod.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
+	}
+
+	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
+	}
+
+	return allErrs
+}
+
 func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyConntrackConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -197,6 +223,10 @@ func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path)
 		string(kubeproxyconfig.ProxyModeIPTables),
 		string(kubeproxyconfig.ProxyModeIPVS),
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NFTablesProxyMode) {
+		validModes.Insert(string(kubeproxyconfig.ProxyModeNFTables))
+	}
 
 	if mode == "" || validModes.Has(string(mode)) {
 		return nil

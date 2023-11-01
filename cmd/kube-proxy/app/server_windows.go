@@ -125,7 +125,10 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	return proxier, nil
 }
 
-// cleanupAndExit cleans up after a previous proxy run
-func cleanupAndExit() error {
-	return errors.New("--cleanup-and-exit is not implemented on Windows")
+// platformCleanup removes stale kube-proxy rules that can be safely removed.
+func platformCleanup(mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
+	if cleanupAndExit {
+		return errors.New("--cleanup-and-exit is not implemented on Windows")
+	}
+	return nil
 }

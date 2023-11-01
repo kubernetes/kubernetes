@@ -49,6 +49,11 @@ logging:
   verbosity: 0
 metricsBindAddress: 127.0.0.1:10249
 mode: ""
+nftables:
+  masqueradeAll: false
+  masqueradeBit: 14
+  minSyncPeriod: 1s
+  syncPeriod: 30s
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""

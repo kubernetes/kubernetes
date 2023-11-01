@@ -40,9 +40,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	toolswatch "k8s.io/client-go/tools/watch"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -50,6 +52,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -100,60 +103,73 @@ func (s *ProxyServer) platformSetup() error {
 	return nil
 }
 
+// isIPTablesBased checks whether mode is based on iptables rather than nftables
+func isIPTablesBased(mode proxyconfigapi.ProxyMode) bool {
+	return mode == proxyconfigapi.ProxyModeIPTables || mode == proxyconfigapi.ProxyModeIPVS
+}
+
+// getIPTables returns an array of [IPv4, IPv6] utiliptables.Interfaces. If primaryFamily
+// is not v1.IPFamilyUnknown then it will also separately return the interface for just
+// that family.
+func getIPTables(primaryFamily v1.IPFamily) ([2]utiliptables.Interface, utiliptables.Interface) {
+	execer := exec.New()
+
+	// Create iptables handlers for both families. Always ordered as IPv4, IPv6
+	ipt := [2]utiliptables.Interface{
+		utiliptables.New(execer, utiliptables.ProtocolIPv4),
+		utiliptables.New(execer, utiliptables.ProtocolIPv6),
+	}
+
+	var iptInterface utiliptables.Interface
+	if primaryFamily == v1.IPv4Protocol {
+		iptInterface = ipt[0]
+	} else if primaryFamily == v1.IPv6Protocol {
+		iptInterface = ipt[1]
+	}
+
+	return ipt, iptInterface
+}
+
 // platformCheckSupported is called immediately before creating the Proxier, to check
 // what IP families are supported (and whether the configuration is usable at all).
 func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
-	execer := exec.New()
-	ipt := utiliptables.New(execer, utiliptables.ProtocolIPv4)
-	ipv4Supported = ipt.Present()
-	ipt = utiliptables.New(execer, utiliptables.ProtocolIPv6)
-	ipv6Supported = ipt.Present()
+	if isIPTablesBased(s.Config.Mode) {
+		ipt, _ := getIPTables(v1.IPFamilyUnknown)
+		ipv4Supported = ipt[0].Present()
+		ipv6Supported = ipt[1].Present()
+
+		if !ipv4Supported && !ipv6Supported {
+			err = fmt.Errorf("iptables is not available on this host")
+		} else if !ipv4Supported {
+			klog.InfoS("No iptables support for family", "ipFamily", v1.IPv4Protocol)
+		} else if !ipv6Supported {
+			klog.InfoS("No iptables support for family", "ipFamily", v1.IPv6Protocol)
+		}
+	} else {
+		// Assume support for both families.
+		// FIXME: figure out how to check for kernel IPv6 support using nft
+		ipv4Supported, ipv6Supported = true, true
+	}
 
 	// The Linux proxies can always support dual-stack if they can support both IPv4
 	// and IPv6.
 	dualStackSupported = ipv4Supported && ipv6Supported
-
-	if !ipv4Supported && !ipv6Supported {
-		err = fmt.Errorf("iptables is not available on this host")
-	} else if !ipv4Supported {
-		klog.InfoS("No iptables support for family", "ipFamily", v1.IPv4Protocol)
-	} else if !ipv6Supported {
-		klog.InfoS("No iptables support for family", "ipFamily", v1.IPv6Protocol)
-	}
-
 	return
 }
 
 // createProxier creates the proxy.Provider
 func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStack, initOnly bool) (proxy.Provider, error) {
 	var proxier proxy.Provider
+	var localDetectors [2]proxyutiliptables.LocalTrafficDetector
+	var localDetector proxyutiliptables.LocalTrafficDetector
 	var err error
-
-	primaryProtocol := utiliptables.ProtocolIPv4
-	if s.PrimaryIPFamily == v1.IPv6Protocol {
-		primaryProtocol = utiliptables.ProtocolIPv6
-	}
-	execer := exec.New()
-	iptInterface := utiliptables.New(execer, primaryProtocol)
-
-	var ipt [2]utiliptables.Interface
-
-	// Create iptables handlers for both families, one is already created
-	// Always ordered as IPv4, IPv6
-	if primaryProtocol == utiliptables.ProtocolIPv4 {
-		ipt[0] = iptInterface
-		ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
-	} else {
-		ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
-		ipt[1] = iptInterface
-	}
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
 		klog.InfoS("Using iptables Proxier")
 
 		if dualStack {
-			// Always ordered to match []ipt
-			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
+			ipt, _ := getIPTables(s.PrimaryIPFamily)
+
 			localDetectors, err = getDualStackLocalDetectorTuple(config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -163,7 +179,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			proxier, err = iptables.NewDualStackProxier(
 				ipt,
 				utilsysctl.New(),
-				execer,
+				exec.New(),
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
@@ -179,7 +195,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
-			var localDetector proxyutiliptables.LocalTrafficDetector
+			_, iptInterface := getIPTables(s.PrimaryIPFamily)
 			localDetector, err = getLocalDetector(s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -190,7 +206,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.PrimaryIPFamily,
 				iptInterface,
 				utilsysctl.New(),
-				execer,
+				exec.New(),
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
@@ -210,6 +226,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	} else if config.Mode == proxyconfigapi.ProxyModeIPVS {
+		execer := exec.New()
 		ipsetInterface := utilipset.New(execer)
 		ipvsInterface := utilipvs.New()
 		if err := ipvs.CanUseIPVSProxier(ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
@@ -218,8 +235,9 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 
 		klog.InfoS("Using ipvs Proxier")
 		if dualStack {
+			ipt, _ := getIPTables(s.PrimaryIPFamily)
+
 			// Always ordered to match []ipt
-			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 			localDetectors, err = getDualStackLocalDetectorTuple(config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -250,7 +268,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				initOnly,
 			)
 		} else {
-			var localDetector proxyutiliptables.LocalTrafficDetector
+			_, iptInterface := getIPTables(s.PrimaryIPFamily)
 			localDetector, err = getLocalDetector(s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -282,6 +300,58 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				initOnly,
 			)
 		}
+		if err != nil {
+			return nil, fmt.Errorf("unable to create proxier: %v", err)
+		}
+	} else if config.Mode == proxyconfigapi.ProxyModeNFTables {
+		klog.InfoS("Using nftables Proxier")
+
+		if dualStack {
+			localDetectors, err = getDualStackLocalDetectorTuple(config.DetectLocalMode, config, s.podCIDRs)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create proxier: %v", err)
+			}
+
+			// TODO this has side effects that should only happen when Run() is invoked.
+			proxier, err = nftables.NewDualStackProxier(
+				utilsysctl.New(),
+				config.NFTables.SyncPeriod.Duration,
+				config.NFTables.MinSyncPeriod.Duration,
+				config.NFTables.MasqueradeAll,
+				int(*config.NFTables.MasqueradeBit),
+				localDetectors,
+				s.Hostname,
+				s.NodeIPs,
+				s.Recorder,
+				s.HealthzServer,
+				config.NodePortAddresses,
+				initOnly,
+			)
+		} else {
+			// Create a single-stack proxier if and only if the node does not support dual-stack
+			localDetector, err = getLocalDetector(s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create proxier: %v", err)
+			}
+
+			// TODO this has side effects that should only happen when Run() is invoked.
+			proxier, err = nftables.NewProxier(
+				s.PrimaryIPFamily,
+				utilsysctl.New(),
+				config.NFTables.SyncPeriod.Duration,
+				config.NFTables.MinSyncPeriod.Duration,
+				config.NFTables.MasqueradeAll,
+				int(*config.NFTables.MasqueradeBit),
+				localDetector,
+				s.Hostname,
+				s.NodeIPs[s.PrimaryIPFamily],
+				s.Recorder,
+				s.HealthzServer,
+				config.NodePortAddresses,
+				initOnly,
+			)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
@@ -475,27 +545,35 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 	return localDetectors, nil
 }
 
-// cleanupAndExit remove iptables rules and ipset/ipvs rules
-func cleanupAndExit() error {
-	execer := exec.New()
-
-	// cleanup IPv6 and IPv4 iptables rules, regardless of current configuration
-	ipts := []utiliptables.Interface{
-		utiliptables.New(execer, utiliptables.ProtocolIPv4),
-		utiliptables.New(execer, utiliptables.ProtocolIPv6),
-	}
-
-	ipsetInterface := utilipset.New(execer)
-	ipvsInterface := utilipvs.New()
-
+// platformCleanup removes stale kube-proxy rules that can be safely removed. If
+// cleanupAndExit is true, it will attempt to remove rules from all known kube-proxy
+// modes. If it is false, it will only remove rules that are definitely not in use by the
+// currently-configured mode.
+func platformCleanup(mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
 	var encounteredError bool
-	for _, ipt := range ipts {
-		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(ipvsInterface, ipt, ipsetInterface) || encounteredError
+
+	// Clean up iptables and ipvs rules if switching to nftables, or if cleanupAndExit
+	if !isIPTablesBased(mode) || cleanupAndExit {
+		ipts, _ := getIPTables(v1.IPFamilyUnknown)
+		execer := exec.New()
+		ipsetInterface := utilipset.New(execer)
+		ipvsInterface := utilipvs.New()
+
+		for _, ipt := range ipts {
+			encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
+			encounteredError = ipvs.CleanupLeftovers(ipvsInterface, ipt, ipsetInterface) || encounteredError
+		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NFTablesProxyMode) {
+		// Clean up nftables rules when switching to iptables or ipvs, or if cleanupAndExit
+		if isIPTablesBased(mode) || cleanupAndExit {
+			encounteredError = nftables.CleanupLeftovers() || encounteredError
+		}
+	}
+
 	if encounteredError {
 		return errors.New("encountered an error while tearing down rules")
 	}
-
 	return nil
 }

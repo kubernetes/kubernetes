@@ -71,6 +71,12 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
+	if obj.NFTables.SyncPeriod.Duration == 0 {
+		obj.NFTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	}
+	if obj.NFTables.MinSyncPeriod.Duration == 0 {
+		obj.NFTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
+	}
 
 	if obj.Conntrack.MaxPerCore == nil {
 		obj.Conntrack.MaxPerCore = ptr.To[int32](32 * 1024)
@@ -82,6 +88,10 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.IPTables.MasqueradeBit == nil {
 		temp := int32(14)
 		obj.IPTables.MasqueradeBit = &temp
+	}
+	if obj.NFTables.MasqueradeBit == nil {
+		temp := int32(14)
+		obj.NFTables.MasqueradeBit = &temp
 	}
 	if obj.Conntrack.TCPEstablishedTimeout == nil {
 		obj.Conntrack.TCPEstablishedTimeout = &metav1.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
