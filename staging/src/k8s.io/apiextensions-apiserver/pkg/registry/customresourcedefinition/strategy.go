@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 )
 
 // strategy implements behavior for CustomResources.
@@ -229,7 +229,7 @@ func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourc
 // dropDisabledFields drops disabled fields that are not used if their associated feature gates
 // are not enabled.
 func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
-	if !utilfeature.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || (oldCRD != nil && !specHasOptionalOldSelf(&oldCRD.Spec))) {
+	if !feature.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || (oldCRD != nil && !specHasOptionalOldSelf(&oldCRD.Spec))) {
 		if newCRD.Spec.Validation != nil {
 			dropOptionalOldSelfField(newCRD.Spec.Validation.OpenAPIV3Schema)
 		}

@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubelet/config/v1beta1"
@@ -251,7 +251,7 @@ func NewKubeletServer() (*KubeletServer, error) {
 // ValidateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid.
 func ValidateKubeletServer(s *KubeletServer) error {
 	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
-	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration, utilfeature.DefaultFeatureGate); err != nil {
+	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration, feature.DefaultFeatureGate); err != nil {
 		return err
 	}
 	if err := ValidateKubeletFlags(&s.KubeletFlags); err != nil {
@@ -441,7 +441,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.Int32Var(&c.ImageGCLowThresholdPercent, "image-gc-low-threshold", c.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Values must be within the range [0, 100] and must be less than that of --image-gc-high-threshold.")
 	fs.DurationVar(&c.VolumeStatsAggPeriod.Duration, "volume-stats-agg-period", c.VolumeStatsAggPeriod.Duration, "Specifies interval for kubelet to calculate and cache the volume disk usage for all pods and volumes.  To disable volume calculations, set to a negative number.")
 	fs.Var(cliflag.NewMapStringBool(&c.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(utilfeature.KnownFeatures(), "\n"))
+		"Options are:\n"+strings.Join(feature.KnownFeatures(), "\n"))
 	fs.StringVar(&c.KubeletCgroups, "kubelet-cgroups", c.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
 	fs.StringVar(&c.SystemCgroups, "system-cgroups", c.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under '/'. Empty for no container. Rolling back the flag requires a reboot.")
 

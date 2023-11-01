@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/policy/validation"
@@ -192,7 +192,7 @@ func hasInvalidLabelValueInLabelSelector(pdb *policy.PodDisruptionBudget) bool {
 // dropDisabledFields removes disabled fields from the pod disruption budget spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod disruption budget spec.
 func dropDisabledFields(pdbSpec, oldPDBSpec *policy.PodDisruptionBudgetSpec) {
-	if !utilfeature.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
+	if !feature.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
 		if !unhealthyPodEvictionPolicyInUse(oldPDBSpec) {
 			pdbSpec.UnhealthyPodEvictionPolicy = nil
 		}

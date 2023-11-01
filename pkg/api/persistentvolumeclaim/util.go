@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -37,7 +37,7 @@ const (
 func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 	// Drop the contents of the volumeAttributesClassName if the VolumeAttributesClass
 	// feature gate is disabled.
-	if !utilfeature.Enabled(features.VolumeAttributesClass) {
+	if !feature.Enabled(features.VolumeAttributesClass) {
 		if oldPVCSpec == nil || oldPVCSpec.VolumeAttributesClassName == nil {
 			pvcSpec.VolumeAttributesClassName = nil
 		}
@@ -45,7 +45,7 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 
 	// Drop the contents of the dataSourceRef field if the AnyVolumeDataSource
 	// feature gate is disabled.
-	if !utilfeature.Enabled(features.AnyVolumeDataSource) {
+	if !feature.Enabled(features.AnyVolumeDataSource) {
 		if !dataSourceRefInUse(oldPVCSpec) {
 			pvcSpec.DataSourceRef = nil
 		}
@@ -53,7 +53,7 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 
 	// Drop the contents of the dataSourceRef field if the CrossNamespaceVolumeDataSource
 	// feature gate is disabled and dataSourceRef.Namespace is specified.
-	if !utilfeature.Enabled(features.CrossNamespaceVolumeDataSource) &&
+	if !feature.Enabled(features.CrossNamespaceVolumeDataSource) &&
 		pvcSpec.DataSourceRef != nil && pvcSpec.DataSourceRef.Namespace != nil && len(*pvcSpec.DataSourceRef.Namespace) != 0 {
 		if !dataSourceRefInUse(oldPVCSpec) {
 			pvcSpec.DataSourceRef = nil
@@ -99,7 +99,7 @@ func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.Persisten
 }
 
 func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
-	if !utilfeature.Enabled(features.VolumeAttributesClass) {
+	if !feature.Enabled(features.VolumeAttributesClass) {
 		if oldPVC == nil || oldPVC.Status.CurrentVolumeAttributesClassName == nil {
 			pvc.Status.CurrentVolumeAttributesClassName = nil
 		}
@@ -108,7 +108,7 @@ func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 		}
 	}
 
-	if !utilfeature.Enabled(features.RecoverVolumeExpansionFailure) {
+	if !feature.Enabled(features.RecoverVolumeExpansionFailure) {
 		if !helper.ClaimContainsAllocatedResources(oldPVC) {
 			pvc.Status.AllocatedResources = nil
 		}
@@ -161,7 +161,7 @@ func dataSourceRefInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 // This should be used by creates/gets of PVCs, but not updates
 func NormalizeDataSources(pvcSpec *core.PersistentVolumeClaimSpec) {
 	// Don't enable this behavior if the feature gate is not on
-	if !utilfeature.Enabled(features.AnyVolumeDataSource) {
+	if !feature.Enabled(features.AnyVolumeDataSource) {
 		return
 	}
 	if pvcSpec.DataSource != nil && pvcSpec.DataSourceRef == nil {

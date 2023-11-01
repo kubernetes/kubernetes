@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -151,7 +151,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	if utilfeature.Enabled(features.TopologyAwareHints) {
+	if feature.Enabled(features.TopologyAwareHints) {
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				c.addNode(logger, obj)

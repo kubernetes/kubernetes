@@ -46,7 +46,7 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	clientgotransport "k8s.io/client-go/transport"
@@ -291,7 +291,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
-		if utilfeature.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if feature.Enabled(features.UnknownVersionInteroperabilityProxy) {
 			// TODO: set up a general clean up for testserver
 			if clientgotransport.DialerStopCh == wait.NeverStop {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)

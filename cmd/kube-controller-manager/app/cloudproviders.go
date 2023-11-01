@@ -19,7 +19,7 @@ package app
 import (
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -35,7 +35,7 @@ func createCloudProvider(logger klog.Logger, cloudProvider string, externalCloud
 	var loopMode ControllerLoopMode
 	var err error
 
-	if utilfeature.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+	if feature.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
 		cloudprovider.DisableWarningForProvider(cloudProvider)
 		return nil, ExternalLoops, fmt.Errorf(
 			"cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider",

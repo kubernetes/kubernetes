@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -441,7 +441,7 @@ func addAllEventHandlers(
 			}
 			handlers = append(handlers, handlerRegistration)
 		case framework.PodSchedulingContext:
-			if utilfeature.Enabled(features.DynamicResourceAllocation) {
+			if feature.Enabled(features.DynamicResourceAllocation) {
 				if handlerRegistration, err = informerFactory.Resource().V1alpha2().PodSchedulingContexts().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext"),
 				); err != nil {
@@ -450,7 +450,7 @@ func addAllEventHandlers(
 				handlers = append(handlers, handlerRegistration)
 			}
 		case framework.ResourceClaim:
-			if utilfeature.Enabled(features.DynamicResourceAllocation) {
+			if feature.Enabled(features.DynamicResourceAllocation) {
 				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClaims().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
 				); err != nil {
@@ -459,7 +459,7 @@ func addAllEventHandlers(
 				handlers = append(handlers, handlerRegistration)
 			}
 		case framework.ResourceClass:
-			if utilfeature.Enabled(features.DynamicResourceAllocation) {
+			if feature.Enabled(features.DynamicResourceAllocation) {
 				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClasses().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClass, "ResourceClass"),
 				); err != nil {

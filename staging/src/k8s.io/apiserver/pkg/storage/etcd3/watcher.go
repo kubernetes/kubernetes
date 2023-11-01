@@ -39,7 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/klog/v2"
 )
@@ -153,7 +153,7 @@ func (w *watcher) getStartWatchResourceVersion(ctx context.Context, resourceVers
 	if resourceVersion > 0 {
 		return resourceVersion, nil
 	}
-	if !utilfeature.Enabled(features.WatchList) {
+	if !feature.Enabled(features.WatchList) {
 		return 0, nil
 	}
 	if opts.SendInitialEvents == nil || *opts.SendInitialEvents {
@@ -183,7 +183,7 @@ func (w *watcher) getStartWatchResourceVersion(ctx context.Context, resourceVers
 //
 // see: https://github.com/kubernetes/kubernetes/issues/120348
 func isInitialEventsEndBookmarkRequired(opts storage.ListOptions) bool {
-	if !utilfeature.Enabled(features.WatchList) {
+	if !feature.Enabled(features.WatchList) {
 		return false
 	}
 	return opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks
@@ -194,7 +194,7 @@ func areInitialEventsRequired(resourceVersion int64, opts storage.ListOptions) b
 	if opts.SendInitialEvents == nil && resourceVersion == 0 {
 		return true // legacy case
 	}
-	if !utilfeature.Enabled(features.WatchList) {
+	if !feature.Enabled(features.WatchList) {
 		return false
 	}
 	return opts.SendInitialEvents != nil && *opts.SendInitialEvents

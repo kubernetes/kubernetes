@@ -21,7 +21,7 @@ import (
 	"sort"
 	"sync"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -50,7 +50,7 @@ func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 // AreLegacyCloudCredentialProvidersDisabled checks if the legacy in-tree cloud
 // credential providers have been disabled.
 func AreLegacyCloudCredentialProvidersDisabled() bool {
-	return utilfeature.Enabled(features.DisableKubeletCloudCredentialProviders)
+	return feature.Enabled(features.DisableKubeletCloudCredentialProviders)
 }
 
 // NewDockerKeyring creates a DockerKeyring to use for resolving credentials,

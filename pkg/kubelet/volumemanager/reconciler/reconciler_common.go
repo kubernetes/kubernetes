@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -149,7 +149,7 @@ type reconciler struct {
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	if utilfeature.Enabled(features.NewVolumeManagerReconstruction) {
+	if feature.Enabled(features.NewVolumeManagerReconstruction) {
 		rc.runNew(stopCh)
 		return
 	}

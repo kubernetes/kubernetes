@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
@@ -118,7 +118,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger kl
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: utilfeature.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodVerticalScalingEnabled: feature.Enabled(features.InPlacePodVerticalScaling),
 	}
 	if !r.useRequested {
 		opts.NonMissingContainerRequests = v1.ResourceList{

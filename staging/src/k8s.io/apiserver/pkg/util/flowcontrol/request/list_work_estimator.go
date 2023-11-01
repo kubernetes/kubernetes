@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -164,7 +164,7 @@ func key(requestInfo *apirequest.RequestInfo) string {
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
-	consistentListFromCacheEnabled := utilfeature.Enabled(features.ConsistentListFromCache)
+	consistentListFromCacheEnabled := feature.Enabled(features.ConsistentListFromCache)
 
 	// Serve consistent reads from storage if ConsistentListFromCache is disabled
 	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled

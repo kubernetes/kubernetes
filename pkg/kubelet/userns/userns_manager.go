@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -142,7 +142,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	}
 
 	// do not bother reading the list of pods if user namespaces are not enabled.
-	if !utilfeature.Enabled(features.UserNamespacesSupport) {
+	if !feature.Enabled(features.UserNamespacesSupport) {
 		return &m, nil
 	}
 
@@ -258,7 +258,7 @@ func (m *UsernsManager) record(pod types.UID, from, length uint32) (err error) {
 
 // Release releases the user namespace allocated to the specified pod.
 func (m *UsernsManager) Release(podUID types.UID) {
-	if !utilfeature.Enabled(features.UserNamespacesSupport) {
+	if !feature.Enabled(features.UserNamespacesSupport) {
 		return
 	}
 
@@ -270,7 +270,7 @@ func (m *UsernsManager) Release(podUID types.UID) {
 
 // podAllocated returns true if the pod is allocated, false otherwise.
 func (m *UsernsManager) podAllocated(podUID types.UID) bool {
-	if !utilfeature.Enabled(features.UserNamespacesSupport) {
+	if !feature.Enabled(features.UserNamespacesSupport) {
 		return false
 	}
 
@@ -380,7 +380,7 @@ func (m *UsernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err err
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
-	if !utilfeature.Enabled(features.UserNamespacesSupport) {
+	if !feature.Enabled(features.UserNamespacesSupport) {
 		return nil, nil
 	}
 
@@ -440,7 +440,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimea
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
 func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
-	if !utilfeature.Enabled(features.UserNamespacesSupport) {
+	if !feature.Enabled(features.UserNamespacesSupport) {
 		return nil
 	}
 

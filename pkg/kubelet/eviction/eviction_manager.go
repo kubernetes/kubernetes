@@ -27,7 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -260,7 +260,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// If we are a split filesystem but the feature is turned off
 		// we should return an error.
 		// This is a bad state.
-		if !utilfeature.Enabled(features.KubeletSeparateDiskGC) && splitContainerImageFs {
+		if !feature.Enabled(features.KubeletSeparateDiskGC) && splitContainerImageFs {
 			splitDiskError := fmt.Errorf("KubeletSeparateDiskGC is turned off but we still have a split filesystem")
 			return nil, splitDiskError
 		}
@@ -411,7 +411,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
 		var condition *v1.PodCondition
-		if utilfeature.Enabled(features.PodDisruptionConditions) {
+		if feature.Enabled(features.PodDisruptionConditions) {
 			condition = &v1.PodCondition{
 				Type:    v1.DisruptionTarget,
 				Status:  v1.ConditionTrue,

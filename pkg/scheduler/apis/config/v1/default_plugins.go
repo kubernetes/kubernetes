@@ -18,7 +18,7 @@ package v1
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -60,10 +60,10 @@ func getDefaultPlugins() *v1.Plugins {
 }
 
 func applyFeatureGates(config *v1.Plugins) {
-	if utilfeature.Enabled(features.PodSchedulingReadiness) {
+	if feature.Enabled(features.PodSchedulingReadiness) {
 		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.SchedulingGates})
 	}
-	if utilfeature.Enabled(features.DynamicResourceAllocation) {
+	if feature.Enabled(features.DynamicResourceAllocation) {
 		// This plugin should come before DefaultPreemption because if
 		// there is a problem with a Pod and PostFilter gets called to
 		// resolve the problem, it is better to first deallocate an

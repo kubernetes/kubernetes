@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -74,7 +74,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
 		enforceMemoryQoS := false
-		if utilfeature.Enabled(kubefeatures.MemoryQoS) &&
+		if feature.Enabled(kubefeatures.MemoryQoS) &&
 			libcontainercgroups.IsCgroup2UnifiedMode() {
 			enforceMemoryQoS = true
 		}

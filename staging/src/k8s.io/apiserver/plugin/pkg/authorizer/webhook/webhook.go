@@ -37,7 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -203,7 +203,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		}
 	}
 	// skipping match when feature is not enabled
-	if utilfeature.Enabled(features.StructuredAuthorizationConfiguration) {
+	if feature.Enabled(features.StructuredAuthorizationConfiguration) {
 		// Process Match Conditions before calling the webhook
 		matches, err := w.match(ctx, r)
 		// If at least one matchCondition evaluates to an error (but none are FALSE):

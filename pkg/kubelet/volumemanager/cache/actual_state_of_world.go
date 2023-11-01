@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -710,7 +710,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 		// Update uncertain volumes - the new markVolumeOpts may have updated information.
 		// Especially reconstructed volumes (marked as uncertain during reconstruction) need
 		// an update.
-		updateUncertainVolume = utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
+		updateUncertainVolume = feature.Enabled(features.SELinuxMountReadWriteOncePod) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
 	}
 	if !podExists || updateUncertainVolume {
 		// Add new mountedPod or update existing one.
@@ -741,7 +741,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 		podObj.mounter = mounter
 	}
 	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		// Store the mount context also in the AttachedVolume to have a global volume context
 		// for a quick comparison in PodExistsInVolume.
 		if volumeObj.seLinuxMountContext == nil {
@@ -805,7 +805,7 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 	if devicePath != "" {
 		volumeObj.devicePath = devicePath
 	}
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		if seLinuxMountContext != "" {
 			volumeObj.seLinuxMountContext = &seLinuxMountContext
 		}
@@ -895,7 +895,7 @@ func (asw *actualStateOfWorld) PodExistsInVolume(podName volumetypes.UniquePodNa
 	}
 
 	// The volume exists, check its SELinux context mount option
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		if volumeObj.seLinuxMountContext != nil && *volumeObj.seLinuxMountContext != seLinuxLabel {
 			fullErr := newSELinuxMountMismatchError(volumeName)
 			return false, volumeObj.devicePath, fullErr
@@ -1127,7 +1127,7 @@ func (asw *actualStateOfWorld) SyncReconstructedVolume(volumeName v1.UniqueVolum
 func (asw *actualStateOfWorld) newAttachedVolume(
 	attachedVolume *attachedVolume) AttachedVolume {
 	seLinuxMountContext := ""
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		if attachedVolume.seLinuxMountContext != nil {
 			seLinuxMountContext = *attachedVolume.seLinuxMountContext
 		}

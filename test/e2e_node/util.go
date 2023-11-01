@@ -42,7 +42,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -523,11 +523,11 @@ func reduceAllocatableMemoryUsageIfCgroupv1() {
 // which can't be used here because we're not in a Testing context.
 // This must be in a non-"_test" file to pass
 // make verify WHAT=test-featuregates
-func withFeatureGate(feature featuregate.Feature, desired bool) func() {
-	current := utilfeature.Enabled(feature)
-	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), desired))
+func withFeatureGate(feat featuregate.Feature, desired bool) func() {
+	current := feature.Enabled(feat)
+	feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feat), desired))
 	return func() {
-		utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))
+		feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feat), current))
 	}
 }
 

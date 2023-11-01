@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
@@ -112,7 +112,7 @@ func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubeconta
 		// of not populating the runtimeHandler CRI field in ImageSpec struct is preserved.
 		// Therefore, when RuntimeClassInImageCriAPI feature gate is set, check to see if this
 		// field is empty and log a warning message.
-		if utilfeature.Enabled(features.RuntimeClassInImageCriAPI) {
+		if feature.Enabled(features.RuntimeClassInImageCriAPI) {
 			if img.Spec == nil || (img.Spec != nil && img.Spec.RuntimeHandler == "") {
 				klog.V(2).InfoS("WARNING: RuntimeHandler is empty", "ImageID", img.Id)
 			}

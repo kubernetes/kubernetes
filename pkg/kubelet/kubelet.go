@@ -52,7 +52,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -374,7 +374,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("invalid sync frequency %d", kubeCfg.SyncFrequency.Duration)
 	}
 
-	if utilfeature.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+	if feature.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
 		cloudprovider.DisableWarningForProvider(cloudProvider)
 		return nil, fmt.Errorf("cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider", cloudProvider)
 	}
@@ -426,7 +426,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
 	}
 
-	if utilfeature.Enabled(features.ImageMaximumGCAge) {
+	if feature.Enabled(features.ImageMaximumGCAge) {
 		imageGCPolicy.MaxAge = kubeCfg.ImageMaximumGCAge.Duration
 	} else if kubeCfg.ImageMaximumGCAge.Duration != 0 {
 		klog.InfoS("ImageMaximumGCAge flag enabled, but corresponding feature gate is not enabled. Ignoring flag.")
@@ -473,7 +473,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
 	if err != nil {
 		if libcontaineruserns.RunningInUserNS() {
-			if utilfeature.Enabled(features.KubeletInUserNamespace) {
+			if feature.Enabled(features.KubeletInUserNamespace) {
 				// oomwatcher.NewWatcher returns "open /dev/kmsg: operation not permitted" error,
 				// when running in a user namespace with sysctl value `kernel.dmesg_restrict=1`.
 				klog.V(2).InfoS("Failed to create an oomWatcher (running in UserNS, ignoring)", "err", err)
@@ -503,7 +503,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// This client must not be modified to include credentials, because it is
 	// critical that credentials not leak from the client to arbitrary hosts.
 	insecureContainerLifecycleHTTPClient := &http.Client{}
-	if utilfeature.Enabled(features.ConsistentHTTPGetHandlers) {
+	if feature.Enabled(features.ConsistentHTTPGetHandlers) {
 		insecureTLSTransport := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -710,12 +710,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			kubeDeps.RemoteRuntimeService,
 			kubeDeps.RemoteImageService,
 			hostStatsProvider,
-			utilfeature.Enabled(features.PodAndContainerStatsFromCRI))
+			feature.Enabled(features.PodAndContainerStatsFromCRI))
 	}
 
 	eventChannel := make(chan *pleg.PodLifecycleEvent, plegChannelCapacity)
 
-	if utilfeature.Enabled(features.EventedPLEG) {
+	if feature.Enabled(features.EventedPLEG) {
 		// adjust Generic PLEG relisting period and threshold to higher value when Evented PLEG is turned on
 		genericRelistDuration := &pleg.RelistDuration{
 			RelistPeriod:    eventedPlegRelistPeriod,
@@ -744,7 +744,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
-	if utilfeature.Enabled(features.EventedPLEG) {
+	if feature.Enabled(features.EventedPLEG) {
 		klet.runtimeState.addHealthCheck("EventedPLEG", klet.eventedPleg.Healthy)
 	}
 	if _, err := klet.updatePodCIDR(ctx, kubeCfg.PodCIDR); err != nil {
@@ -766,7 +766,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.imageManager = imageManager
 
-	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.Enabled(features.RotateKubeletServerCertificate) {
+	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && feature.Enabled(features.RotateKubeletServerCertificate) {
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
@@ -795,7 +795,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
 	var clusterTrustBundleManager clustertrustbundle.Manager
-	if kubeDeps.KubeClient != nil && utilfeature.Enabled(features.ClusterTrustBundleProjection) {
+	if kubeDeps.KubeClient != nil && feature.Enabled(features.ClusterTrustBundleProjection) {
 		kubeInformers := informers.NewSharedInformerFactoryWithOptions(kubeDeps.KubeClient, 0)
 		clusterTrustBundleManager, err = clustertrustbundle.NewInformerManager(kubeInformers.Certificates().V1alpha1().ClusterTrustBundles(), 2*int(kubeCfg.MaxPods), 5*time.Minute)
 		if err != nil {
@@ -1406,7 +1406,7 @@ func (kl *Kubelet) setupDataDirs() error {
 	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
 		return fmt.Errorf("error creating podresources directory: %v", err)
 	}
-	if utilfeature.Enabled(features.ContainerCheckpoint) {
+	if feature.Enabled(features.ContainerCheckpoint) {
 		if err := os.MkdirAll(kl.getCheckpointsDir(), 0700); err != nil {
 			return fmt.Errorf("error creating checkpoint directory: %v", err)
 		}
@@ -1551,7 +1551,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// Adding Registration Callback function for CSI Driver
 	kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler))
 	// Adding Registration Callback function for DRA Plugin
-	if utilfeature.Enabled(features.DynamicResourceAllocation) {
+	if feature.Enabled(features.DynamicResourceAllocation) {
 		kl.pluginManager.AddHandler(pluginwatcherapi.DRAPlugin, plugincache.PluginHandler(draplugin.NewRegistrationHandler()))
 	}
 	// Adding Registration Callback function for Device Manager
@@ -1573,7 +1573,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	ctx := context.Background()
 	if kl.logServer == nil {
 		file := http.FileServer(http.Dir(nodeLogDir))
-		if utilfeature.Enabled(features.NodeLogQuery) && kl.kubeletConfiguration.EnableSystemLogQuery {
+		if feature.Enabled(features.NodeLogQuery) && kl.kubeletConfiguration.EnableSystemLogQuery {
 			kl.logServer = http.StripPrefix("/logs/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if nlq, errs := newNodeLogQuery(req.URL.Query()); len(errs) > 0 {
 					http.Error(w, errs.ToAggregate().Error(), http.StatusBadRequest)
@@ -1659,7 +1659,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	kl.pleg.Start()
 
 	// Start eventedPLEG only if EventedPLEG feature gate is enabled.
-	if utilfeature.Enabled(features.EventedPLEG) {
+	if feature.Enabled(features.EventedPLEG) {
 		kl.eventedPleg.Start()
 	}
 
@@ -1946,7 +1946,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(pod)
 
-	if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+	if feature.Enabled(features.InPlacePodVerticalScaling) {
 		// Handle pod resize here instead of doing it in HandlePodUpdates because
 		// this conveniently retries any Deferred resize requests
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
@@ -1977,7 +1977,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil
 	}
 
-	if utilfeature.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &apiPodStatus) {
+	if feature.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &apiPodStatus) {
 		// While resize is in progress, periodically call PLEG to update pod cache
 		runningPod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err, _ := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
@@ -2078,7 +2078,7 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	// NOTE: resources must be unprepared AFTER all containers have stopped
 	// and BEFORE the pod status is changed on the API server
 	// to avoid race conditions with the resource deallocation code in kubernetes core.
-	if utilfeature.Enabled(features.DynamicResourceAllocation) {
+	if feature.Enabled(features.DynamicResourceAllocation) {
 		if err := kl.UnprepareDynamicResources(pod); err != nil {
 			return err
 		}
@@ -2286,7 +2286,7 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
-	if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+	if feature.Enabled(features.InPlacePodVerticalScaling) {
 		// Use allocated resources values from checkpoint store (source of truth) to determine fit
 		otherPods := make([]*v1.Pod, 0, len(pods))
 		for _, p := range pods {
@@ -2525,7 +2525,7 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+	if feature.Enabled(features.InPlacePodVerticalScaling) {
 		kl.podResizeMutex.Lock()
 		defer kl.podResizeMutex.Unlock()
 	}
@@ -2563,7 +2563,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			// pods that are alive.
 			activePods := kl.filterOutInactivePods(existingPods)
 
-			if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+			if feature.Enabled(features.InPlacePodVerticalScaling) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 				podCopy := pod.DeepCopy()

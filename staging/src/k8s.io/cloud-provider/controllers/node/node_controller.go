@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -748,7 +748,7 @@ func updateNodeAddressesFromNodeIP(node *v1.Node, nodeAddresses []v1.NodeAddress
 
 	providedNodeIP, exists := node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr]
 	if exists {
-		nodeAddresses, err = cloudnodeutil.GetNodeAddressesFromNodeIP(providedNodeIP, nodeAddresses, utilfeature.Enabled(features.CloudDualStackNodeIPs))
+		nodeAddresses, err = cloudnodeutil.GetNodeAddressesFromNodeIP(providedNodeIP, nodeAddresses, feature.Enabled(features.CloudDualStackNodeIPs))
 	}
 
 	return nodeAddresses, err

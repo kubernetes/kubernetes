@@ -27,7 +27,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -139,7 +139,7 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 				Terminating: endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating,
 			}
 
-			if utilfeature.Enabled(features.TopologyAwareHints) {
+			if feature.Enabled(features.TopologyAwareHints) {
 				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
 					epInfo.ZoneHints = sets.New[string]()
 					for _, zone := range endpoint.Hints.ForZones {

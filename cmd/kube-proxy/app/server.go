@@ -50,7 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -91,8 +91,8 @@ import (
 )
 
 func init() {
-	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
-	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(feature.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(feature.DefaultMutableFeatureGate))
 }
 
 // proxyRun defines the interface to run a specified ProxyServer
@@ -148,7 +148,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(utilfeature.KnownFeatures(), "\n")+"\n"+
+		"Options are:\n"+strings.Join(feature.KnownFeatures(), "\n")+"\n"+
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location can be overridden by the master flag).")
@@ -281,7 +281,7 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		return err
 	}
 
-	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
+	return feature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
 }
 
 // copyLogsFromFlags applies the logging flags from the given flag set to the given
@@ -541,7 +541,7 @@ with the apiserver API to configure the proxy.`,
 			}
 
 			logs.InitLogs()
-			if err := logsapi.ValidateAndApplyAsField(&opts.config.Logging, utilfeature.DefaultFeatureGate, field.NewPath("logging")); err != nil {
+			if err := logsapi.ValidateAndApplyAsField(&opts.config.Logging, feature.DefaultFeatureGate, field.NewPath("logging")); err != nil {
 				return fmt.Errorf("initialize logging: %v", err)
 			}
 
@@ -551,7 +551,7 @@ with the apiserver API to configure the proxy.`,
 				return fmt.Errorf("failed validate: %w", err)
 			}
 			// add feature enablement metrics
-			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			feature.DefaultMutableFeatureGate.AddMetrics()
 			if err := opts.Run(); err != nil {
 				klog.ErrorS(err, "Error running ProxyServer")
 				return err
@@ -939,7 +939,7 @@ func (s *ProxyServer) Run() error {
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.podCIDRs))
 	}
-	if utilfeature.Enabled(features.KubeProxyDrainingTerminatingNodes) {
+	if feature.Enabled(features.KubeProxyDrainingTerminatingNodes) {
 		nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
 			HealthServer: s.HealthzServer,
 		})

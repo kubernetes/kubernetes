@@ -28,7 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -93,14 +93,14 @@ type managerImpl struct {
 
 // NewManager returns a new node shutdown manager.
 func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
-	if !utilfeature.Enabled(features.GracefulNodeShutdown) {
+	if !feature.Enabled(features.GracefulNodeShutdown) {
 		m := managerStub{}
 		return m, m
 	}
 
 	shutdownGracePeriodByPodPriority := conf.ShutdownGracePeriodByPodPriority
 	// Migration from the original configuration
-	if !utilfeature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) ||
+	if !feature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) ||
 		len(shutdownGracePeriodByPodPriority) == 0 {
 		shutdownGracePeriodByPodPriority = migrateConfig(conf.ShutdownGracePeriodRequested, conf.ShutdownGracePeriodCriticalPods)
 	}
@@ -129,7 +129,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		syncNodeStatus:                   conf.SyncNodeStatusFunc,
 		shutdownGracePeriodByPodPriority: shutdownGracePeriodByPodPriority,
 		clock:                            conf.Clock,
-		enableMetrics:                    utilfeature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
+		enableMetrics:                    feature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
 		storage: localStorage{
 			Path: filepath.Join(conf.StateDirectory, localStorageStateFile),
 		},
@@ -381,7 +381,7 @@ func (m *managerImpl) processShutdownEvent() error {
 					}
 					status.Message = nodeShutdownMessage
 					status.Reason = nodeShutdownReason
-					if utilfeature.Enabled(features.PodDisruptionConditions) {
+					if feature.Enabled(features.PodDisruptionConditions) {
 						podutil.UpdatePodCondition(status, &v1.PodCondition{
 							Type:    v1.DisruptionTarget,
 							Status:  v1.ConditionTrue,

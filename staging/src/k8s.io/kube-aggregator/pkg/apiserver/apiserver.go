@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/version"
@@ -271,7 +271,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 
-	if utilfeature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if feature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager)
 		s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandlerWithAggregationSupport)
 	} else {
@@ -343,8 +343,8 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 
-	if utilfeature.Enabled(genericfeatures.StorageVersionAPI) &&
-		utilfeature.Enabled(genericfeatures.APIServerIdentity) {
+	if feature.Enabled(genericfeatures.StorageVersionAPI) &&
+		feature.Enabled(genericfeatures.APIServerIdentity) {
 		// Spawn a goroutine in aggregator apiserver to update storage version for
 		// all built-in resources
 		s.GenericAPIServer.AddPostStartHookOrDie(StorageVersionPostStartHookName, func(hookContext genericapiserver.PostStartHookContext) error {
@@ -414,7 +414,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		})
 	}
 
-	if utilfeature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if feature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.discoveryAggregationController = NewDiscoveryManager(
 			// Use aggregator as the source name to avoid overwriting native/CRD
 			// groups

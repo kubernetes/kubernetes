@@ -41,7 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -200,8 +200,8 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			return
 		}
 
-		metainternalversion.SetListOptionsDefaults(&opts, utilfeature.Enabled(features.WatchList))
-		if errs := metainternalversionvalidation.ValidateListOptions(&opts, utilfeature.Enabled(features.WatchList)); len(errs) > 0 {
+		metainternalversion.SetListOptionsDefaults(&opts, feature.Enabled(features.WatchList))
+		if errs := metainternalversionvalidation.ValidateListOptions(&opts, feature.Enabled(features.WatchList)); len(errs) > 0 {
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "ListOptions"}, "", errs)
 			scope.err(err, w, req)
 			return

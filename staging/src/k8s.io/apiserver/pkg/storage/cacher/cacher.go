@@ -41,7 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
 
@@ -510,7 +510,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	//
 	// it should never happen due to our validation but let's just be super-safe here
 	// and disable sendingInitialEvents when the feature wasn't enabled
-	if !utilfeature.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
+	if !feature.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
 		opts.SendInitialEvents = nil
 	}
 	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
@@ -721,7 +721,7 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
 	match := opts.ResourceVersionMatch
-	consistentListFromCacheEnabled := utilfeature.Enabled(features.ConsistentListFromCache)
+	consistentListFromCacheEnabled := feature.Enabled(features.ConsistentListFromCache)
 
 	// Serve consistent reads from storage if ConsistentListFromCache is disabled
 	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled
@@ -767,7 +767,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		// minimal resource version, simply forward the request to storage.
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
-	if listRV == 0 && utilfeature.Enabled(features.ConsistentListFromCache) {
+	if listRV == 0 && feature.Enabled(features.ConsistentListFromCache) {
 		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
 		if err != nil {
 			return err

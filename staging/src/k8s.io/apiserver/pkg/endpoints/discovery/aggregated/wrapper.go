@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 )
 
 type WrappedHandler struct {
@@ -37,7 +37,7 @@ type WrappedHandler struct {
 }
 
 func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	if utilfeature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if feature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		mediaType, _ := negotiation.NegotiateMediaTypeOptions(req.Header.Get("Accept"), wrapped.s.SupportedMediaTypes(), DiscoveryEndpointRestrictions)
 		// mediaType.Convert looks at the request accept headers and is used to control whether the discovery document will be aggregated.
 		if IsAggregatedDiscoveryGVK(mediaType.Convert) {

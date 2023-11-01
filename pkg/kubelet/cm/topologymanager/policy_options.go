@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
@@ -42,11 +42,11 @@ func CheckPolicyOptionAvailable(option string) error {
 		return fmt.Errorf("unknown Topology Manager Policy option: %q", option)
 	}
 
-	if alphaOptions.Has(option) && !utilfeature.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
+	if alphaOptions.Has(option) && !feature.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
 		return fmt.Errorf("Topology Manager Policy Alpha-level Options not enabled, but option %q provided", option)
 	}
 
-	if betaOptions.Has(option) && !utilfeature.Enabled(kubefeatures.TopologyManagerPolicyBetaOptions) {
+	if betaOptions.Has(option) && !feature.Enabled(kubefeatures.TopologyManagerPolicyBetaOptions) {
 		return fmt.Errorf("Topology Manager Policy Beta-level Options not enabled, but option %q provided", option)
 	}
 

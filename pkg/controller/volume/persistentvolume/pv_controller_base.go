@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -144,7 +144,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
-	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, feature.DefaultFeatureGate)
 
 	return controller, nil
 }
@@ -391,7 +391,7 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinal
 func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager, volume *v1.PersistentVolume) ([]string, bool) {
 	modified := false
 	var outFinalizers []string
-	if !utilfeature.Enabled(features.HonorPVReclaimPolicy) {
+	if !feature.Enabled(features.HonorPVReclaimPolicy) {
 		return volume.Finalizers, false
 	}
 	if !metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned) {

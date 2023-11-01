@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/mount-utils"
@@ -281,7 +281,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (vo
 	}
 
 	var mountContext string
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		kvh, ok := plugin.host.(volume.KubeletVolumeHost)
 		if !ok {
 			return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
@@ -386,7 +386,7 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		klog.Errorf("iscsi: failed to setup")
 	}
 
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		// The volume must have been mounted in MountDevice with -o context.
 		// TODO: extract from mount table in GetAttributes() to be sure?
 		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""

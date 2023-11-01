@@ -66,7 +66,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -512,7 +512,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
+	if feature.Enabled(features.MultiCIDRServiceAllocator) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			controller := defaultservicecidr.NewController(
 				c.ExtraConfig.ServiceIPRange,
@@ -526,7 +526,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		})
 	}
 
-	if utilfeature.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if feature.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		peeraddress := getPeerAddress(c.ExtraConfig.PeerAdvertiseAddress, c.GenericConfig.PublicAddress, publicServicePort)
 		peerEndpointCtrl := peerreconcilers.New(
 			c.GenericConfig.APIServerID,
@@ -589,7 +589,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if utilfeature.Enabled(apiserverfeatures.APIServerIdentity) {
+	if feature.Enabled(apiserverfeatures.APIServerIdentity) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 			// TODO: See if we can pass ctx to the current method
@@ -656,7 +656,7 @@ func labelAPIServerHeartbeatFunc(identity string, peeraddress string) lease.Proc
 		lease.Labels[apiv1.LabelHostname] = hostname
 
 		// Include apiserver network location <ip_port> used by peers to proxy requests between kube-apiservers
-		if utilfeature.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if feature.Enabled(features.UnknownVersionInteroperabilityProxy) {
 			if peeraddress != "" {
 				lease.Annotations[apiv1.AnnotationPeerAdvertiseAddress] = peeraddress
 			}

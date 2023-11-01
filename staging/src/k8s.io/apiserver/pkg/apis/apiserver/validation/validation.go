@@ -36,7 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -76,7 +76,7 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration) fie
 	// check and add validation for duplicate issuers.
 	for i, a := range c.JWT {
 		fldPath := root.Index(i)
-		_, errs := validateJWTAuthenticator(a, fldPath, utilfeature.Enabled(features.StructuredAuthenticationConfiguration))
+		_, errs := validateJWTAuthenticator(a, fldPath, feature.Enabled(features.StructuredAuthenticationConfiguration))
 		allErrs = append(allErrs, errs...)
 	}
 
@@ -87,7 +87,7 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration) fie
 // CEL expressions for claim mappings and validation rules.
 // This is exported for use in oidc package.
 func CompileAndValidateJWTAuthenticator(authenticator api.JWTAuthenticator) (authenticationcel.CELMapper, field.ErrorList) {
-	return validateJWTAuthenticator(authenticator, nil, utilfeature.Enabled(features.StructuredAuthenticationConfiguration))
+	return validateJWTAuthenticator(authenticator, nil, feature.Enabled(features.StructuredAuthenticationConfiguration))
 }
 
 func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field.Path, structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
@@ -550,7 +550,7 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{api.AuthorizationWebhookConnectionInfoTypeInCluster, api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile}))
 	}
 
-	_, errs := compileMatchConditions(c.MatchConditions, fldPath, utilfeature.Enabled(features.StructuredAuthorizationConfiguration))
+	_, errs := compileMatchConditions(c.MatchConditions, fldPath, feature.Enabled(features.StructuredAuthorizationConfiguration))
 	allErrs = append(allErrs, errs...)
 
 	return allErrs
@@ -559,7 +559,7 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 // ValidateAndCompileMatchConditions validates a given webhook's matchConditions.
 // This is exported for use in authz package.
 func ValidateAndCompileMatchConditions(matchConditions []api.WebhookMatchCondition) (*authorizationcel.CELMatcher, field.ErrorList) {
-	return compileMatchConditions(matchConditions, nil, utilfeature.Enabled(features.StructuredAuthorizationConfiguration))
+	return compileMatchConditions(matchConditions, nil, feature.Enabled(features.StructuredAuthorizationConfiguration))
 }
 
 func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath *field.Path, structuredAuthzFeatureEnabled bool) (*authorizationcel.CELMatcher, field.ErrorList) {

@@ -39,7 +39,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -603,7 +603,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 	}
 
 	var nodeLister v1listers.NodeLister
-	if utilfeature.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
+	if feature.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
 		nodeLister = versionedInformer.Core().V1().Nodes().Lister()
 	}
 	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
@@ -671,7 +671,7 @@ func (o *BuiltInAuthenticationOptions) validateOIDCOptions() []error {
 	// New validation when authentication config file is provided
 
 	// Authentication config file is only supported when the StructuredAuthenticationConfiguration feature is enabled
-	if !utilfeature.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
+	if !feature.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
 		allErrors = append(allErrors, fmt.Errorf("set --feature-gates=%s=true to use authentication-config file", genericfeatures.StructuredAuthenticationConfiguration))
 	}
 

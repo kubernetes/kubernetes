@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	"k8s.io/kubernetes/pkg/api/pod"
@@ -114,21 +114,21 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 // are not enabled.
 // The typical pattern is:
 //
-//	if !utilfeature.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	if !feature.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //	    newSvc.Spec.MyFeature = nil
 //	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
-	if !utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
+	if !feature.Enabled(features.StatefulSetAutoDeletePVC) {
 		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
 		}
 	}
-	if !utilfeature.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
+	if !feature.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
 		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
 		}
 	}
-	if !utilfeature.Enabled(features.StatefulSetStartOrdinal) {
+	if !feature.Enabled(features.StatefulSetStartOrdinal) {
 		if oldSS == nil || oldSS.Spec.Ordinals == nil {
 			// Reset Spec.Ordinals to the default value (nil).
 			newSS.Spec.Ordinals = nil

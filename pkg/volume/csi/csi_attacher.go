@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -329,7 +329,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	var seLinuxSupported bool
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		support, err := c.plugin.SupportsSELinuxContextMount(spec)
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
@@ -353,7 +353,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		volDataKey.driverName: csiSource.Driver,
 	}
 
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
 		data[volDataKey.seLinuxMountContext] = deviceMounterArgs.SELinuxLabel
 	}
 

@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -66,8 +66,8 @@ import (
 )
 
 func init() {
-	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
-	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(features.AddFeatureGates(feature.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(feature.DefaultMutableFeatureGate))
 }
 
 const (
@@ -91,7 +91,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			if err := logsapi.ValidateAndApply(logOptions, utilfeature.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(logOptions, feature.DefaultFeatureGate); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
 			}
@@ -188,7 +188,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		checks = append(checks, electionChecker)
 	}
 
-	if utilfeature.Enabled(cmfeatures.CloudControllerManagerWebhook) {
+	if feature.Enabled(cmfeatures.CloudControllerManagerWebhook) {
 		if len(webhooks) > 0 {
 			klog.Info("Webhook Handlers enabled: ", webhooks)
 			handler := newHandler(webhooks)

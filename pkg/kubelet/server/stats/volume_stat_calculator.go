@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
@@ -167,7 +167,7 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 			persistentStats = append(persistentStats, volumeStats)
 		}
 
-		if utilfeature.Enabled(features.CSIVolumeHealth) {
+		if feature.Enabled(features.CSIVolumeHealth) {
 			if metric.Abnormal != nil && metric.Message != nil && (*metric.Abnormal) {
 				s.eventRecorder.Event(s.pod, v1.EventTypeWarning, "VolumeConditionAbnormal", fmt.Sprintf("Volume %s: %s", name, *metric.Message))
 			}

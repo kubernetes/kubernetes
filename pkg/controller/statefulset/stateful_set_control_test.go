@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -100,7 +100,7 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 		subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 	}
 	t.Run(subtestName, func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)()
 		testFn(t, &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 			WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -132,7 +132,7 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 			subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 		}
 		t.Run(subtestName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 			testFn(t, policy)
 		})
 	}
@@ -229,7 +229,7 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
 	// Check all pods have correct pod index label.
-	if utilfeature.Enabled(features.PodIndexLabel) {
+	if feature.Enabled(features.PodIndexLabel) {
 		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 		if err != nil {
 			t.Error(err)
@@ -671,7 +671,7 @@ func emptyInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 }
 
 func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
 
 	simpleSetFn := func() *apps.StatefulSet {
 		statefulSet := newStatefulSet(3)
@@ -954,7 +954,7 @@ func setupPodManagementPolicy(podManagementPolicy apps.PodManagementPolicyType, 
 }
 
 func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)()
 
 	simpleParallelVerificationFn := func(
 		set *apps.StatefulSet,
@@ -1211,7 +1211,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 		{[]int{1}}, // note this is an ordinal greater than partition(3)
 	}
 	for _, tc := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)()
 		set, spc, ssc, maxUnavailable, totalPods := setupForInvariant(t)
 		t.Run(fmt.Sprintf("terminating pod at ordinal %d", tc.ordinalOfPodToTerminate), func(t *testing.T) {
 			status := apps.StatefulSetStatus{Replicas: int32(totalPods)}
@@ -2844,7 +2844,7 @@ func checkClaimInvarients(set *apps.StatefulSet, pod *v1.Pod, claim *v1.Persiste
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
 	}
-	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil && utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
+	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil && feature.Enabled(features.StatefulSetAutoDeletePVC) {
 		policy = *set.Spec.PersistentVolumeClaimRetentionPolicy
 	}
 	claimShouldBeRetained := policy.WhenScaled == apps.RetainPersistentVolumeClaimRetentionPolicyType

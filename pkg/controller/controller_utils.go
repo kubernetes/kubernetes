@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -841,7 +841,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 	}
 
 	// 4. lower pod-deletion-cost < higher pod-deletion cost
-	if utilfeature.Enabled(features.PodDeletionCost) {
+	if feature.Enabled(features.PodDeletionCost) {
 		pi, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[i].Annotations)
 		pj, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[j].Annotations)
 		if pi != pj {
@@ -864,7 +864,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		readyTime1 := podReadyTime(s.Pods[i])
 		readyTime2 := podReadyTime(s.Pods[j])
 		if !readyTime1.Equal(readyTime2) {
-			if !utilfeature.Enabled(features.LogarithmicScaleDown) {
+			if !feature.Enabled(features.LogarithmicScaleDown) {
 				return afterOrZero(readyTime1, readyTime2)
 			} else {
 				if s.Now.IsZero() || readyTime1.IsZero() || readyTime2.IsZero() {
@@ -884,7 +884,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 	}
 	// 8. Empty creation time pods < newer pods < older pods
 	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
-		if !utilfeature.Enabled(features.LogarithmicScaleDown) {
+		if !feature.Enabled(features.LogarithmicScaleDown) {
 			return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
 		} else {
 			if s.Now.IsZero() || s.Pods[i].CreationTimestamp.IsZero() || s.Pods[j].CreationTimestamp.IsZero() {

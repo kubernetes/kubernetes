@@ -52,7 +52,7 @@ import (
 	envelopemetrics "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	kmsservice "k8s.io/kms/pkg/service"
 )
@@ -740,7 +740,7 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 	kmsName := config.Name
 	switch config.APIVersion {
 	case kmsAPIVersionV1:
-		if !utilfeature.Enabled(features.KMSv1) {
+		if !feature.Enabled(features.KMSv1) {
 			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("KMSv1 is deprecated and will only receive security updates going forward. Use KMSv2 instead.  Set --feature-gates=KMSv1=true to use the deprecated KMSv1 feature.")
 		}
 		klog.InfoS("KMSv1 is deprecated and will only receive security updates going forward. Use KMSv2 instead.")
@@ -767,7 +767,7 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 		}, nil
 
 	case kmsAPIVersionV2:
-		if !utilfeature.Enabled(features.KMSv2) {
+		if !feature.Enabled(features.KMSv2) {
 			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
 		}
 

@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -294,7 +294,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 
 	var generatedOptions volumetypes.GeneratedOperations
 	var err error
-	if utilfeature.Enabled(features.RecoverVolumeExpansionFailure) {
+	if feature.Enabled(features.RecoverVolumeExpansionFailure) {
 		generatedOptions, err = expc.operationGenerator.GenerateExpandAndRecoverVolumeFunc(pvc, pv, resizerName)
 		if err != nil {
 			logger.Error(err, "Error starting ExpandVolume for pvc", "PVC", klog.KObj(pvc))

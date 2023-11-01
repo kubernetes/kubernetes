@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -89,7 +89,7 @@ func getOrdinal(pod *v1.Pod) int {
 // getStartOrdinal gets the first possible ordinal (inclusive).
 // Returns spec.ordinals.start if spec.ordinals is set, otherwise returns 0.
 func getStartOrdinal(set *apps.StatefulSet) int {
-	if utilfeature.Enabled(features.StatefulSetStartOrdinal) {
+	if feature.Enabled(features.StatefulSetStartOrdinal) {
 		if set.Spec.Ordinals != nil {
 			return int(set.Spec.Ordinals.Start)
 		}
@@ -397,7 +397,7 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
-	if utilfeature.Enabled(features.PodIndexLabel) {
+	if feature.Enabled(features.PodIndexLabel) {
 		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
 	}
 }

@@ -36,7 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/job"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
@@ -97,11 +97,11 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	if !utilfeature.Enabled(features.JobPodFailurePolicy) {
+	if !feature.Enabled(features.JobPodFailurePolicy) {
 		job.Spec.PodFailurePolicy = nil
 	}
 
-	if !utilfeature.Enabled(features.JobBackoffLimitPerIndex) {
+	if !feature.Enabled(features.JobBackoffLimitPerIndex) {
 		job.Spec.BackoffLimitPerIndex = nil
 		job.Spec.MaxFailedIndexes = nil
 		if job.Spec.PodFailurePolicy != nil {
@@ -117,7 +117,7 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 			job.Spec.PodFailurePolicy.Rules = job.Spec.PodFailurePolicy.Rules[:index]
 		}
 	}
-	if !utilfeature.Enabled(features.JobPodReplacementPolicy) {
+	if !feature.Enabled(features.JobPodReplacementPolicy) {
 		job.Spec.PodReplacementPolicy = nil
 	}
 
@@ -130,11 +130,11 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	if !utilfeature.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
+	if !feature.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
 		newJob.Spec.PodFailurePolicy = nil
 	}
 
-	if !utilfeature.Enabled(features.JobBackoffLimitPerIndex) {
+	if !feature.Enabled(features.JobBackoffLimitPerIndex) {
 		if oldJob.Spec.BackoffLimitPerIndex == nil {
 			newJob.Spec.BackoffLimitPerIndex = nil
 		}
@@ -147,7 +147,7 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		// validation of the pod failure policy with FailIndex rules will
 		// continue to pass.
 	}
-	if !utilfeature.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
+	if !feature.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
 		newJob.Spec.PodReplacementPolicy = nil
 	}
 
@@ -178,7 +178,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 	}
 	opts := batchvalidation.JobValidationOptions{
 		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
-		AllowElasticIndexedJobs: utilfeature.Enabled(features.ElasticIndexedJob),
+		AllowElasticIndexedJobs: feature.Enabled(features.ElasticIndexedJob),
 		RequirePrefixedLabels:   true,
 	}
 	if oldJob != nil {

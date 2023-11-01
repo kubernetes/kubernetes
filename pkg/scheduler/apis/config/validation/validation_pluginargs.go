@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -267,7 +267,7 @@ type VolumeBindingArgsValidationOptions struct {
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
 func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
 	return ValidateVolumeBindingArgsWithOptions(path, args, VolumeBindingArgsValidationOptions{
-		AllowVolumeCapacityPriority: utilfeature.Enabled(features.VolumeCapacityPriority),
+		AllowVolumeCapacityPriority: feature.Enabled(features.VolumeCapacityPriority),
 	})
 }
 

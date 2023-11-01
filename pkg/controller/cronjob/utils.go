@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -249,7 +249,7 @@ func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 	name := getJobName(cj, scheduledTime)
 
-	if utilfeature.Enabled(features.CronJobsScheduledAnnotation) {
+	if feature.Enabled(features.CronJobsScheduledAnnotation) {
 
 		timeZoneLocation, err := time.LoadLocation(pointer.StringDeref(cj.Spec.TimeZone, ""))
 		if err != nil {

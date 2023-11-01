@@ -43,7 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
@@ -1751,7 +1751,7 @@ var supportedVolumeModes = sets.New(core.PersistentVolumeBlock, core.PersistentV
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
 	opts := PersistentVolumeSpecValidationOptions{
-		EnableVolumeAttributesClass: utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass: feature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
 	if oldPv != nil && oldPv.Spec.VolumeAttributesClassName != nil {
 		opts.EnableVolumeAttributesClass = true
@@ -2088,7 +2088,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 	}
 
 	if !apiequality.Semantic.DeepEqual(oldPv.Spec.VolumeAttributesClassName, newPv.Spec.VolumeAttributesClassName) {
-		if !utilfeature.Enabled(features.VolumeAttributesClass) {
+		if !feature.Enabled(features.VolumeAttributesClass) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
 		}
 		if opts.EnableVolumeAttributesClass {
@@ -2123,9 +2123,9 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
-		EnableRecoverFromExpansionFailure: utilfeature.Enabled(features.RecoverVolumeExpansionFailure),
+		EnableRecoverFromExpansionFailure: feature.Enabled(features.RecoverVolumeExpansionFailure),
 		AllowInvalidLabelValueInSelector:  false,
-		EnableVolumeAttributesClass:       utilfeature.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass:       feature.Enabled(features.VolumeAttributesClass),
 	}
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
@@ -2158,7 +2158,7 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTemplate *core.PersistentVolumeClaimTemplate) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
-		EnableVolumeAttributesClass:      utilfeature.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass:      feature.Enabled(features.VolumeAttributesClass),
 	}
 	if oldClaimTemplate == nil {
 		// If there's no old PVC template, use the options based solely on feature enablement
@@ -2389,7 +2389,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	if !apiequality.Semantic.DeepEqual(oldPvc.Spec.VolumeAttributesClassName, newPvc.Spec.VolumeAttributesClassName) {
-		if !utilfeature.Enabled(features.VolumeAttributesClass) {
+		if !feature.Enabled(features.VolumeAttributesClass) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
 		}
 		if opts.EnableVolumeAttributesClass {
@@ -5004,7 +5004,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
 		// When the feature-gate is turned off, any new requests attempting to update CPU or memory
 		// resource values will result in validation failure.
-		if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+		if feature.Enabled(features.InPlacePodVerticalScaling) {
 			// Resources are mutable for CPU & memory only
 			//   - user can now modify Resources to express new desired Resources
 			mungeCpuMemResources := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
@@ -5108,7 +5108,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		specDiff := cmp.Diff(oldPod.Spec, mungedPodSpec)
 		errs := field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFieldsNoResources, ","), specDiff))
-		if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+		if feature.Enabled(features.InPlacePodVerticalScaling) {
 			errs = field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFields, ","), specDiff))
 		}
 		allErrs = append(allErrs, errs)
@@ -5769,7 +5769,7 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path, op
 func ValidateReadOnlyPersistentDisks(volumes, oldVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if utilfeature.Enabled(features.SkipReadOnlyValidationGCE) {
+	if feature.Enabled(features.SkipReadOnlyValidationGCE) {
 		return field.ErrorList{}
 	}
 
@@ -7256,7 +7256,7 @@ var (
 func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.Path, spec *core.ServiceSpec) field.ErrorList {
 	allErrs := field.ErrorList{}
 	ingrPath := fldPath.Child("ingress")
-	if !utilfeature.Enabled(features.AllowServiceLBStatusOnNonLB) && spec.Type != core.ServiceTypeLoadBalancer && len(status.Ingress) != 0 {
+	if !feature.Enabled(features.AllowServiceLBStatusOnNonLB) && spec.Type != core.ServiceTypeLoadBalancer && len(status.Ingress) != 0 {
 		allErrs = append(allErrs, field.Forbidden(ingrPath, "may only be used when `spec.type` is 'LoadBalancer'"))
 	} else {
 		for i, ingress := range status.Ingress {
@@ -7267,7 +7267,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 				}
 			}
 
-			if utilfeature.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
+			if feature.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
 				if len(ingress.IP) > 0 {
 					allErrs = append(allErrs, field.Required(idxPath.Child("ipMode"), "must be specified when `ip` is set"))
 				}

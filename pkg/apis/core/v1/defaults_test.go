@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -47,10 +47,10 @@ func TestWorkloadDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
 }
 func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
-	allFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	allFeatures := feature.DefaultFeatureGate.DeepCopy().GetAll()
 	for feature, featureSpec := range allFeatures {
 		if !featureSpec.LockToDefault {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, feature, featuresEnabled)()
 		}
 	}
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
@@ -208,7 +208,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 				".Spec.HostNetwork":                          "true",
 				".Spec.Containers[0].Ports[0].ContainerPort": "12345",
 			}
-			if utilfeature.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+			if feature.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
 				m[".Spec.Containers"] = `[{"name":"","ports":[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
 				m[".Spec.Containers[0].Ports"] = `[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}]`
 				m[".Spec.Containers[0].Ports[0].HostPort"] = "12345"
@@ -237,10 +237,10 @@ func TestPodDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
 }
 func testPodDefaults(t *testing.T, featuresEnabled bool) {
-	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	features := feature.DefaultFeatureGate.DeepCopy().GetAll()
 	for feature, featureSpec := range features {
 		if !featureSpec.LockToDefault {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, feature, featuresEnabled)()
 		}
 	}
 	pod := &v1.Pod{}
@@ -411,7 +411,7 @@ func TestPodHostNetworkDefaults(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DefaultHostNetworkHostPortsInPodTemplates, tc.gate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DefaultHostNetworkHostPortsInPodTemplates, tc.gate)()
 
 			const portNum = 12345
 			spec := v1.PodSpec{
@@ -1275,7 +1275,7 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
 			obj := roundTrip(t, runtime.Object(tc.svc))
 			svc := obj.(*v1.Service)
 			for i, s := range svc.Status.LoadBalancer.Ingress {
@@ -2120,7 +2120,7 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 
 func TestSetDefaultResizePolicy(t *testing.T) {
 	// verify we default to NotRequired restart policy for resize when resources are specified
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 
 	for desc, tc := range map[string]struct {
 		testContainer        v1.Container

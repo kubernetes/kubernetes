@@ -39,7 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -99,7 +99,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
-	if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+	if feature.Enabled(features.InPlacePodVerticalScaling) {
 		// With support for in-place pod resizing, container resources are now mutable.
 		// If container resources are updated with new resource requests values, a pod resize is
 		// desired. The status of this request is reflected by setting Resize field to "Proposed"
@@ -699,7 +699,7 @@ func applyMatchLabelKeysAndMismatchLabelKeys(term *api.PodAffinityTerm, label ma
 }
 
 func mutatePodAffinity(pod *api.Pod) {
-	if !utilfeature.Enabled(features.MatchLabelKeysInPodAffinity) || pod.Spec.Affinity == nil {
+	if !feature.Enabled(features.MatchLabelKeysInPodAffinity) || pod.Spec.Affinity == nil {
 		return
 	}
 	if affinity := pod.Spec.Affinity.PodAffinity; affinity != nil {
@@ -723,7 +723,7 @@ func mutatePodAffinity(pod *api.Pod) {
 // applyWaitingForSchedulingGatesCondition adds a {type:PodScheduled, reason:WaitingForGates} condition
 // to a new-created Pod if necessary.
 func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
-	if !utilfeature.Enabled(features.PodSchedulingReadiness) ||
+	if !feature.Enabled(features.PodSchedulingReadiness) ||
 		len(pod.Spec.SchedulingGates) == 0 {
 		return
 	}

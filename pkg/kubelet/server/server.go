@@ -58,7 +58,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/routes"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
@@ -88,7 +88,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(feature.DefaultMutableFeatureGate))
 }
 
 const (
@@ -284,7 +284,7 @@ func NewServer(
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	if utilfeature.Enabled(features.KubeletTracing) {
+	if feature.Enabled(features.KubeletTracing) {
 		server.InstallTracingFilter(tp)
 	}
 	server.InstallDefaultHandlers()
@@ -412,7 +412,7 @@ func (s *Server) InstallDefaultHandlers() {
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
-	if utilfeature.Enabled(features.PodAndContainerStatsFromCRI) {
+	if feature.Enabled(features.PodAndContainerStatsFromCRI) {
 		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
 	} else {
 		cadvisorOpts := cadvisorv2.RequestOptions{
@@ -445,7 +445,7 @@ func (s *Server) InstallDefaultHandlers() {
 	)
 
 	// Only enable checkpoint API if the feature is enabled
-	if utilfeature.Enabled(features.ContainerCheckpoint) {
+	if feature.Enabled(features.ContainerCheckpoint) {
 		s.addMetricsBucketMatcher("checkpoint")
 		ws = &restful.WebService{}
 		ws.Path("/checkpoint").Produces(restful.MIME_JSON)

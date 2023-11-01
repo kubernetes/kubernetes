@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -707,7 +707,7 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
 		return true
 	}
-	if !utilfeature.Enabled(features.StableLoadBalancerNodeSet) {
+	if !feature.Enabled(features.StableLoadBalancerNodeSet) {
 		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 	}
 	return false
@@ -1017,7 +1017,7 @@ var (
 )
 
 func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
-	if utilfeature.Enabled(features.StableLoadBalancerNodeSet) {
+	if feature.Enabled(features.StableLoadBalancerNodeSet) {
 		return stableNodeSetPredicates
 	}
 	if service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal {

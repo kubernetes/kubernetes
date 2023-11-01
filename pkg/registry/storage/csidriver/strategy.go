@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
@@ -47,7 +47,7 @@ func (csiDriverStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears the fields for which the corresponding feature is disabled.
 func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	csiDriver := obj.(*storage.CSIDriver)
-	if !utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if !feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		csiDriver.Spec.SELinuxMount = nil
 	}
 }
@@ -79,7 +79,7 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldCSIDriver := old.(*storage.CSIDriver)
 
 	if oldCSIDriver.Spec.SELinuxMount == nil &&
-		!utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+		!feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		newCSIDriver.Spec.SELinuxMount = nil
 	}
 

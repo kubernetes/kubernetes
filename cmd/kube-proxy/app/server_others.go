@@ -40,7 +40,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	toolswatch "k8s.io/client-go/tools/watch"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
@@ -565,7 +565,7 @@ func platformCleanup(mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
 		}
 	}
 
-	if utilfeature.Enabled(features.NFTablesProxyMode) {
+	if feature.Enabled(features.NFTablesProxyMode) {
 		// Clean up nftables rules when switching to iptables or ipvs, or if cleanupAndExit
 		if isIPTablesBased(mode) || cleanupAndExit {
 			encounteredError = nftables.CleanupLeftovers() || encounteredError

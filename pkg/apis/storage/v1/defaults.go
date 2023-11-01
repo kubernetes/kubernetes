@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -64,7 +64,7 @@ func SetDefaults_CSIDriver(obj *storagev1.CSIDriver) {
 		obj.Spec.RequiresRepublish = new(bool)
 		*(obj.Spec.RequiresRepublish) = false
 	}
-	if obj.Spec.SELinuxMount == nil && utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if obj.Spec.SELinuxMount == nil && feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		obj.Spec.SELinuxMount = new(bool)
 		*(obj.Spec.SELinuxMount) = false
 	}

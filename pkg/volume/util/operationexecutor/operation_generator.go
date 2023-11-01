@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	volerr "k8s.io/cloud-provider/volume/errors"
@@ -2173,7 +2173,7 @@ func (og *operationGenerator) nodeExpandVolume(
 func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVolumeClaim, volumeToMount VolumeToMount) bool {
 	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
 	allocatedResource := pvc.Status.AllocatedResources
-	featureGateStatus := utilfeature.Enabled(features.RecoverVolumeExpansionFailure)
+	featureGateStatus := feature.Enabled(features.RecoverVolumeExpansionFailure)
 
 	if !featureGateStatus {
 		return false

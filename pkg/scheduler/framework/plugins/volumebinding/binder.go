@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -1097,9 +1097,9 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:
-		return utilfeature.Enabled(features.CSIMigrationPortworx)
+		return feature.Enabled(features.CSIMigrationPortworx)
 	case csiplugins.RBDVolumePluginName:
-		return utilfeature.Enabled(features.CSIMigrationRBD)
+		return feature.Enabled(features.CSIMigrationRBD)
 	}
 	return false
 }

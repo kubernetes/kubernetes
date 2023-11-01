@@ -37,7 +37,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
@@ -542,7 +542,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 }
 
 func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
-	if !utilfeature.Enabled(features.InPlacePodVerticalScaling) {
+	if !feature.Enabled(features.InPlacePodVerticalScaling) {
 		return false
 	}
 	if types.IsStaticPod(pod) {
@@ -863,7 +863,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// is done and there is no container to start.
 		if len(containersToStart) == 0 {
 			hasInitialized := false
-			if !utilfeature.Enabled(features.SidecarContainers) {
+			if !feature.Enabled(features.SidecarContainers) {
 				_, _, hasInitialized = findNextInitContainerToRun(pod, podStatus)
 			} else {
 				// If there is any regular container, it means all init containers have
@@ -881,7 +881,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// state.
 		if len(pod.Spec.InitContainers) != 0 {
 			// Pod has init containers, return the first one.
-			if !utilfeature.Enabled(features.SidecarContainers) {
+			if !feature.Enabled(features.SidecarContainers) {
 				changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
 			} else {
 				changes.InitContainersToStart = []int{0}
@@ -904,7 +904,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	// Check initialization progress.
-	if !utilfeature.Enabled(features.SidecarContainers) {
+	if !feature.Enabled(features.SidecarContainers) {
 		initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
 		if !done {
 			if next != nil {
@@ -1031,7 +1031,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
 		changes.KillPod = true
-		if utilfeature.Enabled(features.SidecarContainers) {
+		if feature.Enabled(features.SidecarContainers) {
 			// To prevent the restartable init containers to keep pod alive, we should
 			// not restart them.
 			changes.InitContainersToStart = nil
@@ -1141,7 +1141,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
 		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
-		if utilfeature.Enabled(features.DynamicResourceAllocation) {
+		if feature.Enabled(features.DynamicResourceAllocation) {
 			if err := m.runtimeHelper.PrepareDynamicResources(pod); err != nil {
 				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 				if referr != nil {
@@ -1275,7 +1275,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 	}
 
-	if !utilfeature.Enabled(features.SidecarContainers) {
+	if !feature.Enabled(features.SidecarContainers) {
 		// Step 6: start the init container.
 		if container := podContainerChanges.NextInitContainerToStart; container != nil {
 			// Start the next init container.
@@ -1466,7 +1466,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
 
-		if idx == 0 && utilfeature.Enabled(features.EventedPLEG) {
+		if idx == 0 && feature.Enabled(features.EventedPLEG) {
 			if resp.Timestamp == 0 {
 				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
 				// then the pod status we get will not have the timestamp set.
@@ -1493,7 +1493,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		}
 	}
 
-	if !utilfeature.Enabled(features.EventedPLEG) {
+	if !feature.Enabled(features.EventedPLEG) {
 		// Get statuses of all containers visible in the pod.
 		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
 		if err != nil {

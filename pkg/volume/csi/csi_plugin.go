@@ -36,7 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
@@ -234,13 +234,13 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			return true
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
-			return utilfeature.Enabled(features.CSIMigrationAzureFile)
+			return feature.Enabled(features.CSIMigrationAzureFile)
 		},
 		csitranslationplugins.PortworxVolumePluginName: func() bool {
-			return utilfeature.Enabled(features.CSIMigrationPortworx)
+			return feature.Enabled(features.CSIMigrationPortworx)
 		},
 		csitranslationplugins.RBDVolumePluginName: func() bool {
-			return utilfeature.Enabled(features.CSIMigrationRBD)
+			return feature.Enabled(features.CSIMigrationRBD)
 		},
 	}
 
@@ -463,7 +463,7 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.Re
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
 	var ret volume.ReconstructedVolume
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		ret.SELinuxMountContext = volData[volDataKey.seLinuxMountContext]
 	}
 
@@ -526,7 +526,7 @@ func (p *csiPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		driver, err := GetCSIDriverName(spec)
 		if err != nil {
 			return false, err

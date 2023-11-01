@@ -31,7 +31,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -119,7 +119,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		return nil, err
 	}
 
-	if utilfeature.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
+	if feature.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
 		abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
 		metrics.Abnormal, metrics.Message = &abnormal, &message
 	}
@@ -834,7 +834,7 @@ type VolumeStatsOptions struct {
 }
 
 func TestVolumeHealthEnable(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name               string
@@ -895,7 +895,7 @@ func TestVolumeHealthEnable(t *testing.T) {
 }
 
 func TestVolumeHealthDisable(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CSIVolumeHealth, false)()
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name           string
@@ -936,7 +936,7 @@ func TestVolumeHealthDisable(t *testing.T) {
 }
 
 func TestVolumeStats(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name               string

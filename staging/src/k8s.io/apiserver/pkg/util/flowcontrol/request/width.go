@@ -23,7 +23,7 @@ import (
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/klog/v2"
 )
@@ -118,7 +118,7 @@ func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelN
 		// From that perspective, given that the watch only consumes APF seats
 		// during its initialization (sending init events), its cost should then
 		// be computed the same way as for a regular list.
-		if utilfeature.Enabled(features.WatchList) {
+		if feature.Enabled(features.WatchList) {
 			return e.listWorkEstimator.EstimateWork(r, flowSchemaName, priorityLevelName)
 		}
 	case "create", "update", "patch", "delete":

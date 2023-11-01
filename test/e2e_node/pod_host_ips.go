@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	netutils "k8s.io/utils/net"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -183,7 +183,7 @@ var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeat
 		})
 
 		ginkgo.It("should provide hostIPs as an env var", func(ctx context.Context) {
-			if !utilfeature.Enabled(kubefeatures.PodHostIPs) {
+			if !feature.Enabled(kubefeatures.PodHostIPs) {
 				e2eskipper.Skipf("PodHostIPs feature is not enabled")
 			}
 

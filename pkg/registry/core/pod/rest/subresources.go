@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/proxy"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	translator "k8s.io/apiserver/pkg/util/proxy"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -118,7 +118,7 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 		return nil, err
 	}
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
-	if utilfeature.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+	if feature.Enabled(features.TranslateStreamCloseWebsocketRequests) {
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{
@@ -175,7 +175,7 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 		return nil, err
 	}
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
-	if utilfeature.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+	if feature.Enabled(features.TranslateStreamCloseWebsocketRequests) {
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{

@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -50,7 +50,7 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 		}
 	}
 
-	if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
+	if feature.Enabled(features.StatefulSetAutoDeletePVC) {
 		if obj.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 			obj.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{}
 		}
@@ -76,7 +76,7 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
 			obj.Spec.UpdateStrategy.RollingUpdate.Partition = ptr.To[int32](0)
 		}
-		if utilfeature.Enabled(features.MaxUnavailableStatefulSet) {
+		if feature.Enabled(features.MaxUnavailableStatefulSet) {
 			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
 			}

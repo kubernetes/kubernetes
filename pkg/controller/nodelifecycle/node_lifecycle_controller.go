@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -413,7 +413,7 @@ func NewNodeLifecycleController(
 	nc.podLister = podInformer.Lister()
 	nc.nodeLister = nodeInformer.Lister()
 
-	if !utilfeature.Enabled(features.SeparateTaintEvictionController) {
+	if !feature.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
 		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
 		if err != nil {
@@ -474,7 +474,7 @@ func (nc *Controller) Run(ctx context.Context) {
 		return
 	}
 
-	if !utilfeature.Enabled(features.SeparateTaintEvictionController) {
+	if !feature.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Starting", "controller", taintEvictionController)
 		go nc.taintManager.Run(ctx)
 	}

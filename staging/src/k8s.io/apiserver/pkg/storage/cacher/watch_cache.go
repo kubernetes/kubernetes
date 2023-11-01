@@ -33,7 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -494,7 +494,7 @@ func (s sortableStoreElements) Swap(i, j int) {
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) ([]interface{}, uint64, string, error) {
 	var err error
-	if utilfeature.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
+	if feature.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 		w.waitingUntilFresh.Remove()

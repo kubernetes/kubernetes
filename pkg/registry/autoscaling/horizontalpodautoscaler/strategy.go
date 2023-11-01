@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
@@ -73,7 +73,7 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	// create cannot set status
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
 
-	if !utilfeature.Enabled(features.HPAContainerMetrics) {
+	if !feature.Enabled(features.HPAContainerMetrics) {
 		dropContainerMetricSources(newHPA.Spec.Metrics)
 	}
 }
@@ -102,7 +102,7 @@ func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
-	if !utilfeature.Enabled(features.HPAContainerMetrics) && !hasContainerMetricSources(oldHPA) {
+	if !feature.Enabled(features.HPAContainerMetrics) && !hasContainerMetricSources(oldHPA) {
 		dropContainerMetricSources(newHPA.Spec.Metrics)
 	}
 	// Update is not allowed to set status

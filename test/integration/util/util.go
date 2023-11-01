@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -507,7 +507,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
-			if utilfeature.Enabled(features.DynamicResourceAllocation) {
+			if feature.Enabled(features.DynamicResourceAllocation) {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
 					resourcev1alpha2.SchemeGroupVersion.String(): "true",
 				}

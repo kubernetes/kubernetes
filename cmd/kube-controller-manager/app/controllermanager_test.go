@@ -25,7 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -108,13 +108,13 @@ func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
 }
 
 func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", false)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", false)()
 
 	controllersWithoutFeatureGates := KnownControllers()
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)()
 
 	controllersWithFeatureGates := KnownControllers()
 
@@ -127,7 +127,7 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 	featureGateRegex := regexp.MustCompile("^([a-zA-Z0-9]+)")
 
 	alphaFeatures := sets.NewString()
-	for _, featureText := range utilfeature.KnownFeatures() {
+	for _, featureText := range feature.KnownFeatures() {
 		// we have to parse this from KnownFeatures, because usage of mutable FeatureGate is not allowed in unit tests
 		feature := featureGateRegex.FindString(featureText)
 		if strings.Contains(featureText, string(featuregate.Alpha)) && feature != "AllAlpha" {
@@ -187,7 +187,7 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)()
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

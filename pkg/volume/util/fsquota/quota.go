@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
@@ -51,5 +51,5 @@ type Interface interface {
 }
 
 func enabledQuotasForMonitoring() bool {
-	return utilfeature.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
+	return feature.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }

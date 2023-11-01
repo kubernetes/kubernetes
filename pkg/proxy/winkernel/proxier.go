@@ -37,7 +37,7 @@ import (
 	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -263,7 +263,7 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 		return false
 	}
 
-	if utilfeature.Enabled(kubefeatures.WinOverlay) && isOverlay(networkInfo) {
+	if feature.Enabled(kubefeatures.WinOverlay) && isOverlay(networkInfo) {
 		// Overlay (VXLAN) networks on Windows do not support dual-stack networking today
 		klog.InfoS("Winoverlay does not support dual-stack, falling back to single-stack")
 		return false
@@ -703,7 +703,7 @@ func NewProxier(
 
 	klog.V(1).InfoS("Hns Network loaded", "hnsNetworkInfo", hnsNetworkInfo)
 	isDSR := config.EnableDSR
-	if isDSR && !utilfeature.Enabled(kubefeatures.WinDSR) {
+	if isDSR && !feature.Enabled(kubefeatures.WinDSR) {
 		return nil, fmt.Errorf("WinDSR feature gate not enabled")
 	}
 
@@ -715,7 +715,7 @@ func NewProxier(
 	var sourceVip string
 	var hostMac string
 	if isOverlay(hnsNetworkInfo) {
-		if !utilfeature.Enabled(kubefeatures.WinOverlay) {
+		if !feature.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
 		err = hcn.RemoteSubnetSupported()

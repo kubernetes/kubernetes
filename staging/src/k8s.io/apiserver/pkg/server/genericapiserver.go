@@ -51,7 +51,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
@@ -760,7 +760,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 		resourceInfos = append(resourceInfos, r...)
 
-		if utilfeature.Enabled(features.AggregatedDiscoveryEndpoint) {
+		if feature.Enabled(features.AggregatedDiscoveryEndpoint) {
 			// Aggregated discovery only aggregates resources under /apis
 			if apiPrefix == APIGroupPrefix {
 				s.AggregatedDiscoveryGroupManager.AddGroupVersion(
@@ -788,8 +788,8 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 
 	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)
 
-	if utilfeature.Enabled(features.StorageVersionAPI) &&
-		utilfeature.Enabled(features.APIServerIdentity) {
+	if feature.Enabled(features.StorageVersionAPI) &&
+		feature.Enabled(features.APIServerIdentity) {
 		// API installation happens before we start listening on the handlers,
 		// therefore it is safe to register ResourceInfos here. The handler will block
 		// write requests until the storage versions of the targeting resources are updated.
@@ -819,7 +819,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	legacyRootAPIHandler := discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix)
-	if utilfeature.Enabled(features.AggregatedDiscoveryEndpoint) {
+	if feature.Enabled(features.AggregatedDiscoveryEndpoint) {
 		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(legacyRootAPIHandler, s.AggregatedLegacyDiscoveryGroupManager)
 		s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/api", metav1.APIVersions{}))
 	} else {

@@ -31,7 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -127,7 +127,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 }
 
 func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
-	if !utilfeature.Enabled(features.PodLifecycleSleepAction) {
+	if !feature.Enabled(features.PodLifecycleSleepAction) {
 		return nil
 	}
 	c := time.After(time.Duration(seconds) * time.Second)
@@ -156,7 +156,7 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 		podIP = host
 	}
 
-	if utilfeature.Enabled(features.ConsistentHTTPGetHandlers) {
+	if feature.Enabled(features.ConsistentHTTPGetHandlers) {
 		req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, podIP, "lifecycle")
 		if err != nil {
 			return err

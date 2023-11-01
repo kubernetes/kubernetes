@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	netutils "k8s.io/utils/net"
 
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -49,7 +49,7 @@ func validateClusterIPFlags(options Extra) []error {
 	}
 
 	// Complete() expected to have set Primary* and Secondary
-	if !utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
+	if !feature.Enabled(features.MultiCIDRServiceAllocator) {
 		// primary CIDR validation
 		if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
 			errs = append(errs, err)
@@ -71,7 +71,7 @@ func validateClusterIPFlags(options Extra) []error {
 		if !dualstack {
 			errs = append(errs, errors.New("--service-cluster-ip-range[0] and --service-cluster-ip-range[1] must be of different IP family"))
 		}
-		if !utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
+		if !feature.Enabled(features.MultiCIDRServiceAllocator) {
 			if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
 				errs = append(errs, err)
 			}

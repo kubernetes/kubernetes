@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -387,7 +387,7 @@ func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.Queuei
 
 		for _, event := range events {
 			fn := event.QueueingHintFn
-			if fn == nil || !utilfeature.Enabled(features.SchedulerQueueingHints) {
+			if fn == nil || !feature.Enabled(features.SchedulerQueueingHints) {
 				fn = defaultQueueingHintFn
 			}
 

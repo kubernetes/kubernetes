@@ -29,7 +29,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -254,7 +254,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	var selinuxLabelMount bool
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		support, err := c.plugin.SupportsSELinuxContextMount(c.spec)
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
@@ -277,7 +277,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		volDataKey.attachmentID:        getAttachmentName(volumeHandle, string(c.driverName), nodeName),
 	}
 
-	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {
+	if feature.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {
 		volData[volDataKey.seLinuxMountContext] = mounterArgs.SELinuxLabel
 	}
 
