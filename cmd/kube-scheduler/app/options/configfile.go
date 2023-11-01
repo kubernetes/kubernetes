@@ -90,12 +90,6 @@ func LogOrWriteConfig(logger klog.Logger, fileName string, cfg *config.KubeSched
 		return err
 	}
 
-	defaultPluginString := "Plugins Enabled By Default:"
-	for _, v := range configv1.GetDefaultPlugins.MultiPoint.Enabled {
-		name := v.Name
-		defaultPluginString += "\n" + "\t" + name
-	}
-	buf.WriteString(defaultPluginString)
 	if loggerV.Enabled() {
 		loggerV.Info("Using component config", "config", buf.String())
 	}
