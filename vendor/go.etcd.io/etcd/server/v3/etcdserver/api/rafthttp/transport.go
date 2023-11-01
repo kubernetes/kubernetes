@@ -110,7 +110,7 @@ type Transport struct {
 	Raft        Raft       // raft state machine, to which the Transport forwards received messages and reports status
 	Snapshotter *snap.Snapshotter
 	ServerStats *stats.ServerStats // used to record general transportation statistics
-	// used to record transportation statistics with followers when
+	// LeaderStats is used to record transportation statistics with followers when
 	// performing as leader in raft protocol
 	LeaderStats *stats.LeaderStats
 	// ErrorC is used to report detected critical errors, e.g.,

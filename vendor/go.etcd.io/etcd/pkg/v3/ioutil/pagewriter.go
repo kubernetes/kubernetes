@@ -15,6 +15,7 @@
 package ioutil
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -41,6 +42,9 @@ type PageWriter struct {
 // NewPageWriter creates a new PageWriter. pageBytes is the number of bytes
 // to write per page. pageOffset is the starting offset of io.Writer.
 func NewPageWriter(w io.Writer, pageBytes, pageOffset int) *PageWriter {
+	if pageBytes <= 0 {
+		panic(fmt.Sprintf("assertion failed: invalid pageBytes (%d) value, it must be greater than 0", pageBytes))
+	}
 	return &PageWriter{
 		w:                 w,
 		pageOffset:        pageOffset,

@@ -19,4 +19,4 @@
 package grpc
 
 // Version is the current grpc version.
-const Version = "1.58.2"
+const Version = "1.58.3"

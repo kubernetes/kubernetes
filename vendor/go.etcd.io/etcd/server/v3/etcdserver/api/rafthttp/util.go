@@ -94,7 +94,7 @@ func checkPostResponse(lg *zap.Logger, resp *http.Response, body []byte, req *ht
 				)
 			}
 			return errIncompatibleVersion
-		case errClusterIDMismatch.Error():
+		case ErrClusterIDMismatch.Error():
 			if lg != nil {
 				lg.Error(
 					"request sent was ignored due to cluster ID mismatch",
@@ -103,7 +103,7 @@ func checkPostResponse(lg *zap.Logger, resp *http.Response, body []byte, req *ht
 					zap.String("local-member-cluster-id", req.Header.Get("X-Etcd-Cluster-ID")),
 				)
 			}
-			return errClusterIDMismatch
+			return ErrClusterIDMismatch
 		default:
 			return fmt.Errorf("unhandled error %q when precondition failed", string(body))
 		}
