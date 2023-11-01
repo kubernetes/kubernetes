@@ -192,6 +192,7 @@ endif
 	# And build the image
 	docker buildx build \
 		--pull \
+		--provenance=false \
 		--output=type=$(OUTPUT_TYPE) \
 		--platform "$(OS)/$(ARCH)" \
 		-t $(REGISTRY)/etcd:$(IMAGE_TAG)-$(IMAGE_SUFFIX) \
