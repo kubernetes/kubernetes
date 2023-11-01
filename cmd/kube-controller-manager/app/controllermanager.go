@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
-	"k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -79,8 +78,8 @@ import (
 )
 
 func init() {
-	utilruntime.Must(logsapi.AddFeatureGates(feature.DefaultMutableFeatureGate))
-	utilruntime.Must(metricsfeatures.AddFeatureGates(feature.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
 }
 
 const (
@@ -130,7 +129,7 @@ controller, and serviceaccounts controller.`,
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := logsapi.ValidateAndApply(s.Logs, feature.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(s.Logs, featuregate.DefaultFeatureGate); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(cmd.Flags())
@@ -140,7 +139,7 @@ controller, and serviceaccounts controller.`,
 				return err
 			}
 			// add feature enablement metrics
-			feature.DefaultMutableFeatureGate.AddMetrics()
+			featuregate.DefaultMutableFeatureGate.AddMetrics()
 			return Run(context.Background(), c.Complete())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -683,7 +682,7 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 	controllerName := controllerDescriptor.Name()
 
 	for _, featureGate := range controllerDescriptor.GetRequiredFeatureGates() {
-		if !feature.Enabled(featureGate) {
+		if !featuregate.Enabled(featureGate) {
 			logger.Info("Controller is disabled by a feature gate", "controller", controllerName, "requiredFeatureGates", controllerDescriptor.GetRequiredFeatureGates())
 			return nil, nil
 		}

@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
@@ -172,7 +172,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 }
 
 func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
 	testRuntimeHandler := "test-runtimeHandler"
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)

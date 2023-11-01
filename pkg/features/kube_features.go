@@ -20,7 +20,6 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -978,7 +977,7 @@ const (
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(featuregate.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.

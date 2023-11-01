@@ -22,7 +22,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -70,7 +70,7 @@ func SetDefaults_Job(obj *batchv1.Job) {
 			}
 		}
 	}
-	if feature.Enabled(features.JobPodReplacementPolicy) {
+	if featuregate.Enabled(features.JobPodReplacementPolicy) {
 		if obj.Spec.PodReplacementPolicy == nil {
 			if obj.Spec.PodFailurePolicy != nil {
 				obj.Spec.PodReplacementPolicy = podReplacementPolicyPtr(batchv1.Failed)

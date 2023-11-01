@@ -23,7 +23,7 @@ import (
 
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -142,5 +142,5 @@ func getServicesHealthCheckURLs() []string {
 }
 
 func SetFeatureGatesForInProcessComponents(featureGates map[string]bool) error {
-	return utilfeature.DefaultMutableFeatureGate.SetFromMap(featureGates)
+	return featuregate.DefaultMutableFeatureGate.SetFromMap(featureGates)
 }

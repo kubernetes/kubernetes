@@ -52,11 +52,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	apisv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
@@ -456,7 +456,7 @@ func TestWebhookAdmissionWithoutWatchCache(t *testing.T) {
 
 // testWebhookAdmission tests communication between API server and webhook process.
 func testWebhookAdmission(t *testing.T, watchCache bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APISelfSubjectReview, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APISelfSubjectReview, true)()
 
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{

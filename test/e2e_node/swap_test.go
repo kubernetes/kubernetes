@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -145,7 +145,7 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 
 func isSwapFeatureGateEnabled() bool {
 	ginkgo.By("figuring if NodeSwap feature gate is turned on")
-	return feature.Enabled(features.NodeSwap)
+	return featuregate.Enabled(features.NodeSwap)
 }
 
 func readCgroupFile(f *framework.Framework, pod *v1.Pod, filename string) string {

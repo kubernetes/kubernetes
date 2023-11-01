@@ -28,7 +28,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubetypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
@@ -245,7 +245,7 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		return nil, nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
 
-	if !feature.Enabled(features.KubeletSeparateDiskGC) {
+	if !featuregate.Enabled(features.KubeletSeparateDiskGC) {
 		imageStats, err := p.imageService.ImageStats(ctx)
 		if err != nil || imageStats == nil {
 			return nil, nil, fmt.Errorf("failed to get image stats: %v", err)

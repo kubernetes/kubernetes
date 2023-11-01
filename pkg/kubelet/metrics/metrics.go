@@ -24,7 +24,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -873,7 +873,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
-		if feature.Enabled(features.KubeletPodResourcesGet) {
+		if featuregate.Enabled(features.KubeletPodResourcesGet) {
 			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
 			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
 		}
@@ -897,13 +897,13 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.CustomMustRegister(collector)
 		}
 
-		if feature.Enabled(features.GracefulNodeShutdown) &&
-			feature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
+		if featuregate.Enabled(features.GracefulNodeShutdown) &&
+			featuregate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 			legacyregistry.MustRegister(GracefulShutdownStartTime)
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
 
-		if feature.Enabled(features.ConsistentHTTPGetHandlers) {
+		if featuregate.Enabled(features.ConsistentHTTPGetHandlers) {
 			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		}
 	})

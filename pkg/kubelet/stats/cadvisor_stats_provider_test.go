@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -537,7 +537,7 @@ func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 		imageStats  = &kubecontainer.ImageStats{TotalStorageBytes: 100}
 	)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletSeparateDiskGC, false)()
 
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
@@ -577,7 +577,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 		ImageFilesystems:     []*runtimeapi.FilesystemUsage{imageFsInfoCRI},
 		ContainerFilesystems: []*runtimeapi.FilesystemUsage{imageFsInfoCRI},
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)()
 
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
 	mockCadvisor.EXPECT().ContainerFsInfo().Return(imageFsInfo, nil)
@@ -637,7 +637,7 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
 	mockCadvisor.EXPECT().ContainerFsInfo().Return(containerFsInfo, nil)
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)()
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
 	stats, containerfs, err := provider.ImageFsStats(ctx)

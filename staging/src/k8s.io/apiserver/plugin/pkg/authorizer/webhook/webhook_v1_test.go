@@ -45,9 +45,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
@@ -577,7 +577,7 @@ func TestV1WebhookCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
 	expressions := []apiserver.WebhookMatchCondition{
 		{
 			Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
@@ -759,7 +759,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, test.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, test.featureEnabled)()
 			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), test.expressions)
 			if test.expectedCompileErr && err == nil {
 				t.Fatalf("%d: Expected compile error", i)
@@ -784,7 +784,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 
 // TestV1WebhookMatchConditions verifies cel expressions are compiled and evaluated correctly
 func TestV1WebhookMatchConditions(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
 	service := new(mockV1Service)
 	service.statusCode = 200
 	service.Allow()

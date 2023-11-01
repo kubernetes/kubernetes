@@ -33,7 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
 
@@ -109,7 +109,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		// Do not allow unauthenticated clients to keep these
 		// connections open (i.e. basically degrade them to the
 		// performance of http1 with keep-alive disabled).
-		if feature.Enabled(genericfeatures.UnauthenticatedHTTP2DOSMitigation) && req.ProtoMajor == 2 && isAnonymousUser(resp.User) {
+		if featuregate.Enabled(genericfeatures.UnauthenticatedHTTP2DOSMitigation) && req.ProtoMajor == 2 && isAnonymousUser(resp.User) {
 			// limit this connection to just this request,
 			// and then send a GOAWAY and tear down the TCP connection
 			// https://github.com/golang/net/commit/97aa3a539ec716117a9d15a4659a911f50d13c3c
@@ -128,7 +128,7 @@ func Unauthorized(s runtime.NegotiatedSerializer) http.Handler {
 		// Do not allow unauthenticated clients to keep these
 		// connections open (i.e. basically degrade them to the
 		// performance of http1 with keep-alive disabled).
-		if feature.Enabled(genericfeatures.UnauthenticatedHTTP2DOSMitigation) && req.ProtoMajor == 2 {
+		if featuregate.Enabled(genericfeatures.UnauthenticatedHTTP2DOSMitigation) && req.ProtoMajor == 2 {
 			// limit this connection to just this request,
 			// and then send a GOAWAY and tear down the TCP connection
 			// https://github.com/golang/net/commit/97aa3a539ec716117a9d15a4659a911f50d13c3c

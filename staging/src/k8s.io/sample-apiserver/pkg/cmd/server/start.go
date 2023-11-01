@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -92,7 +92,7 @@ func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan st
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
-	utilfeature.DefaultMutableFeatureGate.AddFlag(flags)
+	featuregate.DefaultMutableFeatureGate.AddFlag(flags)
 
 	return cmd
 }

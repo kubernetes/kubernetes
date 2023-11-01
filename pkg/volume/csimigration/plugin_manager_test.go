@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
@@ -77,9 +76,9 @@ func TestIsMigratable(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+		pm := NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			migratable, err := pm.IsMigratable(test.spec)
 			if migratable != test.isMigratable {
 				t.Errorf("Expected migratability of spec: %v does not match obtained migratability: %v", test.isMigratable, migratable)
@@ -126,15 +125,15 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+		pm := NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			// CSIMigrationGCE is locked to on, so it cannot be enabled or disabled. There are a couple
 			// of test cases that check correct behavior when CSIMigrationGCE is enabled, but there are
 			// no longer any tests cases for CSIMigrationGCE being disabled as that is not possible.
 			if len(test.pluginFeature) > 0 {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			}
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()
 
 			csiMigrationResult := pm.IsMigrationEnabledForPlugin(test.pluginName)
 			if csiMigrationResult != test.csiMigrationResult {

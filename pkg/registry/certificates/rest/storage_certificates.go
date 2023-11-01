@@ -23,7 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -74,7 +74,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	storage := map[string]rest.Storage{}
 
 	if resource := "clustertrustbundles"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		if feature.Enabled(features.ClusterTrustBundle) {
+		if featuregate.Enabled(features.ClusterTrustBundle) {
 			bundleStorage, err := clustertrustbundlestore.NewREST(restOptionsGetter)
 			if err != nil {
 				return nil, err

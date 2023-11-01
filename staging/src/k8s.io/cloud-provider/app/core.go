@@ -36,7 +36,7 @@ import (
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 )
 
 func startCloudNodeController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
@@ -86,7 +86,7 @@ func startServiceController(ctx context.Context, initContext ControllerInitConte
 		completedConfig.SharedInformers.Core().V1().Services(),
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
-		utilfeature.DefaultFeatureGate,
+		featuregate.DefaultFeatureGate,
 	)
 	if err != nil {
 		// This error shouldn't fail. It lives like this as a legacy.

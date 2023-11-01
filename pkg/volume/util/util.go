@@ -34,8 +34,8 @@ import (
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -623,7 +623,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String, se
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		var seLinuxOptions *v1.SELinuxOptions
-		if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 			if effectiveContainerSecurity != nil {
 				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions

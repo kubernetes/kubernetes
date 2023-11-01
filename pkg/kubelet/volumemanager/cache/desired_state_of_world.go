@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -145,7 +145,7 @@ type VolumeToMount struct {
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
 func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr, seLinuxTranslator util.SELinuxLabelTranslator) DesiredStateOfWorld {
-	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		registerSELinuxMetrics()
 	}
 	return &desiredStateOfWorld{
@@ -395,7 +395,7 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 	var seLinuxFileLabel string
 	var pluginSupportsSELinuxContextMount bool
 
-	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		var err error
 
 		if !dsw.seLinuxTranslator.SELinuxEnabled() {
@@ -505,7 +505,7 @@ func (dsw *desiredStateOfWorld) VolumeExists(
 	if !volumeExists {
 		return false
 	}
-	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		// Handling two volumes with the same name and different SELinux context
 		// as two *different* volumes here. Because if a volume is mounted with
 		// an old SELinux context, it must be unmounted first and then mounted again
@@ -534,7 +534,7 @@ func (dsw *desiredStateOfWorld) PodExistsInVolume(
 		return false
 	}
 
-	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		if volumeObj.effectiveSELinuxMountFileLabel != seLinuxMountOption {
 			// The volume is in DSW, but with a different SELinux mount option.
 			// Report it as unused, so the volume is unmounted and mounted back

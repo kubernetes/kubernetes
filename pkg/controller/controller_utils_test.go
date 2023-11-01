@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -46,6 +45,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -668,7 +668,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	}
 	for i, test := range equalityTests {
 		t.Run(fmt.Sprintf("Equality tests %d", i), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)()
 			if test.p2 == nil {
 				test.p2 = test.p1
 			}
@@ -712,8 +712,8 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 
 	for i, test := range inequalityTests {
 		t.Run(fmt.Sprintf("Inequality tests %d", i), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)()
 
 			podsWithRanks := ActivePodsWithRanks{
 				Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},

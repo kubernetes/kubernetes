@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
@@ -341,7 +340,7 @@ func TestAuthorizer(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.features == nil {
-				authz.features = utilfeature.DefaultFeatureGate
+				authz.features = featuregate.DefaultFeatureGate
 			} else {
 				authz.features = tc.features
 			}
@@ -738,7 +737,7 @@ func BenchmarkAuthorization(b *testing.B) {
 
 		for _, tc := range tests {
 			if tc.features == nil {
-				authz.features = utilfeature.DefaultFeatureGate
+				authz.features = featuregate.DefaultFeatureGate
 			} else {
 				authz.features = tc.features
 			}

@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -625,7 +625,7 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
 
-	if feature.Enabled(features.CSIVolumeHealth) {
+	if featuregate.Enabled(features.CSIVolumeHealth) {
 		isSupportNodeVolumeCondition, err := c.nodeSupportsVolumeCondition(ctx)
 		if err != nil {
 			return nil, err

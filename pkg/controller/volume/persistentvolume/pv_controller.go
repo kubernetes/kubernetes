@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 
@@ -1308,7 +1308,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 		return "", nil
 	}
 
-	if !feature.Enabled(features.HonorPVReclaimPolicy) {
+	if !featuregate.Enabled(features.HonorPVReclaimPolicy) {
 		if newVolume.GetDeletionTimestamp() != nil {
 			logger.V(3).Info("Volume is already being deleted", "volumeName", volume.Name)
 			return "", nil
@@ -1505,7 +1505,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(ctx context.Context, volu
 	}
 	logger.V(2).Info("Volume deleted", "volumeName", volume.Name)
 	// Remove in-tree delete finalizer on the PV as the volume has been deleted from the underlying storage
-	if feature.Enabled(features.HonorPVReclaimPolicy) {
+	if featuregate.Enabled(features.HonorPVReclaimPolicy) {
 		err = ctrl.removeDeletionProtectionFinalizer(ctx, volume)
 		if err != nil {
 			return pluginName, true, err
@@ -1723,7 +1723,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storagehelpers.AnnBoundByController, "yes")
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned, plugin.GetPluginName())
 
-	if feature.Enabled(features.HonorPVReclaimPolicy) {
+	if featuregate.Enabled(features.HonorPVReclaimPolicy) {
 		if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
 			// Add In-Tree protection finalizer here only when the reclaim policy is `Delete`
 			volume.SetFinalizers([]string{storagehelpers.PVDeletionInTreeProtectionFinalizer})

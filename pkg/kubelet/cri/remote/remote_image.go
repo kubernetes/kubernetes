@@ -29,7 +29,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	tracing "k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 
@@ -61,7 +61,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if feature.Enabled(features.KubeletTracing) {
+	if featuregate.Enabled(features.KubeletTracing) {
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithPropagators(tracing.Propagators()),
 			otelgrpc.WithTracerProvider(tp),

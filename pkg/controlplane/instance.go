@@ -66,12 +66,12 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/util/feature"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -512,7 +512,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if feature.Enabled(features.MultiCIDRServiceAllocator) {
+	if featuregate.Enabled(features.MultiCIDRServiceAllocator) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			controller := defaultservicecidr.NewController(
 				c.ExtraConfig.ServiceIPRange,
@@ -526,7 +526,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		})
 	}
 
-	if feature.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if featuregate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		peeraddress := getPeerAddress(c.ExtraConfig.PeerAdvertiseAddress, c.GenericConfig.PublicAddress, publicServicePort)
 		peerEndpointCtrl := peerreconcilers.New(
 			c.GenericConfig.APIServerID,
@@ -589,7 +589,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if feature.Enabled(apiserverfeatures.APIServerIdentity) {
+	if featuregate.Enabled(apiserverfeatures.APIServerIdentity) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 			// TODO: See if we can pass ctx to the current method
@@ -656,7 +656,7 @@ func labelAPIServerHeartbeatFunc(identity string, peeraddress string) lease.Proc
 		lease.Labels[apiv1.LabelHostname] = hostname
 
 		// Include apiserver network location <ip_port> used by peers to proxy requests between kube-apiservers
-		if feature.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if featuregate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 			if peeraddress != "" {
 				lease.Annotations[apiv1.AnnotationPeerAdvertiseAddress] = peeraddress
 			}

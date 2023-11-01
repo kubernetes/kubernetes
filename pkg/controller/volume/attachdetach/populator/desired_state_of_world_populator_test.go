@@ -23,9 +23,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/featuregate"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
@@ -86,7 +86,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 		podLister:                fakePodInformer.Lister(),
 		pvcLister:                pvcLister,
 		pvLister:                 pvLister,
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
 		intreeToCSITranslator:    csiTranslator,
 	}
 
@@ -191,7 +191,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 		podLister:                fakePodInformer.Lister(),
 		pvcLister:                pvcLister,
 		pvLister:                 pvLister,
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
 		intreeToCSITranslator:    csiTranslator,
 	}
 

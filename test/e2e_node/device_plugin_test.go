@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1018,7 +1018,7 @@ func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
 		}
 	}
 
-	if feature.Enabled(features.DevicePluginCDIDevices) {
+	if featuregate.Enabled(features.DevicePluginCDIDevices) {
 		dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "CDI_ENABLED", Value: "1"})
 	}
 

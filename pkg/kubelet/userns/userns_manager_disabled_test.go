@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 )
@@ -29,7 +29,7 @@ import (
 // Test all public methods behave ok when the feature gate is disabled.
 
 func TestMakeUserNsManagerDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	_, err := MakeUserNsManager(testUserNsPodsManager)
@@ -37,7 +37,7 @@ func TestMakeUserNsManagerDisabled(t *testing.T) {
 }
 
 func TestReleaseDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -47,7 +47,7 @@ func TestReleaseDisabled(t *testing.T) {
 }
 
 func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -59,7 +59,7 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)

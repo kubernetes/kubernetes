@@ -24,11 +24,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	fakecloud "k8s.io/cloud-provider/fake"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -449,7 +449,7 @@ func newServiceController(t *testing.T, client *clientset.Clientset) (*serviceco
 		serviceInformer,
 		nodeInformer,
 		"test-cluster",
-		utilfeature.DefaultFeatureGate)
+		featuregate.DefaultFeatureGate)
 	if err != nil {
 		t.Fatalf("Error creating service controller: %v", err)
 	}
@@ -479,7 +479,7 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
 			server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 			defer server.TearDownFn()
 

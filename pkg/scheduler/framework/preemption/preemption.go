@@ -28,9 +28,9 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
+	"k8s.io/component-base/featuregate"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -355,7 +355,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			waitingPod.Reject(pluginName, "preempted")
 			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(pod), "waitingPod", klog.KObj(victim), "node", c.Name())
 		} else {
-			if feature.Enabled(features.PodDisruptionConditions) {
+			if featuregate.Enabled(features.PodDisruptionConditions) {
 				condition := &v1.PodCondition{
 					Type:    v1.DisruptionTarget,
 					Status:  v1.ConditionTrue,

@@ -42,8 +42,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/common"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
@@ -3624,7 +3624,7 @@ func TestRatcheting(t *testing.T) {
 
 // Runs transition rule cases with OptionalOldSelf set to true on the schema
 func TestOptionalOldSelf(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
 
 	tests := []struct {
 		name   string
@@ -3779,7 +3779,7 @@ func TestOptionalOldSelf(t *testing.T) {
 // Shows that type(oldSelf) == null_type works for all supported OpenAPI types
 // both when oldSelf is null and when it is not null
 func TestOptionalOldSelfCheckForNull(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
 
 	tests := []struct {
 		name   string
@@ -3921,7 +3921,7 @@ func TestOptionalOldSelfCheckForNull(t *testing.T) {
 
 // Show that we cant just use oldSelf as if it was unwrapped
 func TestOptionalOldSelfIsOptionalType(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
 
 	cases := []struct {
 		name   string

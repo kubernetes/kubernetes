@@ -60,10 +60,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2"
 	kmsv2mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	kmsv2api "k8s.io/kms/apis/v2"
 	kmsv2svc "k8s.io/kms/pkg/service"
@@ -168,10 +168,10 @@ func TestDefaultValues(t *testing.T) {
 	if encryptionconfig.GetKDF() != true {
 		t.Fatalf("without updating the feature flags, default value of KMSv2KDF should be enabled.")
 	}
-	if feature.Enabled(features.KMSv2) != true {
+	if featuregate.Enabled(features.KMSv2) != true {
 		t.Fatalf("without updating the feature flags, default value of KMSv2 should be enabled.")
 	}
-	if feature.Enabled(features.KMSv1) != false {
+	if featuregate.Enabled(features.KMSv1) != false {
 		t.Fatalf("without updating the feature flags, default value of KMSv1 should be disabled.")
 	}
 	// since encryptionconfig.GetKDF() is true by default, following test should verify if

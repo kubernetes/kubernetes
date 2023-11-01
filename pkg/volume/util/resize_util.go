@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -192,7 +192,7 @@ func MarkForFSResize(
 	conditions := []v1.PersistentVolumeClaimCondition{pvcCondition}
 	newPVC := pvc.DeepCopy()
 
-	if feature.Enabled(features.RecoverVolumeExpansionFailure) {
+	if featuregate.Enabled(features.RecoverVolumeExpansionFailure) {
 		newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimNodeResizePending)
 	}
 
@@ -219,7 +219,7 @@ func MarkFSResizeFinished(
 	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
 
 	// if RecoverVolumeExpansionFailure is enabled, we need to reset ResizeStatus back to nil
-	if feature.Enabled(features.RecoverVolumeExpansionFailure) {
+	if featuregate.Enabled(features.RecoverVolumeExpansionFailure) {
 		allocatedResourceStatusMap := newPVC.Status.AllocatedResourceStatuses
 		delete(allocatedResourceStatusMap, v1.ResourceStorage)
 		if len(allocatedResourceStatusMap) == 0 {

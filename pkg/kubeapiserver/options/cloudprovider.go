@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -43,20 +43,20 @@ func (opts *CloudProviderOptions) Validate() []error {
 	switch {
 	case opts.CloudProvider == "":
 	case opts.CloudProvider == "external":
-		if !feature.Enabled(features.DisableCloudProviders) {
+		if !featuregate.Enabled(features.DisableCloudProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableCloudProviders feature to true", opts.CloudProvider))
 		}
-		if !feature.Enabled(features.DisableKubeletCloudCredentialProviders) {
+		if !featuregate.Enabled(features.DisableKubeletCloudCredentialProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableKubeletCloudCredentialProviders feature to true", opts.CloudProvider))
 		}
 	case cloudprovider.IsDeprecatedInternal(opts.CloudProvider):
-		if feature.Enabled(features.DisableCloudProviders) {
+		if featuregate.Enabled(features.DisableCloudProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableCloudProviders feature to false", opts.CloudProvider))
 		}
-		if feature.Enabled(features.DisableKubeletCloudCredentialProviders) {
+		if featuregate.Enabled(features.DisableKubeletCloudCredentialProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableKubeletCloudCredentialProviders feature to false", opts.CloudProvider))
 		}

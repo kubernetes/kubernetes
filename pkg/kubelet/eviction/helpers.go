@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -1247,7 +1247,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 		for _, container := range pod.Spec.Containers {
 			if container.Name == containerStats.Name {
 				requests := container.Resources.Requests[resourceToReclaim]
-				if feature.Enabled(features.InPlacePodVerticalScaling) &&
+				if featuregate.Enabled(features.InPlacePodVerticalScaling) &&
 					(resourceToReclaim == v1.ResourceMemory || resourceToReclaim == v1.ResourceCPU) {
 					if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
 						requests = cs.AllocatedResources[resourceToReclaim]

@@ -20,8 +20,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -192,7 +192,7 @@ func SetDefaults_VolumeBindingArgs(obj *configv1.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = ptr.To[int64](600)
 	}
-	if len(obj.Shape) == 0 && feature.Enabled(features.VolumeCapacityPriority) {
+	if len(obj.Shape) == 0 && featuregate.Enabled(features.VolumeCapacityPriority) {
 		obj.Shape = []configv1.UtilizationShapePoint{
 			{
 				Utilization: 0,

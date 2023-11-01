@@ -36,10 +36,10 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/util/feature"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -70,8 +70,8 @@ func createAggregatorConfig(
 	// has its own customized OpenAPI handler.
 	genericConfig.SkipOpenAPIInstallation = true
 
-	if feature.Enabled(genericfeatures.StorageVersionAPI) &&
-		feature.Enabled(genericfeatures.APIServerIdentity) {
+	if featuregate.Enabled(genericfeatures.StorageVersionAPI) &&
+		featuregate.Enabled(genericfeatures.APIServerIdentity) {
 		// Add StorageVersionPrecondition handler to aggregator-apiserver.
 		// The handler will block write requests to built-in resources until the
 		// target resources' storage versions are up-to-date.

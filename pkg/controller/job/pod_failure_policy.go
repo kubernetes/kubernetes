@@ -21,7 +21,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -47,7 +47,7 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
 				case batch.PodFailurePolicyActionFailIndex:
-					if feature.Enabled(features.JobBackoffLimitPerIndex) {
+					if featuregate.Enabled(features.JobBackoffLimitPerIndex) {
 						return nil, true, &failIndex
 					}
 				case batch.PodFailurePolicyActionCount:
@@ -64,7 +64,7 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
 				case batch.PodFailurePolicyActionFailIndex:
-					if feature.Enabled(features.JobBackoffLimitPerIndex) {
+					if featuregate.Enabled(features.JobBackoffLimitPerIndex) {
 						return nil, true, &failIndex
 					}
 				case batch.PodFailurePolicyActionCount:

@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
@@ -117,7 +117,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	}
 
 	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	if feature.Enabled(features.InPlacePodVerticalScaling) {
+	if featuregate.Enabled(features.InPlacePodVerticalScaling) {
 		annotations[containerHashWithoutResourcesLabel] = strconv.FormatUint(kubecontainer.HashContainerWithoutResources(container), 16)
 	}
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
@@ -200,7 +200,7 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
 		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerHashLabel, "annotations", annotations)
 	}
-	if feature.Enabled(features.InPlacePodVerticalScaling) {
+	if featuregate.Enabled(features.InPlacePodVerticalScaling) {
 		if containerInfo.HashWithoutResources, err = getUint64ValueFromLabel(annotations, containerHashWithoutResourcesLabel); err != nil {
 			klog.ErrorS(err, "Unable to get label value from annotations", "label", containerHashWithoutResourcesLabel, "annotations", annotations)
 		}

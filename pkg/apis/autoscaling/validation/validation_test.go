@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -1569,7 +1569,7 @@ func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.Hori
 
 func TestValidateHorizontalPodAutoscalerScaleToZeroEnabled(t *testing.T) {
 	// Enable HPAScaleToZero feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HPAScaleToZero, true)()
 
 	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
 	for _, successCase := range zeroMinReplicasCases {
@@ -1581,7 +1581,7 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroEnabled(t *testing.T) {
 
 func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
 	// Disable HPAScaleToZero feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HPAScaleToZero, false)()
 
 	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
 	errorMsg := "must be greater than or equal to 1"
@@ -1607,7 +1607,7 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
 
 func TestValidateHorizontalPodAutoscalerUpdateScaleToZeroEnabled(t *testing.T) {
 	// Enable HPAScaleToZero feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HPAScaleToZero, true)()
 
 	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
 	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
@@ -1627,7 +1627,7 @@ func TestValidateHorizontalPodAutoscalerUpdateScaleToZeroEnabled(t *testing.T) {
 
 func TestValidateHorizontalPodAutoscalerScaleToZeroUpdateDisabled(t *testing.T) {
 	// Disable HPAScaleToZero feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HPAScaleToZero, false)()
 
 	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
 	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)

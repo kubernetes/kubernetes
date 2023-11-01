@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/server"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 
 	"github.com/spf13/pflag"
 )
@@ -337,5 +337,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
-	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
+	featuregate.DefaultMutableFeatureGate.AddFlag(fs)
 }

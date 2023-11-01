@@ -39,10 +39,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -378,7 +378,7 @@ func NewPriorityQueue(
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
 		moveRequestCycle:                  -1,
-		isSchedulingQueueHintEnabled:      feature.Enabled(features.SchedulerQueueingHints),
+		isSchedulingQueueHintEnabled:      featuregate.Enabled(features.SchedulerQueueingHints),
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -1049,7 +1049,7 @@ func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 // admitted by kubelet, is 'InProgress', and results in a net sizing down of updated resources.
 // It returns false if either CPU or memory resource is net resized up, or if no resize is in progress.
 func isPodResourcesResizedDown(pod *v1.Pod) bool {
-	if feature.Enabled(features.InPlacePodVerticalScaling) {
+	if featuregate.Enabled(features.InPlacePodVerticalScaling) {
 		// TODO(vinaykul,wangchen615,InPlacePodVerticalScaling): Fix this to determine when a
 		// pod is truly resized down (might need oldPod if we cannot determine from Status alone)
 		if pod.Status.Resize == v1.PodResizeStatusInProgress {

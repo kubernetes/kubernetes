@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/features"
@@ -266,8 +266,8 @@ func TestPluginValidate(t *testing.T) {
 				},
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ClusterTrustBundle, tc.clusterTrustBundleFeatureEnabled)()
-			p.InspectFeatureGates(feature.DefaultFeatureGate)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ClusterTrustBundle, tc.clusterTrustBundleFeatureEnabled)()
+			p.InspectFeatureGates(featuregate.DefaultFeatureGate)
 
 			err := p.Validate(context.Background(), tc.attributes, nil)
 			if err == nil && !tc.allowed {

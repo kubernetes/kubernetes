@@ -28,8 +28,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -93,14 +93,14 @@ type managerImpl struct {
 
 // NewManager returns a new node shutdown manager.
 func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
-	if !feature.Enabled(features.GracefulNodeShutdown) {
+	if !featuregate.Enabled(features.GracefulNodeShutdown) {
 		m := managerStub{}
 		return m, m
 	}
 
 	shutdownGracePeriodByPodPriority := conf.ShutdownGracePeriodByPodPriority
 	// Migration from the original configuration
-	if !feature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) ||
+	if !featuregate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) ||
 		len(shutdownGracePeriodByPodPriority) == 0 {
 		shutdownGracePeriodByPodPriority = migrateConfig(conf.ShutdownGracePeriodRequested, conf.ShutdownGracePeriodCriticalPods)
 	}
@@ -129,7 +129,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		syncNodeStatus:                   conf.SyncNodeStatusFunc,
 		shutdownGracePeriodByPodPriority: shutdownGracePeriodByPodPriority,
 		clock:                            conf.Clock,
-		enableMetrics:                    feature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
+		enableMetrics:                    featuregate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
 		storage: localStorage{
 			Path: filepath.Join(conf.StateDirectory, localStorageStateFile),
 		},
@@ -381,7 +381,7 @@ func (m *managerImpl) processShutdownEvent() error {
 					}
 					status.Message = nodeShutdownMessage
 					status.Reason = nodeShutdownReason
-					if feature.Enabled(features.PodDisruptionConditions) {
+					if featuregate.Enabled(features.PodDisruptionConditions) {
 						podutil.UpdatePodCondition(status, &v1.PodCondition{
 							Type:    v1.DisruptionTarget,
 							Status:  v1.ConditionTrue,

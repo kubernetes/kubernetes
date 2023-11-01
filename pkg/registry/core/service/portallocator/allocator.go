@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -77,7 +77,7 @@ func New(pr net.PortRange, allocatorFactory allocator.AllocatorWithOffsetFactory
 	}
 
 	var offset = 0
-	if feature.Enabled(features.ServiceNodePortStaticSubrange) {
+	if featuregate.Enabled(features.ServiceNodePortStaticSubrange) {
 		offset = calculateRangeOffset(pr)
 	}
 

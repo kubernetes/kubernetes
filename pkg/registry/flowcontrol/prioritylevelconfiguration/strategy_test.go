@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/utils/ptr"
@@ -299,7 +299,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ZeroLimitedNominalConcurrencyShares, test.zeroFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ZeroLimitedNominalConcurrencyShares, test.zeroFeatureEnabled)()
 
 			scheme := test.scheme
 			scheme.Default(test.obj)

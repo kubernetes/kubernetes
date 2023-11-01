@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -52,7 +52,7 @@ func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -102,7 +102,7 @@ func TestUserNsManagerAllocate(t *testing.T) {
 }
 
 func TestUserNsManagerParseUserNsFile(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	cases := []struct {
 		name    string
@@ -185,7 +185,7 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 }
 
 func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	trueVal := true
 	falseVal := false
@@ -244,7 +244,7 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	cases := []struct {
 		name                 string
@@ -325,7 +325,7 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 }
 
 func TestAllocateMaxPods(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -343,7 +343,7 @@ func TestAllocateMaxPods(t *testing.T) {
 }
 
 func TestRecordMaxPods(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)

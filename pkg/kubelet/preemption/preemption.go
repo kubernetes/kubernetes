@@ -21,8 +21,8 @@ import (
 	"math"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -106,7 +106,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 			status.Phase = v1.PodFailed
 			status.Reason = events.PreemptContainer
 			status.Message = message
-			if feature.Enabled(features.PodDisruptionConditions) {
+			if featuregate.Enabled(features.PodDisruptionConditions) {
 				podutil.UpdatePodCondition(status, &v1.PodCondition{
 					Type:    v1.DisruptionTarget,
 					Status:  v1.ConditionTrue,

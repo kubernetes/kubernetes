@@ -26,8 +26,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -42,7 +42,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 
 	newPath := field.NewPath("KubeProxyConfiguration")
 
-	effectiveFeatures := feature.DefaultFeatureGate.DeepCopy()
+	effectiveFeatures := featuregate.DefaultFeatureGate.DeepCopy()
 	if err := effectiveFeatures.SetFromMap(config.FeatureGates); err != nil {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("featureGates"), config.FeatureGates, err.Error()))
 	}
@@ -224,7 +224,7 @@ func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path)
 		string(kubeproxyconfig.ProxyModeIPVS),
 	)
 
-	if feature.Enabled(features.NFTablesProxyMode) {
+	if featuregate.Enabled(features.NFTablesProxyMode) {
 		validModes.Insert(string(kubeproxyconfig.ProxyModeNFTables))
 	}
 

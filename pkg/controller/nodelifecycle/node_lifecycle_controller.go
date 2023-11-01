@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -51,6 +50,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/featuregate"
 	nodetopology "k8s.io/component-helpers/node/topology"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
@@ -135,7 +135,7 @@ const (
 
 	// taintEvictionController is defined here in order to prevent imports of
 	// k8s.io/kubernetes/cmd/kube-controller-manager/names which would result in validation errors.
-	// This constant will be removed upon graduation of the SeparateTaintEvictionController feature.
+	// This constant will be removed upon graduation of the SeparateTaintEvictionController featuregate.
 	taintEvictionController = "taint-eviction-controller"
 )
 
@@ -413,7 +413,7 @@ func NewNodeLifecycleController(
 	nc.podLister = podInformer.Lister()
 	nc.nodeLister = nodeInformer.Lister()
 
-	if !feature.Enabled(features.SeparateTaintEvictionController) {
+	if !featuregate.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
 		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
 		if err != nil {
@@ -474,7 +474,7 @@ func (nc *Controller) Run(ctx context.Context) {
 		return
 	}
 
-	if !feature.Enabled(features.SeparateTaintEvictionController) {
+	if !featuregate.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Starting", "controller", taintEvictionController)
 		go nc.taintManager.Run(ctx)
 	}

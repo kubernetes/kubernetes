@@ -43,9 +43,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -306,7 +306,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	cm.topologyManager.AddHintProvider(cm.deviceManager)
 
 	// initialize DRA manager
-	if feature.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if featuregate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
 		cm.draManager, err = dra.NewManagerImpl(kubeClient, nodeConfig.KubeletRootDir)
 		if err != nil {
@@ -331,7 +331,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	cm.topologyManager.AddHintProvider(cm.cpuManager)
 
-	if feature.Enabled(kubefeatures.MemoryManager) {
+	if featuregate.Enabled(kubefeatures.MemoryManager) {
 		cm.memoryManager, err = memorymanager.NewManager(
 			nodeConfig.ExperimentalMemoryManagerPolicy,
 			machineInfo,
@@ -432,7 +432,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 			err = sysctl.SetSysctl(flag, expectedValue)
 			if err != nil {
 				if libcontaineruserns.RunningInUserNS() {
-					if feature.Enabled(kubefeatures.KubeletInUserNamespace) {
+					if featuregate.Enabled(kubefeatures.KubeletInUserNamespace) {
 						klog.V(2).InfoS("Updating kernel flag failed (running in UserNS, ignoring)", "flag", flag, "err", err)
 						continue
 					}
@@ -571,7 +571,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}
 
 	// Initialize memory manager
-	if feature.Enabled(kubefeatures.MemoryManager) {
+	if featuregate.Enabled(kubefeatures.MemoryManager) {
 		containerMap, _ := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 		err := cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 		if err != nil {
@@ -650,7 +650,7 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 // TODO: move the GetResources logic to PodContainerManager.
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
-	if feature.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if featuregate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		resOpts, err := cm.draManager.GetResources(pod, container)
 		if err != nil {
 			return nil, err
@@ -947,7 +947,7 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
-	if !feature.Enabled(kubefeatures.DynamicResourceAllocation) {
+	if !featuregate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		return []*podresourcesapi.DynamicResource{}
 	}
 

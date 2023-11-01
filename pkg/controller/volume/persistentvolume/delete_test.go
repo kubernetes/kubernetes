@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2/ktesting"
@@ -37,7 +37,7 @@ import (
 func TestDeleteSync(t *testing.T) {
 	const gceDriver = "pd.csi.storage.gke.io"
 	// Default enable the HonorPVReclaimPolicy feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{

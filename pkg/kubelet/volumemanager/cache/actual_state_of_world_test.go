@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"github.com/stretchr/testify/require"
@@ -877,7 +877,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 // Verifies volume/pod combo exist using PodExistsInVolume()
 func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	// Arrange
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	devicePath := "fake/device/path"
@@ -955,7 +955,7 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 // Verifies newly added volume exists in GetGloballyMountedVolumes()
 func Test_MarkDeviceAsMounted_Positive_SELinux(t *testing.T) {
 	// Arrange
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	pod := &v1.Pod{

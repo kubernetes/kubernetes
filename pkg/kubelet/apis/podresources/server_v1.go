@@ -20,11 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
-	"k8s.io/kubelet/pkg/apis/podresources/v1"
+	v1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 // v1PodResourcesServer implements PodResourcesListerServer
@@ -71,7 +71,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
 				Memory:  p.memoryProvider.GetMemory(string(pod.UID), container.Name),
 			}
-			if feature.Enabled(kubefeatures.KubeletPodResourcesDynamicResources) {
+			if featuregate.Enabled(kubefeatures.KubeletPodResourcesDynamicResources) {
 				pRes.Containers[j].DynamicResources = p.dynamicResourcesProvider.GetDynamicResources(pod, &container)
 			}
 
@@ -104,7 +104,7 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *v1.GetPodResourcesR
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsGetCount.WithLabelValues("v1").Inc()
 
-	if !feature.Enabled(kubefeatures.KubeletPodResourcesGet) {
+	if !featuregate.Enabled(kubefeatures.KubeletPodResourcesGet) {
 		metrics.PodResourcesEndpointErrorsGetCount.WithLabelValues("v1").Inc()
 		return nil, fmt.Errorf("PodResources API Get method disabled")
 	}
@@ -128,7 +128,7 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *v1.GetPodResourcesR
 			CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
 			Memory:  p.memoryProvider.GetMemory(string(pod.UID), container.Name),
 		}
-		if feature.Enabled(kubefeatures.KubeletPodResourcesDynamicResources) {
+		if featuregate.Enabled(kubefeatures.KubeletPodResourcesDynamicResources) {
 			podResources.Containers[i].DynamicResources = p.dynamicResourcesProvider.GetDynamicResources(pod, &container)
 		}
 	}

@@ -27,7 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 )
@@ -300,7 +300,7 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)     // in microseconds
 	tunedQuota := int64(1 * time.Millisecond / time.Microsecond)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUCFSQuotaPeriod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.CPUCFSQuotaPeriod, true)()
 
 	minShares := uint64(MinShares)
 	burstableShares := MilliCPUToShares(100)

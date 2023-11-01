@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -2203,7 +2203,7 @@ func TestPreScorePlugin(t *testing.T) {
 
 // TestPreEnqueuePlugin tests invocation of enqueue plugins.
 func TestPreEnqueuePlugin(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
 
 	testContext := testutils.InitTestAPIServer(t, "enqueue-plugin", nil)
 
@@ -2640,7 +2640,7 @@ func (pl *SchedulingGatesPluginWOEvents) EventsToRegister() []framework.ClusterE
 
 // This test helps to verify registering nil events for schedulingGates plugin works as expected.
 func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
 
 	testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
 

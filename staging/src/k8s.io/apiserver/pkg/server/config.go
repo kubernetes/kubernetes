@@ -67,11 +67,11 @@ import (
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storageversion"
-	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -367,14 +367,14 @@ type AuthorizationInfo struct {
 }
 
 func init() {
-	utilruntime.Must(features.AddFeatureGates(feature.DefaultMutableFeatureGate))
+	utilruntime.Must(features.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
 }
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
-	if feature.Enabled(genericfeatures.APIServerIdentity) {
+	if featuregate.Enabled(genericfeatures.APIServerIdentity) {
 		hostname, err := hostnameFunc()
 		if err != nil {
 			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
@@ -820,7 +820,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
-	if feature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if featuregate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		manager := c.AggregatedDiscoveryGroupManager
 		if manager == nil {
 			manager = discoveryendpoint.NewResourceManager("apis")
@@ -1032,7 +1032,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.NotAcceptingNewRequest.Signaled())
 	}
 	handler = genericfilters.WithHTTPLogging(handler)
-	if feature.Enabled(genericfeatures.APIServerTracing) {
+	if featuregate.Enabled(genericfeatures.APIServerTracing) {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
 	}
 	handler = genericapifilters.WithLatencyTrackers(handler)
@@ -1077,7 +1077,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		if feature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		if featuregate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 			wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
 			s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
 		} else {

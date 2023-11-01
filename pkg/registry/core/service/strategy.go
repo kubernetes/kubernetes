@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -116,7 +116,7 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 // dropServiceDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.  The typical pattern is:
 //
-//	if !feature.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	if !featuregate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //	    newSvc.Spec.MyFeature = nil
 //	}
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
@@ -165,11 +165,11 @@ func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 // dropServiceStatusDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.  The typical pattern is:
 //
-//	if !feature.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	if !featuregate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //	    newSvc.Status.MyFeature = nil
 //	}
 func dropServiceStatusDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
-	if !feature.Enabled(features.LoadBalancerIPMode) && !loadbalancerIPModeInUse(oldSvc) {
+	if !featuregate.Enabled(features.LoadBalancerIPMode) && !loadbalancerIPModeInUse(oldSvc) {
 		for i := range newSvc.Status.LoadBalancer.Ingress {
 			newSvc.Status.LoadBalancer.Ingress[i].IPMode = nil
 		}

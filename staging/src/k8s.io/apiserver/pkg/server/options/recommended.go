@@ -22,7 +22,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
@@ -72,7 +71,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		// Wired a global by default that sadly people will abuse to have different meanings in different repos.
 		// Please consider creating your own FeatureGate so you can have a consistent meaning for what a variable contains
 		// across different repos.  Future you will thank you.
-		FeatureGate:                feature.DefaultFeatureGate,
+		FeatureGate:                featuregate.DefaultFeatureGate,
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
 		EgressSelector:             NewEgressSelectorOptions(),

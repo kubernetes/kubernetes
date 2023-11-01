@@ -27,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -188,7 +188,7 @@ func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resou
 		result = roundUpFunc(&userRequest)
 	}
 
-	if feature.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) && result != nil {
+	if featuregate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) && result != nil {
 		if len(pvc.Status.AllocatedResources) == 0 {
 			return result
 		}
@@ -228,7 +228,7 @@ func toExternalPersistentVolumeClaimOrError(obj runtime.Object) (*corev1.Persist
 
 // RequiresQuotaReplenish enables quota monitoring for PVCs.
 func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
-	if feature.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) {
+	if featuregate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) {
 		if oldPVC.Status.AllocatedResources.Storage() != pvc.Status.AllocatedResources.Storage() {
 			return true
 		}

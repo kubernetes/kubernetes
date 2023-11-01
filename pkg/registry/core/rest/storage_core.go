@@ -32,10 +32,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -124,7 +124,7 @@ func New(c Config) (*legacyProvider, error) {
 	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
 
 	// create service cluster ip repair controller
-	if !feature.Enabled(features.MultiCIDRServiceAllocator) {
+	if !featuregate.Enabled(features.MultiCIDRServiceAllocator) {
 		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepair(
 			c.Services.IPRepairInterval,
 			client.CoreV1(),
@@ -218,8 +218,8 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	var serviceAccountStorage *serviceaccountstore.REST
 	if p.ServiceAccountIssuer != nil {
 		var nodeGetter rest.Getter
-		if feature.Enabled(features.ServiceAccountTokenNodeBinding) ||
-			feature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+		if featuregate.Enabled(features.ServiceAccountTokenNodeBinding) ||
+			featuregate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			nodeGetter = nodeStorage.Node.Store
 		}
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration)
@@ -331,7 +331,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		return rangeRegistries{}, nil, nil, nil, fmt.Errorf("service clusterIPRange is missing")
 	}
 
-	if !feature.Enabled(features.MultiCIDRServiceAllocator) {
+	if !featuregate.Enabled(features.MultiCIDRServiceAllocator) {
 		primaryClusterIPAllocator, err = ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 			var mem allocator.Snapshottable
 			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
@@ -370,7 +370,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 
 	var secondaryClusterIPAllocator ipallocator.Interface
 	if c.Services.SecondaryClusterIPRange.IP != nil {
-		if !feature.Enabled(features.MultiCIDRServiceAllocator) {
+		if !featuregate.Enabled(features.MultiCIDRServiceAllocator) {
 			var err error
 			secondaryClusterIPAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 				var mem allocator.Snapshottable

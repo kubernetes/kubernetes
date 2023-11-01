@@ -18,10 +18,10 @@ package register
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/pkg/features"
 )
 
 func init() {
-	runtime.Must(features.SetupCurrentKubernetesSpecificFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	runtime.Must(features.SetupCurrentKubernetesSpecificFeatureGates(featuregate.DefaultMutableFeatureGate))
 }

@@ -19,7 +19,7 @@ package kuberuntime
 import (
 	"sort"
 
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -49,7 +49,7 @@ func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 		Annotations: annotations,
 	}
 	// if RuntimeClassInImageCriAPI feature gate is enabled, set runtimeHandler CRI field
-	if feature.Enabled(features.RuntimeClassInImageCriAPI) {
+	if featuregate.Enabled(features.RuntimeClassInImageCriAPI) {
 		runtimeHandler := ""
 		if image.Spec != nil {
 			runtimeHandler = image.Spec.RuntimeHandler
@@ -73,7 +73,7 @@ func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageS
 		Annotations: annotations,
 	}
 	// if RuntimeClassInImageCriAPI feature gate is enabled, set runtimeHandler CRI field
-	if feature.Enabled(features.RuntimeClassInImageCriAPI) {
+	if featuregate.Enabled(features.RuntimeClassInImageCriAPI) {
 		spec.RuntimeHandler = imageSpec.RuntimeHandler
 	}
 

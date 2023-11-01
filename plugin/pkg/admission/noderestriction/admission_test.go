@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -38,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/component-base/featuregate"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/coordination"
@@ -1539,13 +1538,13 @@ func TestAdmitPVCStatus(t *testing.T) {
 			attributes := admission.NewAttributesRecord(
 				test.newObj, test.oldObj, schema.GroupVersionKind{},
 				metav1.NamespaceDefault, "foo", apiResource, test.subresource, operation, &metav1.CreateOptions{}, false, mynode)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoveryFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoveryFeatureEnabled)()
 			a := &admitTestCase{
 				name:        test.name,
 				podsGetter:  noExistingPods,
 				nodesGetter: expectedNode,
 				attributes:  attributes,
-				features:    feature.DefaultFeatureGate,
+				features:    featuregate.DefaultFeatureGate,
 				err:         test.expectError,
 			}
 			a.run(t)

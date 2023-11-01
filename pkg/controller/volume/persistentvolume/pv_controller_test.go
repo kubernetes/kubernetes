@@ -28,12 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
@@ -52,7 +52,7 @@ import (
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
 	// Default enable the HonorPVReclaimPolicy feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -573,7 +573,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator, featuregate.DefaultFeatureGate)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -602,7 +602,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	// in-tree plugin is used as migration is disabled. When that plugin is migrated, a different
 	// non-migrated one should be used. If all plugins are migrated this test can be removed. The
 	// gce in-tree plugin is used for a migrated driver as it is feature-locked as of 1.25.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	const nonmigratedDriver = "rbd.csi.ceph.com"
 	const migratedPlugin = "kubernetes.io/gce-pd"
 	const migratedDriver = "pd.csi.storage.gke.io"
@@ -733,7 +733,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator, featuregate.DefaultFeatureGate)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

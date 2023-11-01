@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
@@ -202,7 +202,7 @@ func TestDropDisabledMutatingWebhookConfigurationFields(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
 			DropDisabledMutatingWebhookConfigurationFields(test.new, test.old)
 
 			for _, hook := range test.new.Webhooks {
@@ -397,7 +397,7 @@ func TestDropDisabledValidatingWebhookConfigurationFields(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
 			DropDisabledValidatingWebhookConfigurationFields(test.new, test.old)
 
 			for _, hook := range test.new.Webhooks {

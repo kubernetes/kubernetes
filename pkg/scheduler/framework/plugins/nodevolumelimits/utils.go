@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -42,7 +42,7 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	case csilibplugins.AWSEBSInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		if !feature.Enabled(features.CSIMigrationPortworx) {
+		if !featuregate.Enabled(features.CSIMigrationPortworx) {
 			return false
 		}
 	case csilibplugins.GCEPDInTreePluginName:
@@ -52,7 +52,7 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	case csilibplugins.CinderInTreePluginName:
 		return true
 	case csilibplugins.RBDVolumePluginName:
-		if !feature.Enabled(features.CSIMigrationRBD) {
+		if !featuregate.Enabled(features.CSIMigrationRBD) {
 			return false
 		}
 	default:

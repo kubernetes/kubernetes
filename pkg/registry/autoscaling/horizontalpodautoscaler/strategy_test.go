@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -51,7 +51,7 @@ func makeTestContainerMetricsHPA(hasContainerMetric bool) *autoscaling.Horizonta
 }
 
 func TestCreateWithFeatureEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAContainerMetrics, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HPAContainerMetrics, true)()
 	testHPA := makeTestContainerMetricsHPA(true)
 	Strategy.PrepareForCreate(context.Background(), testHPA)
 	if testHPA.Spec.Metrics[0].ContainerResource == nil {
@@ -60,7 +60,7 @@ func TestCreateWithFeatureEnabled(t *testing.T) {
 }
 
 func TestCreateWithFeatureDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAContainerMetrics, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HPAContainerMetrics, false)()
 	testHPA := makeTestContainerMetricsHPA(true)
 	Strategy.PrepareForCreate(context.Background(), testHPA)
 	if testHPA.Spec.Metrics[0].ContainerResource != nil {
@@ -95,7 +95,7 @@ func TestAutoscalerStatusStrategy_PrepareForUpdate(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAContainerMetrics, tc.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HPAContainerMetrics, tc.featureEnabled)()
 			oldHPA := makeTestContainerMetricsHPA(tc.old)
 			newHPA := makeTestContainerMetricsHPA(true)
 			Strategy.PrepareForUpdate(context.Background(), newHPA, oldHPA)

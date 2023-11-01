@@ -35,7 +35,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -53,7 +53,7 @@ var defaultPageSize = int64(os.Getpagesize())
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
-	if feature.Enabled(kubefeatures.MemoryQoS) &&
+	if featuregate.Enabled(kubefeatures.MemoryQoS) &&
 		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
@@ -63,7 +63,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	}
 	config.Linux = cl
 
-	if feature.Enabled(kubefeatures.UserNamespacesSupport) {
+	if featuregate.Enabled(kubefeatures.UserNamespacesSupport) {
 		if cl.SecurityContext.NamespaceOptions.UsernsOptions != nil {
 			for _, mount := range config.Mounts {
 				mount.UidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Uids
@@ -169,7 +169,7 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 	}
 	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo)
 
-	if !feature.Enabled(kubefeatures.NodeSwap) {
+	if !featuregate.Enabled(kubefeatures.NodeSwap) {
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
 		return
 	}
@@ -188,7 +188,7 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
-	if feature.Enabled(kubefeatures.MemoryQoS) &&
+	if featuregate.Enabled(kubefeatures.MemoryQoS) &&
 		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
@@ -223,7 +223,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
 		cpuPeriod := int64(quotaPeriod)
-		if feature.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
+		if featuregate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 			// kubeGenericRuntimeManager.cpuCFSQuotaPeriod is provided in time.Duration,
 			// but we need to convert it to number of microseconds which is used by kernel.
 			cpuPeriod = int64(m.cpuCFSQuotaPeriod.Duration / time.Microsecond)

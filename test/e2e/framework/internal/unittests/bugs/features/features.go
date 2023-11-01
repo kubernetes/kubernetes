@@ -18,7 +18,6 @@ package features
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -29,7 +28,7 @@ const (
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(testFeatureGates))
+	runtime.Must(featuregate.DefaultMutableFeatureGate.Add(testFeatureGates))
 }
 
 var testFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{

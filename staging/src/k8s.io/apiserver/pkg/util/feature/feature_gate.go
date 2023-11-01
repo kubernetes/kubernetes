@@ -14,30 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Deprecated: use k8s.io/component-base/featuregate
 package feature
 
-import (
-	"k8s.io/component-base/featuregate"
-)
+import "k8s.io/component-base/featuregate"
 
 var (
-	// DefaultMutableFeatureGate is a mutable version of DefaultFeatureGate.
-	// Only top-level commands/options setup and the k8s.io/component-base/featuregate/testing package should make use of this.
-	// Tests that need to modify feature gates for the duration of their test should use:
-	//   defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, <value>)()
-	DefaultMutableFeatureGate featuregate.MutableFeatureGate = featuregate.NewFeatureGate()
-
-	// DefaultFeatureGate is a shared global FeatureGate.
-	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
-	DefaultFeatureGate featuregate.FeatureGate = DefaultMutableFeatureGate
+	// Deprecated: use k8s.io/component-base/featuregate.DefaultMutableFeatureGate
+	DefaultMutableFeatureGate = featuregate.DefaultMutableFeatureGate
+	// Deprecated: use k8s.io/component-base/featuregate.DefaultFeatureGate
+	DefaultFeatureGate = featuregate.DefaultFeatureGate
 )
-
-// Enabled returns true if the key is enabled in the default FeatureGate.
-func Enabled(key featuregate.Feature) bool {
-	return DefaultFeatureGate.Enabled(key)
-}
-
-// KnownFeatures returns a slice of strings describing the default FeatureGate's known features.
-func KnownFeatures() []string {
-	return DefaultFeatureGate.KnownFeatures()
-}

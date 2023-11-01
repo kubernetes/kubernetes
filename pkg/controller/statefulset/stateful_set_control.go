@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/features"
@@ -410,7 +410,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	}
 	// If we find a Pod that has not been created we create the Pod
 	if !isCreated(replicas[i]) {
-		if feature.Enabled(features.StatefulSetAutoDeletePVC) {
+		if featuregate.Enabled(features.StatefulSetAutoDeletePVC) {
 			if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
 				return true, err
 			} else if isStale {
@@ -465,7 +465,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 
 	// Enforce the StatefulSet invariants
 	retentionMatch := true
-	if feature.Enabled(features.StatefulSetAutoDeletePVC) {
+	if featuregate.Enabled(features.StatefulSetAutoDeletePVC) {
 		var err error
 		retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, replicas[i])
 		// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
@@ -646,7 +646,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// Fix pod claims for condemned pods, if necessary.
-	if feature.Enabled(features.StatefulSetAutoDeletePVC) {
+	if featuregate.Enabled(features.StatefulSetAutoDeletePVC) {
 		fixPodClaim := func(i int) (bool, error) {
 			if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
 				return true, err
@@ -684,7 +684,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return &status, nil
 	}
 
-	if feature.Enabled(features.MaxUnavailableStatefulSet) {
+	if featuregate.Enabled(features.MaxUnavailableStatefulSet) {
 		return updateStatefulSetAfterInvariantEstablished(ctx,
 			ssc,
 			set,

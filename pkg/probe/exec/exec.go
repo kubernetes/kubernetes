@@ -19,7 +19,7 @@ package exec
 import (
 	"bytes"
 
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
@@ -71,7 +71,7 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 
 		timeoutErr, ok := err.(*TimeoutError)
 		if ok {
-			if feature.Enabled(features.ExecProbeTimeout) {
+			if featuregate.Enabled(features.ExecProbeTimeout) {
 				// When exec probe timeout, data is empty, so we should return timeoutErr.Error() as the stdout.
 				return probe.Failure, timeoutErr.Error(), nil
 			}

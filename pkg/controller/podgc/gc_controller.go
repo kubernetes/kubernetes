@@ -29,12 +29,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/podgc/metrics"
@@ -346,7 +346,7 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 	// This is needed for the JobPodReplacementPolicy feature to make sure Job replacement pods are created.
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/3939-allow-replacement-when-fully-terminated#risks-and-mitigations
 	// for more details.
-	if feature.Enabled(features.PodDisruptionConditions) || feature.Enabled(features.JobPodReplacementPolicy) {
+	if featuregate.Enabled(features.PodDisruptionConditions) || featuregate.Enabled(features.JobPodReplacementPolicy) {
 
 		// Mark the pod as failed - this is especially important in case the pod
 		// is orphaned, in which case the pod would remain in the Running phase
@@ -354,7 +354,7 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
 			newStatus := pod.Status.DeepCopy()
 			newStatus.Phase = v1.PodFailed
-			if condition != nil && feature.Enabled(features.PodDisruptionConditions) {
+			if condition != nil && featuregate.Enabled(features.PodDisruptionConditions) {
 				apipod.UpdatePodCondition(newStatus, condition)
 			}
 			if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {

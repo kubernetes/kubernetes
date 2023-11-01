@@ -22,7 +22,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	netutils "k8s.io/utils/net"
 
@@ -149,7 +149,7 @@ func TestClusterServiceIPRange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, tc.gate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MultiCIDRServiceAllocator, tc.gate)()
 
 			errs := validateClusterIPFlags(tc.options.Extra)
 			if len(errs) > 0 && !tc.expectErrors {

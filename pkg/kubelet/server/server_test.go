@@ -54,7 +54,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
@@ -571,7 +571,7 @@ func TestAuthzCoverage(t *testing.T) {
 
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ContainerCheckpoint, true)()
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -869,7 +869,7 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 
 func TestCheckpointContainer(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ContainerCheckpoint, true)()
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()

@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -143,7 +143,7 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 
 	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
-		if feature.Enabled(features.LoadBalancerIPMode) {
+		if featuregate.Enabled(features.LoadBalancerIPMode) {
 			ipMode := v1.LoadBalancerIPModeVIP
 
 			for i, ing := range obj.Status.LoadBalancer.Ingress {
@@ -171,7 +171,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
-		if feature.Enabled(features.InPlacePodVerticalScaling) &&
+		if featuregate.Enabled(features.InPlacePodVerticalScaling) &&
 			obj.Spec.Containers[i].Resources.Requests != nil {
 			// For normal containers, set resize restart policy to default value (NotRequired), if not specified.
 			resizePolicySpecified := make(map[v1.ResourceName]bool)
@@ -228,7 +228,7 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
-	if feature.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+	if featuregate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
 		if obj.HostNetwork {
 			defaultHostNetworkPorts(&obj.Containers)
 			defaultHostNetworkPorts(&obj.InitContainers)

@@ -40,7 +40,7 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
@@ -11934,7 +11934,7 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 
 			// prepare status
 			if loadbalancerIPModeInUse(tc.statusBeforeUpdate) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
 			}
 			oldSvc := obj.(*api.Service).DeepCopy()
 			oldSvc.Status = tc.statusBeforeUpdate
@@ -11943,7 +11943,7 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 				t.Errorf("updated status: %s", err)
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
 			newSvc := obj.(*api.Service).DeepCopy()
 			newSvc.Status = tc.newStatus
 			obj, _, err = statusStorage.Update(ctx, newSvc.Name, rest.DefaultUpdatedObjectInfo(newSvc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})

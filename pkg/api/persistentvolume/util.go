@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -34,7 +34,7 @@ const (
 // DropDisabledSpecFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
 func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
-	if !feature.Enabled(features.VolumeAttributesClass) {
+	if !featuregate.Enabled(features.VolumeAttributesClass) {
 		if oldPVSpec == nil || oldPVSpec.VolumeAttributesClassName == nil {
 			pvSpec.VolumeAttributesClassName = nil
 		}
@@ -44,7 +44,7 @@ func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Per
 // DropDisabledStatusFields removes disabled fields from the pv status.
 // This should be called from PrepareForUpdate for all resources containing a pv status.
 func DropDisabledStatusFields(oldStatus, newStatus *api.PersistentVolumeStatus) {
-	if !feature.Enabled(features.PersistentVolumeLastPhaseTransitionTime) && oldStatus.LastPhaseTransitionTime.IsZero() {
+	if !featuregate.Enabled(features.PersistentVolumeLastPhaseTransitionTime) && oldStatus.LastPhaseTransitionTime.IsZero() {
 		newStatus.LastPhaseTransitionTime = nil
 	}
 }

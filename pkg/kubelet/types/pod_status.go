@@ -18,7 +18,7 @@ package types
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -37,7 +37,7 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
-	if feature.Enabled(features.PodReadyToStartContainersCondition) {
+	if featuregate.Enabled(features.PodReadyToStartContainersCondition) {
 		if conditionType == v1.PodReadyToStartContainers {
 			return true
 		}
@@ -47,7 +47,7 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 
 // PodConditionSharedByKubelet returns if the pod condition type is shared by kubelet
 func PodConditionSharedByKubelet(conditionType v1.PodConditionType) bool {
-	if feature.Enabled(features.PodDisruptionConditions) {
+	if featuregate.Enabled(features.PodDisruptionConditions) {
 		if conditionType == v1.DisruptionTarget {
 			return true
 		}

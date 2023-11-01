@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
@@ -52,8 +51,8 @@ import (
 
 func TestPodSecurity(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ProcMountType, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.AppArmor, true)()
 	// Start server
 	server := startPodSecurityServer(t)
 	opts := podsecuritytest.Options{
@@ -74,13 +73,13 @@ func TestPodSecurity(t *testing.T) {
 // TestPodSecurityGAOnly ensures policies pass with only GA features enabled
 func TestPodSecurityGAOnly(t *testing.T) {
 	// Disable all alpha and beta features
-	for k, v := range utilfeature.DefaultFeatureGate.DeepCopy().GetAll() {
+	for k, v := range featuregate.DefaultFeatureGate.DeepCopy().GetAll() {
 		if k == "AllAlpha" || k == "AllBeta" {
 			// Skip special features. When processed first, special features may
 			// erroneously disable other features.
 			continue
 		} else if v.PreRelease == featuregate.Alpha || v.PreRelease == featuregate.Beta {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k, false)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, k, false)()
 		}
 	}
 	// Start server
@@ -89,7 +88,7 @@ func TestPodSecurityGAOnly(t *testing.T) {
 	opts := podsecuritytest.Options{
 		ClientConfig: server.ClientConfig,
 		// Pass in feature gate info so negative test cases depending on alpha or beta features can be skipped
-		Features: utilfeature.DefaultFeatureGate,
+		Features: featuregate.DefaultFeatureGate,
 	}
 	podsecuritytest.Run(t, opts)
 
@@ -98,8 +97,8 @@ func TestPodSecurityGAOnly(t *testing.T) {
 
 func TestPodSecurityWebhook(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ProcMountType, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.AppArmor, true)()
 
 	// Start test API server.
 	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})

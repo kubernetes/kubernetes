@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	tracing "k8s.io/component-base/tracing"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/utils/path"
@@ -79,7 +79,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	if o == nil || o.ConfigFile == "" {
 		return nil
 	}
-	if !feature.Enabled(features.APIServerTracing) {
+	if !featuregate.Enabled(features.APIServerTracing) {
 		return fmt.Errorf("APIServerTracing feature is not enabled, but tracing config file was provided")
 	}
 
@@ -88,7 +88,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		return fmt.Errorf("failed to read tracing config: %v", err)
 	}
 
-	errs := tracingapi.ValidateTracingConfiguration(traceConfig, feature.DefaultFeatureGate, nil)
+	errs := tracingapi.ValidateTracingConfiguration(traceConfig, featuregate.DefaultFeatureGate, nil)
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to validate tracing configuration: %v", errs.ToAggregate())
 	}

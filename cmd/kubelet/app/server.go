@@ -59,7 +59,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -118,7 +117,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(logsapi.AddFeatureGates(feature.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
 }
 
 const (
@@ -191,7 +190,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 			verflag.PrintAndExitIfRequested()
 
 			// set feature gates from initial flags-based config
-			if err := feature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+			if err := featuregate.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
 				return fmt.Errorf("failed to set feature gates from initial flags-based config: %w", err)
 			}
 
@@ -231,21 +230,21 @@ is checked every 20 seconds (also configurable with a flag).`,
 					return fmt.Errorf("failed to precedence kubeletConfigFlag: %w", err)
 				}
 				// update feature gates based on new config
-				if err := feature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+				if err := featuregate.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
 					return fmt.Errorf("failed to set feature gates from initial flags-based config: %w", err)
 				}
 			}
 
 			// Config and flags parsed, now we can initialize logging.
 			logs.InitLogs()
-			if err := logsapi.ValidateAndApplyAsField(&kubeletConfig.Logging, feature.DefaultFeatureGate, field.NewPath("logging")); err != nil {
+			if err := logsapi.ValidateAndApplyAsField(&kubeletConfig.Logging, featuregate.DefaultFeatureGate, field.NewPath("logging")); err != nil {
 				return fmt.Errorf("initialize logging: %v", err)
 			}
 			cliflag.PrintFlags(cleanFlagSet)
 
 			// We always validate the local configuration (command line + config file).
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
-			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, feature.DefaultFeatureGate); err != nil {
+			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, featuregate.DefaultFeatureGate); err != nil {
 				return fmt.Errorf("failed to validate kubelet configuration, error: %w, path: %s", err, kubeletConfig)
 			}
 
@@ -260,7 +259,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 
 			// use kubeletServer to construct the default KubeletDeps
-			kubeletDeps, err := UnsecuredDependencies(kubeletServer, feature.DefaultFeatureGate)
+			kubeletDeps, err := UnsecuredDependencies(kubeletServer, featuregate.DefaultFeatureGate)
 			if err != nil {
 				return fmt.Errorf("failed to construct kubelet dependencies: %w", err)
 			}
@@ -280,9 +279,9 @@ is checked every 20 seconds (also configurable with a flag).`,
 			// set up signal context for kubelet shutdown
 			ctx := genericapiserver.SetupSignalContext()
 
-			feature.DefaultMutableFeatureGate.AddMetrics()
+			featuregate.DefaultMutableFeatureGate.AddMetrics()
 			// run the kubelet
-			return Run(ctx, kubeletServer, kubeletDeps, feature.DefaultFeatureGate)
+			return Run(ctx, kubeletServer, kubeletDeps, featuregate.DefaultFeatureGate)
 		},
 	}
 
@@ -453,7 +452,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		return nil, err
 	}
 	tp := oteltrace.NewNoopTracerProvider()
-	if feature.Enabled(features.KubeletTracing) {
+	if featuregate.Enabled(features.KubeletTracing) {
 		tp, err = newTracerProvider(s)
 		if err != nil {
 			return nil, err
@@ -563,7 +562,7 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 
 func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
 	// Set global feature gates based on the value on the initial KubeletServer
-	err = feature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
+	err = featuregate.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
 		return err
 	}
@@ -573,7 +572,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Warn if MemoryQoS enabled with cgroups v1
-	if feature.Enabled(features.MemoryQoS) &&
+	if featuregate.Enabled(features.MemoryQoS) &&
 		!isCgroup2UnifiedMode() {
 		klog.InfoS("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
 	}
@@ -703,7 +702,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Get cgroup driver setting from CRI
-	if feature.Enabled(features.KubeletCgroupDriverFromCRI) {
+	if featuregate.Enabled(features.KubeletCgroupDriverFromCRI) {
 		if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
 			return err
 		}
@@ -789,7 +788,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var cpuManagerPolicyOptions map[string]string
-		if feature.Enabled(features.CPUManagerPolicyOptions) {
+		if featuregate.Enabled(features.CPUManagerPolicyOptions) {
 			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
 		} else if s.CPUManagerPolicyOptions != nil {
 			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
@@ -797,7 +796,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var topologyManagerPolicyOptions map[string]string
-		if feature.Enabled(features.TopologyManagerPolicyOptions) {
+		if featuregate.Enabled(features.TopologyManagerPolicyOptions) {
 			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
 		} else if s.TopologyManagerPolicyOptions != nil {
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
@@ -1012,7 +1011,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 			utilnet.CloseIdleConnectionsFor(clientConfig.Transport)
 		}
 	}
-	if feature.Enabled(features.KubeletTracing) {
+	if featuregate.Enabled(features.KubeletTracing) {
 		clientConfig.Wrap(tracing.WrapperFor(tp))
 	}
 	return clientConfig, onHeartbeatFailure, nil
@@ -1208,7 +1207,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
-	nodeIPs, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider, feature.Enabled(features.CloudDualStackNodeIPs))
+	nodeIPs, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider, featuregate.Enabled(features.CloudDualStackNodeIPs))
 	if err != nil {
 		return fmt.Errorf("bad --node-ip %q: %v", kubeServer.NodeIP, err)
 	}

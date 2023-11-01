@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -656,7 +656,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 }
 
 func runStaticPolicyTestCaseWithFeatureGate(t *testing.T, testCase staticPolicyTest) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
 	runStaticPolicyTestCase(t, testCase)
 }
 

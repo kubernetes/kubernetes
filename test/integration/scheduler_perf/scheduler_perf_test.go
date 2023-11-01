@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -699,7 +698,7 @@ func BenchmarkPerfScheduling(b *testing.B) {
 					b.Cleanup(cancel)
 
 					for feature, flag := range tc.FeatureGates {
-						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
+						defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.DefaultFeatureGate, feature, flag)()
 					}
 					informerFactory, client, dyncClient := setupClusterForWorkload(ctx, b, tc.SchedulerConfigPath, tc.FeatureGates)
 					results := runWorkload(ctx, b, tc, w, informerFactory, client, dyncClient, false)
@@ -793,7 +792,7 @@ func TestScheduling(t *testing.T) {
 			defer cancel()
 
 			for feature, flag := range config.featureGates {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, feature, flag)()
 			}
 			informerFactory, client, dynClient := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates)
 

@@ -39,11 +39,11 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -347,7 +347,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.StringVar(&o.AuthenticationConfigFile, "authentication-config", o.AuthenticationConfigFile, ""+
 			"File with Authentication Configuration to configure the JWT Token authenticator. "+
 			"Note: This feature is in Alpha since v1.29."+
-			"--feature-gate=StructuredAuthenticationConfiguration=true needs to be set for enabling this feature."+
+			"--feature-gate=StructuredAuthenticationConfiguration=true needs to be set for enabling this featuregate."+
 			"This feature is mutually exclusive with the oidc-* flags.")
 
 		o.OIDC.areFlagsConfigured = func() bool {
@@ -402,7 +402,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.BoolVar(&o.ServiceAccounts.ExtendExpiration, "service-account-extend-token-expiration", o.ServiceAccounts.ExtendExpiration, ""+
 			"Turns on projected service account expiration extension during token generation, "+
-			"which helps safe transition from legacy token to bound service account token feature. "+
+			"which helps safe transition from legacy token to bound service account token featuregate. "+
 			"If this flag is enabled, admission injected tokens would be extended up to 1 year to "+
 			"prevent unexpected failure during transition, ignoring value of service-account-max-token-expiration.")
 	}
@@ -603,7 +603,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 	}
 
 	var nodeLister v1listers.NodeLister
-	if feature.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
+	if featuregate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
 		nodeLister = versionedInformer.Core().V1().Nodes().Lister()
 	}
 	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
@@ -671,7 +671,7 @@ func (o *BuiltInAuthenticationOptions) validateOIDCOptions() []error {
 	// New validation when authentication config file is provided
 
 	// Authentication config file is only supported when the StructuredAuthenticationConfiguration feature is enabled
-	if !feature.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
+	if !featuregate.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
 		allErrors = append(allErrors, fmt.Errorf("set --feature-gates=%s=true to use authentication-config file", genericfeatures.StructuredAuthenticationConfiguration))
 	}
 

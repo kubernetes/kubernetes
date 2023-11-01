@@ -41,8 +41,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/tracing"
 )
 
@@ -166,7 +166,7 @@ func negotiateContentEncoding(req *http.Request) string {
 	if len(encoding) == 0 {
 		return ""
 	}
-	if !feature.Enabled(features.APIResponseCompression) {
+	if !featuregate.Enabled(features.APIResponseCompression) {
 		return ""
 	}
 	for len(encoding) > 0 {

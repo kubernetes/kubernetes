@@ -30,7 +30,7 @@ import (
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -57,7 +57,7 @@ func TestMetadata(t *testing.T) {
 		t.Skip("Skipping test on Windows, not on GCE.")
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.DisableKubeletCloudCredentialProviders, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, kubefeatures.DisableKubeletCloudCredentialProviders, false)()
 
 	var err error
 	gceProductNameFile, err = createProductNameFile()

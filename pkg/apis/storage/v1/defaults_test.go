@@ -23,7 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
@@ -122,7 +122,7 @@ func TestSetDefaultCSIDriver(t *testing.T) {
 }
 
 func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	driver := &storagev1.CSIDriver{}
 
 	// field should be defaulted
@@ -137,7 +137,7 @@ func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
 }
 
 func TestSetDefaultSELinuxMountReadWriteOncePodDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
 	driver := &storagev1.CSIDriver{}
 
 	// field should not be defaulted

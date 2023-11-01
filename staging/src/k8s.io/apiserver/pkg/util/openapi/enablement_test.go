@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -109,7 +109,7 @@ func TestGetOpenAPIDefinitionsWithoutDisabledFeatures(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("enabled=%v", tc.enabled), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.enabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.OpenAPIEnums, tc.enabled)()
 			defs := GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefs)(func(path string) spec.Ref {
 				return spec.Ref{}
 			})

@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -43,7 +43,7 @@ import (
 // TestCustomResourceValidators tests x-kubernetes-validations compile and validate as expected when the feature gate
 // is enabled.
 func TestCustomResourceValidators(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, true)()
 
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	if err != nil {
@@ -426,7 +426,7 @@ func TestCustomResourceValidators(t *testing.T) {
 // TestCustomResourceValidatorsWithBlockingErrors tests x-kubernetes-validations is skipped when
 // blocking errors occurred.
 func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, true)()
 
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	if err != nil {

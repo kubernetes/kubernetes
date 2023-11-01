@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/features"
@@ -51,7 +51,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 
 	for name, enableUnhealthyPodEvictionPolicy := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, enableUnhealthyPodEvictionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, enableUnhealthyPodEvictionPolicy)()
 			testPodDisruptionBudgetStrategy(t)
 		})
 	}
@@ -122,7 +122,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 }
 
 func testPodDisruptionBudgetStrategyWithUnhealthyPodEvictionPolicy(t *testing.T, tc unhealthyPodEvictionPolicyStrategyTestCase) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("PodDisruptionBudget must be namespace scoped")
@@ -157,7 +157,7 @@ func testPodDisruptionBudgetStrategyWithUnhealthyPodEvictionPolicy(t *testing.T,
 		t.Errorf("Unexpected UnhealthyPodEvictionPolicy set: expected %v, got %v", tc.expectedUnhealthyPodEvictionPolicy, pdb.Spec.UnhealthyPodEvictionPolicy)
 	}
 	if tc.disablePDBUnhealthyPodEvictionPolicyFeatureGateAfterCreate {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, false)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, false)()
 	}
 
 	newPdb := &policy.PodDisruptionBudget{
@@ -431,7 +431,7 @@ func TestDropDisabledFields(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
 
 			oldSpecBefore := tc.oldSpec.DeepCopy()
 			dropDisabledFields(tc.newSpec, tc.oldSpec)

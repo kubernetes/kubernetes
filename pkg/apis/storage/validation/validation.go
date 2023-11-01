@@ -27,7 +27,7 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -538,7 +538,7 @@ func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *
 // validateSELinuxMount tests if seLinuxMount is set for CSIDriver.
 func validateSELinuxMount(seLinuxMount *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if seLinuxMount == nil && feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if seLinuxMount == nil && featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 

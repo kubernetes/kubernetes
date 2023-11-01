@@ -37,8 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -110,7 +110,7 @@ func newMatchConditionHandler(recorder *admissionRecorder) http.Handler {
 
 // TestMatchConditions tests ValidatingWebhookConfigurations and MutatingWebhookConfigurations that validates different cases of matchCondition fields
 func TestMatchConditions(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 
 	fail := admissionregistrationv1.Fail
 	ignore := admissionregistrationv1.Ignore
@@ -567,7 +567,7 @@ func TestMatchConditions(t *testing.T) {
 }
 
 func TestMatchConditions_validation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 
 	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--disable-admission-plugins=ServiceAccount",
@@ -805,7 +805,7 @@ func TestFeatureGateEnablement(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			if testcase.matchConditionsFeatureGateInitiallyEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 			}
 
 			validatingwebhook := &admissionregistrationv1.ValidatingWebhookConfiguration{
@@ -898,9 +898,9 @@ func TestFeatureGateEnablement(t *testing.T) {
 
 			// Switch the featureGate state
 			if testcase.matchConditionsFeatureGateInitiallyEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, false)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, false)()
 			} else {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 			}
 
 			// Assert the validating webhook match conditions field - post switch

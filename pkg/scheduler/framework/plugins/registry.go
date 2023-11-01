@@ -17,7 +17,7 @@ limitations under the License.
 package plugins
 
 import (
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
@@ -46,15 +46,15 @@ import (
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
-		EnableDynamicResourceAllocation:              feature.Enabled(features.DynamicResourceAllocation),
-		EnableVolumeCapacityPriority:                 feature.Enabled(features.VolumeCapacityPriority),
-		EnableMinDomainsInPodTopologySpread:          feature.Enabled(features.MinDomainsInPodTopologySpread),
-		EnableNodeInclusionPolicyInPodTopologySpread: feature.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
-		EnableMatchLabelKeysInPodTopologySpread:      feature.Enabled(features.MatchLabelKeysInPodTopologySpread),
-		EnablePodSchedulingReadiness:                 feature.Enabled(features.PodSchedulingReadiness),
-		EnablePodDisruptionConditions:                feature.Enabled(features.PodDisruptionConditions),
-		EnableInPlacePodVerticalScaling:              feature.Enabled(features.InPlacePodVerticalScaling),
-		EnableSidecarContainers:                      feature.Enabled(features.SidecarContainers),
+		EnableDynamicResourceAllocation:              featuregate.Enabled(features.DynamicResourceAllocation),
+		EnableVolumeCapacityPriority:                 featuregate.Enabled(features.VolumeCapacityPriority),
+		EnableMinDomainsInPodTopologySpread:          featuregate.Enabled(features.MinDomainsInPodTopologySpread),
+		EnableNodeInclusionPolicyInPodTopologySpread: featuregate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
+		EnableMatchLabelKeysInPodTopologySpread:      featuregate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		EnablePodSchedulingReadiness:                 featuregate.Enabled(features.PodSchedulingReadiness),
+		EnablePodDisruptionConditions:                featuregate.Enabled(features.PodDisruptionConditions),
+		EnableInPlacePodVerticalScaling:              featuregate.Enabled(features.InPlacePodVerticalScaling),
+		EnableSidecarContainers:                      featuregate.Enabled(features.SidecarContainers),
 	}
 
 	registry := runtime.Registry{

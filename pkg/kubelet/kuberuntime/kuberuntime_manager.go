@@ -37,10 +37,10 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -498,7 +498,7 @@ type podActions struct {
 	// InitContainersToStart keeps a list of indexes for the init containers to
 	// start, where the index is the index of the specific init container in the
 	// pod spec (pod.Spec.InitContainers).
-	// NOTE: This is a field for SidecarContainers feature. Either this or
+	// NOTE: This is a field for SidecarContainers featuregate. Either this or
 	// NextInitContainerToStart will be set.
 	InitContainersToStart []int
 	// ContainersToStart keeps a list of indexes for the containers to start,
@@ -542,7 +542,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 }
 
 func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
-	if !feature.Enabled(features.InPlacePodVerticalScaling) {
+	if !featuregate.Enabled(features.InPlacePodVerticalScaling) {
 		return false
 	}
 	if types.IsStaticPod(pod) {
@@ -863,7 +863,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// is done and there is no container to start.
 		if len(containersToStart) == 0 {
 			hasInitialized := false
-			if !feature.Enabled(features.SidecarContainers) {
+			if !featuregate.Enabled(features.SidecarContainers) {
 				_, _, hasInitialized = findNextInitContainerToRun(pod, podStatus)
 			} else {
 				// If there is any regular container, it means all init containers have
@@ -881,7 +881,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// state.
 		if len(pod.Spec.InitContainers) != 0 {
 			// Pod has init containers, return the first one.
-			if !feature.Enabled(features.SidecarContainers) {
+			if !featuregate.Enabled(features.SidecarContainers) {
 				changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
 			} else {
 				changes.InitContainersToStart = []int{0}
@@ -904,7 +904,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	// Check initialization progress.
-	if !feature.Enabled(features.SidecarContainers) {
+	if !featuregate.Enabled(features.SidecarContainers) {
 		initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
 		if !done {
 			if next != nil {
@@ -1031,7 +1031,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
 		changes.KillPod = true
-		if feature.Enabled(features.SidecarContainers) {
+		if featuregate.Enabled(features.SidecarContainers) {
 			// To prevent the restartable init containers to keep pod alive, we should
 			// not restart them.
 			changes.InitContainersToStart = nil
@@ -1141,7 +1141,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
 		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
-		if feature.Enabled(features.DynamicResourceAllocation) {
+		if featuregate.Enabled(features.DynamicResourceAllocation) {
 			if err := m.runtimeHelper.PrepareDynamicResources(pod); err != nil {
 				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 				if referr != nil {
@@ -1275,7 +1275,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 	}
 
-	if !feature.Enabled(features.SidecarContainers) {
+	if !featuregate.Enabled(features.SidecarContainers) {
 		// Step 6: start the init container.
 		if container := podContainerChanges.NextInitContainerToStart; container != nil {
 			// Start the next init container.
@@ -1466,7 +1466,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
 
-		if idx == 0 && feature.Enabled(features.EventedPLEG) {
+		if idx == 0 && featuregate.Enabled(features.EventedPLEG) {
 			if resp.Timestamp == 0 {
 				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
 				// then the pod status we get will not have the timestamp set.
@@ -1493,7 +1493,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		}
 	}
 
-	if !feature.Enabled(features.EventedPLEG) {
+	if !featuregate.Enabled(features.EventedPLEG) {
 		// Get statuses of all containers visible in the pod.
 		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
 		if err != nil {

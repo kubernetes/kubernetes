@@ -28,16 +28,16 @@ import (
 
 	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
-	// Injected bound service account token expiration which triggers monitoring of its time-bound feature.
+	// Injected bound service account token expiration which triggers monitoring of its time-bound featuregate.
 	WarnOnlyBoundTokenExpirationSeconds = 60*60 + 7
 
-	// Extended expiration for those modified tokens involved in safe rollout if time-bound feature.
+	// Extended expiration for those modified tokens involved in safe rollout if time-bound featuregate.
 	ExpirationExtensionSeconds = 24 * 365 * 60 * 60
 )
 
@@ -75,7 +75,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 		NotBefore: jwt.NewNumericDate(now),
 		Expiry:    jwt.NewNumericDate(now.Add(time.Duration(expirationSeconds) * time.Second)),
 	}
-	if feature.Enabled(features.ServiceAccountTokenJTI) {
+	if featuregate.Enabled(features.ServiceAccountTokenJTI) {
 		sc.ID = newUUID()
 	}
 	pc := &privateClaims{
@@ -97,7 +97,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 			Name: pod.Name,
 			UID:  string(pod.UID),
 		}
-		if feature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+		if featuregate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			// if this is bound to a pod and the node information is available, persist that too
 			if node != nil {
 				pc.Kubernetes.Node = &ref{
@@ -112,7 +112,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 			UID:  string(secret.UID),
 		}
 	case node != nil:
-		if !feature.Enabled(features.ServiceAccountTokenNodeBinding) {
+		if !featuregate.Enabled(features.ServiceAccountTokenNodeBinding) {
 			return nil, nil, fmt.Errorf("token bound to Node object requested, but %q feature gate is disabled", features.ServiceAccountTokenNodeBinding)
 		}
 		pc.Kubernetes.Node = &ref{
@@ -237,13 +237,13 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	if noderef != nil {
 		switch {
 		case podref != nil:
-			if feature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+			if featuregate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 				// for pod-bound tokens, just extract the node claims
 				nodeName = noderef.Name
 				nodeUID = noderef.UID
 			}
 		case podref == nil:
-			if !feature.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
+			if !featuregate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
 				klog.V(4).Infof("ServiceAccount token is bound to a Node object, but the node bound token validation feature is disabled")
 				return nil, fmt.Errorf("token is bound to a Node object but the %s feature gate is disabled", features.ServiceAccountTokenNodeBindingValidation)
 			}
@@ -280,7 +280,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	}
 
 	var jti string
-	if feature.Enabled(features.ServiceAccountTokenJTI) {
+	if featuregate.Enabled(features.ServiceAccountTokenJTI) {
 		jti = public.ID
 	}
 	return &apiserverserviceaccount.ServiceAccountInfo{

@@ -26,7 +26,6 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
@@ -105,7 +104,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 		ctx := context.TODO()
 		t.Run(tt.name, func(t *testing.T) {
 			for _, f := range tt.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, f, true)()
 			}
 
 			schema := tt.input.OpenAPIV3Schema
@@ -214,7 +213,7 @@ func TestDefaultValidationWithOptionalOldSelf(t *testing.T) {
 	for _, tt := range tests {
 		ctx := context.TODO()
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
 			schema := tt.input.OpenAPIV3Schema
 			ss, err := structuralschema.NewStructural(schema)
 			if err != nil {

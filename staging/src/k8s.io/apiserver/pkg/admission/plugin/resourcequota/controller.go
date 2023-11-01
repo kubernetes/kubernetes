@@ -38,8 +38,8 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/featuregate"
 )
 
 // Evaluator is used to see if quota constraints are satisfied.
@@ -518,7 +518,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 			if innerErr != nil {
 				return quotas, innerErr
 			}
-			if feature.Enabled(features.InPlacePodVerticalScaling) {
+			if featuregate.Enabled(features.InPlacePodVerticalScaling) {
 				// allow negative usage for pods as pod resources can increase or decrease
 				if a.GetResource().GroupResource() == corev1.Resource("pods") {
 					deltaUsage = quota.Subtract(deltaUsage, prevUsage)

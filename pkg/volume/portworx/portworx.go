@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -67,7 +67,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
-	return feature.Enabled(features.CSIMigrationPortworx)
+	return featuregate.Enabled(features.CSIMigrationPortworx)
 }
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {

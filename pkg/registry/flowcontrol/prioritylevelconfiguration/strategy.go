@@ -26,7 +26,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/validation"
@@ -102,7 +102,7 @@ func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runt
 	//  'nominalConcurrencyShares' field of 'limited' for CREATE operation.
 	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
 	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: feature.Enabled(features.ZeroLimitedNominalConcurrencyShares),
+		AllowZeroLimitedNominalConcurrencyShares: featuregate.Enabled(features.ZeroLimitedNominalConcurrencyShares),
 	}
 	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration), getRequestGroupVersion(ctx), opts)
 }
@@ -144,7 +144,7 @@ func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, ob
 	//  only if the existing object already contains a zero value.
 	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
 	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: feature.Enabled(features.ZeroLimitedNominalConcurrencyShares) ||
+		AllowZeroLimitedNominalConcurrencyShares: featuregate.Enabled(features.ZeroLimitedNominalConcurrencyShares) ||
 			hasZeroLimitedNominalConcurrencyShares(oldPL),
 	}
 	return validation.ValidatePriorityLevelConfiguration(newPL, getRequestGroupVersion(ctx), opts)

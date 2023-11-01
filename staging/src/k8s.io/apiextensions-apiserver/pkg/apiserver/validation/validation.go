@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel/common"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
@@ -110,7 +110,7 @@ func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps)
 }
 
 func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema) SchemaValidator {
-	if feature.Enabled(features.CRDValidationRatcheting) {
+	if featuregate.Enabled(features.CRDValidationRatcheting) {
 		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 	}
 	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}
@@ -125,7 +125,7 @@ func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema) SchemaValidator {
 // ValidateCustomResource(customResource).
 func ValidateCustomResourceUpdate(fldPath *field.Path, customResource, old interface{}, validator SchemaValidator, options ...ValidationOption) field.ErrorList {
 	// Additional feature gate check for sanity
-	if !feature.Enabled(features.CRDValidationRatcheting) {
+	if !featuregate.Enabled(features.CRDValidationRatcheting) {
 		return ValidateCustomResource(nil, customResource, validator)
 	} else if validator == nil {
 		return nil

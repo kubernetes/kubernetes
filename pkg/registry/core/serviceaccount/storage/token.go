@@ -34,8 +34,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
@@ -153,7 +153,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
 			uid = pod.UID
-			if feature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+			if featuregate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 				if nodeName := pod.Spec.NodeName; nodeName != "" {
 					newCtx := newContext(ctx, "nodes", nodeName, "", api.SchemeGroupVersion.WithKind("Node"))
 					// set ResourceVersion=0 to allow this to be read/served from the apiservers watch cache
@@ -176,7 +176,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				}
 			}
 		case gvk.Group == "" && gvk.Kind == "Node":
-			if !feature.Enabled(features.ServiceAccountTokenNodeBinding) {
+			if !featuregate.Enabled(features.ServiceAccountTokenNodeBinding) {
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to a Node object as the %q feature-gate is disabled", features.ServiceAccountTokenNodeBinding))
 			}
 			newCtx := newContext(ctx, "nodes", ref.Name, "", gvk)
@@ -234,7 +234,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		Token:               tokdata,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
-	if feature.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
+	if featuregate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
 		audit.AddAuditAnnotation(ctx, serviceaccount.CredentialIDKey, serviceaccount.CredentialIDForJTI(sc.ID))
 	}
 	return out, nil

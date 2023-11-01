@@ -35,8 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -360,7 +360,7 @@ func TestWaitingForGatesCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
 
 			Strategy.PrepareForCreate(genericapirequest.NewContext(), tt.pod)
 			var got api.PodCondition
@@ -1543,7 +1543,7 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)()
 
 			pod := &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1587,7 +1587,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	)
 
 	// Enable the Feature Gate during the first rule creation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
 	ctx := genericapirequest.NewDefaultContext()
 
 	pod := &api.Pod{
@@ -1634,7 +1634,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	}
 
 	// Disable the Feature Gate and expect these fields still exist after updating.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)()
 
 	updatedPod := createdPod.DeepCopy()
 	updatedPod.Labels = map[string]string{"foo": "bar"}
@@ -1654,7 +1654,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	}
 
 	// Enable the Feature Gate again to check whether configured fields still exist after updating.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
 
 	updatedPod2 := updatedPod.DeepCopy()
 	updatedPod2.Labels = map[string]string{"foo": "fuz"}
@@ -2021,7 +2021,7 @@ func Test_mutatePodAffinity(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tc.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tc.featureGateEnabled)()
 
 			pod := tc.pod
 			mutatePodAffinity(pod)

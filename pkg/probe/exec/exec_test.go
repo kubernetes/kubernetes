@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/probe"
@@ -134,7 +134,7 @@ func TestExec(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, test.execProbeTimeout)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ExecProbeTimeout, test.execProbeTimeout)()
 		fake := FakeCmd{
 			out: []byte(test.output),
 			err: test.err,

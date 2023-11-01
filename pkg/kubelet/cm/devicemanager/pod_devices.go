@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
@@ -329,7 +329,7 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 			opts.Annotations = append(opts.Annotations, kubecontainer.Annotation{Name: k, Value: v})
 		}
 
-		if feature.Enabled(kubefeatures.DevicePluginCDIDevices) {
+		if featuregate.Enabled(kubefeatures.DevicePluginCDIDevices) {
 			// Updates for CDI devices.
 			cdiDevices := getCDIDeviceInfo(resp, allCDIDevices)
 			opts.CDIDevices = append(opts.CDIDevices, cdiDevices...)
@@ -338,7 +338,7 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 
 	// Although the CDI devices are expected to be empty when this feature is disabled, we still
 	// guard this with a feature gate to avoid any potential issues.
-	if feature.Enabled(kubefeatures.DevicePluginCDIDevices) {
+	if featuregate.Enabled(kubefeatures.DevicePluginCDIDevices) {
 		// We construct a resource ID from the pod UID and container name.
 		// This ID has no semantic meaning, and is only used to ensure that the generated CDI annotation key is unique
 		// for a given container. Since this is only called once per pod-container combination, this should be the case.

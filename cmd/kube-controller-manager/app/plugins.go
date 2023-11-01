@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 	"k8s.io/utils/exec"
 )
@@ -50,7 +50,7 @@ import (
 func ProbeAttachableVolumePlugins(logger klog.Logger) ([]volume.VolumePlugin, error) {
 	var err error
 	allPlugins := []volume.VolumePlugin{}
-	allPlugins, err = appendAttachableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
+	allPlugins, err = appendAttachableLegacyProviderVolumes(logger, allPlugins, featuregate.DefaultFeatureGate)
 	if err != nil {
 		return allPlugins, err
 	}
@@ -71,7 +71,7 @@ func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) v
 func ProbeExpandableVolumePlugins(logger klog.Logger, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
 	var err error
 	allPlugins := []volume.VolumePlugin{}
-	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
+	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, featuregate.DefaultFeatureGate)
 	if err != nil {
 		return allPlugins, err
 	}
@@ -118,7 +118,7 @@ func ProbeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 
 	var err error
-	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
+	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, featuregate.DefaultFeatureGate)
 	if err != nil {
 		return allPlugins, err
 	}

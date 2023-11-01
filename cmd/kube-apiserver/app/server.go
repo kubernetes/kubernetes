@@ -38,7 +38,6 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/dynamic"
@@ -48,6 +47,7 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
@@ -71,7 +71,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(logsapi.AddFeatureGates(feature.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
 }
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -98,7 +98,7 @@ cluster's shared state through which all other components interact.`,
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := logsapi.ValidateAndApply(s.Logs, feature.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(s.Logs, featuregate.DefaultFeatureGate); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(fs)
@@ -114,7 +114,7 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 			// add feature enablement metrics
-			feature.DefaultMutableFeatureGate.AddMetrics()
+			featuregate.DefaultMutableFeatureGate.AddMetrics()
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -259,7 +259,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		},
 	}
 
-	if feature.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if featuregate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		config.ExtraConfig.PeerEndpointLeaseReconciler, err = controlplaneapiserver.CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
 			return nil, nil, nil, err
@@ -316,7 +316,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		versionedInformers,
 		clientgoExternalClient,
 		dynamicExternalClient,
-		feature.DefaultFeatureGate,
+		featuregate.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)

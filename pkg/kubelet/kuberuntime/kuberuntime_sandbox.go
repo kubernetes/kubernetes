@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/types"
@@ -231,7 +231,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod)
 		SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
 	}
 
-	if feature.Enabled(features.WindowsHostNetwork) {
+	if featuregate.Enabled(features.WindowsHostNetwork) {
 		wc.SecurityContext.NamespaceOptions = &runtimeapi.WindowsNamespaceOption{}
 		if kubecontainer.IsHostNetworkPod(pod) {
 			wc.SecurityContext.NamespaceOptions.Network = runtimeapi.NamespaceMode_NODE

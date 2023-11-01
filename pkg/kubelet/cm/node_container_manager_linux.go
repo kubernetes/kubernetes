@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -142,7 +142,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 
 	// Enforce MemoryQoS for cgroups of kube-reserved/system-reserved. For more information,
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
-	if feature.Enabled(kubefeatures.MemoryQoS) {
+	if featuregate.Enabled(kubefeatures.MemoryQoS) {
 		if rp.Memory != nil {
 			if rp.Unified == nil {
 				rp.Unified = make(map[string]string)

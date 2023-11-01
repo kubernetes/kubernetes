@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
@@ -272,7 +272,7 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			as := assert.New(t)
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DevicePluginCDIDevices, tc.gate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.DevicePluginCDIDevices, tc.gate)()
 			podDevices := newPodDevices()
 			for resourceName, response := range tc.responsesPerResource {
 				podDevices.insert("pod", "container", resourceName,

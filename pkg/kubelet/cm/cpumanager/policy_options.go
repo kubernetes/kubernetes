@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -52,11 +52,11 @@ func CheckPolicyOptionAvailable(option string) error {
 		return fmt.Errorf("unknown CPU Manager Policy option: %q", option)
 	}
 
-	if alphaOptions.Has(option) && !feature.Enabled(kubefeatures.CPUManagerPolicyAlphaOptions) {
+	if alphaOptions.Has(option) && !featuregate.Enabled(kubefeatures.CPUManagerPolicyAlphaOptions) {
 		return fmt.Errorf("CPU Manager Policy Alpha-level Options not enabled, but option %q provided", option)
 	}
 
-	if betaOptions.Has(option) && !feature.Enabled(kubefeatures.CPUManagerPolicyBetaOptions) {
+	if betaOptions.Has(option) && !featuregate.Enabled(kubefeatures.CPUManagerPolicyBetaOptions) {
 		return fmt.Errorf("CPU Manager Policy Beta-level Options not enabled, but option %q provided", option)
 	}
 

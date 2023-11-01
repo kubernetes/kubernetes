@@ -21,7 +21,7 @@ import (
 	"runtime"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -93,7 +93,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	nodeInfo.SetNode(node)
 
 	// TODO: Remove this after the SidecarContainers feature gate graduates to GA.
-	if !feature.Enabled(features.SidecarContainers) {
+	if !featuregate.Enabled(features.SidecarContainers) {
 		for _, c := range admitPod.Spec.InitContainers {
 			if types.IsRestartableInitContainer(&c) {
 				message := fmt.Sprintf("Init container %q may not have a non-default restartPolicy", c.Name)

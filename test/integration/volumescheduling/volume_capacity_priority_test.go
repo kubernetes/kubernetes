@@ -27,7 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -76,7 +76,7 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 }
 
 func TestVolumeCapacityPriority(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeCapacityPriority, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.VolumeCapacityPriority, true)()
 
 	config := setupClusterForVolumeCapacityPriority(t, "volume-capacity-priority", 0, 0)
 	defer config.teardown()

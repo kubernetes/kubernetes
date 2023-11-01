@@ -29,7 +29,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -350,7 +349,7 @@ func withFeature(name Feature) interface{} {
 // argument to [framework.It], [framework.Describe], [framework.Context].
 //
 // The feature gate must be listed in
-// [k8s.io/apiserver/pkg/util/feature.DefaultMutableFeatureGate]. Once a
+// [k8s.io/component-base/featuregate.DefaultMutableFeatureGate]. Once a
 // feature gate gets removed from there, the WithFeatureGate calls using it
 // also need to be removed.
 func WithFeatureGate(featureGate featuregate.Feature) interface{} {
@@ -363,7 +362,7 @@ func (f *Framework) WithFeatureGate(featureGate featuregate.Feature) interface{}
 }
 
 func withFeatureGate(featureGate featuregate.Feature) interface{} {
-	spec, ok := utilfeature.DefaultMutableFeatureGate.GetAll()[featureGate]
+	spec, ok := featuregate.DefaultMutableFeatureGate.GetAll()[featureGate]
 	if !ok {
 		RecordBug(NewBug(fmt.Sprintf("WithFeatureGate: the feature gate %q is unknown", featureGate), 2))
 	}

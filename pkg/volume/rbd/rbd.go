@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -81,7 +81,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *rbdPlugin) IsMigratedToCSI() bool {
-	return feature.Enabled(features.CSIMigrationRBD)
+	return featuregate.Enabled(features.CSIMigrationRBD)
 }
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -432,7 +432,7 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volu
 	}
 
 	var mountContext string
-	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		mountContext, err = hu.GetSELinuxMountContext(mountPath)
 		if err != nil {
 			return volume.ReconstructedVolume{}, err
@@ -866,7 +866,7 @@ func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
 		return err
 	}
-	if feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		// The volume must have been mounted in MountDevice with -o context.
 		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
 	}

@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coretesting "k8s.io/client-go/testing"
+	"k8s.io/component-base/featuregate"
 	csitrans "k8s.io/csi-translation-lib"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/controller"
@@ -106,7 +106,7 @@ func TestSyncHandler(t *testing.T) {
 		}
 		allPlugins := []volume.VolumePlugin{}
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate))
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, featuregate.DefaultFeatureGate))
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}

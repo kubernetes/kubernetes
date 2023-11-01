@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -237,7 +237,7 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 }
 
 func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.Time) (sets.String, error) {
-	isRuntimeClassInImageCriAPIEnabled := feature.Enabled(features.RuntimeClassInImageCriAPI)
+	isRuntimeClassInImageCriAPIEnabled := featuregate.Enabled(features.RuntimeClassInImageCriAPI)
 	imagesInUse := sets.NewString()
 
 	images, err := im.runtime.ListImages(ctx)
@@ -452,7 +452,7 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 }
 
 func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo) error {
-	isRuntimeClassInImageCriAPIEnabled := feature.Enabled(features.RuntimeClassInImageCriAPI)
+	isRuntimeClassInImageCriAPIEnabled := featuregate.Enabled(features.RuntimeClassInImageCriAPI)
 	// Remove image. Continue despite errors.
 	var err error
 	klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
@@ -473,7 +473,7 @@ func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo)
 
 // Queries all of the image records and arranges them in a slice of evictionInfo, sorted based on last time used, ignoring images pinned by the runtime.
 func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTime time.Time) ([]evictionInfo, error) {
-	isRuntimeClassInImageCriAPIEnabled := feature.Enabled(features.RuntimeClassInImageCriAPI)
+	isRuntimeClassInImageCriAPIEnabled := featuregate.Enabled(features.RuntimeClassInImageCriAPI)
 	imagesInUse, err := im.detectImages(ctx, freeTime)
 	if err != nil {
 		return nil, err

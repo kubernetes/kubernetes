@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podapi "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -165,7 +165,7 @@ func TestEviction(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
 
 				// same test runs multiple times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
@@ -530,7 +530,7 @@ func TestEvictionIgnorePDB(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
 
 				// same test runs 3 times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
@@ -809,7 +809,7 @@ func TestAddConditionAndDelete(t *testing.T) {
 		for _, conditionsEnabled := range []bool{true, false} {
 			name := fmt.Sprintf("%s_conditions=%v", tc.name, conditionsEnabled)
 			t.Run(name, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, conditionsEnabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDisruptionConditions, conditionsEnabled)()
 				var deleteOptions *metav1.DeleteOptions
 				if tc.initialPod {
 					newPod := validNewPod()

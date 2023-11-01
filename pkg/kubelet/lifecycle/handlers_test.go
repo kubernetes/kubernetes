@@ -32,8 +32,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -278,7 +278,7 @@ func TestRunHandlerHttps(t *testing.T) {
 	})
 
 	t.Run("inconsistent", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
 		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromString("70")
 		pod.Spec.Containers = []v1.Container{container}
 		_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
@@ -349,7 +349,7 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			ctx := context.Background()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, tt.FeatureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, tt.FeatureGateEnabled)()
 			fakeHTTPDoer := fakeHTTP{}
 			handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
@@ -644,12 +644,12 @@ func TestRunHTTPHandler(t *testing.T) {
 			}
 
 			t.Run("consistent", func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 				verify(t, tt.Expected.NewHeader, tt.Expected.NewURL)
 			})
 
 			t.Run("inconsistent", func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
 				verify(t, tt.Expected.OldHeader, tt.Expected.OldURL)
 			})
 		})
@@ -760,7 +760,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 
 func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	ctx := context.Background()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 
 	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
 	// we need to reset them prior running this test.
@@ -894,7 +894,7 @@ func TestRunSleepHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodLifecycleSleepAction, true)()
 
 			pod.Spec.Containers[0].Lifecycle.PreStop.Sleep = &v1.SleepAction{Seconds: tt.sleepSeconds}
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(tt.terminationGracePeriodSeconds)*time.Second)

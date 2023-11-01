@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/utils/clock"
 
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
@@ -159,7 +159,7 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	if op == admission.Create {
 		return true
 	}
-	if feature.Enabled(features.InPlacePodVerticalScaling) && op == admission.Update {
+	if featuregate.Enabled(features.InPlacePodVerticalScaling) && op == admission.Update {
 		return true
 	}
 	return false
@@ -365,7 +365,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: feature.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodVerticalScalingEnabled: featuregate.Enabled(features.InPlacePodVerticalScaling),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

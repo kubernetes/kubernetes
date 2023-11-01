@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
@@ -43,7 +43,7 @@ func isIndexedJob(job *batch.Job) bool {
 }
 
 func hasBackoffLimitPerIndex(job *batch.Job) bool {
-	return feature.Enabled(features.JobBackoffLimitPerIndex) && job.Spec.BackoffLimitPerIndex != nil
+	return featuregate.Enabled(features.JobBackoffLimitPerIndex) && job.Spec.BackoffLimitPerIndex != nil
 }
 
 type interval struct {
@@ -98,7 +98,7 @@ func calculateFailedIndexes(logger klog.Logger, job *batch.Job, pods []*v1.Pod) 
 func isIndexFailed(logger klog.Logger, job *batch.Job, pod *v1.Pod) bool {
 	isPodFailedCounted := false
 	if isPodFailed(pod, job) {
-		if feature.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		if featuregate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 			_, countFailed, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
 			if action != nil && *action == batch.PodFailurePolicyActionFailIndex {
 				return true
@@ -361,7 +361,7 @@ func getNewIndexFailureCounts(logger klog.Logger, job *batch.Job, podBeingReplac
 	if podBeingReplaced != nil {
 		indexFailureCount := parseIndexFailureCountAnnotation(logger, podBeingReplaced)
 		indexIgnoredFailureCount := parseIndexFailureIgnoreCountAnnotation(logger, podBeingReplaced)
-		if feature.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		if featuregate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 			_, countFailed, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, podBeingReplaced)
 			if countFailed {
 				indexFailureCount++
@@ -468,7 +468,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 		}
 	}
 	var fieldPath string
-	if feature.Enabled(features.PodIndexLabel) {
+	if featuregate.Enabled(features.PodIndexLabel) {
 		fieldPath = fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
 	} else {
 		fieldPath = fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation)

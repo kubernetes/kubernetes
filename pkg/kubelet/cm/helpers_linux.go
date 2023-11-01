@@ -26,7 +26,7 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -67,7 +67,7 @@ func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 		return
 	}
 
-	if !feature.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
+	if !featuregate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 		period = QuotaPeriod
 	}
 
@@ -119,7 +119,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
-	inPlacePodVerticalScalingEnabled := feature.Enabled(kubefeatures.InPlacePodVerticalScaling)
+	inPlacePodVerticalScalingEnabled := featuregate.Enabled(kubefeatures.InPlacePodVerticalScaling)
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,

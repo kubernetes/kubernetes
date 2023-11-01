@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-base/featuregate"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -332,7 +332,7 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 }
 
 func IsVIPMode(ing v1.LoadBalancerIngress) bool {
-	if !feature.Enabled(features.LoadBalancerIPMode) {
+	if !featuregate.Enabled(features.LoadBalancerIPMode) {
 		return true // backwards compat
 	}
 	if ing.IPMode == nil {

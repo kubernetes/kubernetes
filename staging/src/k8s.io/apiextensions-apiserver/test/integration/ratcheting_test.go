@@ -47,8 +47,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
@@ -343,7 +343,7 @@ type ratchetingTestCase struct {
 }
 
 func runTests(t *testing.T, cases []ratchetingTestCase) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CRDValidationRatcheting, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -1911,7 +1911,7 @@ func BenchmarkRatcheting(b *testing.B) {
 			name = "RatchetingDisabled"
 		}
 		b.Run(name, func(b *testing.B) {
-			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)()
 			b.ResetTimer()
 
 			do := func(pairs []pair) {

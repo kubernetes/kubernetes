@@ -22,7 +22,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -168,7 +168,7 @@ func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volum
 
 // VolumeSupportsSELinuxMount returns true if given volume access mode can support mount with SELinux mount options.
 func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
-	if !feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if !featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		return false
 	}
 	if volumeSpec.PersistentVolume == nil {
@@ -185,7 +185,7 @@ func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
 
 // AddSELinuxMountOption adds -o context="XYZ" mount option to a given list
 func AddSELinuxMountOption(options []string, seLinuxContext string) []string {
-	if !feature.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if !featuregate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		return options
 	}
 	// Use double quotes to support a comma "," in the SELinux context string.

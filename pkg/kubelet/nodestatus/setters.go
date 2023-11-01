@@ -32,10 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -413,7 +413,7 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 
 		node.Status.NodeInfo.KubeletVersion = version.Get().String()
 
-		if feature.Enabled(features.DisableNodeKubeProxyVersion) {
+		if featuregate.Enabled(features.DisableNodeKubeProxyVersion) {
 			// This field is deprecated and should be cleared if it was previously set.
 			node.Status.NodeInfo.KubeProxyVersion = ""
 		} else {
