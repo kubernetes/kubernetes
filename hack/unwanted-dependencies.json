@@ -31,6 +31,9 @@
   },
   "status": {
     "unwantedReferences": {
+      "cloud.google.com/go/firestore": [
+        "google.golang.org/genproto"
+      ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],

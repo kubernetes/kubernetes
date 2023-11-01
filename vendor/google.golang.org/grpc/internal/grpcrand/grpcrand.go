@@ -52,6 +52,13 @@ func Intn(n int) int {
 	return r.Intn(n)
 }
 
+// Int31n implements rand.Int31n on the grpcrand global source.
+func Int31n(n int32) int32 {
+	mu.Lock()
+	defer mu.Unlock()
+	return r.Int31n(n)
+}
+
 // Float64 implements rand.Float64 on the grpcrand global source.
 func Float64() float64 {
 	mu.Lock()
@@ -64,4 +71,18 @@ func Uint64() uint64 {
 	mu.Lock()
 	defer mu.Unlock()
 	return r.Uint64()
+}
+
+// Uint32 implements rand.Uint32 on the grpcrand global source.
+func Uint32() uint32 {
+	mu.Lock()
+	defer mu.Unlock()
+	return r.Uint32()
+}
+
+// Shuffle implements rand.Shuffle on the grpcrand global source.
+var Shuffle = func(n int, f func(int, int)) {
+	mu.Lock()
+	defer mu.Unlock()
+	r.Shuffle(n, f)
 }

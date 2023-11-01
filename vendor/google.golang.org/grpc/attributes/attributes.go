@@ -19,11 +19,16 @@
 // Package attributes defines a generic key/value store used in various gRPC
 // components.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.
 package attributes
+
+import (
+	"fmt"
+	"strings"
+)
 
 // Attributes is an immutable struct for storing and retrieving generic
 // key/value pairs.  Keys must be hashable, and users should define their own
@@ -98,4 +103,28 @@ func (a *Attributes) Equal(o *Attributes) bool {
 		}
 	}
 	return true
+}
+
+// String prints the attribute map. If any key or values throughout the map
+// implement fmt.Stringer, it calls that method and appends.
+func (a *Attributes) String() string {
+	var sb strings.Builder
+	sb.WriteString("{")
+	first := true
+	for k, v := range a.m {
+		var key, val string
+		if str, ok := k.(interface{ String() string }); ok {
+			key = str.String()
+		}
+		if str, ok := v.(interface{ String() string }); ok {
+			val = str.String()
+		}
+		if !first {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(fmt.Sprintf("%q: %q, ", key, val))
+		first = false
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
