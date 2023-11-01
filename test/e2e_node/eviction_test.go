@@ -506,7 +506,6 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 				pod:              pidConsumingPod("fork-bomb-container-with-high-priority", 12000),
 			},
 		}
-		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
 		specs[2].pod.Spec.PriorityClassName = highPriorityClassName
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 	})
