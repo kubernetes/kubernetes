@@ -433,7 +433,7 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
 	// We should return this value because this is what kubelet agreed to allocate for the container
 	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
 			resources = cs.AllocatedResources
 		}

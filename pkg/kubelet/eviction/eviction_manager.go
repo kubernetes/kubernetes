@@ -260,7 +260,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// If we are a split filesystem but the feature is turned off
 		// we should return an error.
 		// This is a bad state.
-		if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletSeparateDiskGC) && splitContainerImageFs {
+		if !utilfeature.Enabled(features.KubeletSeparateDiskGC) && splitContainerImageFs {
 			splitDiskError := fmt.Errorf("KubeletSeparateDiskGC is turned off but we still have a split filesystem")
 			return nil, splitDiskError
 		}
@@ -411,7 +411,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
 		var condition *v1.PodCondition
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if utilfeature.Enabled(features.PodDisruptionConditions) {
 			condition = &v1.PodCondition{
 				Type:    v1.DisruptionTarget,
 				Status:  v1.ConditionTrue,

@@ -2173,7 +2173,7 @@ func (og *operationGenerator) nodeExpandVolume(
 func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVolumeClaim, volumeToMount VolumeToMount) bool {
 	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
 	allocatedResource := pvc.Status.AllocatedResources
-	featureGateStatus := utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure)
+	featureGateStatus := utilfeature.Enabled(features.RecoverVolumeExpansionFailure)
 
 	if !featureGateStatus {
 		return false

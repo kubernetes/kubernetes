@@ -192,7 +192,7 @@ func SetDefaults_VolumeBindingArgs(obj *configv1.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = ptr.To[int64](600)
 	}
-	if len(obj.Shape) == 0 && feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+	if len(obj.Shape) == 0 && feature.Enabled(features.VolumeCapacityPriority) {
 		obj.Shape = []configv1.UtilizationShapePoint{
 			{
 				Utilization: 0,

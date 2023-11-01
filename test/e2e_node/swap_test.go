@@ -145,7 +145,7 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 
 func isSwapFeatureGateEnabled() bool {
 	ginkgo.By("figuring if NodeSwap feature gate is turned on")
-	return utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap)
+	return utilfeature.Enabled(features.NodeSwap)
 }
 
 func readCgroupFile(f *framework.Framework, pod *v1.Pod, filename string) string {

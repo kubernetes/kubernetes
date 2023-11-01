@@ -453,7 +453,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		return nil, err
 	}
 	tp := oteltrace.NewNoopTracerProvider()
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if utilfeature.Enabled(features.KubeletTracing) {
 		tp, err = newTracerProvider(s)
 		if err != nil {
 			return nil, err
@@ -573,7 +573,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Warn if MemoryQoS enabled with cgroups v1
-	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) &&
+	if utilfeature.Enabled(features.MemoryQoS) &&
 		!isCgroup2UnifiedMode() {
 		klog.InfoS("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
 	}
@@ -703,7 +703,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Get cgroup driver setting from CRI
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCgroupDriverFromCRI) {
+	if utilfeature.Enabled(features.KubeletCgroupDriverFromCRI) {
 		if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
 			return err
 		}
@@ -789,7 +789,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var cpuManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
+		if utilfeature.Enabled(features.CPUManagerPolicyOptions) {
 			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
 		} else if s.CPUManagerPolicyOptions != nil {
 			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
@@ -797,7 +797,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var topologyManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+		if utilfeature.Enabled(features.TopologyManagerPolicyOptions) {
 			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
 		} else if s.TopologyManagerPolicyOptions != nil {
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
@@ -1012,7 +1012,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 			utilnet.CloseIdleConnectionsFor(clientConfig.Transport)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if utilfeature.Enabled(features.KubeletTracing) {
 		clientConfig.Wrap(tracing.WrapperFor(tp))
 	}
 	return clientConfig, onHeartbeatFailure, nil
@@ -1208,7 +1208,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
-	nodeIPs, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider, utilfeature.DefaultFeatureGate.Enabled(features.CloudDualStackNodeIPs))
+	nodeIPs, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider, utilfeature.Enabled(features.CloudDualStackNodeIPs))
 	if err != nil {
 		return fmt.Errorf("bad --node-ip %q: %v", kubeServer.NodeIP, err)
 	}

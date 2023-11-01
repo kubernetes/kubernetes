@@ -143,7 +143,7 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 
 	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
-		if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+		if utilfeature.Enabled(features.LoadBalancerIPMode) {
 			ipMode := v1.LoadBalancerIPModeVIP
 
 			for i, ing := range obj.Status.LoadBalancer.Ingress {
@@ -171,7 +171,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
+		if utilfeature.Enabled(features.InPlacePodVerticalScaling) &&
 			obj.Spec.Containers[i].Resources.Requests != nil {
 			// For normal containers, set resize restart policy to default value (NotRequired), if not specified.
 			resizePolicySpecified := make(map[v1.ResourceName]bool)
@@ -228,7 +228,7 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+	if utilfeature.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
 		if obj.HostNetwork {
 			defaultHostNetworkPorts(&obj.Containers)
 			defaultHostNetworkPorts(&obj.InitContainers)

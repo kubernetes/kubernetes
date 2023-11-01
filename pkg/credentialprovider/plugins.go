@@ -50,7 +50,7 @@ func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 // AreLegacyCloudCredentialProvidersDisabled checks if the legacy in-tree cloud
 // credential providers have been disabled.
 func AreLegacyCloudCredentialProvidersDisabled() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.DisableKubeletCloudCredentialProviders)
+	return utilfeature.Enabled(features.DisableKubeletCloudCredentialProviders)
 }
 
 // NewDockerKeyring creates a DockerKeyring to use for resolving credentials,

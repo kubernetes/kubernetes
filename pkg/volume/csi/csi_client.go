@@ -625,7 +625,7 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+	if utilfeature.Enabled(features.CSIVolumeHealth) {
 		isSupportNodeVolumeCondition, err := c.nodeSupportsVolumeCondition(ctx)
 		if err != nil {
 			return nil, err

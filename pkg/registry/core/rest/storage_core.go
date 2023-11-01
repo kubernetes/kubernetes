@@ -124,7 +124,7 @@ func New(c Config) (*legacyProvider, error) {
 	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
 
 	// create service cluster ip repair controller
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+	if !utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
 		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepair(
 			c.Services.IPRepairInterval,
 			client.CoreV1(),
@@ -218,8 +218,8 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	var serviceAccountStorage *serviceaccountstore.REST
 	if p.ServiceAccountIssuer != nil {
 		var nodeGetter rest.Getter
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) ||
-			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+		if utilfeature.Enabled(features.ServiceAccountTokenNodeBinding) ||
+			utilfeature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			nodeGetter = nodeStorage.Node.Store
 		}
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration)
@@ -331,7 +331,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		return rangeRegistries{}, nil, nil, nil, fmt.Errorf("service clusterIPRange is missing")
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+	if !utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
 		primaryClusterIPAllocator, err = ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 			var mem allocator.Snapshottable
 			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
@@ -370,7 +370,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 
 	var secondaryClusterIPAllocator ipallocator.Interface
 	if c.Services.SecondaryClusterIPRange.IP != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		if !utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
 			var err error
 			secondaryClusterIPAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 				var mem allocator.Snapshottable

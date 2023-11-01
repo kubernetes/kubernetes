@@ -74,7 +74,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	storage := map[string]rest.Storage{}
 
 	if resource := "clustertrustbundles"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		if utilfeature.Enabled(features.ClusterTrustBundle) {
 			bundleStorage, err := clustertrustbundlestore.NewREST(restOptionsGetter)
 			if err != nil {
 				return nil, err

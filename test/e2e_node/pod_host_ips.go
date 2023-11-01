@@ -183,7 +183,7 @@ var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeat
 		})
 
 		ginkgo.It("should provide hostIPs as an env var", func(ctx context.Context) {
-			if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodHostIPs) {
+			if !utilfeature.Enabled(kubefeatures.PodHostIPs) {
 				e2eskipper.Skipf("PodHostIPs feature is not enabled")
 			}
 

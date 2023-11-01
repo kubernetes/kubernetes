@@ -106,7 +106,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 			status.Phase = v1.PodFailed
 			status.Reason = events.PreemptContainer
 			status.Message = message
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			if utilfeature.Enabled(features.PodDisruptionConditions) {
 				podutil.UpdatePodCondition(status, &v1.PodCondition{
 					Type:    v1.DisruptionTarget,
 					Status:  v1.ConditionTrue,

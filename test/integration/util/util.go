@@ -507,7 +507,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			if utilfeature.Enabled(features.DynamicResourceAllocation) {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
 					resourcev1alpha2.SchemeGroupVersion.String(): "true",
 				}

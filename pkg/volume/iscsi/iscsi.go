@@ -281,7 +281,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (vo
 	}
 
 	var mountContext string
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		kvh, ok := plugin.host.(volume.KubeletVolumeHost)
 		if !ok {
 			return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
@@ -386,7 +386,7 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		klog.Errorf("iscsi: failed to setup")
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		// The volume must have been mounted in MountDevice with -o context.
 		// TODO: extract from mount table in GetAttributes() to be sure?
 		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""

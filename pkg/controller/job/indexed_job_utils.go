@@ -43,7 +43,7 @@ func isIndexedJob(job *batch.Job) bool {
 }
 
 func hasBackoffLimitPerIndex(job *batch.Job) bool {
-	return feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) && job.Spec.BackoffLimitPerIndex != nil
+	return feature.Enabled(features.JobBackoffLimitPerIndex) && job.Spec.BackoffLimitPerIndex != nil
 }
 
 type interval struct {
@@ -98,7 +98,7 @@ func calculateFailedIndexes(logger klog.Logger, job *batch.Job, pods []*v1.Pod) 
 func isIndexFailed(logger klog.Logger, job *batch.Job, pod *v1.Pod) bool {
 	isPodFailedCounted := false
 	if isPodFailed(pod, job) {
-		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		if feature.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 			_, countFailed, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
 			if action != nil && *action == batch.PodFailurePolicyActionFailIndex {
 				return true
@@ -361,7 +361,7 @@ func getNewIndexFailureCounts(logger klog.Logger, job *batch.Job, podBeingReplac
 	if podBeingReplaced != nil {
 		indexFailureCount := parseIndexFailureCountAnnotation(logger, podBeingReplaced)
 		indexIgnoredFailureCount := parseIndexFailureIgnoreCountAnnotation(logger, podBeingReplaced)
-		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		if feature.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 			_, countFailed, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, podBeingReplaced)
 			if countFailed {
 				indexFailureCount++
@@ -468,7 +468,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 		}
 	}
 	var fieldPath string
-	if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+	if feature.Enabled(features.PodIndexLabel) {
 		fieldPath = fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
 	} else {
 		fieldPath = fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation)

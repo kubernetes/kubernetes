@@ -53,7 +53,7 @@ var defaultPageSize = int64(os.Getpagesize())
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+	if utilfeature.Enabled(kubefeatures.MemoryQoS) &&
 		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
@@ -63,7 +63,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	}
 	config.Linux = cl
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.UserNamespacesSupport) {
+	if utilfeature.Enabled(kubefeatures.UserNamespacesSupport) {
 		if cl.SecurityContext.NamespaceOptions.UsernsOptions != nil {
 			for _, mount := range config.Mounts {
 				mount.UidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Uids
@@ -169,7 +169,7 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 	}
 	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+	if !utilfeature.Enabled(kubefeatures.NodeSwap) {
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
 		return
 	}
@@ -188,7 +188,7 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+	if utilfeature.Enabled(kubefeatures.MemoryQoS) &&
 		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
@@ -223,7 +223,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
 		cpuPeriod := int64(quotaPeriod)
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
+		if utilfeature.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 			// kubeGenericRuntimeManager.cpuCFSQuotaPeriod is provided in time.Duration,
 			// but we need to convert it to number of microseconds which is used by kernel.
 			cpuPeriod = int64(m.cpuCFSQuotaPeriod.Duration / time.Microsecond)

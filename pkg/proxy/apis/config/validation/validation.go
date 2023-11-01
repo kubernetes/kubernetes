@@ -224,7 +224,7 @@ func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path)
 		string(kubeproxyconfig.ProxyModeIPVS),
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.NFTablesProxyMode) {
+	if utilfeature.Enabled(features.NFTablesProxyMode) {
 		validModes.Insert(string(kubeproxyconfig.ProxyModeNFTables))
 	}
 

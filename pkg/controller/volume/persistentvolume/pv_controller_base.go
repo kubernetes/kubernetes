@@ -391,7 +391,7 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinal
 func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager, volume *v1.PersistentVolume) ([]string, bool) {
 	modified := false
 	var outFinalizers []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+	if !utilfeature.Enabled(features.HonorPVReclaimPolicy) {
 		return volume.Finalizers, false
 	}
 	if !metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned) {

@@ -102,7 +102,7 @@ func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runt
 	//  'nominalConcurrencyShares' field of 'limited' for CREATE operation.
 	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
 	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: utilfeature.DefaultFeatureGate.Enabled(features.ZeroLimitedNominalConcurrencyShares),
+		AllowZeroLimitedNominalConcurrencyShares: utilfeature.Enabled(features.ZeroLimitedNominalConcurrencyShares),
 	}
 	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration), getRequestGroupVersion(ctx), opts)
 }
@@ -144,7 +144,7 @@ func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, ob
 	//  only if the existing object already contains a zero value.
 	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
 	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: utilfeature.DefaultFeatureGate.Enabled(features.ZeroLimitedNominalConcurrencyShares) ||
+		AllowZeroLimitedNominalConcurrencyShares: utilfeature.Enabled(features.ZeroLimitedNominalConcurrencyShares) ||
 			hasZeroLimitedNominalConcurrencyShares(oldPL),
 	}
 	return validation.ValidatePriorityLevelConfiguration(newPL, getRequestGroupVersion(ctx), opts)

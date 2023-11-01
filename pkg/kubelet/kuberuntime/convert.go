@@ -49,7 +49,7 @@ func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 		Annotations: annotations,
 	}
 	// if RuntimeClassInImageCriAPI feature gate is enabled, set runtimeHandler CRI field
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+	if utilfeature.Enabled(features.RuntimeClassInImageCriAPI) {
 		runtimeHandler := ""
 		if image.Spec != nil {
 			runtimeHandler = image.Spec.RuntimeHandler
@@ -73,7 +73,7 @@ func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageS
 		Annotations: annotations,
 	}
 	// if RuntimeClassInImageCriAPI feature gate is enabled, set runtimeHandler CRI field
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+	if utilfeature.Enabled(features.RuntimeClassInImageCriAPI) {
 		spec.RuntimeHandler = imageSpec.RuntimeHandler
 	}
 

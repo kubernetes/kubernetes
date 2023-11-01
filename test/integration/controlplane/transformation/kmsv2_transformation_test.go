@@ -168,10 +168,10 @@ func TestDefaultValues(t *testing.T) {
 	if encryptionconfig.GetKDF() != true {
 		t.Fatalf("without updating the feature flags, default value of KMSv2KDF should be enabled.")
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) != true {
+	if utilfeature.Enabled(features.KMSv2) != true {
 		t.Fatalf("without updating the feature flags, default value of KMSv2 should be enabled.")
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KMSv1) != false {
+	if utilfeature.Enabled(features.KMSv1) != false {
 		t.Fatalf("without updating the feature flags, default value of KMSv1 should be disabled.")
 	}
 	// since encryptionconfig.GetKDF() is true by default, following test should verify if

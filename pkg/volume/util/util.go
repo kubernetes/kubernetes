@@ -623,7 +623,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String, se
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		var seLinuxOptions *v1.SELinuxOptions
-		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 			if effectiveContainerSecurity != nil {
 				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions

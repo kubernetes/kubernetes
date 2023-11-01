@@ -410,7 +410,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	}
 	// If we find a Pod that has not been created we create the Pod
 	if !isCreated(replicas[i]) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 			if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
 				return true, err
 			} else if isStale {
@@ -465,7 +465,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 
 	// Enforce the StatefulSet invariants
 	retentionMatch := true
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 		var err error
 		retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, replicas[i])
 		// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
@@ -646,7 +646,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// Fix pod claims for condemned pods, if necessary.
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 		fixPodClaim := func(i int) (bool, error) {
 			if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
 				return true, err
@@ -684,7 +684,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return &status, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
+	if utilfeature.Enabled(features.MaxUnavailableStatefulSet) {
 		return updateStatefulSetAfterInvariantEstablished(ctx,
 			ssc,
 			set,

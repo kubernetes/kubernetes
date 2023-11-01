@@ -234,13 +234,13 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			return true
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
+			return utilfeature.Enabled(features.CSIMigrationAzureFile)
 		},
 		csitranslationplugins.PortworxVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+			return utilfeature.Enabled(features.CSIMigrationPortworx)
 		},
 		csitranslationplugins.RBDVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
+			return utilfeature.Enabled(features.CSIMigrationRBD)
 		},
 	}
 
@@ -463,7 +463,7 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.Re
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
 	var ret volume.ReconstructedVolume
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		ret.SELinuxMountContext = volData[volDataKey.seLinuxMountContext]
 	}
 
@@ -526,7 +526,7 @@ func (p *csiPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		driver, err := GetCSIDriverName(spec)
 		if err != nil {
 			return false, err

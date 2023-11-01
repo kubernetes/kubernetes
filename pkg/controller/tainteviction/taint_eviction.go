@@ -129,7 +129,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 }
 
 func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, ns string) (err error) {
-	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+	if feature.Enabled(features.PodDisruptionConditions) {
 		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return err

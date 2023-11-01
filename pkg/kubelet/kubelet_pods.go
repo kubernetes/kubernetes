@@ -831,7 +831,7 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 		}
 		return hostIPs[0].String(), nil
 	case "status.hostIPs":
-		if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
+		if !utilfeature.Enabled(features.PodHostIPs) {
 			return "", nil
 		}
 		hostIPs, err := kl.getHostIPsAnyWay()
@@ -930,7 +930,7 @@ func (kl *Kubelet) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
 	// status manager and its tests.
 	// TODO: extend PodDeletionSafetyProvider interface and implement it
 	// in a separate Kubelet method.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.Enabled(features.DynamicResourceAllocation) {
 		if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
 			return true
 		}
@@ -1677,7 +1677,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		oldPodStatus = pod.Status
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
 		s.Resize = kl.determinePodResizeStatus(pod, s)
 	}
 	// calculate the next phase and preserve reason
@@ -1741,7 +1741,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+	if utilfeature.Enabled(features.PodDisruptionConditions) {
 		// copy over the pod disruption conditions from state which is already
 		// updated during the eviciton (due to either node resource pressure or
 		// node graceful shutdown). We do not re-generate the conditions based
@@ -1753,7 +1753,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 
 	// set all Kubelet-owned conditions
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
+	if utilfeature.Enabled(features.PodReadyToStartContainersCondition) {
 		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(pod, podStatus))
 	}
 	allContainerStatuses := append(s.InitContainerStatuses, s.ContainerStatuses...)
@@ -1778,7 +1778,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 				}
 			}
 			s.HostIP = hostIPs[0].String()
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
+			if utilfeature.Enabled(features.PodHostIPs) {
 				s.HostIPs = []v1.HostIP{{IP: s.HostIP}}
 				if len(hostIPs) == 2 {
 					s.HostIPs = append(s.HostIPs, v1.HostIP{IP: hostIPs[1].String()})
@@ -2145,7 +2145,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			oldStatusPtr = &oldStatus
 		}
 		status := convertContainerStatus(cStatus, oldStatusPtr)
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
 			if status.State.Running != nil {
 				status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
 			}

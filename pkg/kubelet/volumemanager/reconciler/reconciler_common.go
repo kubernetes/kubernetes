@@ -149,7 +149,7 @@ type reconciler struct {
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
+	if utilfeature.Enabled(features.NewVolumeManagerReconstruction) {
 		rc.runNew(stopCh)
 		return
 	}

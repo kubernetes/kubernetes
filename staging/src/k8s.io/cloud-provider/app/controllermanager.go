@@ -188,7 +188,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		checks = append(checks, electionChecker)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.CloudControllerManagerWebhook) {
+	if utilfeature.Enabled(cmfeatures.CloudControllerManagerWebhook) {
 		if len(webhooks) > 0 {
 			klog.Info("Webhook Handlers enabled: ", webhooks)
 			handler := newHandler(webhooks)

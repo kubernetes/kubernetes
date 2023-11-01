@@ -74,7 +74,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
 		enforceMemoryQoS := false
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+		if utilfeature.Enabled(kubefeatures.MemoryQoS) &&
 			libcontainercgroups.IsCgroup2UnifiedMode() {
 			enforceMemoryQoS = true
 		}

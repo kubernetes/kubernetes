@@ -42,11 +42,11 @@ func CheckPolicyOptionAvailable(option string) error {
 		return fmt.Errorf("unknown Topology Manager Policy option: %q", option)
 	}
 
-	if alphaOptions.Has(option) && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
+	if alphaOptions.Has(option) && !utilfeature.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
 		return fmt.Errorf("Topology Manager Policy Alpha-level Options not enabled, but option %q provided", option)
 	}
 
-	if betaOptions.Has(option) && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManagerPolicyBetaOptions) {
+	if betaOptions.Has(option) && !utilfeature.Enabled(kubefeatures.TopologyManagerPolicyBetaOptions) {
 		return fmt.Errorf("Topology Manager Policy Beta-level Options not enabled, but option %q provided", option)
 	}
 

@@ -118,7 +118,7 @@ func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelN
 		// From that perspective, given that the watch only consumes APF seats
 		// during its initialization (sending init events), its cost should then
 		// be computed the same way as for a regular list.
-		if utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+		if utilfeature.Enabled(features.WatchList) {
 			return e.listWorkEstimator.EstimateWork(r, flowSchemaName, priorityLevelName)
 		}
 	case "create", "update", "patch", "delete":

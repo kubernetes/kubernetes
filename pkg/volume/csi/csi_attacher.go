@@ -329,7 +329,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	var seLinuxSupported bool
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		support, err := c.plugin.SupportsSELinuxContextMount(spec)
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
@@ -353,7 +353,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		volDataKey.driverName: csiSource.Driver,
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
 		data[volDataKey.seLinuxMountContext] = deviceMounterArgs.SELinuxLabel
 	}
 

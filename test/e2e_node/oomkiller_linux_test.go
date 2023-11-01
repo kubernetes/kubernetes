@@ -121,7 +121,7 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
 			cfg, configErr := getCurrentKubeletConfig(context.TODO())
 			framework.ExpectNoError(configErr)
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+			if utilfeature.Enabled(features.NodeSwap) {
 				// If Swap is enabled, we should test OOM with LimitedSwap.
 				// UnlimitedSwap allows for workloads to use unbounded swap which
 				// makes testing OOM challenging.

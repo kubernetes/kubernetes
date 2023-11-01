@@ -185,7 +185,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	// specified, then pass ""
 	podRuntimeHandler := ""
 	var err error
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+	if utilfeature.Enabled(features.RuntimeClassInImageCriAPI) {
 		if pod.Spec.RuntimeClassName != nil && *pod.Spec.RuntimeClassName != "" {
 			podRuntimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
 			if err != nil {
@@ -605,7 +605,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	var cStatusResources *kubecontainer.ContainerResources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if utilfeature.Enabled(features.InPlacePodVerticalScaling) {
 		// If runtime reports cpu & memory resources info, add it to container status
 		cStatusResources = toKubeContainerResources(status.Resources)
 	}
@@ -794,7 +794,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 	wg.Add(len(runningPod.Containers))
 	var termOrdering *terminationOrdering
 	// we only care about container termination ordering if the sidecars feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+	if utilfeature.Enabled(features.SidecarContainers) {
 		var runningContainerNames []string
 		for _, container := range runningPod.Containers {
 			runningContainerNames = append(runningContainerNames, container.Name)

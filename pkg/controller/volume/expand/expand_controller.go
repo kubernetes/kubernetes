@@ -294,7 +294,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 
 	var generatedOptions volumetypes.GeneratedOperations
 	var err error
-	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+	if utilfeature.Enabled(features.RecoverVolumeExpansionFailure) {
 		generatedOptions, err = expc.operationGenerator.GenerateExpandAndRecoverVolumeFunc(pvc, pv, resizerName)
 		if err != nil {
 			logger.Error(err, "Error starting ExpandVolume for pvc", "PVC", klog.KObj(pvc))

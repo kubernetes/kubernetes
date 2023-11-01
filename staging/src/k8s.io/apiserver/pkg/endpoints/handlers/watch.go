@@ -341,7 +341,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 }
 
 func shouldRecordWatchListLatency(event watch.Event) bool {
-	if event.Type != watch.Bookmark || !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+	if event.Type != watch.Bookmark || !utilfeature.Enabled(features.WatchList) {
 		return false
 	}
 	// as of today the initial-events-end annotation is added only to a single event

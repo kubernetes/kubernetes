@@ -142,7 +142,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 
 	// Enforce MemoryQoS for cgroups of kube-reserved/system-reserved. For more information,
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
+	if utilfeature.Enabled(kubefeatures.MemoryQoS) {
 		if rp.Memory != nil {
 			if rp.Unified == nil {
 				rp.Unified = make(map[string]string)

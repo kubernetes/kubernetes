@@ -95,7 +95,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				allErrs = append(allErrs, celErrs...)
 
-				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+				if len(celErrs) == 0 && utilfeature.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
 					// If ratcheting is enabled some CEL rules may use optionalOldSelf
 					// For such rules the above validation is not sufficient for
 					// determining if the default value is a valid value to introduce
@@ -139,7 +139,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				allErrs = append(allErrs, celErrs...)
 
-				if len(celErrs) == 0 && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+				if len(celErrs) == 0 && utilfeature.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
 					// If ratcheting is enabled some CEL rules may use optionalOldSelf
 					// For such rules the above validation is not sufficient for
 					// determining if the default value is a valid value to introduce

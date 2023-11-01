@@ -826,7 +826,7 @@ func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 	var non0InitCPU, non0InitMem int64
 	var non0CPU, non0Mem int64
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodVerticalScalingEnabled: utilfeature.Enabled(features.InPlacePodVerticalScaling),
 		ContainerFn: func(requests v1.ResourceList, containerType podutil.ContainerType) {
 			non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&requests)
 			switch containerType {

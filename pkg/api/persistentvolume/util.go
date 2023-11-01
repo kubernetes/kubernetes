@@ -34,7 +34,7 @@ const (
 // DropDisabledSpecFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
 func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+	if !utilfeature.Enabled(features.VolumeAttributesClass) {
 		if oldPVSpec == nil || oldPVSpec.VolumeAttributesClassName == nil {
 			pvSpec.VolumeAttributesClassName = nil
 		}
@@ -44,7 +44,7 @@ func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Per
 // DropDisabledStatusFields removes disabled fields from the pv status.
 // This should be called from PrepareForUpdate for all resources containing a pv status.
 func DropDisabledStatusFields(oldStatus, newStatus *api.PersistentVolumeStatus) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeLastPhaseTransitionTime) && oldStatus.LastPhaseTransitionTime.IsZero() {
+	if !utilfeature.Enabled(features.PersistentVolumeLastPhaseTransitionTime) && oldStatus.LastPhaseTransitionTime.IsZero() {
 		newStatus.LastPhaseTransitionTime = nil
 	}
 }

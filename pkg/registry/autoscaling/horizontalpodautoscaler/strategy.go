@@ -73,7 +73,7 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	// create cannot set status
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) {
+	if !utilfeature.Enabled(features.HPAContainerMetrics) {
 		dropContainerMetricSources(newHPA.Spec.Metrics)
 	}
 }
@@ -102,7 +102,7 @@ func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) && !hasContainerMetricSources(oldHPA) {
+	if !utilfeature.Enabled(features.HPAContainerMetrics) && !hasContainerMetricSources(oldHPA) {
 		dropContainerMetricSources(newHPA.Spec.Metrics)
 	}
 	// Update is not allowed to set status

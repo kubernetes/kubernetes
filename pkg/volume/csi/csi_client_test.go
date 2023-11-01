@@ -119,7 +119,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		return nil, err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
+	if utilfeature.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
 		abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
 		metrics.Abnormal, metrics.Message = &abnormal, &message
 	}

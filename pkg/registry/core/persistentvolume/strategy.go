@@ -70,7 +70,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeLastPhaseTransitionTime) {
+	if utilfeature.Enabled(features.PersistentVolumeLastPhaseTransitionTime) {
 		pv.Status.Phase = api.VolumePending
 		now := NowFunc()
 		pv.Status.LastPhaseTransitionTime = &now
@@ -148,7 +148,7 @@ func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Spec = oldPv.Spec
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeLastPhaseTransitionTime) {
+	if utilfeature.Enabled(features.PersistentVolumeLastPhaseTransitionTime) {
 		switch {
 		case oldPv.Status.Phase == newPv.Status.Phase && newPv.Status.LastPhaseTransitionTime == nil:
 			// phase didn't change, preserve the existing transition time if set

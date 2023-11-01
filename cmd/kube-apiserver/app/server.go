@@ -259,7 +259,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if utilfeature.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		config.ExtraConfig.PeerEndpointLeaseReconciler, err = controlplaneapiserver.CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
 			return nil, nil, nil, err

@@ -346,7 +346,7 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 	// This is needed for the JobPodReplacementPolicy feature to make sure Job replacement pods are created.
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/3939-allow-replacement-when-fully-terminated#risks-and-mitigations
 	// for more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) || utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+	if utilfeature.Enabled(features.PodDisruptionConditions) || utilfeature.Enabled(features.JobPodReplacementPolicy) {
 
 		// Mark the pod as failed - this is especially important in case the pod
 		// is orphaned, in which case the pod would remain in the Running phase
@@ -354,7 +354,7 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
 			newStatus := pod.Status.DeepCopy()
 			newStatus.Phase = v1.PodFailed
-			if condition != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			if condition != nil && utilfeature.Enabled(features.PodDisruptionConditions) {
 				apipod.UpdatePodCondition(newStatus, condition)
 			}
 			if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {

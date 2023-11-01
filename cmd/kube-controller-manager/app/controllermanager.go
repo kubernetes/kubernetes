@@ -683,7 +683,7 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 	controllerName := controllerDescriptor.Name()
 
 	for _, featureGate := range controllerDescriptor.GetRequiredFeatureGates() {
-		if !utilfeature.DefaultFeatureGate.Enabled(featureGate) {
+		if !utilfeature.Enabled(featureGate) {
 			logger.Info("Controller is disabled by a feature gate", "controller", controllerName, "requiredFeatureGates", controllerDescriptor.GetRequiredFeatureGates())
 			return nil, nil
 		}

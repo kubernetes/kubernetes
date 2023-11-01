@@ -332,7 +332,7 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 }
 
 func IsVIPMode(ing v1.LoadBalancerIngress) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+	if !utilfeature.Enabled(features.LoadBalancerIPMode) {
 		return true // backwards compat
 	}
 	if ing.IPMode == nil {

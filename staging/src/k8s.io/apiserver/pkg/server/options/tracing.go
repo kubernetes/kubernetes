@@ -79,7 +79,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	if o == nil || o.ConfigFile == "" {
 		return nil
 	}
-	if !feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+	if !feature.Enabled(features.APIServerTracing) {
 		return fmt.Errorf("APIServerTracing feature is not enabled, but tracing config file was provided")
 	}
 

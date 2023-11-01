@@ -93,7 +93,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	nodeInfo.SetNode(node)
 
 	// TODO: Remove this after the SidecarContainers feature gate graduates to GA.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+	if !utilfeature.Enabled(features.SidecarContainers) {
 		for _, c := range admitPod.Spec.InitContainers {
 			if types.IsRestartableInitContainer(&c) {
 				message := fmt.Sprintf("Init container %q may not have a non-default restartPolicy", c.Name)

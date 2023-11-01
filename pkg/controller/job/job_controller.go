@@ -777,7 +777,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		return err
 	}
 	var terminating *int32
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+	if feature.Enabled(features.JobPodReplacementPolicy) {
 		terminating = ptr.To(controller.CountTerminatingPods(pods))
 	}
 	jobCtx := &syncJobCtx{
@@ -793,7 +793,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	jobCtx.succeeded = job.Status.Succeeded + int32(len(newSucceededPods)) + int32(len(jobCtx.uncounted.succeeded))
 	failed := job.Status.Failed + int32(nonIgnoredFailedPodsCount(jobCtx, newFailedPods)) + int32(len(jobCtx.uncounted.failed))
 	var ready *int32
-	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
+	if feature.Enabled(features.JobReadyPods) {
 		ready = ptr.To(countReadyPods(jobCtx.activePods))
 	}
 
@@ -809,7 +809,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 
 	exceedsBackoffLimit := failed > *job.Spec.BackoffLimit
 
-	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
+	if feature.Enabled(features.JobPodFailurePolicy) {
 		if failureTargetCondition := findConditionByType(job.Status.Conditions, batch.JobFailureTarget); failureTargetCondition != nil {
 			jobCtx.finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition, jm.clock.Now())
 		} else if failJobMessage := getFailJobMessage(&job, pods); failJobMessage != nil {
@@ -952,7 +952,7 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 
 func nonIgnoredFailedPodsCount(jobCtx *syncJobCtx, failedPods []*v1.Pod) int {
 	result := len(failedPods)
-	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && jobCtx.job.Spec.PodFailurePolicy != nil {
+	if feature.Enabled(features.JobPodFailurePolicy) && jobCtx.job.Spec.PodFailurePolicy != nil {
 		for _, p := range failedPods {
 			_, countFailed, _ := matchPodFailurePolicy(jobCtx.job.Spec.PodFailurePolicy, p)
 			if !countFailed {
@@ -1063,7 +1063,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			// When the job is considered finished, every non-terminated pod is considered failed
 			ix := getCompletionIndex(pod.Annotations)
 			if !jobCtx.uncounted.failed.Has(string(pod.UID)) && (!isIndexed || (ix != unknownCompletionIndex && ix < int(*jobCtx.job.Spec.Completions))) {
-				if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && jobCtx.job.Spec.PodFailurePolicy != nil {
+				if feature.Enabled(features.JobPodFailurePolicy) && jobCtx.job.Spec.PodFailurePolicy != nil {
 					_, countFailed, action := matchPodFailurePolicy(jobCtx.job.Spec.PodFailurePolicy, pod)
 					if action != nil {
 						podFailureCountByPolicyAction[string(*action)] += 1
@@ -1108,7 +1108,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			needsFlush = true
 		}
 	}
-	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
+	if feature.Enabled(features.JobPodFailurePolicy) {
 		if jobCtx.finishedCondition != nil && jobCtx.finishedCondition.Type == batch.JobFailureTarget {
 
 			// Append the interim FailureTarget condition to update the job status with before finalizers are removed.
@@ -1397,7 +1397,7 @@ func newCondition(conditionType batch.JobConditionType, status v1.ConditionStatu
 
 // getFailJobMessage returns a job failure message if the job should fail with the current counters
 func getFailJobMessage(job *batch.Job, pods []*v1.Pod) *string {
-	if !feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) || job.Spec.PodFailurePolicy == nil {
+	if !feature.Enabled(features.JobPodFailurePolicy) || job.Spec.PodFailurePolicy == nil {
 		return nil
 	}
 	for _, p := range pods {
@@ -1573,7 +1573,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						template = podTemplate.DeepCopy()
 						addCompletionIndexAnnotation(template, completionIndex)
 
-						if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+						if feature.Enabled(features.PodIndexLabel) {
 							addCompletionIndexLabel(template, completionIndex)
 						}
 						template.Spec.Hostname = fmt.Sprintf("%s-%d", job.Name, completionIndex)
@@ -1801,7 +1801,7 @@ func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditio
 }
 
 func isPodFailed(p *v1.Pod, job *batch.Job) bool {
-	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+	if feature.Enabled(features.PodDisruptionConditions) && feature.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 		// When PodDisruptionConditions is enabled, orphan Pods and unschedulable
 		// terminating Pods are marked as Failed. So we only need to check the phase.
 		// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
@@ -1897,10 +1897,10 @@ func onlyReplaceFailedPods(job *batch.Job) bool {
 	// We check both PodReplacementPolicy for nil and failed
 	// because it is possible that  `PodReplacementPolicy` is not defaulted,
 	// when the `JobPodReplacementPolicy` feature gate is disabled for API server.
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && job.Spec.PodReplacementPolicy != nil && *job.Spec.PodReplacementPolicy == batch.Failed {
+	if feature.Enabled(features.JobPodReplacementPolicy) && job.Spec.PodReplacementPolicy != nil && *job.Spec.PodReplacementPolicy == batch.Failed {
 		return true
 	}
-	return feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil
+	return feature.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil
 }
 
 func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
@@ -1920,7 +1920,7 @@ func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
 
 func recordJobPodsCreationTotal(job *batch.Job, succeeded, failed int32) {
 	reason := metrics.PodCreateNew
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+	if feature.Enabled(features.JobPodReplacementPolicy) {
 		podsTerminating := job.Status.Terminating != nil && *job.Status.Terminating > 0
 		isRecreateAction := podsTerminating || job.Status.Failed > 0
 		if isRecreateAction {

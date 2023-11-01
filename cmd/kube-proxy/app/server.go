@@ -148,7 +148,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n")+"\n"+
+		"Options are:\n"+strings.Join(utilfeature.KnownFeatures(), "\n")+"\n"+
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location can be overridden by the master flag).")
@@ -939,7 +939,7 @@ func (s *ProxyServer) Run() error {
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.podCIDRs))
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyDrainingTerminatingNodes) {
+	if utilfeature.Enabled(features.KubeProxyDrainingTerminatingNodes) {
 		nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
 			HealthServer: s.HealthzServer,
 		})

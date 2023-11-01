@@ -538,7 +538,7 @@ func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *
 // validateSELinuxMount tests if seLinuxMount is set for CSIDriver.
 func validateSELinuxMount(seLinuxMount *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if seLinuxMount == nil && utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if seLinuxMount == nil && utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 

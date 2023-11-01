@@ -178,11 +178,11 @@ func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
 
 	// DRA Resource Claims
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.Enabled(features.DynamicResourceAllocation) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie())
 	}
 	// Kubelet needs access to ClusterTrustBundles to support the pemTrustAnchors volume type.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+	if utilfeature.Enabled(features.ClusterTrustBundle) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie())
 	}
 
@@ -570,7 +570,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
 	}
 	// Needed for dynamic resource allocation.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.Enabled(features.DynamicResourceAllocation) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclasses").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
@@ -585,7 +585,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	})
 
 	// Default ClusterRole to allow reading ClusterTrustBundle objects
-	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+	if utilfeature.Enabled(features.ClusterTrustBundle) {
 		roles = append(roles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:cluster-trust-bundle-discovery"},
 			Rules: []rbacv1.PolicyRule{
@@ -635,7 +635,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	)
 
 	// Service accounts can read ClusterTrustBundle objects.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+	if utilfeature.Enabled(features.ClusterTrustBundle) {
 		rolebindings = append(rolebindings, rbacv1helpers.NewClusterBinding("system:cluster-trust-bundle-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie())
 	}
 

@@ -70,8 +70,8 @@ func createAggregatorConfig(
 	// has its own customized OpenAPI handler.
 	genericConfig.SkipOpenAPIInstallation = true
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+	if utilfeature.Enabled(genericfeatures.StorageVersionAPI) &&
+		utilfeature.Enabled(genericfeatures.APIServerIdentity) {
 		// Add StorageVersionPrecondition handler to aggregator-apiserver.
 		// The handler will block write requests to built-in resources until the
 		// target resources' storage versions are up-to-date.

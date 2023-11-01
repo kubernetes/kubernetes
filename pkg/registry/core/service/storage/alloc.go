@@ -404,7 +404,7 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 		if ip == "" {
 			var allocatedIP net.IP
 			var err error
-			if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+			if utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
 				// TODO: simplify this and avoid all this duplicate code
 				svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
 				if ok {
@@ -425,7 +425,7 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 				return allocated, errors.NewInternalError(fmt.Errorf("failed to parse service IP %q", ip))
 			}
 			var err error
-			if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+			if utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
 				// TODO: simplify this and avoid all this duplicate code
 				svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
 				if ok {

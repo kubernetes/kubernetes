@@ -42,7 +42,7 @@ func GetOpenAPIDefinitionsWithoutDisabledFeatures(GetOpenAPIDefinitions common.G
 // restoreDefinitions restores any changes by disabled features from definition map.
 func restoreDefinitions(defs map[string]common.OpenAPIDefinition) {
 	// revert changes from OpenAPIEnums
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIEnums) {
+	if !utilfeature.Enabled(genericfeatures.OpenAPIEnums) {
 		for gvk, def := range defs {
 			orig := &def.Schema
 			if ret := pruneEnums(orig); ret != orig {

@@ -110,7 +110,7 @@ func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps)
 }
 
 func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema) SchemaValidator {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+	if utilfeature.Enabled(features.CRDValidationRatcheting) {
 		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 	}
 	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}
@@ -125,7 +125,7 @@ func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema) SchemaValidator {
 // ValidateCustomResource(customResource).
 func ValidateCustomResourceUpdate(fldPath *field.Path, customResource, old interface{}, validator SchemaValidator, options ...ValidationOption) field.ErrorList {
 	// Additional feature gate check for sanity
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+	if !utilfeature.Enabled(features.CRDValidationRatcheting) {
 		return ValidateCustomResource(nil, customResource, validator)
 	} else if validator == nil {
 		return nil

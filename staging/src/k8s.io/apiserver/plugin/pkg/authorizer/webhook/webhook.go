@@ -203,7 +203,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		}
 	}
 	// skipping match when feature is not enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration) {
+	if utilfeature.Enabled(features.StructuredAuthorizationConfiguration) {
 		// Process Match Conditions before calling the webhook
 		matches, err := w.match(ctx, r)
 		// If at least one matchCondition evaluates to an error (but none are FALSE):

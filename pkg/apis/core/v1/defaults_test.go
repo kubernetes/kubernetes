@@ -208,7 +208,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 				".Spec.HostNetwork":                          "true",
 				".Spec.Containers[0].Ports[0].ContainerPort": "12345",
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+			if utilfeature.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
 				m[".Spec.Containers"] = `[{"name":"","ports":[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
 				m[".Spec.Containers[0].Ports"] = `[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}]`
 				m[".Spec.Containers[0].Ports[0].HostPort"] = "12345"

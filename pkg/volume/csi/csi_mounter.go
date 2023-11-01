@@ -254,7 +254,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	var selinuxLabelMount bool
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		support, err := c.plugin.SupportsSELinuxContextMount(c.spec)
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
@@ -277,7 +277,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		volDataKey.attachmentID:        getAttachmentName(volumeHandle, string(c.driverName), nodeName),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {
 		volData[volDataKey.seLinuxMountContext] = mounterArgs.SELinuxLabel
 	}
 

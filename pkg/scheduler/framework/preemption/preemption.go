@@ -355,7 +355,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			waitingPod.Reject(pluginName, "preempted")
 			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(pod), "waitingPod", klog.KObj(victim), "node", c.Name())
 		} else {
-			if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			if feature.Enabled(features.PodDisruptionConditions) {
 				condition := &v1.PodCondition{
 					Type:    v1.DisruptionTarget,
 					Status:  v1.ConditionTrue,

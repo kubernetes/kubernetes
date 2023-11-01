@@ -1018,7 +1018,7 @@ func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePluginCDIDevices) {
+	if utilfeature.Enabled(features.DevicePluginCDIDevices) {
 		dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "CDI_ENABLED", Value: "1"})
 	}
 

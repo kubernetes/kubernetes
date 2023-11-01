@@ -413,7 +413,7 @@ func NewNodeLifecycleController(
 	nc.podLister = podInformer.Lister()
 	nc.nodeLister = nodeInformer.Lister()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
+	if !utilfeature.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
 		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
 		if err != nil {
@@ -474,7 +474,7 @@ func (nc *Controller) Run(ctx context.Context) {
 		return
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
+	if !utilfeature.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Starting", "controller", taintEvictionController)
 		go nc.taintManager.Run(ctx)
 	}

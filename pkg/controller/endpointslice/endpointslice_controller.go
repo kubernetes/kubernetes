@@ -151,7 +151,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+	if utilfeature.Enabled(features.TopologyAwareHints) {
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				c.addNode(logger, obj)

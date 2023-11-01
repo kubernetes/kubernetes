@@ -43,20 +43,20 @@ func (opts *CloudProviderOptions) Validate() []error {
 	switch {
 	case opts.CloudProvider == "":
 	case opts.CloudProvider == "external":
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
+		if !utilfeature.Enabled(features.DisableCloudProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableCloudProviders feature to true", opts.CloudProvider))
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableKubeletCloudCredentialProviders) {
+		if !utilfeature.Enabled(features.DisableKubeletCloudCredentialProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableKubeletCloudCredentialProviders feature to true", opts.CloudProvider))
 		}
 	case cloudprovider.IsDeprecatedInternal(opts.CloudProvider):
-		if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
+		if utilfeature.Enabled(features.DisableCloudProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableCloudProviders feature to false", opts.CloudProvider))
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DisableKubeletCloudCredentialProviders) {
+		if utilfeature.Enabled(features.DisableKubeletCloudCredentialProviders) {
 			errs = append(errs, fmt.Errorf("when using --cloud-provider set to '%s', "+
 				"please set DisableKubeletCloudCredentialProviders feature to false", opts.CloudProvider))
 		}

@@ -77,7 +77,7 @@ func New(pr net.PortRange, allocatorFactory allocator.AllocatorWithOffsetFactory
 	}
 
 	var offset = 0
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceNodePortStaticSubrange) {
+	if utilfeature.Enabled(features.ServiceNodePortStaticSubrange) {
 		offset = calculateRangeOffset(pr)
 	}
 

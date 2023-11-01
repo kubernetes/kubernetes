@@ -118,7 +118,7 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 		return nil, err
 	}
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
-	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+	if utilfeature.Enabled(features.TranslateStreamCloseWebsocketRequests) {
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{
@@ -175,7 +175,7 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 		return nil, err
 	}
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
-	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
+	if utilfeature.Enabled(features.TranslateStreamCloseWebsocketRequests) {
 		// Wrap the upgrade aware handler to implement stream translation
 		// for WebSocket/V5 upgrade requests.
 		streamOptions := translator.Options{

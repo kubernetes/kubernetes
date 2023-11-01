@@ -139,7 +139,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				eventsRule(),
 			},
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if utilfeature.Enabled(features.PodDisruptionConditions) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("pods/status").RuleOrDie())
 		}
 		return role
@@ -206,7 +206,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		},
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if utilfeature.Enabled(features.DynamicResourceAllocation) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resource-claim-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -274,7 +274,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				eventsRule(),
 			},
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if utilfeature.Enabled(features.PodDisruptionConditions) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("pods").RuleOrDie())
 		}
 		return role
@@ -310,7 +310,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			},
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if utilfeature.Enabled(features.PodDisruptionConditions) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie())
 		}
 		return role
@@ -369,7 +369,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+	if utilfeature.Enabled(features.MultiCIDRServiceAllocator) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "service-cidrs-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -396,7 +396,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("update", "delete").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie())
 		}
 
@@ -454,7 +454,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
+	if utilfeature.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -466,8 +466,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+	if utilfeature.Enabled(genericfeatures.StorageVersionAPI) &&
+		utilfeature.Enabled(genericfeatures.APIServerIdentity) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "storage-version-garbage-collector"},
 			Rules: []rbacv1.PolicyRule{
@@ -479,7 +479,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.LegacyServiceAccountTokenCleanUp) {
+	if utilfeature.Enabled(features.LegacyServiceAccountTokenCleanUp) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "legacy-service-account-token-cleaner"},
 			Rules: []rbacv1.PolicyRule{

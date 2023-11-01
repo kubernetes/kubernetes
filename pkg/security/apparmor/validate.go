@@ -91,7 +91,7 @@ func (v *validator) ValidateHost() error {
 // validateHost verifies that the host and runtime is capable of enforcing AppArmor profiles.
 func validateHost() error {
 	// Check feature-gates
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
+	if !utilfeature.Enabled(features.AppArmor) {
 		return errors.New("AppArmor disabled by feature-gate")
 	}
 

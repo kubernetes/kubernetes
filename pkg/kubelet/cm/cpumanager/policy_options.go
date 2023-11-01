@@ -52,11 +52,11 @@ func CheckPolicyOptionAvailable(option string) error {
 		return fmt.Errorf("unknown CPU Manager Policy option: %q", option)
 	}
 
-	if alphaOptions.Has(option) && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManagerPolicyAlphaOptions) {
+	if alphaOptions.Has(option) && !utilfeature.Enabled(kubefeatures.CPUManagerPolicyAlphaOptions) {
 		return fmt.Errorf("CPU Manager Policy Alpha-level Options not enabled, but option %q provided", option)
 	}
 
-	if betaOptions.Has(option) && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManagerPolicyBetaOptions) {
+	if betaOptions.Has(option) && !utilfeature.Enabled(kubefeatures.CPUManagerPolicyBetaOptions) {
 		return fmt.Errorf("CPU Manager Policy Beta-level Options not enabled, but option %q provided", option)
 	}
 

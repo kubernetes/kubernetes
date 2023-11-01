@@ -35,7 +35,7 @@ func createCloudProvider(logger klog.Logger, cloudProvider string, externalCloud
 	var loopMode ControllerLoopMode
 	var err error
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+	if utilfeature.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
 		cloudprovider.DisableWarningForProvider(cloudProvider)
 		return nil, ExternalLoops, fmt.Errorf(
 			"cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider",

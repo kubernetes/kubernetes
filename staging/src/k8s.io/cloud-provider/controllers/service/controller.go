@@ -707,7 +707,7 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
 		return true
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
+	if !utilfeature.Enabled(features.StableLoadBalancerNodeSet) {
 		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 	}
 	return false
@@ -1017,7 +1017,7 @@ var (
 )
 
 func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
+	if utilfeature.Enabled(features.StableLoadBalancerNodeSet) {
 		return stableNodeSetPredicates
 	}
 	if service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal {

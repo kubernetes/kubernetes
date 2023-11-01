@@ -441,7 +441,7 @@ func addAllEventHandlers(
 			}
 			handlers = append(handlers, handlerRegistration)
 		case framework.PodSchedulingContext:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			if utilfeature.Enabled(features.DynamicResourceAllocation) {
 				if handlerRegistration, err = informerFactory.Resource().V1alpha2().PodSchedulingContexts().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext"),
 				); err != nil {
@@ -450,7 +450,7 @@ func addAllEventHandlers(
 				handlers = append(handlers, handlerRegistration)
 			}
 		case framework.ResourceClaim:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			if utilfeature.Enabled(features.DynamicResourceAllocation) {
 				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClaims().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
 				); err != nil {
@@ -459,7 +459,7 @@ func addAllEventHandlers(
 				handlers = append(handlers, handlerRegistration)
 			}
 		case framework.ResourceClass:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			if utilfeature.Enabled(features.DynamicResourceAllocation) {
 				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClasses().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClass, "ResourceClass"),
 				); err != nil {

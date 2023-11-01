@@ -357,14 +357,14 @@ func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
 	opts := apivalidation.PodValidationOptions{
-		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
+		AllowInvalidPodDeletionCost: !utilfeature.Enabled(features.PodDeletionCost),
 		// Allow pod spec to use status.hostIPs in downward API if feature is enabled
-		AllowHostIPsField: utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs),
+		AllowHostIPsField: utilfeature.Enabled(features.PodHostIPs),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues:                   false,
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
-		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
+		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.Enabled(features.PodSchedulingReadiness),
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 	}
 
@@ -520,7 +520,7 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
+	if !utilfeature.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
 		for k := range podAnnotations {
 			if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 				delete(podAnnotations, k)
@@ -529,7 +529,7 @@ func dropDisabledFields(
 	}
 
 	// If the feature is disabled and not in use, drop the hostUsers field.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(oldPodSpec) {
 		// Drop the field in podSpec only if SecurityContext is not nil.
 		// If it is nil, there is no need to set hostUsers=nil (it will be nil too).
 		if podSpec.SecurityContext != nil {
@@ -538,7 +538,7 @@ func dropDisabledFields(
 	}
 
 	// If the feature is disabled and not in use, drop the schedulingGates field.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) && !schedulingGatesInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.PodSchedulingReadiness) && !schedulingGatesInUse(oldPodSpec) {
 		podSpec.SchedulingGates = nil
 	}
 
@@ -551,7 +551,7 @@ func dropDisabledFields(
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
 		// field is mutable for certain controllers. Let ValidatePodUpdate handle it.
 		for i := range podSpec.Containers {
@@ -565,7 +565,7 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && !restartableInitContainersInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.SidecarContainers) && !restartableInitContainersInUse(oldPodSpec) {
 		// Drop the RestartPolicy field of init containers.
 		for i := range podSpec.InitContainers {
 			podSpec.InitContainers[i].RestartPolicy = nil
@@ -573,7 +573,7 @@ func dropDisabledFields(
 		// For other types of containers, validateContainers will handle them.
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) && !podLifecycleSleepActionInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.PodLifecycleSleepAction) && !podLifecycleSleepActionInUse(oldPodSpec) {
 		for i := range podSpec.Containers {
 			if podSpec.Containers[i].Lifecycle == nil {
 				continue
@@ -639,7 +639,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		podStatus = &api.PodStatus{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop Resize, AllocatedResources, and Resources fields
 		dropResourcesFields := func(csl []api.ContainerStatus) {
 			for i := range csl {
@@ -653,12 +653,12 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		podStatus.Resize = ""
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
 		podStatus.ResourceClaimStatuses = nil
 	}
 
 	// drop HostIPs to empty (disable PodHostIPs).
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
+	if !utilfeature.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
 		podStatus.HostIPs = nil
 	}
 }
@@ -674,7 +674,7 @@ func hostIPsInUse(podStatus *api.PodStatus) bool {
 // container specs and pod-level resource claims unless they are already used
 // by the old pod spec.
 func dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
 		dropResourceClaimRequests(podSpec.Containers)
 		dropResourceClaimRequests(podSpec.InitContainers)
 		dropEphemeralResourceClaimRequests(podSpec.EphemeralContainers)
@@ -708,7 +708,7 @@ func dropEphemeralResourceClaimRequests(containers []api.EphemeralContainer) {
 // dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
 // to TopologySpreadConstraints only if it is not already used by the old spec.
 func dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread) &&
+	if !utilfeature.Enabled(features.MinDomainsInPodTopologySpread) &&
 		!minDomainsInUse(oldPodSpec) &&
 		podSpec != nil {
 		for i := range podSpec.TopologySpreadConstraints {
@@ -735,7 +735,7 @@ func minDomainsInUse(podSpec *api.PodSpec) bool {
 // dropDisabledProcMountField removes disabled fields from PodSpec related
 // to ProcMount only if it is not already used by the old spec
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
 		defaultProcMount := api.DefaultProcMount
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			if c.SecurityContext != nil && c.SecurityContext.ProcMount != nil {
@@ -752,7 +752,7 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledNodeInclusionPolicyFields removes disabled fields from PodSpec related
 // to NodeInclusionPolicy only if it is not used by the old spec.
 func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread) && podSpec != nil {
+	if !utilfeature.Enabled(features.NodeInclusionPolicyInPodTopologySpread) && podSpec != nil {
 		if !nodeTaintsPolicyInUse(oldPodSpec) {
 			for i := range podSpec.TopologySpreadConstraints {
 				podSpec.TopologySpreadConstraints[i].NodeTaintsPolicy = nil
@@ -769,7 +769,7 @@ func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledMatchLabelKeysFieldInPodAffinity removes disabled fields from PodSpec related
 // to MatchLabelKeys in required/preferred PodAffinity/PodAntiAffinity only if it is not already used by the old spec.
 func dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec *api.PodSpec) {
-	if podSpec == nil || podSpec.Affinity == nil || utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodAffinity) || matchLabelKeysFieldInPodAffinityInUse(oldPodSpec) {
+	if podSpec == nil || podSpec.Affinity == nil || utilfeature.Enabled(features.MatchLabelKeysInPodAffinity) || matchLabelKeysFieldInPodAffinityInUse(oldPodSpec) {
 		return
 	}
 
@@ -786,7 +786,7 @@ func dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec *api.PodSp
 // dropDisabledMatchLabelKeysFieldInTopologySpread removes disabled fields from PodSpec related
 // to MatchLabelKeys in TopologySpread only if it is not already used by the old spec.
 func dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) && !matchLabelKeysInTopologySpreadInUse(oldPodSpec) {
+	if !utilfeature.Enabled(features.MatchLabelKeysInPodTopologySpread) && !matchLabelKeysInTopologySpreadInUse(oldPodSpec) {
 		for i := range podSpec.TopologySpreadConstraints {
 			podSpec.TopologySpreadConstraints[i].MatchLabelKeys = nil
 		}
@@ -990,7 +990,7 @@ func clusterTrustBundleProjectionInUse(podSpec *api.PodSpec) bool {
 }
 
 func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundleProjection) {
+	if utilfeature.Enabled(features.ClusterTrustBundleProjection) {
 		return
 	}
 	if podSpec == nil {

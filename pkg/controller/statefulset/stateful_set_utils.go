@@ -89,7 +89,7 @@ func getOrdinal(pod *v1.Pod) int {
 // getStartOrdinal gets the first possible ordinal (inclusive).
 // Returns spec.ordinals.start if spec.ordinals is set, otherwise returns 0.
 func getStartOrdinal(set *apps.StatefulSet) int {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
+	if utilfeature.Enabled(features.StatefulSetStartOrdinal) {
 		if set.Spec.Ordinals != nil {
 			return int(set.Spec.Ordinals.Start)
 		}
@@ -397,7 +397,7 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+	if utilfeature.Enabled(features.PodIndexLabel) {
 		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
 	}
 }

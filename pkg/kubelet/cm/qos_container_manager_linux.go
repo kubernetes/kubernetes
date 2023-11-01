@@ -335,12 +335,12 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	}
 
 	// update the qos level cgrougs v2 settings of memory qos if feature enabled
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+	if utilfeature.Enabled(kubefeatures.MemoryQoS) &&
 		libcontainercgroups.IsCgroup2UnifiedMode() {
 		m.setMemoryQoS(qosConfigs)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.QOSReserved) {
+	if utilfeature.Enabled(kubefeatures.QOSReserved) {
 		for resource, percentReserve := range m.qosReserved {
 			switch resource {
 			case v1.ResourceMemory:

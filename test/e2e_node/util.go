@@ -524,7 +524,7 @@ func reduceAllocatableMemoryUsageIfCgroupv1() {
 // This must be in a non-"_test" file to pass
 // make verify WHAT=test-featuregates
 func withFeatureGate(feature featuregate.Feature, desired bool) func() {
-	current := utilfeature.DefaultFeatureGate.Enabled(feature)
+	current := utilfeature.Enabled(feature)
 	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), desired))
 	return func() {
 		utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))

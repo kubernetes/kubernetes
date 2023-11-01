@@ -67,7 +67,7 @@ func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 		return
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
+	if !utilfeature.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 		period = QuotaPeriod
 	}
 
@@ -119,7 +119,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
+	inPlacePodVerticalScalingEnabled := utilfeature.Enabled(kubefeatures.InPlacePodVerticalScaling)
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,

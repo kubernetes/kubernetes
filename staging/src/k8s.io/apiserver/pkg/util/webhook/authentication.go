@@ -59,7 +59,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				if err != nil {
 					return nil, err
 				}
-				if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+				if feature.Enabled(features.APIServerTracing) {
 					ret.Wrap(tracing.WrapperFor(tp))
 				}
 
@@ -84,7 +84,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				if err != nil {
 					return nil, err
 				}
-				if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+				if feature.Enabled(features.APIServerTracing) {
 					ret.Wrap(tracing.WrapperFor(tp))
 				}
 

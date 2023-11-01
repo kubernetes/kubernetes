@@ -192,7 +192,7 @@ func hasInvalidLabelValueInLabelSelector(pdb *policy.PodDisruptionBudget) bool {
 // dropDisabledFields removes disabled fields from the pod disruption budget spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod disruption budget spec.
 func dropDisabledFields(pdbSpec, oldPDBSpec *policy.PodDisruptionBudgetSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
+	if !utilfeature.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
 		if !unhealthyPodEvictionPolicyInUse(oldPDBSpec) {
 			pdbSpec.UnhealthyPodEvictionPolicy = nil
 		}

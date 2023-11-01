@@ -24,7 +24,7 @@ import (
 // DropDisabledMutatingWebhookConfigurationFields removes disabled fields from the mutatingWebhookConfiguration metadata and spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a mutatingWebhookConfiguration
 func DropDisabledMutatingWebhookConfigurationFields(mutatingWebhookConfiguration, oldMutatingWebhookConfiguration *MutatingWebhookConfiguration) {
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AdmissionWebhookMatchConditions) && !matchConditionsInUseMutatingWebhook(oldMutatingWebhookConfiguration) {
+	if !utilfeature.Enabled(genericfeatures.AdmissionWebhookMatchConditions) && !matchConditionsInUseMutatingWebhook(oldMutatingWebhookConfiguration) {
 		for i := range mutatingWebhookConfiguration.Webhooks {
 			mutatingWebhookConfiguration.Webhooks[i].MatchConditions = nil
 		}
@@ -46,7 +46,7 @@ func matchConditionsInUseMutatingWebhook(mutatingWebhookConfiguration *MutatingW
 // DropDisabledValidatingWebhookConfigurationFields removes disabled fields from the validatingWebhookConfiguration metadata and spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a validatingWebhookConfiguration
 func DropDisabledValidatingWebhookConfigurationFields(validatingWebhookConfiguration, oldValidatingWebhookConfiguration *ValidatingWebhookConfiguration) {
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AdmissionWebhookMatchConditions) && !matchConditionsInUseValidatingWebhook(oldValidatingWebhookConfiguration) {
+	if !utilfeature.Enabled(genericfeatures.AdmissionWebhookMatchConditions) && !matchConditionsInUseValidatingWebhook(oldValidatingWebhookConfiguration) {
 		for i := range validatingWebhookConfiguration.Webhooks {
 			validatingWebhookConfiguration.Webhooks[i].MatchConditions = nil
 		}

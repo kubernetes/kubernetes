@@ -64,7 +64,7 @@ func SetDefaults_CSIDriver(obj *storagev1beta1.CSIDriver) {
 		obj.Spec.RequiresRepublish = new(bool)
 		*(obj.Spec.RequiresRepublish) = false
 	}
-	if obj.Spec.SELinuxMount == nil && utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if obj.Spec.SELinuxMount == nil && utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		obj.Spec.SELinuxMount = new(bool)
 		*(obj.Spec.SELinuxMount) = false
 	}

@@ -109,7 +109,7 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 	//	- the config file can be loaded
 	//	- the config file represents a valid configuration
 	if o.AuthorizationConfigurationFile != "" {
-		if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
+		if !utilfeature.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
 			return append(allErrors, fmt.Errorf("--%s cannot be used without enabling StructuredAuthorizationConfiguration feature flag", authorizationConfigFlag))
 		}
 
@@ -252,7 +252,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 	// else,
 	//	- build the AuthorizationConfig from the legacy flags
 	if o.AuthorizationConfigurationFile != "" {
-		if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
+		if !utilfeature.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
 			return nil, fmt.Errorf("--%s cannot be used without enabling StructuredAuthorizationConfiguration feature flag", authorizationConfigFlag)
 		}
 

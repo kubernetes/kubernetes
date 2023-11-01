@@ -65,7 +65,7 @@ type customResourceStrategy struct {
 
 func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchema *structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
 	var celValidator *cel.Validator
-	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
+	if utilfeature.Enabled(features.CustomResourceValidationExpressions) {
 		celValidator = cel.NewValidator(structuralSchema, true, celconfig.PerCallLimit) // CEL programs are compiled and cached here
 	}
 
@@ -248,7 +248,7 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	var options []validation.ValidationOption
 	var celOptions []cel.Option
 	var correlatedObject *common.CorrelatedObject
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+	if utilfeature.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
 		correlatedObject = common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
 		options = append(options, validation.WithRatcheting(correlatedObject))
 		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
@@ -276,7 +276,7 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	}
 
 	// No-op if not attached to context
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+	if utilfeature.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
 		validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
 	}
 	return errs

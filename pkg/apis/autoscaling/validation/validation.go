@@ -110,7 +110,7 @@ func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutosc
 	// 0 when HPA scale-to-zero feature is enabled
 	var minReplicasLowerBound int32
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+	if utilfeature.Enabled(features.HPAScaleToZero) {
 		minReplicasLowerBound = 0
 	} else {
 		minReplicasLowerBound = 1
@@ -128,7 +128,7 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autosca
 	// 0 when HPA scale-to-zero feature is enabled or HPA object already has minReplicas=0
 	var minReplicasLowerBound int32
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || (oldAutoscaler.Spec.MinReplicas != nil && *oldAutoscaler.Spec.MinReplicas == 0) {
+	if utilfeature.Enabled(features.HPAScaleToZero) || (oldAutoscaler.Spec.MinReplicas != nil && *oldAutoscaler.Spec.MinReplicas == 0) {
 		minReplicasLowerBound = 0
 	} else {
 		minReplicasLowerBound = 1
@@ -317,7 +317,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 		expectedField = "external"
 	case autoscaling.ContainerResourceMetricSourceType:
 		if spec.ContainerResource == nil {
-			if utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) {
+			if utilfeature.Enabled(features.HPAContainerMetrics) {
 				allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source"))
 			} else {
 				allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source (only allowed when HPAContainerMetrics feature is enabled)"))

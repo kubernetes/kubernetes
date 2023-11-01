@@ -124,7 +124,7 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 	if apierrors.IsAlreadyExists(err) {
 		return err
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 		// Set PVC policy as much as is possible at this point.
 		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
 			spc.recordPodEvent("update", set, pod, err)
@@ -155,7 +155,7 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 				return err
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 			// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
 			// and dirty the pod.
 			if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
@@ -323,7 +323,7 @@ func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(ctx context.C
 		return err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 		// Set PVC policy as much as is possible at this point.
 		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
 			spc.recordPodEvent("update", set, pod, err)

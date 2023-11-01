@@ -67,7 +67,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+	return utilfeature.Enabled(features.CSIMigrationPortworx)
 }
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {

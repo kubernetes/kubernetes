@@ -75,7 +75,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 		NotBefore: jwt.NewNumericDate(now),
 		Expiry:    jwt.NewNumericDate(now.Add(time.Duration(expirationSeconds) * time.Second)),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) {
+	if utilfeature.Enabled(features.ServiceAccountTokenJTI) {
 		sc.ID = newUUID()
 	}
 	pc := &privateClaims{
@@ -97,7 +97,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 			Name: pod.Name,
 			UID:  string(pod.UID),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+		if utilfeature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			// if this is bound to a pod and the node information is available, persist that too
 			if node != nil {
 				pc.Kubernetes.Node = &ref{
@@ -112,7 +112,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 			UID:  string(secret.UID),
 		}
 	case node != nil:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) {
+		if !utilfeature.Enabled(features.ServiceAccountTokenNodeBinding) {
 			return nil, nil, fmt.Errorf("token bound to Node object requested, but %q feature gate is disabled", features.ServiceAccountTokenNodeBinding)
 		}
 		pc.Kubernetes.Node = &ref{
@@ -237,13 +237,13 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	if noderef != nil {
 		switch {
 		case podref != nil:
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+			if utilfeature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 				// for pod-bound tokens, just extract the node claims
 				nodeName = noderef.Name
 				nodeUID = noderef.UID
 			}
 		case podref == nil:
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
+			if !utilfeature.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
 				klog.V(4).Infof("ServiceAccount token is bound to a Node object, but the node bound token validation feature is disabled")
 				return nil, fmt.Errorf("token is bound to a Node object but the %s feature gate is disabled", features.ServiceAccountTokenNodeBindingValidation)
 			}
@@ -280,7 +280,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	}
 
 	var jti string
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) {
+	if utilfeature.Enabled(features.ServiceAccountTokenJTI) {
 		jti = public.ID
 	}
 	return &apiserverserviceaccount.ServiceAccountInfo{

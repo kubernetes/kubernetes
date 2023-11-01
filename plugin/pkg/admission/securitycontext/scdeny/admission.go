@@ -37,7 +37,7 @@ const docLink = "https://k8s.io/docs/reference/access-authn-authz/admission-cont
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.SecurityContextDeny) {
+		if utilfeature.Enabled(features.SecurityContextDeny) {
 			return NewSecurityContextDeny(), nil
 		} else {
 			return nil, fmt.Errorf("%s admission controller is an alpha feature, planned to be removed, and requires the SecurityContextDeny feature gate to be enabled, see %s for more information", PluginName, docLink)

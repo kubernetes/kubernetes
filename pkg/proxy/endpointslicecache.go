@@ -139,7 +139,7 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 				Terminating: endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating,
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+			if utilfeature.Enabled(features.TopologyAwareHints) {
 				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
 					epInfo.ZoneHints = sets.New[string]()
 					for _, zone := range endpoint.Hints.ForZones {

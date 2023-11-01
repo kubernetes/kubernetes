@@ -413,7 +413,7 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 
 		node.Status.NodeInfo.KubeletVersion = version.Get().String()
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.DisableNodeKubeProxyVersion) {
+		if utilfeature.Enabled(features.DisableNodeKubeProxyVersion) {
 			// This field is deprecated and should be cleared if it was previously set.
 			node.Status.NodeInfo.KubeProxyVersion = ""
 		} else {

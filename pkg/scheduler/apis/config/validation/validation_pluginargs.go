@@ -267,7 +267,7 @@ type VolumeBindingArgsValidationOptions struct {
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
 func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
 	return ValidateVolumeBindingArgsWithOptions(path, args, VolumeBindingArgsValidationOptions{
-		AllowVolumeCapacityPriority: utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		AllowVolumeCapacityPriority: utilfeature.Enabled(features.VolumeCapacityPriority),
 	})
 }
 

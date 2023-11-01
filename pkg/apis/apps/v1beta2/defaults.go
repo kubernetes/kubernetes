@@ -74,14 +74,14 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
 			obj.Spec.UpdateStrategy.RollingUpdate.Partition = ptr.To[int32](0)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
+		if utilfeature.Enabled(features.MaxUnavailableStatefulSet) {
 			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
 			}
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 		if obj.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 			obj.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{}
 		}

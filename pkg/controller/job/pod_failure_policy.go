@@ -47,7 +47,7 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
 				case batch.PodFailurePolicyActionFailIndex:
-					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+					if feature.Enabled(features.JobBackoffLimitPerIndex) {
 						return nil, true, &failIndex
 					}
 				case batch.PodFailurePolicyActionCount:
@@ -64,7 +64,7 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
 				case batch.PodFailurePolicyActionFailIndex:
-					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+					if feature.Enabled(features.JobBackoffLimitPerIndex) {
 						return nil, true, &failIndex
 					}
 				case batch.PodFailurePolicyActionCount:

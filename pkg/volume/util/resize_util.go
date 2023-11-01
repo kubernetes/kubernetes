@@ -192,7 +192,7 @@ func MarkForFSResize(
 	conditions := []v1.PersistentVolumeClaimCondition{pvcCondition}
 	newPVC := pvc.DeepCopy()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+	if utilfeature.Enabled(features.RecoverVolumeExpansionFailure) {
 		newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimNodeResizePending)
 	}
 
@@ -219,7 +219,7 @@ func MarkFSResizeFinished(
 	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
 
 	// if RecoverVolumeExpansionFailure is enabled, we need to reset ResizeStatus back to nil
-	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+	if utilfeature.Enabled(features.RecoverVolumeExpansionFailure) {
 		allocatedResourceStatusMap := newPVC.Status.AllocatedResourceStatuses
 		delete(allocatedResourceStatusMap, v1.ResourceStorage)
 		if len(allocatedResourceStatusMap) == 0 {

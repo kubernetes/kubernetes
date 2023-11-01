@@ -127,7 +127,7 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 	featureGateRegex := regexp.MustCompile("^([a-zA-Z0-9]+)")
 
 	alphaFeatures := sets.NewString()
-	for _, featureText := range utilfeature.DefaultFeatureGate.KnownFeatures() {
+	for _, featureText := range utilfeature.KnownFeatures() {
 		// we have to parse this from KnownFeatures, because usage of mutable FeatureGate is not allowed in unit tests
 		feature := featureGateRegex.FindString(featureText)
 		if strings.Contains(featureText, string(featuregate.Alpha)) && feature != "AllAlpha" {

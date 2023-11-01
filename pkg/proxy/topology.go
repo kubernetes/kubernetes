@@ -145,7 +145,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 // * All of the endpoints for this Service have a topology hint
 // * At least one endpoint for this Service is hinted for this node's zone.
 func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+	if !utilfeature.Enabled(features.TopologyAwareHints) {
 		return false
 	}
 	// Any non-empty and non-disabled values for the hints annotation are acceptable.

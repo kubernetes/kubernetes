@@ -245,7 +245,7 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		return nil, nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletSeparateDiskGC) {
+	if !utilfeature.Enabled(features.KubeletSeparateDiskGC) {
 		imageStats, err := p.imageService.ImageStats(ctx)
 		if err != nil || imageStats == nil {
 			return nil, nil, fmt.Errorf("failed to get image stats: %v", err)

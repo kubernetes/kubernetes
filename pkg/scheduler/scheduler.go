@@ -387,7 +387,7 @@ func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.Queuei
 
 		for _, event := range events {
 			fn := event.QueueingHintFn
-			if fn == nil || !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			if fn == nil || !utilfeature.Enabled(features.SchedulerQueueingHints) {
 				fn = defaultQueueingHintFn
 			}
 

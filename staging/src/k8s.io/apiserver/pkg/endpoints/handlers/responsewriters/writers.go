@@ -166,7 +166,7 @@ func negotiateContentEncoding(req *http.Request) string {
 	if len(encoding) == 0 {
 		return ""
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression) {
+	if !utilfeature.Enabled(features.APIResponseCompression) {
 		return ""
 	}
 	for len(encoding) > 0 {

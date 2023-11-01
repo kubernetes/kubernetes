@@ -97,11 +97,11 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
+	if !utilfeature.Enabled(features.JobPodFailurePolicy) {
 		job.Spec.PodFailurePolicy = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+	if !utilfeature.Enabled(features.JobBackoffLimitPerIndex) {
 		job.Spec.BackoffLimitPerIndex = nil
 		job.Spec.MaxFailedIndexes = nil
 		if job.Spec.PodFailurePolicy != nil {
@@ -117,7 +117,7 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 			job.Spec.PodFailurePolicy.Rules = job.Spec.PodFailurePolicy.Rules[:index]
 		}
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+	if !utilfeature.Enabled(features.JobPodReplacementPolicy) {
 		job.Spec.PodReplacementPolicy = nil
 	}
 
@@ -130,11 +130,11 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
+	if !utilfeature.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
 		newJob.Spec.PodFailurePolicy = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+	if !utilfeature.Enabled(features.JobBackoffLimitPerIndex) {
 		if oldJob.Spec.BackoffLimitPerIndex == nil {
 			newJob.Spec.BackoffLimitPerIndex = nil
 		}
@@ -147,7 +147,7 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		// validation of the pod failure policy with FailIndex rules will
 		// continue to pass.
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
+	if !utilfeature.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
 		newJob.Spec.PodReplacementPolicy = nil
 	}
 
@@ -178,7 +178,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 	}
 	opts := batchvalidation.JobValidationOptions{
 		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
-		AllowElasticIndexedJobs: utilfeature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob),
+		AllowElasticIndexedJobs: utilfeature.Enabled(features.ElasticIndexedJob),
 		RequirePrefixedLabels:   true,
 	}
 	if oldJob != nil {

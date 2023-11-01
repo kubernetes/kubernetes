@@ -72,7 +72,7 @@ func (o *CoreAPIOptions) ApplyTo(config *server.RecommendedConfig) error {
 			return err
 		}
 	}
-	if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+	if feature.Enabled(features.APIServerTracing) {
 		kubeconfig.Wrap(tracing.WrapperFor(config.TracerProvider))
 	}
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeconfig)

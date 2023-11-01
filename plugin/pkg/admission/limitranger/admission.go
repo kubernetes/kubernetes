@@ -524,7 +524,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
-				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+				InPlacePodVerticalScalingEnabled: feature.Enabled(features.InPlacePodVerticalScaling),
 			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)

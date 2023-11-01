@@ -873,7 +873,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
-		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+		if utilfeature.Enabled(features.KubeletPodResourcesGet) {
 			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
 			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
 		}
@@ -897,13 +897,13 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.CustomMustRegister(collector)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) &&
-			utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
+		if utilfeature.Enabled(features.GracefulNodeShutdown) &&
+			utilfeature.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 			legacyregistry.MustRegister(GracefulShutdownStartTime)
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
+		if utilfeature.Enabled(features.ConsistentHTTPGetHandlers) {
 			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		}
 	})

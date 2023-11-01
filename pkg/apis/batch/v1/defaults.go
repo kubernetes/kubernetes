@@ -70,7 +70,7 @@ func SetDefaults_Job(obj *batchv1.Job) {
 			}
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+	if utilfeature.Enabled(features.JobPodReplacementPolicy) {
 		if obj.Spec.PodReplacementPolicy == nil {
 			if obj.Spec.PodFailurePolicy != nil {
 				obj.Spec.PodReplacementPolicy = podReplacementPolicyPtr(batchv1.Failed)

@@ -284,7 +284,7 @@ func NewServer(
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if utilfeature.Enabled(features.KubeletTracing) {
 		server.InstallTracingFilter(tp)
 	}
 	server.InstallDefaultHandlers()
@@ -412,7 +412,7 @@ func (s *Server) InstallDefaultHandlers() {
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
+	if utilfeature.Enabled(features.PodAndContainerStatsFromCRI) {
 		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
 	} else {
 		cadvisorOpts := cadvisorv2.RequestOptions{
@@ -445,7 +445,7 @@ func (s *Server) InstallDefaultHandlers() {
 	)
 
 	// Only enable checkpoint API if the feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
+	if utilfeature.Enabled(features.ContainerCheckpoint) {
 		s.addMetricsBucketMatcher("checkpoint")
 		ws = &restful.WebService{}
 		ws.Path("/checkpoint").Produces(restful.MIME_JSON)

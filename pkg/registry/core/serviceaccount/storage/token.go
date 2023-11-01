@@ -153,7 +153,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
 			uid = pod.UID
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+			if utilfeature.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 				if nodeName := pod.Spec.NodeName; nodeName != "" {
 					newCtx := newContext(ctx, "nodes", nodeName, "", api.SchemeGroupVersion.WithKind("Node"))
 					// set ResourceVersion=0 to allow this to be read/served from the apiservers watch cache
@@ -176,7 +176,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				}
 			}
 		case gvk.Group == "" && gvk.Kind == "Node":
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) {
+			if !utilfeature.Enabled(features.ServiceAccountTokenNodeBinding) {
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to a Node object as the %q feature-gate is disabled", features.ServiceAccountTokenNodeBinding))
 			}
 			newCtx := newContext(ctx, "nodes", ref.Name, "", gvk)
@@ -234,7 +234,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		Token:               tokdata,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
+	if utilfeature.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
 		audit.AddAuditAnnotation(ctx, serviceaccount.CredentialIDKey, serviceaccount.CredentialIDForJTI(sc.ID))
 	}
 	return out, nil

@@ -231,7 +231,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod)
 		SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostNetwork) {
+	if utilfeature.Enabled(features.WindowsHostNetwork) {
 		wc.SecurityContext.NamespaceOptions = &runtimeapi.WindowsNamespaceOption{}
 		if kubecontainer.IsHostNetworkPod(pod) {
 			wc.SecurityContext.NamespaceOptions.Network = runtimeapi.NamespaceMode_NODE

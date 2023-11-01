@@ -168,7 +168,7 @@ func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volum
 
 // VolumeSupportsSELinuxMount returns true if given volume access mode can support mount with SELinux mount options.
 func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if !utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		return false
 	}
 	if volumeSpec.PersistentVolume == nil {
@@ -185,7 +185,7 @@ func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
 
 // AddSELinuxMountOption adds -o context="XYZ" mount option to a given list
 func AddSELinuxMountOption(options []string, seLinuxContext string) []string {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if !utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		return options
 	}
 	// Use double quotes to support a comma "," in the SELinux context string.

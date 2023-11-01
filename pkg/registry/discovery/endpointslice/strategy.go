@@ -130,7 +130,7 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 
 // dropDisabledConditionsOnCreate will drop any fields that are disabled.
 func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
+	dropHints := !utilfeature.Enabled(features.TopologyAwareHints)
 
 	if dropHints {
 		for i := range endpointSlice.Endpoints {
@@ -144,7 +144,7 @@ func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
 // dropDisabledFieldsOnUpdate will drop any disable fields that have not already
 // been set on the EndpointSlice.
 func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
+	dropHints := !utilfeature.Enabled(features.TopologyAwareHints)
 	if dropHints {
 		for _, ep := range oldEPS.Endpoints {
 			if ep.Hints != nil {

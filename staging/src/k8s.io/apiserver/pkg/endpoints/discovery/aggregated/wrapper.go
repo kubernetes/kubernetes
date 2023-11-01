@@ -37,7 +37,7 @@ type WrappedHandler struct {
 }
 
 func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if utilfeature.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		mediaType, _ := negotiation.NegotiateMediaTypeOptions(req.Header.Get("Accept"), wrapped.s.SupportedMediaTypes(), DiscoveryEndpointRestrictions)
 		// mediaType.Convert looks at the request accept headers and is used to control whether the discovery document will be aggregated.
 		if IsAggregatedDiscoveryGVK(mediaType.Convert) {

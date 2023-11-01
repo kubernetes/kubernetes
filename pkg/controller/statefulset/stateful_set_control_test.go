@@ -229,7 +229,7 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
 	// Check all pods have correct pod index label.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+	if utilfeature.Enabled(features.PodIndexLabel) {
 		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 		if err != nil {
 			t.Error(err)
@@ -2844,7 +2844,7 @@ func checkClaimInvarients(set *apps.StatefulSet, pod *v1.Pod, claim *v1.Persiste
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
 	}
-	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil && utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil && utilfeature.Enabled(features.StatefulSetAutoDeletePVC) {
 		policy = *set.Spec.PersistentVolumeClaimRetentionPolicy
 	}
 	claimShouldBeRetained := policy.WhenScaled == apps.RetainPersistentVolumeClaimRetentionPolicyType

@@ -312,7 +312,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			// transition rules are evaluated only if there is a comparable existing value
 			// But if the rule uses optional oldSelf and gate is enabled we allow
 			// the rule to be evaluated
-			if !utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+			if !utilfeature.Enabled(features.CRDValidationRatcheting) {
 				continue
 			}
 

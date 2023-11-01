@@ -518,7 +518,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 			if innerErr != nil {
 				return quotas, innerErr
 			}
-			if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if feature.Enabled(features.InPlacePodVerticalScaling) {
 				// allow negative usage for pods as pod resources can increase or decrease
 				if a.GetResource().GroupResource() == corev1.Resource("pods") {
 					deltaUsage = quota.Subtract(deltaUsage, prevUsage)

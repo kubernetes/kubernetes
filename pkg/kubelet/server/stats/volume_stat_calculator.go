@@ -167,7 +167,7 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 			persistentStats = append(persistentStats, volumeStats)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		if utilfeature.Enabled(features.CSIVolumeHealth) {
 			if metric.Abnormal != nil && metric.Message != nil && (*metric.Abnormal) {
 				s.eventRecorder.Event(s.pod, v1.EventTypeWarning, "VolumeConditionAbnormal", fmt.Sprintf("Volume %s: %s", name, *metric.Message))
 			}

@@ -81,7 +81,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *rbdPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
+	return utilfeature.Enabled(features.CSIMigrationRBD)
 }
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -432,7 +432,7 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volu
 	}
 
 	var mountContext string
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		mountContext, err = hu.GetSELinuxMountContext(mountPath)
 		if err != nil {
 			return volume.ReconstructedVolume{}, err
@@ -866,7 +866,7 @@ func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
 		return err
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		// The volume must have been mounted in MountDevice with -o context.
 		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
 	}

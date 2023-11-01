@@ -164,7 +164,7 @@ func key(requestInfo *apirequest.RequestInfo) string {
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
-	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+	consistentListFromCacheEnabled := utilfeature.Enabled(features.ConsistentListFromCache)
 
 	// Serve consistent reads from storage if ConsistentListFromCache is disabled
 	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled

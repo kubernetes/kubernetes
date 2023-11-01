@@ -285,7 +285,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volum
 	}
 
 	var mountContext string
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		kvh, ok := plugin.host.(volume.KubeletVolumeHost)
 		if !ok {
 			return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
@@ -407,7 +407,7 @@ func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) erro
 		klog.Errorf("fc: failed to setup")
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+	if utilfeature.Enabled(features.SELinuxMountReadWriteOncePod) {
 		// The volume must have been mounted in MountDevice with -o context.
 		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
 	}

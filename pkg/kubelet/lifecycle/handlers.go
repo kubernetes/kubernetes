@@ -127,7 +127,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 }
 
 func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) {
+	if !utilfeature.Enabled(features.PodLifecycleSleepAction) {
 		return nil
 	}
 	c := time.After(time.Duration(seconds) * time.Second)
@@ -156,7 +156,7 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 		podIP = host
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
+	if utilfeature.Enabled(features.ConsistentHTTPGetHandlers) {
 		req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, podIP, "lifecycle")
 		if err != nil {
 			return err

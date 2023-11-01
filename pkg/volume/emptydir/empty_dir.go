@@ -114,7 +114,7 @@ func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec *volume.Spec, pod *v1.Pod) *resource.Quantity {
 	// if feature is disabled, continue the default behavior of linux host default
 	sizeLimit := &resource.Quantity{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SizeMemoryBackedVolumes) {
+	if !utilfeature.Enabled(features.SizeMemoryBackedVolumes) {
 		return sizeLimit
 	}
 
@@ -519,7 +519,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
+	if utilfeature.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
 		// Remove any quota
 		err := fsquota.ClearQuota(ed.mounter, dir)
 		if err != nil {

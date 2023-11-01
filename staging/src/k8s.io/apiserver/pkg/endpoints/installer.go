@@ -481,7 +481,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var apiResource metav1.APIResource
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
+	if utilfeature.Enabled(features.StorageVersionHash) &&
 		isStorageVersionProvider &&
 		storageVersionProvider.StorageVersion() != nil {
 		versioner := storageVersionProvider.StorageVersion()
@@ -592,8 +592,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var resourceInfo *storageversion.ResourceInfo
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) &&
+	if utilfeature.Enabled(features.StorageVersionAPI) &&
+		utilfeature.Enabled(features.APIServerIdentity) &&
 		isStorageVersionProvider &&
 		storageVersionProvider.StorageVersion() != nil {
 
