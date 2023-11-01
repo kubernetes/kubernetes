@@ -97,6 +97,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 		ID:                   kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
 		Name:                 c.GetMetadata().GetName(),
 		ImageID:              c.ImageRef,
+		ImageRuntimeHandler:  c.Image.RuntimeHandler,
 		Image:                c.Image.Image,
 		Hash:                 annotatedInfo.Hash,
 		HashWithoutResources: annotatedInfo.HashWithoutResources,

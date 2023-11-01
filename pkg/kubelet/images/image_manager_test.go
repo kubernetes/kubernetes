@@ -28,9 +28,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/kubernetes/pkg/features"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	testingclock "k8s.io/utils/clock/testing"
@@ -269,7 +272,7 @@ func TestParallelPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -301,7 +304,7 @@ func TestSerializedPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -364,7 +367,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
 
-		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -375,6 +378,67 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 		image := images[0]
 		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
+		assert.Equal(t, "", image.Spec.RuntimeHandler, "image.Spec.RuntimeHandler not empty", "ImageID", image.ID)
+
+		expectedAnnotations := []Annotation{
+			{
+				Name:  "kubernetes.io/runtimehandler",
+				Value: "handler_name",
+			}}
+		assert.Equal(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
+	})
+}
+
+func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T) {
+	runtimeHandler := "handler_name"
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+			Annotations: map[string]string{
+				"kubernetes.io/runtimehandler": runtimeHandler,
+			},
+		},
+		Spec: v1.PodSpec{
+			RuntimeClassName: &runtimeHandler,
+		},
+	}
+	c := pullerTestCase{ // pull missing image
+		testName:       "test pull and list image with pod annotations",
+		containerImage: "missing_image",
+		policy:         v1.PullIfNotPresent,
+		inspectErr:     nil,
+		pullerErr:      nil,
+		expected: []pullerExpects{
+			{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+		}}
+
+	useSerializedEnv := true
+	t.Run(c.testName, func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+		ctx := context.Background()
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+		fakeRuntime.CalledFunctions = nil
+		fakeRuntime.ImageList = []Image{}
+		fakeClock.Step(time.Second)
+
+		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, runtimeHandler)
+		fakeRuntime.AssertCalls(c.expected[0].calls)
+		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
+		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
+		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
+
+		images, _ := fakeRuntime.ListImages(ctx)
+		assert.Equal(t, 1, len(images), "ListImages() count")
+
+		image := images[0]
+		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
+
+		// when RuntimeClassInImageCriAPI feature gate is enabled, check runtime
+		// handler information for every image in the ListImages() response
+		assert.Equal(t, runtimeHandler, image.Spec.RuntimeHandler, "runtime handler returned not as expected", "Image ID", image)
 
 		expectedAnnotations := []Annotation{
 			{
@@ -419,7 +483,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < maxParallelImagePulls; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 			assert.Nil(t, err)
 			wg.Done()
 		}()
@@ -431,7 +495,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 			assert.Nil(t, err)
 			wg.Done()
 		}()
