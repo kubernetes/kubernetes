@@ -70,7 +70,7 @@ func createRemoteRuntimeServiceWithTracerProvider(endpoint string, tp oteltrace.
 }
 
 func TestGetSpans(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletTracing, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KubeletTracing, true)()
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
 		fakeRuntime.Stop()

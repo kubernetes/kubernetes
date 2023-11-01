@@ -903,7 +903,7 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, tc.enableSchedulingGates)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodSchedulingReadiness, tc.enableSchedulingGates)()
 
 		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), tc.create, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod: %v", err)

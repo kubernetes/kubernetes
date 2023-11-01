@@ -1538,13 +1538,13 @@ func TestAdmitPVCStatus(t *testing.T) {
 			attributes := admission.NewAttributesRecord(
 				test.newObj, test.oldObj, schema.GroupVersionKind{},
 				metav1.NamespaceDefault, "foo", apiResource, test.subresource, operation, &metav1.CreateOptions{}, false, mynode)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoveryFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.RecoverVolumeExpansionFailure, test.recoveryFeatureEnabled)()
 			a := &admitTestCase{
 				name:        test.name,
 				podsGetter:  noExistingPods,
 				nodesGetter: expectedNode,
 				attributes:  attributes,
-				features:    featuregate.DefaultFeatureGate,
+				features:    featuregate.Default,
 				err:         test.expectError,
 			}
 			a.run(t)

@@ -165,7 +165,7 @@ func TestEviction(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PDBUnhealthyPodEvictionPolicy, true)()
 
 				// same test runs multiple times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
@@ -530,7 +530,7 @@ func TestEvictionIgnorePDB(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PDBUnhealthyPodEvictionPolicy, true)()
 
 				// same test runs 3 times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
@@ -809,7 +809,7 @@ func TestAddConditionAndDelete(t *testing.T) {
 		for _, conditionsEnabled := range []bool{true, false} {
 			name := fmt.Sprintf("%s_conditions=%v", tc.name, conditionsEnabled)
 			t.Run(name, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDisruptionConditions, conditionsEnabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodDisruptionConditions, conditionsEnabled)()
 				var deleteOptions *metav1.DeleteOptions
 				if tc.initialPod {
 					newPod := validNewPod()

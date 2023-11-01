@@ -282,7 +282,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 	}
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
@@ -416,7 +416,7 @@ func Test_ValidateAnnotationsAndWarnings(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 
 	// prepare audit policy file
 	policyFile, err := os.CreateTemp("", "audit-policy.yaml")
@@ -551,7 +551,7 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			}, framework.SharedEtcd())
@@ -588,7 +588,7 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 }
 
 func TestMultiplePolicyBindings(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -715,7 +715,7 @@ func TestMultiplePolicyBindings(t *testing.T) {
 // Test_PolicyExemption tests that ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding resources
 // are exempt from policy rules.
 func Test_PolicyExemption(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -802,7 +802,7 @@ func Test_PolicyExemption(t *testing.T) {
 // the new ParamKind to be allowed. For example, when Paramkind is v1/ConfigMap, only namespaces prefixed with "configmap"
 // is allowed and when ParamKind is updated to v1/Secret, only namespaces prefixed with "secret" is allowed, etc.
 func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -943,7 +943,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
 // only the ParamRef in the binding is updated. This test creates a policy where namespaces must have a prefix that matches
 // the ParamRef set in the policy binding. The paramRef in the binding is then updated to a different object.
 func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1091,7 +1091,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
 
 // Test_ValidatingAdmissionPolicy_UpdateParamResource validates behavior of a policy after updates to the param resource.
 func Test_ValidatingAdmissionPolicy_UpdateParamResource(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1224,7 +1224,7 @@ func Test_ValidatingAdmissionPolicy_UpdateParamResource(t *testing.T) {
 }
 
 func Test_ValidatingAdmissionPolicy_MatchByObjectSelector(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1292,7 +1292,7 @@ func Test_ValidatingAdmissionPolicy_MatchByObjectSelector(t *testing.T) {
 }
 
 func Test_ValidatingAdmissionPolicy_MatchByNamespaceSelector(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1384,7 +1384,7 @@ func Test_ValidatingAdmissionPolicy_MatchByNamespaceSelector(t *testing.T) {
 }
 
 func Test_ValidatingAdmissionPolicy_MatchByResourceNames(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1443,7 +1443,7 @@ func Test_ValidatingAdmissionPolicy_MatchByResourceNames(t *testing.T) {
 }
 
 func Test_ValidatingAdmissionPolicy_MatchWithExcludeResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1515,7 +1515,7 @@ func Test_ValidatingAdmissionPolicy_MatchWithExcludeResources(t *testing.T) {
 }
 
 func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyEquivalent(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1607,7 +1607,7 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyEquivalent(t *testing.T)
 }
 
 func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1704,7 +1704,7 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
 // Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated validates that deleting a ValidatingAdmissionPolicy
 // removes the policy from the apiserver admission chain and recreating it re-enables it.
 func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1822,7 +1822,7 @@ func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
 // Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated validates that deleting a ValidatingAdmissionPolicyBinding
 // removes the policy from the apiserver admission chain and recreating it re-enables it.
 func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -1941,7 +1941,7 @@ func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
 // Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated validates that deleting a param resource referenced
 // by a binding renders the policy as invalid. Recreating the param resource re-enables the policy.
 func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -2131,7 +2131,7 @@ func TestCRDParams(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			}, framework.SharedEtcd())
@@ -2183,7 +2183,7 @@ func TestCRDParams(t *testing.T) {
 }
 
 func TestBindingRemoval(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
@@ -2338,7 +2338,7 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 
 			for clientName, clientFn := range clients {
 				t.Run(clientName, func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 					server, err := apiservertesting.StartTestServer(t, nil, []string{
 						"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 						"--authorization-mode=RBAC",
@@ -2945,7 +2945,7 @@ func TestAuthorizationDecisionCaching(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
 
 			ctx, cancel := context.WithCancel(context.TODO())
 			defer cancel()

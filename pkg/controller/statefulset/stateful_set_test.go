@@ -684,7 +684,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 }
 
 func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetAutoDeletePVC, true)()
 
 	testFn := func(t *testing.T, scaledownPolicy, deletionPolicy apps.PersistentVolumeClaimRetentionPolicyType) {
 		set := newStatefulSet(4)
@@ -819,7 +819,7 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 }
 
 func TestStaleOwnerRefOnScaleup(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetAutoDeletePVC, true)()
 
 	for _, policy := range []*apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		{

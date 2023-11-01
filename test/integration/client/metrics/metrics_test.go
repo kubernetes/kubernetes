@@ -44,8 +44,8 @@ import (
 
 // regression test for https://issues.k8s.io/117258
 func TestAPIServerTransportMetrics(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllAlpha", true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllBeta", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllAlpha", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllBeta", true)()
 
 	// reset default registry metrics
 	legacyregistry.Reset()

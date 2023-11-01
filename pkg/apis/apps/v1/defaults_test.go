@@ -597,8 +597,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enablePVCDeletionPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetAutoDeletePVC, test.enablePVCDeletionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
 
 			obj2 := roundTrip(t, runtime.Object(test.original))
 			got, ok := obj2.(*appsv1.StatefulSet)

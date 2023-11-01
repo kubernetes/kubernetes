@@ -161,7 +161,7 @@ func TestContainerAnnotations(t *testing.T) {
 		PreStopHandler:            container.Lifecycle.PreStop,
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, true)()
 	// Test whether we can get right information from label
 	annotations := newContainerAnnotations(container, pod, restartCount, opts)
 	containerInfo := getContainerInfoFromAnnotations(annotations)

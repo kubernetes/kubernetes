@@ -57,7 +57,7 @@ func TestMetadata(t *testing.T) {
 		t.Skip("Skipping test on Windows, not on GCE.")
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, kubefeatures.DisableKubeletCloudCredentialProviders, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, kubefeatures.DisableKubeletCloudCredentialProviders, false)()
 
 	var err error
 	gceProductNameFile, err = createProductNameFile()

@@ -260,7 +260,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	for name, tc := range testCases {
 		for _, enablePodDisruptionConditions := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s;PodDisruptionConditions=%v", name, enablePodDisruptionConditions), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodDisruptionConditions, enablePodDisruptionConditions)()
 
 				podMaker := makePodWithMemoryStats
 				summaryStatsMaker := makeMemoryStats
@@ -441,8 +441,9 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 	for name, tc := range testCases {
 		for _, enablePodDisruptionConditions := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s;PodDisruptionConditions=%v", name, enablePodDisruptionConditions), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodDisruptionConditions, enablePodDisruptionConditions)()
 
 				podMaker := makePodWithDiskStats
 				summaryStatsMaker := makeDiskStats
@@ -946,7 +947,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
 
 			podMaker := makePodWithDiskStats
 			summaryStatsMaker := makeDiskStats
@@ -1468,7 +1469,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
 
 			podMaker := makePodWithDiskStats
 			summaryStatsMaker := makeDiskStats
@@ -1931,7 +1932,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)()
 
 			podMaker := podMaker
 			summaryStatsMaker := summaryStatsMaker

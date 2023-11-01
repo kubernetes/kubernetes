@@ -343,8 +343,8 @@ func TestPrepareForCreate(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.AnyVolumeDataSource, test.anyEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)()
 			pvc := api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
 					DataSource:    test.dataSource,

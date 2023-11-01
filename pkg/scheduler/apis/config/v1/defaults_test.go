@@ -796,7 +796,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 		utilruntime.Must(AddToScheme(scheme))
 		t.Run(tc.name, func(t *testing.T) {
 			for k, v := range tc.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, k, v)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, k, v)()
 			}
 			scheme.Default(tc.in)
 			if diff := cmp.Diff(tc.in, tc.want); diff != "" {

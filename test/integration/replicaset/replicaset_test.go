@@ -641,7 +641,7 @@ func TestPodDeletionCost(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDeletionCost, tc.enabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodDeletionCost, tc.enabled)()
 			closeFn, rm, informers, c := rmSetup(t)
 			defer closeFn()
 			ns := framework.CreateNamespaceOrDie(c, tc.name, t)

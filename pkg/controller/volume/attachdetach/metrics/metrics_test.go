@@ -120,7 +120,7 @@ func TestVolumesInUseMetricCollection(t *testing.T) {
 		nil,
 		nil,
 		fakeVolumePluginMgr,
-		csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
+		csimigration.NewPluginManager(csiTranslator, featuregate.Default),
 		csiTranslator)
 	logger, _ := ktesting.NewTestContext(t)
 	nodeUseMap := metricCollector.getVolumeInUseCount(logger)
@@ -163,7 +163,7 @@ func TestTotalVolumesMetricCollection(t *testing.T) {
 		asw,
 		dsw,
 		fakeVolumePluginMgr,
-		csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
+		csimigration.NewPluginManager(csiTranslator, featuregate.Default),
 		csiTranslator)
 
 	totalVolumesMap := metricCollector.getTotalVolumesCount()

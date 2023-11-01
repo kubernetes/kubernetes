@@ -616,7 +616,7 @@ func TestMakeAbsolutePath(t *testing.T) {
 }
 
 func TestGetPodVolumeNames(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SELinuxMountReadWriteOncePod, true)()
 	tests := []struct {
 		name                    string
 		pod                     *v1.Pod

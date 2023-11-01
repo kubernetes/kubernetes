@@ -794,7 +794,7 @@ func TestEtcdCreateWithSchedulingGates(t *testing.T) {
 				tt.name = fmt.Sprintf("%v and flipped before binding", tt.name)
 			}
 			t.Run(tt.name, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodSchedulingReadiness, tt.featureEnabled)()
 				storage, bindingStorage, _, server := newStorage(t)
 				defer server.Terminate(t)
 				defer storage.Store.DestroyFunc()
@@ -806,7 +806,7 @@ func TestEtcdCreateWithSchedulingGates(t *testing.T) {
 					t.Fatalf("Unexpected error: %v", err)
 				}
 				if flipFeatureGateBeforeBinding {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, !tt.featureEnabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodSchedulingReadiness, !tt.featureEnabled)()
 				}
 				_, err := bindingStorage.Create(ctx, "foo", &api.Binding{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},

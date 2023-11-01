@@ -382,7 +382,7 @@ leaderElection:
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			for k, v := range tc.restoreFeatures {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, k, v)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, k, v)()
 			}
 
 			fs := pflag.NewFlagSet("test", pflag.PanicOnError)

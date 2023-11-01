@@ -343,7 +343,7 @@ type ratchetingTestCase struct {
 }
 
 func runTests(t *testing.T, cases []ratchetingTestCase) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CRDValidationRatcheting, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CRDValidationRatcheting, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -1911,7 +1911,7 @@ func BenchmarkRatcheting(b *testing.B) {
 			name = "RatchetingDisabled"
 		}
 		b.Run(name, func(b *testing.B) {
-			defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.Default, features.CRDValidationRatcheting, ratchetingEnabled)()
 			b.ResetTimer()
 
 			do := func(pairs []pair) {

@@ -86,7 +86,7 @@ func startServiceController(ctx context.Context, initContext ControllerInitConte
 		completedConfig.SharedInformers.Core().V1().Services(),
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
-		featuregate.DefaultFeatureGate,
+		featuregate.Default,
 	)
 	if err != nil {
 		// This error shouldn't fail. It lives like this as a legacy.

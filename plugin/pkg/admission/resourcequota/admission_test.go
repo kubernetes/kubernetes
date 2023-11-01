@@ -2180,7 +2180,7 @@ func TestPodResourcesResizeWithResourceQuota(t *testing.T) {
 
 	for desc, tc := range testCases {
 		t.Run(desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, tc.fgEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, tc.fgEnabled)()
 			kubeClient := fake.NewSimpleClientset(resourceQuota)
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 			handler, err := createHandler(kubeClient, informerFactory, stopCh)

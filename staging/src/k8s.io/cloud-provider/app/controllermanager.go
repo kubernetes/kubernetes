@@ -66,8 +66,8 @@ import (
 )
 
 func init() {
-	utilruntime.Must(features.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
-	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(features.AddFeatureGates(featuregate.DefaultMutable))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 const (
@@ -91,7 +91,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			if err := logsapi.ValidateAndApply(logOptions, featuregate.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(logOptions, featuregate.Default); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
 			}

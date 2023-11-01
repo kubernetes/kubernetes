@@ -379,7 +379,7 @@ func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.WindowsHostNetwork, false)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.WindowsHostNetwork, false)()
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 
@@ -458,7 +458,7 @@ func TestGeneratePodSandboxWindowsConfig_HostNetwork(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)()
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 

@@ -94,7 +94,7 @@ func TestSerializeObjectParallel(t *testing.T) {
 				}
 			}()
 			t.Parallel()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APIResponseCompression, ctt.compressionEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APIResponseCompression, ctt.compressionEnabled)()
 
 			encoder := &fakeEncoder{
 				buf:  ctt.out,
@@ -348,7 +348,7 @@ func TestSerializeObject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APIResponseCompression, tt.compressionEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APIResponseCompression, tt.compressionEnabled)()
 
 			encoder := &fakeEncoder{
 				buf:  tt.out,
@@ -462,7 +462,7 @@ func benchmarkSerializeObject(b *testing.B, payload []byte) {
 		},
 		URL: &url.URL{Path: "/path"},
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.DefaultFeatureGate, features.APIResponseCompression, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.Default, features.APIResponseCompression, true)()
 
 	encoder := &fakeEncoder{
 		buf: payload,

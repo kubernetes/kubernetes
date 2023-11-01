@@ -698,7 +698,7 @@ func BenchmarkPerfScheduling(b *testing.B) {
 					b.Cleanup(cancel)
 
 					for feature, flag := range tc.FeatureGates {
-						defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.DefaultFeatureGate, feature, flag)()
+						defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.Default, feature, flag)()
 					}
 					informerFactory, client, dyncClient := setupClusterForWorkload(ctx, b, tc.SchedulerConfigPath, tc.FeatureGates)
 					results := runWorkload(ctx, b, tc, w, informerFactory, client, dyncClient, false)
@@ -792,7 +792,7 @@ func TestScheduling(t *testing.T) {
 			defer cancel()
 
 			for feature, flag := range config.featureGates {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, feature, flag)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, feature, flag)()
 			}
 			informerFactory, client, dynClient := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates)
 

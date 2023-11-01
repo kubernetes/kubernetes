@@ -520,7 +520,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ConsistentListFromCache, true)()
 	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
 	defer store.Stop()
@@ -589,7 +589,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ConsistentListFromCache, tc.ConsistentListFromCache)()
 			ctx := context.Background()
 			store := newTestWatchCache(3, &cache.Indexers{})
 			defer store.Stop()

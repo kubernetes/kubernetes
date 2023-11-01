@@ -36,7 +36,7 @@ if [[ -n "${direct_sets}" ]]; then
   echo "${direct_sets}" >&2
   echo >&2
   echo "Use this invocation instead:" >&2
-  echo "  defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.<FeatureName>, <value>)()" >&2
+  echo "  defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.<FeatureName>, <value>)()" >&2
   echo >&2
   rc=1
 fi
@@ -48,7 +48,7 @@ if [[ -n "${missing_defers}" ]]; then
   echo "${missing_defers}" >&2
   echo >&2
   echo "Always make a deferred call to the returned function to ensure the feature gate is reset:" >&2
-  echo "  defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.<FeatureName>, <value>)()" >&2
+  echo "  defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.<FeatureName>, <value>)()" >&2
   echo >&2
   rc=1
 fi

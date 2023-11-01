@@ -49,8 +49,8 @@ const (
 )
 
 func TestStorageVersionGarbageCollection(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APIServerIdentity, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StorageVersionAPI, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APIServerIdentity, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StorageVersionAPI, true)()
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
 

@@ -189,7 +189,7 @@ func (o *Options) initFlags() {
 	o.Authorization.AddFlags(nfs.FlagSet("authorization"))
 	o.Deprecated.AddFlags(nfs.FlagSet("deprecated"))
 	options.BindLeaderElectionFlags(o.LeaderElection, nfs.FlagSet("leader election"))
-	featuregate.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
+	featuregate.DefaultMutable.AddFlag(nfs.FlagSet("feature gate"))
 	o.Metrics.AddFlags(nfs.FlagSet("metrics"))
 	logsapi.AddFlags(o.Logs, nfs.FlagSet("logs"))
 

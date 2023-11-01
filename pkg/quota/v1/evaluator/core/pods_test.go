@@ -1088,7 +1088,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
 		for testName, testCase := range testCases {
 			t.Run(testName, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, enabled)()
 				actual, err := evaluator.Usage(testCase.pod)
 				if err != nil {
 					t.Error(err)

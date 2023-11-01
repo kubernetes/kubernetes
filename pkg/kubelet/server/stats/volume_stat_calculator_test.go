@@ -189,7 +189,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 }
 
 func TestAbnormalVolumeEvent(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CSIVolumeHealth, true)()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 

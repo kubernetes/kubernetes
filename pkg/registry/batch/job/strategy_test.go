@@ -442,9 +442,9 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForUpdate(ctx, &tc.updatedJob, &tc.job)
@@ -755,9 +755,9 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForCreate(ctx, &tc.job)
@@ -1083,8 +1083,8 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
 			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
@@ -1719,8 +1719,8 @@ func TestJobStrategy_Validate(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
 			errs := Strategy.Validate(ctx, tc.job)
 			if len(errs) != int(tc.wantWarningCount) {
 				t.Errorf("want warnings %d but got %d, errors: %v", tc.wantWarningCount, len(errs), errs)

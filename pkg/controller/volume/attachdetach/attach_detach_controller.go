@@ -179,7 +179,7 @@ func NewAttachDetachController(
 
 	csiTranslator := csitrans.New()
 	adc.intreeToCSITranslator = csiTranslator
-	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate)
+	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, featuregate.Default)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,

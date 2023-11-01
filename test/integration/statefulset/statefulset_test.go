@@ -477,7 +477,7 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetAutoDeletePVC, true)()
 			_, ctx := ktesting.NewTestContext(t)
 			closeFn, rm, informers, c := scSetup(ctx, t)
 			defer closeFn()
@@ -699,7 +699,7 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetStartOrdinal, true)()
 	_, ctx := ktesting.NewTestContext(t)
 	closeFn, rm, informers, c := scSetup(ctx, t)
 	defer closeFn()

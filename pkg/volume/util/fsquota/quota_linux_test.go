@@ -596,7 +596,7 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 }
 
 func testAddRemoveQuotas(t *testing.T, enabled bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)()
 	tmpProjectsFile, err := os.CreateTemp("", "projects")
 	if err == nil {
 		_, err = tmpProjectsFile.WriteString(projectsHeader)

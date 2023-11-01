@@ -331,8 +331,8 @@ func TestManager(t *testing.T) {
 			systemDbus = func() (dbusInhibiter, error) {
 				return fakeDbus, nil
 			}
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, pkgfeatures.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, pkgfeatures.GracefulNodeShutdown, true)()
 
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
@@ -436,7 +436,7 @@ func TestFeatureEnabled(t *testing.T) {
 			killPodsFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 				return nil
 			}
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)()
 
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}

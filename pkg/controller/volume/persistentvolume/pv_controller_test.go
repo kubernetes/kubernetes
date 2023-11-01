@@ -52,7 +52,7 @@ import (
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
 	// Default enable the HonorPVReclaimPolicy feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -573,7 +573,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, featuregate.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator, featuregate.Default)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -602,7 +602,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	// in-tree plugin is used as migration is disabled. When that plugin is migrated, a different
 	// non-migrated one should be used. If all plugins are migrated this test can be removed. The
 	// gce in-tree plugin is used for a migrated driver as it is feature-locked as of 1.25.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.HonorPVReclaimPolicy, true)()
 	const nonmigratedDriver = "rbd.csi.ceph.com"
 	const migratedPlugin = "kubernetes.io/gce-pd"
 	const migratedDriver = "pd.csi.storage.gke.io"
@@ -733,7 +733,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, featuregate.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator, featuregate.Default)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

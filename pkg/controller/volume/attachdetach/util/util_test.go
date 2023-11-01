@@ -292,7 +292,7 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 	*fsVolumeMode = v1.PersistentVolumeFilesystem
 
 	csiTranslator := csitrans.New()
-	intreeToCSITranslator := csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate)
+	intreeToCSITranslator := csimigration.NewPluginManager(csiTranslator, featuregate.Default)
 	kubeClient := fake.NewSimpleClientset()
 
 	factory := informers.NewSharedInformerFactory(kubeClient, time.Minute)

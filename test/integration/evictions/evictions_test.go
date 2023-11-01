@@ -394,7 +394,7 @@ func TestEvictionWithFinalizers(t *testing.T) {
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-finalizers", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
 			defer cancel()
 
 			informers.Start(ctx.Done())
@@ -477,7 +477,7 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
 			closeFn, rm, informers, _, clientSet := rmSetup(ctx, t)
 			defer closeFn()
 

@@ -60,7 +60,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.OpenAPIEnums, tc.featureEnabled)()
 
 			getDefinitionsFn := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 				defs := generated.GetOpenAPIDefinitions(ref)

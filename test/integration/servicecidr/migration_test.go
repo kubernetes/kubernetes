@@ -48,7 +48,7 @@ import (
 // 6. start the new apiserver with the new ServiceCIDRs on the flags and shutdown the old one
 // 7. delete the kubernetes.default service, the new apiserver will recreate it within the new ServiceCIDR
 func TestMigrateServiceCIDR(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MultiCIDRServiceAllocator, true)()
 	ctx, cancelFn := context.WithCancel(context.Background())
 	defer cancelFn()
 

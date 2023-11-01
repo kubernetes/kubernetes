@@ -410,8 +410,8 @@ func createV1alpha1ValidatingPolicyAndBinding(client clientset.Interface, conver
 // This test tries to mirror very closely the same test for webhook admission
 // test/integration/apiserver/admissionwebhook/admission_test.go testWebhookAdmission
 func TestPolicyAdmission(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APISelfSubjectReview, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.ValidatingAdmissionPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APISelfSubjectReview, true)()
 
 	holder := &policyExpectationHolder{
 		holder: holder{

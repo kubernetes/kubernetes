@@ -92,7 +92,7 @@ func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan st
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
-	featuregate.DefaultMutableFeatureGate.AddFlag(flags)
+	featuregate.DefaultMutable.AddFlag(flags)
 
 	return cmd
 }

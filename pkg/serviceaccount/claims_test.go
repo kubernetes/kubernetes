@@ -342,9 +342,9 @@ func TestClaims(t *testing.T) {
 			}
 
 			// set feature flags for the duration of the test case
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ServiceAccountTokenJTI, c.featureJTI)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, c.featureNodeBinding)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, c.featurePodNodeInfo)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ServiceAccountTokenJTI, c.featureJTI)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ServiceAccountTokenNodeBinding, c.featureNodeBinding)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ServiceAccountTokenPodNodeInfo, c.featurePodNodeInfo)()
 
 			sc, pc, err := Claims(c.sa, c.pod, c.sec, c.node, c.exp, c.warnafter, c.aud)
 			if err != nil && err.Error() != c.err {
@@ -539,7 +539,7 @@ func TestValidatePrivateClaims(t *testing.T) {
 				expiry = tc.expiry
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ServiceAccountTokenNodeBindingValidation, tc.featureNodeBindingValidation)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ServiceAccountTokenNodeBindingValidation, tc.featureNodeBindingValidation)()
 
 			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: &expiry, NotBefore: &tc.notBefore}, tc.private)
 			if len(tc.expectErr) > 0 {

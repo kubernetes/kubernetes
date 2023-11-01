@@ -1044,7 +1044,7 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SizeMemoryBackedVolumes, testCase.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SizeMemoryBackedVolumes, testCase.featureGateEnabled)()
 			spec := &volume.Spec{
 				Volume: &v1.Volume{
 					VolumeSource: v1.VolumeSource{

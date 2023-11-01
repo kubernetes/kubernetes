@@ -537,7 +537,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 		t.Run(testTitle, func(t *testing.T) {
 			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetAutoDeletePVC, true)()
 			}
 
 			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
@@ -1756,7 +1756,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "2"
@@ -1977,7 +1977,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	for testName, errorCase := range errorCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			errorCase.old.ObjectMeta.ResourceVersion = "1"
 			errorCase.update.ObjectMeta.ResourceVersion = "2"
@@ -2693,7 +2693,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 	}
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "2"
@@ -2793,7 +2793,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 		}
 		for testName, errorCase := range errorCases {
 			t.Run(testName, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
 				// ResourceVersion is required for updates.
 				errorCase.old.ObjectMeta.ResourceVersion = "1"
 				errorCase.update.ObjectMeta.ResourceVersion = "2"
@@ -3118,7 +3118,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	}
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "2"
@@ -3211,7 +3211,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	}
 	for testName, errorCase := range errorCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			errorCase.old.ObjectMeta.ResourceVersion = "1"
 			errorCase.update.ObjectMeta.ResourceVersion = "2"

@@ -60,7 +60,7 @@ type resettable interface {
 }
 
 func TestMetrics(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, apiextensionsfeatures.CRDValidationRatcheting, true)()
 
 	// Wrap metric to keep time constant
 	testMetrics := &fakeMetrics{original: validation.Metrics}

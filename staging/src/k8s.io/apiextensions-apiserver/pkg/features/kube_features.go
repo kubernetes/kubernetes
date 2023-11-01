@@ -36,7 +36,7 @@ const (
 )
 
 func init() {
-	featuregate.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)
+	featuregate.DefaultMutable.Add(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.

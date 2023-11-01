@@ -68,7 +68,7 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 		graph:      graph,
 		identifier: identifier,
 		nodeRules:  rules,
-		features:   featuregate.DefaultFeatureGate,
+		features:   featuregate.Default,
 	}
 }
 

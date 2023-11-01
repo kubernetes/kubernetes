@@ -76,7 +76,7 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 }
 
 func TestVolumeCapacityPriority(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.VolumeCapacityPriority, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.VolumeCapacityPriority, true)()
 
 	config := setupClusterForVolumeCapacityPriority(t, "volume-capacity-priority", 0, 0)
 	defer config.teardown()

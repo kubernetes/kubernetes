@@ -456,7 +456,7 @@ func TestWebhookAdmissionWithoutWatchCache(t *testing.T) {
 
 // testWebhookAdmission tests communication between API server and webhook process.
 func testWebhookAdmission(t *testing.T, watchCache bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APISelfSubjectReview, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APISelfSubjectReview, true)()
 
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{

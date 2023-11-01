@@ -11934,7 +11934,7 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 
 			// prepare status
 			if loadbalancerIPModeInUse(tc.statusBeforeUpdate) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.LoadBalancerIPMode, true)()
 			}
 			oldSvc := obj.(*api.Service).DeepCopy()
 			oldSvc.Status = tc.statusBeforeUpdate
@@ -11943,7 +11943,7 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 				t.Errorf("updated status: %s", err)
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.LoadBalancerIPMode, tc.ipModeEnabled)()
 			newSvc := obj.(*api.Service).DeepCopy()
 			newSvc.Status = tc.newStatus
 			obj, _, err = statusStorage.Update(ctx, newSvc.Name, rest.DefaultUpdatedObjectInfo(newSvc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})

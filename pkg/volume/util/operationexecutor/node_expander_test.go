@@ -93,7 +93,7 @@ func TestNodeExpander(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.RecoverVolumeExpansionFailure, true)()
 			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 
 			pvc := test.pvc

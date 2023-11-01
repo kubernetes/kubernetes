@@ -124,8 +124,8 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				},
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
 			cs := testCtx.ClientSet
 
@@ -333,7 +333,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
 
 			testCtx := testutils.InitTestAPIServer(t, "taint-based-evictions", admission)
 

@@ -836,7 +836,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
 			jobFailMessage, countFailed, action := matchPodFailurePolicy(tc.podFailurePolicy, tc.failedPod)
 			if diff := cmp.Diff(tc.wantJobFailureMessage, jobFailMessage); diff != "" {
 				t.Errorf("Unexpected job failure message: %s", diff)

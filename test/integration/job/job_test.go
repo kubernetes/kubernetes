@@ -154,7 +154,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 			},
 		},
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, true)()
 	closeFn, restConfig, cs, ns := setup(t, "simple")
 	defer closeFn()
 
@@ -439,7 +439,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, test.enableJobPodFailurePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, test.enableJobPodFailurePolicy)()
 
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
 			defer closeFn()
@@ -500,7 +500,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 func TestBackoffLimitPerIndex_DelayedPodDeletion(t *testing.T) {
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, true)()
 	closeFn, restConfig, clientSet, ns := setup(t, "backoff-limit-per-index-failed")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -578,7 +578,7 @@ func TestBackoffLimitPerIndex_DelayedPodDeletion(t *testing.T) {
 func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, true)()
 	closeFn, restConfig, clientSet, ns := setup(t, "backoff-limit-per-index-reenabled")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -616,7 +616,7 @@ func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
 	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(1, 2), "", ptr.To("0"))
 
 	// Disable the feature
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, false)()
 
 	// First pod from index 1 failed
 	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
@@ -631,7 +631,7 @@ func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
 	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 1, 2), "", nil)
 
 	// Reenable the feature
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, true)()
 
 	// First pod from index 2 failed
 	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
@@ -666,7 +666,7 @@ func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
 // - fail index 1
 // - succeed index 1
 func TestBackoffLimitPerIndex_JobPodsCreatedWithExponentialBackoff(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, true)()
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, 2*time.Second))
 
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
@@ -1109,8 +1109,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, true)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobBackoffLimitPerIndex, true)()
 
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
 			defer closeFn()
@@ -1782,8 +1782,8 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobSpec.PodFailurePolicy != nil)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodFailurePolicy, tc.jobSpec.PodFailurePolicy != nil)()
 
 			closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
 			t.Cleanup(closeFn)
@@ -1854,7 +1854,7 @@ func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
 		PodReplacementPolicy: ptr.To(batchv1.Failed),
 	}
 	wantTerminating := ptr.To(podCount)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodReplacementPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodReplacementPolicy, true)()
 	closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -1879,7 +1879,7 @@ func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
 		Ready:       ptr.To[int32](0),
 	})
 	// Disable controller and turn feature off.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodReplacementPolicy, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodReplacementPolicy, false)()
 	cancel()
 	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
 
@@ -1890,7 +1890,7 @@ func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
 		Active:      int(podCount),
 	})
 	// Disable the controller and turn feature on again.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.JobPodReplacementPolicy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.JobPodReplacementPolicy, true)()
 	cancel()
 	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
 	waitForPodsToBeActive(ctx, t, jobClient, 2, jobObj)
@@ -2002,7 +2002,7 @@ func TestElasticIndexedJob(t *testing.T) {
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ElasticIndexedJob, tc.featureGate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ElasticIndexedJob, tc.featureGate)()
 			closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 			defer closeFn()
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -2120,7 +2120,7 @@ func BenchmarkLargeIndexedJob(b *testing.B) {
 	for name, tc := range cases {
 		b.Run(name, func(b *testing.B) {
 			enableJobBackoffLimitPerIndex := tc.backoffLimitPerIndex != nil
-			defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.Default, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)()
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				b.StartTimer()
@@ -2205,7 +2205,7 @@ func BenchmarkLargeFailureHandling(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			enableJobBackoffLimitPerIndex := tc.backoffLimitPerIndex != nil
 			timeout := ptr.Deref(tc.customTimeout, wait.ForeverTestTimeout)
-			defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.DefaultFeatureGate, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(b, featuregate.Default, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)()
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				b.StopTimer()

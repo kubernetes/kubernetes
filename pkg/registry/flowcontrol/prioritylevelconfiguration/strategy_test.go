@@ -299,7 +299,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ZeroLimitedNominalConcurrencyShares, test.zeroFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ZeroLimitedNominalConcurrencyShares, test.zeroFeatureEnabled)()
 
 			scheme := test.scheme
 			scheme.Default(test.obj)

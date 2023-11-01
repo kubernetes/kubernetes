@@ -20,8 +20,8 @@ package feature
 import "k8s.io/component-base/featuregate"
 
 var (
-	// Deprecated: use k8s.io/component-base/featuregate.DefaultMutableFeatureGate
-	DefaultMutableFeatureGate = featuregate.DefaultMutableFeatureGate
-	// Deprecated: use k8s.io/component-base/featuregate.DefaultFeatureGate
-	DefaultFeatureGate = featuregate.DefaultFeatureGate
+	// Deprecated: use k8s.io/component-base/featuregate.DefaultMutable
+	DefaultMutableFeatureGate = featuregate.DefaultMutable
+	// Deprecated: use k8s.io/component-base/featuregate.Default
+	DefaultFeatureGate = featuregate.Default
 )

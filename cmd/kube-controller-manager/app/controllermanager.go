@@ -78,8 +78,8 @@ import (
 )
 
 func init() {
-	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
-	utilruntime.Must(metricsfeatures.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutable))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 const (
@@ -129,7 +129,7 @@ controller, and serviceaccounts controller.`,
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := logsapi.ValidateAndApply(s.Logs, featuregate.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(s.Logs, featuregate.Default); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(cmd.Flags())
@@ -139,7 +139,7 @@ controller, and serviceaccounts controller.`,
 				return err
 			}
 			// add feature enablement metrics
-			featuregate.DefaultMutableFeatureGate.AddMetrics()
+			featuregate.DefaultMutable.AddMetrics()
 			return Run(context.Background(), c.Complete())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {

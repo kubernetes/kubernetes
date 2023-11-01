@@ -196,7 +196,7 @@ func TestResizeFunctions(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.RecoverVolumeExpansionFailure, true)()
 			pvc := tc.pvc
 			kubeClient := fake.NewSimpleClientset(pvc)
 

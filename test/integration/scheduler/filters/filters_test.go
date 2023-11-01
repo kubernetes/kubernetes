@@ -1070,7 +1070,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enableMatchLabelKeysInAffinity)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MatchLabelKeysInPodAffinity, test.enableMatchLabelKeysInAffinity)()
 			_, ctx := ktesting.NewTestContext(t)
 
 			testCtx := initTest(t, "")
@@ -1772,9 +1772,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, tt.enableMinDomains)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MinDomainsInPodTopologySpread, tt.enableMinDomains)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
 			testCtx := initTest(t, "pts-predicate")
 			cs := testCtx.ClientSet

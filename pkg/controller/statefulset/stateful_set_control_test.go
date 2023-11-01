@@ -100,7 +100,7 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 		subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 	}
 	t.Run(subtestName, func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetAutoDeletePVC, false)()
 		testFn(t, &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 			WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -132,7 +132,7 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 			subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 		}
 		t.Run(subtestName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetAutoDeletePVC, true)()
 			testFn(t, policy)
 		})
 	}
@@ -671,7 +671,7 @@ func emptyInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 }
 
 func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StatefulSetStartOrdinal, true)()
 
 	simpleSetFn := func() *apps.StatefulSet {
 		statefulSet := newStatefulSet(3)
@@ -954,7 +954,7 @@ func setupPodManagementPolicy(podManagementPolicy apps.PodManagementPolicyType, 
 }
 
 func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MaxUnavailableStatefulSet, true)()
 
 	simpleParallelVerificationFn := func(
 		set *apps.StatefulSet,
@@ -1211,7 +1211,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 		{[]int{1}}, // note this is an ordinal greater than partition(3)
 	}
 	for _, tc := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MaxUnavailableStatefulSet, true)()
 		set, spc, ssc, maxUnavailable, totalPods := setupForInvariant(t)
 		t.Run(fmt.Sprintf("terminating pod at ordinal %d", tc.ordinalOfPodToTerminate), func(t *testing.T) {
 			status := apps.StatefulSetStatus{Replicas: int32(totalPods)}

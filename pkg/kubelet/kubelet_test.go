@@ -2453,7 +2453,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 }
 
 func TestPodResourceAllocationReset(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, true)()
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2637,7 +2637,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 }
 
 func TestHandlePodResourcesResize(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, true)()
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet

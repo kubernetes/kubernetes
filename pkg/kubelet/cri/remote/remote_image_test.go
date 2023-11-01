@@ -49,7 +49,7 @@ func createRemoteImageServiceWithoutTracerProvider(endpoint string, t *testing.T
 }
 
 func TestImageServiceSpansWithTP(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletTracing, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KubeletTracing, true)()
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
 		fakeRuntime.Stop()
@@ -76,7 +76,7 @@ func TestImageServiceSpansWithTP(t *testing.T) {
 }
 
 func TestImageServiceSpansWithoutTP(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KubeletTracing, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KubeletTracing, true)()
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
 		fakeRuntime.Stop()

@@ -834,7 +834,7 @@ type VolumeStatsOptions struct {
 }
 
 func TestVolumeHealthEnable(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CSIVolumeHealth, true)()
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name               string
@@ -895,7 +895,7 @@ func TestVolumeHealthEnable(t *testing.T) {
 }
 
 func TestVolumeHealthDisable(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CSIVolumeHealth, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CSIVolumeHealth, false)()
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name           string
@@ -936,7 +936,7 @@ func TestVolumeHealthDisable(t *testing.T) {
 }
 
 func TestVolumeStats(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CSIVolumeHealth, true)()
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name               string

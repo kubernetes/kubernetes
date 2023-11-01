@@ -524,9 +524,9 @@ func reduceAllocatableMemoryUsageIfCgroupv1() {
 // make verify WHAT=test-featuregates
 func withFeatureGate(feat featuregate.Feature, desired bool) func() {
 	current := featuregate.Enabled(feat)
-	featuregate.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feat), desired))
+	featuregate.DefaultMutable.Set(fmt.Sprintf("%s=%v", string(feat), desired))
 	return func() {
-		featuregate.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feat), current))
+		featuregate.DefaultMutable.Set(fmt.Sprintf("%s=%v", string(feat), current))
 	}
 }
 

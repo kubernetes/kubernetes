@@ -81,7 +81,7 @@ func BenchmarkVerifyPod(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	p.InspectFeatureGates(featuregate.DefaultFeatureGate)
+	p.InspectFeatureGates(featuregate.Default)
 
 	enforceImplicitPrivilegedNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "enforce-implicit", Labels: map[string]string{}}}
 	enforcePrivilegedNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "enforce-privileged", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "privileged"}}}
@@ -189,7 +189,7 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	p.InspectFeatureGates(featuregate.DefaultFeatureGate)
+	p.InspectFeatureGates(featuregate.Default)
 
 	namespace := "enforce"
 	enforceNamespaceBaselineV1 := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"}}}

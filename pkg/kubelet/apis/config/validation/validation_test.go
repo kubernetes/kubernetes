@@ -79,7 +79,7 @@ var (
 )
 
 func TestValidateKubeletConfiguration(t *testing.T) {
-	featureGate := featuregate.DefaultFeatureGate.DeepCopy()
+	featureGate := featuregate.Default.DeepCopy()
 	logsapi.AddFeatureGates(featureGate)
 
 	cases := []struct {

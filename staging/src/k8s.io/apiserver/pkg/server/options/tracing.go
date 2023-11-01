@@ -88,7 +88,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		return fmt.Errorf("failed to read tracing config: %v", err)
 	}
 
-	errs := tracingapi.ValidateTracingConfiguration(traceConfig, featuregate.DefaultFeatureGate, nil)
+	errs := tracingapi.ValidateTracingConfiguration(traceConfig, featuregate.Default, nil)
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to validate tracing configuration: %v", errs.ToAggregate())
 	}

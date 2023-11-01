@@ -152,7 +152,7 @@ func TestSetDefaultCSIDriver(t *testing.T) {
 }
 
 func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SELinuxMountReadWriteOncePod, true)()
 	driver := &storagev1beta1.CSIDriver{}
 
 	// field should be defaulted
@@ -167,7 +167,7 @@ func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
 }
 
 func TestSetDefaultSELinuxMountReadWriteOncePodDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SELinuxMountReadWriteOncePod, false)()
 	driver := &storagev1beta1.CSIDriver{}
 
 	// field should not be defaulted

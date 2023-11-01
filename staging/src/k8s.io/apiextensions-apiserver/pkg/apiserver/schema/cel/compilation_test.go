@@ -155,7 +155,7 @@ func (v transitionRuleMatcher) String() string {
 }
 
 func TestCelCompilation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, apiextensionsfeatures.CRDValidationRatcheting, true)()
 	cases := []struct {
 		name            string
 		input           schema.Structural

@@ -117,7 +117,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 const (
@@ -190,7 +190,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 			verflag.PrintAndExitIfRequested()
 
 			// set feature gates from initial flags-based config
-			if err := featuregate.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+			if err := featuregate.DefaultMutable.SetFromMap(kubeletConfig.FeatureGates); err != nil {
 				return fmt.Errorf("failed to set feature gates from initial flags-based config: %w", err)
 			}
 
@@ -230,21 +230,21 @@ is checked every 20 seconds (also configurable with a flag).`,
 					return fmt.Errorf("failed to precedence kubeletConfigFlag: %w", err)
 				}
 				// update feature gates based on new config
-				if err := featuregate.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+				if err := featuregate.DefaultMutable.SetFromMap(kubeletConfig.FeatureGates); err != nil {
 					return fmt.Errorf("failed to set feature gates from initial flags-based config: %w", err)
 				}
 			}
 
 			// Config and flags parsed, now we can initialize logging.
 			logs.InitLogs()
-			if err := logsapi.ValidateAndApplyAsField(&kubeletConfig.Logging, featuregate.DefaultFeatureGate, field.NewPath("logging")); err != nil {
+			if err := logsapi.ValidateAndApplyAsField(&kubeletConfig.Logging, featuregate.Default, field.NewPath("logging")); err != nil {
 				return fmt.Errorf("initialize logging: %v", err)
 			}
 			cliflag.PrintFlags(cleanFlagSet)
 
 			// We always validate the local configuration (command line + config file).
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
-			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, featuregate.DefaultFeatureGate); err != nil {
+			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, featuregate.Default); err != nil {
 				return fmt.Errorf("failed to validate kubelet configuration, error: %w, path: %s", err, kubeletConfig)
 			}
 
@@ -259,7 +259,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 
 			// use kubeletServer to construct the default KubeletDeps
-			kubeletDeps, err := UnsecuredDependencies(kubeletServer, featuregate.DefaultFeatureGate)
+			kubeletDeps, err := UnsecuredDependencies(kubeletServer, featuregate.Default)
 			if err != nil {
 				return fmt.Errorf("failed to construct kubelet dependencies: %w", err)
 			}
@@ -279,9 +279,9 @@ is checked every 20 seconds (also configurable with a flag).`,
 			// set up signal context for kubelet shutdown
 			ctx := genericapiserver.SetupSignalContext()
 
-			featuregate.DefaultMutableFeatureGate.AddMetrics()
+			featuregate.DefaultMutable.AddMetrics()
 			// run the kubelet
-			return Run(ctx, kubeletServer, kubeletDeps, featuregate.DefaultFeatureGate)
+			return Run(ctx, kubeletServer, kubeletDeps, featuregate.Default)
 		},
 	}
 
@@ -562,7 +562,7 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 
 func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
 	// Set global feature gates based on the value on the initial KubeletServer
-	err = featuregate.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
+	err = featuregate.DefaultMutable.SetFromMap(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
 		return err
 	}

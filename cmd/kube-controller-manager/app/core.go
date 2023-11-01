@@ -97,7 +97,7 @@ func startServiceLBController(ctx context.Context, controllerContext ControllerC
 		controllerContext.InformerFactory.Core().V1().Services(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ComponentConfig.KubeCloudShared.ClusterName,
-		featuregate.DefaultFeatureGate,
+		featuregate.Default,
 	)
 	if err != nil {
 		// This error shouldn't fail. It lives like this as a legacy.
@@ -415,7 +415,7 @@ func startPersistentVolumeExpanderController(ctx context.Context, controllerCont
 		controllerContext.Cloud,
 		plugins,
 		csiTranslator,
-		csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
+		csimigration.NewPluginManager(csiTranslator, featuregate.Default),
 	)
 
 	if expandControllerErr != nil {

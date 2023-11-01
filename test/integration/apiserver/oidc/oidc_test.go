@@ -109,7 +109,7 @@ func TestOIDC(t *testing.T) {
 }
 
 func TestStructuredAuthenticationConfig(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StructuredAuthenticationConfiguration, true)()
 
 	t.Log("Testing OIDC authenticator with authentication config")
 	runTests(t, true)
@@ -397,7 +397,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 }
 
 func TestStructuredAuthenticationConfigCEL(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StructuredAuthenticationConfiguration, true)()
 
 	tests := []struct {
 		name                    string

@@ -28,7 +28,7 @@ const (
 )
 
 func init() {
-	runtime.Must(featuregate.DefaultMutableFeatureGate.Add(testFeatureGates))
+	runtime.Must(featuregate.DefaultMutable.Add(testFeatureGates))
 }
 
 var testFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{

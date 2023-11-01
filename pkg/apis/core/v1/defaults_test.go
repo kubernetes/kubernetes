@@ -47,10 +47,10 @@ func TestWorkloadDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
 }
 func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
-	allFeatures := featuregate.DefaultFeatureGate.DeepCopy().GetAll()
+	allFeatures := featuregate.Default.DeepCopy().GetAll()
 	for feature, featureSpec := range allFeatures {
 		if !featureSpec.LockToDefault {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, feature, featuresEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, feature, featuresEnabled)()
 		}
 	}
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
@@ -237,10 +237,10 @@ func TestPodDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
 }
 func testPodDefaults(t *testing.T, featuresEnabled bool) {
-	features := featuregate.DefaultFeatureGate.DeepCopy().GetAll()
+	features := featuregate.Default.DeepCopy().GetAll()
 	for feature, featureSpec := range features {
 		if !featureSpec.LockToDefault {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, feature, featuresEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, feature, featuresEnabled)()
 		}
 	}
 	pod := &v1.Pod{}
@@ -411,7 +411,7 @@ func TestPodHostNetworkDefaults(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.DefaultHostNetworkHostPortsInPodTemplates, tc.gate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.DefaultHostNetworkHostPortsInPodTemplates, tc.gate)()
 
 			const portNum = 12345
 			spec := v1.PodSpec{
@@ -1275,7 +1275,7 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.LoadBalancerIPMode, tc.ipModeEnabled)()
 			obj := roundTrip(t, runtime.Object(tc.svc))
 			svc := obj.(*v1.Service)
 			for i, s := range svc.Status.LoadBalancer.Ingress {
@@ -2120,7 +2120,7 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 
 func TestSetDefaultResizePolicy(t *testing.T) {
 	// verify we default to NotRequired restart policy for resize when resources are specified
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, true)()
 
 	for desc, tc := range map[string]struct {
 		testContainer        v1.Container

@@ -17,23 +17,23 @@ limitations under the License.
 package featuregate
 
 var (
-	// DefaultMutableFeatureGate is a mutable version of DefaultFeatureGate.
+	// DefaultMutable is a mutable version of Default.
 	// Only top-level commands/options setup and the k8s.io/component-base/featuregate/testing package should make use of this.
 	// Tests that need to modify feature gates for the duration of their test should use:
-	//   defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.<FeatureName>, <value>)()
-	DefaultMutableFeatureGate MutableFeatureGate = NewFeatureGate()
+	//   defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.<FeatureName>, <value>)()
+	DefaultMutable MutableFeatureGate = NewFeatureGate()
 
-	// DefaultFeatureGate is a shared global FeatureGate.
-	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
-	DefaultFeatureGate FeatureGate = DefaultMutableFeatureGate
+	// Default is a shared global FeatureGate.
+	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutable.
+	Default FeatureGate = DefaultMutable
 )
 
 // Enabled returns true if the key is enabled in the default FeatureGate.
 func Enabled(key Feature) bool {
-	return DefaultFeatureGate.Enabled(key)
+	return Default.Enabled(key)
 }
 
 // KnownFeatures returns a slice of strings describing the default FeatureGate's known features.
 func KnownFeatures() []string {
-	return DefaultFeatureGate.KnownFeatures()
+	return Default.KnownFeatures()
 }

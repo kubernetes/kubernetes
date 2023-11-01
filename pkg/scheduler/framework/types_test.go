@@ -1510,7 +1510,7 @@ func TestFitError_Error(t *testing.T) {
 }
 
 func TestCalculatePodResourcesWithResize(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, true)()
 	cpu500m := resource.MustParse("500m")
 	mem500M := resource.MustParse("500Mi")
 	cpu700m := resource.MustParse("700m")

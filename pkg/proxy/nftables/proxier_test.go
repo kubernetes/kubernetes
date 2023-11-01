@@ -4878,7 +4878,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.LoadBalancerIPMode, testCase.ipModeEnabled)()
 			nft, fp := NewFakeProxier(v1.IPv4Protocol)
 			makeServiceMap(fp,
 				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {

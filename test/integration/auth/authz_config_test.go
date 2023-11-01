@@ -43,7 +43,7 @@ import (
 )
 
 func TestAuthzConfig(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StructuredAuthorizationConfiguration, true)()
 
 	dir := t.TempDir()
 	configFileName := filepath.Join(dir, "config.yaml")
@@ -113,7 +113,7 @@ authorizers:
 }
 
 func TestMultiWebhookAuthzConfig(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StructuredAuthorizationConfiguration, true)()
 
 	dir := t.TempDir()
 

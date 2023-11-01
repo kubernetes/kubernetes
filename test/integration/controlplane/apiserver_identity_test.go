@@ -65,7 +65,7 @@ func expectedAPIServerIdentity(t *testing.T, hostname string) string {
 }
 
 func TestCreateLeaseOnStart(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APIServerIdentity, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APIServerIdentity, true)()
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
 
@@ -128,7 +128,7 @@ func TestLeaseGarbageCollection(t *testing.T) {
 	controlplane.IdentityLeaseGCPeriod = time.Second
 	controlplane.IdentityLeaseRenewIntervalPeriod = time.Second
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APIServerIdentity, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APIServerIdentity, true)()
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
 

@@ -177,7 +177,7 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 
 	t.Run("ConsistentListFromStorage", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ConsistentListFromCache, false)()
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
 		)
@@ -187,7 +187,7 @@ func TestGetListCacheBypass(t *testing.T) {
 
 	})
 	t.Run("ConsistentListFromCache", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ConsistentListFromCache, true)()
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
 		)
@@ -1604,7 +1604,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.WatchList, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.WatchList, true)()
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1757,7 +1757,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 // a bookmark event will be delivered after the cacher has seen an event.
 // Previously the watchers have been removed from the "want bookmark" queue.
 func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.WatchList, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.WatchList, true)()
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {

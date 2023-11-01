@@ -100,7 +100,7 @@ func TestMilliCPUToQuota(t *testing.T) {
 }
 
 func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CPUCFSQuotaPeriod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CPUCFSQuotaPeriod, true)()
 
 	for _, testCase := range []struct {
 		msg      string

@@ -242,7 +242,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.seLinuxMountReadWriteOncePodEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SELinuxMountReadWriteOncePod, test.seLinuxMountReadWriteOncePodEnabled)()
 
 			csiDriver := test.update.DeepCopy()
 			Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
@@ -433,7 +433,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationSELinuxMountEnabledDisabled
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SELinuxMountReadWriteOncePod, true)()
 
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{

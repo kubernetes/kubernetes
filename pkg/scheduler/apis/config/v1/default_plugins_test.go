@@ -139,7 +139,7 @@ func TestApplyFeatureGates(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			for k, v := range test.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, k, v)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, k, v)()
 			}
 
 			gotConfig := getDefaultPlugins()

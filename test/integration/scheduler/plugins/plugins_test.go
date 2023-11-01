@@ -2203,7 +2203,7 @@ func TestPreScorePlugin(t *testing.T) {
 
 // TestPreEnqueuePlugin tests invocation of enqueue plugins.
 func TestPreEnqueuePlugin(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodSchedulingReadiness, true)()
 
 	testContext := testutils.InitTestAPIServer(t, "enqueue-plugin", nil)
 
@@ -2640,7 +2640,7 @@ func (pl *SchedulingGatesPluginWOEvents) EventsToRegister() []framework.ClusterE
 
 // This test helps to verify registering nil events for schedulingGates plugin works as expected.
 func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodSchedulingReadiness, true)()
 
 	testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
 

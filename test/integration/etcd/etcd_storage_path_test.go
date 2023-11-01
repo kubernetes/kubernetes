@@ -72,8 +72,8 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllAlpha", true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllBeta", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllAlpha", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllBeta", true)()
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 	})
 	defer apiServer.Cleanup()

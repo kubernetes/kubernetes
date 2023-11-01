@@ -93,7 +93,7 @@ func TestGetsSelfAttributes(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APISelfSubjectReview, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APISelfSubjectReview, true)()
 
 	var respMu sync.RWMutex
 	response := &user.DefaultInfo{
@@ -213,7 +213,7 @@ func TestGetsSelfAttributesError(t *testing.T) {
 	toggle := &atomic.Value{}
 	toggle.Store(true)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APISelfSubjectReview, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APISelfSubjectReview, true)()
 
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)

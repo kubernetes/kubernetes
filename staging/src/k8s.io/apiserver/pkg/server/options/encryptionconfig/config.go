@@ -121,7 +121,7 @@ func SetKDFForTests(b bool) func() {
 }
 
 // this function should be used to determine enablement of the KMSv2KDF feature
-// instead of getting it from DefaultFeatureGate as the feature gate is now locked
+// instead of getting it from Default as the feature gate is now locked
 // to true starting with v1.29
 func GetKDF() bool {
 	return !kdfDisabled.Load()

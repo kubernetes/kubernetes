@@ -88,7 +88,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(metricsfeatures.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 const (

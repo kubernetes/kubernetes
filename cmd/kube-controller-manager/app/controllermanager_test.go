@@ -107,13 +107,13 @@ func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
 }
 
 func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllAlpha", false)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllBeta", false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllAlpha", false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllBeta", false)()
 
 	controllersWithoutFeatureGates := KnownControllers()
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllAlpha", true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, "AllBeta", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllAlpha", true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, "AllBeta", true)()
 
 	controllersWithFeatureGates := KnownControllers()
 
@@ -186,7 +186,7 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SeparateTaintEvictionController, test.enableFeatureGate)()
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

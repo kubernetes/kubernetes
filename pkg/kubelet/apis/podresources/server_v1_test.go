@@ -35,7 +35,7 @@ import (
 )
 
 func TestListPodResourcesV1(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
 
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
@@ -544,8 +544,8 @@ func TestAllocatableResources(t *testing.T) {
 }
 
 func TestGetPodResourcesV1(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, pkgfeatures.KubeletPodResourcesGet, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
 
 	podName := "pod-name"
 	podNamespace := "pod-namespace"

@@ -86,7 +86,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 		podLister:                fakePodInformer.Lister(),
 		pvcLister:                pvcLister,
 		pvLister:                 pvLister,
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.Default),
 		intreeToCSITranslator:    csiTranslator,
 	}
 
@@ -191,7 +191,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 		podLister:                fakePodInformer.Lister(),
 		pvcLister:                pvcLister,
 		pvLister:                 pvLister,
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.Default),
 		intreeToCSITranslator:    csiTranslator,
 	}
 

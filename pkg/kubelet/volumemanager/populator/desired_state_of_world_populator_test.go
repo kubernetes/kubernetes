@@ -90,7 +90,7 @@ func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod
 
 func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 	// Outer volume spec replacement is needed only when the old volume reconstruction is used
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.NewVolumeManagerReconstruction, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.NewVolumeManagerReconstruction, false)()
 	// create dswp
 	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
 
@@ -1189,7 +1189,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 }
 
 func TestCheckVolumeSELinux(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.SELinuxMountReadWriteOncePod, true)()
 	fullOpts := &v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -1637,7 +1637,7 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,
 		keepTerminatedPodVolumes: false,
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, featuregate.Default),
 		intreeToCSITranslator:    csiTranslator,
 		volumePluginMgr:          fakeVolumePluginMgr,
 	}

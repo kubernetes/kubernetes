@@ -340,7 +340,7 @@ func TestAuthorizer(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.features == nil {
-				authz.features = featuregate.DefaultFeatureGate
+				authz.features = featuregate.Default
 			} else {
 				authz.features = tc.features
 			}
@@ -737,7 +737,7 @@ func BenchmarkAuthorization(b *testing.B) {
 
 		for _, tc := range tests {
 			if tc.features == nil {
-				authz.features = featuregate.DefaultFeatureGate
+				authz.features = featuregate.Default
 			} else {
 				authz.features = tc.features
 			}

@@ -57,7 +57,7 @@ func (f fakeHTTPHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 }
 
 func TestAggregationEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.AggregatedDiscoveryEndpoint, true)()
 
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
 	aggregated := fakeHTTPHandler{data: "aggregated"}
@@ -105,7 +105,7 @@ func TestAggregationEnabled(t *testing.T) {
 }
 
 func TestAggregationDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.AggregatedDiscoveryEndpoint, false)()
 
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
 	aggregated := fakeHTTPHandler{data: "aggregated"}

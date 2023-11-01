@@ -266,8 +266,8 @@ func TestPluginValidate(t *testing.T) {
 				},
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ClusterTrustBundle, tc.clusterTrustBundleFeatureEnabled)()
-			p.InspectFeatureGates(featuregate.DefaultFeatureGate)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ClusterTrustBundle, tc.clusterTrustBundleFeatureEnabled)()
+			p.InspectFeatureGates(featuregate.Default)
 
 			err := p.Validate(context.Background(), tc.attributes, nil)
 			if err == nil && !tc.allowed {

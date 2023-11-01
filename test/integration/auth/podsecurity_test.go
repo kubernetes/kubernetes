@@ -51,8 +51,8 @@ import (
 
 func TestPodSecurity(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.AppArmor, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ProcMountType, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.AppArmor, true)()
 	// Start server
 	server := startPodSecurityServer(t)
 	opts := podsecuritytest.Options{
@@ -73,13 +73,13 @@ func TestPodSecurity(t *testing.T) {
 // TestPodSecurityGAOnly ensures policies pass with only GA features enabled
 func TestPodSecurityGAOnly(t *testing.T) {
 	// Disable all alpha and beta features
-	for k, v := range featuregate.DefaultFeatureGate.DeepCopy().GetAll() {
+	for k, v := range featuregate.Default.DeepCopy().GetAll() {
 		if k == "AllAlpha" || k == "AllBeta" {
 			// Skip special features. When processed first, special features may
 			// erroneously disable other features.
 			continue
 		} else if v.PreRelease == featuregate.Alpha || v.PreRelease == featuregate.Beta {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, k, false)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, k, false)()
 		}
 	}
 	// Start server
@@ -88,7 +88,7 @@ func TestPodSecurityGAOnly(t *testing.T) {
 	opts := podsecuritytest.Options{
 		ClientConfig: server.ClientConfig,
 		// Pass in feature gate info so negative test cases depending on alpha or beta features can be skipped
-		Features: featuregate.DefaultFeatureGate,
+		Features: featuregate.Default,
 	}
 	podsecuritytest.Run(t, opts)
 
@@ -97,8 +97,8 @@ func TestPodSecurityGAOnly(t *testing.T) {
 
 func TestPodSecurityWebhook(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.AppArmor, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ProcMountType, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.AppArmor, true)()
 
 	// Start test API server.
 	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})

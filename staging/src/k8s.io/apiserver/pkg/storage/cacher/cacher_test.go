@@ -173,7 +173,7 @@ func TestList(t *testing.T) {
 }
 
 func TestListWithListFromCache(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ConsistentListFromCache, true)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)

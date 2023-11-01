@@ -76,9 +76,9 @@ func TestIsMigratable(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate)
+		pm := NewPluginManager(csiTranslator, featuregate.Default)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, test.pluginFeature, test.pluginFeatureEnabled)()
 			migratable, err := pm.IsMigratable(test.spec)
 			if migratable != test.isMigratable {
 				t.Errorf("Expected migratability of spec: %v does not match obtained migratability: %v", test.isMigratable, migratable)
@@ -125,15 +125,15 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator, featuregate.DefaultFeatureGate)
+		pm := NewPluginManager(csiTranslator, featuregate.Default)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			// CSIMigrationGCE is locked to on, so it cannot be enabled or disabled. There are a couple
 			// of test cases that check correct behavior when CSIMigrationGCE is enabled, but there are
 			// no longer any tests cases for CSIMigrationGCE being disabled as that is not possible.
 			if len(test.pluginFeature) > 0 {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, test.pluginFeature, test.pluginFeatureEnabled)()
 			}
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()
 
 			csiMigrationResult := pm.IsMigrationEnabledForPlugin(test.pluginName)
 			if csiMigrationResult != test.csiMigrationResult {

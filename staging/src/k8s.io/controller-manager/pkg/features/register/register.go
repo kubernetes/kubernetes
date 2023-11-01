@@ -23,5 +23,5 @@ import (
 )
 
 func init() {
-	runtime.Must(features.SetupCurrentKubernetesSpecificFeatureGates(featuregate.DefaultMutableFeatureGate))
+	runtime.Must(features.SetupCurrentKubernetesSpecificFeatureGates(featuregate.DefaultMutable))
 }

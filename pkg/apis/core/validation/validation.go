@@ -1751,7 +1751,7 @@ var supportedVolumeModes = sets.New(core.PersistentVolumeBlock, core.PersistentV
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
 	opts := PersistentVolumeSpecValidationOptions{
-		EnableVolumeAttributesClass: featuregate.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass: featuregate.DefaultMutable.Enabled(features.VolumeAttributesClass),
 	}
 	if oldPv != nil && oldPv.Spec.VolumeAttributesClassName != nil {
 		opts.EnableVolumeAttributesClass = true

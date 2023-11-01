@@ -91,8 +91,8 @@ import (
 )
 
 func init() {
-	utilruntime.Must(metricsfeatures.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
-	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(featuregate.DefaultMutable))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 // proxyRun defines the interface to run a specified ProxyServer
@@ -281,7 +281,7 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		return err
 	}
 
-	return featuregate.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
+	return featuregate.DefaultMutable.SetFromMap(o.config.FeatureGates)
 }
 
 // copyLogsFromFlags applies the logging flags from the given flag set to the given
@@ -541,7 +541,7 @@ with the apiserver API to configure the proxy.`,
 			}
 
 			logs.InitLogs()
-			if err := logsapi.ValidateAndApplyAsField(&opts.config.Logging, featuregate.DefaultFeatureGate, field.NewPath("logging")); err != nil {
+			if err := logsapi.ValidateAndApplyAsField(&opts.config.Logging, featuregate.Default, field.NewPath("logging")); err != nil {
 				return fmt.Errorf("initialize logging: %v", err)
 			}
 
@@ -551,7 +551,7 @@ with the apiserver API to configure the proxy.`,
 				return fmt.Errorf("failed validate: %w", err)
 			}
 			// add feature enablement metrics
-			featuregate.DefaultMutableFeatureGate.AddMetrics()
+			featuregate.DefaultMutable.AddMetrics()
 			if err := opts.Run(); err != nil {
 				klog.ErrorS(err, "Error running ProxyServer")
 				return err

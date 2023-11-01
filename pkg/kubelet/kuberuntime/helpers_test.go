@@ -161,7 +161,7 @@ func TestToKubeContainer(t *testing.T) {
 }
 
 func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.RuntimeClassInImageCriAPI, true)()
 	c := &runtimeapi.Container{
 		Id: "test-id",
 		Metadata: &runtimeapi.ContainerMetadata{

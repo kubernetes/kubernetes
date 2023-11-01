@@ -977,7 +977,7 @@ const (
 )
 
 func init() {
-	runtime.Must(featuregate.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(featuregate.DefaultMutable.Add(defaultKubernetesFeatureGates))
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.

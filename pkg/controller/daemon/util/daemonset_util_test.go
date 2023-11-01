@@ -477,7 +477,7 @@ func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...featuregat
 	for _, fg := range gates {
 		for _, f := range []bool{true, false} {
 			func() {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, fg, f)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, fg, f)()
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
 			}()
 		}

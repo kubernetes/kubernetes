@@ -240,7 +240,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Updating Pod Container Resources is not supported on Windows.")
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.InPlacePodVerticalScaling, true)()
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
@@ -438,7 +438,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 		t.Run("inconsistent", func(t *testing.T) {
 			ctx := context.Background()
 			defer func() { fakeHTTP.req = nil }()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ConsistentHTTPGetHandlers, false)()
 			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
 			testContainer.Lifecycle = httpLifeCycle
 			_ = m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod, nil)

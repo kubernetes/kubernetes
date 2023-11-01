@@ -156,7 +156,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 	defer webhookServer.Close()
 
 	upCh := typeChecker.Reset()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.AdmissionWebhookMatchConditions, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		"--disable-admission-plugins=ServiceAccount",
 	}, framework.SharedEtcd())

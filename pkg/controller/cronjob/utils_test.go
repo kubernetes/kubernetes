@@ -47,7 +47,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 		scheduledTime   = *topOfTheHour()
 	)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.CronJobsScheduledAnnotation, true)()
 
 	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{

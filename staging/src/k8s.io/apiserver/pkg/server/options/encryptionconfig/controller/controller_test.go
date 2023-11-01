@@ -41,7 +41,7 @@ func TestController(t *testing.T) {
 	t.Cleanup(func() { minKMSPluginCloseGracePeriod = origMinKMSPluginCloseGracePeriod })
 	minKMSPluginCloseGracePeriod = 300 * time.Millisecond
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.KMSv1, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.KMSv1, true)()
 
 	const expectedSuccessMetricValue = `
 # HELP apiserver_encryption_config_controller_automatic_reload_success_total [ALPHA] Total number of successful automatic reloads of encryption configuration split by apiserver identity.

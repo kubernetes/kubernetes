@@ -122,7 +122,7 @@ func TestAllocate(t *testing.T) {
 }
 
 func TestAllocateReserved(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ServiceNodePortStaticSubrange, true)()
 
 	pr, err := net.ParsePortRange("30000-30128")
 	if err != nil {

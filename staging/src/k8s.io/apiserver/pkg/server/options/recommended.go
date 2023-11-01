@@ -71,7 +71,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		// Wired a global by default that sadly people will abuse to have different meanings in different repos.
 		// Please consider creating your own FeatureGate so you can have a consistent meaning for what a variable contains
 		// across different repos.  Future you will thank you.
-		FeatureGate:                featuregate.DefaultFeatureGate,
+		FeatureGate:                featuregate.Default,
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
 		EgressSelector:             NewEgressSelectorOptions(),

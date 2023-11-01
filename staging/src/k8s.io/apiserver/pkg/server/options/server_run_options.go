@@ -337,5 +337,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
-	featuregate.DefaultMutableFeatureGate.AddFlag(fs)
+	featuregate.DefaultMutable.AddFlag(fs)
 }

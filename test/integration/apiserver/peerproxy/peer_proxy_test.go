@@ -57,9 +57,9 @@ func TestPeerProxiedRequest(t *testing.T) {
 	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APIServerIdentity, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StorageVersionAPI, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APIServerIdentity, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StorageVersionAPI, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, kubefeatures.UnknownVersionInteroperabilityProxy, true)()
 
 	// create sharedetcd
 	etcd := framework.SharedEtcd()
@@ -118,9 +118,9 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.APIServerIdentity, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StorageVersionAPI, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.APIServerIdentity, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StorageVersionAPI, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, kubefeatures.UnknownVersionInteroperabilityProxy, true)()
 
 	// create sharedetcd
 	etcd := framework.SharedEtcd()

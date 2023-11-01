@@ -202,7 +202,7 @@ func TestDropDisabledMutatingWebhookConfigurationFields(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
 			DropDisabledMutatingWebhookConfigurationFields(test.new, test.old)
 
 			for _, hook := range test.new.Webhooks {
@@ -397,7 +397,7 @@ func TestDropDisabledValidatingWebhookConfigurationFields(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, genericfeatures.AdmissionWebhookMatchConditions, test.featureGateEnabled)()
 			DropDisabledValidatingWebhookConfigurationFields(test.new, test.old)
 
 			for _, hook := range test.new.Webhooks {

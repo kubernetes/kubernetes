@@ -115,7 +115,7 @@ func TestSchedulingGates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.PodSchedulingReadiness, tt.featureEnabled)()
 
 			// Use zero backoff seconds to bypass backoffQ.
 			// It's intended to not start the scheduler's queue, and hence to

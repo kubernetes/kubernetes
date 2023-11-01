@@ -449,7 +449,7 @@ func newServiceController(t *testing.T, client *clientset.Clientset) (*serviceco
 		serviceInformer,
 		nodeInformer,
 		"test-cluster",
-		featuregate.DefaultFeatureGate)
+		featuregate.Default)
 	if err != nil {
 		t.Fatalf("Error creating service controller: %v", err)
 	}
@@ -479,7 +479,7 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.LoadBalancerIPMode, tc.ipModeEnabled)()
 			server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 			defer server.TearDownFn()
 

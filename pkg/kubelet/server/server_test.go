@@ -571,7 +571,7 @@ func TestAuthzCoverage(t *testing.T) {
 
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ContainerCheckpoint, true)()
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -869,7 +869,7 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 
 func TestCheckpointContainer(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.ContainerCheckpoint, true)()
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()

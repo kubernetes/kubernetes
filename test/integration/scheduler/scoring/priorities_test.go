@@ -644,7 +644,7 @@ func TestPodAffinityScoring(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tt.enableMatchLabelKeysInAffinity)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MatchLabelKeysInPodAffinity, tt.enableMatchLabelKeysInAffinity)()
 
 			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name, interpodaffinity.Name)
 			if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
@@ -908,8 +908,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
 			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name, podtopologyspread.Name)
 			cs := testCtx.ClientSet

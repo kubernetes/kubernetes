@@ -199,7 +199,7 @@ func NewVolumeManager(
 	}
 
 	intreeToCSITranslator := csitrans.New()
-	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator, featuregate.DefaultFeatureGate)
+	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator, featuregate.Default)
 
 	vm.intreeToCSITranslator = intreeToCSITranslator
 	vm.csiMigratedPluginManager = csiMigratedPluginManager

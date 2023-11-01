@@ -367,7 +367,7 @@ type AuthorizationInfo struct {
 }
 
 func init() {
-	utilruntime.Must(features.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(features.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 // NewConfig returns a Config struct with the default values

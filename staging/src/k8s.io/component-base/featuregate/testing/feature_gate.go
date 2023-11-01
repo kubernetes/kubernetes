@@ -28,7 +28,7 @@ import (
 //
 // Example use:
 //
-// defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.<FeatureName>, true)()
+// defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.<FeatureName>, true)()
 func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
 	originalValue := gate.Enabled(f)
 

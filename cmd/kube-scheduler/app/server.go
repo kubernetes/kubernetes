@@ -65,8 +65,8 @@ import (
 )
 
 func init() {
-	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
-	utilruntime.Must(features.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutable))
+	utilruntime.Must(features.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 // Option configures a framework.Registry.
@@ -123,7 +123,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 
 	// Activate logging as soon as possible, after that
 	// show flags with the final logging configuration.
-	if err := logsapi.ValidateAndApply(opts.Logs, featuregate.DefaultFeatureGate); err != nil {
+	if err := logsapi.ValidateAndApply(opts.Logs, featuregate.Default); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
@@ -142,7 +142,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 		return err
 	}
 	// add feature enablement metrics
-	featuregate.DefaultMutableFeatureGate.AddMetrics()
+	featuregate.DefaultMutable.AddMetrics()
 	return Run(ctx, cc, sched)
 }
 

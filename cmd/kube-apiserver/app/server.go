@@ -71,7 +71,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(featuregate.DefaultMutable))
 }
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -98,7 +98,7 @@ cluster's shared state through which all other components interact.`,
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := logsapi.ValidateAndApply(s.Logs, featuregate.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(s.Logs, featuregate.Default); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(fs)
@@ -114,7 +114,7 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 			// add feature enablement metrics
-			featuregate.DefaultMutableFeatureGate.AddMetrics()
+			featuregate.DefaultMutable.AddMetrics()
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -316,7 +316,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		versionedInformers,
 		clientgoExternalClient,
 		dynamicExternalClient,
-		featuregate.DefaultFeatureGate,
+		featuregate.Default,
 		pluginInitializers...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)

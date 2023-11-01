@@ -450,7 +450,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 }
 
 func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StableLoadBalancerNodeSet, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StableLoadBalancerNodeSet, false)()
 	node1 := makeNode(tweakName("node1"), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
 	node2 := makeNode(tweakName("node2"), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
 	node3 := makeNode(tweakName("node3"), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
@@ -2196,7 +2196,7 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 	}}
 	for _, testcase := range testcases {
 		t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, testcase.stableNodeSetEnabled), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StableLoadBalancerNodeSet, testcase.stableNodeSetEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StableLoadBalancerNodeSet, testcase.stableNodeSetEnabled)()
 			shouldSync := shouldSyncUpdatedNode(testcase.oldNode, testcase.newNode)
 			if shouldSync != testcase.shouldSync {
 				t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
@@ -2405,7 +2405,7 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 		},
 	}...)
 	for _, testcase := range testcases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, features.StableLoadBalancerNodeSet, testcase.fgEnabled)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, features.StableLoadBalancerNodeSet, testcase.fgEnabled)()
 		t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, testcase.fgEnabled), func(t *testing.T) {
 			shouldSync := shouldSyncUpdatedNode(testcase.oldNode, testcase.newNode)
 			if shouldSync != testcase.shouldSync {

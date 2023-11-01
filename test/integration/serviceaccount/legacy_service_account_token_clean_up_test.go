@@ -53,7 +53,7 @@ const (
 )
 
 func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, kubefeatures.LegacyServiceAccountTokenCleanUp, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.Default, kubefeatures.LegacyServiceAccountTokenCleanUp, true)()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c, config, stopFunc, informers, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)

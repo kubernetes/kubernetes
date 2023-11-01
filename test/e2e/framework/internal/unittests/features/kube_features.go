@@ -26,7 +26,7 @@ const (
 )
 
 func init() {
-	runtime.Must(featuregate.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(featuregate.DefaultMutable.Add(defaultKubernetesFeatureGates))
 }
 
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
