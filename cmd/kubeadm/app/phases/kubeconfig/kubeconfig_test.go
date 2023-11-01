@@ -933,7 +933,7 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 			}
 
 			client, err := EnsureAdminClusterRoleBindingImpl(
-				context.Background(), adminClient, superAdminClient, time.Millisecond*50, time.Millisecond*1000)
+				context.Background(), adminClient, superAdminClient, 0, 0)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}
