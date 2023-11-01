@@ -24,22 +24,12 @@ import (
 
 // DefaultConfig is the global default logging configuration for a unit
 // test. It is used by NewTestContext and k8s.io/klogr/testing/init.
-//
-// # Experimental
-//
-// Notice: This variable is EXPERIMENTAL and may be changed or removed in a
-// later release.
 var DefaultConfig = NewConfig()
 
 // NewTestContext returns a logger and context for use in a unit test case or
 // benchmark. The tl parameter can be a testing.T or testing.B pointer that
 // will receive all log output. Importing k8s.io/klogr/testing/init will add
 // command line flags that modify the configuration of that log output.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func NewTestContext(tl TL) (logr.Logger, context.Context) {
 	logger := NewLogger(tl, DefaultConfig)
 	ctx := logr.NewContext(context.Background(), logger)
