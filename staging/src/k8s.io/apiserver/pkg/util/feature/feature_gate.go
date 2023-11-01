@@ -31,3 +31,13 @@ var (
 	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
 	DefaultFeatureGate featuregate.FeatureGate = DefaultMutableFeatureGate
 )
+
+// Enabled returns true if the key is enabled in the default FeatureGate.
+func Enabled(key featuregate.Feature) bool {
+	return DefaultFeatureGate.Enabled(key)
+}
+
+// KnownFeatures returns a slice of strings describing the default FeatureGate's known features.
+func KnownFeatures() []string {
+	return DefaultFeatureGate.KnownFeatures()
+}
