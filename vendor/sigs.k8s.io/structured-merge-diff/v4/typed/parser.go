@@ -93,13 +93,13 @@ func (p ParseableType) IsValid() bool {
 
 // FromYAML parses a yaml string into an object with the current schema
 // and the type "typename" or an error if validation fails.
-func (p ParseableType) FromYAML(object YAMLObject) (*TypedValue, error) {
+func (p ParseableType) FromYAML(object YAMLObject, opts ...ValidationOptions) (*TypedValue, error) {
 	var v interface{}
 	err := yaml.Unmarshal([]byte(object), &v)
 	if err != nil {
 		return nil, err
 	}
-	return AsTyped(value.NewValueInterface(v), p.Schema, p.TypeRef)
+	return AsTyped(value.NewValueInterface(v), p.Schema, p.TypeRef, opts...)
 }
 
 // FromUnstructured converts a go "interface{}" type, typically an
@@ -108,8 +108,8 @@ func (p ParseableType) FromYAML(object YAMLObject) (*TypedValue, error) {
 // The provided interface{} must be one of: map[string]interface{},
 // map[interface{}]interface{}, []interface{}, int types, float types,
 // string or boolean. Nested interface{} must also be one of these types.
-func (p ParseableType) FromUnstructured(in interface{}) (*TypedValue, error) {
-	return AsTyped(value.NewValueInterface(in), p.Schema, p.TypeRef)
+func (p ParseableType) FromUnstructured(in interface{}, opts ...ValidationOptions) (*TypedValue, error) {
+	return AsTyped(value.NewValueInterface(in), p.Schema, p.TypeRef, opts...)
 }
 
 // FromStructured converts a go "interface{}" type, typically an structured object in
@@ -117,12 +117,12 @@ func (p ParseableType) FromUnstructured(in interface{}) (*TypedValue, error) {
 // schema validation. The provided "interface{}" value must be a pointer so that the
 // value can be modified via reflection. The provided "interface{}" may contain structs
 // and types that are converted to Values by the jsonMarshaler interface.
-func (p ParseableType) FromStructured(in interface{}) (*TypedValue, error) {
+func (p ParseableType) FromStructured(in interface{}, opts ...ValidationOptions) (*TypedValue, error) {
 	v, err := value.NewValueReflect(in)
 	if err != nil {
 		return nil, fmt.Errorf("error creating struct value reflector: %v", err)
 	}
-	return AsTyped(v, p.Schema, p.TypeRef)
+	return AsTyped(v, p.Schema, p.TypeRef, opts...)
 }
 
 // DeducedParseableType is a ParseableType that deduces the type from

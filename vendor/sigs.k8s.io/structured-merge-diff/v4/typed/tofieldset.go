@@ -94,9 +94,31 @@ func (v *toFieldSetWalker) doScalar(t *schema.Scalar) ValidationErrors {
 }
 
 func (v *toFieldSetWalker) visitListItems(t *schema.List, list value.List) (errs ValidationErrors) {
+	// Keeps track of the PEs we've seen
+	seen := fieldpath.MakePathElementSet(list.Length())
+	// Keeps tracks of the PEs we've counted as duplicates
+	duplicates := fieldpath.MakePathElementSet(list.Length())
 	for i := 0; i < list.Length(); i++ {
 		child := list.At(i)
-		pe, _ := listItemToPathElement(v.allocator, v.schema, t, i, child)
+		pe, _ := listItemToPathElement(v.allocator, v.schema, t, child)
+		if seen.Has(pe) {
+			if duplicates.Has(pe) {
+				// do nothing
+			} else {
+				v.set.Insert(append(v.path, pe))
+				duplicates.Insert(pe)
+			}
+		} else {
+			seen.Insert(pe)
+		}
+	}
+
+	for i := 0; i < list.Length(); i++ {
+		child := list.At(i)
+		pe, _ := listItemToPathElement(v.allocator, v.schema, t, child)
+		if duplicates.Has(pe) {
+			continue
+		}
 		v2 := v.prepareDescent(pe, t.ElementType)
 		v2.value = child
 		errs = append(errs, v2.toFieldSet()...)
