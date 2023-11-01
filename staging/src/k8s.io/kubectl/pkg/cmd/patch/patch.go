@@ -25,8 +25,6 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,6 +39,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -61,11 +60,14 @@ type PatchOptions struct {
 	ToPrinter   func(string) (printers.ResourcePrinter, error)
 	Recorder    genericclioptions.Recorder
 
-	Local       bool
-	PatchType   string
-	Patch       string
-	PatchFile   string
-	Subresource string
+	Local         bool
+	PatchType     string
+	Patch         string
+	PatchFile     string
+	Subresource   string
+	LabelSelector string
+	FieldSelector string
+	All           bool
 
 	namespace                    string
 	enforceNamespace             bool
@@ -146,6 +148,9 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-patch")
 	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, patch will operate on the subresource of the requested object.", supportedSubresources...)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
+	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types")
 
 	return cmd
 }
@@ -235,7 +240,9 @@ func (o *PatchOptions) RunPatch() error {
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
 		Subresource(o.Subresource).
-		ResourceTypeOrNameArgs(false, o.args...).
+		ResourceTypeOrNameArgs(o.All, o.args...).
+		LabelSelectorParam(o.LabelSelector).
+		FieldSelectorParam(o.FieldSelector).
 		Flatten().
 		Do()
 	err = r.Err()
