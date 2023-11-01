@@ -1625,12 +1625,30 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	}
 }
 
+func deleteCustomResourceFromResourceRequirements(target *v1.ResourceRequirements) {
+	for resource := range target.Limits {
+		if resource != v1.ResourceCPU && resource != v1.ResourceMemory && resource != v1.ResourceEphemeralStorage {
+			delete(target.Limits, resource)
+		}
+	}
+	for resource := range target.Requests {
+		if resource != v1.ResourceCPU && resource != v1.ResourceMemory && resource != v1.ResourceEphemeralStorage {
+			delete(target.Requests, resource)
+		}
+	}
+}
+
 func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
 	var podResizeStatus v1.PodResizeStatus
 	specStatusDiffer := false
 	for _, c := range pod.Spec.Containers {
 		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
-			if cs.Resources != nil && !cmp.Equal(c.Resources, *cs.Resources) {
+			cResourceCopy := c.Resources.DeepCopy()
+			// for both requests and limits, we only compare the cpu, memory and ephemeralstorage
+			// which are included in convertToAPIContainerStatuses
+			deleteCustomResourceFromResourceRequirements(cResourceCopy)
+			csResourceCopy := cs.Resources.DeepCopy()
+			if csResourceCopy != nil && !cmp.Equal(*cResourceCopy, *csResourceCopy) {
 				specStatusDiffer = true
 				break
 			}
