@@ -287,6 +287,10 @@ func (s *Status) Equal(x *Status) bool {
 	return cmp.Equal(s.plugin, x.plugin)
 }
 
+func (s *Status) String() string {
+	return s.Message()
+}
+
 // NewStatus makes a Status out of the given arguments and returns its pointer.
 func NewStatus(code Code, reasons ...string) *Status {
 	s := &Status{
