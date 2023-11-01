@@ -168,7 +168,7 @@ kube::etcd::install() {
     ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
     rm "${download_file}"
   elif [[ ${os} == "linux" ]]; then
-    url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
+    url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
     download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
     kube::util::download_file "${url}" "${download_file}"
     tar xzf "${download_file}"

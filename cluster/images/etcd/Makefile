@@ -134,7 +134,7 @@ ifeq ($(ARCH),amd64)
 ifeq ($(OS),windows)
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
-		curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$$version/etcd-v$$version-windows-amd64.zip -o etcd-v$$version-windows-amd64.zip; \
+		curl -sSL --retry 5 https://github.com/etcd-io/etcd/releases/download/v$$version/etcd-v$$version-windows-amd64.zip -o etcd-v$$version-windows-amd64.zip; \
 		unzip -q -d $$etcd_release_tmp_dir etcd-v$$version-windows-amd64.zip; \
 		rm etcd-v$$version-windows-amd64.zip; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd-v$$version-windows-amd64/etcd.exe $$etcd_release_tmp_dir/etcd-v$$version-windows-amd64/etcdctl.exe $(TEMP_DIR)/; \
@@ -144,7 +144,7 @@ ifeq ($(OS),windows)
 else
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
-		curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$$version/etcd-v$$version-linux-amd64.tar.gz | tar -xz -C $$etcd_release_tmp_dir --strip-components=1; \
+		curl -sSL --retry 5 https://github.com/etcd-io/etcd/releases/download/v$$version/etcd-v$$version-linux-amd64.tar.gz | tar -xz -C $$etcd_release_tmp_dir --strip-components=1; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$version; \
@@ -168,7 +168,7 @@ else
 			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
 		fi; \
 		docker run --rm --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
-			"git clone https://github.com/coreos/etcd $$etcd_build_dir \
+			"git clone https://github.com/etcd-io/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
 			&& $(arch_prefix) GOARCH=$(ARCH) ./build.sh \
