@@ -21,5 +21,11 @@ import (
 // DefaultRecorder will be called for each Record call.
 var DefaultRecorder func(tags *tag.Map, measurement interface{}, attachments map[string]interface{})
 
+// MeasurementRecorder will be called for each Record call. This is the same as DefaultRecorder but
+// avoids interface{} conversion.
+// This will be a func(tags *tag.Map, measurement []Measurement, attachments map[string]interface{}) type,
+// but is interface{} here to avoid import loops
+var MeasurementRecorder interface{}
+
 // SubscriptionReporter reports when a view subscribed with a measure.
 var SubscriptionReporter func(measure string)

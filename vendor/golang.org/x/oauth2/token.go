@@ -16,10 +16,10 @@ import (
 	"golang.org/x/oauth2/internal"
 )
 
-// expiryDelta determines how earlier a token should be considered
+// defaultExpiryDelta determines how earlier a token should be considered
 // expired than its actual expiration time. It is used to avoid late
 // expirations due to client-server time mismatches.
-const expiryDelta = 10 * time.Second
+const defaultExpiryDelta = 10 * time.Second
 
 // Token represents the credentials used to authorize
 // the requests to access protected resources on the OAuth 2.0
@@ -52,6 +52,11 @@ type Token struct {
 	// raw optionally contains extra metadata from the server
 	// when updating a token.
 	raw interface{}
+
+	// expiryDelta is used to calculate when a token is considered
+	// expired, by subtracting from Expiry. If zero, defaultExpiryDelta
+	// is used.
+	expiryDelta time.Duration
 }
 
 // Type returns t.TokenType if non-empty, else "Bearer".
@@ -126,6 +131,11 @@ var timeNow = time.Now
 func (t *Token) expired() bool {
 	if t.Expiry.IsZero() {
 		return false
+	}
+
+	expiryDelta := defaultExpiryDelta
+	if t.expiryDelta != 0 {
+		expiryDelta = t.expiryDelta
 	}
 	return t.Expiry.Round(0).Add(-expiryDelta).Before(timeNow())
 }
