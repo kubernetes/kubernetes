@@ -615,23 +615,12 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 	}
 
 	if a.celMapper.UserValidationRules != nil {
-		userInfo := &authenticationv1.UserInfo{
-			Extra:    make(map[string]authenticationv1.ExtraValue),
-			Groups:   info.GetGroups(),
-			UID:      info.GetUID(),
-			Username: info.GetName(),
-		}
-		// Convert the extra information in the user object
-		for key, val := range info.GetExtra() {
-			userInfo.Extra[key] = authenticationv1.ExtraValue(val)
-		}
-
 		// Convert the user info to unstructured so that we can evaluate the CEL expressions
 		// against the user info. This is done once here so that we don't have to convert
 		// the user info to unstructured multiple times in the CEL mapper for each mapping.
-		userInfoUnstructured, err := convertObjectToUnstructured(userInfo)
+		userInfoUnstructured, err := convertUserInfoToUnstructured(info)
 		if err != nil {
-			return nil, false, fmt.Errorf("oidc: could not convert user info to unstructured: %v", err)
+			return nil, false, fmt.Errorf("oidc: could not convert user info to unstructured: %w", err)
 		}
 
 		evalResult, err := a.celMapper.UserValidationRules.EvalUser(ctx, userInfoUnstructured)
@@ -943,4 +932,41 @@ func convertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, e
 		return nil, err
 	}
 	return &unstructured.Unstructured{Object: ret}, nil
+}
+
+func convertUserInfoToUnstructured(info user.Info) (*unstructured.Unstructured, error) {
+	userInfo := &authenticationv1.UserInfo{
+		Extra:    make(map[string]authenticationv1.ExtraValue),
+		Groups:   info.GetGroups(),
+		UID:      info.GetUID(),
+		Username: info.GetName(),
+	}
+	// Convert the extra information in the user object
+	for key, val := range info.GetExtra() {
+		userInfo.Extra[key] = authenticationv1.ExtraValue(val)
+	}
+
+	// Convert the user info to unstructured so that we can evaluate the CEL expressions
+	// against the user info. This is done once here so that we don't have to convert
+	// the user info to unstructured multiple times in the CEL mapper for each mapping.
+	userInfoUnstructured, err := convertObjectToUnstructured(userInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	// check if the user info contains the required fields. If not, set them to empty values.
+	// This is done because the CEL expressions expect these fields to be present.
+	if userInfoUnstructured.Object["username"] == nil {
+		userInfoUnstructured.Object["username"] = ""
+	}
+	if userInfoUnstructured.Object["uid"] == nil {
+		userInfoUnstructured.Object["uid"] = ""
+	}
+	if userInfoUnstructured.Object["groups"] == nil {
+		userInfoUnstructured.Object["groups"] = []string{}
+	}
+	if userInfoUnstructured.Object["extra"] == nil {
+		userInfoUnstructured.Object["extra"] = map[string]authenticationv1.ExtraValue{}
+	}
+	return userInfoUnstructured, nil
 }
