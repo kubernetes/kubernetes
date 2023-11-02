@@ -618,10 +618,11 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
 	// Expect 40% usage.
-	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{
+	imageStats := &statsapi.FsStats{
 		AvailableBytes: uint64Ptr(600),
 		CapacityBytes:  uint64Ptr(1000),
-	}, nil)
+	}
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(imageStats, imageStats, nil)
 
 	assert.NoError(t, manager.GarbageCollect(ctx))
 }
@@ -637,7 +638,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
-	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{}, fmt.Errorf("error"))
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{}, &statsapi.FsStats{}, fmt.Errorf("error"))
 	assert.NotNil(t, manager.GarbageCollect(ctx))
 }
 
@@ -654,10 +655,11 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
 
 	// Expect 95% usage and most of it gets freed.
-	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{
+	imageFs := &statsapi.FsStats{
 		AvailableBytes: uint64Ptr(50),
 		CapacityBytes:  uint64Ptr(1000),
-	}, nil)
+	}
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(imageFs, imageFs, nil)
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 450),
 	}
@@ -677,10 +679,11 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
 
 	// Expect 95% usage and little of it gets freed.
-	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{
+	imageFs := &statsapi.FsStats{
 		AvailableBytes: uint64Ptr(50),
 		CapacityBytes:  uint64Ptr(1000),
-	}, nil)
+	}
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(imageFs, imageFs, nil)
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 50),
 	}

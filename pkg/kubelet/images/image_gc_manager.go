@@ -54,7 +54,7 @@ const imageIndexTupleFormat = "%s,%s"
 // collection.
 type StatsProvider interface {
 	// ImageFsStats returns the stats of the image filesystem.
-	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsapi.FsStats, error)
 }
 
 // ImageGCManager is an interface for managing lifecycle of all images.
@@ -328,7 +328,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 	}
 
 	// Get disk usage on disk holding images.
-	fsStats, err := im.statsProvider.ImageFsStats(ctx)
+	fsStats, _, err := im.statsProvider.ImageFsStats(ctx)
 	if err != nil {
 		return err
 	}

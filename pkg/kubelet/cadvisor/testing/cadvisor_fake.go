@@ -101,6 +101,11 @@ func (c *Fake) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 
+// ContainerFsInfo is a fake implementation of Interface.ContainerFsInfo.
+func (c *Fake) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cadvisorapiv2.FsInfo{}, nil
+}
+
 // WatchEvents is a fake implementation of Interface.WatchEvents.
 func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return new(events.EventChannel), nil

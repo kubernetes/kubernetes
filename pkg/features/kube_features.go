@@ -454,6 +454,12 @@ const (
 	// Enable POD resources API to return allocatable resources
 	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
 
+	// KubeletSeparateDiskGC enables Kubelet to garbage collection images/containers on different filesystems
+	// owner: @kannon92
+	// kep: https://kep.k8s.io/4191
+	// alpha: v1.29
+	KubeletSeparateDiskGC featuregate.Feature = "KubeletSeparateDiskGC"
+
 	// owner: @sallyom
 	// kep: https://kep.k8s.io/2832
 	// alpha: v1.25
@@ -1087,6 +1093,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResourcesGet: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletPodResourcesGetAllocatable: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.28, remove in 1.30
+
+	KubeletSeparateDiskGC: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletTracing: {Default: true, PreRelease: featuregate.Beta},
 
