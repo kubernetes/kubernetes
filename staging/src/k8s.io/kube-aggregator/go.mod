@@ -2,7 +2,7 @@
 
 module k8s.io/kube-aggregator
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
