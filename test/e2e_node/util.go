@@ -518,15 +518,22 @@ func reduceAllocatableMemoryUsageIfCgroupv1() {
 	}
 }
 
+func setGateOrPanic(feat featuregate.Feature, desired bool) {
+	err := featuregate.DefaultMutable.Set(fmt.Sprintf("%s=%v", string(feat), desired))
+	if err != nil {
+		panic(fmt.Sprintf("can't set feature gate %s=%v: %v", string(feat), desired, err))
+	}
+}
+
 // Equivalent of featuregatetesting.SetFeatureGateDuringTest
 // which can't be used here because we're not in a Testing context.
 // This must be in a non-"_test" file to pass
 // make verify WHAT=test-featuregates
 func withFeatureGate(feat featuregate.Feature, desired bool) func() {
 	current := featuregate.Enabled(feat)
-	featuregate.DefaultMutable.Set(fmt.Sprintf("%s=%v", string(feat), desired))
+	setGateOrPanic(feat, desired)
 	return func() {
-		featuregate.DefaultMutable.Set(fmt.Sprintf("%s=%v", string(feat), current))
+		setGateOrPanic(feat, current)
 	}
 }
 

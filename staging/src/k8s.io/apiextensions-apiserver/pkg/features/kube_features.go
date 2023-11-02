@@ -17,6 +17,8 @@ limitations under the License.
 package features
 
 import (
+	"fmt"
+
 	"k8s.io/component-base/featuregate"
 )
 
@@ -36,7 +38,10 @@ const (
 )
 
 func init() {
-	featuregate.DefaultMutable.Add(defaultKubernetesFeatureGates)
+	err := featuregate.DefaultMutable.Add(defaultKubernetesFeatureGates)
+	if err != nil {
+		panic(fmt.Sprintf("can't add feature gates: %v", err))
+	}
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
