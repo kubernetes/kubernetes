@@ -99,6 +99,7 @@ func Test_loopConditionUntilContext_semantic(t *testing.T) {
 		cancelContextAfter int
 		attemptsExpected   int
 		errExpected        error
+		timer              Timer
 	}{
 		{
 			name: "condition successful is only one attempt",
@@ -203,45 +204,88 @@ func Test_loopConditionUntilContext_semantic(t *testing.T) {
 			attemptsExpected: 0,
 			errExpected:      context.DeadlineExceeded,
 		},
+		{
+			name:      "context canceled before the second execution and immediate",
+			immediate: true,
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
+			callback: func(attempts int) (bool, error) {
+				return false, nil
+			},
+			attemptsExpected: 1,
+			errExpected:      context.DeadlineExceeded,
+			timer:            Backoff{Duration: 2 * time.Second}.Timer(),
+		},
+		{
+			name:      "immediate and long duration of condition and sliding false",
+			immediate: true,
+			sliding:   false,
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
+			callback: func(attempts int) (bool, error) {
+				if attempts >= 4 {
+					return true, nil
+				}
+				time.Sleep(time.Second / 5)
+				return false, nil
+			},
+			attemptsExpected: 4,
+			timer:            Backoff{Duration: time.Second / 5, Jitter: 0.001}.Timer(),
+		},
+		{
+			name:      "immediate and long duration of condition and sliding true",
+			immediate: true,
+			sliding:   true,
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
+			callback: func(attempts int) (bool, error) {
+				if attempts >= 4 {
+					return true, nil
+				}
+				time.Sleep(time.Second / 5)
+				return false, nil
+			},
+			errExpected:      context.DeadlineExceeded,
+			attemptsExpected: 3,
+			timer:            Backoff{Duration: time.Second / 5, Jitter: 0.001}.Timer(),
+		},
 	}
 
 	for _, test := range tests {
-		for _, immediate := range []bool{true, false} {
-			t.Run(fmt.Sprintf("immediate=%t", immediate), func(t *testing.T) {
-				for _, sliding := range []bool{true, false} {
-					t.Run(fmt.Sprintf("sliding=%t", sliding), func(t *testing.T) {
-						t.Run(test.name, func(t *testing.T) {
-							contextFn := test.context
-							if contextFn == nil {
-								contextFn = defaultContext
-							}
-							ctx, cancel := contextFn()
-							defer cancel()
+		t.Run(test.name, func(t *testing.T) {
+			contextFn := test.context
+			if contextFn == nil {
+				contextFn = defaultContext
+			}
+			ctx, cancel := contextFn()
+			defer cancel()
 
-							timer := Backoff{Duration: time.Microsecond}.Timer()
-							attempts := 0
-							err := loopConditionUntilContext(ctx, timer, test.immediate, test.sliding, func(_ context.Context) (bool, error) {
-								attempts++
-								defer func() {
-									if test.cancelContextAfter > 0 && test.cancelContextAfter == attempts {
-										cancel()
-									}
-								}()
-								return test.callback(attempts)
-							})
-
-							if test.errExpected != err {
-								t.Errorf("expected error: %v but got: %v", test.errExpected, err)
-							}
-
-							if test.attemptsExpected != attempts {
-								t.Errorf("expected attempts count: %d but got: %d", test.attemptsExpected, attempts)
-							}
-						})
-					})
-				}
+			timer := test.timer
+			if timer == nil {
+				timer = Backoff{Duration: time.Microsecond}.Timer()
+			}
+			attempts := 0
+			err := loopConditionUntilContext(ctx, timer, test.immediate, test.sliding, func(_ context.Context) (bool, error) {
+				attempts++
+				defer func() {
+					if test.cancelContextAfter > 0 && test.cancelContextAfter == attempts {
+						cancel()
+					}
+				}()
+				return test.callback(attempts)
 			})
-		}
+
+			if test.errExpected != err {
+				t.Errorf("expected error: %v but got: %v", test.errExpected, err)
+			}
+
+			if test.attemptsExpected != attempts {
+				t.Errorf("expected attempts count: %d but got: %d", test.attemptsExpected, attempts)
+			}
+		})
 	}
 }
 
