@@ -350,16 +350,11 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 			// OBSERVATION: pvc is "Pending", will retry
 
 			logger.V(4).Info("Attempting to assign storage class to unbound PersistentVolumeClaim", "PVC", klog.KObj(claim))
-			updated, err := ctrl.assignDefaultStorageClass(ctx, claim)
+			newClaim, err := ctrl.assignDefaultStorageClass(ctx, claim)
 			if err != nil {
-				metrics.RecordRetroactiveStorageClassMetric(false)
 				return fmt.Errorf("can't update PersistentVolumeClaim[%q]: %w", claimToClaimKey(claim), err)
 			}
-			if updated {
-				logger.V(4).Info("PersistentVolumeClaim update successful, restarting claim sync", "PVC", klog.KObj(claim))
-				metrics.RecordRetroactiveStorageClassMetric(true)
-				return nil
-			}
+			claim = newClaim
 
 			switch {
 			case delayBinding && !storagehelpers.IsDelayBindingProvisioning(claim):
@@ -939,31 +934,39 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(ctx context.C
 
 // assignDefaultStorageClass updates the claim storage class if there is any, the claim is updated to the API server.
 // Ignores claims that already have a storage class.
-// TODO: if resync is ever changed to a larger period, we might need to change how we set the default class on existing unbound claims
-func (ctrl *PersistentVolumeController) assignDefaultStorageClass(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
+func (ctrl *PersistentVolumeController) assignDefaultStorageClass(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	logger := klog.FromContext(ctx)
 
 	if storagehelpers.GetPersistentVolumeClaimClass(claim) != "" {
-		return false, nil
+		return claim, nil
 	}
 
 	class, err := util.GetDefaultClass(ctrl.classLister)
 	if err != nil {
-		return false, err
+		return nil, err
 	} else if class == nil {
 		logger.V(4).Info("Can not assign storage class to PersistentVolumeClaim: default storage class not found", "PVC", klog.KObj(claim))
-		return false, nil
+		return claim, nil
 	}
 
+	claimClone := claim.DeepCopy()
 	logger.V(4).Info("Assigning StorageClass to PersistentVolumeClaim", "PVC", klog.KObj(claim), "storageClassName", class.Name)
-	claim.Spec.StorageClassName = &class.Name
-	_, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.GetNamespace()).Update(ctx, claim, metav1.UpdateOptions{})
-	if err != nil {
-		return false, err
-	}
+	claimClone.Spec.StorageClassName = &class.Name
 
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.GetNamespace()).Update(ctx, claimClone, metav1.UpdateOptions{})
+	if err != nil {
+		metrics.RecordRetroactiveStorageClassMetric(false)
+		return nil, err
+	}
 	logger.V(4).Info("Successfully assigned StorageClass to PersistentVolumeClaim", "PVC", klog.KObj(claim), "storageClassName", class.Name)
-	return true, nil
+	metrics.RecordRetroactiveStorageClassMetric(true)
+
+	_, err = ctrl.storeClaimUpdate(logger, newClaim)
+	if err != nil {
+		logger.V(4).Info("Updating PersistentVolumeClaim: cannot update internal cache", "PVC", klog.KObj(claim), "err", err)
+		return nil, err
+	}
+	return newClaim, nil
 }
 
 // bindVolumeToClaim modifies given volume to be bound to a claim and saves it to
