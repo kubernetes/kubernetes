@@ -1438,6 +1438,7 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 							ConnectionInfo: api.WebhookConnectionInfo{
 								Type: "InClusterConfig",
 							},
+							MatchConditions: []api.WebhookMatchCondition{{Expression: "true"}},
 						},
 					},
 				},

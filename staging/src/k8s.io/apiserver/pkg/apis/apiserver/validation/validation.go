@@ -512,7 +512,9 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 
 	switch c.MatchConditionSubjectAccessReviewVersion {
 	case "":
-		allErrs = append(allErrs, field.Required(fldPath.Child("matchConditionSubjectAccessReviewVersion"), ""))
+		if len(c.MatchConditions) > 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("matchConditionSubjectAccessReviewVersion"), "required if match conditions are specified"))
+		}
 	case "v1":
 		_ = &v1.SubjectAccessReview{}
 	default:
