@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -40,7 +41,7 @@ import (
 
 const runAsUserNameContainerName = "run-as-username-container"
 
-var _ = sigDescribe("[Feature:Windows] SecurityContext", skipUnlessWindows(func() {
+var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

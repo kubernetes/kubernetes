@@ -30,6 +30,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 )
@@ -41,7 +42,7 @@ const SeccompProcStatusField = "Seccomp:"
 const ProcSelfStatusPath = "/proc/self/status"
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly]", func() {
+var _ = SIGDescribe("SeccompDefault", framework.WithSerial(), feature.SeccompDefault, "[LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("seccompdefault-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

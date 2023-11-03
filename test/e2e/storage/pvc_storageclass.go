@@ -62,7 +62,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 		}
 	})
 
-	ginkgo.Describe("Retroactive StorageClass assignment [Serial][Disruptive]", func() {
+	f.Describe("Retroactive StorageClass assignment", framework.WithSerial(), framework.WithDisruptive(), func() {
 		ginkgo.It("should assign default SC to PVCs that have no SC set", func(ctx context.Context) {
 
 			// Temporarily set all default storage classes as non-default

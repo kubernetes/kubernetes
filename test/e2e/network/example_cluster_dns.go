@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -58,7 +59,7 @@ try:
 except:
 	print('err')`
 
-var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
+var _ = common.SIGDescribe("ClusterDns", feature.Example, func() {
 	f := framework.NewDefaultFramework("cluster-dns")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

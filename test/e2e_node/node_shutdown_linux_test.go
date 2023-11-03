@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 
 	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
@@ -57,7 +58,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
+var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.GracefulNodeShutdown, nodefeature.GracefulNodeShutdownBasedOnPodPriority, func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -83,7 +84,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		}
 	})
 
-	ginkgo.Context("graceful node shutdown when PodDisruptionConditions are enabled [NodeFeature:PodDisruptionConditions]", func() {
+	f.Context("graceful node shutdown when PodDisruptionConditions are enabled", nodefeature.PodDisruptionConditions, func() {
 
 		const (
 			pollInterval            = 1 * time.Second

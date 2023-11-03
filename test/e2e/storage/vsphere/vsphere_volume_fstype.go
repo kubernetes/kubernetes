@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -68,7 +69,7 @@ const (
 	7. Verify if the MountVolume.MountDevice fails because it is unable to find the file system executable file on the node.
 */
 
-var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume FStype", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-fstype")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

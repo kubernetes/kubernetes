@@ -43,7 +43,7 @@ type testCase struct {
 // be reserved for K8s components.
 const KubeReservedMemory = 0.35
 
-var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [LinuxOnly] [Serial]", func() {
+var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [LinuxOnly]", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("nodeallocatable-oomkiller-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
@@ -61,7 +61,7 @@ var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [
 	}
 })
 
-var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
+var _ = SIGDescribe("OOMKiller [LinuxOnly]", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

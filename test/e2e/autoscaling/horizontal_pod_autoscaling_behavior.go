@@ -21,6 +21,7 @@ import (
 	"time"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -29,7 +30,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", func() {
+var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "Horizontal pod autoscaling (non-default behavior)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

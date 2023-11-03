@@ -283,11 +283,11 @@ var _ = SIGDescribe("DisruptionController", func() {
 		// tests with exclusive set to true relies on HostPort to make sure
 		// only one pod from the replicaset is assigned to each node. This
 		// requires these tests to be run serially.
-		var serial string
+		args := []interface{}{fmt.Sprintf("evictions: %s => %s", c.description, expectation)}
 		if c.exclusive {
-			serial = " [Serial]"
+			args = append(args, framework.WithSerial())
 		}
-		ginkgo.It(fmt.Sprintf("evictions: %s => %s%s", c.description, expectation, serial), func(ctx context.Context) {
+		f.It(append(args, func(ctx context.Context) {
 			if c.skipForBigClusters {
 				e2eskipper.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
 			}
@@ -338,7 +338,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				})
 				framework.ExpectNoError(err)
 			}
-		})
+		})...)
 	}
 
 	/*

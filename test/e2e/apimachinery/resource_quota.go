@@ -46,6 +46,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1203,7 +1204,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 })
 
-var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
+var _ = SIGDescribe("ResourceQuota", feature.ScopeSelectors, func() {
 	f := framework.NewDefaultFramework("scope-selectors")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("should verify ResourceQuota with best effort scope using scope-selectors.", func(ctx context.Context) {
@@ -1384,7 +1385,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 	})
 })
 
-var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
+var _ = SIGDescribe("ResourceQuota", feature.PodPriority, func() {
 	f := framework.NewDefaultFramework("resourcequota-priorityclass")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

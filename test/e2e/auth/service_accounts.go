@@ -43,6 +43,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	utilptr "k8s.io/utils/pointer"
@@ -334,7 +335,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   Containers MUST verify that the projected service account token can be
 	   read and has correct file mode set including ownership and permission.
 	*/
-	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
+	f.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		var (
@@ -430,7 +431,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	ginkgo.It("should support InClusterConfig with token rotation [Slow]", func(ctx context.Context) {
+	f.It("should support InClusterConfig with token rotation", f.WithSlow(), func(ctx context.Context) {
 		tenMin := int64(10 * 60)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "inclusterclient"},

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -231,7 +232,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *fram
 // that each have a variable amount of content in the associated Namespace.
 // When run in [Serial] this test appears to delete Namespace objects at a
 // rate of approximately 1 per second.
-var _ = SIGDescribe("Namespaces [Serial]", func() {
+var _ = SIGDescribe("Namespaces", framework.WithSerial(), func() {
 
 	f := framework.NewDefaultFramework("namespaces")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
@@ -259,7 +260,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	})
 
 	// On hold until etcd3; see #7372
-	ginkgo.It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]", func(ctx context.Context) {
+	f.It("should always delete fast (ALL of 100 namespaces in 150 seconds)", feature.ComprehensiveNamespaceDraining, func(ctx context.Context) {
 		extinguish(ctx, f, 100, 0, 150)
 	})
 

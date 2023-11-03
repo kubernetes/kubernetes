@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -35,7 +36,7 @@ var (
 	WindowsHyperVContainerRuntimeClass = "runhcs-wcow-hypervisor"
 )
 
-var _ = sigDescribe("[Feature:WindowsHyperVContainers] HyperV containers", skipUnlessWindows(func() {
+var _ = sigDescribe(feature.WindowsHyperVContainers, "HyperV containers", skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})

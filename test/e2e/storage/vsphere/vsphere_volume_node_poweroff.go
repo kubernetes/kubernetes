@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -45,7 +46,7 @@ Test to verify volume status after node power off:
 1. Verify the pod got provisioned on a different node with volume attached to it
 2. Verify the volume is detached from the powered off node
 */
-var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
+var _ = utils.SIGDescribe("Node Poweroff", feature.Vsphere, framework.WithSlow(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("node-poweroff")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

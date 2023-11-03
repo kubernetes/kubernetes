@@ -42,11 +42,11 @@ var (
 	NodeProblemDetector                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeProblemDetector"))
 	OOMScoreAdj                            = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
 	PodDisruptionConditions                = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodDisruptionConditions"))
+	PodHostIPs                             = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodHostIPs"))
 	PodResources                           = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 	ResourceMetrics                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))
 	RuntimeHandler                         = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
 	SystemNodeCriticalPod                  = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
-	TopologyManager                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("TopologyManager"))
 )
 
 func init() {

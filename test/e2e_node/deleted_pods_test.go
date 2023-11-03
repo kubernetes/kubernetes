@@ -38,7 +38,7 @@ const (
 	testFinalizer = "example.com/test-finalizer"
 )
 
-var _ = SIGDescribe("Deleted pods handling [NodeConformance]", func() {
+var _ = SIGDescribe("Deleted pods handling", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("deleted-pods-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

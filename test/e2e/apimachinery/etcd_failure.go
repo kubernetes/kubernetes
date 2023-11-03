@@ -36,7 +36,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
+var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 
 	f := framework.NewDefaultFramework("etcd-failure")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

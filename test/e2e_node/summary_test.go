@@ -40,7 +40,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-var _ = SIGDescribe("Summary API [NodeConformance]", func() {
+var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("summary-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {

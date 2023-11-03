@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/environment"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -32,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
+var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func() {
 
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.
@@ -75,7 +76,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	  [Environment:NotInUserNS]: The test fails in UserNS (as expected): `open /proc/sys/kernel/shm_rmid_forced: permission denied`
 	*/
-	framework.ConformanceIt("should support sysctls [MinimumKubeletVersion:1.21] [Environment:NotInUserNS]", func(ctx context.Context) {
+	framework.ConformanceIt("should support sysctls [MinimumKubeletVersion:1.21]", environment.NotInUserNS, func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -185,7 +186,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	  [Environment:NotInUserNS]: The test fails in UserNS (as expected): `open /proc/sys/kernel/shm_rmid_forced: permission denied`
 	*/
-	ginkgo.It("should support sysctls with slashes as separator [MinimumKubeletVersion:1.23] [Environment:NotInUserNS]", func(ctx context.Context) {
+	f.It("should support sysctls with slashes as separator [MinimumKubeletVersion:1.23]", environment.NotInUserNS, func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{

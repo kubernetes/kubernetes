@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -132,7 +133,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, post start exec hook
 			Description: When a post start handler is specified in the container lifecycle using a 'Exec' action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod using ExecAction to validate that the post start is executed.
 		*/
-		framework.ConformanceIt("should execute poststart exec hook properly [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should execute poststart exec hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
@@ -149,7 +150,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop exec hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'Exec' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod using ExecAction to validate that the pre-stop is executed.
 		*/
-		framework.ConformanceIt("should execute prestop exec hook properly [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should execute prestop exec hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
@@ -165,7 +166,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, post start http hook
 			Description: When a post start handler is specified in the container lifecycle using a HttpGet action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod on the same node with a container lifecycle specifying a post start that invokes the server pod to validate that the post start is executed.
 		*/
-		framework.ConformanceIt("should execute poststart http hook properly [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should execute poststart http hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -187,7 +188,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, poststart https hook
 			Description: When a post-start handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod on the same node with a container lifecycle specifying a post-start that invokes the server pod to validate that the post-start is executed.
 		*/
-		ginkgo.It("should execute poststart https hook properly [MinimumKubeletVersion:1.23] [NodeConformance]", func(ctx context.Context) {
+		f.It("should execute poststart https hook properly [MinimumKubeletVersion:1.23]", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -210,7 +211,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop http hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod on the same node with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
-		framework.ConformanceIt("should execute prestop http hook properly [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should execute prestop http hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -232,7 +233,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop https hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod on the same node with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
-		ginkgo.It("should execute prestop https hook properly [MinimumKubeletVersion:1.23] [NodeConformance]", func(ctx context.Context) {
+		f.It("should execute prestop https hook properly [MinimumKubeletVersion:1.23]", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -253,7 +254,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Feature:SidecarContainers] Restartable Init Container Lifecycle Hook", func() {
+var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers]", feature.SidecarContainers, "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -545,7 +546,7 @@ func getSidecarPodWithHook(name string, image string, lifecycle *v1.Lifecycle) *
 	}
 }
 
-var _ = SIGDescribe("[Feature:PodLifecycleSleepAction]", func() {
+var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient

@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -39,11 +40,12 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe("DualStack Host IP [Serial] [NodeFeature:PodHostIPs] [Feature:PodHostIPs]", func() {
+var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeature.PodHostIPs, feature.PodHostIPs, func() {
 	f := framework.NewDefaultFramework("dualstack")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

@@ -37,6 +37,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -880,7 +881,7 @@ func isSMTAlignmentError(pod *v1.Pod) bool {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager]", func() {
+var _ = SIGDescribe("CPU Manager", framework.WithSerial(), feature.CPUManager, func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

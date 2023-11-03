@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -35,7 +36,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes", feature.Vsphere, feature.ReclaimPolicy, func() {
 	f := framework.NewDefaultFramework("persistentvolumereclaim")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
@@ -53,7 +54,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, f.Timeouts.NodeSchedulable))
 	})
 
-	ginkgo.Describe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
+	f.Describe("persistentvolumereclaim:vsphere", feature.Vsphere, func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			e2eskipper.SkipUnlessProviderIs("vsphere")
 			ginkgo.DeferCleanup(testCleanupVSpherePersistentVolumeReclaim, c, nodeInfo, ns, volumePath, pv, pvc)

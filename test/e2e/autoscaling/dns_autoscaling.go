@@ -104,7 +104,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
-	ginkgo.It("[Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
+	f.It(f.WithSerial(), f.WithSlow(), "kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
 		numNodes, err := e2enode.TotalRegistered(ctx, c)
 		framework.ExpectNoError(err)
 

@@ -43,7 +43,7 @@ func nodeNames(nodes []v1.Node) []string {
 	return result
 }
 
-var _ = SIGDescribe("Restart [Disruptive]", func() {
+var _ = SIGDescribe("Restart", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("restart")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ps *testutils.PodStore

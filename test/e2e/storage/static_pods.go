@@ -28,6 +28,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -42,7 +43,7 @@ import (
 // NOTE: these tests *require* the cluster under test to be Kubernetes In Docker (kind)!
 // Kind runs its API server as a static Pod, and we leverage it here
 // to test kubelet starting without the API server.
-var _ = utils.SIGDescribe("StaticPods [Feature:Kind]", func() {
+var _ = utils.SIGDescribe("StaticPods", feature.Kind, func() {
 	f := framework.NewDefaultFramework("static-pods-csi")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -61,7 +62,7 @@ var _ = utils.SIGDescribe("StaticPods [Feature:Kind]", func() {
 	// Test https://github.com/kubernetes/kubernetes/issues/117745
 	// I.e. kubelet starts and it must start the API server as a static pod,
 	// while there is a CSI volume mounted by the previous kubelet.
-	ginkgo.It("should run after kubelet stopped with CSI volume mounted [Disruptive][Serial]", func(ctx context.Context) {
+	f.It("should run after kubelet stopped with CSI volume mounted", f.WithDisruptive(), f.WithSerial(), func(ctx context.Context) {
 		var timeout int64 = 5
 
 		ginkgo.By("Provision a new CSI volume")

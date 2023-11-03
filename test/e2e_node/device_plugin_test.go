@@ -49,11 +49,13 @@ import (
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 )
 
 var (
@@ -62,7 +64,7 @@ var (
 )
 
 // Serial because the test restarts Kubelet
-var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
+var _ = SIGDescribe("Device Plugin", feature.DevicePluginProbe, nodefeature.DevicePluginProbe, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
@@ -93,7 +95,7 @@ const (
 
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
-	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", func() {
+	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var devicePluginPod, dptemplate *v1.Pod
 		var v1alphaPodResources *kubeletpodresourcesv1alpha1.ListPodResourcesResponse
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
@@ -705,7 +707,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 }
 
 func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
-	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", func() {
+	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var devicePluginPod *v1.Pod
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
 		var triggerPathFile, triggerPathDir string

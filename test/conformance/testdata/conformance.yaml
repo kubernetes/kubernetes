@@ -3035,7 +3035,7 @@
   file: test/e2e/storage/persistent_volumes.go
 - testname: Projected Volume, multiple projections
   codename: '[sig-storage] Projected combined should project all components that make
-    up the projection API [Projection][NodeConformance] [Conformance]'
+    up the projection API [Projection] [NodeConformance] [Conformance]'
   description: A Pod is created with a projected volume source for secrets, configMap
     and downwardAPI with pod name, cpu and memory limits and cpu and memory requests.
     Pod MUST be able to read the secrets, configMap values and the cpu and memory

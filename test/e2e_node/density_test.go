@@ -53,7 +53,7 @@ const (
 	kubeletAddr = "localhost:10255"
 )
 
-var _ = SIGDescribe("Density [Serial] [Slow]", func() {
+var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), func() {
 	const (
 		// The data collection time of resource collector and the standalone cadvisor
 		// is not synchronized, so resource collector may miss data or
