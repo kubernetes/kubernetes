@@ -37,6 +37,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -209,7 +210,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
-			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, []apiserver.WebhookMatchCondition{}, noopAuthorizerMetrics())
+			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion, []apiserver.WebhookMatchCondition{}, noopAuthorizerMetrics())
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -352,7 +353,7 @@ func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cache
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
-	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, expressions, metrics)
+	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, expressions, metrics)
 }
 
 func TestV1TLSConfig(t *testing.T) {
@@ -703,6 +704,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 			Name:   "alice",
 			UID:    "1",
 			Groups: []string{"group1", "group2"},
+			Extra:  map[string][]string{"key1": {"a", "b", "c"}},
 		},
 		ResourceRequest: true,
 		Namespace:       "kittensandponies",
@@ -797,6 +799,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			Name:   "alice",
 			UID:    "1",
 			Groups: []string{"group1", "group2"},
+			Extra:  map[string][]string{"key1": {"a", "b", "c"}},
 		},
 		ResourceRequest: true,
 		Namespace:       "kittensandponies",
@@ -846,6 +849,18 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 				},
 				{
 					Expression: "('group1' in request.groups)",
+				},
+				{
+					Expression: "('key1' in request.extra)",
+				},
+				{
+					Expression: "!('key2' in request.extra)",
+				},
+				{
+					Expression: "('a' in request.extra['key1'])",
+				},
+				{
+					Expression: "!('z' in request.extra['key1'])",
 				},
 				{
 					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
@@ -1027,13 +1042,10 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			expectedCompileErr: "",
 			// default decisionOnError in newWithBackoff to skip
 			expectedDecision: authorizer.DecisionNoOpinion,
-			expectedEvalErr:  "[cel evaluation error: expression 'request.user == 'bob'' resulted in error: no such key: user, cel evaluation error: expression 'has(request.nonResourceAttributes) && request.nonResourceAttributes.verb == 'get'' resulted in error: no such key: verb]",
+			expectedEvalErr:  "cel evaluation error: expression 'request.resourceAttributes.verb == 'get'' resulted in error: no such key: resourceAttributes",
 			expressions: []apiserver.WebhookMatchCondition{
 				{
-					Expression: "request.user == 'bob'",
-				},
-				{
-					Expression: "has(request.nonResourceAttributes) && request.nonResourceAttributes.verb == 'get'",
+					Expression: "request.resourceAttributes.verb == 'get'",
 				},
 			},
 		},

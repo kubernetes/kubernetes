@@ -22,6 +22,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types/ref"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -143,6 +144,7 @@ func mustBuildEnv(baseEnv *environment.EnvSet) *environment.EnvSet {
 }
 
 // buildRequestType generates a DeclType for SubjectAccessReviewSpec.
+// if attributes are added here, also add to convertObjectToUnstructured.
 func buildRequestType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	resourceAttributesType := buildResourceAttributesType(field, fields)
 	nonResourceAttributesType := buildNonResourceAttributesType(field, fields)
@@ -157,6 +159,7 @@ func buildRequestType(field func(name string, declType *apiservercel.DeclType, r
 }
 
 // buildResourceAttributesType generates a DeclType for ResourceAttributes.
+// if attributes are added here, also add to convertObjectToUnstructured.
 func buildResourceAttributesType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	return apiservercel.NewObjectType("kubernetes.ResourceAttributes", fields(
 		field("namespace", apiservercel.StringType, false),
@@ -170,9 +173,42 @@ func buildResourceAttributesType(field func(name string, declType *apiservercel.
 }
 
 // buildNonResourceAttributesType generates a DeclType for NonResourceAttributes.
+// if attributes are added here, also add to convertObjectToUnstructured.
 func buildNonResourceAttributesType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	return apiservercel.NewObjectType("kubernetes.NonResourceAttributes", fields(
 		field("path", apiservercel.StringType, false),
 		field("verb", apiservercel.StringType, false),
 	))
+}
+
+func convertObjectToUnstructured(obj *authorizationv1.SubjectAccessReviewSpec) map[string]interface{} {
+	// Construct version containing every SubjectAccessReview user and string attribute field, even omitempty ones, for evaluation by CEL
+	extra := obj.Extra
+	if extra == nil {
+		extra = map[string]authorizationv1.ExtraValue{}
+	}
+	ret := map[string]interface{}{
+		"user":   obj.User,
+		"groups": obj.Groups,
+		"uid":    string(obj.UID),
+		"extra":  extra,
+	}
+	if obj.ResourceAttributes != nil {
+		ret["resourceAttributes"] = map[string]string{
+			"namespace":   obj.ResourceAttributes.Namespace,
+			"verb":        obj.ResourceAttributes.Verb,
+			"group":       obj.ResourceAttributes.Group,
+			"version":     obj.ResourceAttributes.Version,
+			"resource":    obj.ResourceAttributes.Resource,
+			"subresource": obj.ResourceAttributes.Subresource,
+			"name":        obj.ResourceAttributes.Name,
+		}
+	}
+	if obj.NonResourceAttributes != nil {
+		ret["nonResourceAttributes"] = map[string]string{
+			"verb": obj.NonResourceAttributes.Verb,
+			"path": obj.NonResourceAttributes.Path,
+		}
+	}
+	return ret
 }

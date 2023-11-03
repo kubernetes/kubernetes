@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	celgo "github.com/google/cel-go/cel"
+
 	authorizationv1 "k8s.io/api/authorization/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -33,12 +33,8 @@ type CELMatcher struct {
 // eval evaluates the given SubjectAccessReview against all cel matchCondition expression
 func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error) {
 	var evalErrors []error
-	specValObject, err := convertObjectToUnstructured(&r.Spec)
-	if err != nil {
-		return false, fmt.Errorf("authz celMatcher eval error: convert SubjectAccessReviewSpec object to unstructured failed: %w", err)
-	}
 	va := map[string]interface{}{
-		"request": specValObject,
+		"request": convertObjectToUnstructured(&r.Spec),
 	}
 	for _, compilationResult := range c.CompilationResults {
 		evalResult, _, err := compilationResult.Program.ContextEval(ctx, va)
@@ -67,15 +63,4 @@ func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessR
 	}
 	// return ALL matchConditions evaluate to TRUE successfully without error
 	return true, nil
-}
-
-func convertObjectToUnstructured(obj *authorizationv1.SubjectAccessReviewSpec) (map[string]interface{}, error) {
-	if obj == nil {
-		return nil, nil
-	}
-	ret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
-	return ret, nil
 }
