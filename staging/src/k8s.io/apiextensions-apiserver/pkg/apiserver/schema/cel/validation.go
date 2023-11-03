@@ -32,15 +32,18 @@ import (
 	"github.com/google/cel-go/interpreter"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/metrics"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
@@ -65,9 +68,10 @@ type Validator struct {
 	// custom resource being validated, or the root of an XEmbeddedResource object.
 	isResourceRoot bool
 
-	// celActivationFactory produces an Activation, which resolves identifiers (e.g. self and
-	// oldSelf) to CEL values.
-	celActivationFactory func(sts *schema.Structural, obj, oldObj interface{}) interpreter.Activation
+	// celActivationFactory produces a Activations, which resolve identifiers
+	// (e.g. self and oldSelf) to CEL values. One activation must be produced
+	// for each of the cases when oldSelf is optional and non-optional.
+	celActivationFactory func(sts *schema.Structural, obj, oldObj interface{}) (activation interpreter.Activation, optionalOldSelfActivation interpreter.Activation)
 }
 
 // NewValidator returns compiles all the CEL programs defined in x-kubernetes-validations extensions
@@ -122,7 +126,7 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, declType.ElemType, perCallLimit)
 	}
 	if len(compiledRules) > 0 || err != nil || itemsValidator != nil || additionalPropertiesValidator != nil || len(propertiesValidators) > 0 {
-		var activationFactory func(*schema.Structural, interface{}, interface{}) interpreter.Activation = validationActivationWithoutOldSelf
+		activationFactory := validationActivationWithoutOldSelf
 		for _, rule := range compiledRules {
 			if rule.UsesOldSelf {
 				activationFactory = validationActivationWithOldSelf
@@ -289,7 +293,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	if s.isResourceRoot {
 		sts = model.WithTypeAndObjectMeta(sts)
 	}
-	activation := s.celActivationFactory(sts, obj, oldObj)
+	activation, optionalOldSelfActivation := s.celActivationFactory(sts, obj, oldObj)
 	for i, compiled := range s.compiledRules {
 		rule := sts.XValidations[i]
 		if compiled.Error != nil {
@@ -300,11 +304,29 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			// rule is empty
 			continue
 		}
+
+		// If ratcheting is enabled, allow rule with oldSelf to evaluate
+		// when `optionalOldSelf` is set to true
+		optionalOldSelfRule := ptr.Deref(rule.OptionalOldSelf, false)
 		if compiled.UsesOldSelf && oldObj == nil {
 			// transition rules are evaluated only if there is a comparable existing value
-			continue
+			// But if the rule uses optional oldSelf and gate is enabled we allow
+			// the rule to be evaluated
+			if !utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+				continue
+			}
+
+			if !optionalOldSelfRule {
+				continue
+			}
 		}
-		evalResult, evalDetails, err := compiled.Program.ContextEval(ctx, activation)
+
+		ruleActivation := activation
+		if optionalOldSelfRule {
+			ruleActivation = optionalOldSelfActivation
+		}
+
+		evalResult, evalDetails, err := compiled.Program.ContextEval(ctx, ruleActivation)
 		if evalDetails == nil {
 			errs = append(errs, field.InternalError(fldPath, fmt.Errorf("runtime cost could not be calculated for validation rule: %v, no further validation rules will be run", ruleErrorString(rule))))
 			return errs, -1
@@ -622,21 +644,31 @@ type validationActivation struct {
 	hasOldSelf    bool
 }
 
-func validationActivationWithOldSelf(sts *schema.Structural, obj, oldObj interface{}) interpreter.Activation {
+func validationActivationWithOldSelf(sts *schema.Structural, obj, oldObj interface{}) (activation interpreter.Activation, optionalOldSelfActivation interpreter.Activation) {
 	va := &validationActivation{
 		self: UnstructuredToVal(obj, sts),
 	}
+	optionalVA := &validationActivation{
+		self:       va.self,
+		hasOldSelf: true, // this means the oldSelf variable is defined for CEL to reference, not that it has a value
+		oldSelf:    types.OptionalNone,
+	}
+
 	if oldObj != nil {
 		va.oldSelf = UnstructuredToVal(oldObj, sts) // +k8s:verify-mutation:reason=clone
-		va.hasOldSelf = true                        // +k8s:verify-mutation:reason=clone
+		va.hasOldSelf = true
+
+		optionalVA.oldSelf = types.OptionalOf(va.oldSelf) // +k8s:verify-mutation:reason=clone
 	}
-	return va
+
+	return va, optionalVA
 }
 
-func validationActivationWithoutOldSelf(sts *schema.Structural, obj, _ interface{}) interpreter.Activation {
-	return &validationActivation{
+func validationActivationWithoutOldSelf(sts *schema.Structural, obj, _ interface{}) (interpreter.Activation, interpreter.Activation) {
+	res := &validationActivation{
 		self: UnstructuredToVal(obj, sts),
 	}
+	return res, res
 }
 
 func (a *validationActivation) ResolveName(name string) (interface{}, bool) {

@@ -29,10 +29,14 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -151,12 +155,99 @@ func (v transitionRuleMatcher) String() string {
 }
 
 func TestCelCompilation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
 	cases := []struct {
 		name            string
 		input           schema.Structural
 		expectedResults []validationMatcher
 		unmodified      bool
 	}{
+		{
+			name: "optional primitive transition rule type checking",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "integer",
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "self >= oldSelf.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self >= oldSelf.orValue(1)", OptionalOldSelf: ptr.To(true)},
+						{Rule: "oldSelf.hasValue() ? self >= oldSelf.value() : true", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self >= oldSelf", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self >= oldSelf.orValue('')", OptionalOldSelf: ptr.To(true)},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(invalidError("optional")),
+				matchesAll(invalidError("orValue")),
+			},
+		},
+		{
+			name: "optional complex transition rule type checking",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"i": {Generic: schema.Generic{Type: "integer"}},
+					"b": {Generic: schema.Generic{Type: "boolean"}},
+					"s": {Generic: schema.Generic{Type: "string"}},
+					"a": {
+						Generic: schema.Generic{Type: "array"},
+						Items:   &schema.Structural{Generic: schema.Generic{Type: "integer"}},
+					},
+					"o": {
+						Generic: schema.Generic{Type: "object"},
+						Properties: map[string]schema.Structural{
+							"i": {Generic: schema.Generic{Type: "integer"}},
+							"b": {Generic: schema.Generic{Type: "boolean"}},
+							"s": {Generic: schema.Generic{Type: "string"}},
+							"a": {
+								Generic: schema.Generic{Type: "array"},
+								Items:   &schema.Structural{Generic: schema.Generic{Type: "integer"}},
+							},
+							"o": {
+								Generic: schema.Generic{Type: "object"},
+							},
+						},
+					},
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "self.i >= oldSelf.i.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.s == oldSelf.s.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.b == oldSelf.b.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o == oldSelf.o.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o.i >= oldSelf.o.i.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o.s == oldSelf.o.s.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o.b == oldSelf.o.b.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o.o == oldSelf.o.o.value()", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o.i >= oldSelf.o.i.orValue(1)", OptionalOldSelf: ptr.To(true)},
+						{Rule: "oldSelf.hasValue() ? self.o.i >= oldSelf.o.i.value() : true", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o.i >= oldSelf.o.i", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.o.i >= oldSelf.o.s.orValue(0)", OptionalOldSelf: ptr.To(true)},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(invalidError("optional")),
+				matchesAll(invalidError("orValue")),
+			},
+		},
 		{
 			name: "valid object",
 			input: schema.Structural{

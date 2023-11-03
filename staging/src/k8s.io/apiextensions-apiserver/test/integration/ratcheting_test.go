@@ -1340,6 +1340,50 @@ func TestRatchetingFunctionality(t *testing.T) {
 						}}},
 			},
 		},
+		{
+			Name: "CEL Optional OldSelf",
+			Operations: []ratchetingTestOperation{
+				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"field": {
+							Type: "string",
+							XValidations: []apiextensionsv1.ValidationRule{
+								{
+									Rule:            "!oldSelf.hasValue()",
+									Message:         "oldSelf must be null",
+									OptionalOldSelf: ptr(true),
+								},
+							},
+						},
+					},
+				}},
+
+				applyPatchOperation{
+					"create instance passes since oldself is null",
+					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
+						"field": "value",
+					}},
+
+				expectError{
+					applyPatchOperation{
+						"update field fails, since oldself is not null",
+						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
+							"field": "value2",
+						},
+					},
+				},
+
+				expectError{
+					applyPatchOperation{
+						"noop update field fails, since oldself is not null and transition rules are not ratcheted",
+						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
+							"field": "value",
+						},
+					},
+				},
+			},
+		},
 		// Features that should not ratchet
 		{
 			Name: "AllOf_should_not_ratchet",
