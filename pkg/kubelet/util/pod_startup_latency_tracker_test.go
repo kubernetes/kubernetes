@@ -56,6 +56,7 @@ func TestNoEvents(t *testing.T) {
 
 		assert.Empty(t, tracker.pods)
 		metrics.PodStartSLIDuration.Reset()
+		metrics.PodStartTotalDuration.Reset()
 	})
 }
 
@@ -84,6 +85,7 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 
 		assert.Empty(t, tracker.pods)
 		metrics.PodStartSLIDuration.Reset()
+		metrics.PodStartTotalDuration.Reset()
 	})
 }
 
@@ -94,34 +96,34 @@ func TestSinglePodOneImageDownloadRecorded(t *testing.T) {
 		wants := `
 # HELP kubelet_pod_start_sli_duration_seconds [ALPHA] Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch
 # TYPE kubelet_pod_start_sli_duration_seconds histogram
-kubelet_pod_start_sli_duration_seconds_bucket{le="0.5"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="1"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="2"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="3"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="4"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="5"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="6"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="8"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="10"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="20"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="30"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="45"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="60"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="120"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="180"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="240"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="300"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="360"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="480"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="600"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="900"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="1200"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="1800"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="2700"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="3600"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="+Inf"} 1
-kubelet_pod_start_sli_duration_seconds_sum 2.9
-kubelet_pod_start_sli_duration_seconds_count 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="0.5"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="2"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="3"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="4"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="5"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="6"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="8"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="10"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="20"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="30"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="45"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="60"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="120"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="180"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="240"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="300"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="360"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="480"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="600"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="900"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1200"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1800"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="2700"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="3600"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="+Inf"} 1
+kubelet_pod_start_sli_duration_seconds_sum{first_with_network="true"} 2.9
+kubelet_pod_start_sli_duration_seconds_count{first_with_network="true"} 1
 		`
 
 		fakeClock := testingclock.NewFakeClock(frozenTime)
@@ -165,6 +167,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		assert.Empty(t, tracker.pods)
 		metrics.PodStartSLIDuration.Reset()
+		metrics.PodStartTotalDuration.Reset()
 	})
 }
 
@@ -175,34 +178,34 @@ func TestSinglePodMultipleDownloadsAndRestartsRecorded(t *testing.T) {
 		wants := `
 # HELP kubelet_pod_start_sli_duration_seconds [ALPHA] Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch
 # TYPE kubelet_pod_start_sli_duration_seconds histogram
-kubelet_pod_start_sli_duration_seconds_bucket{le="0.5"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="1"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="2"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="3"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="4"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="5"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="6"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="8"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="10"} 0
-kubelet_pod_start_sli_duration_seconds_bucket{le="20"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="30"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="45"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="60"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="120"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="180"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="240"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="300"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="360"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="480"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="600"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="900"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="1200"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="1800"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="2700"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="3600"} 1
-kubelet_pod_start_sli_duration_seconds_bucket{le="+Inf"} 1
-kubelet_pod_start_sli_duration_seconds_sum 20
-kubelet_pod_start_sli_duration_seconds_count 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="0.5"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="2"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="3"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="4"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="5"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="6"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="8"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="10"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="20"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="30"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="45"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="60"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="120"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="180"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="240"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="300"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="360"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="480"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="600"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="900"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1200"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1800"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="2700"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="3600"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="+Inf"} 1
+kubelet_pod_start_sli_duration_seconds_sum{first_with_network="true"} 20
+kubelet_pod_start_sli_duration_seconds_count{first_with_network="true"} 1
 `
 
 		fakeClock := testingclock.NewFakeClock(frozenTime)
@@ -272,6 +275,128 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		assert.Empty(t, tracker.pods)
 		metrics.PodStartSLIDuration.Reset()
+		metrics.PodStartTotalDuration.Reset()
+	})
+}
+
+func TestFirstNetworkPodMetrics(t *testing.T) {
+
+	t.Run("first network pod; started in 30s, image pulling between 10th and 20th seconds", func(t *testing.T) {
+
+		wants := `
+		# HELP kubelet_pod_start_sli_duration_seconds [ALPHA] Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch
+		# TYPE kubelet_pod_start_sli_duration_seconds histogram
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="0.5"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="2"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="3"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="4"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="5"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="6"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="8"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="10"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="20"} 0
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="30"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="45"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="60"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="120"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="180"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="240"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="300"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="360"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="480"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="600"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="900"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1200"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="1800"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="2700"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="3600"} 1
+		kubelet_pod_start_sli_duration_seconds_bucket{first_with_network="true",le="+Inf"} 1
+		kubelet_pod_start_sli_duration_seconds_sum{first_with_network="true"} 30
+		kubelet_pod_start_sli_duration_seconds_count{first_with_network="true"} 1
+		# HELP kubelet_pod_start_total_duration_seconds [ALPHA] Duration in seconds to start a pod since creation, including time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch
+		# TYPE kubelet_pod_start_total_duration_seconds histogram
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="0.5"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="1"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="2"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="3"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="4"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="5"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="6"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="8"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="10"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="20"} 0
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="30"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="45"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="60"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="120"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="180"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="240"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="300"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="360"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="480"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="600"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="900"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="1200"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="1800"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="2700"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="3600"} 1
+		kubelet_pod_start_total_duration_seconds_bucket{first_with_network="true",le="+Inf"} 1
+		kubelet_pod_start_total_duration_seconds_sum{first_with_network="true"} 30
+		kubelet_pod_start_total_duration_seconds_count{first_with_network="true"} 1
+`
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:  map[types.UID]*perPodState{},
+			clock: fakeClock,
+		}
+
+		// hostNetwork pods should not be tracked
+		hostNetworkPodInitializing := buildInitializingPod()
+		hostNetworkPodInitializing.UID = "11111-22222"
+		hostNetworkPodInitializing.Spec.HostNetwork = true
+		tracker.ObservedPodOnWatch(hostNetworkPodInitializing, frozenTime)
+
+		hostNetworkPodStarted := buildRunningPod()
+		hostNetworkPodStarted.UID = "11111-22222"
+		hostNetworkPodStarted.Spec.HostNetwork = true
+		tracker.RecordStatusUpdated(hostNetworkPodStarted)
+
+		// track only the first pod with network
+		podInitializing := buildInitializingPod()
+		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
+
+		// pod started
+		podStarted := buildRunningPod()
+		tracker.RecordStatusUpdated(podStarted)
+
+		// at 30s observe the same pod on watch
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
+
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_pod_start_sli_duration_seconds", "kubelet_pod_start_total_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// any new pod observations should not impact the metrics, as the pod should be recorder only once
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*150))
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
+
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_pod_start_sli_duration_seconds", "kubelet_pod_start_total_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// cleanup
+		tracker.DeletePodStartupState(hostNetworkPodStarted.UID)
+		tracker.DeletePodStartupState(podStarted.UID)
+
+		assert.Empty(t, tracker.pods)
+		metrics.PodStartSLIDuration.Reset()
+		metrics.PodStartTotalDuration.Reset()
 	})
 }
 

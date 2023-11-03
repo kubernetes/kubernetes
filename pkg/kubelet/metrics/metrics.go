@@ -182,6 +182,8 @@ var (
 	// so as to be roughly exponential but still round numbers in everyday units. This is to minimise the number
 	// of buckets while allowing accurate measurement of thresholds which might be used in SLOs
 	// e.g. x% of pods start up within 30 seconds, or 15 minutes, etc.
+	// It also tracks the duration (in seconds) it takes for the first network pod to run, that is special because
+	// depends on the CNI startup times and impact the user workloads latency.
 	PodStartSLIDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -190,7 +192,7 @@ var (
 			Buckets:        podStartupDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{},
+		[]string{"first_with_network"},
 	)
 
 	// PodStartTotalDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run
@@ -200,6 +202,8 @@ var (
 	// so as to be roughly exponential but still round numbers in everyday units. This is to minimise the number
 	// of buckets while allowing accurate measurement of thresholds which might be used in SLOs
 	// e.g. x% of pods start up within 30 seconds, or 15 minutes, etc.
+	// It also tracks the duration (in seconds) it takes for the first network pod to run, that is special because
+	// depends on the CNI startup times and impact the user workloads latency.
 	PodStartTotalDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -208,7 +212,7 @@ var (
 			Buckets:        podStartupDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{},
+		[]string{"first_with_network"},
 	)
 
 	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
