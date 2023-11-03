@@ -53,12 +53,10 @@ func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for scheduling gates: %v", gates))
 }
 
-// EventsToRegister returns the possible events that may make a Pod
-// failed by this plugin schedulable.
+// EventsToRegister returns nil here to indicate that schedulingGates plugin is not
+// interested in any event but its own update.
 func (pl *SchedulingGates) EventsToRegister() []framework.ClusterEventWithHint {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
-	}
+	return nil
 }
 
 // New initializes a new plugin and returns it.
