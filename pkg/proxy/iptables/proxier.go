@@ -95,47 +95,42 @@ const (
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal"
 
-// internal struct for string service information
-type servicePortInfo struct {
-	*proxy.BaseServicePortInfo
-	// The following fields are computed and stored for performance reasons.
-	nameString             string
-	clusterPolicyChainName utiliptables.Chain
-	localPolicyChainName   utiliptables.Chain
-	firewallChainName      utiliptables.Chain
-	externalChainName      utiliptables.Chain
-}
-
-// returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
-	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
-
-	// Store the following for performance reasons.
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
-	protocol := strings.ToLower(string(svcPort.Protocol()))
-	svcPort.nameString = svcPortName.String()
-	svcPort.clusterPolicyChainName = servicePortPolicyClusterChain(svcPort.nameString, protocol)
-	svcPort.localPolicyChainName = servicePortPolicyLocalChainName(svcPort.nameString, protocol)
-	svcPort.firewallChainName = serviceFirewallChainName(svcPort.nameString, protocol)
-	svcPort.externalChainName = serviceExternalChainName(svcPort.nameString, protocol)
-
-	return svcPort
-}
-
-// internal struct for endpoints information
-type endpointInfo struct {
-	*proxy.BaseEndpointInfo
-
-	ChainName utiliptables.Chain
-}
-
-// returns a new proxy.Endpoint which abstracts a endpointInfo
-func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
-	return &endpointInfo{
-		BaseEndpointInfo: baseInfo,
-		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.String()),
+// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
+func NewDualStackProxier(
+	ipt [2]utiliptables.Interface,
+	sysctl utilsysctl.Interface,
+	exec utilexec.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	localhostNodePorts bool,
+	masqueradeBit int,
+	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
+	hostname string,
+	nodeIPs map[v1.IPFamily]net.IP,
+	recorder events.EventRecorder,
+	healthzServer *healthcheck.ProxierHealthServer,
+	nodePortAddresses []string,
+	initOnly bool,
+) (proxy.Provider, error) {
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
+		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
+
+	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
+		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
+	}
+	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
@@ -322,42 +317,47 @@ func NewProxier(ipFamily v1.IPFamily,
 	return proxier, nil
 }
 
-// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
-func NewDualStackProxier(
-	ipt [2]utiliptables.Interface,
-	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	localhostNodePorts bool,
-	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
-	hostname string,
-	nodeIPs map[v1.IPFamily]net.IP,
-	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
-	nodePortAddresses []string,
-	initOnly bool,
-) (proxy.Provider, error) {
-	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
-	}
+// internal struct for string service information
+type servicePortInfo struct {
+	*proxy.BaseServicePortInfo
+	// The following fields are computed and stored for performance reasons.
+	nameString             string
+	clusterPolicyChainName utiliptables.Chain
+	localPolicyChainName   utiliptables.Chain
+	firewallChainName      utiliptables.Chain
+	externalChainName      utiliptables.Chain
+}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+// returns a new proxy.ServicePort which abstracts a serviceInfo
+func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
+	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
+
+	// Store the following for performance reasons.
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
+	protocol := strings.ToLower(string(svcPort.Protocol()))
+	svcPort.nameString = svcPortName.String()
+	svcPort.clusterPolicyChainName = servicePortPolicyClusterChain(svcPort.nameString, protocol)
+	svcPort.localPolicyChainName = servicePortPolicyLocalChainName(svcPort.nameString, protocol)
+	svcPort.firewallChainName = serviceFirewallChainName(svcPort.nameString, protocol)
+	svcPort.externalChainName = serviceExternalChainName(svcPort.nameString, protocol)
+
+	return svcPort
+}
+
+// internal struct for endpoints information
+type endpointInfo struct {
+	*proxy.BaseEndpointInfo
+
+	ChainName utiliptables.Chain
+}
+
+// returns a new proxy.Endpoint which abstracts a endpointInfo
+func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+	return &endpointInfo{
+		BaseEndpointInfo: baseInfo,
+		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.String()),
 	}
-	if initOnly {
-		return nil, nil
-	}
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 type iptablesJumpChain struct {

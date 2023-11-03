@@ -98,112 +98,6 @@ const (
 	defaultDummyDevice = "kube-ipvs0"
 )
 
-// iptablesJumpChain is tables of iptables chains that ipvs proxier used to install iptables or cleanup iptables.
-// `to` is the iptables chain we want to operate.
-// `from` is the source iptables chain
-var iptablesJumpChain = []struct {
-	table   utiliptables.Table
-	from    utiliptables.Chain
-	to      utiliptables.Chain
-	comment string
-}{
-	{utiliptables.TableNAT, utiliptables.ChainOutput, kubeServicesChain, "kubernetes service portals"},
-	{utiliptables.TableNAT, utiliptables.ChainPrerouting, kubeServicesChain, "kubernetes service portals"},
-	{utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, "kubernetes postrouting rules"},
-	{utiliptables.TableFilter, utiliptables.ChainForward, kubeForwardChain, "kubernetes forwarding rules"},
-	{utiliptables.TableFilter, utiliptables.ChainInput, kubeNodePortChain, "kubernetes health check rules"},
-	{utiliptables.TableFilter, utiliptables.ChainInput, kubeProxyFirewallChain, "kube-proxy firewall rules"},
-	{utiliptables.TableFilter, utiliptables.ChainForward, kubeProxyFirewallChain, "kube-proxy firewall rules"},
-	{utiliptables.TableFilter, utiliptables.ChainInput, kubeIPVSFilterChain, "kubernetes ipvs access filter"},
-	{utiliptables.TableFilter, utiliptables.ChainOutput, kubeIPVSOutFilterChain, "kubernetes ipvs access filter"},
-}
-
-var iptablesChains = []struct {
-	table utiliptables.Table
-	chain utiliptables.Chain
-}{
-	{utiliptables.TableNAT, kubeServicesChain},
-	{utiliptables.TableNAT, kubePostroutingChain},
-	{utiliptables.TableNAT, kubeNodePortChain},
-	{utiliptables.TableNAT, kubeLoadBalancerChain},
-	{utiliptables.TableNAT, kubeMarkMasqChain},
-	{utiliptables.TableFilter, kubeForwardChain},
-	{utiliptables.TableFilter, kubeNodePortChain},
-	{utiliptables.TableFilter, kubeProxyFirewallChain},
-	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
-	{utiliptables.TableFilter, kubeIPVSFilterChain},
-	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
-}
-
-var iptablesCleanupChains = []struct {
-	table utiliptables.Table
-	chain utiliptables.Chain
-}{
-	{utiliptables.TableNAT, kubeServicesChain},
-	{utiliptables.TableNAT, kubePostroutingChain},
-	{utiliptables.TableNAT, kubeNodePortChain},
-	{utiliptables.TableNAT, kubeLoadBalancerChain},
-	{utiliptables.TableFilter, kubeForwardChain},
-	{utiliptables.TableFilter, kubeNodePortChain},
-	{utiliptables.TableFilter, kubeProxyFirewallChain},
-	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
-	{utiliptables.TableFilter, kubeIPVSFilterChain},
-	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
-}
-
-// ipsetInfo is all ipset we needed in ipvs proxier
-var ipsetInfo = []struct {
-	name    string
-	setType utilipset.Type
-	comment string
-}{
-	{kubeLoopBackIPSet, utilipset.HashIPPortIP, kubeLoopBackIPSetComment},
-	{kubeClusterIPSet, utilipset.HashIPPort, kubeClusterIPSetComment},
-	{kubeExternalIPSet, utilipset.HashIPPort, kubeExternalIPSetComment},
-	{kubeExternalIPLocalSet, utilipset.HashIPPort, kubeExternalIPLocalSetComment},
-	{kubeLoadBalancerSet, utilipset.HashIPPort, kubeLoadBalancerSetComment},
-	{kubeLoadBalancerFWSet, utilipset.HashIPPort, kubeLoadBalancerFWSetComment},
-	{kubeLoadBalancerLocalSet, utilipset.HashIPPort, kubeLoadBalancerLocalSetComment},
-	{kubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, kubeLoadBalancerSourceIPSetComment},
-	{kubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, kubeLoadBalancerSourceCIDRSetComment},
-	{kubeNodePortSetTCP, utilipset.BitmapPort, kubeNodePortSetTCPComment},
-	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, kubeNodePortLocalSetTCPComment},
-	{kubeNodePortSetUDP, utilipset.BitmapPort, kubeNodePortSetUDPComment},
-	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, kubeNodePortLocalSetUDPComment},
-	{kubeNodePortSetSCTP, utilipset.HashIPPort, kubeNodePortSetSCTPComment},
-	{kubeNodePortLocalSetSCTP, utilipset.HashIPPort, kubeNodePortLocalSetSCTPComment},
-	{kubeHealthCheckNodePortSet, utilipset.BitmapPort, kubeHealthCheckNodePortSetComment},
-	{kubeIPVSSet, utilipset.HashIP, kubeIPVSSetComment},
-}
-
-// ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
-// `iptables -t nat -A <from> -m set --match-set <name> <matchType> -j <to>`
-// example: iptables -t nat -A KUBE-SERVICES -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-NODE-PORT
-// ipsets with other match rules will be created Individually.
-// Note: kubeNodePortLocalSetTCP must be prior to kubeNodePortSetTCP, the same for UDP.
-var ipsetWithIptablesChain = []struct {
-	name          string
-	table         utiliptables.Table
-	from          string
-	to            string
-	matchType     string
-	protocolMatch string
-}{
-	{kubeLoopBackIPSet, utiliptables.TableNAT, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
-	{kubeLoadBalancerSet, utiliptables.TableNAT, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
-	{kubeLoadBalancerLocalSet, utiliptables.TableNAT, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortLocalSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
-	{kubeNodePortSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
-	{kubeNodePortLocalSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
-	{kubeNodePortSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
-	{kubeNodePortLocalSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
-	{kubeNodePortSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
-
-	{kubeLoadBalancerFWSet, utiliptables.TableFilter, string(kubeProxyFirewallChain), string(kubeSourceRangesFirewallChain), "dst,dst", ""},
-	{kubeLoadBalancerSourceCIDRSet, utiliptables.TableFilter, string(kubeSourceRangesFirewallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerSourceIPSet, utiliptables.TableFilter, string(kubeSourceRangesFirewallChain), "RETURN", "dst,dst,src", ""},
-}
-
 // In IPVS proxy mode, the following flags need to be set
 const (
 	sysctlVSConnTrack             = "net/ipv4/vs/conntrack"
@@ -214,6 +108,58 @@ const (
 	sysctlArpIgnore               = "net/ipv4/conf/all/arp_ignore"
 	sysctlArpAnnounce             = "net/ipv4/conf/all/arp_announce"
 )
+
+// NewDualStackProxier returns a new Proxier for dual-stack operation
+func NewDualStackProxier(
+	ipt [2]utiliptables.Interface,
+	ipvs utilipvs.Interface,
+	ipset utilipset.Interface,
+	sysctl utilsysctl.Interface,
+	exec utilexec.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	excludeCIDRs []string,
+	strictARP bool,
+	tcpTimeout time.Duration,
+	tcpFinTimeout time.Duration,
+	udpTimeout time.Duration,
+	masqueradeAll bool,
+	masqueradeBit int,
+	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
+	hostname string,
+	nodeIPs map[v1.IPFamily]net.IP,
+	recorder events.EventRecorder,
+	healthzServer *healthcheck.ProxierHealthServer,
+	scheduler string,
+	nodePortAddresses []string,
+	initOnly bool,
+) (proxy.Provider, error) {
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, ipset, sysctl,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
+		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol], recorder,
+		healthzServer, scheduler, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
+	}
+
+	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, ipset, sysctl,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
+		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol], recorder,
+		healthzServer, scheduler, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
+	}
+
+	// Return a meta-proxier that dispatch calls between the two
+	// single-stack proxier instances
+	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
+}
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
@@ -466,59 +412,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	return proxier, nil
 }
 
-// NewDualStackProxier returns a new Proxier for dual-stack operation
-func NewDualStackProxier(
-	ipt [2]utiliptables.Interface,
-	ipvs utilipvs.Interface,
-	ipset utilipset.Interface,
-	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	excludeCIDRs []string,
-	strictARP bool,
-	tcpTimeout time.Duration,
-	tcpFinTimeout time.Duration,
-	udpTimeout time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
-	hostname string,
-	nodeIPs map[v1.IPFamily]net.IP,
-	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
-	scheduler string,
-	nodePortAddresses []string,
-	initOnly bool,
-) (proxy.Provider, error) {
-
-	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, ipset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol], recorder,
-		healthzServer, scheduler, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
-	}
-
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, ipset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol], recorder,
-		healthzServer, scheduler, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
-	}
-	if initOnly {
-		return nil, nil
-	}
-
-	// Return a meta-proxier that dispatch calls between the two
-	// single-stack proxier instances
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
-}
-
 func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
 	var filteredCIDRs []string
 	for _, cidr := range cidrs {
@@ -527,6 +420,112 @@ func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
 		}
 	}
 	return filteredCIDRs
+}
+
+// iptablesJumpChain is tables of iptables chains that ipvs proxier used to install iptables or cleanup iptables.
+// `to` is the iptables chain we want to operate.
+// `from` is the source iptables chain
+var iptablesJumpChain = []struct {
+	table   utiliptables.Table
+	from    utiliptables.Chain
+	to      utiliptables.Chain
+	comment string
+}{
+	{utiliptables.TableNAT, utiliptables.ChainOutput, kubeServicesChain, "kubernetes service portals"},
+	{utiliptables.TableNAT, utiliptables.ChainPrerouting, kubeServicesChain, "kubernetes service portals"},
+	{utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, "kubernetes postrouting rules"},
+	{utiliptables.TableFilter, utiliptables.ChainForward, kubeForwardChain, "kubernetes forwarding rules"},
+	{utiliptables.TableFilter, utiliptables.ChainInput, kubeNodePortChain, "kubernetes health check rules"},
+	{utiliptables.TableFilter, utiliptables.ChainInput, kubeProxyFirewallChain, "kube-proxy firewall rules"},
+	{utiliptables.TableFilter, utiliptables.ChainForward, kubeProxyFirewallChain, "kube-proxy firewall rules"},
+	{utiliptables.TableFilter, utiliptables.ChainInput, kubeIPVSFilterChain, "kubernetes ipvs access filter"},
+	{utiliptables.TableFilter, utiliptables.ChainOutput, kubeIPVSOutFilterChain, "kubernetes ipvs access filter"},
+}
+
+var iptablesChains = []struct {
+	table utiliptables.Table
+	chain utiliptables.Chain
+}{
+	{utiliptables.TableNAT, kubeServicesChain},
+	{utiliptables.TableNAT, kubePostroutingChain},
+	{utiliptables.TableNAT, kubeNodePortChain},
+	{utiliptables.TableNAT, kubeLoadBalancerChain},
+	{utiliptables.TableNAT, kubeMarkMasqChain},
+	{utiliptables.TableFilter, kubeForwardChain},
+	{utiliptables.TableFilter, kubeNodePortChain},
+	{utiliptables.TableFilter, kubeProxyFirewallChain},
+	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
+	{utiliptables.TableFilter, kubeIPVSFilterChain},
+	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
+}
+
+var iptablesCleanupChains = []struct {
+	table utiliptables.Table
+	chain utiliptables.Chain
+}{
+	{utiliptables.TableNAT, kubeServicesChain},
+	{utiliptables.TableNAT, kubePostroutingChain},
+	{utiliptables.TableNAT, kubeNodePortChain},
+	{utiliptables.TableNAT, kubeLoadBalancerChain},
+	{utiliptables.TableFilter, kubeForwardChain},
+	{utiliptables.TableFilter, kubeNodePortChain},
+	{utiliptables.TableFilter, kubeProxyFirewallChain},
+	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
+	{utiliptables.TableFilter, kubeIPVSFilterChain},
+	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
+}
+
+// ipsetInfo is all ipset we needed in ipvs proxier
+var ipsetInfo = []struct {
+	name    string
+	setType utilipset.Type
+	comment string
+}{
+	{kubeLoopBackIPSet, utilipset.HashIPPortIP, kubeLoopBackIPSetComment},
+	{kubeClusterIPSet, utilipset.HashIPPort, kubeClusterIPSetComment},
+	{kubeExternalIPSet, utilipset.HashIPPort, kubeExternalIPSetComment},
+	{kubeExternalIPLocalSet, utilipset.HashIPPort, kubeExternalIPLocalSetComment},
+	{kubeLoadBalancerSet, utilipset.HashIPPort, kubeLoadBalancerSetComment},
+	{kubeLoadBalancerFWSet, utilipset.HashIPPort, kubeLoadBalancerFWSetComment},
+	{kubeLoadBalancerLocalSet, utilipset.HashIPPort, kubeLoadBalancerLocalSetComment},
+	{kubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, kubeLoadBalancerSourceIPSetComment},
+	{kubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, kubeLoadBalancerSourceCIDRSetComment},
+	{kubeNodePortSetTCP, utilipset.BitmapPort, kubeNodePortSetTCPComment},
+	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, kubeNodePortLocalSetTCPComment},
+	{kubeNodePortSetUDP, utilipset.BitmapPort, kubeNodePortSetUDPComment},
+	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, kubeNodePortLocalSetUDPComment},
+	{kubeNodePortSetSCTP, utilipset.HashIPPort, kubeNodePortSetSCTPComment},
+	{kubeNodePortLocalSetSCTP, utilipset.HashIPPort, kubeNodePortLocalSetSCTPComment},
+	{kubeHealthCheckNodePortSet, utilipset.BitmapPort, kubeHealthCheckNodePortSetComment},
+	{kubeIPVSSet, utilipset.HashIP, kubeIPVSSetComment},
+}
+
+// ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
+// `iptables -t nat -A <from> -m set --match-set <name> <matchType> -j <to>`
+// example: iptables -t nat -A KUBE-SERVICES -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-NODE-PORT
+// ipsets with other match rules will be created Individually.
+// Note: kubeNodePortLocalSetTCP must be prior to kubeNodePortSetTCP, the same for UDP.
+var ipsetWithIptablesChain = []struct {
+	name          string
+	table         utiliptables.Table
+	from          string
+	to            string
+	matchType     string
+	protocolMatch string
+}{
+	{kubeLoopBackIPSet, utiliptables.TableNAT, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
+	{kubeLoadBalancerSet, utiliptables.TableNAT, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
+	{kubeLoadBalancerLocalSet, utiliptables.TableNAT, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
+	{kubeNodePortLocalSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
+	{kubeNodePortSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
+	{kubeNodePortLocalSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
+	{kubeNodePortSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
+	{kubeNodePortLocalSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
+	{kubeNodePortSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
+
+	{kubeLoadBalancerFWSet, utiliptables.TableFilter, string(kubeProxyFirewallChain), string(kubeSourceRangesFirewallChain), "dst,dst", ""},
+	{kubeLoadBalancerSourceCIDRSet, utiliptables.TableFilter, string(kubeSourceRangesFirewallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerSourceIPSet, utiliptables.TableFilter, string(kubeSourceRangesFirewallChain), "RETURN", "dst,dst,src", ""},
 }
 
 // internal struct for string service information
