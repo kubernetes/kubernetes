@@ -72,8 +72,8 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 		return
 	}
 
-	nodeInfo := sched.Cache.AddNode(logger, node)
 	logger.V(3).Info("Add event for node", "node", klog.KObj(node))
+	nodeInfo := sched.Cache.AddNode(logger, node)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.NodeAdd, nil, node, preCheckForNode(nodeInfo))
 }
 
@@ -90,6 +90,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 		return
 	}
 
+	logger.V(4).Info("Update event for node", "node", klog.KObj(newNode))
 	nodeInfo := sched.Cache.UpdateNode(logger, oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
 	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != nil {
@@ -114,6 +115,7 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		logger.Error(nil, "Cannot convert to *v1.Node", "obj", t)
 		return
 	}
+
 	logger.V(3).Info("Delete event for node", "node", klog.KObj(node))
 	if err := sched.Cache.RemoveNode(logger, node); err != nil {
 		logger.Error(err, "Scheduler cache RemoveNode failed")
@@ -146,6 +148,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		return
 	}
 
+	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	if err := sched.SchedulingQueue.Update(logger, oldPod, newPod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
@@ -168,6 +171,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
 		return
 	}
+
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
@@ -194,8 +198,8 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", obj)
 		return
 	}
-	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 
+	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
 		logger.Error(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
@@ -215,8 +219,8 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		logger.Error(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
-	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 
+	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 	if err := sched.Cache.UpdatePod(logger, oldPod, newPod); err != nil {
 		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
@@ -241,6 +245,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t)
 		return
 	}
+
 	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.RemovePod(logger, pod); err != nil {
 		logger.Error(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
