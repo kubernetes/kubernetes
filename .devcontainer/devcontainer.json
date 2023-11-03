@@ -2,7 +2,13 @@
 // https://github.com/devcontainers/images/tree/main/src/base-debian
 {
     "name": "Kubernetes with e2e testing image build and push",
-    "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+    "build": {
+        "dockerfile": "../build/build-image/Dockerfile",
+        "args": {
+            "KUBE_CROSS_IMAGE": "registry.k8s.io/build-image/kube-cross",
+            "KUBE_CROSS_VERSION": "v1.29.0-go1.21.3-bullseye.0"
+        }
+    },
     // Setup the go environment and mount into the dev container at the expected location
     "hostRequirements": {
         "cpus": 4
@@ -17,10 +23,6 @@
     // Install utils, go, docker-in-docker, and other tools
     // For more info about dev container Features see https://containers.dev/features
     "features": {
-        "ghcr.io/devcontainers/features/go:1": {
-            "version": "1.21.1",
-            "username": "root"
-        },
         // Install kubectl, but skip minikube and helm
         "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
             "version": "latest",
