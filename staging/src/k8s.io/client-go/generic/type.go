@@ -42,13 +42,45 @@ type namedObject interface {
 }
 
 type Interface[T objectWithMeta, L runtime.Object] interface {
+	Creator[T]
+	Updater[T]
+	Deleter
+	CollectionDeleter
+	Getter[T]
+	Lister[T, L]
+	Watcher
+	Patcher[T]
+}
+
+type Creator[T objectWithMeta] interface {
 	Create(ctx context.Context, obj T, opts metav1.CreateOptions) (T, error)
+}
+
+type Updater[T objectWithMeta] interface {
 	Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error)
+}
+
+type Deleter interface {
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+}
+
+type CollectionDeleter interface {
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+}
+
+type Getter[T objectWithMeta] interface {
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (T, error)
+}
+
+type Lister[T objectWithMeta, L runtime.Object] interface {
 	List(ctx context.Context, opts metav1.ListOptions) (L, error)
+}
+
+type Watcher interface {
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+}
+
+type Patcher[T objectWithMeta] interface {
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (T, error)
 }
 

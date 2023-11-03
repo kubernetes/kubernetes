@@ -77,6 +77,7 @@ func genStatus(t *types.Type) bool {
 // GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	generateApply := len(g.applyConfigurationPackage) > 0
+	genericVerbTemplates := buildGenericVerbTemplates(generateApply)
 	defaultVerbTemplates := buildDefaultVerbTemplates(generateApply)
 	subresourceDefaultVerbTemplates := buildSubresourceDefaultVerbTemplates(generateApply)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
@@ -205,9 +206,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		}
 		if hasAllDefaultVerbs(tags) {
 			sw.Do(commonInterface, m)
-			skipDefaultVerbs(defaultVerbTemplates)
+			skipDefaultVerbs(genericVerbTemplates)
 		}
-		sw.Do("\n"+generateInterface(defaultVerbTemplates, tags)+interfaceSuffix, m)
+		sw.Do("\n"+generateInterface(genericVerbTemplates, tags)+interfaceSuffix, m)
 		// add extended verbs into interface
 		for _, v := range extendedMethods {
 			sw.Do(v.template+interfaceSuffix, v.args)
@@ -387,16 +388,35 @@ func buildSubresourceDefaultVerbTemplates(generateApply bool) map[string]string 
 
 func buildDefaultVerbTemplates(generateApply bool) map[string]string {
 	m := map[string]string{
-		"create": `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
-		"update": `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
-		"updateStatus": `// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-generic.StatusUpdater[*$.inputType|raw$]`,
+		"create":           `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
+		"update":           `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
+		"updateStatus":     `UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
 		"delete":           `Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error`,
 		"deleteCollection": `DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
 		"get":              `Get(ctx context.Context, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
 		"list":             `List(ctx context.Context, opts $.ListOptions|raw$) (*$.resultType|raw$List, error)`,
 		"watch":            `Watch(ctx context.Context, opts $.ListOptions|raw$) ($.watchInterface|raw$, error)`,
 		"patch":            `Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error)`,
+	}
+	if generateApply {
+		m["apply"] = `Apply(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
+		m["applyStatus"] = `ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
+	}
+	return m
+}
+
+func buildGenericVerbTemplates(generateApply bool) map[string]string {
+	m := map[string]string{
+		"create": `generic.Creator[*$.resultType|raw$]`,
+		"update": `generic.Updater[*$.resultType|raw$]`,
+		"updateStatus": `// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+generic.StatusUpdater[*$.type|raw$]`,
+		"delete":           `generic.Deleter`,
+		"deleteCollection": `generic.CollectionDeleter`,
+		"get":              `generic.Getter[*$.resultType|raw$]`,
+		"list":             `generic.Lister[*$.resultType|raw$, *$.resultType|raw$List]`,
+		"watch":            `generic.Watcher`,
+		"patch":            `generic.Patcher[*$.resultType|raw$]`,
 	}
 	if generateApply {
 		m["apply"] = `generic.Applier[*$.resultType|raw$, *$.inputApplyConfig|raw$]`
