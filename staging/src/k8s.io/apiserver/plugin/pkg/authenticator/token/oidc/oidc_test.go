@@ -2727,6 +2727,59 @@ func TestToken(t *testing.T) {
 				Name: "jane",
 			},
 		},
+		// test to ensure omitempty fields not included in user info
+		// are set and accessible for CEL evaluation.
+		{
+			name: "test user validation rule doesn't fail when user info is empty",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username == ""`,
+							Message:    "username must be empty string",
+						},
+						{
+							Expression: `user.uid == ""`,
+							Message:    "uid must be empty string",
+						},
+						{
+							Expression: `!('bar' in user.groups)`,
+							Message:    "groups must not contain bar",
+						},
+						{
+							Expression: `!('bar' in user.extra)`,
+							Message:    "extra must not contain bar",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "",
+				"groups": null,
+				"exp": %d,
+				"baz": "qux"
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)
