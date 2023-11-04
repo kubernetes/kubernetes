@@ -4371,6 +4371,25 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: timeoutSeconds
       type:
         scalar: numeric
+- name: io.k8s.api.core.v1.ClusterTrustBundleProjection
+  map:
+    fields:
+    - name: labelSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: name
+      type:
+        scalar: string
+    - name: optional
+      type:
+        scalar: boolean
+    - name: path
+      type:
+        scalar: string
+      default: ""
+    - name: signerName
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.ComponentCondition
   map:
     fields:
@@ -7874,6 +7893,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.VolumeProjection
   map:
     fields:
+    - name: clusterTrustBundle
+      type:
+        namedType: io.k8s.api.core.v1.ClusterTrustBundleProjection
     - name: configMap
       type:
         namedType: io.k8s.api.core.v1.ConfigMapProjection

@@ -1155,6 +1155,69 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 			}
 		}
+		if projPath := srcPath.Child("clusterTrustBundlePEM"); source.ClusterTrustBundle != nil {
+			numSources++
+
+			usingName := source.ClusterTrustBundle.Name != nil
+			usingSignerName := source.ClusterTrustBundle.SignerName != nil
+
+			switch {
+			case usingName && usingSignerName:
+				allErrs = append(allErrs, field.Invalid(projPath, source.ClusterTrustBundle, "only one of name and signerName may be used"))
+			case usingName:
+				if *source.ClusterTrustBundle.Name == "" {
+					allErrs = append(allErrs, field.Required(projPath.Child("name"), "must be a valid object name"))
+				}
+
+				name := *source.ClusterTrustBundle.Name
+				if signerName, ok := extractSignerNameFromClusterTrustBundleName(name); ok {
+					validationFunc := ValidateClusterTrustBundleName(signerName)
+					errMsgs := validationFunc(name, false)
+					for _, msg := range errMsgs {
+						allErrs = append(allErrs, field.Invalid(projPath.Child("name"), name, fmt.Sprintf("not a valid clustertrustbundlename: %v", msg)))
+					}
+				} else {
+					validationFunc := ValidateClusterTrustBundleName("")
+					errMsgs := validationFunc(name, false)
+					for _, msg := range errMsgs {
+						allErrs = append(allErrs, field.Invalid(projPath.Child("name"), name, fmt.Sprintf("not a valid clustertrustbundlename: %v", msg)))
+					}
+				}
+
+				if source.ClusterTrustBundle.LabelSelector != nil {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("labelSelector"), source.ClusterTrustBundle.LabelSelector, "labelSelector must be unset if name is specified"))
+				}
+			case usingSignerName:
+				if *source.ClusterTrustBundle.SignerName == "" {
+					allErrs = append(allErrs, field.Required(projPath.Child("signerName"), "must be a valid signer name"))
+				}
+
+				allErrs = append(allErrs, ValidateSignerName(projPath.Child("signerName"), *source.ClusterTrustBundle.SignerName)...)
+
+				labelSelectorErrs := unversionedvalidation.ValidateLabelSelector(
+					source.ClusterTrustBundle.LabelSelector,
+					unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false},
+					projPath.Child("labelSelector"),
+				)
+				allErrs = append(allErrs, labelSelectorErrs...)
+
+			default:
+				allErrs = append(allErrs, field.Required(projPath, "either name or signerName must be specified"))
+			}
+
+			if source.ClusterTrustBundle.Path == "" {
+				allErrs = append(allErrs, field.Required(projPath.Child("path"), ""))
+			}
+
+			allErrs = append(allErrs, validateLocalNonReservedPath(source.ClusterTrustBundle.Path, projPath.Child("path"))...)
+
+			curPath := source.ClusterTrustBundle.Path
+			if !allPaths.Has(curPath) {
+				allPaths.Insert(curPath)
+			} else {
+				allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
+			}
+		}
 		if numSources > 1 {
 			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type"))
 		}

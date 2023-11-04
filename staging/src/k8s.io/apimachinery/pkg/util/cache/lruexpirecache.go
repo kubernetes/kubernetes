@@ -136,6 +136,19 @@ func (c *LRUExpireCache) Remove(key interface{}) {
 	delete(c.entries, key)
 }
 
+// RemoveAll removes all keys that match predicate.
+func (c *LRUExpireCache) RemoveAll(predicate func(key any) bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for key, element := range c.entries {
+		if predicate(key) {
+			c.evictionList.Remove(element)
+			delete(c.entries, key)
+		}
+	}
+}
+
 // Keys returns all unexpired keys in the cache.
 //
 // Keep in mind that subsequent calls to Get() for any of the returned keys

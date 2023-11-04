@@ -38,6 +38,8 @@ var (
 	ClusterSizeAutoscalingGpu               = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingGpu"))
 	ClusterSizeAutoscalingScaleDown         = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleDown"))
 	ClusterSizeAutoscalingScaleUp           = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
+	ClusterTrustBundle                      = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundle"))
+	ClusterTrustBundleProjection            = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundleProjection"))
 	ClusterUpgrade                          = framework.WithFeature(framework.ValidFeatures.Add("ClusterUpgrade"))
 	ComprehensiveNamespaceDraining          = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
 	CPUManager                              = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
