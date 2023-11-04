@@ -447,7 +447,7 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runn
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	allPods := sets.NewString()
+	allPods := sets.New[string]()
 	for _, pod := range pods {
 		allPods.Insert(string(pod.UID))
 	}
@@ -455,7 +455,7 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runn
 		allPods.Insert(string(pod.ID))
 	}
 
-	allFound := sets.NewString()
+	allFound := sets.New[string]()
 	found, err := m.kl.ListPodsFromDisk()
 	if err != nil {
 		return err
