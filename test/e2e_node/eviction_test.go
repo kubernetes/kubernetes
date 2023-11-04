@@ -83,11 +83,16 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
 			summary := eventuallyGetSummary(ctx)
 			inodesFree := *summary.Node.Fs.InodesFree
-			if inodesFree <= inodesConsumed {
+			inodesFreeImagefs := *(summary.Node.Runtime.ImageFs.InodesFree)
+
+			if inodesFree <= inodesConsumed && inodesFreeImagefs <= inodesConsumed {
 				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed), string(evictionapi.SignalImageFsInodesFree): fmt.Sprintf("%d", inodesFreeImagefs-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			ginkgo.By(fmt.Sprintf("EvictionHardSettings %s", initialConfig.EvictionHard))
+			ginkgo.By(fmt.Sprintf("ImageFs.inodesFree %d diskConsumed %d ImageFs.availableBytes - diskConsumed %d", inodesFreeImagefs, inodesConsumed, inodesFreeImagefs-inodesConsumed))
+
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logInodeMetrics, []podEvictSpec{
 			{
@@ -120,11 +125,16 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
 			summary := eventuallyGetSummary(ctx)
 			inodesFree := *summary.Node.Fs.InodesFree
-			if inodesFree <= inodesConsumed {
+			inodesFreeImagefs := *(summary.Node.Runtime.ImageFs.InodesFree)
+
+			if inodesFree <= inodesConsumed && inodesFreeImagefs <= inodesConsumed {
 				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed), string(evictionapi.SignalImageFsInodesFree): fmt.Sprintf("%d", inodesFreeImagefs-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			ginkgo.By(fmt.Sprintf("EvictionHardSettings %s", initialConfig.EvictionHard))
+			ginkgo.By(fmt.Sprintf("ImageFs.inodesFree %d diskConsumed %d ImageFs.availableBytes - diskConsumed %d", inodesFreeImagefs, inodesConsumed, inodesFreeImagefs-inodesConsumed))
+
 		})
 		// Consume enough inodes to induce disk pressure,
 		// but expect that image garbage collection can reduce it enough to avoid an eviction
@@ -184,16 +194,24 @@ var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.With
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			summary := eventuallyGetSummary(ctx)
 
-			diskConsumedByTest := resource.MustParse("4Gi")
+			diskConsumedByTest := *(summary.Node.Runtime.ImageFs.AvailableBytes) / 10
 			availableBytesOnSystem := *(summary.Node.Fs.AvailableBytes)
-			evictionThreshold := strconv.FormatUint(availableBytesOnSystem-uint64(diskConsumedByTest.Value()), 10)
+			availableBytesOnImageFs := *(summary.Node.Runtime.ImageFs.AvailableBytes)
+			evictionThreshold := strconv.FormatUint(availableBytesOnSystem-diskConsumedByTest, 10)
+			evictionThresholdImageFs := strconv.FormatUint(availableBytesOnImageFs-diskConsumedByTest, 10)
 
-			if availableBytesOnSystem <= uint64(diskConsumedByTest.Value()) {
+			if availableBytesOnSystem <= diskConsumedByTest {
 				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageEviction test to run")
 			}
+			if availableBytesOnImageFs <= diskConsumedByTest {
+				e2eskipper.Skipf("Too little disk free on the image filesystem for the LocalStorageEviction test to run")
+			}
 
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): evictionThreshold}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): evictionThreshold, string(evictionapi.SignalImageFsAvailable): evictionThresholdImageFs}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			ginkgo.By(fmt.Sprintf("EvictionHardSettings %s", initialConfig.EvictionHard))
+			ginkgo.By(fmt.Sprintf("ImageFs.availableBytes %d diskConsumed %d", availableBytesOnImageFs, diskConsumedByTest))
+
 		})
 
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
@@ -220,20 +238,25 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 	expectedStarvedResource := v1.ResourceEphemeralStorage
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("4Gi")
 			summary := eventuallyGetSummary(ctx)
+			diskConsumed := *summary.Node.Runtime.ImageFs.AvailableBytes / 10
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			if availableBytes <= uint64(diskConsumed.Value()) {
+			availableBytesImageFs := *(summary.Node.Runtime.ImageFs.AvailableBytes)
+			if availableBytes <= diskConsumed && availableBytesImageFs <= diskConsumed {
 				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
 			}
-			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
-			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsAvailable): "1m"}
+			ginkgo.By(fmt.Sprintf("ImageFs.availableBytes %d diskConsumed %d ImageFs.availableBytes - diskConsumed %d", availableBytesImageFs, diskConsumed, availableBytesImageFs-diskConsumed))
+
+			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-diskConsumed), string(evictionapi.SignalImageFsAvailable): fmt.Sprintf("%d", availableBytesImageFs-diskConsumed)}
+			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsAvailable): "1m", string(evictionapi.SignalImageFsAvailable): "1m"}
 			// Defer to the pod default grace period
 			initialConfig.EvictionMaxPodGracePeriod = 30
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 			// Ensure that pods are not evicted because of the eviction-hard threshold
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
+			ginkgo.By(fmt.Sprintf("EvictionSoftSettings %s", initialConfig.EvictionSoft))
+
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
@@ -419,14 +442,17 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering", framework.WithSlow()
 
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("4Gi")
 			summary := eventuallyGetSummary(ctx)
+			diskConsumed := *(summary.Node.Runtime.ImageFs.AvailableBytes) / 10
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			if availableBytes <= uint64(diskConsumed.Value()) {
+			availableBytesImageFs := *(summary.Node.Runtime.ImageFs.AvailableBytes)
+			if availableBytes <= diskConsumed && availableBytesImageFs <= diskConsumed {
 				e2eskipper.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
 			}
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-diskConsumed), string(evictionapi.SignalImageFsAvailable): fmt.Sprintf("%d", availableBytesImageFs-diskConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			ginkgo.By(fmt.Sprintf("ImageFs.availableBytes %d diskConsumed %d ImageFs.availableBytes - diskConsumed %d", availableBytesImageFs, diskConsumed, availableBytesImageFs-diskConsumed))
+			ginkgo.By(fmt.Sprintf("EvictionHard %s", initialConfig.EvictionHard))
 		})
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
@@ -941,7 +967,7 @@ func eventuallyGetSummary(ctx context.Context) (s *kubeletstatsv1alpha1.Summary)
 		if err != nil {
 			return err
 		}
-		if summary == nil || summary.Node.Fs == nil || summary.Node.Fs.InodesFree == nil || summary.Node.Fs.AvailableBytes == nil {
+		if summary == nil || summary.Node.Fs == nil || summary.Node.Fs.InodesFree == nil || summary.Node.Fs.AvailableBytes == nil || summary.Node.Runtime == nil || summary.Node.Runtime.ImageFs.InodesFree == nil || summary.Node.Runtime.ImageFs.AvailableBytes == nil {
 			return fmt.Errorf("some part of data is nil")
 		}
 		s = summary
