@@ -51,7 +51,6 @@ import (
 	ipvstest "k8s.io/kubernetes/pkg/proxy/ipvs/util/testing"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -148,7 +147,7 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 		ipset:                 ipset,
 		conntrack:             conntrack.NewFake(),
 		strictARP:             false,
-		localDetector:         proxyutiliptables.NewNoOpLocalDetector(),
+		localDetector:         proxyutil.NewNoOpLocalDetector(),
 		hostname:              testHostname,
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         defaultScheduler,

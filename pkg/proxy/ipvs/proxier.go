@@ -53,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
@@ -127,7 +126,7 @@ func NewDualStackProxier(
 	udpTimeout time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
+	localDetectors [2]proxyutil.LocalTrafficDetector,
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
@@ -207,7 +206,7 @@ type Proxier struct {
 	conntrack      conntrack.Interface
 	masqueradeAll  bool
 	masqueradeMark string
-	localDetector  proxyutiliptables.LocalTrafficDetector
+	localDetector  proxyutil.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
 	recorder       events.EventRecorder
@@ -282,7 +281,7 @@ func NewProxier(
 	udpTimeout time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	localDetector proxyutiliptables.LocalTrafficDetector,
+	localDetector proxyutil.LocalTrafficDetector,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
