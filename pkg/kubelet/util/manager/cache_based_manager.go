@@ -210,7 +210,7 @@ func (s *objectStore) Get(namespace, name string) (runtime.Object, error) {
 // (e.g. ttl-based implementation vs watch-based implementation).
 type cacheBasedManager struct {
 	objectStore          Store
-	getReferencedObjects func(*v1.Pod) sets.String
+	getReferencedObjects func(*v1.Pod) sets.Set[string]
 
 	lock           sync.Mutex
 	registeredPods map[objectKey]*v1.Pod
@@ -273,7 +273,7 @@ func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 //   - every GetObject() call tries to fetch the value from local cache; if it is
 //     not there, invalidated or too old, we fetch it from apiserver and refresh the
 //     value in cache; otherwise it is just fetched from cache
-func NewCacheBasedManager(objectStore Store, getReferencedObjects func(*v1.Pod) sets.String) Manager {
+func NewCacheBasedManager(objectStore Store, getReferencedObjects func(*v1.Pod) sets.Set[string]) Manager {
 	return &cacheBasedManager{
 		objectStore:          objectStore,
 		getReferencedObjects: getReferencedObjects,
