@@ -132,6 +132,7 @@ spec:
       - fieldPath: fieldPathValue
         message: messageValue
         messageExpression: messageExpressionValue
+        optionalOldSelf: true
         reason: reasonValue
         rule: ruleValue
   version: versionValue
@@ -208,6 +209,7 @@ spec:
         - fieldPath: fieldPathValue
           message: messageValue
           messageExpression: messageExpressionValue
+          optionalOldSelf: true
           reason: reasonValue
           rule: ruleValue
     served: true

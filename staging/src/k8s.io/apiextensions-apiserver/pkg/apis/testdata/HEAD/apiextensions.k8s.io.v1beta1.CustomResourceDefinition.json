@@ -136,7 +136,8 @@
             "message": "messageValue",
             "messageExpression": "messageExpressionValue",
             "reason": "reasonValue",
-            "fieldPath": "fieldPathValue"
+            "fieldPath": "fieldPathValue",
+            "optionalOldSelf": true
           }
         ]
       }
@@ -233,7 +234,8 @@
                 "message": "messageValue",
                 "messageExpression": "messageExpressionValue",
                 "reason": "reasonValue",
-                "fieldPath": "fieldPathValue"
+                "fieldPath": "fieldPathValue",
+                "optionalOldSelf": true
               }
             ]
           }

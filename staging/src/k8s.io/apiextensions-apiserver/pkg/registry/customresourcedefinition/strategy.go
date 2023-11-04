@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // strategy implements behavior for CustomResources.
@@ -222,4 +224,61 @@ func MatchCustomResourceDefinition(label labels.Selector, field fields.Selector)
 // CustomResourceDefinitionToSelectableFields returns a field set that represents the object.
 func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourceDefinition) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
+}
+
+// dropDisabledFields drops disabled fields that are not used if their associated feature gates
+// are not enabled.
+func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || (oldCRD != nil && !specHasOptionalOldSelf(&oldCRD.Spec))) {
+		if newCRD.Spec.Validation != nil {
+			dropOptionalOldSelfField(newCRD.Spec.Validation.OpenAPIV3Schema)
+		}
+
+		for _, v := range newCRD.Spec.Versions {
+			if v.Schema != nil {
+				dropOptionalOldSelfField(v.Schema.OpenAPIV3Schema)
+			}
+		}
+	}
+}
+
+// dropOptionalOldSelfField drops field optionalOldSelf from CRD schema
+func dropOptionalOldSelfField(schema *apiextensions.JSONSchemaProps) {
+	if schema == nil {
+		return
+	}
+	for i := range schema.XValidations {
+		schema.XValidations[i].OptionalOldSelf = nil
+	}
+
+	if schema.AdditionalProperties != nil {
+		dropOptionalOldSelfField(schema.AdditionalProperties.Schema)
+	}
+	for def, jsonSchema := range schema.Properties {
+		dropOptionalOldSelfField(&jsonSchema)
+		schema.Properties[def] = jsonSchema
+	}
+	if schema.Items != nil {
+		dropOptionalOldSelfField(schema.Items.Schema)
+		for i, jsonSchema := range schema.Items.JSONSchemas {
+			dropOptionalOldSelfField(&jsonSchema)
+			schema.Items.JSONSchemas[i] = jsonSchema
+		}
+	}
+}
+
+func specHasOptionalOldSelf(spec *apiextensions.CustomResourceDefinitionSpec) bool {
+	return validation.HasSchemaWith(spec, schemaHasOptionalOldSelf)
+}
+
+func schemaHasOptionalOldSelf(s *apiextensions.JSONSchemaProps) bool {
+	return validation.SchemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		for _, v := range s.XValidations {
+			if v.OptionalOldSelf != nil {
+				return true
+			}
+
+		}
+		return false
+	})
 }
