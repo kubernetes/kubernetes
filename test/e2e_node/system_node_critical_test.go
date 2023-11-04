@@ -23,7 +23,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -52,11 +51,16 @@ var _ = SIGDescribe("SystemNodeCriticalPod", framework.WithSlow(), framework.Wit
 
 	ginkgo.Context("when create a system-node-critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("200Mi")
 			summary := eventuallyGetSummary(ctx)
-			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
+			availableBytesNodeFs := *(summary.Node.Fs.AvailableBytes)
+			availableBytesImageFs := *(summary.Node.Runtime.ImageFs.AvailableBytes)
+			diskConsumed := availableBytesImageFs / 10
+			hardLimitsNodeFs := fmt.Sprintf("%d", availableBytesNodeFs-diskConsumed)
+			hardLimitsImageFs := fmt.Sprintf("%d", availableBytesImageFs-diskConsumed)
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): hardLimitsNodeFs, string(evictionapi.SignalImageFsAvailable): hardLimitsImageFs}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			ginkgo.By(fmt.Sprintf("EvictionHardSettings %s", initialConfig.EvictionHard))
+
 		})
 
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
