@@ -100,6 +100,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SidecarContainers = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
 
+	// Sig-node: add e2e tests for KEP-4191
+	SplitDisk = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SplitDisk"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SystemNodeCriticalPod = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
 
