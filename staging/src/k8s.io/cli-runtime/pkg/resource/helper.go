@@ -153,9 +153,9 @@ func EnhanceListError(err error, opts metav1.ListOptions, subj string) error {
 			return se
 		}
 		if len(opts.LabelSelector) == 0 && len(opts.FieldSelector) == 0 {
-			return fmt.Errorf("Unable to list %q: %v", subj, err)
+			return fmt.Errorf("unable to list %q: %v", subj, err)
 		}
-		return fmt.Errorf("Unable to find %q that match label selector %q, field selector %q: %v",
+		return fmt.Errorf("unable to find %q that match label selector %q, field selector %q: %v",
 			subj, opts.LabelSelector, opts.FieldSelector, err)
 	}
 	return err
