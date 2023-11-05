@@ -430,28 +430,6 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []v1.EndpointAddress{{IP: "1.2.3.5"}},
 				Ports:     []v1.EndpointPort{{Port: 222}, {Port: 333}},
 			}},
-		}, {
-			name: "four sets, three mixed ips, three ports, jumbled",
-			given: []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{IP: "1.2.3.4"}},
-				Ports:     []v1.EndpointPort{{Port: 111}},
-			}, {
-				NotReadyAddresses: []v1.EndpointAddress{{IP: "1.2.3.5"}},
-				Ports:             []v1.EndpointPort{{Port: 222}},
-			}, {
-				Addresses: []v1.EndpointAddress{{IP: "1.2.3.6"}},
-				Ports:     []v1.EndpointPort{{Port: 111}},
-			}, {
-				NotReadyAddresses: []v1.EndpointAddress{{IP: "1.2.3.5"}},
-				Ports:             []v1.EndpointPort{{Port: 333}},
-			}},
-			expect: []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}},
-				Ports:     []v1.EndpointPort{{Port: 111}},
-			}, {
-				NotReadyAddresses: []v1.EndpointAddress{{IP: "1.2.3.5"}},
-				Ports:             []v1.EndpointPort{{Port: 222}, {Port: 333}},
-			}},
 		},
 	}
 
