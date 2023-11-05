@@ -607,7 +607,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 		})
 
-		ginkgo.It("Can schedule a pod with a restartable init container [NodeAlphaFeature:SidecarContainers]", func(ctx context.Context) {
+		f.It("Can schedule a pod with a restartable init container", nodefeature.SidecarContainers, func(ctx context.Context) {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s"
 			sleepOneSecond := "1s"
 			rl := v1.ResourceList{v1.ResourceName(SampleDeviceResourceName): *resource.NewQuantity(1, resource.DecimalSI)}

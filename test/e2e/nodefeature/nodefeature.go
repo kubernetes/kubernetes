@@ -47,6 +47,7 @@ var (
 	PodResources                           = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 	ResourceMetrics                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))
 	RuntimeHandler                         = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
+	SidecarContainers                      = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
 	SystemNodeCriticalPod                  = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
 )
 
