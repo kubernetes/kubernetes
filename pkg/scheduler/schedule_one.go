@@ -126,6 +126,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// Usually, DonePod is called inside the scheduling queue,
 		// but in this case, we need to call it here because this Pod won't go back to the scheduling queue.
 		sched.SchedulingQueue.Done(assumedPodInfo.Pod.UID)
+		metrics.ScheduleAttemptsToSchedule.WithLabelValues(fwk.ProfileName()).Observe(float64(assumedPodInfo.Attempts))
 	}()
 }
 

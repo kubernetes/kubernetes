@@ -65,7 +65,14 @@ var (
 			Help:           "Number of attempts to schedule pods, by the result. 'unschedulable' means a pod could not be scheduled, while 'error' means an internal scheduler problem.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
-
+	ScheduleAttemptsToSchedule = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "schedule_attempts_to_schedule_total",
+			Help:           "Number of scheduling attempts that each Pod has gone through until it's scheduled.",
+			Buckets:        metrics.ExponentialBuckets(1, 2, 7),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile"})
 	schedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
