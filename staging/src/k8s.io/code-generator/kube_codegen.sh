@@ -557,6 +557,10 @@ function kube::codegen::gen_client() {
         ) | LC_ALL=C sort -u
     )
 
+    # remove duplicates for any entries
+    IFS=" " read -r -a group_versions <<< "$(tr ' ' '\n' <<< "${group_versions[@]}" | sort -u | tr '\n' ' ')"
+    IFS=" " read -r -a input_pkgs <<< "$(tr ' ' '\n' <<< "${input_pkgs[@]}" | sort -u | tr '\n' ' ')"
+
     if [ "${#group_versions[@]}" == 0 ]; then
         return 0
     fi
