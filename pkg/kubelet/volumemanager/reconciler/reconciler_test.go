@@ -2326,15 +2326,31 @@ func TestSyncStates(t *testing.T) {
 				filepath.Join("pod2uid", "volumes", "fake-plugin", "volume-name"),
 			},
 			createMountPoint: true,
-			podInfos:         []podInfo{defaultPodInfo},
+			podInfos: []podInfo{
+				{
+					podName:         "pod2",
+					podUID:          "pod2uid",
+					outerVolumeName: "volume-name",
+					innerVolumeName: "volume-name",
+				},
+			},
 			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
 				// for pod that is deleted, volume is considered as mounted
 				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
 				if len(mountedPods) != 1 {
 					return fmt.Errorf("expected 1 pods to in asw got %d", len(mountedPods))
 				}
-				if types.UniquePodName("pod2uid") != mountedPods[0].PodName {
-					return fmt.Errorf("expected mounted pod to be %s got %s", "pod2uid", mountedPods[0].PodName)
+				if types.UniquePodName("pod1uid") != mountedPods[0].PodName {
+					return fmt.Errorf("expected mounted pod to be %s got %s", "pod1uid", mountedPods[0].PodName)
+				}
+
+				// for pod that is in dsw, volume is in skippedDuringReconstruction
+				skippedVolumes := rcInstance.skippedDuringReconstruction
+				if len(skippedVolumes) != 1 {
+					return fmt.Errorf("expected 1 pods to in skippedDuringReconstruction got %d", len(skippedVolumes))
+				}
+				if skippedVolumes["fake-plugin/volume-name"] == nil {
+					return fmt.Errorf("expected %s is in skippedDuringReconstruction, got %+v", "fake-plugin/volume-name", skippedVolumes)
 				}
 				return nil
 			},
