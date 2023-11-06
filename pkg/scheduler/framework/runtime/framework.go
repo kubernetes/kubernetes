@@ -758,7 +758,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
 	// When contextualized logging hits GA
 	// https://github.com/kubernetes/kubernetes/issues/111672
-	logger = klog.LoggerWithValues(logger, klog.KObj(podToSchedule), "node", klog.KObj(nodeInfo.Node()))
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(podToSchedule), "node", klog.KObj(nodeInfo.Node()))
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil || state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
