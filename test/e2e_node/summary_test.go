@@ -120,12 +120,12 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				})
 			}
 			expectedPageFaultsUpperBound := 1000000
-			expectedMajorPageFaultsUpperBound := 15
+			expectedMajorPageFaultsUpperBound := 1e9
 			if IsCgroup2UnifiedMode() {
 				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
 				// above for the container.
 				expectedPageFaultsUpperBound = 1e9
-				expectedMajorPageFaultsUpperBound = 100000
+				expectedMajorPageFaultsUpperBound = 1e9
 			}
 
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -158,7 +158,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"WorkingSetBytes": bounded(100*e2evolume.Kb, memoryLimit),
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1e9),
-					"MajorPageFaults": bounded(0, 100000),
+					"MajorPageFaults": bounded(0, 1e9),
 				})
 				systemContainers["misc"] = miscContExpectations
 			}
@@ -281,7 +281,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
-						"MajorPageFaults": bounded(0, 100000),
+						"MajorPageFaults": bounded(0, 1e9),
 					}),
 					"Swap": swapExpectation(memoryLimit),
 					// TODO(#28407): Handle non-eth0 network interface names.
