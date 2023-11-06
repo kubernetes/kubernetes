@@ -120,7 +120,6 @@ linters-settings: # please keep this alphabetized
           structured k8s.io/kubernetes/cmd/kubelet/.*
           structured k8s.io/kubernetes/pkg/kubelet/.*
           structured k8s.io/kubernetes/pkg/proxy/.*
-          structured k8s.io/kubernetes/pkg/scheduler/.*
           structured k8s.io/kms/.*
           structured k8s.io/apiserver/pkg/storage/value/.*
           structured k8s.io/apiserver/pkg/server/options/encryptionconfig/.*
