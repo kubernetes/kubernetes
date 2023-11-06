@@ -1865,7 +1865,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	// Create new endpoints
-	for _, ep := range sets.List(newEndpoints) {
+	for _, ep := range newEndpoints.UnsortedList() {
 		ip, port, err := net.SplitHostPort(ep)
 		if err != nil {
 			klog.ErrorS(err, "Failed to parse endpoint", "endpoint", ep)
