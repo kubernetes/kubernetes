@@ -502,6 +502,14 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 			c.queueEndpointsForEndpointSlice(endpointSlice)
 		}
 	}
+
+	if managedByController(endpointSlice) {
+		for _, endpoint := range endpointSlice.OwnerReferences {
+			if *endpoint.Controller == true && endpoint.Kind == "Endpoints" {
+				c.queue.Add(endpointSlice.Namespace + "/" + endpoint.Name)
+			}
+		}
+	}
 }
 
 // queueEndpointsForEndpointSlice attempts to queue the corresponding Endpoints
