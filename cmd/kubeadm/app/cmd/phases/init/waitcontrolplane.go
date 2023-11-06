@@ -82,9 +82,10 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
 	klog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
 
-	client, err := data.Client()
+	// WaitForAPI uses the /healthz endpoint, thus a client without permissions works fine
+	client, err := data.ClientWithoutBootstrap()
 	if err != nil {
-		return errors.Wrap(err, "cannot obtain client")
+		return errors.Wrap(err, "cannot obtain client without bootstrap")
 	}
 
 	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
