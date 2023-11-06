@@ -129,7 +129,7 @@ type KubeletConfiguration struct {
 	// TLSMinVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSMinVersion string
-	// TLSMaxVersion is the minimum TLS version supported.
+	// TLSMaxVersion is the maximum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSMaxVersion string
 	// rotateCertificates enables client certificate rotation. The Kubelet will request a
