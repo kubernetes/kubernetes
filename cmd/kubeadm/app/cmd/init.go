@@ -496,21 +496,28 @@ func (d *initData) OutputWriter() io.Writer {
 	return d.outputWriter
 }
 
+// getDryRunClient creates a fake client that answers some GET calls in order to be able to do the full init flow in dry-run mode.
+func getDryRunClient(d *initData) (clientset.Interface, error) {
+	svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
+	}
+	dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
+	return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
+}
+
 // Client returns a Kubernetes client to be used by kubeadm.
 // This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
 // Important. This function must be called after the admin.conf kubeconfig file is created.
 func (d *initData) Client() (clientset.Interface, error) {
+	var err error
 	if d.client == nil {
 		if d.dryRun {
-			svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
+			d.client, err = getDryRunClient(d)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
+				return nil, err
 			}
-			// If we're dry-running, we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
-			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
-			d.client = apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
 		} else { // Use a real client
-			var err error
 			if !d.adminKubeConfigBootstrapped {
 				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
 				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil)
@@ -529,6 +536,28 @@ func (d *initData) Client() (clientset.Interface, error) {
 		}
 	}
 	return d.client, nil
+}
+
+// ClientWithoutBootstrap returns a dry-run client or a regular client from admin.conf.
+// Unlike Client(), it does not call EnsureAdminClusterRoleBinding() or sets d.client.
+// This means the client only has anonymous permissions and does not persist in initData.
+func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
+	var (
+		client clientset.Interface
+		err    error
+	)
+	if d.dryRun {
+		client, err = getDryRunClient(d)
+		if err != nil {
+			return nil, err
+		}
+	} else { // Use a real client
+		client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return client, nil
 }
 
 // Tokens returns an array of token strings.
