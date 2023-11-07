@@ -2041,7 +2041,11 @@ func TestStoreDeleteCollection(t *testing.T) {
 	// and reduce the default page size to 2.
 	storeWithCounter := &storageWithCounter{Interface: registry.Storage.Storage}
 	registry.Storage.Storage = storeWithCounter
+	originalDeleteCollectionPageSize := deleteCollectionPageSize
 	deleteCollectionPageSize = 2
+	defer func() {
+		deleteCollectionPageSize = originalDeleteCollectionPageSize
+	}()
 
 	numPods := 10
 	for i := 0; i < numPods; i++ {
