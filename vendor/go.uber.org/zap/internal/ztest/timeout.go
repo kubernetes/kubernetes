@@ -42,11 +42,11 @@ func Sleep(base time.Duration) {
 // Initialize checks the environment and alters the timeout scale accordingly.
 // It returns a function to undo the scaling.
 func Initialize(factor string) func() {
-	original := _timeoutScale
 	fv, err := strconv.ParseFloat(factor, 64)
 	if err != nil {
 		panic(err)
 	}
+	original := _timeoutScale
 	_timeoutScale = fv
 	return func() { _timeoutScale = original }
 }

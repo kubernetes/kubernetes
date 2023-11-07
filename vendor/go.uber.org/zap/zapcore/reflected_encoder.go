@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2022 Uber Technologies, Inc.
+// Copyright (c) 2016 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,26 +18,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package atomic
+package zapcore
 
-//go:generate bin/gen-atomicwrapper -name=String -type=string -wrapped=Value -compareandswap -swap -file=string.go
+import (
+	"encoding/json"
+	"io"
+)
 
-// String returns the wrapped value.
-func (s *String) String() string {
-	return s.Load()
+// ReflectedEncoder serializes log fields that can't be serialized with Zap's
+// JSON encoder. These have the ReflectType field type.
+// Use EncoderConfig.NewReflectedEncoder to set this.
+type ReflectedEncoder interface {
+	// Encode encodes and writes to the underlying data stream.
+	Encode(interface{}) error
 }
 
-// MarshalText encodes the wrapped string into a textual form.
-//
-// This makes it encodable as JSON, YAML, XML, and more.
-func (s *String) MarshalText() ([]byte, error) {
-	return []byte(s.Load()), nil
-}
-
-// UnmarshalText decodes text and replaces the wrapped string with it.
-//
-// This makes it decodable from JSON, YAML, XML, and more.
-func (s *String) UnmarshalText(b []byte) error {
-	s.Store(string(b))
-	return nil
+func defaultReflectedEncoder(w io.Writer) ReflectedEncoder {
+	enc := json.NewEncoder(w)
+	// For consistency with our custom JSON encoder.
+	enc.SetEscapeHTML(false)
+	return enc
 }

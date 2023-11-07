@@ -27,6 +27,11 @@ type levelFilterCore struct {
 	level LevelEnabler
 }
 
+var (
+	_ Core           = (*levelFilterCore)(nil)
+	_ leveledEnabler = (*levelFilterCore)(nil)
+)
+
 // NewIncreaseLevelCore creates a core that can be used to increase the level of
 // an existing Core. It cannot be used to decrease the logging level, as it acts
 // as a filter before calling the underlying core. If level decreases the log level,
@@ -43,6 +48,10 @@ func NewIncreaseLevelCore(core Core, level LevelEnabler) (Core, error) {
 
 func (c *levelFilterCore) Enabled(lvl Level) bool {
 	return c.level.Enabled(lvl)
+}
+
+func (c *levelFilterCore) Level() Level {
+	return LevelOf(c.level)
 }
 
 func (c *levelFilterCore) With(fields []Field) Core {

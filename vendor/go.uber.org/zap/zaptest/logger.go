@@ -61,7 +61,7 @@ func WrapOptions(zapOpts ...zap.Option) LoggerOption {
 // NewLogger builds a new Logger that logs all messages to the given
 // testing.TB.
 //
-//   logger := zaptest.NewLogger(t)
+//	logger := zaptest.NewLogger(t)
 //
 // Use this with a *testing.T or *testing.B to get logs which get printed only
 // if a test fails or if you ran go test -v.
@@ -69,11 +69,11 @@ func WrapOptions(zapOpts ...zap.Option) LoggerOption {
 // The returned logger defaults to logging debug level messages and above.
 // This may be changed by passing a zaptest.Level during construction.
 //
-//   logger := zaptest.NewLogger(t, zaptest.Level(zap.WarnLevel))
+//	logger := zaptest.NewLogger(t, zaptest.Level(zap.WarnLevel))
 //
 // You may also pass zap.Option's to customize test logger.
 //
-//   logger := zaptest.NewLogger(t, zaptest.WrapOptions(zap.AddCaller()))
+//	logger := zaptest.NewLogger(t, zaptest.WrapOptions(zap.AddCaller()))
 func NewLogger(t TestingT, opts ...LoggerOption) *zap.Logger {
 	cfg := loggerOptions{
 		Level: zapcore.DebugLevel,

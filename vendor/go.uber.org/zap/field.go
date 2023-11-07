@@ -25,6 +25,7 @@ import (
 	"math"
 	"time"
 
+	"go.uber.org/zap/internal/stacktrace"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -374,7 +375,7 @@ func StackSkip(key string, skip int) Field {
 	// from expanding the zapcore.Field union struct to include a byte slice. Since
 	// taking a stacktrace is already so expensive (~10us), the extra allocation
 	// is okay.
-	return String(key, takeStacktrace(skip+1)) // skip StackSkip
+	return String(key, stacktrace.Take(skip+1)) // skip StackSkip
 }
 
 // Duration constructs a field with the given key and value. The encoder
@@ -410,6 +411,63 @@ func Inline(val zapcore.ObjectMarshaler) Field {
 	}
 }
 
+// Dict constructs a field containing the provided key-value pairs.
+// It acts similar to [Object], but with the fields specified as arguments.
+func Dict(key string, val ...Field) Field {
+	return dictField(key, val)
+}
+
+// We need a function with the signature (string, T) for zap.Any.
+func dictField(key string, val []Field) Field {
+	return Object(key, dictObject(val))
+}
+
+type dictObject []Field
+
+func (d dictObject) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	for _, f := range d {
+		f.AddTo(enc)
+	}
+	return nil
+}
+
+// We discovered an issue where zap.Any can cause a performance degradation
+// when used in new goroutines.
+//
+// This happens because the compiler assigns 4.8kb (one zap.Field per arm of
+// switch statement) of stack space for zap.Any when it takes the form:
+//
+//	switch v := v.(type) {
+//	case string:
+//		return String(key, v)
+//	case int:
+//		return Int(key, v)
+//		// ...
+//	default:
+//		return Reflect(key, v)
+//	}
+//
+// To avoid this, we use the type switch to assign a value to a single local variable
+// and then call a function on it.
+// The local variable is just a function reference so it doesn't allocate
+// when converted to an interface{}.
+//
+// A fair bit of experimentation went into this.
+// See also:
+//
+// - https://github.com/uber-go/zap/pull/1301
+// - https://github.com/uber-go/zap/pull/1303
+// - https://github.com/uber-go/zap/pull/1304
+// - https://github.com/uber-go/zap/pull/1305
+// - https://github.com/uber-go/zap/pull/1308
+type anyFieldC[T any] func(string, T) Field
+
+func (f anyFieldC[T]) Any(key string, val any) Field {
+	v, _ := val.(T)
+	// val is guaranteed to be a T, except when it's nil.
+	return f(key, v)
+}
+
 // Any takes a key and an arbitrary value and chooses the best way to represent
 // them as a field, falling back to a reflection-based approach only if
 // necessary.
@@ -418,132 +476,138 @@ func Inline(val zapcore.ObjectMarshaler) Field {
 // them. To minimize surprises, []byte values are treated as binary blobs, byte
 // values are treated as uint8, and runes are always treated as integers.
 func Any(key string, value interface{}) Field {
-	switch val := value.(type) {
+	var c interface{ Any(string, any) Field }
+
+	switch value.(type) {
 	case zapcore.ObjectMarshaler:
-		return Object(key, val)
+		c = anyFieldC[zapcore.ObjectMarshaler](Object)
 	case zapcore.ArrayMarshaler:
-		return Array(key, val)
+		c = anyFieldC[zapcore.ArrayMarshaler](Array)
+	case []Field:
+		c = anyFieldC[[]Field](dictField)
 	case bool:
-		return Bool(key, val)
+		c = anyFieldC[bool](Bool)
 	case *bool:
-		return Boolp(key, val)
+		c = anyFieldC[*bool](Boolp)
 	case []bool:
-		return Bools(key, val)
+		c = anyFieldC[[]bool](Bools)
 	case complex128:
-		return Complex128(key, val)
+		c = anyFieldC[complex128](Complex128)
 	case *complex128:
-		return Complex128p(key, val)
+		c = anyFieldC[*complex128](Complex128p)
 	case []complex128:
-		return Complex128s(key, val)
+		c = anyFieldC[[]complex128](Complex128s)
 	case complex64:
-		return Complex64(key, val)
+		c = anyFieldC[complex64](Complex64)
 	case *complex64:
-		return Complex64p(key, val)
+		c = anyFieldC[*complex64](Complex64p)
 	case []complex64:
-		return Complex64s(key, val)
+		c = anyFieldC[[]complex64](Complex64s)
 	case float64:
-		return Float64(key, val)
+		c = anyFieldC[float64](Float64)
 	case *float64:
-		return Float64p(key, val)
+		c = anyFieldC[*float64](Float64p)
 	case []float64:
-		return Float64s(key, val)
+		c = anyFieldC[[]float64](Float64s)
 	case float32:
-		return Float32(key, val)
+		c = anyFieldC[float32](Float32)
 	case *float32:
-		return Float32p(key, val)
+		c = anyFieldC[*float32](Float32p)
 	case []float32:
-		return Float32s(key, val)
+		c = anyFieldC[[]float32](Float32s)
 	case int:
-		return Int(key, val)
+		c = anyFieldC[int](Int)
 	case *int:
-		return Intp(key, val)
+		c = anyFieldC[*int](Intp)
 	case []int:
-		return Ints(key, val)
+		c = anyFieldC[[]int](Ints)
 	case int64:
-		return Int64(key, val)
+		c = anyFieldC[int64](Int64)
 	case *int64:
-		return Int64p(key, val)
+		c = anyFieldC[*int64](Int64p)
 	case []int64:
-		return Int64s(key, val)
+		c = anyFieldC[[]int64](Int64s)
 	case int32:
-		return Int32(key, val)
+		c = anyFieldC[int32](Int32)
 	case *int32:
-		return Int32p(key, val)
+		c = anyFieldC[*int32](Int32p)
 	case []int32:
-		return Int32s(key, val)
+		c = anyFieldC[[]int32](Int32s)
 	case int16:
-		return Int16(key, val)
+		c = anyFieldC[int16](Int16)
 	case *int16:
-		return Int16p(key, val)
+		c = anyFieldC[*int16](Int16p)
 	case []int16:
-		return Int16s(key, val)
+		c = anyFieldC[[]int16](Int16s)
 	case int8:
-		return Int8(key, val)
+		c = anyFieldC[int8](Int8)
 	case *int8:
-		return Int8p(key, val)
+		c = anyFieldC[*int8](Int8p)
 	case []int8:
-		return Int8s(key, val)
+		c = anyFieldC[[]int8](Int8s)
 	case string:
-		return String(key, val)
+		c = anyFieldC[string](String)
 	case *string:
-		return Stringp(key, val)
+		c = anyFieldC[*string](Stringp)
 	case []string:
-		return Strings(key, val)
+		c = anyFieldC[[]string](Strings)
 	case uint:
-		return Uint(key, val)
+		c = anyFieldC[uint](Uint)
 	case *uint:
-		return Uintp(key, val)
+		c = anyFieldC[*uint](Uintp)
 	case []uint:
-		return Uints(key, val)
+		c = anyFieldC[[]uint](Uints)
 	case uint64:
-		return Uint64(key, val)
+		c = anyFieldC[uint64](Uint64)
 	case *uint64:
-		return Uint64p(key, val)
+		c = anyFieldC[*uint64](Uint64p)
 	case []uint64:
-		return Uint64s(key, val)
+		c = anyFieldC[[]uint64](Uint64s)
 	case uint32:
-		return Uint32(key, val)
+		c = anyFieldC[uint32](Uint32)
 	case *uint32:
-		return Uint32p(key, val)
+		c = anyFieldC[*uint32](Uint32p)
 	case []uint32:
-		return Uint32s(key, val)
+		c = anyFieldC[[]uint32](Uint32s)
 	case uint16:
-		return Uint16(key, val)
+		c = anyFieldC[uint16](Uint16)
 	case *uint16:
-		return Uint16p(key, val)
+		c = anyFieldC[*uint16](Uint16p)
 	case []uint16:
-		return Uint16s(key, val)
+		c = anyFieldC[[]uint16](Uint16s)
 	case uint8:
-		return Uint8(key, val)
+		c = anyFieldC[uint8](Uint8)
 	case *uint8:
-		return Uint8p(key, val)
+		c = anyFieldC[*uint8](Uint8p)
 	case []byte:
-		return Binary(key, val)
+		c = anyFieldC[[]byte](Binary)
 	case uintptr:
-		return Uintptr(key, val)
+		c = anyFieldC[uintptr](Uintptr)
 	case *uintptr:
-		return Uintptrp(key, val)
+		c = anyFieldC[*uintptr](Uintptrp)
 	case []uintptr:
-		return Uintptrs(key, val)
+		c = anyFieldC[[]uintptr](Uintptrs)
 	case time.Time:
-		return Time(key, val)
+		c = anyFieldC[time.Time](Time)
 	case *time.Time:
-		return Timep(key, val)
+		c = anyFieldC[*time.Time](Timep)
 	case []time.Time:
-		return Times(key, val)
+		c = anyFieldC[[]time.Time](Times)
 	case time.Duration:
-		return Duration(key, val)
+		c = anyFieldC[time.Duration](Duration)
 	case *time.Duration:
-		return Durationp(key, val)
+		c = anyFieldC[*time.Duration](Durationp)
 	case []time.Duration:
-		return Durations(key, val)
+		c = anyFieldC[[]time.Duration](Durations)
 	case error:
-		return NamedError(key, val)
+		c = anyFieldC[error](NamedError)
 	case []error:
-		return Errors(key, val)
+		c = anyFieldC[[]error](Errors)
 	case fmt.Stringer:
-		return Stringer(key, val)
+		c = anyFieldC[fmt.Stringer](Stringer)
 	default:
-		return Reflect(key, val)
+		c = anyFieldC[any](Reflect)
 	}
+
+	return c.Any(key, value)
 }

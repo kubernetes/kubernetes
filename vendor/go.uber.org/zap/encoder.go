@@ -63,7 +63,7 @@ func RegisterEncoder(name string, constructor func(zapcore.EncoderConfig) (zapco
 
 func newEncoder(name string, encoderConfig zapcore.EncoderConfig) (zapcore.Encoder, error) {
 	if encoderConfig.TimeKey != "" && encoderConfig.EncodeTime == nil {
-		return nil, fmt.Errorf("missing EncodeTime in EncoderConfig")
+		return nil, errors.New("missing EncodeTime in EncoderConfig")
 	}
 
 	_encoderMutex.RLock()
