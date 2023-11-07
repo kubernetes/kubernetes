@@ -501,9 +501,6 @@ type JobStatus struct {
 	UncountedTerminatedPods *UncountedTerminatedPods `json:"uncountedTerminatedPods,omitempty" protobuf:"bytes,8,opt,name=uncountedTerminatedPods"`
 
 	// The number of pods which have a Ready condition.
-	//
-	// This field is beta-level. The job controller populates the field when
-	// the feature gate JobReadyPods is enabled (enabled by default).
 	// +optional
 	Ready *int32 `json:"ready,omitempty" protobuf:"varint,9,opt,name=ready"`
 }
