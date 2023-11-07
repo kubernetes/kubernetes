@@ -78,15 +78,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		initialConfig: config,
 	}
 
-	var (
-		authorizers   []authorizer.Authorizer
-		ruleResolvers []authorizer.RuleResolver
-	)
-
-	// Add SystemPrivilegedGroup as an authorizing group
-	superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-	authorizers = append(authorizers, superuserAuthorizer)
-
+	// Build and store authorizers which will persist across reloads
 	for _, configuredAuthorizer := range config.AuthorizationConfiguration.Authorizers {
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
@@ -101,9 +93,43 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
+
+		case authzconfig.AuthorizerType(modes.ModeABAC):
+			var err error
+			r.abacAuthorizer, err = abac.NewFromFile(config.PolicyFile)
+			if err != nil {
+				return nil, nil, err
+			}
+		case authzconfig.AuthorizerType(modes.ModeRBAC):
+			r.rbacAuthorizer = rbac.New(
+				&rbac.RoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().Roles().Lister()},
+				&rbac.RoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().RoleBindings().Lister()},
+				&rbac.ClusterRoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister()},
+				&rbac.ClusterRoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoleBindings().Lister()},
+			)
+		}
+	}
+
+	// Construct the authorizers / ruleResolvers for the given configuration
+
+	var (
+		authorizers   []authorizer.Authorizer
+		ruleResolvers []authorizer.RuleResolver
+	)
+
+	// Add SystemPrivilegedGroup as an authorizing group
+	superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+	authorizers = append(authorizers, superuserAuthorizer)
+
+	for _, configuredAuthorizer := range config.AuthorizationConfiguration.Authorizers {
+		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
+		switch configuredAuthorizer.Type {
+		case authzconfig.AuthorizerType(modes.ModeNode):
+			if r.nodeAuthorizer == nil {
+				return nil, nil, fmt.Errorf("nil nodeAuthorizer")
+			}
 			authorizers = append(authorizers, r.nodeAuthorizer)
 			ruleResolvers = append(ruleResolvers, r.nodeAuthorizer)
-
 		case authzconfig.AuthorizerType(modes.ModeAlwaysAllow):
 			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
 			authorizers = append(authorizers, alwaysAllowAuthorizer)
@@ -113,18 +139,16 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, alwaysDenyAuthorizer)
 			ruleResolvers = append(ruleResolvers, alwaysDenyAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeABAC):
-			var err error
-			r.abacAuthorizer, err = abac.NewFromFile(config.PolicyFile)
-			if err != nil {
-				return nil, nil, err
+			if r.abacAuthorizer == nil {
+				return nil, nil, fmt.Errorf("nil abacAuthorizer")
 			}
 			authorizers = append(authorizers, r.abacAuthorizer)
 			ruleResolvers = append(ruleResolvers, r.abacAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeWebhook):
-			if config.WebhookRetryBackoff == nil {
+			if r.initialConfig.WebhookRetryBackoff == nil {
 				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
 			}
-			clientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, config.CustomDial)
+			clientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, r.initialConfig.CustomDial)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -141,7 +165,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
 				configuredAuthorizer.Webhook.AuthorizedTTL.Duration,
 				configuredAuthorizer.Webhook.UnauthorizedTTL.Duration,
-				*config.WebhookRetryBackoff,
+				*r.initialConfig.WebhookRetryBackoff,
 				decisionOnError,
 				configuredAuthorizer.Webhook.MatchConditions,
 			)
@@ -151,12 +175,9 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, webhookAuthorizer)
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeRBAC):
-			r.rbacAuthorizer = rbac.New(
-				&rbac.RoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().Roles().Lister()},
-				&rbac.RoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().RoleBindings().Lister()},
-				&rbac.ClusterRoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister()},
-				&rbac.ClusterRoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoleBindings().Lister()},
-			)
+			if r.rbacAuthorizer == nil {
+				return nil, nil, fmt.Errorf("nil rbacAuthorizer")
+			}
 			authorizers = append(authorizers, r.rbacAuthorizer)
 			ruleResolvers = append(ruleResolvers, r.rbacAuthorizer)
 		default:
