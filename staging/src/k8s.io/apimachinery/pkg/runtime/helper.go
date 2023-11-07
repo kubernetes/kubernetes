@@ -240,6 +240,16 @@ func (e WithVersionEncoder) Encode(obj Object, stream io.Writer) error {
 		// gvk already set as intended, skip injecting it.
 		return e.Encoder.Encode(obj, stream)
 	}
+	if versionOverrider, ok := obj.(VersionOverrider); ok {
+		// Delegate setting the GVK to the object.
+		restore := versionOverrider.OverrideVersionForEncoding(e.Encoder, gvk)
+		defer restore()
+		return e.Encoder.Encode(obj, stream)
+	}
+	// Traditional fallback when VersionOverrider is not supported:
+	// temporarily set the GVK in object, then restore the old one.
+	// Danger! This leads to race conditions when the same object
+	// is used by different goroutines.
 	kind.SetGroupVersionKind(gvk)
 	err = e.Encoder.Encode(obj, stream)
 	kind.SetGroupVersionKind(oldGVK)

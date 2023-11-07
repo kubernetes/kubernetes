@@ -17,6 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"sync"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -123,7 +126,72 @@ func (obj *TypeMeta) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 
 // GroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
 func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
+	if o, ok := protoTypeOverrides.Load(obj); ok {
+		return o.(*TypeMeta).GroupVersionKind()
+	}
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+var (
+	// TODO: avoid duplicating these identifiers or use some other method of identifying how
+	// the encoder works.
+	protobufRawID runtime.Identifier = "raw-protobuf" /* protobuf.NewRawSerializer(nil, nil).Identifier() - import cycle! */
+	protobufID    runtime.Identifier = "protobuf"     /* protobuf.NewSerializer(nil, nil).Identifier() - import cycle! */
+
+	protoTypeOverrides sync.Map
+)
+
+// OverrideVersionForEncoding satisfies the VersionOverrider interface for all objects that embed TypeMeta
+func (obj *TypeMeta) OverrideVersionForEncoding(encoder runtime.Encoder, gvk schema.GroupVersionKind) func() {
+
+	// TODO: Use "Caller-specified customization" from json/v2
+	// (https://github.com/golang/go/discussions/63397) to override
+	// the GVK.
+
+	switch encoder.Identifier() {
+	case protobufRawID, protobufID:
+		apiVersion, kind := gvk.ToAPIVersionAndKind()
+		protoTypeOverrides.Store(obj, &TypeMeta{APIVersion: apiVersion, Kind: kind})
+		return func() {
+			protoTypeOverrides.Delete(obj)
+		}
+	default:
+		oldObj := *obj
+		obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+		return func() {
+			*obj = oldObj
+		}
+	}
+}
+
+var _ runtime.VersionOverrider = &TypeMeta{}
+
+func (m *TypeMeta) Marshal() (dAtA []byte, err error) {
+	if o, ok := protoTypeOverrides.Load(m); ok {
+		return o.(*TypeMeta).marshal()
+	}
+	return m.marshal()
+}
+
+func (m *TypeMeta) MarshalTo(dAtA []byte) (int, error) {
+	if o, ok := protoTypeOverrides.Load(m); ok {
+		return o.(*TypeMeta).marshalTo(dAtA)
+	}
+	return m.marshalTo(dAtA)
+}
+
+func (m *TypeMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	if o, ok := protoTypeOverrides.Load(m); ok {
+		return o.(*TypeMeta).marshalToSizedBuffer(dAtA)
+	}
+	return m.marshalToSizedBuffer(dAtA)
+}
+
+func (m *TypeMeta) Size() (n int) {
+	if o, ok := protoTypeOverrides.Load(m); ok {
+		return o.(*TypeMeta).size()
+	}
+	return m.size()
 }
 
 func (obj *ListMeta) GetListMeta() ListInterface { return obj }

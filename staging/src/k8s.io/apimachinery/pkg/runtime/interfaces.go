@@ -69,6 +69,24 @@ type Encoder interface {
 	Identifier() Identifier
 }
 
+// VersionOverrider is an optional interface implemented by object types which
+// can be used to override the version that will be encoded together with
+// the object.
+type VersionOverrider interface {
+	// OverrideVersionForEncoding will be called by
+	// WithVersionEncoder.Encode before encoding an object if the object
+	// doesn't have the right GVK already set. The returned restore
+	// function must be called after encoding is done.
+	//
+	// Implementations of this are allowed to temporarily modify the
+	// object. This is what WithVersionEncoder.Encode has traditionally
+	// done to encode the desired GVK.
+	//
+	// Instead, an implementation may reconfigure the encoder to inject the
+	// GVK during encoding. This has to be thread-safe.
+	OverrideVersionForEncoding(encoder Encoder, gvk schema.GroupVersionKind) (restore func())
+}
+
 // MemoryAllocator is responsible for allocating memory.
 // By encapsulating memory allocation into its own interface, we can reuse the memory
 // across many operations in places we know it can significantly improve the performance.
@@ -323,6 +341,21 @@ type Namer interface {
 type Object interface {
 	GetObjectKind() schema.ObjectKind
 	DeepCopyObject() Object
+}
+
+// When serializing an object, it's type information may have to be added. This
+// is done by calling GetObjectKind().SetGroupVersionKind on the object before
+// encoding and restoring the previous GVK afterwards. Modifying the input
+// during encoding is unexpected and leads to data races when that object is
+// used as input in multiple parallel goroutines.
+//
+// Types where inline encoding of the original object and a separate ObjectKind
+// instance is valid may implement this extended interface to create that
+// separate ObjectKind for encoding.
+type ObjectKindFactory interface {
+	Object
+
+	NewObjectKind() schema.ObjectKind
 }
 
 // CacheableObject allows an object to cache its different serializations

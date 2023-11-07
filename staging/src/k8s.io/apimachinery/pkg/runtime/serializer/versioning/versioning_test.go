@@ -17,17 +17,27 @@ limitations under the License.
 package versioning
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
+
+type testType struct {
+	metav1.TypeMeta `json:",inline"`
+}
+
+func (t testType) DeepCopyObject() runtime.Object { return &t }
 
 type testDecodable struct {
 	Other string
@@ -337,6 +347,15 @@ func (s *mockSerializer) Identifier() runtime.Identifier {
 	return runtime.Identifier("mock")
 }
 
+type mockCreater map[schema.GroupVersionKind]runtime.Object
+
+func (mc mockCreater) New(kind schema.GroupVersionKind) (out runtime.Object, err error) {
+	if obj, ok := mc[kind]; ok {
+		return obj.DeepCopyObject(), nil
+	}
+	return nil, fmt.Errorf("unsupported GVK %s", kind)
+}
+
 type mockTyper struct {
 	gvks        []schema.GroupVersionKind
 	unversioned bool
@@ -374,6 +393,63 @@ func TestDirectCodecEncode(t *testing.T) {
 	c.Encode(&testDecodable{}, ioutil.Discard)
 	if e, a := "expected_group", serializer.encodingObjGVK.Group; e != a {
 		t.Errorf("expected group to be %v, got %v", e, a)
+	}
+}
+
+func TestWithVersionEncoder(t *testing.T) {
+	gvk := schema.GroupVersionKind{
+		Group:   "expected_group",
+		Version: "v1",
+		Kind:    "some_kind",
+	}
+	creater := mockCreater{
+		gvk: &testType{},
+	}
+	typer := &mockTyper{
+		gvks: []schema.GroupVersionKind{gvk},
+	}
+	testcases := map[string]runtime.Serializer{
+		"json":     json.NewSerializerWithOptions(json.DefaultMetaFactory, creater, typer, json.SerializerOptions{}),
+		"protobuf": protobuf.NewSerializer(creater, typer),
+	}
+
+	for name, serializer := range testcases {
+		t.Run(name, func(t *testing.T) {
+			c := runtime.WithVersionEncoder{
+				Version:     schema.GroupVersion{Group: "expected_group", Version: "v1"},
+				Encoder:     serializer,
+				ObjectTyper: typer,
+			}
+			var buffer bytes.Buffer
+			var original testType
+			input := original
+			if err := c.Encode(&input, &buffer); err != nil {
+				t.Fatalf("Unexpected error encoding the object: %v", err)
+			}
+			if input != original {
+				t.Errorf("Unexpected modification during encoding.\nOriginal:\n    %+v\nModified input:   %+v\n", original, input)
+			}
+			// kind+apiVersion must be present for json.DefaultMetaFactory.
+			actual, _, err := serializer.Decode(buffer.Bytes(), nil, nil)
+			if err != nil {
+				t.Fatalf("error decoding object: %v\nBuffer contains:\n%s\n", err, buffer.String())
+			}
+			actualTestType, ok := actual.(*testType)
+			if !ok {
+				t.Fatalf("expected *testType, got %T", actual)
+			}
+			expected := testType{
+				// TypeMeta gets injected by runtime.WithVersionEncoder.
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "some_kind",
+					APIVersion: "expected_group/v1",
+				},
+			}
+
+			if expected != *actualTestType {
+				t.Errorf("Expected:\n    %+v\nActual:   %+v\n", expected, *actualTestType)
+			}
+		})
 	}
 }
 
