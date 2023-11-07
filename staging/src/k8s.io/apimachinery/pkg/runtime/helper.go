@@ -236,6 +236,10 @@ func (e WithVersionEncoder) Encode(obj Object, stream io.Writer) error {
 			gvk = preferredGVK
 		}
 	}
+	if gvk == oldGVK {
+		// gvk already set as intended, skip injecting it.
+		return e.Encoder.Encode(obj, stream)
+	}
 	kind.SetGroupVersionKind(gvk)
 	err = e.Encoder.Encode(obj, stream)
 	kind.SetGroupVersionKind(oldGVK)
