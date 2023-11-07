@@ -129,7 +129,7 @@ const (
 	// This is an action which might be taken on a pod failure - mark the
 	// Job's index as failed to avoid restarts within this index. This action
 	// can only be used when backoffLimitPerIndex is set.
-	// This value is alpha-level.
+	// This value is beta-level.
 	PodFailurePolicyActionFailIndex PodFailurePolicyAction = "FailIndex"
 
 	// This is an action which might be taken on a pod failure - the counter towards
