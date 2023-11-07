@@ -19,10 +19,15 @@ package authorizer
 import (
 	"errors"
 	"fmt"
+	"strings"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/apis/apiserver/load"
+	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -155,4 +160,57 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 	}
 
 	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
+}
+
+// RepeatableAuthorizerTypes is the list of Authorizer that can be repeated in the Authorization Config
+var repeatableAuthorizerTypes = []string{modes.ModeWebhook}
+
+// GetNameForAuthorizerMode returns the name to be set for the mode in AuthorizationConfiguration
+// For now, lower cases the mode name
+func GetNameForAuthorizerMode(mode string) string {
+	return strings.ToLower(mode)
+}
+
+func LoadAndValidateFile(configFile string, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+	// load the file and check for errors
+	authorizationConfiguration, err := load.LoadFromFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AuthorizationConfiguration from file: %v", err)
+	}
+
+	// validate the file and return any error
+	if errors := validation.ValidateAuthorizationConfiguration(nil, authorizationConfiguration,
+		sets.NewString(modes.AuthorizationModeChoices...),
+		sets.NewString(repeatableAuthorizerTypes...),
+	); len(errors) != 0 {
+		return nil, fmt.Errorf(errors.ToAggregate().Error())
+	}
+
+	// test to check if the authorizer names passed conform to the authorizers for type!=Webhook
+	// this test is only for kube-apiserver and hence checked here
+	// it preserves compatibility with o.buildAuthorizationConfiguration
+	var allErrors []error
+	seenModes := sets.New[authzconfig.AuthorizerType]()
+	for _, authorizer := range authorizationConfiguration.Authorizers {
+		if string(authorizer.Type) == modes.ModeWebhook {
+			continue
+		}
+		seenModes.Insert(authorizer.Type)
+
+		expectedName := GetNameForAuthorizerMode(string(authorizer.Type))
+		if expectedName != authorizer.Name {
+			allErrors = append(allErrors, fmt.Errorf("expected name %s for authorizer %s instead of %s", expectedName, authorizer.Type, authorizer.Name))
+		}
+
+	}
+
+	if missingTypes := requireNonWebhookTypes.Difference(seenModes); missingTypes.Len() > 0 {
+		allErrors = append(allErrors, fmt.Errorf("missing required types: %v", sets.List(missingTypes)))
+	}
+
+	if len(allErrors) > 0 {
+		return nil, utilerrors.NewAggregate(allErrors)
+	}
+
+	return authorizationConfiguration, nil
 }
