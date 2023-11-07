@@ -111,6 +111,23 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 	}
 
 	// Construct the authorizers / ruleResolvers for the given configuration
+	authorizer, ruleResolver, err := r.newForConfig(r.initialConfig.AuthorizationConfiguration)
+	if err != nil {
+		return nil, nil, err
+	}
+	r.current.Store(&authorizerResolver{
+		authorizer:   authorizer,
+		ruleResolver: ruleResolver,
+	})
+
+	return r, r, nil
+}
+
+// newForConfig constructs
+func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.AuthorizationConfiguration) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+	if len(authzConfig.Authorizers) == 0 {
+		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
+	}
 
 	var (
 		authorizers   []authorizer.Authorizer
@@ -121,7 +138,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 	superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 	authorizers = append(authorizers, superuserAuthorizer)
 
-	for _, configuredAuthorizer := range config.AuthorizationConfiguration.Authorizers {
+	for _, configuredAuthorizer := range authzConfig.Authorizers {
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
@@ -185,12 +202,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		}
 	}
 
-	r.current.Store(&authorizerResolver{
-		authorizer:   union.New(authorizers...),
-		ruleResolver: union.NewRuleResolvers(ruleResolvers...),
-	})
-
-	return r, r, nil
+	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
 }
 
 // RepeatableAuthorizerTypes is the list of Authorizer that can be repeated in the Authorization Config
