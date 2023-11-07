@@ -74,6 +74,10 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
+	r := &reloadableAuthorizerResolver{
+		initialConfig: config,
+	}
+
 	var (
 		authorizers   []authorizer.Authorizer
 		ruleResolvers []authorizer.RuleResolver
@@ -96,9 +100,9 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 			)
-			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
-			authorizers = append(authorizers, nodeAuthorizer)
-			ruleResolvers = append(ruleResolvers, nodeAuthorizer)
+			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
+			authorizers = append(authorizers, r.nodeAuthorizer)
+			ruleResolvers = append(ruleResolvers, r.nodeAuthorizer)
 
 		case authzconfig.AuthorizerType(modes.ModeAlwaysAllow):
 			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
@@ -109,12 +113,13 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, alwaysDenyAuthorizer)
 			ruleResolvers = append(ruleResolvers, alwaysDenyAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeABAC):
-			abacAuthorizer, err := abac.NewFromFile(config.PolicyFile)
+			var err error
+			r.abacAuthorizer, err = abac.NewFromFile(config.PolicyFile)
 			if err != nil {
 				return nil, nil, err
 			}
-			authorizers = append(authorizers, abacAuthorizer)
-			ruleResolvers = append(ruleResolvers, abacAuthorizer)
+			authorizers = append(authorizers, r.abacAuthorizer)
+			ruleResolvers = append(ruleResolvers, r.abacAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeWebhook):
 			if config.WebhookRetryBackoff == nil {
 				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
@@ -146,20 +151,25 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, webhookAuthorizer)
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeRBAC):
-			rbacAuthorizer := rbac.New(
+			r.rbacAuthorizer = rbac.New(
 				&rbac.RoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().Roles().Lister()},
 				&rbac.RoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().RoleBindings().Lister()},
 				&rbac.ClusterRoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister()},
 				&rbac.ClusterRoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoleBindings().Lister()},
 			)
-			authorizers = append(authorizers, rbacAuthorizer)
-			ruleResolvers = append(ruleResolvers, rbacAuthorizer)
+			authorizers = append(authorizers, r.rbacAuthorizer)
+			ruleResolvers = append(ruleResolvers, r.rbacAuthorizer)
 		default:
 			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", configuredAuthorizer.Type)
 		}
 	}
 
-	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
+	r.current.Store(&authorizerResolver{
+		authorizer:   union.New(authorizers...),
+		ruleResolver: union.NewRuleResolvers(ruleResolvers...),
+	})
+
+	return r, r, nil
 }
 
 // RepeatableAuthorizerTypes is the list of Authorizer that can be repeated in the Authorization Config
