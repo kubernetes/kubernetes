@@ -265,6 +265,7 @@ aliases:
     - khenidak
     - mrhohn
     - robscott
+    - shaneutt
     - thockin
   sig-network-reviewers:
     - andrewsykim
@@ -275,6 +276,7 @@ aliases:
     - dcbw
     - khenidak
     - robscott
+    - shaneutt
     - thockin
   sig-apps-approvers:
     - kow3ns
@@ -357,9 +359,11 @@ aliases:
     - vincepri
   sig-network-api-approvers:
     - danwinship
+    - shaneutt
     - thockin
   sig-network-api-reviewers:
     - danwinship
+    - shaneutt
     - thockin
   sig-scheduling-api-approvers:
     - msau42
