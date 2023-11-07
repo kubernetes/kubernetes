@@ -1,0 +1,19 @@
+kind: ValidatingWebhookConfiguration
+apiVersion: admissionregistration.k8s.io/v1
+metadata:
+  name: cloud-controller-validating-webhook
+webhooks:
+- admissionReviewVersions:
+  - v1
+  failurePolicy: Fail
+  name: validating-webhook.aws.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+    scope: '*'

@@ -140,7 +140,8 @@ func (cb *CommandBuilder) BuildCommand() *cobra.Command {
 			cliflag.PrintFlags(cmd.Flags())
 
 			config, err := cb.options.Config(ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(),
-				cb.controllerAliases, WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())
+				cb.controllerAliases, WebhookNamesByType(cb.webhookConfigs, ValidatingWebhook), WebhookNamesByType(cb.webhookConfigs, MutatingWebhook),
+				WebhooksDisabledByDefault.List())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err

@@ -53,14 +53,24 @@ func init() {
 // WebhooksDisabledByDefault is the webhooks disabled default when starting cloud-controller managers.
 var WebhooksDisabledByDefault = sets.NewString()
 
+// WebHookType specifies the type of webhook.
+type WebhookType string
+
+const (
+	ValidatingWebhook WebhookType = "ValidatingWebhook"
+	MutatingWebhook   WebhookType = "MutatingWebhook"
+)
+
 type WebhookConfig struct {
 	Path             string
+	Type             WebhookType
 	AdmissionHandler func(*admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error)
 }
 
 type WebhookHandler struct {
 	Name string
 	Path string
+	Type WebhookType
 	http.Handler
 	AdmissionHandler func(*admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error)
 	CompletedConfig  *config.CompletedConfig
@@ -78,6 +88,7 @@ func NewWebhookHandlers(webhookConfigs map[string]WebhookConfig, completedConfig
 		webhookHandlers[name] = WebhookHandler{
 			Name:             name,
 			Path:             config.Path,
+			Type:             config.Type,
 			AdmissionHandler: config.AdmissionHandler,
 			CompletedConfig:  completedConfig,
 			Cloud:            cloud,
@@ -89,6 +100,16 @@ func NewWebhookHandlers(webhookConfigs map[string]WebhookConfig, completedConfig
 func WebhookNames(webhooks map[string]WebhookConfig) []string {
 	ret := sets.StringKeySet(webhooks)
 	return ret.List()
+}
+
+func WebhookNamesByType(webhooks map[string]WebhookConfig, webhookType WebhookType) []string {
+	var webhookNames []string
+	for name, config := range webhooks {
+		if config.Type == webhookType {
+			webhookNames = append(webhookNames, name)
+		}
+	}
+	return webhookNames
 }
 
 func newHandler(webhooks map[string]WebhookHandler) *mux.PathRecorderMux {

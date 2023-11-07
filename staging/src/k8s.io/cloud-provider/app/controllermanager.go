@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -101,7 +102,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 				return err
 			}
 
-			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
+			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, AllWebhooks, DisabledByDefaultWebhooks)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
@@ -168,42 +169,93 @@ the cloud specific control loops shipped with Kubernetes.`,
 }
 
 func createOrUpdateWebhookConfiguration(ctx context.Context, webhooks map[string]WebhookHandler, webhooksConfig cloudproviderconfig.WebhookConfiguration, clientBuilder clientbuilder.SimpleControllerClientBuilder) error {
-	for i, webhook := range webhooksConfig.ValidationWebhookConfiguration.Webhooks {
-		webhookconfig, ok := webhooks[webhook.Name]
-		if !ok {
-			return fmt.Errorf("webhook configuration not found for webhook %s", webhook.Name)
+	errors := []error{}
+	if webhooksConfig.ValidatingWebhookConfiguration != nil {
+		for i, webhook := range webhooksConfig.ValidatingWebhookConfiguration.Webhooks {
+			webhookconfig, ok := webhooks[webhook.Name]
+			if !ok {
+				errors = append(errors, fmt.Errorf("webhook configuration not found for webhook %s", webhook.Name))
+				continue
+			}
+			url := fmt.Sprintf("https://%s:%d/%s", webhooksConfig.WebhookAddress, webhooksConfig.WebhookPort, strings.TrimPrefix(webhookconfig.Path, "/"))
+
+			webhooksConfig.ValidatingWebhookConfiguration.Webhooks[i].ClientConfig = v1.WebhookClientConfig{
+				URL:      &url,
+				CABundle: []byte(webhooksConfig.CaBundle),
+			}
 		}
-		url := fmt.Sprintf("https://%s:%d/%s", webhooksConfig.WebhookAddress, webhooksConfig.WebhookPort, strings.TrimPrefix(webhookconfig.Path, "/"))
+	}
+	if webhooksConfig.MutatingWebhookConfiguration != nil {
+		for i, webhook := range webhooksConfig.MutatingWebhookConfiguration.Webhooks {
+			webhookconfig, ok := webhooks[webhook.Name]
+			if !ok {
+				errors = append(errors, fmt.Errorf("webhook configuration not found for webhook %s", webhook.Name))
+				continue
+			}
+			url := fmt.Sprintf("https://%s:%d/%s", webhooksConfig.WebhookAddress, webhooksConfig.WebhookPort, strings.TrimPrefix(webhookconfig.Path, "/"))
 
-		webhooksConfig.ValidationWebhookConfiguration.Webhooks[i].ClientConfig = v1.WebhookClientConfig{
-			URL:      &url,
-			CABundle: []byte(webhooksConfig.CaBundle),
+			webhooksConfig.MutatingWebhookConfiguration.Webhooks[i].ClientConfig = v1.WebhookClientConfig{
+				URL:      &url,
+				CABundle: []byte(webhooksConfig.CaBundle),
+			}
 		}
 	}
-	kubeClient := clientBuilder.ClientOrDie("ccm")
-	_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(ctx, webhooksConfig.ValidationWebhookConfiguration, metav1.CreateOptions{})
-	if err == nil {
-		klog.Infoln("webhook configuration successfully created")
-		return nil
+	if len(errors) != 0 {
+		return utilerrors.NewAggregate(errors)
 	}
 
-	if !apierrors.IsAlreadyExists(err) {
-		klog.ErrorS(err, "Unable to create webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidationWebhookConfiguration))
-		return fmt.Errorf("unable to create webhook configuration with API server %v", err)
+	kubeClient := clientBuilder.ClientOrDie("ccm-webhook")
+
+	if webhooksConfig.ValidatingWebhookConfiguration != nil {
+		_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(ctx, webhooksConfig.ValidatingWebhookConfiguration, metav1.CreateOptions{})
+		if err == nil {
+			klog.Infoln("validating webhook configuration successfully created")
+		} else {
+			if !apierrors.IsAlreadyExists(err) {
+				klog.ErrorS(err, "Unable to create validating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidatingWebhookConfiguration))
+				return fmt.Errorf("unable to create validating webhook configuration with API server %v", err)
+			}
+
+			currentConfiguration, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, webhooksConfig.ValidatingWebhookConfiguration.Name, metav1.GetOptions{})
+			if err != nil {
+				klog.ErrorS(err, "Unable to create validating webhook configuration with API server, error getting existing webhook configuration", "webhookconfiguration", webhooksConfig.ValidatingWebhookConfiguration.Name)
+				return fmt.Errorf("unable to get validating webhook configuration from API server %v", err)
+			}
+			currentConfiguration.Webhooks = webhooksConfig.ValidatingWebhookConfiguration.Webhooks
+
+			_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, currentConfiguration, metav1.UpdateOptions{})
+			if err != nil {
+				klog.ErrorS(err, "Unable to update validating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidatingWebhookConfiguration))
+				return fmt.Errorf("unable to update validating webhook configuration with API server %v", err)
+			}
+		}
 	}
 
-	currentConfiguration, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, webhooksConfig.ValidationWebhookConfiguration.Name, metav1.GetOptions{})
-	if err != nil {
-		klog.ErrorS(err, "Unable to create webhook configuration with API server, error getting existing webhook configuration", "webhookconfiguration", webhooksConfig.ValidationWebhookConfiguration.Name)
-		return fmt.Errorf("unable to get webhook configuration from API server %v", err)
-	}
-	currentConfiguration.Webhooks = webhooksConfig.ValidationWebhookConfiguration.Webhooks
+	if webhooksConfig.MutatingWebhookConfiguration != nil {
+		_, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(ctx, webhooksConfig.MutatingWebhookConfiguration, metav1.CreateOptions{})
+		if err == nil {
+			klog.Infoln("mutating webhook configuration successfully created")
+		} else {
+			if !apierrors.IsAlreadyExists(err) {
+				klog.ErrorS(err, "Unable to create mutating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.MutatingWebhookConfiguration))
+				return fmt.Errorf("unable to create mutating webhook configuration with API server %v", err)
+			}
 
-	_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, currentConfiguration, metav1.UpdateOptions{})
-	if err != nil {
-		klog.ErrorS(err, "Unable to update webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidationWebhookConfiguration))
-		return fmt.Errorf("unable to update webhook configuration with API server %v", err)
+			currentConfiguration, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhooksConfig.MutatingWebhookConfiguration.Name, metav1.GetOptions{})
+			if err != nil {
+				klog.ErrorS(err, "Unable to create mutating webhook configuration with API server, error fetching existing webhook configuration", "webhookconfiguration", webhooksConfig.MutatingWebhookConfiguration.Name)
+				return fmt.Errorf("unable to get mutating webhook configuration from API server %v", err)
+			}
+			currentConfiguration.Webhooks = webhooksConfig.MutatingWebhookConfiguration.Webhooks
+
+			_, err = kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, currentConfiguration, metav1.UpdateOptions{})
+			if err != nil {
+				klog.ErrorS(err, "Unable to update mutating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.MutatingWebhookConfiguration))
+				return fmt.Errorf("unable to update mutating webhook configuration with API server %v", err)
+			}
+		}
 	}
+
 	return nil
 }
 

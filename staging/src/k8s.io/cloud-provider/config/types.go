@@ -107,6 +107,9 @@ type WebhookConfiguration struct {
 	WebhookAddress string
 	// CaBundle is the ca certs to be used by apiserver for validating the webhook server certs.
 	CaBundle string
-	// ValidationWebhookConfiguration is the config used for creating validation webhook config object.
-	ValidationWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration
+	// ValidatingWebhookConfiguration is the config used for creating validation webhook config object.
+	ValidatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration
+
+	// MutatingWebhookConfiguration is the config used for creating mutating webhook config object.
+	MutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration
 }
