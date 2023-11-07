@@ -2032,7 +2032,8 @@ func (m *Timestamp) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *TypeMeta) Marshal() (dAtA []byte, err error) {
+// TODO: automatate the Marshal -> marshal renaming during code generation.
+func (m *TypeMeta) marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2042,12 +2043,12 @@ func (m *TypeMeta) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *TypeMeta) MarshalTo(dAtA []byte) (int, error) {
+func (m *TypeMeta) marshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *TypeMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *TypeMeta) marshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2939,7 +2940,7 @@ func (m *Timestamp) Size() (n int) {
 	return n
 }
 
-func (m *TypeMeta) Size() (n int) {
+func (m *TypeMeta) size() (n int) {
 	if m == nil {
 		return 0
 	}

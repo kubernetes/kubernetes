@@ -101,6 +101,7 @@ type SerializerOptions struct {
 }
 
 var _ runtime.Serializer = &Serializer{}
+var _ runtime.VersioningEncoder = &Serializer{}
 var _ runtime.EncoderWithAllocator = &Serializer{}
 var _ recognizer.RecognizingDecoder = &Serializer{}
 
@@ -189,6 +190,25 @@ func (s *Serializer) EncodeWithAllocator(obj runtime.Object, w io.Writer, memAll
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	return s.encode(obj, w, &runtime.SimpleAllocator{})
+}
+
+// EncodeWithGVK serializes the provided object to the given writer, using the given GVK.
+func (s *Serializer) EncodeWithGVK(obj runtime.Object, gvk schema.GroupVersionKind, w io.Writer) error {
+	kind := obj.GetObjectKind()
+	oldGVK := kind.GroupVersionKind()
+	if gvk != oldGVK {
+		if overrider, ok := obj.(runtime.ProtobufVersionOverrider); ok {
+			// Override via some side-channel, restore when done.
+			restore := overrider.OverrideVersionForProtobufEncoding(gvk)
+			defer restore()
+		} else {
+			// Override inline in the object.
+			kind.SetGroupVersionKind(gvk)
+			defer kind.SetGroupVersionKind(oldGVK)
+		}
+	}
+
 	return s.encode(obj, w, &runtime.SimpleAllocator{})
 }
 
