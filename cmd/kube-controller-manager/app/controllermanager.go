@@ -211,14 +211,21 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
+	var gracefulShutdownSecureServer func()
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		stoppedCh, listenerStoppedCh, err := c.SecureServing.Serve(handler, 0, stopCh)
+		if err != nil {
 			return err
+		}
+		gracefulShutdownSecureServer = func() {
+			<-listenerStoppedCh
+			logger.Info("[graceful-termination] secure server has stopped listening")
+			<-stoppedCh
+			logger.Info("[graceful-termination] secure server is exiting")
 		}
 	}
 
@@ -250,6 +257,9 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		controllerDescriptors := NewControllerDescriptors()
 		controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
 		run(ctx, controllerDescriptors)
+		if gracefulShutdownSecureServer != nil {
+			gracefulShutdownSecureServer()
+		}
 		return nil
 	}
 
@@ -299,8 +309,12 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 				run(ctx, controllerDescriptors)
 			},
 			OnStoppedLeading: func() {
-				logger.Error(nil, "leaderelection lost")
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				select {
+				case <-ctx.Done():
+				default:
+					logger.Error(nil, "leaderelection lost")
+					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				}
 			},
 		})
 
@@ -326,13 +340,20 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 					run(ctx, controllerDescriptors)
 				},
 				OnStoppedLeading: func() {
-					logger.Error(nil, "migration leaderelection lost")
-					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					select {
+					case <-ctx.Done():
+					default:
+						logger.Error(nil, "migration leaderelection lost")
+						klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					}
 				},
 			})
 	}
 
 	<-stopCh
+	if gracefulShutdownSecureServer != nil {
+		gracefulShutdownSecureServer()
+	}
 	return nil
 }
 
@@ -855,8 +876,6 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 		WatchDog:      electionChecker,
 		Name:          leaseName,
 	})
-
-	panic("unreachable")
 }
 
 // filteredControllerDescriptors returns all controllerDescriptors after filtering through filterFunc.
