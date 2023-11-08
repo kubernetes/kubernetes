@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/coloredwriter"
 	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -83,6 +84,8 @@ type GetOptions struct {
 	IgnoreNotFound bool
 
 	genericiooptions.IOStreams
+
+	COut *coloredwriter.ColoredWriter
 }
 
 var (
@@ -150,6 +153,7 @@ func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOption
 		IOStreams:   streams,
 		ChunkSize:   cmdutil.DefaultChunkSize,
 		ServerPrint: true,
+		COut:        coloredwriter.NewColoredWriter(streams.Out),
 	}
 }
 
@@ -249,6 +253,10 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		if err != nil {
 			return nil, err
 		}
+
+		///theme decode printer type: json/yaml/tabview
+		o.COut.UpdatePrinterType(printer)
+
 		printer, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(printer, nil)
 		if err != nil {
 			return nil, err
@@ -507,7 +515,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	var lastMapping *meta.RESTMapping
 
 	// track if we write any output
-	trackingWriter := &trackingWriterWrapper{Delegate: o.Out}
+	trackingWriter := &trackingWriterWrapper{Delegate: o.COut}
 	// output an empty line separating output
 	separatorWriter := &separatorWriterWrapper{Delegate: trackingWriter}
 
@@ -786,13 +794,13 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		for _, item := range items {
 			list.Items = append(list.Items, *item.(*unstructured.Unstructured))
 		}
-		if err := printer.PrintObj(list, o.Out); err != nil {
+		if err := printer.PrintObj(list, o.COut); err != nil {
 			errs = append(errs, err)
 		}
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
-	if printErr := printer.PrintObj(obj, o.Out); printErr != nil {
+	if printErr := printer.PrintObj(obj, o.COut); printErr != nil {
 		errs = append(errs, printErr)
 	}
 
