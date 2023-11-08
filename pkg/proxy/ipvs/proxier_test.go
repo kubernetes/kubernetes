@@ -238,6 +238,7 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 }
 
 func TestCleanupLeftovers(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -286,6 +287,7 @@ func TestCleanupLeftovers(t *testing.T) {
 }
 
 func TestCanUseIPVSProxier(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name         string
 		scheduler    string
@@ -343,6 +345,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 }
 
 func TestGetNodeIPs(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		isIPv6       bool
 		devAddresses map[string][]string
@@ -433,6 +436,7 @@ func TestGetNodeIPs(t *testing.T) {
 }
 
 func TestNodePortIPv4(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                   string
 		services               []*v1.Service
@@ -984,6 +988,7 @@ func TestNodePortIPv4(t *testing.T) {
 }
 
 func TestNodePortIPv6(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                   string
 		services               []*v1.Service
@@ -1326,6 +1331,7 @@ func TestNodePortIPv6(t *testing.T) {
 }
 
 func Test_syncEndpoint_updateWeightsOnRestart(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -1406,6 +1412,7 @@ func Test_syncEndpoint_updateWeightsOnRestart(t *testing.T) {
 }
 
 func TestIPv4Proxier(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		services     []*v1.Service
@@ -1543,6 +1550,7 @@ func TestIPv4Proxier(t *testing.T) {
 }
 
 func TestIPv6Proxier(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		services     []*v1.Service
@@ -1680,6 +1688,7 @@ func TestIPv6Proxier(t *testing.T) {
 }
 
 func TestMasqueradeRule(t *testing.T) {
+	t.Parallel()
 	for _, testcase := range []bool{false, true} {
 		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
 		ipvs := ipvstest.NewFake()
@@ -1714,6 +1723,7 @@ func TestMasqueradeRule(t *testing.T) {
 }
 
 func TestExternalIPsNoEndpoint(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -1766,6 +1776,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 }
 
 func TestExternalIPs(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -1836,6 +1847,7 @@ func TestExternalIPs(t *testing.T) {
 }
 
 func TestOnlyLocalExternalIPs(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -1917,6 +1929,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 }
 
 func TestLoadBalancer(t *testing.T) {
+	t.Parallel()
 	ipt, fp := buildFakeProxier()
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -2002,6 +2015,7 @@ func TestLoadBalancer(t *testing.T) {
 }
 
 func TestOnlyLocalNodePorts(t *testing.T) {
+	t.Parallel()
 	nodeIP := netutils.ParseIPSloppy("100.101.102.103")
 	ipt, fp := buildFakeProxier()
 
@@ -2101,6 +2115,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 }
 
 func TestHealthCheckNodePort(t *testing.T) {
+	t.Parallel()
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
@@ -2174,6 +2189,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 }
 
 func TestLoadBalancerSourceRanges(t *testing.T) {
+	t.Parallel()
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
@@ -2279,6 +2295,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 }
 
 func TestAcceptIPVSTraffic(t *testing.T) {
+	t.Parallel()
 	ipt, fp := buildFakeProxier()
 
 	ingressIP := "1.2.3.4"
@@ -2349,6 +2366,7 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 }
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
+	t.Parallel()
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
@@ -2463,6 +2481,7 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 }
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -2575,6 +2594,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -2615,6 +2635,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -2645,6 +2666,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -2736,6 +2758,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 }
 
 func TestSessionAffinity(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -2792,6 +2815,7 @@ func makeServicePortName(ns, name, port string, protocol v1.Protocol) proxy.Serv
 }
 
 func Test_updateEndpointsMap(t *testing.T) {
+	t.Parallel()
 	emptyEndpointSlices := []*discovery.EndpointSlice{
 		makeTestEndpointSlice("ns1", "ep1", 1, func(*discovery.EndpointSlice) {}),
 	}
@@ -3649,6 +3673,7 @@ func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap,
 }
 
 func Test_syncService(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		oldVirtualServer  *utilipvs.VirtualServer
 		svcName           string
@@ -3949,6 +3974,7 @@ func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer)
 }
 
 func TestCleanLegacyService(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4030,6 +4056,7 @@ func TestCleanLegacyService(t *testing.T) {
 }
 
 func TestCleanLegacyServiceWithRealServers(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4099,6 +4126,7 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 }
 
 func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4151,6 +4179,7 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 }
 
 func TestCleanLegacyService6(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4233,6 +4262,7 @@ func TestCleanLegacyService6(t *testing.T) {
 }
 
 func TestMultiPortServiceBindAddr(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4304,6 +4334,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 }
 
 func Test_getFirstColumn(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		fileContent string
@@ -4337,6 +4368,7 @@ raid10 57344 0 - Live 0xffffffffc0597000`,
 // the shared EndpointsChangeTracker and EndpointSliceCache. This test ensures that the
 // ipvs proxier supports translating EndpointSlices to ipvs output.
 func TestEndpointSliceE2E(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4422,6 +4454,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 }
 
 func TestHealthCheckNodePortE2E(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4476,6 +4509,7 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 
 // Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
 func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4590,6 +4624,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 }
 
 func TestFilterCIDRs(t *testing.T) {
+	t.Parallel()
 	var cidrList []string
 	var cidrs []string
 	var expected []string
@@ -4620,6 +4655,7 @@ func TestFilterCIDRs(t *testing.T) {
 }
 
 func TestCreateAndLinkKubeChain(t *testing.T) {
+	t.Parallel()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4645,6 +4681,7 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 // This test ensures that the iptables proxier supports translating Endpoints to
 // iptables output when internalTrafficPolicy is specified
 func TestTestInternalTrafficPolicyE2E(t *testing.T) {
+	t.Parallel()
 	type endpoint struct {
 		ip       string
 		hostname string
@@ -4819,6 +4856,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 // Test_EndpointSliceReadyAndTerminatingCluster tests that when there are ready and ready + terminating
 // endpoints and the traffic policy is "Cluster", only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
+	t.Parallel()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -4992,6 +5030,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 // Test_EndpointSliceReadyAndTerminatingLocal tests that when there are local ready and ready + terminating
 // endpoints, only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
+	t.Parallel()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -5164,6 +5203,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 // Test_EndpointSliceOnlyReadyTerminatingCluster tests that when there are only ready terminating
 // endpoints and the traffic policy is "Cluster",  we fall back to terminating endpoints.
 func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
+	t.Parallel()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -5336,6 +5376,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 // Test_EndpointSliceOnlyReadyTerminatingLocal tests that when there are only local ready terminating
 // endpoints, we fall back to those endpoints.
 func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
+	t.Parallel()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -5503,6 +5544,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 }
 
 func TestIpIsValidForSet(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		isIPv6 bool
 		ip     string
@@ -5594,6 +5636,7 @@ func TestIpIsValidForSet(t *testing.T) {
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
+	// NOTE: Can't be parallel, since the metrics are global
 	type endpoint struct {
 		ip       string
 		hostname string
@@ -5756,6 +5799,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 }
 
 func TestDismissLocalhostRuleExist(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		ipFamily v1.IPFamily
@@ -5797,6 +5841,7 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 }
 
 func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name             string
 		ipModeEnabled    bool
