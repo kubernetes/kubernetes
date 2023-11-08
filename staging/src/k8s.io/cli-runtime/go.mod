@@ -2,7 +2,7 @@
 
 module k8s.io/cli-runtime
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
