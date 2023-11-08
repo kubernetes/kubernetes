@@ -46,10 +46,11 @@ const (
 	// The Job labels will use batch.kubernetes.io as a prefix for all labels
 	// Historically the job controller uses unprefixed labels for job-name and controller-uid and
 	// Kubernetes continutes to recognize those unprefixed labels for consistency.
-	JobNameLabel = labelPrefix + "job-name"
+	JobNameLabel             = labelPrefix + "job-name"
+	LegacyControllerUidLabel = "controller-uid"
 	// ControllerUid is used to programatically get pods corresponding to a Job.
 	// There is a corresponding label without the batch.kubernetes.io that we support for legacy reasons.
-	ControllerUidLabel = labelPrefix + "controller-uid"
+	ControllerUidLabel = labelPrefix + LegacyControllerUidLabel
 	// Annotation indicating the number of failures for the index corresponding
 	// to the pod, which are counted towards the backoff limit.
 	JobIndexFailureCountAnnotation = labelPrefix + "job-index-failure-count"
