@@ -71,6 +71,7 @@ var (
 	KubeProxyDaemonSetDowngrade             = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetDowngrade"))
 	KubeProxyDaemonSetUpgrade               = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetUpgrade"))
 	KubeProxyDaemonSetMigration             = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetMigration"))
+	KubeUp                                  = framework.WithFeature(framework.ValidFeatures.Add("KubeUp"))
 	LabelSelector                           = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
 	LocalStorageCapacityIsolation           = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolation"))
 	LocalStorageCapacityIsolationQuota      = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
