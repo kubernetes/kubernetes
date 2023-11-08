@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/authutil"
@@ -62,6 +64,16 @@ authorizers:
 		framework.SharedEtcd(),
 	)
 	t.Cleanup(server.TearDownFn)
+
+	// Make sure anonymous requests work
+	anonymousClient := clientset.NewForConfigOrDie(rest.AnonymousClientConfig(server.ClientConfig))
+	healthzResult, err := anonymousClient.DiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).Raw()
+	if !bytes.Equal(healthzResult, []byte(`ok`)) {
+		t.Fatalf("expected 'ok', got %s", string(healthzResult))
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
