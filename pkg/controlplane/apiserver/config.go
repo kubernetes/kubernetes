@@ -147,12 +147,13 @@ func BuildGenericConfig(
 		return
 	}
 
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
+	var enablesRBAC bool
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, enablesRBAC, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
 	}
-	if s.Authorization != nil && !sets.NewString(s.Authorization.Modes...).Has(modes.ModeRBAC) {
+	if s.Authorization != nil && !enablesRBAC {
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
@@ -168,25 +169,35 @@ func BuildGenericConfig(
 	return
 }
 
-// BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, nil
-func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+// BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
+func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, egressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
 	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if authorizationConfig == nil {
-		return nil, nil, nil
+		return nil, nil, false, nil
 	}
 
-	if EgressSelector != nil {
-		egressDialer, err := EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
+	if egressSelector != nil {
+		egressDialer, err := egressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		authorizationConfig.CustomDial = egressDialer
 	}
 
-	return authorizationConfig.New()
+	enablesRBAC := false
+	for _, a := range authorizationConfig.AuthorizationConfiguration.Authorizers {
+		if string(a.Type) == modes.ModeRBAC {
+			enablesRBAC = true
+			break
+		}
+	}
+
+	authorizer, ruleResolver, err := authorizationConfig.New()
+
+	return authorizer, ruleResolver, enablesRBAC, err
 }
 
 // CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop
