@@ -369,7 +369,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 			expected: apiRequestCountStatus(
 				withRequestLastHour(withPerNodeAPIRequestLog("node1")),
 				withRequestLast24hN("0-4,6-23", withPerNodeAPIRequestLog("node1")),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 		},
 		{
@@ -398,7 +398,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
 					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("delete", 1386)),
 				)),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 		},
 		{
@@ -425,7 +425,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
 					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("delete", 1386)),
 				)),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 			expected: apiRequestCountStatus(
 				withRequestLastHour(withPerNodeAPIRequestLog("node1")),
@@ -436,7 +436,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 				withRequestLast24h(5, withPerNodeAPIRequestLog("node1",
 					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("list", 434)),
 				)),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 		},
 		{
@@ -459,7 +459,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
 					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("delete", 1386)),
 				)),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 			expected: apiRequestCountStatus(
 				withRequestLastHour(
@@ -485,7 +485,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 					),
 					withPerNodeAPIRequestLog("node2"),
 				),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 		},
 		{
@@ -509,7 +509,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
 					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("delete", 1386)),
 				)),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 			expected: apiRequestCountStatus(
 				withRequestLastHour(
@@ -536,7 +536,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 					),
 					withPerNodeAPIRequestLog("node2"),
 				),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
 			),
 		},
 		{
@@ -568,7 +568,59 @@ func TestSetRequestCountsForNode(t *testing.T) {
 					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("delete", 1386)),
 					withPerUserAPIRequestCount("mia", "DIFFERENT-agent", withRequestCount("delete", 542)),
 				)),
-				setRequestCountTotals,
+				withComputedRequestCountTotals(),
+			),
+		},
+		{
+			name:        "NumberOfUsersToReport",
+			nodeName:    "node1",
+			expiredHour: 5,
+			countsToPersist: resource("test.v1.group",
+				withHour(3,
+					withUser("ana", "some-agent", withCounts("get", 101)),
+					withUser("bob", "some-agent", withCounts("get", 102)),
+					withUser("eva", "some-agent", withCounts("get", 103)),
+					withUser("gus", "some-agent", withCounts("get", 104)),
+					withUser("ivy", "some-agent", withCounts("get", 105)),
+					withUser("joe", "some-agent", withCounts("get", 106)),
+					withUser("lia", "some-agent", withCounts("get", 107)),
+					withUser("max", "some-agent", withCounts("get", 108)),
+					withUser("mia", "some-agent", withCounts("get", 109)),
+					withUser("rex", "some-agent", withCounts("get", 110)),
+					withUser("amy", "some-agent", withCounts("get", 100)),
+					withUser("zoe", "some-agent", withCounts("get", 111)),
+				),
+				withHour(4,
+					withUser("mia", "some-agent", withCounts("delete", 1386)),
+				),
+			),
+			status: &apiv1.APIRequestCountStatus{},
+			expected: apiRequestCountStatus(
+				withRequestLastHour(
+					withPerNodeAPIRequestLog("node1",
+						withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("delete", 1386)),
+					),
+				),
+				withRequestLast24hN("0-4,6-23", withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(3, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("zoe", "some-agent", withRequestCount("get", 111)),
+					withPerUserAPIRequestCount("rex", "some-agent", withRequestCount("get", 110)),
+					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("get", 109)),
+					withPerUserAPIRequestCount("max", "some-agent", withRequestCount("get", 108)),
+					withPerUserAPIRequestCount("lia", "some-agent", withRequestCount("get", 107)),
+					withPerUserAPIRequestCount("joe", "some-agent", withRequestCount("get", 106)),
+					withPerUserAPIRequestCount("ivy", "some-agent", withRequestCount("get", 105)),
+					withPerUserAPIRequestCount("gus", "some-agent", withRequestCount("get", 104)),
+					withPerUserAPIRequestCount("eva", "some-agent", withRequestCount("get", 103)),
+					withPerUserAPIRequestCount("bob", "some-agent", withRequestCount("get", 102)),
+				)),
+				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("mia", "some-agent", withRequestCount("delete", 1386)),
+				)),
+				withComputedRequestCountTotals(
+					withAdditionalRequestCounts(3, "node1", 101),
+					withAdditionalRequestCounts(3, "node1", 100),
+				),
 			),
 		},
 	}
@@ -637,7 +689,7 @@ func TestPersistRequestCountForAllResources(t *testing.T) {
 						withRequestLast24h(20, withPerNodeAPIRequestLog("node10",
 							withPerUserAPIRequestCount("user10", "agent10", withRequestCount("get", 100)),
 						)),
-						setRequestCountTotals,
+						withComputedRequestCountTotals(),
 					),
 				),
 				// this api will have some current requests
@@ -655,7 +707,7 @@ func TestPersistRequestCountForAllResources(t *testing.T) {
 						withRequestLast24h(20, withPerNodeAPIRequestLog("node10",
 							withPerUserAPIRequestCount("user10", "agent10", withRequestCount("get", 100)),
 						)),
-						setRequestCountTotals,
+						withComputedRequestCountTotals(),
 					),
 				),
 				apiRequestCount("test.v2.group",
@@ -667,7 +719,7 @@ func TestPersistRequestCountForAllResources(t *testing.T) {
 						withRequestLast24h(0, withPerNodeAPIRequestLog("node10",
 							withPerUserAPIRequestCount("user10", "agent10", withRequestCount("get", 53)),
 						)),
-						setRequestCountTotals,
+						withComputedRequestCountTotals(),
 					),
 				),
 				apiRequestCount("test.v3.group",
@@ -679,7 +731,7 @@ func TestPersistRequestCountForAllResources(t *testing.T) {
 						withRequestLast24h(0, withPerNodeAPIRequestLog("node10",
 							withPerUserAPIRequestCount("user10", "agent10", withRequestCount("get", 57)),
 						)),
-						setRequestCountTotals,
+						withComputedRequestCountTotals(),
 					),
 				),
 			},
@@ -865,39 +917,55 @@ func withRequestCount(verb string, count int64) func(user *apiv1.PerUserAPIReque
 	}
 }
 
-func setRequestCountTotals(status *apiv1.APIRequestCountStatus) {
-	totalForDay := int64(0)
-	for hourIndex, hourlyCount := range status.Last24h {
-		totalForHour := int64(0)
-		for nodeIndex, nodeCount := range hourlyCount.ByNode {
+func withAdditionalRequestCounts(hour int, node string, counts int) func(map[int]map[string]int64) {
+	return func(m map[int]map[string]int64) {
+		if _, ok := m[hour]; !ok {
+			m[hour] = map[string]int64{}
+		}
+		m[hour][node] = m[hour][node] + int64(counts)
+	}
+}
+
+func withComputedRequestCountTotals(options ...func(map[int]map[string]int64)) func(*apiv1.APIRequestCountStatus) {
+	additionalCounts := map[int]map[string]int64{}
+	for _, f := range options {
+		f(additionalCounts)
+	}
+	return func(status *apiv1.APIRequestCountStatus) {
+		totalForDay := int64(0)
+		for hourIndex, hourlyCount := range status.Last24h {
+			totalForHour := int64(0)
+			for nodeIndex, nodeCount := range hourlyCount.ByNode {
+				totalForNode := int64(0)
+				for _, userCount := range nodeCount.ByUser {
+					totalForNode += userCount.RequestCount
+				}
+				totalForNode += additionalCounts[hourIndex][nodeCount.NodeName]
+				// only set the perNode count if it is not set already
+				if status.Last24h[hourIndex].ByNode[nodeIndex].RequestCount == 0 {
+					status.Last24h[hourIndex].ByNode[nodeIndex].RequestCount = totalForNode
+				}
+				totalForHour += status.Last24h[hourIndex].ByNode[nodeIndex].RequestCount
+			}
+			status.Last24h[hourIndex].RequestCount = totalForHour
+			totalForDay += totalForHour
+		}
+		status.RequestCount = totalForDay
+
+		totalForCurrentHour := int64(0)
+		for nodeIndex, nodeCount := range status.CurrentHour.ByNode {
 			totalForNode := int64(0)
 			for _, userCount := range nodeCount.ByUser {
 				totalForNode += userCount.RequestCount
 			}
 			// only set the perNode count if it is not set already
-			if status.Last24h[hourIndex].ByNode[nodeIndex].RequestCount == 0 {
-				status.Last24h[hourIndex].ByNode[nodeIndex].RequestCount = totalForNode
+			if status.CurrentHour.ByNode[nodeIndex].RequestCount == 0 {
+				status.CurrentHour.ByNode[nodeIndex].RequestCount = totalForNode
 			}
-			totalForHour += status.Last24h[hourIndex].ByNode[nodeIndex].RequestCount
+			totalForCurrentHour += status.CurrentHour.ByNode[nodeIndex].RequestCount
 		}
-		status.Last24h[hourIndex].RequestCount = totalForHour
-		totalForDay += totalForHour
+		status.CurrentHour.RequestCount = totalForCurrentHour
 	}
-	status.RequestCount = totalForDay
-
-	totalForCurrentHour := int64(0)
-	for nodeIndex, nodeCount := range status.CurrentHour.ByNode {
-		totalForNode := int64(0)
-		for _, userCount := range nodeCount.ByUser {
-			totalForNode += userCount.RequestCount
-		}
-		// only set the perNode count if it is not set already
-		if status.CurrentHour.ByNode[nodeIndex].RequestCount == 0 {
-			status.CurrentHour.ByNode[nodeIndex].RequestCount = totalForNode
-		}
-		totalForCurrentHour += status.CurrentHour.ByNode[nodeIndex].RequestCount
-	}
-	status.CurrentHour.RequestCount = totalForCurrentHour
 }
 
 func apiRequestCount(n string, options ...func(*apiv1.APIRequestCount)) *apiv1.APIRequestCount {
@@ -1111,7 +1179,7 @@ func Test_removePersistedRequestCounts(t *testing.T) {
 						withPerUserAPIRequestCount("mia", "mia-agent", withRequestCount("delete", 1386)),
 						withPerUserAPIRequestCount("eva", "eva-agent", withRequestCount("get", 725), withRequestCount("watch", 640)),
 					)),
-					setRequestCountTotals,
+					withComputedRequestCountTotals(),
 				),
 				localResourceCount: resource("test.v1.group",
 					withHour(4,
@@ -1143,7 +1211,7 @@ func Test_removePersistedRequestCounts(t *testing.T) {
 						withPerUserAPIRequestCount("mia", "mia-agent", withRequestCount("delete", 1386)),
 						withPerUserAPIRequestCount("eva", "eva-agent", withRequestCount("get", 725), withRequestCount("watch", 640)),
 					)),
-					setRequestCountTotals,
+					withComputedRequestCountTotals(),
 				),
 				localResourceCount: resource("test.v1.group",
 					withHour(4,

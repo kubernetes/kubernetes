@@ -113,10 +113,15 @@ func resourceRequestCountToHourlyNodeRequestLog(nodeName string, maxNumUsers int
 			// the api resource has an interesting property of only keeping the last few.  Having a short list makes the sort faster
 			hasMaxEntries := len(hourlyNodeRequests[hour].ByUser) >= maxNumUsers
 			if hasMaxEntries {
-				currentSmallestCount := hourlyNodeRequests[hour].ByUser[len(hourlyNodeRequests[hour].ByUser)-1].RequestCount
+				// users are expected to be sorted by decending request count
+				currentSmallestCountIndex := len(hourlyNodeRequests[hour].ByUser) - 1
+				currentSmallestCount := hourlyNodeRequests[hour].ByUser[currentSmallestCountIndex].RequestCount
 				if apiUserStatus.RequestCount <= currentSmallestCount {
+					// not in top numberOfUsersToReport
 					continue
 				}
+				// drop smallest user request count to make room
+				hourlyNodeRequests[hour].ByUser = hourlyNodeRequests[hour].ByUser[:currentSmallestCountIndex]
 			}
 
 			hourlyNodeRequests[hour].ByUser = append(hourlyNodeRequests[hour].ByUser, apiUserStatus)
