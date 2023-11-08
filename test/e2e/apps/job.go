@@ -71,16 +71,13 @@ type watchEventConfig struct {
 var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	parallelism := int32(2)
-	completions := int32(4)
-
-	largeParallelism := int32(90)
-	largeCompletions := int32(90)
-
-	backoffLimit := int32(6) // default value
 
 	// Simplest case: N pods succeed
 	ginkgo.It("should run a job to completion when tasks succeed", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
@@ -114,6 +111,9 @@ var _ = SIGDescribe("Job", func() {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJobOnNode("failOnce", "pod-failure-failjob", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
 		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
@@ -145,6 +145,8 @@ var _ = SIGDescribe("Job", func() {
 		// the Job's Pods to be scheduled to a single Node and use a hostPath
 		// volume to persist data across new Pods.
 		backoffLimit := int32(0)
+		parallelism := int32(2)
+		completions := int32(4)
 
 		ginkgo.By("Looking for a node to schedule job pod")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -194,6 +196,8 @@ var _ = SIGDescribe("Job", func() {
 			// job failure if not for the pod failure policy to ignore the failed
 			// pods from counting them towards the backoffLimit.
 			backoffLimit := int32(0)
+			parallelism := int32(2)
+			completions := int32(4)
 
 			ginkgo.By("Looking for a node to schedule job pods")
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -274,6 +278,10 @@ var _ = SIGDescribe("Job", func() {
 	)
 
 	ginkgo.It("should not create pods when created in suspend state", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.BoolPtr(true)
@@ -302,6 +310,10 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	ginkgo.It("should delete pods when suspended", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job with suspend=false")
 		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.Bool(false)
@@ -406,6 +418,10 @@ done`}
 			Ensure that created pods have completion index annotation and environment variable.
 	*/
 	framework.ConformanceIt("should create pods for an Indexed job with completion indexes and specified hostname", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating Indexed job")
 		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		mode := batchv1.IndexedCompletion
@@ -443,6 +459,10 @@ done`}
 		backoffLimitPerIndex=1, allowing for one pod recreation before marking that indexed failed.
 	*/
 	ginkgo.It("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating an indexed job with backoffLimit per index and failing pods")
 		job := e2ejob.NewTestJob("failOddSucceedEven", "with-backoff-limit-per-index", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.BackoffLimit = nil
@@ -545,6 +565,10 @@ done`}
 		job and ensure if the pods associated with the job have been removed
 	*/
 	ginkgo.It("should remove pods when job is deleted", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "all-pods-removed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
@@ -570,6 +594,10 @@ done`}
 		execute to completion.
 	*/
 	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job")
 		// One failure, then a success, local restarts.
 		// We can't use the random failure approach, because kubelet will
@@ -598,6 +626,10 @@ done`}
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJobOnNode("failOnce", "fail-once-non-local", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
@@ -609,8 +641,12 @@ done`}
 	})
 
 	ginkgo.It("should fail when exceeds active deadline", func(ctx context.Context) {
+		activeDeadlineSeconds := int64(1)
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job")
-		var activeDeadlineSeconds int64 = 1
 		job := e2ejob.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
@@ -625,6 +661,10 @@ done`}
 		Description: Create a job. Ensure the active pods reflect parallelism in the namespace and delete the job. Job MUST be deleted successfully.
 	*/
 	framework.ConformanceIt("should delete a job", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
@@ -653,6 +693,10 @@ done`}
 		Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
 	*/
 	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.
@@ -740,9 +784,12 @@ done`}
 
 		cpuRequest := fmt.Sprint(int64(0.2 * float64(cpu.Value())))
 
-		backoff := 0
+		parallelism := int32(90)
+		completions := int32(90)
+		backoffLimit := int32(0)
+
 		ginkgo.By("Creating a job")
-		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, largeParallelism, largeCompletions, nil, int32(backoff))
+		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		for i := range job.Spec.Template.Spec.Containers {
 			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
@@ -757,7 +804,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, largeCompletions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods for job exist")
@@ -769,7 +816,7 @@ done`}
 				successes++
 			}
 		}
-		gomega.Expect(successes).To(gomega.Equal(largeCompletions), "expected %d successful job pods, but got  %d", largeCompletions, successes)
+		gomega.Expect(successes).To(gomega.Equal(completions), "expected %d successful job pods, but got  %d", completions, successes)
 	})
 
 	/*
@@ -785,6 +832,10 @@ done`}
 
 		ns := f.Namespace.Name
 		jClient := f.ClientSet.BatchV1().Jobs(ns)
+
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
 
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
@@ -868,6 +919,10 @@ done`}
 		}
 		jobsList, err := jobClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		framework.ExpectNoError(err, "failed to list Job")
+
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
 
 		ginkgo.By("Creating a suspended job")
 		job := e2ejob.NewTestJob("succeed", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
@@ -965,6 +1020,10 @@ done`}
 	})
 
 	ginkgo.It("should update the status ready field", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("notTerminate", "all-ready", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = ptr.To[bool](true)
