@@ -130,12 +130,24 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 	return framework.QueueSkip, nil
 }
 
+func getSchedulingRequired(affinity *v1.Affinity) *v1.NodeSelector {
+	if affinity == nil || affinity.NodeAffinity == nil || affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return nil
+	}
+	return affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+}
+
+func getExecutionRequired(affinity *v1.Affinity) *v1.NodeSelector {
+	if affinity == nil || affinity.NodeAffinity == nil || affinity.NodeAffinity.RequiredDuringSchedulingRequiredDuringExecution == nil {
+		return nil
+	}
+	return affinity.NodeAffinity.RequiredDuringSchedulingRequiredDuringExecution
+}
+
 // PreFilter builds and writes cycle state used by Filter.
 func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	affinity := pod.Spec.Affinity
-	noNodeAffinity := (affinity == nil ||
-		affinity.NodeAffinity == nil ||
-		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil)
+	noNodeAffinity := (getSchedulingRequired(affinity) == nil) && (getExecutionRequired(affinity) == nil)
 	if noNodeAffinity && pl.addedNodeSelector == nil && pod.Spec.NodeSelector == nil {
 		// NodeAffinity Filter has nothing to do with the Pod.
 		return nil, framework.NewStatus(framework.Skip)
@@ -144,12 +156,16 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.Cyc
 	state := &preFilterState{requiredNodeSelectorAndAffinity: nodeaffinity.GetRequiredNodeAffinity(pod)}
 	cycleState.Write(preFilterStateKey, state)
 
-	if noNodeAffinity || len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+	requiredAffinity := getExecutionRequired(affinity)
+	if requiredAffinity == nil {
+		requiredAffinity = getSchedulingRequired(affinity)
+	}
+	if noNodeAffinity || len(requiredAffinity.NodeSelectorTerms) == 0 {
 		return nil, nil
 	}
 
 	// Check if there is affinity to a specific node and return it.
-	terms := affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	terms := requiredAffinity.NodeSelectorTerms
 	var nodeNames sets.Set[string]
 	for _, t := range terms {
 		var termNodeNames sets.Set[string]

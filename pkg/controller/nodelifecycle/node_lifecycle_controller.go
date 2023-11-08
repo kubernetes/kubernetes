@@ -218,6 +218,7 @@ type podUpdateItem struct {
 // Controller is the controller that manages node's life cycle.
 type Controller struct {
 	taintManager *tainteviction.Controller
+	labelManager *scheduler.LabelManager
 
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
@@ -422,6 +423,14 @@ func NewNodeLifecycleController(
 		nc.taintManager = tm
 	}
 
+	nc.labelManager = scheduler.NewLabelManager(ctx, kubeClient, nc.podLister, nc.nodeLister, nc.getPodsAssignedToNode)
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+			nc.labelManager.NodeUpdated(oldNode, newNode)
+			return nil
+		}),
+	})
+
 	logger.Info("Controller will reconcile labels")
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
@@ -478,6 +487,8 @@ func (nc *Controller) Run(ctx context.Context) {
 		logger.Info("Starting", "controller", taintEvictionController)
 		go nc.taintManager.Run(ctx)
 	}
+
+	go nc.labelManager.Run(ctx)
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
 	for i := 0; i < nodeUpdateWorkerSize; i++ {

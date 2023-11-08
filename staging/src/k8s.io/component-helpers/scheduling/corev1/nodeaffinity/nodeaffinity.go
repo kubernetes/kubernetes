@@ -311,9 +311,27 @@ func GetRequiredNodeAffinity(pod *v1.Pod) RequiredNodeAffinity {
 	// Use LazyErrorNodeSelector for backwards compatibility of parsing errors.
 	var affinity *LazyErrorNodeSelector
 	if pod.Spec.Affinity != nil &&
+		pod.Spec.Affinity.NodeAffinity != nil {
+		if pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+			affinity = NewLazyErrorNodeSelector(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingRequiredDuringExecution)
+		} else if pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			affinity = NewLazyErrorNodeSelector(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+		}
+	}
+	return RequiredNodeAffinity{labelSelector: selector, nodeSelector: affinity}
+}
+
+func GetExecutionRequiredNodeAffinity(pod *v1.Pod) RequiredNodeAffinity {
+	var selector labels.Selector
+	if len(pod.Spec.NodeSelector) > 0 {
+		selector = labels.SelectorFromSet(pod.Spec.NodeSelector)
+	}
+	// Use LazyErrorNodeSelector for backwards compatibility of parsing errors.
+	var affinity *LazyErrorNodeSelector
+	if pod.Spec.Affinity != nil &&
 		pod.Spec.Affinity.NodeAffinity != nil &&
-		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		affinity = NewLazyErrorNodeSelector(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		affinity = NewLazyErrorNodeSelector(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingRequiredDuringExecution)
 	}
 	return RequiredNodeAffinity{labelSelector: selector, nodeSelector: affinity}
 }
