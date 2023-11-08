@@ -80,12 +80,20 @@ type BuiltInAuthorizationOptions struct {
 // NewBuiltInAuthorizationOptions create a BuiltInAuthorizationOptions with default value
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	return &BuiltInAuthorizationOptions{
-		Modes:                       []string{authzmodes.ModeAlwaysAllow},
+		Modes:                       []string{},
 		WebhookVersion:              "v1beta1",
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
 		WebhookRetryBackoff:         genericoptions.DefaultAuthWebhookRetryBackoff(),
 	}
+}
+
+// Complete modifies authorization options
+func (o *BuiltInAuthorizationOptions) Complete() []error {
+	if len(o.AuthorizationConfigurationFile) == 0 && len(o.Modes) == 0 {
+		o.Modes = []string{authzmodes.ModeAlwaysAllow}
+	}
+	return nil
 }
 
 // Validate checks invalid config combination
@@ -185,7 +193,7 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.StringSliceVar(&o.Modes, authorizationModeFlag, o.Modes, ""+
-		"Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+
+		"Ordered list of plug-ins to do authorization on secure port. Defaults to AlwaysAllow if --authorization-config is not used. Comma-delimited list of: "+
 		strings.Join(authzmodes.AuthorizationModeChoices, ",")+".")
 
 	fs.StringVar(&o.PolicyFile, authorizationPolicyFileFlag, o.PolicyFile, ""+
