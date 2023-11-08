@@ -249,6 +249,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		VersionedInformerFactory: versionedInformerFactory,
 		WebhookRetryBackoff:      o.WebhookRetryBackoff,
 
+		ReloadFile:                 o.AuthorizationConfigurationFile,
 		AuthorizationConfiguration: authorizationConfiguration,
 	}, nil
 }

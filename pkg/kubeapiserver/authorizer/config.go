@@ -17,8 +17,11 @@ limitations under the License.
 package authorizer
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -56,6 +59,8 @@ type Config struct {
 	// Optional field, custom dial function used to connect to webhook
 	CustomDial utilnet.DialFunc
 
+	// ReloadFile holds the filename to reload authorization configuration from
+	ReloadFile string
 	// AuthorizationConfiguration stores the configuration for the Authorizer chain
 	// It will deprecate most of the above flags when GA
 	AuthorizationConfiguration *authzconfig.AuthorizationConfiguration
@@ -63,17 +68,25 @@ type Config struct {
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.
-func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, error) {
+// stopCh is used to shut down config reload goroutines when the server is shutting down.
+func (config Config) New(ctx context.Context, serverID string) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(config.AuthorizationConfiguration.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
 	r := &reloadableAuthorizerResolver{
-		initialConfig: config,
+		initialConfig:    config,
+		apiServerID:      serverID,
+		lastLoadedConfig: config.AuthorizationConfiguration,
+		reloadInterval:   time.Minute,
 	}
+
+	seenTypes := sets.New[authzconfig.AuthorizerType]()
 
 	// Build and store authorizers which will persist across reloads
 	for _, configuredAuthorizer := range config.AuthorizationConfiguration.Authorizers {
+		seenTypes.Insert(configuredAuthorizer.Type)
+
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
@@ -104,15 +117,24 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		}
 	}
 
+	// Require all non-webhook authorizer types to remain specified in the file on reload
+	seenTypes.Delete(authzconfig.TypeWebhook)
+	r.requireNonWebhookTypes = seenTypes
+
 	// Construct the authorizers / ruleResolvers for the given configuration
 	authorizer, ruleResolver, err := r.newForConfig(r.initialConfig.AuthorizationConfiguration)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	r.current.Store(&authorizerResolver{
 		authorizer:   authorizer,
 		ruleResolver: ruleResolver,
 	})
+
+	if r.initialConfig.ReloadFile != "" {
+		go r.runReload(ctx)
+	}
 
 	return r, r, nil
 }
@@ -127,10 +149,18 @@ func GetNameForAuthorizerMode(mode string) string {
 }
 
 func LoadAndValidateFile(configFile string, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
-	// load the file and check for errors
-	authorizationConfiguration, err := load.LoadFromFile(configFile)
+	data, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load AuthorizationConfiguration from file: %v", err)
+		return nil, err
+	}
+	return LoadAndValidateData(data, requireNonWebhookTypes)
+}
+
+func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+	// load the file and check for errors
+	authorizationConfiguration, err := load.LoadFromData(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AuthorizationConfiguration from file: %w", err)
 	}
 
 	// validate the file and return any error
