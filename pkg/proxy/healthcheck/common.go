@@ -19,6 +19,8 @@ package healthcheck
 import (
 	"net"
 	"net/http"
+
+	"github.com/c0va23/go-proxyprotocol"
 )
 
 // listener allows for testing of ServiceHealthServer and ProxierHealthServer.
@@ -46,7 +48,8 @@ type httpServer interface {
 type stdNetListener struct{}
 
 func (stdNetListener) Listen(addr string) (net.Listener, error) {
-	return net.Listen("tcp", addr)
+	listener := net.Listen("tcp", addr)
+	return proxyprotocol.NewDefaultListener(listener)
 }
 
 var _ listener = stdNetListener{}

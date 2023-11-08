@@ -1,0 +1,17 @@
+language: go
+
+go:
+  - 1.12.x
+  - 1.x
+
+env:
+  - GO111MODULE=on
+
+notifications:
+  email:
+    on_success: never
+    on_failure: change
+
+install:
+  - go mod download
+

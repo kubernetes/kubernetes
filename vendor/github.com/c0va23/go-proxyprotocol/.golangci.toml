@@ -1,0 +1,30 @@
+[linters]
+  enable-all = true
+  disable = [
+      "gochecknoglobals",
+  ]
+
+[linters-settings]
+  [linters-settings.govet]
+    check-shadowing = true
+
+  [linters-settings.misspell]
+    locale = "US"
+
+  [linters-settings.maligned]
+    suggest-new = true
+
+  [linters-settings.gocyclo]
+    min-complexity = 10.0
+
+[issues]
+  [[issues.exclude-rules]]
+    path = "mock_gen_test.go"
+    linters = [
+      "lll",
+    ]
+ [[issues.exclude-rules]] # TODO must be fixed
+    path = "(.+)_test.go"
+    linters = [
+      "gocyclo",
+    ]
