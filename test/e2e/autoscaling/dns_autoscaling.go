@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -104,7 +105,8 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
-	f.It(f.WithSerial(), f.WithSlow(), "kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
+	// TODO(upodroid) This test will be removed in 1.33 when kubeup is removed
+	f.It(f.WithSerial(), f.WithSlow(), feature.KubeUp, "kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
 		numNodes, err := e2enode.TotalRegistered(ctx, c)
 		framework.ExpectNoError(err)
 
