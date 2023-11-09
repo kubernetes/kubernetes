@@ -105,6 +105,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/sharedcpus"
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -630,6 +631,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	if managed.IsEnabled() {
 		klog.InfoS("Pinned Workload Management Enabled")
+	}
+	if sharedcpus.IsEnabled() {
+		klog.InfoS("Mixed CPUs Workload Enabled")
 	}
 
 	if kubeDeps.KubeClient != nil {
