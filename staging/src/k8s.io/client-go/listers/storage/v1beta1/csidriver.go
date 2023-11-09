@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type CSIDriverLister interface {
 
 // cSIDriverLister implements the CSIDriverLister interface.
 type cSIDriverLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1beta1.CSIDriver]
 }
 
 // NewCSIDriverLister returns a new CSIDriverLister.
 func NewCSIDriverLister(indexer cache.Indexer) CSIDriverLister {
-	return &cSIDriverLister{indexer: indexer}
-}
-
-// List lists all CSIDrivers in the indexer.
-func (s *cSIDriverLister) List(selector labels.Selector) (ret []*v1beta1.CSIDriver, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.CSIDriver))
-	})
-	return ret, err
-}
-
-// Get retrieves the CSIDriver from the index for a given name.
-func (s *cSIDriverLister) Get(name string) (*v1beta1.CSIDriver, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("csidriver"), name)
-	}
-	return obj.(*v1beta1.CSIDriver), nil
+	return &cSIDriverLister{listers.New[*v1beta1.CSIDriver](indexer, v1beta1.Resource("csidriver"))}
 }
