@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type PodLister interface {
 
 // podLister implements the PodLister interface.
 type podLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.Pod]
 }
 
 // NewPodLister returns a new PodLister.
 func NewPodLister(indexer cache.Indexer) PodLister {
-	return &podLister{indexer: indexer}
-}
-
-// List lists all Pods in the indexer.
-func (s *podLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Pod))
-	})
-	return ret, err
+	return &podLister{listers.New[*v1.Pod](indexer, v1.Resource("pod"))}
 }
 
 // Pods returns an object that can list and get Pods.
 func (s *podLister) Pods(namespace string) PodNamespaceLister {
-	return podNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return podNamespaceLister{listers.NewNamespaced[*v1.Pod](s.ResourceIndexer, namespace)}
 }
 
 // PodNamespaceLister helps list and get Pods.
@@ -74,26 +66,5 @@ type PodNamespaceLister interface {
 // podNamespaceLister implements the PodNamespaceLister
 // interface.
 type podNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Pods in the indexer for a given namespace.
-func (s podNamespaceLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Pod))
-	})
-	return ret, err
-}
-
-// Get retrieves the Pod from the indexer for a given namespace and name.
-func (s podNamespaceLister) Get(name string) (*v1.Pod, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("pod"), name)
-	}
-	return obj.(*v1.Pod), nil
+	listers.ResourceIndexer[*v1.Pod]
 }
