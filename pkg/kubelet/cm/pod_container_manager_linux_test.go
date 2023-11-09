@@ -293,3 +293,75 @@ func TestGetPodContainerName(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureExists(t *testing.T) {
+	newBestEffortPodWithUID := func(uid types.UID) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: uid,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container",
+					},
+				},
+			},
+		}
+	}
+
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+
+	type fields struct {
+		cgroupManager CgroupManager
+	}
+	type args struct {
+		pod *v1.Pod
+	}
+
+	tests := []struct {
+		name                string
+		fields              fields
+		args                args
+		wantCgroupName      CgroupName
+		wantLiteralCgroupfs string
+	}{
+		{
+			name: "pod with qos best-effort and cgroupfs",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "cgroupfs"),
+			},
+			args: args{
+				pod: newBestEffortPodWithUID("fake-uid-5"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-5"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-5").ToCgroupfs(),
+		}, {
+			name: "pod with qos best-effort and systemd",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "systemd"),
+			},
+			args: args{
+				pod: newBestEffortPodWithUID("fake-uid-6"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-6"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-6").ToSystemd(),
+		},
+	}
+
+	for _, tt := range tests {
+		pcm := &podContainerManagerImpl{
+			cgroupManager:     tt.fields.cgroupManager,
+			qosContainersInfo: qosContainersInfo,
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			err := pcm.EnsureExists(tt.args.pod)
+			require.Nil(t, err, "Unexpected error: %s", err)
+		})
+	}
+}
