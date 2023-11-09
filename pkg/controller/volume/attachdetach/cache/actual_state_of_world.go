@@ -23,14 +23,13 @@ package cache
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -64,9 +63,6 @@ type ActualStateOfWorld interface {
 	// SetVolumeMountedByNode sets the MountedByNode value for the given volume
 	// and node. When set to true the mounted parameter indicates the volume
 	// is mounted by the given node, indicating it may not be safe to detach.
-	// If the forceUnmount is set to true the MountedByNode value would be reset
-	// to false even it was not set yet (this is required during a controller
-	// crash recovery).
 	// If no volume with the name volumeName exists in the store, an error is
 	// returned.
 	// If no node with the name nodeName exists in list of attached nodes for
