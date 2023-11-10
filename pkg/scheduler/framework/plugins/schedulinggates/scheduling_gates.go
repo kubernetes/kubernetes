@@ -32,7 +32,7 @@ const Name = names.SchedulingGates
 
 // SchedulingGates checks if a Pod carries .spec.schedulingGates.
 type SchedulingGates struct {
-	enablePodSchedulingReadiness bool
+	EnablePodSchedulingReadiness bool
 }
 
 var _ framework.PreEnqueuePlugin = &SchedulingGates{}
@@ -43,7 +43,7 @@ func (pl *SchedulingGates) Name() string {
 }
 
 func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
-	if !pl.enablePodSchedulingReadiness || len(p.Spec.SchedulingGates) == 0 {
+	if !pl.EnablePodSchedulingReadiness || len(p.Spec.SchedulingGates) == 0 {
 		return nil
 	}
 	gates := make([]string, 0, len(p.Spec.SchedulingGates))
@@ -53,15 +53,13 @@ func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for scheduling gates: %v", gates))
 }
 
-// EventsToRegister returns the possible events that may make a Pod
-// failed by this plugin schedulable.
+// EventsToRegister returns nil here to indicate that schedulingGates plugin is not
+// interested in any event but its own update.
 func (pl *SchedulingGates) EventsToRegister() []framework.ClusterEventWithHint {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
-	}
+	return nil
 }
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
-	return &SchedulingGates{enablePodSchedulingReadiness: fts.EnablePodSchedulingReadiness}, nil
+	return &SchedulingGates{EnablePodSchedulingReadiness: fts.EnablePodSchedulingReadiness}, nil
 }

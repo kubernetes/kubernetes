@@ -662,6 +662,7 @@ const (
 	emptyEventsToRegister          = "emptyEventsToRegister"
 	queueSort                      = "no-op-queue-sort-plugin"
 	fakeBind                       = "bind-plugin"
+	emptyEventExtensions           = "emptyEventExtensions"
 )
 
 func Test_buildQueueingHintMap(t *testing.T) {
@@ -726,6 +727,23 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+			},
+		},
+		{
+			name:    "register plugin with empty event",
+			plugins: []framework.Plugin{&emptyEventPlugin{}},
+			want:    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{},
+		},
+		{
+			name:    "register plugins including emptyEventPlugin",
+			plugins: []framework.Plugin{&emptyEventPlugin{}, &fakeNodePlugin{}},
+			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: framework.Pod, ActionType: framework.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: framework.Node, ActionType: framework.Add}: {
+					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
 			},
 		},
@@ -1007,6 +1025,18 @@ func (pl *fakePodPlugin) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add}, QueueingHintFn: fakePodPluginQueueingFn},
 	}
+}
+
+type emptyEventPlugin struct{}
+
+func (*emptyEventPlugin) Name() string { return emptyEventExtensions }
+
+func (*emptyEventPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return nil
+}
+
+func (pl *emptyEventPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+	return nil
 }
 
 // emptyEventsToRegisterPlugin implement interface framework.EnqueueExtensions, but returns nil from EventsToRegister.

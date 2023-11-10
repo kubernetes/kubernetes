@@ -370,6 +370,10 @@ type EnqueueExtensions interface {
 	// and leveraged to build event handlers dynamically.
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
+	//
+	// The returned events could be nil to indicate that no events other than the pod's own update
+	// can make the pod re-schedulable. An example is SchedulingGates plugin.
+	// Appropriate implementation of this function will make Pod's re-scheduling accurate and performant.
 	EventsToRegister() []ClusterEventWithHint
 }
 
