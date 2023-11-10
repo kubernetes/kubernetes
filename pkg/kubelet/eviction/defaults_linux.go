@@ -25,4 +25,5 @@ var DefaultEvictionHard = map[string]string{
 	"nodefs.available":  "10%",
 	"nodefs.inodesFree": "5%",
 	"imagefs.available": "15%",
+	"imagefs.inodesFree": "5%",
 }
