@@ -297,11 +297,11 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 	return foundPods, nil
 }
 
-func (m *podContainerManagerImpl) DoNotEnforceCpuLimits() {
+func (m *podContainerManagerImpl) DoNotEnforceCPULimits() {
 	m.enforceCPULimits = false
 }
 
-func (m *podContainerManagerImpl) RemoveCpuLimits(pod *v1.Pod) {
+func (m *podContainerManagerImpl) RemoveCPULimits(pod *v1.Pod) {
 	if !m.enforceCPULimits {
 		klog.InfoS("cpu quota for pod already disabled", "podName", pod.Name, "podUID", pod.UID)
 		return
@@ -379,8 +379,8 @@ func (m *podContainerManagerNoop) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 	return nil
 }
 
-func (m *podContainerManagerNoop) DoNotEnforceCpuLimits() {
+func (m *podContainerManagerNoop) DoNotEnforceCPULimits() {
 }
 
-func (m *podContainerManagerNoop) RemoveCpuLimits(*v1.Pod) {
+func (m *podContainerManagerNoop) RemoveCPULimits(*v1.Pod) {
 }

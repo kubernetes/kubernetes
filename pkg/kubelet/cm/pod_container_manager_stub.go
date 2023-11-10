@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -74,8 +74,8 @@ func (m *podContainerManagerStub) SetPodCgroupCpuLimit(_ *v1.Pod, _ *int64, _, _
 	return nil
 }
 
-func (m *podContainerManagerStub) DoNotEnforceCpuLimits() {
+func (m *podContainerManagerStub) DoNotEnforceCPULimits() {
 }
 
-func (m *podContainerManagerStub) RemoveCpuLimits(*v1.Pod) {
+func (m *podContainerManagerStub) RemoveCPULimits(*v1.Pod) {
 }

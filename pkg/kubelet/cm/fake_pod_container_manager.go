@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -126,8 +126,8 @@ func (cm *FakePodContainerManager) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNa
 	return nil
 }
 
-func (m *FakePodContainerManager) DoNotEnforceCpuLimits() {
+func (m *FakePodContainerManager) DoNotEnforceCPULimits() {
 }
 
-func (m *FakePodContainerManager) RemoveCpuLimits(*v1.Pod) {
+func (m *FakePodContainerManager) RemoveCPULimits(*v1.Pod) {
 }

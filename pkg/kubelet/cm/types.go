@@ -136,10 +136,10 @@ type PodContainerManager interface {
 	// Disable enforcement of cpu limits for this pod
 	// This is used when a container with guaranteed and dedicated cpus is started when
 	// the sandbox is yet to be created
-	DoNotEnforceCpuLimits()
+	DoNotEnforceCPULimits()
 
 	// Clear cpu limits for this pod
 	// This is used when a container with guaranteed and dedicated cpus is started and the
 	// sandbox cgroup already exists.
-	RemoveCpuLimits(pod *v1.Pod)
+	RemoveCPULimits(pod *v1.Pod)
 }

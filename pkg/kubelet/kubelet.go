@@ -1888,14 +1888,14 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 				if kl.containerManager.PodContainsPinnedCpus(pod) {
 					klog.InfoS("Disabling cpu quota for pod", "podName", pod.Name, "podUID", pod.UID)
-					pcm.DoNotEnforceCpuLimits()
+					pcm.DoNotEnforceCPULimits()
 				}
 
 				if err := pcm.EnsureExists(pod); err != nil {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
 					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
-			} else {
+			} else if kl.containerManager.PodContainsPinnedCpus(pod) {
 				// Quota is not capped when cfs quota is disabled
 				// or when the pod has guaranteed QoS class and exclusively assigned cpus (*)
 				//
@@ -1914,9 +1914,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				// This platform overhead happens on the Pod cgroup level and so this change will leave it
 				// unbounded. This cost is for now considered to be acceptable when compared to the
 				// benefit of fixing the throttling of the much more common workload types.
-				if kl.containerManager.PodContainsPinnedCpus(pod) {
-					pcm.RemoveCpuLimits(pod)
-				}
+				pcm.RemoveCPULimits(pod)
 			}
 		}
 	}
