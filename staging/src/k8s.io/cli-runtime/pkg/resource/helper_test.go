@@ -756,7 +756,7 @@ func TestEnhanceListError(t *testing.T) {
 			err:             apierrors.NewBadRequest("request is invalid"),
 			opts:            metav1.ListOptions{},
 			subj:            podSubject,
-			expectedErr:     "Unable to list \"/v1, Resource=pods\": request is invalid",
+			expectedErr:     "unable to list \"/v1, Resource=pods\": request is invalid",
 			expectStatusErr: true,
 		}, {
 			name: "bad request StatusError with selectors",
@@ -766,14 +766,14 @@ func TestEnhanceListError(t *testing.T) {
 				FieldSelector: ".spec.nodeName=foo",
 			},
 			subj:            podSubject,
-			expectedErr:     "Unable to find \"/v1, Resource=pods\" that match label selector \"a=b\", field selector \".spec.nodeName=foo\": request is invalid",
+			expectedErr:     "unable to find \"/v1, Resource=pods\" that match label selector \"a=b\", field selector \".spec.nodeName=foo\": request is invalid",
 			expectStatusErr: true,
 		}, {
 			name:            "not found without selectors",
 			err:             apierrors.NewNotFound(podGVR.GroupResource(), "foo"),
 			opts:            metav1.ListOptions{},
 			subj:            podSubject,
-			expectedErr:     "Unable to list \"/v1, Resource=pods\": pods \"foo\" not found",
+			expectedErr:     "unable to list \"/v1, Resource=pods\": pods \"foo\" not found",
 			expectStatusErr: true,
 		}, {
 			name: "not found StatusError with selectors",
@@ -783,7 +783,7 @@ func TestEnhanceListError(t *testing.T) {
 				FieldSelector: ".spec.nodeName=foo",
 			},
 			subj:            podSubject,
-			expectedErr:     "Unable to find \"/v1, Resource=pods\" that match label selector \"a=b\", field selector \".spec.nodeName=foo\": pods \"foo\" not found",
+			expectedErr:     "unable to find \"/v1, Resource=pods\" that match label selector \"a=b\", field selector \".spec.nodeName=foo\": pods \"foo\" not found",
 			expectStatusErr: true,
 		}, {
 			name: "non StatusError without selectors",
@@ -791,7 +791,7 @@ func TestEnhanceListError(t *testing.T) {
 				"foo")),
 			opts:            metav1.ListOptions{},
 			subj:            podSubject,
-			expectedErr:     "Unable to list \"/v1, Resource=pods\": extra info: pods \"foo\" not found",
+			expectedErr:     "unable to list \"/v1, Resource=pods\": extra info: pods \"foo\" not found",
 			expectStatusErr: false,
 		}, {
 			name: "non StatusError with selectors",
@@ -801,7 +801,7 @@ func TestEnhanceListError(t *testing.T) {
 				FieldSelector: ".spec.nodeName=foo",
 			},
 			subj: podSubject,
-			expectedErr: "Unable to find \"/v1, " +
+			expectedErr: "unable to find \"/v1, " +
 				"Resource=pods\" that match label selector \"a=b\", " +
 				"field selector \".spec.nodeName=foo\": extra info: pods \"foo\" not found",
 			expectStatusErr: false,
