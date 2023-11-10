@@ -254,7 +254,7 @@ func NewMember(key, value string, props ...Property) (Member, error) {
 	if err := m.validate(); err != nil {
 		return newInvalidMember(), err
 	}
-	decodedValue, err := url.QueryUnescape(value)
+	decodedValue, err := url.PathUnescape(value)
 	if err != nil {
 		return newInvalidMember(), fmt.Errorf("%w: %q", errInvalidValue, value)
 	}
@@ -301,7 +301,7 @@ func parseMember(member string) (Member, error) {
 	// when converting the header into a data structure."
 	key = strings.TrimSpace(k)
 	var err error
-	value, err = url.QueryUnescape(strings.TrimSpace(v))
+	value, err = url.PathUnescape(strings.TrimSpace(v))
 	if err != nil {
 		return newInvalidMember(), fmt.Errorf("%w: %q", err, value)
 	}

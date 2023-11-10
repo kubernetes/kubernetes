@@ -36,8 +36,10 @@ func setOSDescriptionProvider(osDescriptionProvider osDescriptionProvider) {
 	osDescription = osDescriptionProvider
 }
 
-type osTypeDetector struct{}
-type osDescriptionDetector struct{}
+type (
+	osTypeDetector        struct{}
+	osDescriptionDetector struct{}
+)
 
 // Detect returns a *Resource that describes the operating system type the
 // service is running on.
@@ -56,7 +58,6 @@ func (osTypeDetector) Detect(ctx context.Context) (*Resource, error) {
 // service is running on.
 func (osDescriptionDetector) Detect(ctx context.Context) (*Resource, error) {
 	description, err := osDescription()
-
 	if err != nil {
 		return nil, err
 	}

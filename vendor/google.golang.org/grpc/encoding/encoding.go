@@ -38,6 +38,10 @@ const Identity = "identity"
 
 // Compressor is used for compressing and decompressing when sending or
 // receiving messages.
+//
+// If a Compressor implements `DecompressedSize(compressedBytes []byte) int`,
+// gRPC will invoke it to determine the size of the buffer allocated for the
+// result of decompression.  A return value of -1 indicates unknown size.
 type Compressor interface {
 	// Compress writes the data written to wc to w after compressing it.  If an
 	// error occurs while initializing the compressor, that error is returned
@@ -51,15 +55,6 @@ type Compressor interface {
 	// coding header.  The result must be static; the result cannot change
 	// between calls.
 	Name() string
-	// If a Compressor implements
-	// DecompressedSize(compressedBytes []byte) int, gRPC will call it
-	// to determine the size of the buffer allocated for the result of decompression.
-	// Return -1 to indicate unknown size.
-	//
-	// Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-	// later release.
 }
 
 var registeredCompressor = make(map[string]Compressor)
