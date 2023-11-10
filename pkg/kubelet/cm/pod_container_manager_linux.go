@@ -312,16 +312,12 @@ func (m *podContainerManagerImpl) RemoveCpuLimits(pod *v1.Pod) {
 	// Make sure the limits will stay disabled
 	m.enforceCPULimits = false
 
-	result := &ResourceConfig{}
-	var quota int64 = -1
-	result.CPUQuota = &quota
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	containerConfig, _ := m.cgroupManager.GetCgroupConfig(podCgroupName, v1.ResourceCPU)
 
-	podContainerName, _ := m.GetPodContainerName(pod)
-	containerConfig := &CgroupConfig{
-		Name:               podContainerName,
-		ResourceParameters: result,
-	}
-	if err := m.cgroupManager.Update(containerConfig); err != nil {
+	var quota int64 = -1
+	containerConfig.CPUQuota = &quota
+	if err := m.cgroupManager.SetCgroupConfig(podCgroupName, v1.ResourceCPU, containerConfig); err != nil {
 		klog.ErrorS(err, "could not disable cpu quota for pod", "podName", pod.Name, "podUID", pod.UID)
 	}
 }
