@@ -41,7 +41,7 @@ func TestPKICertificateReadWriter(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// creates a certificate
-	cert := writeTestCertificate(t, dir, "test", testCACert, testCAKey)
+	cert := writeTestCertificate(t, dir, "test", testCACert, testCAKey, testCertOrganization)
 
 	// Creates a pkiCertificateReadWriter
 	pkiReadWriter := newPKICertificateReadWriter(dir, "test")
@@ -145,8 +145,8 @@ func TestKubeconfigReadWriter(t *testing.T) {
 }
 
 // writeTestCertificate is a utility for creating a test certificate
-func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer) *x509.Certificate {
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, testCertCfg)
+func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer, organization []string) *x509.Certificate {
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, makeTestCertConfig(organization))
 	if err != nil {
 		t.Fatalf("couldn't generate certificate: %v", err)
 	}
@@ -164,7 +164,7 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 	cfg := &pkiutil.CertConfig{
 		Config: certutil.Config{
 			CommonName:   "test-common-name",
-			Organization: []string{"sig-cluster-lifecycle"},
+			Organization: testCertOrganization,
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			AltNames: certutil.AltNames{
 				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
