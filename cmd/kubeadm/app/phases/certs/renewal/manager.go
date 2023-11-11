@@ -46,6 +46,8 @@ type Manager struct {
 	cas map[string]*CAExpirationHandler
 }
 
+type certConfigMutatorFunc func(*certutil.Config) error
+
 // CertificateRenewHandler defines required info for renewing a certificate
 type CertificateRenewHandler struct {
 	// Name of the certificate to be used for UX.
@@ -66,6 +68,10 @@ type CertificateRenewHandler struct {
 
 	// readwriter defines a CertificateReadWriter to be used for certificate renewal
 	readwriter certificateReadWriter
+
+	// certConfigMutators holds the mutator functions that can be applied to the input cert config object
+	// These functions will be run in series.
+	certConfigMutators []certConfigMutatorFunc
 }
 
 // CAExpirationHandler defines required info for CA expiration check
@@ -109,17 +115,19 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 		for _, cert := range certs {
 			// create a ReadWriter for certificates stored in the K8s local PKI
 			pkiReadWriter := newPKICertificateReadWriter(rm.cfg.CertificatesDir, cert.BaseName)
+			certConfigMutators := loadCertConfigMutators(cert.BaseName)
 
 			// adds the certificateRenewHandler.
 			// PKI certificates are indexed by name, that is a well know constant defined
 			// in the certsphase package and that can be reused across all the kubeadm codebase
 			rm.certificates[cert.Name] = &CertificateRenewHandler{
-				Name:       cert.Name,
-				LongName:   cert.LongName,
-				FileName:   cert.BaseName,
-				CAName:     ca.Name,
-				CABaseName: ca.BaseName, //Nb. this is a path for etcd certs (they are stored in a subfolder)
-				readwriter: pkiReadWriter,
+				Name:               cert.Name,
+				LongName:           cert.LongName,
+				FileName:           cert.BaseName,
+				CAName:             ca.Name,
+				CABaseName:         ca.BaseName, // Nb. this is a path for etcd certs (they are stored in a subfolder)
+				readwriter:         pkiReadWriter,
+				certConfigMutators: certConfigMutators,
 			}
 		}
 
@@ -230,8 +238,15 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	}
 
 	// extract the certificate config
+	certConfig := certToConfig(cert)
+	for _, f := range handler.certConfigMutators {
+		if err := f(&certConfig); err != nil {
+			return false, err
+		}
+	}
+
 	cfg := &pkiutil.CertConfig{
-		Config:              certToConfig(cert),
+		Config:              certConfig,
 		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
 	}
 
@@ -273,8 +288,14 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	}
 
 	// extracts the certificate config
+	certConfig := certToConfig(cert)
+	for _, f := range handler.certConfigMutators {
+		if err := f(&certConfig); err != nil {
+			return err
+		}
+	}
 	cfg := &pkiutil.CertConfig{
-		Config:              certToConfig(cert),
+		Config:              certConfig,
 		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
 	}
 
@@ -398,5 +419,52 @@ func certToConfig(cert *x509.Certificate) certutil.Config {
 			DNSNames: cert.DNSNames,
 		},
 		Usages: cert.ExtKeyUsage,
+	}
+}
+
+func loadCertConfigMutators(certBaseName string) []certConfigMutatorFunc {
+	// TODO: Remove these mutators after the organization migration is complete in a future release
+	// https://github.com/kubernetes/kubeadm/issues/2414
+	switch certBaseName {
+	case kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
+		kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName:
+		return []certConfigMutatorFunc{
+			removeSystemPrivilegedGroupMutator(),
+		}
+	case kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName:
+		return []certConfigMutatorFunc{
+			removeSystemPrivilegedGroupMutator(),
+			addClusterAdminsGroupMutator(),
+		}
+	}
+	return nil
+}
+
+func removeSystemPrivilegedGroupMutator() certConfigMutatorFunc {
+	return func(c *certutil.Config) error {
+		organizations := make([]string, 0, len(c.Organization))
+		for _, org := range c.Organization {
+			if org != kubeadmconstants.SystemPrivilegedGroup {
+				organizations = append(organizations, org)
+			}
+		}
+		c.Organization = organizations
+		return nil
+	}
+}
+
+func addClusterAdminsGroupMutator() certConfigMutatorFunc {
+	return func(c *certutil.Config) error {
+		found := false
+		for _, org := range c.Organization {
+			if org == kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding {
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.Organization = append(c.Organization, kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding)
+		}
+		return nil
 	}
 }
