@@ -26,7 +26,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "clientConfig": {
           "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.WebhookClientConfig",
@@ -74,7 +75,8 @@
           "items": {
             "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.RuleWithOperations"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "sideEffects": {
           "description": "SideEffects states whether this webhook has side effects. Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown). Webhooks with side effects MUST implement a reconciliation system, since a request may be rejected by a future step in the admission chain and the side effects therefore need to be undone. Requests with the dryRun attribute will be auto-rejected if they match a webhook with sideEffects == Unknown or Some.",
@@ -115,6 +117,10 @@
             "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.MutatingWebhook"
           },
           "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
           "x-kubernetes-patch-merge-key": "name",
           "x-kubernetes-patch-strategy": "merge"
         }
@@ -240,7 +246,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "clientConfig": {
           "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.WebhookClientConfig",
@@ -284,7 +291,8 @@
           "items": {
             "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.RuleWithOperations"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "sideEffects": {
           "description": "SideEffects states whether this webhook has side effects. Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown). Webhooks with side effects MUST implement a reconciliation system, since a request may be rejected by a future step in the admission chain and the side effects therefore need to be undone. Requests with the dryRun attribute will be auto-rejected if they match a webhook with sideEffects == Unknown or Some.",
@@ -325,6 +333,10 @@
             "$ref": "#/definitions/io.k8s.api.admissionregistration.v1.ValidatingWebhook"
           },
           "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
           "x-kubernetes-patch-merge-key": "name",
           "x-kubernetes-patch-strategy": "merge"
         }
