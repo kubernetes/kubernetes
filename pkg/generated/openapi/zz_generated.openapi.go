@@ -9601,6 +9601,11 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"audiences": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Audiences are the intendend audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
 							Type:        []string{"array"},
@@ -9733,6 +9738,11 @@ func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCall
 						},
 					},
 					"audiences": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
 							Type:        []string{"array"},
@@ -9775,6 +9785,11 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 						},
 					},
 					"audiences": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
 							Type:        []string{"array"},
@@ -9826,6 +9841,11 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 						},
 					},
 					"groups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The names of groups this user is a part of.",
 							Type:        []string{"array"},
@@ -10065,6 +10085,11 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.Referenc
 						},
 					},
 					"audiences": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
 							Type:        []string{"array"},
@@ -10107,6 +10132,11 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.Refere
 						},
 					},
 					"audiences": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
 							Type:        []string{"array"},
@@ -10158,6 +10188,11 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 						},
 					},
 					"groups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The names of groups this user is a part of.",
 							Type:        []string{"array"},

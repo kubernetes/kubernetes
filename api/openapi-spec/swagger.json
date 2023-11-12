@@ -2611,7 +2611,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "boundObjectRef": {
           "$ref": "#/definitions/io.k8s.api.authentication.v1.BoundObjectReference",
@@ -2690,7 +2691,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "token": {
           "description": "Token is the opaque bearer token.",
@@ -2707,7 +2709,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "authenticated": {
           "description": "Authenticated indicates that the token was associated with a known user.",
@@ -2742,7 +2745,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "uid": {
           "description": "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",

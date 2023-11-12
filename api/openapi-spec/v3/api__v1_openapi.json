@@ -83,7 +83,8 @@
               "default": "",
               "type": "string"
             },
-            "type": "array"
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "boundObjectRef": {
             "allOf": [
