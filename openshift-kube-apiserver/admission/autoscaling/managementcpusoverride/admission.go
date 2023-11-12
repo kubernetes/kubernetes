@@ -71,6 +71,14 @@ func Register(plugins *admission.Plugins) {
 		})
 }
 
+type resourceAnnotation struct {
+	// CPUShares contains resource annotation value cpushares key
+	CPUShares uint64 `json:"cpushares,omitempty"`
+	// CPULimit contains the cpu limit in millicores to be used by the container runtime to calculate
+	// quota
+	CPULimit int64 `json:"cpulimit,omitempty"`
+}
+
 // managementCPUsOverride presents admission plugin that should replace pod container CPU requests with a new management resource.
 // It applies to all pods that:
 // 1. are in an allowed namespace
@@ -217,6 +225,13 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return err
 	}
 
+	if _, found := ns.Annotations[namespaceAllowedAnnotation]; !found && len(workloadType) > 0 {
+		pod.Annotations[workloadAdmissionWarning] = fmt.Sprintf(
+			"skipping pod CPUs requests modifications because the %s namespace is not annotated with %s to allow workload partitioning",
+			ns.GetName(), namespaceAllowedAnnotation)
+		return nil
+	}
+
 	if !doesNamespaceAllowWorkloadType(ns.Annotations, workloadType) {
 		return admission.NewForbidden(attr, fmt.Errorf("%s the pod namespace %q does not allow the workload type %s", PluginName, ns.Name, workloadType))
 	}
@@ -242,13 +257,6 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 	// relevant managers(CPU and memory) under the kubelet
 	if podQoSClass == coreapi.PodQOSGuaranteed {
 		pod.Annotations[workloadAdmissionWarning] = "skip pod CPUs requests modifications because it has guaranteed QoS class"
-		return nil
-	}
-
-	// we should skip mutation of the pod that has container with both CPU limit and request because once we will remove
-	// the request, the defaulter will set the request back with the CPU limit value
-	if podHasBothCPULimitAndRequest(allContainers) {
-		pod.Annotations[workloadAdmissionWarning] = "skip pod CPUs requests modifications because pod container has both CPU limit and request"
 		return nil
 	}
 
@@ -353,6 +361,14 @@ func updateContainersResources(containers []coreapi.Container, podAnnotations ma
 			continue
 		}
 
+		resourceAnno := resourceAnnotation{}
+
+		if c.Resources.Limits != nil {
+			if value, ok := c.Resources.Limits[coreapi.ResourceCPU]; ok {
+				resourceAnno.CPULimit = value.MilliValue()
+			}
+		}
+
 		if c.Resources.Requests != nil {
 			if _, ok := c.Resources.Requests[coreapi.ResourceCPU]; !ok {
 				continue
@@ -361,9 +377,20 @@ func updateContainersResources(containers []coreapi.Container, podAnnotations ma
 			cpuRequest := c.Resources.Requests[coreapi.ResourceCPU]
 			cpuRequestInMilli := cpuRequest.MilliValue()
 
-			cpuShares := cm.MilliCPUToShares(cpuRequestInMilli)
-			podAnnotations[cpusharesAnnotationKey] = fmt.Sprintf(`{"%s": %d}`, containerResourcesAnnotationValueKeyCPUShares, cpuShares)
+			// Casting to uint64, Linux build returns uint64, noop Darwin build returns int64
+			resourceAnno.CPUShares = uint64(cm.MilliCPUToShares(cpuRequestInMilli))
+
+			// This should not error but if something does go wrong we default to string creation of just CPU Shares
+			// and add a warning annotation
+			resourceAnnoString, err := json.Marshal(resourceAnno)
+			if err != nil {
+				podAnnotations[workloadAdmissionWarning] = fmt.Sprintf("failed to marshal cpu resources, using fallback: err: %s", err.Error())
+				podAnnotations[cpusharesAnnotationKey] = fmt.Sprintf(`{"%s": %d}`, containerResourcesAnnotationValueKeyCPUShares, resourceAnno.CPUShares)
+			} else {
+				podAnnotations[cpusharesAnnotationKey] = string(resourceAnnoString)
+			}
 			delete(c.Resources.Requests, coreapi.ResourceCPU)
+			delete(c.Resources.Limits, coreapi.ResourceCPU)
 
 			if c.Resources.Limits == nil {
 				c.Resources.Limits = coreapi.ResourceList{}
@@ -378,7 +405,7 @@ func updateContainersResources(containers []coreapi.Container, podAnnotations ma
 	}
 }
 
-func isGuaranteed(containers []coreapi.Container) bool {
+func IsGuaranteed(containers []coreapi.Container) bool {
 	for _, c := range containers {
 		// only memory and CPU resources are relevant to decide pod QoS class
 		for _, r := range []coreapi.ResourceName{coreapi.ResourceMemory, coreapi.ResourceCPU} {
@@ -425,7 +452,7 @@ func isBestEffort(containers []coreapi.Container) bool {
 }
 
 func getPodQoSClass(containers []coreapi.Container) coreapi.PodQOSClass {
-	if isGuaranteed(containers) {
+	if IsGuaranteed(containers) {
 		return coreapi.PodQOSGuaranteed
 	}
 
@@ -449,10 +476,13 @@ func podHasBothCPULimitAndRequest(containers []coreapi.Container) bool {
 	return false
 }
 
+// doesNamespaceAllowWorkloadType will return false when a workload type does not match any present ones.
 func doesNamespaceAllowWorkloadType(annotations map[string]string, workloadType string) bool {
 	v, found := annotations[namespaceAllowedAnnotation]
+	// When a namespace contains no annotation for workloads we infer that to mean all workload types are allowed.
+	// The mutation hook will strip all workload annotation from pods that contain them in that circumstance.
 	if !found {
-		return false
+		return true
 	}
 
 	for _, t := range strings.Split(v, ",") {
@@ -559,17 +589,20 @@ func (a *managementCPUsOverride) Validate(ctx context.Context, attr admission.At
 		allErrs = append(allErrs, getPodInvalidWorkloadAnnotationError(pod.Annotations, err.Error()))
 	}
 
-	workloadResourceAnnotations := map[string]map[string]int{}
+	workloadResourceAnnotations := resourceAnnotation{}
+	hasWorkloadAnnotation := false
 	for k, v := range pod.Annotations {
 		if !strings.HasPrefix(k, containerResourcesAnnotationPrefix) {
 			continue
 		}
+		hasWorkloadAnnotation = true
 
-		resourceAnnotationValue := map[string]int{}
-		if err := json.Unmarshal([]byte(v), &resourceAnnotationValue); err != nil {
+		// Custom decoder to print invalid fields for resources
+		decoder := json.NewDecoder(strings.NewReader(v))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&workloadResourceAnnotations); err != nil {
 			allErrs = append(allErrs, getPodInvalidWorkloadAnnotationError(pod.Annotations, err.Error()))
 		}
-		workloadResourceAnnotations[k] = resourceAnnotationValue
 	}
 
 	containersWorkloadResources := map[string]*coreapi.Container{}
@@ -586,9 +619,9 @@ func (a *managementCPUsOverride) Validate(ctx context.Context, attr admission.At
 		}
 	}
 
-	// the pod does not have workload annotation
-	if len(workloadType) == 0 {
-		if len(workloadResourceAnnotations) > 0 {
+	switch {
+	case len(workloadType) == 0: // the pod does not have workload annotation
+		if hasWorkloadAnnotation {
 			allErrs = append(allErrs, getPodInvalidWorkloadAnnotationError(pod.Annotations, "the pod without workload annotation can not have resource annotation"))
 		}
 
@@ -599,21 +632,8 @@ func (a *managementCPUsOverride) Validate(ctx context.Context, attr admission.At
 
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.containers.resources.requests"), c.Resources.Requests, fmt.Sprintf("the pod without workload annotations can not have containers with workload resources %q", resourceName)))
 		}
-	} else {
-		if !doesNamespaceAllowWorkloadType(ns.Annotations, workloadType) { // pod has workload annotation, but the pod does not have workload annotation
-			allErrs = append(allErrs, getPodInvalidWorkloadAnnotationError(pod.Annotations, fmt.Sprintf("the pod can not have workload annotation, when the namespace %q does not allow it", ns.Name)))
-		}
-
-		for _, v := range workloadResourceAnnotations {
-			if len(v) > 1 {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata.annotations"), pod.Annotations, "the pod resource annotation value can not have more than one key"))
-			}
-
-			// the pod should not have any resource annotations with the value that includes keys different from cpushares
-			if _, ok := v[containerResourcesAnnotationValueKeyCPUShares]; len(v) == 1 && !ok {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata.annotations"), pod.Annotations, "the pod resource annotation value should have only cpushares key"))
-			}
-		}
+	case !doesNamespaceAllowWorkloadType(ns.Annotations, workloadType): // pod has workload annotation, but the namespace does not allow specified workload
+		allErrs = append(allErrs, getPodInvalidWorkloadAnnotationError(pod.Annotations, fmt.Sprintf("the namespace %q does not allow the workload type %s", ns.Name, workloadType)))
 	}
 
 	if len(allErrs) == 0 {
