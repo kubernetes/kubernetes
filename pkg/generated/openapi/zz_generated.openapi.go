@@ -45923,6 +45923,11 @@ func schema_pkg_apis_apiextensions_v1_ConversionRequest(ref common.ReferenceCall
 						},
 					},
 					"objects": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "objects is the list of custom resource objects to be converted.",
 							Type:        []string{"array"},
@@ -45960,6 +45965,11 @@ func schema_pkg_apis_apiextensions_v1_ConversionResponse(ref common.ReferenceCal
 						},
 					},
 					"convertedObjects": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "convertedObjects is the list of converted version of `request.objects` if the `result` is successful, otherwise empty. The webhook is expected to set `apiVersion` of these objects to the `request.desiredAPIVersion`. The list must also have the same size as the input list with the same objects in the same order (equal kind, metadata.uid, metadata.name and metadata.namespace). The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.",
 							Type:        []string{"array"},
@@ -46295,6 +46305,11 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref common.R
 						},
 					},
 					"shortNames": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "shortNames are short names for the resource, exposed in API discovery documents, and used by clients to support invocations like `kubectl get <shortname>`. It must be all lowercase.",
 							Type:        []string{"array"},
@@ -46325,6 +46340,11 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref common.R
 						},
 					},
 					"categories": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "categories is a list of grouped resources this custom resource belongs to (e.g. 'all'). This is published in API discovery documents, and used by clients to support invocations like `kubectl get all`.",
 							Type:        []string{"array"},
@@ -46377,6 +46397,11 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 						},
 					},
 					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "versions is the list of all API versions of the defined custom resource. Version names are used to compute the order in which served versions are listed in API discovery. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
 							Type:        []string{"array"},
@@ -46449,6 +46474,11 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref common.
 						},
 					},
 					"storedVersions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "storedVersions lists all versions of CustomResources that were ever persisted. Tracking these versions allows a migration path for stored versions in etcd. The field is mutable so a migration controller can finish a migration to another version (ensuring no old objects are left in storage), and then remove the rest of the versions from this list. Versions may not be removed from `spec.versions` while they exist in this list.",
 							Type:        []string{"array"},
@@ -46529,6 +46559,11 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref common
 						},
 					},
 					"additionalPrinterColumns": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "additionalPrinterColumns specifies additional columns returned in Table output. See https://kubernetes.io/docs/reference/using-api/api-concepts/#receiving-resources-as-tables for details. If no columns are specified, a single column displaying the age of the custom resource is used.",
 							Type:        []string{"array"},
@@ -46807,6 +46842,11 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 						},
 					},
 					"enum": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -46831,6 +46871,11 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 						},
 					},
 					"required": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -46850,6 +46895,11 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 						},
 					},
 					"allOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -46863,6 +46913,11 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 						},
 					},
 					"oneOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -46876,6 +46931,11 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 						},
 					},
 					"anyOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -46996,6 +47056,11 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 						},
 					},
 					"x-kubernetes-list-map-keys": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used as the index of the map.\n\nThis tag MUST only be used on lists that have the \"x-kubernetes-list-type\" extension set to \"map\". Also, the values specified for this attribute must be a scalar typed field of the child structure (no nesting is supported).\n\nThe properties specified must either be required or have a default value, to ensure those properties are present for all list items.",
 							Type:        []string{"array"},
@@ -47243,6 +47308,11 @@ func schema_pkg_apis_apiextensions_v1_WebhookConversion(ref common.ReferenceCall
 						},
 					},
 					"conversionReviewVersions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "conversionReviewVersions is an ordered list of preferred `ConversionReview` versions the Webhook expects. The API server will use the first version in the list which it supports. If none of the versions specified in this list are supported by API server, conversion will fail for the custom resource. If a persisted Webhook configuration specifies allowed versions and does not include any versions known to the API Server, calls to the webhook will fail.",
 							Type:        []string{"array"},
@@ -47290,6 +47360,11 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionRequest(ref common.Referenc
 						},
 					},
 					"objects": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "objects is the list of custom resource objects to be converted.",
 							Type:        []string{"array"},
@@ -47327,6 +47402,11 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionResponse(ref common.Referen
 						},
 					},
 					"convertedObjects": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "convertedObjects is the list of converted version of `request.objects` if the `result` is successful, otherwise empty. The webhook is expected to set `apiVersion` of these objects to the `request.desiredAPIVersion`. The list must also have the same size as the input list with the same objects in the same order (equal kind, metadata.uid, metadata.name and metadata.namespace). The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.",
 							Type:        []string{"array"},
@@ -47477,6 +47557,11 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceConversion(ref common.R
 						},
 					},
 					"conversionReviewVersions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "conversionReviewVersions is an ordered list of preferred `ConversionReview` versions the Webhook expects. The API server will use the first version in the list which it supports. If none of the versions specified in this list are supported by API server, conversion will fail for the custom resource. If a persisted Webhook configuration specifies allowed versions and does not include any versions known to the API Server, calls to the webhook will fail. Defaults to `[\"v1beta1\"]`.",
 							Type:        []string{"array"},
@@ -47677,6 +47762,11 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref com
 						},
 					},
 					"shortNames": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "shortNames are short names for the resource, exposed in API discovery documents, and used by clients to support invocations like `kubectl get <shortname>`. It must be all lowercase.",
 							Type:        []string{"array"},
@@ -47707,6 +47797,11 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref com
 						},
 					},
 					"categories": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "categories is a list of grouped resources this custom resource belongs to (e.g. 'all'). This is published in API discovery documents, and used by clients to support invocations like `kubectl get all`.",
 							Type:        []string{"array"},
@@ -47778,6 +47873,11 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 						},
 					},
 					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "versions is the list of all API versions of the defined custom resource. Optional if `version` is specified. The name of the first item in the `versions` list must match the `version` field if `version` and `versions` are both specified. Version names are used to compute the order in which served versions are listed in API discovery. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
 							Type:        []string{"array"},
@@ -47792,6 +47892,11 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 						},
 					},
 					"additionalPrinterColumns": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "additionalPrinterColumns specifies additional columns returned in Table output. See https://kubernetes.io/docs/reference/using-api/api-concepts/#receiving-resources-as-tables for details. If present, this field configures columns for all versions. Top-level and per-version columns are mutually exclusive. If no top-level or per-version columns are specified, a single column displaying the age of the custom resource is used.",
 							Type:        []string{"array"},
@@ -47864,6 +47969,11 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 						},
 					},
 					"storedVersions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "storedVersions lists all versions of CustomResources that were ever persisted. Tracking these versions allows a migration path for stored versions in etcd. The field is mutable so a migration controller can finish a migration to another version (ensuring no old objects are left in storage), and then remove the rest of the versions from this list. Versions may not be removed from `spec.versions` while they exist in this list.",
 							Type:        []string{"array"},
@@ -47944,6 +48054,11 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 						},
 					},
 					"additionalPrinterColumns": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "additionalPrinterColumns specifies additional columns returned in Table output. See https://kubernetes.io/docs/reference/using-api/api-concepts/#receiving-resources-as-tables for details. Top-level and per-version columns are mutually exclusive. Per-version columns must not all be set to identical values (top-level columns should be used instead). If no top-level or per-version columns are specified, a single column displaying the age of the custom resource is used.",
 							Type:        []string{"array"},
@@ -48222,6 +48337,11 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 						},
 					},
 					"enum": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -48246,6 +48366,11 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 						},
 					},
 					"required": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -48265,6 +48390,11 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 						},
 					},
 					"allOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -48278,6 +48408,11 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 						},
 					},
 					"oneOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -48291,6 +48426,11 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 						},
 					},
 					"anyOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -48411,6 +48551,11 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 						},
 					},
 					"x-kubernetes-list-map-keys": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used as the index of the map.\n\nThis tag MUST only be used on lists that have the \"x-kubernetes-list-type\" extension set to \"map\". Also, the values specified for this attribute must be a scalar typed field of the child structure (no nesting is supported).\n\nThe properties specified must either be required or have a default value, to ensure those properties are present for all list items.",
 							Type:        []string{"array"},

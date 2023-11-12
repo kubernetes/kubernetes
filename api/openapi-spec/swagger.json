@@ -15497,7 +15497,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "kind": {
           "description": "kind is the serialized kind of the resource. It is normally CamelCase and singular. Custom resource instances will use this value as the `kind` attribute in API calls.",
@@ -15516,7 +15517,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "singular": {
           "description": "singular is the singular name of the resource. It must be all lowercase. Defaults to lowercased `kind`.",
@@ -15557,7 +15559,8 @@
           "items": {
             "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionVersion"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
@@ -15591,7 +15594,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "type": "object"
@@ -15604,7 +15608,8 @@
           "items": {
             "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceColumnDefinition"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "deprecated": {
           "description": "deprecated indicates this version of the custom resource API is deprecated. When set to true, API requests to this version receive a warning header in the server response. Defaults to false.",
@@ -15726,13 +15731,15 @@
           "items": {
             "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "anyOf": {
           "items": {
             "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "default": {
           "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON",
@@ -15757,7 +15764,8 @@
           "items": {
             "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "example": {
           "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"
@@ -15827,7 +15835,8 @@
           "items": {
             "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "pattern": {
           "type": "string"
@@ -15848,7 +15857,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "title": {
           "type": "string"
@@ -15872,7 +15882,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "x-kubernetes-list-type": {
           "description": "x-kubernetes-list-type annotates an array to further describe its topology. This extension must only be used on lists and may have 3 possible values:\n\n1) `atomic`: the list is treated as a single entity, like a scalar.\n     Atomic lists will be entirely replaced when updated. This extension\n     may be used on any type of list (struct, scalar, ...).\n2) `set`:\n     Sets are lists that must not have multiple items with the same value. Each\n     value must be a scalar, an object with x-kubernetes-map-type `atomic` or an\n     array with x-kubernetes-list-type `atomic`.\n3) `map`:\n     These lists are like maps in that their elements have a non-index key\n     used to identify them. Order is preserved upon merge. The map tag\n     must only be used on a list with elements of type object.\nDefaults to atomic for arrays.",
@@ -16002,7 +16013,8 @@
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
