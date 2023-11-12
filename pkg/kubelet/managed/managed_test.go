@@ -267,7 +267,7 @@ func TestStaticPodManaged(t *testing.T) {
 			},
 			expectedAnnotations: map[string]string{
 				"target.workload.openshift.io/management": `{"effect": "PreferredDuringScheduling"}`,
-				"resources.workload.openshift.io/c1":      `{"cpushares":20}`,
+				"resources.workload.openshift.io/c1":      `{"cpushares":20,"cpulimit":100}`,
 			},
 		},
 		{
@@ -392,6 +392,74 @@ func TestStaticPodManaged(t *testing.T) {
 				WorkloadAnnotationWarning: qosWarning,
 			},
 			isGuaranteed: true,
+		},
+		{
+			pod: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					UID:       "12345",
+					Namespace: "mynamespace",
+					Annotations: map[string]string{
+						"target.workload.openshift.io/management": `{"effect": "PreferredDuringScheduling"}`,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test/nginx",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("100m"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("200m"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+							},
+						},
+						{
+							Name:  "c2",
+							Image: "test/image",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+							},
+						},
+						{
+							Name:  "c_3",
+							Image: "test/image",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+					SecurityContext: &v1.PodSecurityContext{},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+				},
+			},
+			expectedAnnotations: map[string]string{
+				"target.workload.openshift.io/management": `{"effect": "PreferredDuringScheduling"}`,
+				"resources.workload.openshift.io/c1":      `{"cpushares":102,"cpulimit":200}`,
+				"resources.workload.openshift.io/c2":      `{"cpushares":1024}`,
+				"resources.workload.openshift.io/c_3":     `{"cpushares":1024,"cpulimit":1000}`,
+			},
 		},
 	}
 
@@ -609,6 +677,74 @@ func TestStaticPodThrottle(t *testing.T) {
 				WorkloadAnnotationWarning: qosWarning,
 			},
 			isGuaranteed: true,
+		},
+		{
+			pod: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					UID:       "12345",
+					Namespace: "mynamespace",
+					Annotations: map[string]string{
+						"target.workload.openshift.io/throttle": `{"effect": "PreferredDuringScheduling"}`,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test/image",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("100m"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("200m"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("200m"),
+								},
+							},
+						},
+						{
+							Name:  "c2",
+							Image: "test/image",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("200m"),
+								},
+							},
+						},
+						{
+							Name:  "c_3",
+							Image: "test/image",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+					SecurityContext: &v1.PodSecurityContext{},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+				},
+			},
+			expectedAnnotations: map[string]string{
+				"target.workload.openshift.io/throttle": `{"effect": "PreferredDuringScheduling"}`,
+				"resources.workload.openshift.io/c1":    `{"cpushares":102,"cpulimit":200}`,
+				"resources.workload.openshift.io/c2":    `{"cpushares":1024,"cpulimit":2000}`,
+				"resources.workload.openshift.io/c_3":   `{"cpushares":1024}`,
+			},
 		},
 	}
 
