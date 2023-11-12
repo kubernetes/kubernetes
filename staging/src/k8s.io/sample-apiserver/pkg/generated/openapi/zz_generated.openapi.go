@@ -2662,6 +2662,11 @@ func schema_pkg_apis_wardle_v1alpha1_Fischer(ref common.ReferenceCallback) commo
 						},
 					},
 					"disallowedFlunders": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "DisallowedFlunders holds a list of Flunder.Names that are disallowed.",
 							Type:        []string{"array"},

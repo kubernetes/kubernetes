@@ -1,4 +1,3 @@
-API rule violation: list_type_missing,k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1,Fischer,DisallowedFlunders
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,APIResourceList,APIResources
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Duration
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
