@@ -1740,6 +1740,10 @@
             "$ref": "#/definitions/io.k8s.api.apps.v1.DaemonSetCondition"
           },
           "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
           "x-kubernetes-patch-merge-key": "type",
           "x-kubernetes-patch-strategy": "merge"
         },
@@ -1974,6 +1978,10 @@
             "$ref": "#/definitions/io.k8s.api.apps.v1.DeploymentCondition"
           },
           "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
           "x-kubernetes-patch-merge-key": "type",
           "x-kubernetes-patch-strategy": "merge"
         },
@@ -2158,6 +2166,10 @@
             "$ref": "#/definitions/io.k8s.api.apps.v1.ReplicaSetCondition"
           },
           "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
           "x-kubernetes-patch-merge-key": "type",
           "x-kubernetes-patch-strategy": "merge"
         },
@@ -2404,7 +2416,8 @@
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
@@ -2433,6 +2446,10 @@
             "$ref": "#/definitions/io.k8s.api.apps.v1.StatefulSetCondition"
           },
           "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
           "x-kubernetes-patch-merge-key": "type",
           "x-kubernetes-patch-strategy": "merge"
         },

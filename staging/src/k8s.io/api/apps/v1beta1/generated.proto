@@ -208,6 +208,8 @@ message DeploymentStatus {
   // Conditions represent the latest available observations of a deployment's current state.
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated DeploymentCondition conditions = 6;
 
   // collisionCount is the count of hash collisions for the Deployment. The Deployment controller uses this
@@ -445,6 +447,7 @@ message StatefulSetSpec {
   // any volumes in the template, with the same name.
   // TODO: Define the behavior if a claim already exists with the same name.
   // +optional
+  // +listType=atomic
   repeated k8s.io.api.core.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 
   // serviceName is the name of the service that governs this StatefulSet.
@@ -536,6 +539,8 @@ message StatefulSetStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated StatefulSetCondition conditions = 10;
 
   // availableReplicas is the total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.
