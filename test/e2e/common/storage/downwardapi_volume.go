@@ -211,7 +211,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_limit")
 
 		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("67108864\n"),
+			"134217728\n",
 		})
 	})
 
@@ -340,7 +340,7 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 				},
 				Limits: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("1250m"),
-					v1.ResourceMemory: resource.MustParse("64Mi"),
+					v1.ResourceMemory: resource.MustParse("128Mi"),
 				},
 			},
 			VolumeMounts: []v1.VolumeMount{
