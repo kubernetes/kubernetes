@@ -1386,13 +1386,9 @@ func TestNeedsCleanup(t *testing.T) {
 // make sure that the slow node sync never removes the Node from LB set because it
 // has stale data.
 func TestSlowNodeSync(t *testing.T) {
-	stopCh, updateCallCh := make(chan struct{}), make(chan fakecloud.UpdateBalancerCall)
+	stopCh, syncServiceDone, syncService := make(chan struct{}), make(chan string), make(chan string)
 	defer close(stopCh)
-	defer close(updateCallCh)
-
-	duration := time.Millisecond
-
-	syncService := make(chan string)
+	defer close(syncService)
 
 	node1 := makeNode(tweakName("node1"))
 	node2 := makeNode(tweakName("node2"))
@@ -1405,14 +1401,16 @@ func TestSlowNodeSync(t *testing.T) {
 	serviceKeys := sets.New(sKey1, sKey2)
 
 	controller, cloudProvider, kubeClient := newController(stopCh, node1, node2, service1, service2)
-	cloudProvider.RequestDelay = 4 * duration
 	cloudProvider.UpdateCallCb = func(update fakecloud.UpdateBalancerCall) {
-		updateCallCh <- update
+		key, _ := cache.MetaNamespaceKeyFunc(update.Service)
+		impactedService := serviceKeys.Difference(sets.New(key)).UnsortedList()[0]
+		syncService <- impactedService
+		<-syncServiceDone
+
 	}
 	cloudProvider.EnsureCallCb = func(update fakecloud.UpdateBalancerCall) {
-		updateCallCh <- update
+		syncServiceDone <- update.Service.Name
 	}
-
 	// Two update calls are expected. This is because this test calls
 	// controller.syncNodes once with two existing services, but with one
 	// controller.syncService while that is happening. The end result is
@@ -1428,6 +1426,8 @@ func TestSlowNodeSync(t *testing.T) {
 	expectedUpdateCalls := []fakecloud.UpdateBalancerCall{
 		// First update call for first service from controller.syncNodes
 		{Service: service1, Hosts: []*v1.Node{node1, node2}},
+	}
+	expectedEnsureCalls := []fakecloud.UpdateBalancerCall{
 		// Second update call for impacted service from controller.syncService
 		{Service: service2, Hosts: []*v1.Node{node1, node2, node3}},
 	}
@@ -1439,51 +1439,34 @@ func TestSlowNodeSync(t *testing.T) {
 		controller.syncNodes(context.TODO(), 1)
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		updateCallIdx := 0
-		impactedService := ""
-		for update := range updateCallCh {
-			// Validate that the call hosts are what we expect
-			if !compareHostSets(t, expectedUpdateCalls[updateCallIdx].Hosts, update.Hosts) {
-				t.Errorf("unexpected updated hosts for update: %v, expected: %v, got: %v", updateCallIdx, expectedUpdateCalls[updateCallIdx].Hosts, update.Hosts)
-				return
-			}
-			key, _ := cache.MetaNamespaceKeyFunc(update.Service)
-			// For call 0: determine impacted service
-			if updateCallIdx == 0 {
-				impactedService = serviceKeys.Difference(sets.New(key)).UnsortedList()[0]
-				syncService <- impactedService
-			}
-			// For calls > 0: validate the impacted service
-			if updateCallIdx > 0 {
-				if key != impactedService {
-					t.Error("unexpected impacted service")
-					return
-				}
-			}
-			if updateCallIdx == len(expectedUpdateCalls)-1 {
-				return
-			}
-			updateCallIdx++
-		}
-	}()
-
 	key := <-syncService
 	if _, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node3, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("error creating node3, err: %v", err)
 	}
 
-	// Give it some time to update the informer cache, needs to be lower than
-	// cloudProvider.RequestDelay
-	time.Sleep(duration)
 	// Sync the service
 	if err := controller.syncService(context.TODO(), key); err != nil {
-		t.Errorf("unexpected service sync error, err: %v", err)
+		t.Fatalf("unexpected service sync error, err: %v", err)
 	}
 
 	wg.Wait()
+
+	if len(expectedUpdateCalls) != len(cloudProvider.UpdateCalls) {
+		t.Fatalf("unexpected amount of update calls, expected: %v, got: %v", len(expectedUpdateCalls), len(cloudProvider.UpdateCalls))
+	}
+	for idx, update := range cloudProvider.UpdateCalls {
+		if !compareHostSets(t, expectedUpdateCalls[idx].Hosts, update.Hosts) {
+			t.Fatalf("unexpected updated hosts for update: %v, expected: %v, got: %v", idx, expectedUpdateCalls[idx].Hosts, update.Hosts)
+		}
+	}
+	if len(expectedEnsureCalls) != len(cloudProvider.EnsureCalls) {
+		t.Fatalf("unexpected amount of ensure calls, expected: %v, got: %v", len(expectedEnsureCalls), len(cloudProvider.EnsureCalls))
+	}
+	for idx, ensure := range cloudProvider.EnsureCalls {
+		if !compareHostSets(t, expectedEnsureCalls[idx].Hosts, ensure.Hosts) {
+			t.Fatalf("unexpected updated hosts for ensure: %v, expected: %v, got: %v", idx, expectedEnsureCalls[idx].Hosts, ensure.Hosts)
+		}
+	}
 }
 
 func TestNeedsUpdate(t *testing.T) {
