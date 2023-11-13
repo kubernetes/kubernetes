@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
 
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
@@ -83,11 +82,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	if initOnly {
 		return nil, fmt.Errorf("--init-only is not implemented on Windows")
 	}
-	var healthzPort int
-	if len(config.HealthzBindAddress) > 0 {
-		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
-		healthzPort, _ = strconv.Atoi(port)
-	}
 
 	var proxier proxy.Provider
 	var err error
@@ -100,8 +94,8 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
+			config.HealthzBindAddress,
 			config.Winkernel,
-			healthzPort,
 		)
 	} else {
 		proxier, err = winkernel.NewProxier(
@@ -112,8 +106,8 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,
+			config.HealthzBindAddress,
 			config.Winkernel,
-			healthzPort,
 		)
 	}
 	if err != nil {

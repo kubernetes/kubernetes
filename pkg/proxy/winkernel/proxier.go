@@ -657,8 +657,8 @@ func NewProxier(
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxierHealthServer,
+	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
-	healthzPort int,
 ) (*Proxier, error) {
 	if nodeIP == nil {
 		klog.InfoS("Invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
@@ -668,6 +668,12 @@ func NewProxier(
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+
+	var healthzPort int
+	if len(healthzBindAddress) > 0 {
+		_, port, _ := net.SplitHostPort(healthzBindAddress)
+		healthzPort, _ = strconv.Atoi(port)
+	}
 
 	hcnImpl := newHcnImpl()
 	hns, supportedFeatures := newHostNetworkService(hcnImpl)
@@ -787,14 +793,14 @@ func NewDualStackProxier(
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxierHealthServer,
+	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
-	healthzPort int,
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, syncPeriod, minSyncPeriod,
 		hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
-		config, healthzPort)
+		healthzBindAddress, config)
 
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv4Protocol])
@@ -802,7 +808,7 @@ func NewDualStackProxier(
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, syncPeriod, minSyncPeriod,
 		hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
-		config, healthzPort)
+		healthzBindAddress, config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv6Protocol])
 	}
