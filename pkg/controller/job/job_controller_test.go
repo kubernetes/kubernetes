@@ -5253,7 +5253,7 @@ func TestFinalizerCleanup(t *testing.T) {
 	defer cancel()
 
 	clientset := fake.NewSimpleClientset()
-	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.StaticResyncPeriodFunc(1*time.Second)())
 	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
