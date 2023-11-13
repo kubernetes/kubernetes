@@ -23,7 +23,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 
 	v1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -227,18 +226,6 @@ func convertCelTypeToDeclType(celType *cel.Type) *apiservercel.DeclType {
 	case cel.UintType:
 		return apiservercel.UintType
 	default:
-		if celType.HasTrait(traits.ContainerType) && celType.HasTrait(traits.IndexerType) {
-			parameters := celType.Parameters()
-			switch len(parameters) {
-			case 1:
-				elemType := convertCelTypeToDeclType(parameters[0])
-				return apiservercel.NewListType(elemType, -1)
-			case 2:
-				keyType := convertCelTypeToDeclType(parameters[0])
-				valueType := convertCelTypeToDeclType(parameters[1])
-				return apiservercel.NewMapType(keyType, valueType, -1)
-			}
-		}
 		return apiservercel.DynType
 	}
 }

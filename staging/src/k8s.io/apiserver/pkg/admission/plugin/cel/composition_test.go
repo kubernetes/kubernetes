@@ -159,32 +159,6 @@ func TestCompositedPolicies(t *testing.T) {
 			expression:     "variables.dict['foo'].contains('bar')",
 			expectedResult: true,
 		},
-		{
-			name: "variable of a list but confused as a map",
-			variables: []NamedExpressionAccessor{
-				&testVariable{
-					name:       "list",
-					expression: "[1, 2, 3, 4]",
-				},
-			},
-			attributes:           endpointCreateAttributes(),
-			expression:           "variables.list['invalid'] == 'invalid'",
-			expectErr:            true,
-			expectedErrorMessage: "found no matching overload for '_[_]' applied to '(list(int), string)'",
-		},
-		{
-			name: "list of strings, but element is confused as an integer",
-			variables: []NamedExpressionAccessor{
-				&testVariable{
-					name:       "list",
-					expression: "['1', '2', '3', '4']",
-				},
-			},
-			attributes:           endpointCreateAttributes(),
-			expression:           "variables.list[0] == 1",
-			expectErr:            true,
-			expectedErrorMessage: "found no matching overload for '_==_' applied to '(string, int)'",
-		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
