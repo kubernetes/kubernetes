@@ -6,5 +6,6 @@ approvers:
 reviewers:
   - sig-apps-reviewers
   - mimowo
+  - kannon92
 labels:
   - sig/apps
