@@ -814,6 +814,19 @@ func BenchmarkWithOneCELExpressions(b *testing.B) {
 		benchmarkWebhookAuthorize(b, expressions, true)
 	})
 }
+func BenchmarkWithOneCELExpressionsFalse(b *testing.B) {
+	expressions := []apiserver.WebhookMatchCondition{
+		{
+			Expression: "request.user == 'alice2'",
+		},
+	}
+	b.Run("compile", func(b *testing.B) {
+		benchmarkNewWebhookAuthorizer(b, expressions, true)
+	})
+	b.Run("authorize", func(b *testing.B) {
+		benchmarkWebhookAuthorize(b, expressions, true)
+	})
+}
 func BenchmarkWithTwoCELExpressions(b *testing.B) {
 	expressions := []apiserver.WebhookMatchCondition{
 		{
@@ -830,13 +843,13 @@ func BenchmarkWithTwoCELExpressions(b *testing.B) {
 		benchmarkWebhookAuthorize(b, expressions, true)
 	})
 }
-func BenchmarkWithTwoComplexCELExpressions(b *testing.B) {
+func BenchmarkWithTwoCELExpressionsFalse(b *testing.B) {
 	expressions := []apiserver.WebhookMatchCondition{
 		{
 			Expression: "request.user == 'alice'",
 		},
 		{
-			Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
+			Expression: "request.uid == '2'",
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
@@ -871,6 +884,40 @@ func BenchmarkWithManyCELExpressions(b *testing.B) {
 		},
 		{
 			Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
+		},
+	}
+	b.Run("compile", func(b *testing.B) {
+		benchmarkNewWebhookAuthorizer(b, expressions, true)
+	})
+	b.Run("authorize", func(b *testing.B) {
+		benchmarkWebhookAuthorize(b, expressions, true)
+	})
+}
+func BenchmarkWithManyCELExpressionsFalse(b *testing.B) {
+	expressions := []apiserver.WebhookMatchCondition{
+		{
+			Expression: "request.user == 'alice'",
+		},
+		{
+			Expression: "request.uid == '1'",
+		},
+		{
+			Expression: "('group1' in request.groups)",
+		},
+		{
+			Expression: "('key1' in request.extra)",
+		},
+		{
+			Expression: "!('key2' in request.extra)",
+		},
+		{
+			Expression: "('a' in request.extra['key1'])",
+		},
+		{
+			Expression: "!('z' in request.extra['key1'])",
+		},
+		{
+			Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies1'",
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
