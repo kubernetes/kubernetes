@@ -2,7 +2,7 @@
 
 module k8s.io/kube-controller-manager
 
-go 1.21.3
+go 1.21
 
 require (
 	k8s.io/apimachinery v0.0.0
