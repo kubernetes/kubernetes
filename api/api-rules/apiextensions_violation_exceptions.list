@@ -5,7 +5,6 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionSpec,Versions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionStatus,StoredVersions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionVersion,AdditionalPrinterColumns
-API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSON,Raw
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,AllOf
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,AnyOf
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Enum
@@ -14,7 +13,6 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListMapKeys
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrStringArray,Property
-API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,WebhookClientConfig,CABundle
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,WebhookConversion,ConversionReviewVersions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,ConversionRequest,Objects
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,ConversionResponse,ConvertedObjects
@@ -25,7 +23,6 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionSpec,Versions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionStatus,StoredVersions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionVersion,AdditionalPrinterColumns
-API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSON,Raw
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,AllOf
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,AnyOf
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Enum
@@ -34,10 +31,6 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListMapKeys
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrStringArray,Property
-API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,WebhookClientConfig,CABundle
-API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,FieldsV1,Raw
-API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,RawExtension,Raw
-API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XEmbeddedResource
