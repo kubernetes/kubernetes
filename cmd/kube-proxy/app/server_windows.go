@@ -96,7 +96,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.ClusterCIDR,
 			s.Hostname,
 			s.NodeIPs,
 			s.Recorder,
@@ -109,7 +108,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			s.PrimaryIPFamily,
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.ClusterCIDR,
 			s.Hostname,
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
