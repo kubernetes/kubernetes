@@ -527,7 +527,7 @@ func TestSuccessPolicy(t *testing.T) {
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:    ptr.To[int32](1),
-					Completions:    ptr.To[int32](1),
+					Completions:    ptr.To[int32](2),
 					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
 					Template:       podTemplateSpec,
 					SuccessPolicy: &batchv1.SuccessPolicy{
@@ -1164,7 +1164,7 @@ func TestBackoffLimitPerIndex_JobPodsCreatedWithExponentialBackoff(t *testing.T)
 		Ready:       ptr.To[int32](0),
 		Terminating: ptr.To[int32](0),
 	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New[int](), "0,1", ptr.To(""))
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New[int](), "0,1", nil)
 	validateJobComplete(ctx, t, clientSet, jobObj)
 
 	for index := 0; index < int(*jobObj.Spec.Completions); index++ {

@@ -916,40 +916,49 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			jobCtx.finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, batch.JobReasonPodFailurePolicy, *failJobMessage, jm.clock.Now())
 		}
 	}
-	if jobCtx.finishedCondition == nil {
-		if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
-			// check if the number of pod restart exceeds backoff (for restart OnFailure only)
-			// OR if the number of failed jobs increased since the last syncJob
-			jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonBackoffLimitExceeded, "Job has reached the specified backoff limit")
-		} else if jm.pastActiveDeadline(&job) {
-			jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonDeadlineExceeded, "Job was active longer than specified deadline")
-		} else if job.Spec.ActiveDeadlineSeconds != nil && !jobSuspended(&job) {
-			syncDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second - jm.clock.Since(job.Status.StartTime.Time)
-			logger.V(2).Info("Job has activeDeadlineSeconds configuration. Will sync this job again", "key", key, "nextSyncIn", syncDuration)
-			jm.queue.AddAfter(key, syncDuration)
-		}
-	}
 
+	// The failure conditions will be evaluated only when the Job finishedCondition has not been marked as SuccessCriteriaMet in the previous reconciliation
+	// or the Job has already reached the Complete criteria, which recorded succeeded Pods greater or equal than the desired Job completion (.spec.completion).
 	if isIndexedJob(&job) {
 		jobCtx.prevSucceededIndexes, jobCtx.succeededIndexes = calculateSucceededIndexes(logger, &job, pods)
 		jobCtx.succeeded = int32(jobCtx.succeededIndexes.total())
-		if hasBackoffLimitPerIndex(&job) {
-			jobCtx.failedIndexes = calculateFailedIndexes(logger, &job, pods)
-			if jobCtx.finishedCondition == nil {
-				if job.Spec.MaxFailedIndexes != nil && jobCtx.failedIndexes.total() > int(*job.Spec.MaxFailedIndexes) {
-					jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonMaxFailedIndexesExceeded, "Job has exceeded the specified maximal number of failed indexes")
-				} else if jobCtx.failedIndexes.total() > 0 && jobCtx.failedIndexes.total()+jobCtx.succeededIndexes.total() >= int(*job.Spec.Completions) {
-					jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonFailedIndexes, "Job has failed indexes")
-				}
-			}
-			jobCtx.podsWithDelayedDeletionPerIndex = getPodsWithDelayedDeletionPerIndex(logger, jobCtx)
-		}
+	}
+	waitingComplete := isSuccessCriteriaMetCondition(jobCtx.finishedCondition) || (jobCtx.finishedCondition == nil && succeededPodsCountExceedCompletions(jobCtx, job))
+	if !waitingComplete {
 		if jobCtx.finishedCondition == nil {
-			if msg, met := matchSuccessPolicy(logger, job.Spec.SuccessPolicy, *job.Spec.Completions, jobCtx.succeededIndexes); met {
-				jobCtx.finishedCondition = newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, batch.JobReasonSuccessPolicy, msg, jm.clock.Now())
+			if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
+				// check if the number of pod restart exceeds backoff (for restart OnFailure only)
+				// OR if the number of failed jobs increased since the last syncJob
+				jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonBackoffLimitExceeded, "Job has reached the specified backoff limit")
+			} else if jm.pastActiveDeadline(&job) {
+				jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonDeadlineExceeded, "Job was active longer than specified deadline")
+			} else if job.Spec.ActiveDeadlineSeconds != nil && !jobSuspended(&job) {
+				syncDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second - jm.clock.Since(job.Status.StartTime.Time)
+				logger.V(2).Info("Job has activeDeadlineSeconds configuration. Will sync this job again", "key", key, "nextSyncIn", syncDuration)
+				jm.queue.AddAfter(key, syncDuration)
+			}
+		}
+		if isIndexedJob(&job) {
+			if hasBackoffLimitPerIndex(&job) {
+				jobCtx.failedIndexes = calculateFailedIndexes(logger, &job, pods)
+				if jobCtx.finishedCondition == nil {
+					if job.Spec.MaxFailedIndexes != nil && jobCtx.failedIndexes.total() > int(*job.Spec.MaxFailedIndexes) {
+						jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonMaxFailedIndexesExceeded, "Job has exceeded the specified maximal number of failed indexes")
+					} else if jobCtx.failedIndexes.total() > 0 && jobCtx.failedIndexes.total()+jobCtx.succeededIndexes.total() >= int(*job.Spec.Completions) {
+						jobCtx.finishedCondition = jm.newFailureCondition(batch.JobReasonFailedIndexes, "Job has failed indexes")
+					}
+				}
+				jobCtx.podsWithDelayedDeletionPerIndex = getPodsWithDelayedDeletionPerIndex(logger, jobCtx)
+			}
+			// The SuccessPolicies are evaluated only when the Job has not yet reached all failure conditions.
+			if jobCtx.finishedCondition == nil {
+				if msg, met := matchSuccessPolicy(logger, job.Spec.SuccessPolicy, *job.Spec.Completions, jobCtx.succeededIndexes); met {
+					jobCtx.finishedCondition = newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, batch.JobReasonSuccessPolicy, msg, jm.clock.Now())
+				}
 			}
 		}
 	}
+
 	suspendCondChanged := false
 	// Remove active pods if Job failed.
 	if jobCtx.finishedCondition != nil {
@@ -971,23 +980,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			active, action, manageJobErr = jm.manageJob(ctx, &job, jobCtx)
 			manageJobCalled = true
 		}
-		complete := false
-		if job.Spec.Completions == nil {
-			// This type of job is complete when any pod exits with success.
-			// Each pod is capable of
-			// determining whether or not the entire Job is done.  Subsequent pods are
-			// not expected to fail, but if they do, the failure is ignored.  Once any
-			// pod succeeds, the controller waits for remaining pods to finish, and
-			// then the job is complete.
-			complete = jobCtx.succeeded > 0 && active == 0
-		} else {
-			// Job specifies a number of completions.  This type of job signals
-			// success by having that number of successes.  Since we do not
-			// start more pods than there are remaining completions, there should
-			// not be any remaining active pods once this count is reached.
-			complete = jobCtx.succeeded >= *job.Spec.Completions && active == 0
-		}
-		if complete {
+		if succeededPodsCountExceedCompletions(jobCtx, job) && active == 0 {
 			jobCtx.finishedCondition = jm.newSuccessCondition()
 		} else if manageJobCalled {
 			// Update the conditions / emit events only if manageJob was called in
@@ -1036,6 +1029,21 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	}
 
 	return manageJobErr
+}
+
+func succeededPodsCountExceedCompletions(jobCtx *syncJobCtx, job batch.Job) bool {
+	// This type of job is complete when any pod exits with success.
+	// Each pod is capable of
+	// determining whether or not the entire Job is done. Subsequent pods are
+	// not expected to fail, but if they do, the failure is ignored. Once any
+	// pod succeeds, the controller waits for remaining pods to finish, and
+	// then the job is complete.
+	return (job.Spec.Completions == nil && jobCtx.succeeded > 0) ||
+		// Job specifies a number of completions. This type of job signals
+		// success by having that number of successes. Since we do not
+		// start more pods than there are remaining completions, there should
+		// not be any remaining active pods once this count is reached.
+		(job.Spec.Completions != nil && jobCtx.succeeded >= *job.Spec.Completions)
 }
 
 func (jm *Controller) newFailureCondition(reason, message string) *batch.JobCondition {

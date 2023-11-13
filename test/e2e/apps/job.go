@@ -475,7 +475,7 @@ done`}
 		once all indexes succeeded.
 	*/
 	ginkgo.It("with successPolicy should succeeded when all indexes succeeded", func(ctx context.Context) {
-		parallelism := int32(2)
+		parallelism := int32(1)
 		completions := int32(2)
 		backoffLimit := int32(6) // default value
 
@@ -484,7 +484,7 @@ done`}
 		job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
 		job.Spec.SuccessPolicy = &batchv1.SuccessPolicy{
 			Rules: []batchv1.SuccessPolicyRule{{
-				SucceededCount: ptr.To[int32](2),
+				SucceededCount: ptr.To[int32](1),
 			}},
 		}
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
@@ -495,7 +495,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure that job has SuccessCriteriaMet with SuccessPolicy reason condition")
 
 		ginkgo.By("Ensure that the job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), 1)
 		framework.ExpectNoError(err, "failed to ensure that job completed")
 
 		ginkgo.By("Verifying that the job status to ensure correct final state")
