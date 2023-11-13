@@ -58,7 +58,7 @@ func IsCorruptedMnt(err error) bool {
 		underlyingError = err
 	}
 
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES || underlyingError == syscall.EHOSTDOWN
+	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES || underlyingError == syscall.EHOSTDOWN || underlyingError == syscall.EWOULDBLOCK
 }
 
 // MountInfo represents a single line in /proc/<pid>/mountinfo.
