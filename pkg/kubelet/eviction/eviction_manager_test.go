@@ -2705,10 +2705,8 @@ func TestEvictionSuccessSpan(t *testing.T) {
 
 	assert.Equal(t, 1, len(output), "Manager should output 1 span")
 	assert.Equal(t, "Eviction/EvictPod", output[0].Name(), "Manager should output 1 span with name 'Eviction/EvictPod'")
-	assert.Equal(t, 3, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name")
-	assert.Equal(t, 2, len(output[0].Events()), "Manager should output 1 span with 2 events")
-	assert.Equal(t, 4, len(output[0].Events()[0].Attributes), "Manager should output first event with 4 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
-	assert.Equal(t, 3, len(output[0].Events()[1].Attributes), "Manager should output second event with 3 attributes, if eviction is successful, k8s.pod.id, k8s.pod.name, k8s.namespace.name")
+	assert.Equal(t, 4, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
+	assert.Equal(t, 0, len(output[0].Events()), "Manager should output 1 span with 0 events")
 }
 
 func TestEvictionFailSpan(t *testing.T) {
@@ -2775,8 +2773,7 @@ func TestEvictionFailSpan(t *testing.T) {
 
 	assert.Equal(t, 1, len(output), "Manager should output 1 span")
 	assert.Equal(t, "Eviction/EvictPod", output[0].Name(), "Manager should output 1 span with name 'Eviction/EvictPod'")
-	assert.Equal(t, 3, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name")
-	assert.Equal(t, 2, len(output[0].Events()), "Manager should output 1 span with 2 events")
-	assert.Equal(t, 4, len(output[0].Events()[0].Attributes), "Manager should output first event with 4 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
-	assert.Equal(t, 5, len(output[0].Events()[1].Attributes), "Manager should output second event with 5 attributes, if eviction is failed, k8s.pod.id, k8s.pod.name, k8s.namespace.name, exception.type, exception.message")
+	assert.Equal(t, 4, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
+	assert.Equal(t, 1, len(output[0].Events()), "Manager should output 1 span with 2 events")
+	assert.Equal(t, 5, len(output[0].Events()[0].Attributes), "Manager should output second event with 5 attributes, if eviction is failed, k8s.pod.id, k8s.pod.name, k8s.namespace.name, exception.type, exception.message")
 }

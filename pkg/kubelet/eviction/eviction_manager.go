@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 
@@ -616,11 +616,6 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 		semconv.K8SPodUIDKey.String(string(pod.UID)),
 		semconv.K8SPodNameKey.String(pod.Name),
 		semconv.K8SNamespaceNameKey.String(pod.Namespace),
-	))
-	otelSpan.AddEvent("Evicting pod", trace.WithAttributes(
-		semconv.K8SPodUIDKey.String(string(pod.UID)),
-		semconv.K8SPodNameKey.String(pod.Name),
-		semconv.K8SNamespaceNameKey.String(pod.Namespace),
 		attribute.String("k8s.eviction.message", evictMsg),
 	))
 	defer otelSpan.End()
@@ -641,11 +636,6 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 		))
 	} else {
 		klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
-		otelSpan.AddEvent("pod is evicted successfully", trace.WithAttributes(
-			semconv.K8SPodUIDKey.String(string(pod.UID)),
-			semconv.K8SPodNameKey.String(pod.Name),
-			semconv.K8SNamespaceNameKey.String(pod.Namespace),
-		))
 	}
 	return true
 }
