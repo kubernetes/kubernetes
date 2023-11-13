@@ -1,3 +1,25 @@
+- testname: Priority and Fairness FlowSchema API
+  codename: '[sig-api-machinery] API priority and fairness should support FlowSchema
+    API operations [Conformance]'
+  description: ' The flowcontrol.apiserver.k8s.io API group MUST exist in the /apis
+    discovery document. The flowcontrol.apiserver.k8s.io/v1 API group/version MUST
+    exist in the /apis/flowcontrol.apiserver.k8s.io discovery document. The flowschemas
+    and flowschemas/status resources MUST exist in the /apis/flowcontrol.apiserver.k8s.io/v1
+    discovery document. The flowschema resource must support create, get, list, watch,
+    update, patch, delete, and deletecollection.'
+  release: v1.29
+  file: test/e2e/apimachinery/flowcontrol.go
+- testname: Priority and Fairness PriorityLevelConfiguration API
+  codename: '[sig-api-machinery] API priority and fairness should support PriorityLevelConfiguration
+    API operations [Conformance]'
+  description: ' The flowcontrol.apiserver.k8s.io API group MUST exist in the /apis
+    discovery document. The flowcontrol.apiserver.k8s.io/v1 API group/version MUST
+    exist in the /apis/flowcontrol.apiserver.k8s.io discovery document. The prioritylevelconfiguration
+    and prioritylevelconfiguration/status resources MUST exist in the /apis/flowcontrol.apiserver.k8s.io/v1
+    discovery document. The prioritylevelconfiguration resource must support create,
+    get, list, watch, update, patch, delete, and deletecollection.'
+  release: v1.29
+  file: test/e2e/apimachinery/flowcontrol.go
 - testname: Admission webhook, list mutating webhooks
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing
     mutating webhooks should work [Conformance]'
