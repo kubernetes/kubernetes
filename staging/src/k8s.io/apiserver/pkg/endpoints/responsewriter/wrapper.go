@@ -165,10 +165,13 @@ func (wr outerWithCloseNotifyAndFlush) CloseNotify() <-chan bool {
 	return wr.InnerCloseNotifierFlusher.CloseNotify()
 }
 
-// Although available, we no longer recommend Flush to be invoked, instead
-// we recommend the use of FlushError
 func (wr outerWithCloseNotifyAndFlush) Flush() {
-	panic(fmt.Errorf("Flush not allowed, use FlushError function instead"))
+	if flusher, ok := wr.UserProvidedDecorator.(http.Flusher); ok {
+		flusher.Flush()
+		return
+	}
+
+	wr.InnerCloseNotifierFlusher.Flush()
 }
 
 func (wr outerWithCloseNotifyAndFlush) FlushError() error {

@@ -19,6 +19,8 @@ package flushwriter
 import (
 	"io"
 	"net/http"
+
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 // Wrap wraps an io.Writer into a writer that flushes after every write if
@@ -26,6 +28,9 @@ import (
 func Wrap(w io.Writer) io.Writer {
 	fw := &flushWriter{
 		writer: w,
+	}
+	if flusher, ok := w.(responsewriter.FlusherError); ok {
+		fw.flusherError = flusher
 	}
 	if flusher, ok := w.(http.Flusher); ok {
 		fw.flusher = flusher
@@ -35,8 +40,9 @@ func Wrap(w io.Writer) io.Writer {
 
 // flushWriter provides wrapper for responseWriter with HTTP streaming capabilities
 type flushWriter struct {
-	flusher http.Flusher
-	writer  io.Writer
+	flusherError responsewriter.FlusherError
+	flusher      http.Flusher
+	writer       io.Writer
 }
 
 // Write is a FlushWriter implementation of the io.Writer that sends any buffered
@@ -44,6 +50,17 @@ type flushWriter struct {
 func (fw *flushWriter) Write(p []byte) (n int, err error) {
 	n, err = fw.writer.Write(p)
 	if err != nil {
+		return
+	}
+
+	// FlusherError should have higher priority, if available
+	if fw.flusherError != nil {
+		if err := fw.flusherError.FlushError(); err != nil {
+			// TODO: check if it is in keeping with the expected behavior,
+			//  n byte have been written but the FlushError has returned an
+			//  unexpected error
+			return n, err
+		}
 		return
 	}
 	if fw.flusher != nil {

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -191,9 +192,9 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}()
 
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := w.(responsewriter.FlusherError)
 	if !ok {
-		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
+		err := fmt.Errorf("unable to start watch - can't get FlusherError: %#v", w)
 		utilruntime.HandleError(err)
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
@@ -216,7 +217,13 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
+
+	if err := flusher.FlushError(); err != nil {
+		err := fmt.Errorf("unable to start watch - FlusherError returned an error: %v", err)
+		utilruntime.HandleError(err)
+		s.Scope.err(errors.NewInternalError(err), w, req)
+		return
+	}
 
 	kind := s.Scope.Kind
 	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer)
@@ -253,7 +260,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			if len(ch) == 0 {
-				flusher.Flush()
+				if err := flusher.FlushError(); err != nil {
+					// TODO: return a timeout error here.
+					utilruntime.HandleError(fmt.Errorf("unable to flush watch events - FlusherError returned an error: %v", err))
+					return
+				}
 			}
 			if isWatchListLatencyRecordingRequired {
 				metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope)

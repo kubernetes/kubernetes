@@ -44,6 +44,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 const fakeStatusCode = 567
@@ -1057,6 +1058,9 @@ func TestFlushIntervalHeaders(t *testing.T) {
 		w.Header().Add("MyHeader", expected)
 		w.WriteHeader(200)
 		w.(http.Flusher).Flush()
+		if err := w.(responsewriter.FlusherError).FlushError(); err != nil {
+			t.Errorf("expected no error from FlusherError, but got: %v", err)
+		}
 		<-stopCh
 	}))
 	defer backend.Close()

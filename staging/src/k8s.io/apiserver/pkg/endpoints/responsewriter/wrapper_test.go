@@ -312,24 +312,61 @@ func TestResponseWriterDecorator(t *testing.T) {
 }
 
 func TestDecoratorShouldNotUseFlush(t *testing.T) {
+	tests := []struct {
+		name      string
+		http1x    bool
+		decorator func(inner http.ResponseWriter) UserProvidedDecorator
+	}{
+		{
+			name:   "http/1.x",
+			http1x: true,
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &shoundNotBeUsedflusher{ResponseWriter: inner}
+			},
+		},
+		{
+			name: "http2",
+			decorator: func(inner http.ResponseWriter) UserProvidedDecorator {
+				return &shoundNotBeUsedflusher{ResponseWriter: inner}
+			},
+		},
+	}
+
 	errWant := fmt.Errorf("Flush not allowed, use FlushError function instead")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			invokedCh := make(chan struct{}, 1)
+			handler := http.HandlerFunc(func(inner http.ResponseWriter, r *http.Request) {
+				assertCloseNotifierFlusher(t, inner)
 
-	inner := &responsewritertesting.FakeResponseWriter{}
-	middle := &shoundNotBeUsedflusher{ResponseWriter: inner}
+				func() {
+					defer func() {
+						close(invokedCh)
+						r := recover()
+						if r == nil {
+							t.Errorf("Expected a panic")
+							return
+						}
+						if errGot, ok := r.(error); !ok || errWant.Error() != errGot.Error() {
+							t.Errorf("Expected error: %v, but got: %v", errWant, errGot)
+						}
+					}()
+					middle := test.decorator(inner)
+					WrapForHTTP1Or2(middle)
+				}()
+			})
 
-	func() {
-		defer func() {
-			r := recover()
-			if r == nil {
-				t.Errorf("Expected a panic")
-				return
+			server := newServer(t, handler, !test.http1x)
+			defer server.Close()
+			sendRequest(t, server)
+
+			select {
+			case <-invokedCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the handler to be invoked")
 			}
-			if errGot, ok := r.(error); !ok || errWant.Error() != errGot.Error() {
-				t.Errorf("Expected error: %v, but got: %v", errWant, errGot)
-			}
-		}()
-		WrapForHTTP1Or2(middle)
-	}()
+		})
+	}
 }
 
 func newServer(t *testing.T, h http.Handler, http2 bool) *httptest.Server {
