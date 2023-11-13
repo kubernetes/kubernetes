@@ -2089,6 +2089,23 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedCondition:       batch.JobSuspended,
 			expectedConditionReason: "JobSuspended",
 		},
+		"nonIndexed job succeeded and exceeded activeDeadlineSeconds": {
+			parallelism:           1,
+			activeDeadlineSeconds: 10,
+			startTime:             15,
+			succeededPods:         1,
+			expectedSucceeded:     1,
+			expectedCondition:     batch.JobComplete,
+		},
+		"indexed job succeeded and exceeded activeDeadlineSeconds": {
+			parallelism:           2,
+			completions:           2,
+			activeDeadlineSeconds: 10,
+			startTime:             15,
+			succeededPods:         2,
+			expectedSucceeded:     2,
+			expectedCondition:     batch.JobComplete,
+		},
 	}
 
 	for name, tc := range testCases {
