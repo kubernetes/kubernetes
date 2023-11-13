@@ -2699,7 +2699,10 @@ func TestEvictionSuccessSpan(t *testing.T) {
 	}
 
 	// synchronize to detect the memory pressure
-	manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have error but got %v", err)
+	}
 
 	output := fakeRecorder.Ended()
 
@@ -2767,7 +2770,10 @@ func TestEvictionFailSpan(t *testing.T) {
 	}
 
 	// synchronize to detect the memory pressure
-	manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have error but got %v", err)
+	}
 
 	output := fakeRecorder.Ended()
 
