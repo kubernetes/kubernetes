@@ -507,16 +507,18 @@ func (rc *ResourceConsumer) WaitForReplicas(ctx context.Context, desiredReplicas
 // EnsureDesiredReplicasInRange ensure the replicas is in a desired range
 func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
-	framework.Gomega().Consistently(ctx, func(ctx context.Context) int {
+	desiredReplicasErr := framework.Gomega().Consistently(ctx, func(ctx context.Context) int {
 		return rc.GetReplicas(ctx)
 	}).WithTimeout(duration).WithPolling(interval).Should(gomega.And(gomega.BeNumerically(">=", minDesiredReplicas), gomega.BeNumerically("<=", maxDesiredReplicas)))
 
+	// dump HPA for debugging
 	as, err := rc.GetHpa(ctx, hpaName)
 	if err != nil {
 		framework.Logf("Error getting HPA: %s", err)
 	} else {
 		framework.Logf("HPA status: %+v", as.Status)
 	}
+	framework.ExpectNoError(desiredReplicasErr)
 }
 
 // Pause stops background goroutines responsible for consuming resources.
