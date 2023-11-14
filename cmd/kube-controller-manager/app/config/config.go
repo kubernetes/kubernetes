@@ -21,6 +21,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/internal/feature"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
@@ -43,6 +44,8 @@ type Config struct {
 
 	EventBroadcaster record.EventBroadcaster
 	EventRecorder    record.EventRecorder
+
+	dummyFeature feature.Feature
 }
 
 type completedConfig struct {
