@@ -2,7 +2,7 @@
 
 module k8s.io/kubectl
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
@@ -103,6 +103,7 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
+	k8s.io/internal => ../internal
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
 )

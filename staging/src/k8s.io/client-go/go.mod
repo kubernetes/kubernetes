@@ -2,7 +2,7 @@
 
 module k8s.io/client-go
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
@@ -26,6 +26,7 @@ require (
 	google.golang.org/protobuf v1.31.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
+	k8s.io/internal v0.0.0
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
@@ -64,4 +65,5 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
+	k8s.io/internal => ../internal
 )

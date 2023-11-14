@@ -2,7 +2,7 @@
 
 module k8s.io/sample-apiserver
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/google/gofuzz v1.2.0
@@ -100,6 +100,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.0.0 // indirect
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01 // indirect
+	k8s.io/internal v0.0.0 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
 	k8s.io/kms v0.0.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0 // indirect
@@ -114,6 +115,7 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
+	k8s.io/internal => ../internal
 	k8s.io/kms => ../kms
 	k8s.io/sample-apiserver => ../sample-apiserver
 )

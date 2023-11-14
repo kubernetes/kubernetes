@@ -2,7 +2,7 @@
 
 module k8s.io/component-base
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/blang/semver/v4 v4.0.0
@@ -27,6 +27,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
+	k8s.io/internal v0.0.0
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
@@ -87,4 +88,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/internal => ../internal
 )

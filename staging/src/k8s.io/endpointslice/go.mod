@@ -2,7 +2,7 @@
 
 module k8s.io/endpointslice
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -69,4 +69,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/endpointslice => ../endpointslice
+	k8s.io/internal => ../internal
 )

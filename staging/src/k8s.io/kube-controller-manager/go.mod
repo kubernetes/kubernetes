@@ -2,7 +2,7 @@
 
 module k8s.io/kube-controller-manager
 
-go 1.21
+go 1.21.4
 
 require (
 	k8s.io/apimachinery v0.0.0
@@ -39,6 +39,7 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/controller-manager => ../controller-manager
+	k8s.io/internal => ../internal
 	k8s.io/kms => ../kms
 	k8s.io/kube-controller-manager => ../kube-controller-manager
 )

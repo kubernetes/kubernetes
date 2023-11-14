@@ -2,7 +2,7 @@
 
 module k8s.io/component-helpers
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/google/go-cmp v0.6.0
@@ -57,4 +57,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-helpers => ../component-helpers
+	k8s.io/internal => ../internal
 )

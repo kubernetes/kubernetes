@@ -2,7 +2,7 @@
 
 module k8s.io/sample-controller
 
-go 1.21
+go 1.21.4
 
 require (
 	golang.org/x/time v0.3.0
@@ -62,5 +62,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
+	k8s.io/internal => ../internal
 	k8s.io/sample-controller => ../sample-controller
 )

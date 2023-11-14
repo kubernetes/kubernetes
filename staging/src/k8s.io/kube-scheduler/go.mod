@@ -2,7 +2,7 @@
 
 module k8s.io/kube-scheduler
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/google/go-cmp v0.6.0
@@ -34,5 +34,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/internal => ../internal
 	k8s.io/kube-scheduler => ../kube-scheduler
 )

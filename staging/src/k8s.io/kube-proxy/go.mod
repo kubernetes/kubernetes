@@ -2,7 +2,7 @@
 
 module k8s.io/kube-proxy
 
-go 1.21
+go 1.21.4
 
 require (
 	k8s.io/apimachinery v0.0.0
@@ -36,6 +36,7 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	k8s.io/internal v0.0.0 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
@@ -48,5 +49,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/internal => ../internal
 	k8s.io/kube-proxy => ../kube-proxy
 )

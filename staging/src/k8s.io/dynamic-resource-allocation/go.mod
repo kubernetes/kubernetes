@@ -2,7 +2,7 @@
 
 module k8s.io/dynamic-resource-allocation
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/go-logr/logr v1.3.0
@@ -64,5 +64,6 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/cri-api => ../cri-api
 	k8s.io/dynamic-resource-allocation => ../dynamic-resource-allocation
+	k8s.io/internal => ../internal
 	k8s.io/kubelet => ../kubelet
 )

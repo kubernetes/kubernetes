@@ -2,7 +2,7 @@
 
 module k8s.io/cli-runtime
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
@@ -75,4 +75,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	k8s.io/internal => ../internal
 )

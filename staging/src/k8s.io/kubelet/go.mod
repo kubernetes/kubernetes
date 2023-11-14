@@ -2,7 +2,7 @@
 
 module k8s.io/kubelet
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
@@ -55,6 +55,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/internal v0.0.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
@@ -67,6 +68,7 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/cri-api => ../cri-api
+	k8s.io/internal => ../internal
 	k8s.io/kms => ../kms
 	k8s.io/kubelet => ../kubelet
 )
