@@ -228,10 +228,10 @@ kubernetes.
 
 ## Update base-os and test images
 
-To be able to use the latest kubelet from a pull request, in this repository
-we build [machine-os-content image](openshift-hack/images/os/Dockerfile).
-Make sure that both `FROM` and `curl` operation in `RUN` command use appropriate
-OCP version which corresponds with what we have in the [hyperkube image](openshift-hack/images/hyperkube/Dockerfile.rhel).
+To be able to use the latest kubelet from a pull request, the openshift/release
+job layers the built RPM [on top of the `rhel-coreos` image](https://github.com/openshift/release/blob/78568fbde1ee9a15bc6ab08c7c49ae3539d3e302/ci-operator/config/openshift/kubernetes/openshift-kubernetes-master.yaml#L102-L113).
+Make sure that the `FROM` uses the appropriate OCP version which corresponds
+with what we have in the [hyperkube image](openshift-hack/images/hyperkube/Dockerfile.rhel).
 
 Similarly, update `FROM` in [test image](openshift-hack/images/tests/Dockerfile.rhel)
 to match the one from [hyperkube image](openshift-hack/images/hyperkube/Dockerfile.rhel).
