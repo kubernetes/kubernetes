@@ -32,6 +32,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	utilpath "k8s.io/utils/path"
+	"k8s.io/utils/ptr"
 )
 
 func newHostPathType(pathType string) *v1.HostPathType {
@@ -503,6 +504,7 @@ func TestOSFileTypeChecker(t *testing.T) {
 type fakeHostPathTypeChecker struct {
 	name            string
 	path            string
+	pathType        *v1.HostPathType
 	exists          bool
 	isDir           bool
 	isFile          bool
@@ -513,21 +515,23 @@ type fakeHostPathTypeChecker struct {
 	invalidpathType []*v1.HostPathType
 }
 
-func (ftc *fakeHostPathTypeChecker) MakeFile() error { return nil }
-func (ftc *fakeHostPathTypeChecker) MakeDir() error  { return nil }
-func (ftc *fakeHostPathTypeChecker) Exists() bool    { return ftc.exists }
-func (ftc *fakeHostPathTypeChecker) IsFile() bool    { return ftc.isFile }
-func (ftc *fakeHostPathTypeChecker) IsDir() bool     { return ftc.isDir }
-func (ftc *fakeHostPathTypeChecker) IsBlock() bool   { return ftc.isBlock }
-func (ftc *fakeHostPathTypeChecker) IsChar() bool    { return ftc.isChar }
-func (ftc *fakeHostPathTypeChecker) IsSocket() bool  { return ftc.isSocket }
-func (ftc *fakeHostPathTypeChecker) GetPath() string { return ftc.path }
+func (ftc *fakeHostPathTypeChecker) MakeFile() error          { return nil }
+func (ftc *fakeHostPathTypeChecker) MakeDir() error           { return nil }
+func (ftc *fakeHostPathTypeChecker) Exists() bool             { return ftc.exists }
+func (ftc *fakeHostPathTypeChecker) IsFile() bool             { return ftc.isFile }
+func (ftc *fakeHostPathTypeChecker) IsDir() bool              { return ftc.isDir }
+func (ftc *fakeHostPathTypeChecker) IsBlock() bool            { return ftc.isBlock }
+func (ftc *fakeHostPathTypeChecker) IsChar() bool             { return ftc.isChar }
+func (ftc *fakeHostPathTypeChecker) IsSocket() bool           { return ftc.isSocket }
+func (ftc *fakeHostPathTypeChecker) GetPath() string          { return ftc.path }
+func (ftc *fakeHostPathTypeChecker) GetType() (string, error) { return string(*ftc.pathType), nil }
 
 func TestHostPathTypeCheckerInternal(t *testing.T) {
 	testCases := []fakeHostPathTypeChecker{
 		{
 			name:          "Existing Folder",
 			path:          "/existingFolder",
+			pathType:      ptr.To(v1.HostPathDirectory),
 			isDir:         true,
 			exists:        true,
 			validpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate), string(v1.HostPathDirectory)),
@@ -537,6 +541,7 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 		{
 			name:          "New Folder",
 			path:          "/newFolder",
+			pathType:      ptr.To(v1.HostPathDirectory),
 			isDir:         false,
 			exists:        false,
 			validpathType: newHostPathTypeList(string(v1.HostPathDirectoryOrCreate)),
@@ -546,6 +551,7 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 		{
 			name:          "Existing File",
 			path:          "/existingFile",
+			pathType:      ptr.To(v1.HostPathFile),
 			isFile:        true,
 			exists:        true,
 			validpathType: newHostPathTypeList(string(v1.HostPathFileOrCreate), string(v1.HostPathFile)),
@@ -555,6 +561,7 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 		{
 			name:          "New File",
 			path:          "/newFile",
+			pathType:      ptr.To(v1.HostPathFile),
 			isFile:        false,
 			exists:        false,
 			validpathType: newHostPathTypeList(string(v1.HostPathFileOrCreate)),
@@ -564,6 +571,7 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 		{
 			name:          "Existing Socket",
 			path:          "/existing.socket",
+			pathType:      ptr.To(v1.HostPathSocket),
 			isSocket:      true,
 			isFile:        true,
 			exists:        true,
@@ -574,6 +582,7 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 		{
 			name:          "Existing Character Device",
 			path:          "/existing.char",
+			pathType:      ptr.To(v1.HostPathCharDev),
 			isChar:        true,
 			isFile:        true,
 			exists:        true,
@@ -584,6 +593,7 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 		{
 			name:          "Existing Block Device",
 			path:          "/existing.block",
+			pathType:      ptr.To(v1.HostPathBlockDev),
 			isBlock:       true,
 			isFile:        true,
 			exists:        true,
