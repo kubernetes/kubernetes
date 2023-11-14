@@ -192,9 +192,14 @@ type want struct {
 	prescore         result
 	reserve          result
 	unreserve        result
+	prebind          result
 	postbind         result
 	postFilterResult *framework.PostFilterResult
 	postfilter       result
+
+	// unreserveAfterBindFailure, if set, triggers a call to Unreserve
+	// after PreBind, as if the actual Bind had failed.
+	unreserveAfterBindFailure *result
 }
 
 // prepare contains changes for objects in the API server.
@@ -206,6 +211,7 @@ type prepare struct {
 	prescore   change
 	reserve    change
 	unreserve  change
+	prebind    change
 	postbind   change
 	postfilter change
 }
@@ -237,7 +243,7 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
-				reserve: result{
+				prebind: result{
 					changes: change{
 						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
 							if claim.Name == claimName {
@@ -254,7 +260,7 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimTemplateInStatus,
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
-				reserve: result{
+				prebind: result{
 					changes: change{
 						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
 							if claim.Name == claimName {
@@ -417,7 +423,7 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
-				reserve: result{
+				prebind: result{
 					changes: change{
 						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
 							return st.FromResourceClaim(in).
@@ -492,12 +498,36 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaimWithGoodTopology},
 			want: want{
-				reserve: result{
+				prebind: result{
 					changes: change{
 						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
 							return st.FromResourceClaim(in).
 								ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
 								Obj()
+						},
+					},
+				},
+			},
+		},
+		"bind-failure": {
+			pod:    podWithClaimName,
+			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaimWithGoodTopology},
+			want: want{
+				prebind: result{
+					changes: change{
+						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							return st.FromResourceClaim(in).
+								ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								Obj()
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					changes: change{
+						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourcev1alpha2.ResourceClaimConsumerReference{}
+							return out
 						},
 					},
 				},
@@ -607,11 +637,26 @@ func TestPlugin(t *testing.T) {
 					})
 				} else {
 					initialObjects = testCtx.listAll(t)
-					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postbind)
-					testCtx.p.PostBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
-					t.Run("postbind", func(t *testing.T) {
-						testCtx.verify(t, tc.want.postbind, initialObjects, nil, status)
+					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prebind)
+					status := testCtx.p.PreBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
+					t.Run("prebind", func(t *testing.T) {
+						testCtx.verify(t, tc.want.prebind, initialObjects, nil, status)
 					})
+
+					if tc.want.unreserveAfterBindFailure != nil {
+						initialObjects = testCtx.listAll(t)
+						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
+						t.Run("unreserverAfterBindFailure", func(t *testing.T) {
+							testCtx.verify(t, *tc.want.unreserveAfterBindFailure, initialObjects, nil, status)
+						})
+					} else if status.IsSuccess() {
+						initialObjects = testCtx.listAll(t)
+						initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postbind)
+						testCtx.p.PostBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
+						t.Run("postbind", func(t *testing.T) {
+							testCtx.verify(t, tc.want.postbind, initialObjects, nil, nil)
+						})
+					}
 				}
 			} else {
 				initialObjects = testCtx.listAll(t)

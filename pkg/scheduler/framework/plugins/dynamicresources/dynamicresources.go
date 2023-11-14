@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
@@ -100,25 +101,6 @@ type informationForClaim struct {
 
 func (d *stateData) Clone() framework.StateData {
 	return d
-}
-
-func (d *stateData) updateClaimStatus(ctx context.Context, clientset kubernetes.Interface, index int, claim *resourcev1alpha2.ResourceClaim) error {
-	// TODO (#113700): replace with patch operation. Beware that patching must only succeed if the
-	// object has not been modified in parallel by someone else.
-	claim, err := clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
-	// TODO: metric for update results, with the operation ("set selected
-	// node", "set PotentialNodes", etc.) as one dimension.
-	if err != nil {
-		return fmt.Errorf("update resource claim: %w", err)
-	}
-
-	// Remember the new instance. This is relevant when the plugin must
-	// update the same claim multiple times (for example, first reserve
-	// the claim, then later remove the reservation), because otherwise the second
-	// update would fail with a "was modified" error.
-	d.claims[index] = claim
-
-	return nil
 }
 
 type podSchedulingState struct {
@@ -300,6 +282,7 @@ var _ framework.PostFilterPlugin = &dynamicResources{}
 var _ framework.PreScorePlugin = &dynamicResources{}
 var _ framework.ReservePlugin = &dynamicResources{}
 var _ framework.EnqueueExtensions = &dynamicResources{}
+var _ framework.PreBindPlugin = &dynamicResources{}
 var _ framework.PostBindPlugin = &dynamicResources{}
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -808,7 +791,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim.Status.DeallocationRequested = true
 			claim.Status.ReservedFor = nil
 			logger.V(5).Info("Requesting deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-			if err := state.updateClaimStatus(ctx, pl.clientset, index, claim); err != nil {
+			if _, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return nil, statusError(logger, err)
 			}
 			return nil, nil
@@ -926,27 +909,11 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	logger := klog.FromContext(ctx)
 	for index, claim := range state.claims {
 		if claim.Status.Allocation != nil {
-			// Allocated, but perhaps not reserved yet.
-			if resourceclaim.IsReservedForPod(pod, claim) {
-				logger.V(5).Info("is reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim))
-				continue
-			}
-			claim := claim.DeepCopy()
-			claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-				resourcev1alpha2.ResourceClaimConsumerReference{
-					Resource: "pods",
-					Name:     pod.Name,
-					UID:      pod.UID,
-				})
-			logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim))
-			_, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
-			// TODO: metric for update errors.
-			if err != nil {
-				return statusError(logger, err)
-			}
-			// If we get here, we know that reserving the claim for
-			// the pod worked and we can proceed with schedulingCtx
-			// it.
+			// Allocated, but perhaps not reserved yet. We checked in PreFilter that
+			// the pod could reserve the claim. Instead of reserving here by
+			// updating the ResourceClaim status, we assume that reserving
+			// will work and only do it for real during binding. If it fails at
+			// that time, some other pod was faster and we have to try again.
 		} else {
 			// Must be delayed allocation.
 			numDelayedAllocationPending++
@@ -1040,27 +1007,72 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 	}
 
 	logger := klog.FromContext(ctx)
-	for index, claim := range state.claims {
+	for _, claim := range state.claims {
 		if claim.Status.Allocation != nil &&
 			resourceclaim.IsReservedForPod(pod, claim) {
-			// Remove pod from ReservedFor.
-			claim := claim.DeepCopy()
-			reservedFor := make([]resourcev1alpha2.ResourceClaimConsumerReference, 0, len(claim.Status.ReservedFor)-1)
-			for _, reserved := range claim.Status.ReservedFor {
-				// TODO: can UID be assumed to be unique all resources or do we also need to compare Group/Version/Resource?
-				if reserved.UID != pod.UID {
-					reservedFor = append(reservedFor, reserved)
-				}
-			}
-			claim.Status.ReservedFor = reservedFor
-			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim))
-			if err := state.updateClaimStatus(ctx, pl.clientset, index, claim); err != nil {
-				// We will get here again when pod schedulingCtx
-				// is retried.
+			// Remove pod from ReservedFor. A strategic-merge-patch is used
+			// because that allows removing an individual entry without having
+			// the latest slice.
+			patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"$patch": "delete", "uid": %q} ] }}`,
+				claim.UID,
+				pod.UID,
+			)
+			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod))
+			claim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
+			if err != nil {
+				// We will get here again when pod scheduling is retried.
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
 			}
 		}
 	}
+}
+
+// PreBind gets called in a separate goroutine after it has been determined
+// that the pod should get bound to this node. Because Reserve did not actually
+// reserve claims, we need to do it now. If that fails, we return an error and
+// the pod will have to go into the backoff queue. The scheduler will call
+// Unreserve as part of the error handling.
+func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	if !pl.enabled {
+		return nil
+	}
+	state, err := getStateData(cs)
+	if err != nil {
+		return statusError(klog.FromContext(ctx), err)
+	}
+	if len(state.claims) == 0 {
+		return nil
+	}
+
+	logger := klog.FromContext(ctx)
+	for index, claim := range state.claims {
+		if !resourceclaim.IsReservedForPod(pod, claim) {
+			// The claim might be stale, for example because the claim can get shared and some
+			// other goroutine has updated it in the meantime. We therefore cannot use
+			// SSA here to add the pod because then we would have to send the entire slice
+			// or use different field manager strings for each entry.
+			//
+			// With a strategic-merge-patch, we can simply send one new entry. The apiserver
+			// validation will catch if two goroutines try to do that at the same time and
+			// the claim cannot be shared.
+			patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"resource": "pods", "name": %q, "uid": %q} ] }}`,
+				claim.UID,
+				pod.Name,
+				pod.UID,
+			)
+			logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim))
+			claim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
+			logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.Format(claim))
+			// TODO: metric for update errors.
+			if err != nil {
+				return statusError(logger, err)
+			}
+			state.claims[index] = claim
+		}
+	}
+	// If we get here, we know that reserving the claim for
+	// the pod worked and we can proceed with binding it.
+	return nil
 }
 
 // PostBind is called after a pod is successfully bound to a node. Now we are

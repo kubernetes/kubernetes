@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -294,6 +295,108 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 4)
+
+		ginkgo.Context("with local unshared resources", func() {
+			driver := NewDriver(f, nodes, func() app.Resources {
+				return app.Resources{
+					NodeLocal:      true,
+					MaxAllocations: 10,
+					Nodes:          nodes.NodeNames,
+				}
+			})
+			b := newBuilder(f, driver)
+
+			// This test covers some special code paths in the scheduler:
+			// - Patching the ReservedFor during PreBind because in contrast
+			//   to claims specifically allocated for a pod, here the claim
+			//   gets allocated without reserving it.
+			// - Error handling when PreBind fails: multiple attempts to bind pods
+			//   are started concurrently, only one attempt succeeds.
+			// - Removing a ReservedFor entry because the first inline claim gets
+			//   reserved during allocation.
+			ginkgo.It("reuses an allocated immediate claim", func(ctx context.Context) {
+				objects := []klog.KMetadata{
+					b.parameters(),
+					b.externalClaim(resourcev1alpha2.AllocationModeImmediate),
+				}
+				podExternal := b.podExternal()
+
+				// Create many pods to increase the chance that the scheduler will
+				// try to bind two pods at the same time.
+				numPods := 5
+				for i := 0; i < numPods; i++ {
+					podInline, claimTemplate := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+					podInline.Spec.Containers[0].Resources.Claims = append(podInline.Spec.Containers[0].Resources.Claims, podExternal.Spec.Containers[0].Resources.Claims[0])
+					podInline.Spec.ResourceClaims = append(podInline.Spec.ResourceClaims, podExternal.Spec.ResourceClaims[0])
+					objects = append(objects, claimTemplate, podInline)
+				}
+				b.create(ctx, objects...)
+
+				var runningPod *v1.Pod
+				haveRunningPod := gcustom.MakeMatcher(func(pods []v1.Pod) (bool, error) {
+					numRunning := 0
+					runningPod = nil
+					for _, pod := range pods {
+						if pod.Status.Phase == v1.PodRunning {
+							pod := pod // Don't keep pointer to loop variable...
+							runningPod = &pod
+							numRunning++
+						}
+					}
+					return numRunning == 1, nil
+				}).WithTemplate("Expected one running Pod.\nGot instead:\n{{.FormattedActual}}")
+
+				for i := 0; i < numPods; i++ {
+					ginkgo.By("waiting for exactly one pod to start")
+					runningPod = nil
+					gomega.Eventually(ctx, b.listTestPods).WithTimeout(f.Timeouts.PodStartSlow).Should(haveRunningPod)
+
+					ginkgo.By("checking that no other pod gets scheduled")
+					havePendingPods := gcustom.MakeMatcher(func(pods []v1.Pod) (bool, error) {
+						numPending := 0
+						for _, pod := range pods {
+							if pod.Status.Phase == v1.PodPending {
+								numPending++
+							}
+						}
+						return numPending == numPods-1-i, nil
+					}).WithTemplate("Expected only one running Pod.\nGot instead:\n{{.FormattedActual}}")
+					gomega.Consistently(ctx, b.listTestPods).WithTimeout(time.Second).Should(havePendingPods)
+
+					ginkgo.By(fmt.Sprintf("deleting pod %s", klog.KObj(runningPod)))
+					framework.ExpectNoError(b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, runningPod.Name, metav1.DeleteOptions{}))
+
+					ginkgo.By(fmt.Sprintf("waiting for pod %s to disappear", klog.KObj(runningPod)))
+					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, b.f.ClientSet, runningPod.Name, runningPod.Namespace, f.Timeouts.PodDelete))
+				}
+			})
+		})
+
+		ginkgo.Context("with shared network resources", func() {
+			driver := NewDriver(f, nodes, networkResources)
+			b := newBuilder(f, driver)
+
+			// This test complements "reuses an allocated immediate claim" above:
+			// because the claim can be shared, each PreBind attempt succeeds.
+			ginkgo.It("shares an allocated immediate claim", func(ctx context.Context) {
+				objects := []klog.KMetadata{
+					b.parameters(),
+					b.externalClaim(resourcev1alpha2.AllocationModeImmediate),
+				}
+				// Create many pods to increase the chance that the scheduler will
+				// try to bind two pods at the same time.
+				numPods := 5
+				pods := make([]*v1.Pod, numPods)
+				for i := 0; i < numPods; i++ {
+					pods[i] = b.podExternal()
+					objects = append(objects, pods[i])
+				}
+				b.create(ctx, objects...)
+
+				ginkgo.By("waiting all pods to start")
+				framework.ExpectNoError(e2epod.WaitForPodsRunning(ctx, b.f.ClientSet, f.Namespace.Name, numPods+1 /* driver */, f.Timeouts.PodStartSlow))
+			})
+		})
 
 		// claimTests tries out several different combinations of pods with
 		// claims, both inline and external.
