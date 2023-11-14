@@ -264,6 +264,11 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 	return true, ""
 }
 
+// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
+func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
+	return nil
+}
+
 // podTerminatingByPreemption returns the pod's terminating state if feature PodDisruptionConditions is not enabled.
 // Otherwise, it additionally checks if the termination state is caused by scheduler preemption.
 func podTerminatingByPreemption(p *v1.Pod, enablePodDisruptionConditions bool) bool {
