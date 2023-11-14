@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -146,13 +147,16 @@ func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
 }
 
-func alwaysReady() bool { return true }
-
-func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
+// newController creates a new service controller. Callers have the option to
+// specify `stopChan` for test cases which might require running the
+// node/service informers and reacting to resource events. Callers can also
+// specify `objects` which represent the initial state of objects, used to
+// populate the client set / informer cache at start-up.
+func newController(stopCh <-chan struct{}, objects ...runtime.Object) (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	cloud := &fakecloud.Cloud{}
 	cloud.Region = region
 
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewSimpleClientset(objects...)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
@@ -162,26 +166,36 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 
 	controller := &Controller{
-		cloud:            cloud,
-		kubeClient:       kubeClient,
-		clusterName:      "test-cluster",
-		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
-		eventBroadcaster: broadcaster,
-		eventRecorder:    recorder,
-		nodeLister:       newFakeNodeLister(nil),
-		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		nodeQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
-		lastSyncedNodes:  []*v1.Node{},
+		cloud:               cloud,
+		kubeClient:          kubeClient,
+		clusterName:         "test-cluster",
+		eventBroadcaster:    broadcaster,
+		eventRecorder:       recorder,
+		serviceLister:       serviceInformer.Lister(),
+		serviceListerSynced: serviceInformer.Informer().HasSynced,
+		nodeLister:          nodeInformer.Lister(),
+		nodeListerSynced:    nodeInformer.Informer().HasSynced,
+		serviceQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
+		nodeQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
+		lastSyncedNodes:     make(map[string][]*v1.Node),
 	}
+
+	informerFactory.Start(stopCh)
+	informerFactory.WaitForCacheSync(stopCh)
+
+	serviceMap := make(map[string]*cachedService)
+	services, _ := serviceInformer.Lister().List(labels.Everything())
+	for _, service := range services {
+		serviceMap[service.Name] = &cachedService{
+			state: service,
+		}
+	}
+
+	controller.cache = &serviceCache{serviceMap: serviceMap}
 
 	balancer, _ := cloud.LoadBalancer()
 	controller.balancer = balancer
 
-	controller.serviceLister = serviceInformer.Lister()
-
-	controller.nodeListerSynced = alwaysReady
-	controller.serviceListerSynced = alwaysReady
 	controller.eventRecorder = record.NewFakeRecorder(100)
 
 	cloud.Calls = nil         // ignore any cloud calls made in init()
@@ -265,7 +279,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			controller, cloud, client := newController()
+			controller, cloud, client := newController(nil)
 			cloud.Exists = tc.lbExists
 			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
 			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(ctx, tc.service, metav1.CreateOptions{}); err != nil {
@@ -439,7 +453,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		t.Run(item.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			controller, cloud, _ := newController()
+			controller, cloud, _ := newController(nil)
 			controller.nodeLister = newFakeNodeLister(nil, nodes...)
 			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); len(servicesToRetry) != 0 {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
@@ -590,11 +604,15 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
 	}} {
 		t.Run(tc.desc, func(t *testing.T) {
-			controller, cloud, _ := newController()
+			controller, cloud, _ := newController(nil)
+
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			controller.lastSyncedNodes = tc.initialState
+			for _, svc := range services {
+				key, _ := cache.MetaNamespaceKeyFunc(svc)
+				controller.lastSyncedNodes[key] = tc.initialState
+			}
 
 			for _, state := range tc.stateChanges {
 				setupState := func() {
@@ -762,11 +780,15 @@ func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
 		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
 	}} {
 		t.Run(tc.desc, func(t *testing.T) {
-			controller, cloud, _ := newController()
+			controller, cloud, _ := newController(nil)
+
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			controller.lastSyncedNodes = tc.initialState
+			for _, svc := range services {
+				key, _ := cache.MetaNamespaceKeyFunc(svc)
+				controller.lastSyncedNodes[key] = tc.initialState
+			}
 
 			for _, state := range tc.stateChanges {
 				setupState := func() {
@@ -806,7 +828,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		serviceNames.Insert(fmt.Sprintf("%s/%s", svc.GetObjectMeta().GetNamespace(), svc.GetObjectMeta().GetName()))
 	}
 
-	controller, cloud, _ := newController()
+	controller, cloud, _ := newController(nil)
 	for _, tc := range []struct {
 		desc                  string
 		nodes                 []*v1.Node
@@ -901,8 +923,28 @@ func compareUpdateCalls(t *testing.T, left, right []fakecloud.UpdateBalancerCall
 	}
 }
 
+// compareHostSets compares if the nodes in left are in right, despite the order.
+func compareHostSets(t *testing.T, left, right []*v1.Node) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for _, lHost := range left {
+		found := false
+		for _, rHost := range right {
+			if reflect.DeepEqual(lHost, rHost) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 func TestNodesNotEqual(t *testing.T) {
-	controller, cloud, _ := newController()
+	controller, cloud, _ := newController(nil)
 
 	services := []*v1.Service{
 		newService("s0", v1.ServiceTypeLoadBalancer),
@@ -952,7 +994,12 @@ func TestNodesNotEqual(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			controller.nodeLister = newFakeNodeLister(nil, tc.newNodes...)
-			controller.lastSyncedNodes = tc.lastSyncNodes
+
+			for _, svc := range services {
+				key, _ := cache.MetaNamespaceKeyFunc(svc)
+				controller.lastSyncedNodes[key] = tc.lastSyncNodes
+			}
+
 			controller.updateLoadBalancerHosts(ctx, services, 5)
 			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
 			cloud.UpdateCalls = []fakecloud.UpdateBalancerCall{}
@@ -961,7 +1008,7 @@ func TestNodesNotEqual(t *testing.T) {
 }
 
 func TestProcessServiceCreateOrUpdate(t *testing.T) {
-	controller, _, client := newController()
+	controller, _, client := newController(nil)
 
 	//A pair of old and new loadbalancer IP address
 	oldLBIP := "192.168.1.1"
@@ -1076,7 +1123,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 			svc := newService(svcName, v1.ServiceTypeLoadBalancer)
 			// Preset finalizer so k8s error only happens when patching status.
 			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
-			controller, _, client := newController()
+			controller, _, client := newController(nil)
 			client.PrependReactor("patch", "services", func(action core.Action) (bool, runtime.Object, error) {
 				return true, nil, tc.k8sErr
 			})
@@ -1120,7 +1167,7 @@ func TestSyncService(t *testing.T) {
 			testName: "if an invalid service name is synced",
 			key:      "invalid/key/string",
 			updateFn: func() {
-				controller, _, _ = newController()
+				controller, _, _ = newController(nil)
 			},
 			expectedFn: func(e error) error {
 				//TODO: should find a way to test for dependent package errors in such a way that it won't break
@@ -1152,7 +1199,7 @@ func TestSyncService(t *testing.T) {
 			key:      "external-balancer",
 			updateFn: func() {
 				testSvc := defaultExternalService()
-				controller, _, _ = newController()
+				controller, _, _ = newController(nil)
 				controller.enqueueService(testSvc)
 				svc := controller.cache.getOrCreate("external-balancer")
 				svc.state = testSvc
@@ -1258,7 +1305,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		defer cancel()
 
 		//Create a new controller.
-		controller, cloud, _ = newController()
+		controller, cloud, _ = newController(nil)
 		tc.updateFn(controller)
 		obtainedErr := controller.processServiceDeletion(ctx, svcKey)
 		if err := tc.expectedFn(obtainedErr); err != nil {
@@ -1333,8 +1380,96 @@ func TestNeedsCleanup(t *testing.T) {
 
 }
 
-func TestNeedsUpdate(t *testing.T) {
+// This tests a service update while a slow node sync is happening. If we have multiple
+// services to process from a node sync: each service will experience a sync delta.
+// If a new Node is added and a service is synced while this happens: we want to
+// make sure that the slow node sync never removes the Node from LB set because it
+// has stale data.
+func TestSlowNodeSync(t *testing.T) {
+	stopCh, syncServiceDone, syncService := make(chan struct{}), make(chan string), make(chan string)
+	defer close(stopCh)
+	defer close(syncService)
 
+	node1 := makeNode(tweakName("node1"))
+	node2 := makeNode(tweakName("node2"))
+	node3 := makeNode(tweakName("node3"))
+	service1 := newService("service1", v1.ServiceTypeLoadBalancer)
+	service2 := newService("service2", v1.ServiceTypeLoadBalancer)
+
+	sKey1, _ := cache.MetaNamespaceKeyFunc(service1)
+	sKey2, _ := cache.MetaNamespaceKeyFunc(service2)
+	serviceKeys := sets.New(sKey1, sKey2)
+
+	controller, cloudProvider, kubeClient := newController(stopCh, node1, node2, service1, service2)
+	cloudProvider.UpdateCallCb = func(update fakecloud.UpdateBalancerCall) {
+		key, _ := cache.MetaNamespaceKeyFunc(update.Service)
+		impactedService := serviceKeys.Difference(sets.New(key)).UnsortedList()[0]
+		syncService <- impactedService
+		<-syncServiceDone
+
+	}
+	cloudProvider.EnsureCallCb = func(update fakecloud.UpdateBalancerCall) {
+		syncServiceDone <- update.Service.Name
+	}
+	// Two update calls are expected. This is because this test calls
+	// controller.syncNodes once with two existing services, but with one
+	// controller.syncService while that is happening. The end result is
+	// therefore two update calls - since the second controller.syncNodes won't
+	// trigger an update call because the syncService already did. Each update
+	// call takes cloudProvider.RequestDelay to process. The test asserts that
+	// the order of the Hosts defined by the update calls is respected, but
+	// doesn't necessarily assert the order of the Service. This is because the
+	// controller implementation doesn't use a deterministic order when syncing
+	// services. The test therefor works out which service is impacted by the
+	// slow node sync (which will be whatever service is not synced first) and
+	// then validates that the Hosts for each update call is respected.
+	expectedUpdateCalls := []fakecloud.UpdateBalancerCall{
+		// First update call for first service from controller.syncNodes
+		{Service: service1, Hosts: []*v1.Node{node1, node2}},
+	}
+	expectedEnsureCalls := []fakecloud.UpdateBalancerCall{
+		// Second update call for impacted service from controller.syncService
+		{Service: service2, Hosts: []*v1.Node{node1, node2, node3}},
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		controller.syncNodes(context.TODO(), 1)
+	}()
+
+	key := <-syncService
+	if _, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node3, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("error creating node3, err: %v", err)
+	}
+
+	// Sync the service
+	if err := controller.syncService(context.TODO(), key); err != nil {
+		t.Fatalf("unexpected service sync error, err: %v", err)
+	}
+
+	wg.Wait()
+
+	if len(expectedUpdateCalls) != len(cloudProvider.UpdateCalls) {
+		t.Fatalf("unexpected amount of update calls, expected: %v, got: %v", len(expectedUpdateCalls), len(cloudProvider.UpdateCalls))
+	}
+	for idx, update := range cloudProvider.UpdateCalls {
+		if !compareHostSets(t, expectedUpdateCalls[idx].Hosts, update.Hosts) {
+			t.Fatalf("unexpected updated hosts for update: %v, expected: %v, got: %v", idx, expectedUpdateCalls[idx].Hosts, update.Hosts)
+		}
+	}
+	if len(expectedEnsureCalls) != len(cloudProvider.EnsureCalls) {
+		t.Fatalf("unexpected amount of ensure calls, expected: %v, got: %v", len(expectedEnsureCalls), len(cloudProvider.EnsureCalls))
+	}
+	for idx, ensure := range cloudProvider.EnsureCalls {
+		if !compareHostSets(t, expectedEnsureCalls[idx].Hosts, ensure.Hosts) {
+			t.Fatalf("unexpected updated hosts for ensure: %v, expected: %v, got: %v", idx, expectedEnsureCalls[idx].Hosts, ensure.Hosts)
+		}
+	}
+}
+
+func TestNeedsUpdate(t *testing.T) {
 	testCases := []struct {
 		testName            string                            //Name of the test case
 		updateFn            func() (*v1.Service, *v1.Service) //Function to update the service object
@@ -1494,7 +1629,7 @@ func TestNeedsUpdate(t *testing.T) {
 		expectedNeedsUpdate: true,
 	}}
 
-	controller, _, _ := newController()
+	controller, _, _ := newController(nil)
 	for _, tc := range testCases {
 		oldSvc, newSvc := tc.updateFn()
 		obtainedResult := controller.needsUpdate(oldSvc, newSvc)
@@ -2441,7 +2576,7 @@ func TestServiceQueueDelay(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			controller, cloud, client := newController()
+			controller, cloud, client := newController(nil)
 			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
 			controller.serviceQueue = queue
 			cloud.Err = tc.lbCloudErr
