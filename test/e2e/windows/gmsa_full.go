@@ -321,8 +321,8 @@ func deployGmsaWebhook(ctx context.Context, f *framework.Framework) error {
 	bindClusterRBACRoleToServiceAccount(ctx, f, s, "cluster-admin")
 
 	installSteps := []string{
-		"echo \"@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing/\" >> /etc/apk/repositories",
-		"&& apk add kubectl@testing gettext openssl",
+		"echo \"@community http://dl-cdn.alpinelinux.org/alpine/edge/community/\" >> /etc/apk/repositories",
+		"&& apk add kubectl@community gettext openssl",
 		"&& apk add --update coreutils",
 		fmt.Sprintf("&& curl %s > gmsa.sh", gmsaWebhookDeployScriptURL),
 		"&& chmod +x gmsa.sh",
