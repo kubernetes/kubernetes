@@ -432,8 +432,6 @@ func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.Us
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
 // given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
-	clusterDomain := kl.dnsConfigurer.ClusterDomain
-
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
@@ -447,15 +445,20 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 		return "", "", err
 	}
 
-	hostDomain := ""
+	hostDomain := &strings.Builder{}
+	clusterDomain := kl.dnsConfigurer.ClusterDomain
 	if len(pod.Spec.Subdomain) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Subdomain); len(msgs) != 0 {
 			return "", "", fmt.Errorf("pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
-		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
+		hostDomain.WriteString(fmt.Sprintf("%s.%s.svc", pod.Spec.Subdomain, pod.Namespace))
+		if clusterDomain != "" {
+			hostDomain.WriteRune('.')
+			hostDomain.WriteString(clusterDomain)
+		}
 	}
 
-	return hostname, hostDomain, nil
+	return hostname, hostDomain.String(), nil
 }
 
 // GetPodCgroupParent gets pod cgroup parent from container manager.
