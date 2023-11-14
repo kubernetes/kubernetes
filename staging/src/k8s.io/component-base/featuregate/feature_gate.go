@@ -29,10 +29,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/naming"
 	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
+	"k8s.io/internal/feature"
 	"k8s.io/klog/v2"
 )
 
-type Feature string
+type Feature = feature.Feature
 
 const (
 	flagName = "feature-gates"
@@ -64,58 +65,24 @@ var (
 	}
 )
 
-type FeatureSpec struct {
-	// Default is the default enablement state for the feature
-	Default bool
-	// LockToDefault indicates that the feature is locked to its default and cannot be changed
-	LockToDefault bool
-	// PreRelease indicates the maturity level of the feature
-	PreRelease prerelease
-}
-
-type prerelease string
+type FeatureSpec = feature.FeatureSpec
 
 const (
 	// Values for PreRelease.
-	Alpha = prerelease("ALPHA")
-	Beta  = prerelease("BETA")
-	GA    = prerelease("")
+	Alpha = feature.Alpha
+	Beta  = feature.Beta
+	GA    = feature.GA
 
 	// Deprecated
-	Deprecated = prerelease("DEPRECATED")
+	Deprecated = feature.Deprecated
 )
 
 // FeatureGate indicates whether a given feature is enabled or not
-type FeatureGate interface {
-	// Enabled returns true if the key is enabled.
-	Enabled(key Feature) bool
-	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
-	KnownFeatures() []string
-	// DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
-	// set on the copy without mutating the original. This is useful for validating
-	// config against potential feature gate changes before committing those changes.
-	DeepCopy() MutableFeatureGate
-}
+type FeatureGate = feature.FeatureGate
 
 // MutableFeatureGate parses and stores flag gates for known features from
 // a string like feature1=true,feature2=false,...
-type MutableFeatureGate interface {
-	FeatureGate
-
-	// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
-	AddFlag(fs *pflag.FlagSet)
-	// Set parses and stores flag gates for known features
-	// from a string like feature1=true,feature2=false,...
-	Set(value string) error
-	// SetFromMap stores flag gates for known features from a map[string]bool or returns an error
-	SetFromMap(m map[string]bool) error
-	// Add adds features to the featureGate.
-	Add(features map[Feature]FeatureSpec) error
-	// GetAll returns a copy of the map of known feature names to feature specs.
-	GetAll() map[Feature]FeatureSpec
-	// AddMetrics adds feature enablement metrics
-	AddMetrics()
-}
+type MutableFeatureGate = feature.MutableFeatureGate
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
 type featureGate struct {
