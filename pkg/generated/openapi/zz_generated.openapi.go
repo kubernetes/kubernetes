@@ -42805,7 +42805,9 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref common.Reference
 								"x-kubernetes-list-map-keys": []interface{}{
 									"uid",
 								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "uid",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
