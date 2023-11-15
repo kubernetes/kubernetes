@@ -830,6 +830,11 @@ type KubeletConfiguration struct {
 	// If not specified, the value in containerRuntimeEndpoint is used.
 	// +optional
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
+
+	// PodLogsRootDirectoryPodLogsRootDirectory is the directory for pod logs.
+	// Default: "/var/log/pods"
+	// +optional
+	PodLogsRootDirectory string `json:"podLogsRootDirectory,omitempty"`
 }
 
 type KubeletAuthorizationMode string

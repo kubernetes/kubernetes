@@ -39,6 +39,8 @@ const (
 
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	DefaultMemoryThrottlingFactor = 0.9
+
+	DefaultPodLogsRootDirectory = "/var/log/pods"
 )
 
 var (
@@ -273,5 +275,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.ContainerRuntimeEndpoint == "" {
 		obj.ContainerRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
+	}
+	if obj.PodLogsRootDirectory == "" {
+		obj.PodLogsRootDirectory = DefaultPodLogsRootDirectory
 	}
 }

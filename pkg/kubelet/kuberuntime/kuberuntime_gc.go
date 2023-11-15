@@ -36,19 +36,21 @@ import (
 
 // containerGC is the manager of garbage collection.
 type containerGC struct {
-	client           internalapi.RuntimeService
-	manager          *kubeGenericRuntimeManager
-	podStateProvider podStateProvider
-	tracer           trace.Tracer
+	client               internalapi.RuntimeService
+	manager              *kubeGenericRuntimeManager
+	podStateProvider     podStateProvider
+	tracer               trace.Tracer
+	podLogsRootDirectory string
 }
 
 // NewContainerGC creates a new containerGC.
-func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager, tracer trace.Tracer) *containerGC {
+func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager, tracer trace.Tracer, podLogsRootDirectory string) *containerGC {
 	return &containerGC{
-		client:           client,
-		manager:          manager,
-		podStateProvider: podStateProvider,
-		tracer:           tracer,
+		client:               client,
+		manager:              manager,
+		podStateProvider:     podStateProvider,
+		tracer:               tracer,
+		podLogsRootDirectory: podLogsRootDirectory,
 	}
 }
 
@@ -329,9 +331,9 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 	osInterface := cgc.manager.osInterface
 	if allSourcesReady {
 		// Only remove pod logs directories when all sources are ready.
-		dirs, err := osInterface.ReadDir(podLogsRootDirectory)
+		dirs, err := osInterface.ReadDir(cgc.podLogsRootDirectory)
 		if err != nil {
-			return fmt.Errorf("failed to read podLogsRootDirectory %q: %v", podLogsRootDirectory, err)
+			return fmt.Errorf("failed to read podLogsRootDirectory %q: %v", cgc.podLogsRootDirectory, err)
 		}
 		for _, dir := range dirs {
 			name := dir.Name()
@@ -340,7 +342,7 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 				continue
 			}
 			klog.V(4).InfoS("Removing pod logs", "podUID", podUID)
-			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))
+			err := osInterface.RemoveAll(filepath.Join(cgc.podLogsRootDirectory, name))
 			if err != nil {
 				klog.ErrorS(err, "Failed to remove pod logs directory", "path", name)
 			}

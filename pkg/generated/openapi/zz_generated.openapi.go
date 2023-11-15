@@ -57669,6 +57669,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"podLogsRootDirectory": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodLogsRootDirectoryPodLogsRootDirectory is the directory for pod logs. Default: \"/var/log/pods\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"containerRuntimeEndpoint"},
 			},

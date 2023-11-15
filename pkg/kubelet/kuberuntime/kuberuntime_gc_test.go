@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -431,9 +432,9 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	// pod log directories without corresponding pods should be removed.
 	files := []string{"123", "456", "789", "012", "name_namespace_321", "name_namespace_654"}
 	removed := []string{
-		filepath.Join(podLogsRootDirectory, "789"),
-		filepath.Join(podLogsRootDirectory, "012"),
-		filepath.Join(podLogsRootDirectory, "name_namespace_654"),
+		filepath.Join(kubeletconfigv1beta1.DefaultPodLogsRootDirectory, "789"),
+		filepath.Join(kubeletconfigv1beta1.DefaultPodLogsRootDirectory, "012"),
+		filepath.Join(kubeletconfigv1beta1.DefaultPodLogsRootDirectory, "name_namespace_654"),
 	}
 	podStateProvider.removed["012"] = struct{}{}
 	podStateProvider.removed["789"] = struct{}{}

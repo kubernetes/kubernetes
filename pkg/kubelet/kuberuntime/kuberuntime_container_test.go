@@ -40,6 +40,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -78,8 +79,8 @@ func TestRemoveContainer(t *testing.T) {
 		pattern = strings.Replace(pattern, "\\", "\\\\", -1)
 		return regexp.MustCompile(pattern).MatchString(path)
 	}
-	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
-	expectedContainerLogPathRotated := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
+	expectedContainerLogPath := filepath.Join(kubeletconfigv1beta1.DefaultPodLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogPathRotated := filepath.Join(kubeletconfigv1beta1.DefaultPodLogsRootDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
 	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
 
 	fakeOS.Create(expectedContainerLogPath)

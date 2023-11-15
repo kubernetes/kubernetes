@@ -31,6 +31,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -42,7 +43,7 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 	require.NoError(t, err)
 	pod := newTestPod()
 
-	expectedLogDirectory := filepath.Join(podLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
+	expectedLogDirectory := filepath.Join(kubeletconfigv1beta1.DefaultPodLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
 	expectedLabels := map[string]string{
 		"io.kubernetes.pod.name":      pod.Name,
 		"io.kubernetes.pod.namespace": pod.Namespace,
@@ -78,7 +79,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
 		// Check pod logs root directory is created.
-		assert.Equal(t, filepath.Join(podLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
+		assert.Equal(t, filepath.Join(kubeletconfigv1beta1.DefaultPodLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
 		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}

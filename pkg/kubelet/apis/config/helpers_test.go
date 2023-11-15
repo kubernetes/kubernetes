@@ -289,5 +289,6 @@ var (
 		"Tracing.Endpoint",
 		"Tracing.SamplingRatePerMillion",
 		"LocalStorageCapacityIsolation",
+		"PodLogsRootDirectory",
 	)
 )
