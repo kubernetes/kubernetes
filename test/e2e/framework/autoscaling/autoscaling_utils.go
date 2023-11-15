@@ -50,6 +50,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -506,29 +507,18 @@ func (rc *ResourceConsumer) WaitForReplicas(ctx context.Context, desiredReplicas
 // EnsureDesiredReplicasInRange ensure the replicas is in a desired range
 func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
-	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
-		replicas := rc.GetReplicas(ctx)
-		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
-		as, err := rc.GetHpa(ctx, hpaName)
-		if err != nil {
-			framework.Logf("Error getting HPA: %s", err)
-		} else {
-			framework.Logf("HPA status: %+v", as.Status)
-		}
-		if replicas < minDesiredReplicas {
-			return false, fmt.Errorf("number of replicas below target")
-		} else if replicas > maxDesiredReplicas {
-			return false, fmt.Errorf("number of replicas above target")
-		} else {
-			return false, nil // Expected number of replicas found. Continue polling until timeout.
-		}
-	})
-	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
-	if wait.Interrupted(err) {
-		framework.Logf("Number of replicas was stable over %v", duration)
-		return
+	desiredReplicasErr := framework.Gomega().Consistently(ctx, func(ctx context.Context) int {
+		return rc.GetReplicas(ctx)
+	}).WithTimeout(duration).WithPolling(interval).Should(gomega.And(gomega.BeNumerically(">=", minDesiredReplicas), gomega.BeNumerically("<=", maxDesiredReplicas)))
+
+	// dump HPA for debugging
+	as, err := rc.GetHpa(ctx, hpaName)
+	if err != nil {
+		framework.Logf("Error getting HPA: %s", err)
+	} else {
+		framework.Logf("HPA status: %+v", as.Status)
 	}
-	framework.ExpectNoErrorWithOffset(1, err)
+	framework.ExpectNoError(desiredReplicasErr)
 }
 
 // Pause stops background goroutines responsible for consuming resources.
