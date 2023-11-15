@@ -540,7 +540,7 @@ github.com/mohae/deepcopy
 # github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
 ## explicit
 github.com/monochromegane/go-gitignore
-# github.com/mrunalp/fileutils v0.5.0
+# github.com/mrunalp/fileutils v0.5.1
 ## explicit; go 1.13
 github.com/mrunalp/fileutils
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
@@ -591,7 +591,7 @@ github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/opencontainers/runc v1.1.9
+# github.com/opencontainers/runc v1.1.10
 ## explicit; go 1.17
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
