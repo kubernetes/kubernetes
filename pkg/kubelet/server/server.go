@@ -39,11 +39,8 @@ import (
 	"github.com/google/cadvisor/metrics"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 	oteltrace "go.opentelemetry.io/otel/trace"
+	oteltracenoop "go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
-	"k8s.io/utils/clock"
-	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,6 +64,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubelet/pkg/cri/streaming"
@@ -81,10 +79,13 @@ import (
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/utils/clock"
+	netutils "k8s.io/utils/net"
 )
 
 func init() {
@@ -193,7 +194,7 @@ func ListenAndServeKubeletReadOnlyServer(
 	port uint) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
 	// TODO: https://github.com/kubernetes/kubernetes/issues/109829 tracer should use WithPublicEndpoint
-	s := NewServer(host, resourceAnalyzer, nil, oteltrace.NewNoopTracerProvider(), nil)
+	s := NewServer(host, resourceAnalyzer, nil, oteltracenoop.NewTracerProvider(), nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),

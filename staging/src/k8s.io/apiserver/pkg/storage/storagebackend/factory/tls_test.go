@@ -25,10 +25,10 @@ import (
 	"testing"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
-	oteltrace "go.opentelemetry.io/otel/trace"
-
+	oteltracenoop "go.opentelemetry.io/otel/trace/noop"
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -77,7 +77,7 @@ func TestTLSConnection(t *testing.T) {
 			CertFile:       certFile,
 			KeyFile:        keyFile,
 			TrustedCAFile:  caFile,
-			TracerProvider: oteltrace.NewNoopTracerProvider(),
+			TracerProvider: oteltracenoop.NewTracerProvider(),
 		},
 		Codec: codec,
 	}

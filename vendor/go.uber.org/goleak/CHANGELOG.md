@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.3.0]
+### Fixed
+- Built-in ignores now match function names more accurately.
+  They will no longer ignore stacks because of file names
+  that look similar to function names. (#112)
+### Added
+- Add an `IgnoreAnyFunction` option to ignore stack traces
+  that have the provided function anywhere in the stack. (#113)
+- Ignore `testing.runFuzzing` and `testing.runFuzzTests` alongside
+  other already-ignored test functions (`testing.RunTests`, etc). (#105)
+### Changed
+- Miscellaneous CI-related fixes. (#103, #108, #114)
+
+[1.3.0]: https://github.com/uber-go/goleak/compare/v1.2.1...v1.3.0
+
 ## [1.2.1]
 ### Changed
 - Drop golang/x/lint dependency.

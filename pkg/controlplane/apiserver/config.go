@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
+	oteltracenoop "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,7 +43,6 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -129,7 +128,7 @@ func BuildGenericConfig(
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
 	} else {
-		s.Etcd.StorageConfig.Transport.TracerProvider = oteltrace.NewNoopTracerProvider()
+		s.Etcd.StorageConfig.Transport.TracerProvider = oteltracenoop.NewTracerProvider()
 	}
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()

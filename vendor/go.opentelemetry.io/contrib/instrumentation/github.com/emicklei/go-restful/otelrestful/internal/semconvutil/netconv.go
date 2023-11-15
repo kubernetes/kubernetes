@@ -1,5 +1,7 @@
+// Code created by gotmpl. DO NOT MODIFY.
+// source: internal/shared/semconvutil/netconv.go.tmpl
+
 // Copyright The OpenTelemetry Authors
-//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -12,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal // import "go.opentelemetry.io/otel/semconv/internal/v2"
+package semconvutil // import "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconvutil"
 
 import (
 	"net"
@@ -20,11 +22,37 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
-// NetConv are the network semantic convention attributes defined for a version
+// NetTransport returns a trace attribute describing the transport protocol of the
+// passed network. See the net.Dial for information about acceptable network
+// values.
+func NetTransport(network string) attribute.KeyValue {
+	return nc.Transport(network)
+}
+
+// NetClient returns trace attributes for a client network connection to address.
+// See net.Dial for information about acceptable address values, address should
+// be the same as the one used to create conn. If conn is nil, only network
+// peer attributes will be returned that describe address. Otherwise, the
+// socket level information about conn will also be included.
+func NetClient(address string, conn net.Conn) []attribute.KeyValue {
+	return nc.Client(address, conn)
+}
+
+// NetServer returns trace attributes for a network listener listening at address.
+// See net.Listen for information about acceptable address values, address
+// should be the same as the one used to create ln. If ln is nil, only network
+// host attributes will be returned that describe address. Otherwise, the
+// socket level information about ln will also be included.
+func NetServer(address string, ln net.Listener) []attribute.KeyValue {
+	return nc.Server(address, ln)
+}
+
+// netConv are the network semantic convention attributes defined for a version
 // of the OpenTelemetry specification.
-type NetConv struct {
+type netConv struct {
 	NetHostNameKey     attribute.Key
 	NetHostPortKey     attribute.Key
 	NetPeerNameKey     attribute.Key
@@ -40,7 +68,23 @@ type NetConv struct {
 	NetTransportInProc attribute.KeyValue
 }
 
-func (c *NetConv) Transport(network string) attribute.KeyValue {
+var nc = &netConv{
+	NetHostNameKey:     semconv.NetHostNameKey,
+	NetHostPortKey:     semconv.NetHostPortKey,
+	NetPeerNameKey:     semconv.NetPeerNameKey,
+	NetPeerPortKey:     semconv.NetPeerPortKey,
+	NetSockFamilyKey:   semconv.NetSockFamilyKey,
+	NetSockPeerAddrKey: semconv.NetSockPeerAddrKey,
+	NetSockPeerPortKey: semconv.NetSockPeerPortKey,
+	NetSockHostAddrKey: semconv.NetSockHostAddrKey,
+	NetSockHostPortKey: semconv.NetSockHostPortKey,
+	NetTransportOther:  semconv.NetTransportOther,
+	NetTransportTCP:    semconv.NetTransportTCP,
+	NetTransportUDP:    semconv.NetTransportUDP,
+	NetTransportInProc: semconv.NetTransportInProc,
+}
+
+func (c *netConv) Transport(network string) attribute.KeyValue {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 		return c.NetTransportTCP
@@ -55,7 +99,7 @@ func (c *NetConv) Transport(network string) attribute.KeyValue {
 }
 
 // Host returns attributes for a network host address.
-func (c *NetConv) Host(address string) []attribute.KeyValue {
+func (c *netConv) Host(address string) []attribute.KeyValue {
 	h, p := splitHostPort(address)
 	var n int
 	if h != "" {
@@ -82,7 +126,7 @@ func (c *NetConv) Host(address string) []attribute.KeyValue {
 // be the same as the one used to create ln. If ln is nil, only network host
 // attributes will be returned that describe address. Otherwise, the socket
 // level information about ln will also be included.
-func (c *NetConv) Server(address string, ln net.Listener) []attribute.KeyValue {
+func (c *netConv) Server(address string, ln net.Listener) []attribute.KeyValue {
 	if ln == nil {
 		return c.Host(address)
 	}
@@ -123,11 +167,11 @@ func (c *NetConv) Server(address string, ln net.Listener) []attribute.KeyValue {
 	return attr
 }
 
-func (c *NetConv) HostName(name string) attribute.KeyValue {
+func (c *netConv) HostName(name string) attribute.KeyValue {
 	return c.NetHostNameKey.String(name)
 }
 
-func (c *NetConv) HostPort(port int) attribute.KeyValue {
+func (c *netConv) HostPort(port int) attribute.KeyValue {
 	return c.NetHostPortKey.Int(port)
 }
 
@@ -136,7 +180,7 @@ func (c *NetConv) HostPort(port int) attribute.KeyValue {
 // the same as the one used to create conn. If conn is nil, only network peer
 // attributes will be returned that describe address. Otherwise, the socket
 // level information about conn will also be included.
-func (c *NetConv) Client(address string, conn net.Conn) []attribute.KeyValue {
+func (c *netConv) Client(address string, conn net.Conn) []attribute.KeyValue {
 	if conn == nil {
 		return c.Peer(address)
 	}
@@ -246,7 +290,7 @@ func positiveInt(ints ...int) int {
 }
 
 // Peer returns attributes for a network peer address.
-func (c *NetConv) Peer(address string) []attribute.KeyValue {
+func (c *netConv) Peer(address string) []attribute.KeyValue {
 	h, p := splitHostPort(address)
 	var n int
 	if h != "" {
@@ -268,19 +312,19 @@ func (c *NetConv) Peer(address string) []attribute.KeyValue {
 	return attrs
 }
 
-func (c *NetConv) PeerName(name string) attribute.KeyValue {
+func (c *netConv) PeerName(name string) attribute.KeyValue {
 	return c.NetPeerNameKey.String(name)
 }
 
-func (c *NetConv) PeerPort(port int) attribute.KeyValue {
+func (c *netConv) PeerPort(port int) attribute.KeyValue {
 	return c.NetPeerPortKey.Int(port)
 }
 
-func (c *NetConv) SockPeerAddr(addr string) attribute.KeyValue {
+func (c *netConv) SockPeerAddr(addr string) attribute.KeyValue {
 	return c.NetSockPeerAddrKey.String(addr)
 }
 
-func (c *NetConv) SockPeerPort(port int) attribute.KeyValue {
+func (c *netConv) SockPeerPort(port int) attribute.KeyValue {
 	return c.NetSockPeerPortKey.Int(port)
 }
 

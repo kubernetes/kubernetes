@@ -17,14 +17,15 @@ package otelrestful // import "go.opentelemetry.io/contrib/instrumentation/githu
 import (
 	"github.com/emicklei/go-restful/v3"
 
+	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconvutil"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"go.opentelemetry.io/otel/semconv/v1.17.0/httpconv"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
-const tracerName = "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
+// ScopeName is the instrumentation scope name.
+const ScopeName = "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 
 // OTelFilter returns a restful.FilterFunction which will trace an incoming request.
 //
@@ -40,7 +41,7 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 		cfg.TracerProvider = otel.GetTracerProvider()
 	}
 	tracer := cfg.TracerProvider.Tracer(
-		tracerName,
+		ScopeName,
 		oteltrace.WithInstrumentationVersion(Version()),
 	)
 	if cfg.Propagators == nil {
@@ -53,7 +54,7 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 		spanName := route
 
 		opts := []oteltrace.SpanStartOption{
-			oteltrace.WithAttributes(httpconv.ServerRequest(service, r)...),
+			oteltrace.WithAttributes(semconvutil.HTTPServerRequest(service, r)...),
 			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
 		}
 		if route != "" {
@@ -78,7 +79,7 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 		chain.ProcessFilter(req, resp)
 
 		status := resp.StatusCode()
-		span.SetStatus(httpconv.ServerStatus(status))
+		span.SetStatus(semconvutil.HTTPServerStatus(status))
 		if status > 0 {
 			span.SetAttributes(semconv.HTTPStatusCode(status))
 		}

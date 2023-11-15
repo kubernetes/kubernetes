@@ -36,18 +36,17 @@ import (
 
 	"github.com/coreos/go-systemd/v22/daemon"
 	jsonpatch "github.com/evanphx/json-patch"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
+	oteltracenoop "go.opentelemetry.io/otel/trace/noop"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,6 +81,7 @@ import (
 	"k8s.io/component-base/version/verflag"
 	nodeutil "k8s.io/component-helpers/node/util"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -112,6 +112,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/cpuset"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
@@ -452,7 +453,8 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	if err != nil {
 		return nil, err
 	}
-	tp := oteltrace.NewNoopTracerProvider()
+	var tp oteltrace.TracerProvider
+	tp = oteltracenoop.NewTracerProvider()
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		tp, err = newTracerProvider(s)
 		if err != nil {
@@ -1347,7 +1349,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 
 func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, error) {
 	if s.KubeletConfiguration.Tracing == nil {
-		return oteltrace.NewNoopTracerProvider(), nil
+		return oteltracenoop.NewTracerProvider(), nil
 	}
 	hostname, err := nodeutil.GetHostname(s.HostnameOverride)
 	if err != nil {

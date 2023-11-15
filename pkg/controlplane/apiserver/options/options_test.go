@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	oteltracenoop "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -35,9 +35,8 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	netutils "k8s.io/utils/net"
-
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -141,7 +140,7 @@ func TestAddFlags(t *testing.T) {
 					KeyFile:        "/var/run/kubernetes/etcd.key",
 					TrustedCAFile:  "/var/run/kubernetes/etcdca.crt",
 					CertFile:       "/var/run/kubernetes/etcdce.crt",
-					TracerProvider: oteltrace.NewNoopTracerProvider(),
+					TracerProvider: oteltracenoop.NewTracerProvider(),
 				},
 				Prefix:                "/registry",
 				CompactionInterval:    storagebackend.DefaultCompactInterval,

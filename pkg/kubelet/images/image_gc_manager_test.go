@@ -26,8 +26,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	oteltracenoop "go.opentelemetry.io/otel/trace/noop"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -51,7 +51,7 @@ func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provide
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
-		tracer:        oteltrace.NewNoopTracerProvider().Tracer(""),
+		tracer:        oteltracenoop.NewTracerProvider().Tracer(""),
 	}, fakeRuntime
 }
 
@@ -946,7 +946,7 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, oteltrace.NewNoopTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, oteltracenoop.NewTracerProvider()); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
