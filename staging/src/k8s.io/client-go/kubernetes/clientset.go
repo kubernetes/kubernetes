@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	discovery "k8s.io/client-go/discovery"
+	features "k8s.io/client-go/features"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
@@ -462,6 +463,9 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 
 	if configShallowCopy.UserAgent == "" {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+	if configShallowCopy.FeatureGateProvider == nil {
+		configShallowCopy.FeatureGateProvider = features.DefaultFeatureGates()
 	}
 
 	// share the transport between all clients

@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
+	features "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -104,6 +105,10 @@ func setConfigDefaults(config *rest.Config) error {
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+
+	if config.FeatureGateProvider == nil {
+		config.FeatureGateProvider = features.DefaultFeatureGates()
+	}
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

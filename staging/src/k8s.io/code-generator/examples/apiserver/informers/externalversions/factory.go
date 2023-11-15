@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	features "k8s.io/client-go/features"
 	cache "k8s.io/client-go/tools/cache"
 	versioned "k8s.io/code-generator/examples/apiserver/clientset/versioned"
 	example "k8s.io/code-generator/examples/apiserver/informers/externalversions/example"
@@ -55,6 +56,8 @@ type sharedInformerFactory struct {
 	// shuttingDown is true when Shutdown has been called. It may still be running
 	// because it needs to wait for goroutines.
 	shuttingDown bool
+
+	featureGateProvider features.Provider
 }
 
 // WithCustomResyncConfig sets a custom resync period for the specified informer types.
@@ -87,6 +90,13 @@ func WithNamespace(namespace string) SharedInformerOption {
 func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+func WithFeatureGateProvider(provider features.Provider) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.featureGateProvider = provider
 		return factory
 	}
 }
@@ -196,6 +206,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 
 	informer = newFunc(f.client, resyncPeriod)
 	informer.SetTransform(f.transform)
+	informer.SetFeatureGateProvider(f.featureGateProvider)
 	f.informers[informerType] = informer
 
 	return informer

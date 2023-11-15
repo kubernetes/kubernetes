@@ -25,6 +25,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	discovery "k8s.io/client-go/discovery"
+	features "k8s.io/client-go/features"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 )
@@ -70,6 +71,9 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 
 	if configShallowCopy.UserAgent == "" {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+	if configShallowCopy.FeatureGateProvider == nil {
+		configShallowCopy.FeatureGateProvider = features.DefaultFeatureGates()
 	}
 
 	// share the transport between all clients

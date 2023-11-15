@@ -24,6 +24,7 @@ import (
 
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1"
 	discovery "k8s.io/client-go/discovery"
+	features "k8s.io/client-go/features"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 )
@@ -62,6 +63,9 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 
 	if configShallowCopy.UserAgent == "" {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+	if configShallowCopy.FeatureGateProvider == nil {
+		configShallowCopy.FeatureGateProvider = features.DefaultFeatureGates()
 	}
 
 	// share the transport between all clients

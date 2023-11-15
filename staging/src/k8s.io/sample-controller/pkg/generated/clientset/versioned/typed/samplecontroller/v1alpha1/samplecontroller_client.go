@@ -21,6 +21,7 @@ package v1alpha1
 import (
 	"net/http"
 
+	features "k8s.io/client-go/features"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	"k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
@@ -89,6 +90,10 @@ func setConfigDefaults(config *rest.Config) error {
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+
+	if config.FeatureGateProvider == nil {
+		config.FeatureGateProvider = features.DefaultFeatureGates()
+	}
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

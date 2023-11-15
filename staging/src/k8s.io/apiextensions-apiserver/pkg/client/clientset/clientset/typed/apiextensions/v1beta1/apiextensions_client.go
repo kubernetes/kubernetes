@@ -23,6 +23,7 @@ import (
 
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	features "k8s.io/client-go/features"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -89,6 +90,10 @@ func setConfigDefaults(config *rest.Config) error {
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+
+	if config.FeatureGateProvider == nil {
+		config.FeatureGateProvider = features.DefaultFeatureGates()
+	}
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
