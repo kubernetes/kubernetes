@@ -66,6 +66,7 @@ func (persistentvolumeStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
+	pvutil.DropDisabledSpecFields(&pv.Spec, nil)
 
 	pv.Status.Phase = api.VolumePending
 	now := NowFunc()
@@ -97,6 +98,7 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
+	pvutil.DropDisabledSpecFields(&newPv.Spec, &oldPv.Spec)
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

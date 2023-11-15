@@ -914,7 +914,7 @@ func (b *volumeBinder) findMatchingVolumes(logger klog.Logger, pod *v1.Pod, clai
 		pvs := unboundVolumesDelayBinding[storageClassName]
 
 		// Find a matching PV
-		pv, err := volume.FindMatchingVolume(pvc, pvs, node, chosenPVs, true)
+		pv, err := volume.FindMatchingVolume(pvc, pvs, node, chosenPVs, true, utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass))
 		if err != nil {
 			return false, nil, nil, err
 		}
