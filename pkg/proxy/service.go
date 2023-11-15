@@ -145,7 +145,7 @@ func (bsvcPortInfo *BaseServicePortInfo) UsesLocalEndpoints() bool {
 	return bsvcPortInfo.internalPolicyLocal || (bsvcPortInfo.externalPolicyLocal && bsvcPortInfo.ExternallyAccessible())
 }
 
-func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServicePortInfo {
+func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.ServicePort) *BaseServicePortInfo {
 	externalPolicyLocal := apiservice.ExternalPolicyLocal(service)
 	internalPolicyLocal := apiservice.InternalPolicyLocal(service)
 
@@ -155,7 +155,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 
-	clusterIP := proxyutil.GetClusterIPByFamily(sct.ipFamily, service)
+	clusterIP := proxyutil.GetClusterIPByFamily(ipFamily, service)
 	info := &BaseServicePortInfo{
 		clusterIP:           netutils.ParseIPSloppy(clusterIP),
 		port:                int(port.Port),
@@ -184,20 +184,20 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	// to just log lines with high verbosity
 
 	ipFamilyMap := proxyutil.MapIPsByIPFamily(service.Spec.ExternalIPs)
-	info.externalIPs = ipFamilyMap[sct.ipFamily]
+	info.externalIPs = ipFamilyMap[ipFamily]
 
 	// Log the IPs not matching the ipFamily
-	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
+	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
-			"ipFamily", sct.ipFamily, "externalIPs", strings.Join(ips, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "externalIPs", strings.Join(ips, ", "), "service", klog.KObj(service))
 	}
 
 	ipFamilyMap = proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
-	info.loadBalancerSourceRanges = ipFamilyMap[sct.ipFamily]
+	info.loadBalancerSourceRanges = ipFamilyMap[ipFamily]
 	// Log the CIDRs not matching the ipFamily
-	if cidrs, ok := ipFamilyMap[proxyutil.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
+	if cidrs, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
-			"ipFamily", sct.ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ", "), "service", klog.KObj(service))
 	}
 
 	// Obtain Load Balancer Ingress
@@ -212,13 +212,13 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		// the status ingress.IP and the ClusterIP belong to the same family.
 		if !proxyutil.IsVIPMode(ing) {
 			klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IP for given Service as it using Proxy mode",
-				"ipFamily", sct.ipFamily, "loadBalancerIngressIP", ing.IP, "service", klog.KObj(service))
+				"ipFamily", ipFamily, "loadBalancerIngressIP", ing.IP, "service", klog.KObj(service))
 			continue
 		}
 
 		// kube-proxy does not implement IP family translation, skip addresses with
 		// different IP family
-		if ipFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ipFamily == sct.ipFamily {
+		if ingFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ingFamily == ipFamily {
 			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ing.IP)
 		} else {
 			invalidIPs = append(invalidIPs, ing.IP)
@@ -226,7 +226,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	}
 	if len(invalidIPs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
-			"ipFamily", sct.ipFamily, "loadBalancerIngressIPs", strings.Join(invalidIPs, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "loadBalancerIngressIPs", strings.Join(invalidIPs, ", "), "service", klog.KObj(service))
 	}
 
 	if apiservice.NeedsHealthCheck(service) {
@@ -375,7 +375,7 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name, Protocol: servicePort.Protocol}
-		baseSvcInfo := sct.newBaseServiceInfo(servicePort, service)
+		baseSvcInfo := newBaseServiceInfo(service, sct.ipFamily, servicePort)
 		if sct.makeServiceInfo != nil {
 			svcPortMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)
 		} else {
