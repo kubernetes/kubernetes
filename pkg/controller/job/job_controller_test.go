@@ -5294,7 +5294,7 @@ func TestFinalizerCleanup(t *testing.T) {
 	// Await for the Pod to appear in the podStore to ensure that the pod exists when cleaning up the Job.
 	// In a production environment, there wouldn't be these guarantees, but the Pod would be cleaned up
 	// by the orphan pod worker, when the Pod finishes.
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		pod, _ := manager.podStore.Pods(pod.GetNamespace()).Get(pod.Name)
 		return pod != nil, nil
 	}); err != nil {
