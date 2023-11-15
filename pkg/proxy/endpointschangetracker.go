@@ -17,18 +17,15 @@ limitations under the License.
 package proxy
 
 import (
-	"net"
-	"strconv"
 	"sync"
 	"time"
-
-	"k8s.io/client-go/tools/events"
-	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 )
 
@@ -36,93 +33,6 @@ var supportedEndpointSliceAddressTypes = sets.New[string](
 	string(discovery.AddressTypeIPv4),
 	string(discovery.AddressTypeIPv6),
 )
-
-// BaseEndpointInfo contains base information that defines an endpoint.
-// This could be used directly by proxier while processing endpoints,
-// or can be used for constructing a more specific EndpointInfo struct
-// defined by the proxier if needed.
-type BaseEndpointInfo struct {
-	// Cache this values to improve performance
-	ip   string
-	port int
-	// endpoint is the same as net.JoinHostPort(ip,port)
-	endpoint string
-
-	// isLocal indicates whether the endpoint is running on same host as kube-proxy.
-	isLocal bool
-
-	// ready indicates whether this endpoint is ready and NOT terminating, unless
-	// PublishNotReadyAddresses is set on the service, in which case it will just
-	// always be true.
-	ready bool
-	// serving indicates whether this endpoint is ready regardless of its terminating state.
-	// For pods this is true if it has a ready status regardless of its deletion timestamp.
-	serving bool
-	// terminating indicates whether this endpoint is terminating.
-	// For pods this is true if it has a non-nil deletion timestamp.
-	terminating bool
-
-	// zoneHints represent the zone hints for the endpoint. This is based on
-	// endpoint.hints.forZones[*].name in the EndpointSlice API.
-	zoneHints sets.Set[string]
-}
-
-var _ Endpoint = &BaseEndpointInfo{}
-
-// String is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) String() string {
-	return info.endpoint
-}
-
-// IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) IP() string {
-	return info.ip
-}
-
-// Port returns just the Port part of the endpoint.
-func (info *BaseEndpointInfo) Port() int {
-	return info.port
-}
-
-// IsLocal is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) IsLocal() bool {
-	return info.isLocal
-}
-
-// IsReady returns true if an endpoint is ready and not terminating.
-func (info *BaseEndpointInfo) IsReady() bool {
-	return info.ready
-}
-
-// IsServing returns true if an endpoint is ready, regardless of if the
-// endpoint is terminating.
-func (info *BaseEndpointInfo) IsServing() bool {
-	return info.serving
-}
-
-// IsTerminating retruns true if an endpoint is terminating. For pods,
-// that is any pod with a deletion timestamp.
-func (info *BaseEndpointInfo) IsTerminating() bool {
-	return info.terminating
-}
-
-// ZoneHints returns the zone hint for the endpoint.
-func (info *BaseEndpointInfo) ZoneHints() sets.Set[string] {
-	return info.zoneHints
-}
-
-func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
-	return &BaseEndpointInfo{
-		ip:          ip,
-		port:        port,
-		endpoint:    net.JoinHostPort(ip, strconv.Itoa(port)),
-		isLocal:     isLocal,
-		ready:       ready,
-		serving:     serving,
-		terminating: terminating,
-		zoneHints:   zoneHints,
-	}
-}
 
 type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName) Endpoint
 
