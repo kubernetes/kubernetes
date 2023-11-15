@@ -581,6 +581,8 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 	}
 
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
+	// this could be a place to inject a feature gate to the factory
+	// for example: informers.WithFeatureGateProvider()
 	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
 
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))

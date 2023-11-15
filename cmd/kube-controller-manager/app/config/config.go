@@ -61,5 +61,8 @@ func (c *Config) Complete() *CompletedConfig {
 
 	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
+	// this could be a place that would inject a feature gate provider (i.e. DefaultFeatureGate)
+	// cc.Kubeconfig.FeatureGateProvider = MyFeatureGateProvider
+
 	return &CompletedConfig{&cc}
 }
