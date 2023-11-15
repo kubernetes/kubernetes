@@ -80,8 +80,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	if err != nil {
 		return nil, err
 	}
+
+	resources, err := m.generateLinuxContainerResources(pod, container, enforceMemoryQoS)
+	if err != nil {
+		return nil, err
+	}
+
 	lc := &runtimeapi.LinuxContainerConfig{
-		Resources:       m.generateLinuxContainerResources(pod, container, enforceMemoryQoS),
+		Resources:       resources,
 		SecurityContext: sc,
 	}
 
@@ -94,7 +100,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 }
 
 // generateLinuxContainerResources generates linux container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) (*runtimeapi.LinuxContainerResources, error) {
 	// set linux container resources
 	var cpuRequest *resource.Quantity
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
@@ -102,8 +108,11 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	}
 	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
 
-	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
-		int64(m.machineInfo.MemoryCapacity)))
+	oomScoreAdj, err := qos.GetContainerOOMScoreAdjust(pod, container, int64(m.machineInfo.MemoryCapacity))
+	if err != nil {
+		return nil, err
+	}
+	lcr.OomScoreAdj = int64(oomScoreAdj)
 
 	lcr.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 
@@ -157,7 +166,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 		}
 	}
 
-	return lcr
+	return lcr, nil
 }
 
 // configureContainerSwapResources configures the swap resources for a specified (linux) container.
@@ -198,16 +207,22 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 }
 
 // generateContainerResources generates platform specific (linux) container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) (*runtimeapi.ContainerResources, error) {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
 		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
-	return &runtimeapi.ContainerResources{
-		Linux: m.generateLinuxContainerResources(pod, container, enforceMemoryQoS),
+
+	linux, err := m.generateLinuxContainerResources(pod, container, enforceMemoryQoS)
+	if err != nil {
+		return nil, err
 	}
+
+	return &runtimeapi.ContainerResources{
+		Linux: linux,
+	}, nil
 }
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
