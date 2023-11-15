@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -187,7 +188,8 @@ func FindMatchingVolume(
 	volumes []*v1.PersistentVolume,
 	node *v1.Node,
 	excludedVolumes map[string]*v1.PersistentVolume,
-	delayBinding bool) (*v1.PersistentVolume, error) {
+	delayBinding bool,
+	vacEnabled bool) (*v1.PersistentVolume, error) {
 
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
@@ -277,6 +279,9 @@ func FindMatchingVolume(
 			continue
 		}
 		if GetPersistentVolumeClass(volume) != requestedClass {
+			continue
+		}
+		if vacEnabled && ptr.Deref(volume.Spec.VolumeAttributesClassName, "") != ptr.Deref(claim.Spec.VolumeAttributesClassName, "") {
 			continue
 		}
 		if !nodeAffinityValid {

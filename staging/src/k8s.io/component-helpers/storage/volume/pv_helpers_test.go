@@ -196,55 +196,55 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 	}{
 		"success-match": {
 			expectedMatch: "affinity-pv",
-			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:          node1,
 		},
 		"success-prebound": {
 			expectedMatch: "affinity-prebound",
-			claim:         makeTestPersistentVolumeClaim("claim02", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:         makeTestPersistentVolumeClaim("claim02", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:          node1,
 		},
 		"success-exclusion": {
 			expectedMatch:   "affinity-pv2",
-			claim:           makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:           makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:            node1,
 			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil},
 		},
 		"fail-exclusion": {
 			expectedMatch:   "",
-			claim:           makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:           makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:            node1,
 			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil, "affinity002": nil},
 		},
 		"fail-accessmode": {
 			expectedMatch: "",
-			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}),
+			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}, nil),
 			node:          node1,
 		},
 		"fail-nodeaffinity": {
 			expectedMatch: "",
-			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:          node2,
 		},
 		"fail-prebound-node-affinity": {
 			expectedMatch: "",
-			claim:         makeTestPersistentVolumeClaim("claim02", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:         makeTestPersistentVolumeClaim("claim02", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:          node3,
 		},
 		"fail-nonavaliable": {
 			expectedMatch: "",
-			claim:         makeTestPersistentVolumeClaim("claim04", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:         makeTestPersistentVolumeClaim("claim04", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:          node4,
 		},
 		"success-bad-and-good-node-affinity": {
 			expectedMatch: "affinity-pv3",
-			claim:         makeTestPersistentVolumeClaim("claim03", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+			claim:         makeTestPersistentVolumeClaim("claim03", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:          node3,
 		},
 	}
 
 	for name, scenario := range scenarios {
-		volume, err := FindMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true)
+		volume, err := FindMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true, false)
 		if err != nil {
 			t.Errorf("Unexpected error matching volume by claim: %v", err)
 		}
@@ -260,10 +260,10 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 	}
 }
 
-func makeTestPersistentVolumeClaim(name string, size string, accessMode []v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
+func makeTestPersistentVolumeClaim(name string, size string, accessMode []v1.PersistentVolumeAccessMode, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
 	fs := v1.PersistentVolumeFilesystem
 	sc := "wait"
-	return &v1.PersistentVolumeClaim{
+	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "myns",
@@ -279,6 +279,12 @@ func makeTestPersistentVolumeClaim(name string, size string, accessMode []v1.Per
 			VolumeMode:       &fs,
 		},
 	}
+
+	if modfn != nil {
+		modfn(pvc)
+	}
+
+	return pvc
 }
 
 func makeTestVolume(uid types.UID, name string, capacity string, available bool, modfn func(*v1.PersistentVolume)) *v1.PersistentVolume {
