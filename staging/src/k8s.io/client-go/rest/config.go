@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/features"
 	"net"
 	"net/http"
 	"net/url"
@@ -143,6 +144,9 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	// FeatureGateProvider used to check a feature state.
+	FeatureGateProvider features.Provider
 }
 
 var _ fmt.Stringer = new(Config)
