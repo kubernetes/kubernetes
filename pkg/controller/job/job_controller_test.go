@@ -5322,6 +5322,7 @@ func TestFinalizerCleanup(t *testing.T) {
 	}); err != nil {
 		t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
 	}
+
 }
 
 func checkJobCompletionLabel(t *testing.T, p *v1.PodTemplateSpec) {
