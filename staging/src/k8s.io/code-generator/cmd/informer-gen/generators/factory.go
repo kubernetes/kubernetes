@@ -76,6 +76,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	m := map[string]interface{}{
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
 		"cacheTransformFunc":             c.Universe.Type(cacheTransformFunc),
+		"featureGateProviderFunc":        c.Universe.Type(featureGateProviderFunc),
 		"groupVersions":                  g.groupVersions,
 		"gvInterfaces":                   gvInterfaces,
 		"gvNewFuncs":                     gvNewFuncs,
@@ -121,6 +122,8 @@ type sharedInformerFactory struct {
 	// shuttingDown is true when Shutdown has been called. It may still be running
 	// because it needs to wait for goroutines.
 	shuttingDown bool
+
+	featureGateProvider {{.featureGateProviderFunc|raw}}
 }
 
 // WithCustomResyncConfig sets a custom resync period for the specified informer types.
@@ -153,6 +156,13 @@ func WithNamespace(namespace string) SharedInformerOption {
 func WithTransform(transform {{.cacheTransformFunc|raw}}) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+func WithFeatureGateProvider(provider {{.featureGateProviderFunc|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.featureGateProvider = provider
 		return factory
 	}
 }
