@@ -18,6 +18,7 @@ package cache
 
 import (
 	"errors"
+	"k8s.io/client-go/features"
 	"sync"
 	"time"
 
@@ -77,6 +78,8 @@ type Config struct {
 
 	// WatchListPageSize is the requested chunk size of initial and relist watch lists.
 	WatchListPageSize int64
+
+	FeatureGateProvider features.Provider
 }
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
@@ -137,9 +140,10 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
-			ResyncPeriod:    c.config.FullResyncPeriod,
-			TypeDescription: c.config.ObjectDescription,
-			Clock:           c.clock,
+			ResyncPeriod:        c.config.FullResyncPeriod,
+			TypeDescription:     c.config.ObjectDescription,
+			Clock:               c.clock,
+			FeatureGateProvider: c.config.FeatureGateProvider,
 		},
 	)
 	r.ShouldResync = c.config.ShouldResync

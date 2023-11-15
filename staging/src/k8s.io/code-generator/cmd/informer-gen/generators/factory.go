@@ -263,6 +263,7 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
 
   informer = newFunc(f.client, resyncPeriod)
   informer.SetTransform(f.transform)
+  informer.SetFeatureGateProvider(f.featureGateProvider)
   f.informers[informerType] = informer
 
   return informer

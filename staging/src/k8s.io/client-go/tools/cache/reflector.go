@@ -39,6 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/features"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -193,6 +194,8 @@ type ReflectorOptions struct {
 
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
+
+	FeatureGateProvider features.Provider
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -209,6 +212,10 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	reflectorClock := options.Clock
 	if reflectorClock == nil {
 		reflectorClock = clock.RealClock{}
+	}
+	featureGateProvider := options.FeatureGateProvider
+	if featureGateProvider == nil {
+		featureGateProvider = features.DefaultFeatureGates()
 	}
 	r := &Reflector{
 		name:            options.Name,
@@ -237,6 +244,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
 	}
 
+	if featureGateProvider.Enabled("foo") {
+		// ok, the feature is on, do something
+	}
 	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
 		r.UseWatchList = true
 	}

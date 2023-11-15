@@ -19,6 +19,7 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"k8s.io/client-go/features"
 	"sync"
 	"time"
 
@@ -212,6 +213,9 @@ type SharedInformer interface {
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
 	IsStopped() bool
+
+	// SetFeatureGateProvider set a feature gate provider for the informer.
+	SetFeatureGateProvider(provider features.Provider) error
 }
 
 // Opaque interface representing the registration of ResourceEventHandler for
@@ -276,6 +280,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		clock:                           realClock,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
+		featureGateProvider:             features.DefaultFeatureGates(),
 	}
 }
 
@@ -390,6 +395,8 @@ type sharedIndexInformer struct {
 	watchErrorHandler WatchErrorHandler
 
 	transform TransformFunc
+
+	featureGateProvider features.Provider
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -450,6 +457,24 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	return nil
 }
 
+func (s *sharedIndexInformer) SetFeatureGateProvider(provider features.Provider) error {
+	if provider == nil {
+		return nil
+	}
+
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+
+	if provider != nil {
+		s.featureGateProvider = provider
+	}
+	return nil
+}
+
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
@@ -477,8 +502,9 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 			RetryOnError:      false,
 			ShouldResync:      s.processor.shouldResync,
 
-			Process:           s.HandleDeltas,
-			WatchErrorHandler: s.watchErrorHandler,
+			Process:             s.HandleDeltas,
+			WatchErrorHandler:   s.watchErrorHandler,
+			FeatureGateProvider: s.featureGateProvider,
 		}
 
 		s.controller = New(cfg)
