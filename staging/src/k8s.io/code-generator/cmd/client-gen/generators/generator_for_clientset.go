@@ -84,6 +84,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		"NewDiscoveryClientForConfigOrDie":     c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClientForConfigOrDie"}),
 		"NewDiscoveryClient":                   c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClient"}),
 		"flowcontrolNewTokenBucketRateLimiter": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/flowcontrol", Name: "NewTokenBucketRateLimiter"}),
+		"defaultFeatureGateProviderFunc":       c.Universe.Function(types.Name{Package: "k8s.io/client-go/features", Name: "DefaultFeatureGates"}),
 	}
 	sw.Do(clientsetInterface, m)
 	sw.Do(clientsetTemplate, m)
@@ -145,6 +146,9 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	if configShallowCopy.UserAgent == "" {
 		configShallowCopy.UserAgent = $.DefaultKubernetesUserAgent|raw$()
 	}
+    if configShallowCopy.FeatureGateProvider == nil {
+         configShallowCopy.FeatureGateProvider = $.defaultFeatureGateProviderFunc|raw$()
+    }
 
 	// share the transport between all clients
 	httpClient, err := $.RESTHTTPClientFor|raw$(&configShallowCopy)

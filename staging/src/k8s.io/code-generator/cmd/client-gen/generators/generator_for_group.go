@@ -105,6 +105,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"restRESTClientFor":                c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
 		"restRESTClientForConfigAndClient": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientForConfigAndClient"}),
 		"SchemeGroupVersion":               c.Universe.Variable(types.Name{Package: path.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
+		"defaultFeatureGateProviderFunc":   c.Universe.Function(types.Name{Package: "k8s.io/client-go/features", Name: "DefaultFeatureGates"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -240,6 +241,10 @@ func setConfigDefaults(config *$.restConfig|raw$) error {
 	}
 	config.NegotiatedSerializer = scheme.Codecs
 
+     if config.FeatureGateProvider == nil {
+        config.FeatureGateProvider = $.defaultFeatureGateProviderFunc|raw$()
+    }
+
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
@@ -257,6 +262,10 @@ func setConfigDefaults(config *$.restConfig|raw$) error {
 	config.GroupVersion =  &gv
 	config.APIPath = $.apiPath$
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+
+    if config.FeatureGateProvider == nil {
+        config.FeatureGateProvider = $.defaultFeatureGateProviderFunc|raw$()
+    }
 
 	if config.UserAgent == "" {
 		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
