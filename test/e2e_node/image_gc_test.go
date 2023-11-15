@@ -34,8 +34,14 @@ import (
 	"github.com/onsi/gomega"
 )
 
-// var _ = SIGDescribe("ImageGarbageCollect [Serial][NodeFeature:GarbageCollect]", func() {
-var _ = SIGDescribe("ImageGarbageCollect", func() {
+const (
+	// Kubelet GC's on a frequency of once every 5 minutes
+	// Add a little leeway to give it time.
+	checkGCUntil time.Duration = 6 * time.Minute
+	checkGCFreq  time.Duration = 30 * time.Second
+)
+
+var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.WithNodeFeature("GarbageCollect"), func() {
 	f := framework.NewDefaultFramework("image-garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var is internalapi.ImageManagerService
@@ -45,11 +51,11 @@ var _ = SIGDescribe("ImageGarbageCollect", func() {
 		framework.ExpectNoError(err)
 	})
 	ginkgo.AfterEach(func() {
-		// framework.ExpectNoError(PrePullAllImages())
+		framework.ExpectNoError(PrePullAllImages())
 	})
 	ginkgo.Context("when ImageMaximumGCAge is set", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.ImageMaximumGCAge = metav1.Duration{Duration: time.Duration(time.Second * 30)}
+			initialConfig.ImageMaximumGCAge = metav1.Duration{Duration: time.Duration(time.Minute * 1)}
 			initialConfig.ImageMinimumGCAge = metav1.Duration{Duration: time.Duration(time.Second * 1)}
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
@@ -68,11 +74,44 @@ var _ = SIGDescribe("ImageGarbageCollect", func() {
 
 			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
-			time.Sleep(time.Minute * 2)
+			// Even though the image gc max timing is less, we are bound by the kubelet's
+			// ImageGCPeriod, which is hardcoded to 5 minutes.
+			gomega.Eventually(ctx, func() int {
+				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
+				framework.ExpectNoError(err)
+				return len(gcdImageList)
+			}, checkGCUntil, checkGCFreq).Should(gomega.BeNumerically("<", len(allImages)))
+		})
+		ginkgo.It("should not GC unused images prematurely", func(ctx context.Context) {
+			pod := innocentPod()
+			e2epod.NewPodClient(f).CreateBatch(ctx, []*v1.Pod{pod})
 
-			// All images but one is unused, so expect them to be garbage collected
-			gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
-			gomega.Expect(len(allImages)).To(gomega.BeNumerically(">", len(gcdImageList)))
+			_, err := is.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: agnhostImage}, nil, nil)
+			framework.ExpectNoError(err)
+
+			allImages, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
+			framework.ExpectNoError(err)
+
+			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+
+			restartKubelet(true)
+			waitForKubeletToStart(ctx, f)
+
+			// Wait until the maxAge of the image after the kubelet is restarted to ensure it doesn't
+			// GC too early.
+			gomega.Consistently(ctx, func() int {
+				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
+				framework.ExpectNoError(err)
+				return len(gcdImageList)
+			}, 50*time.Second, 10*time.Second).Should(gomega.Equal(len(allImages)))
+
+			// Even though the image gc max timing is less, we are bound by the kubelet's
+			// ImageGCPeriod, which is hardcoded to 5 minutes.
+			gomega.Eventually(ctx, func() int {
+				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
+				framework.ExpectNoError(err)
+				return len(gcdImageList)
+			}, checkGCUntil, checkGCFreq).Should(gomega.BeNumerically("<", len(allImages)))
 		})
 	})
 })
