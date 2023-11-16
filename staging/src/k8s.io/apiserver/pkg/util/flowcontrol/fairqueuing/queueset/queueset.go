@@ -33,11 +33,6 @@ import (
 	fqrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog/v2"
-
-	// The following hack is needed to work around a tooling deficiency.
-	// Packages imported only for test code are not included in vendor.
-	// See https://kubernetes.slack.com/archives/C0EG7JC6T/p1626985671458800?thread_ts=1626983387.450800&cid=C0EG7JC6T
-	_ "k8s.io/utils/clock/testing"
 )
 
 const nsTimeFmt = "2006-01-02 15:04:05.000000000"
