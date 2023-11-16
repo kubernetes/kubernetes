@@ -19,9 +19,10 @@ package resourcelock
 import (
 	"context"
 	"fmt"
+	"time"
+
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -119,6 +120,7 @@ type LeaderElectionRecord struct {
 	AcquireTime          metav1.Time `json:"acquireTime"`
 	RenewTime            metav1.Time `json:"renewTime"`
 	LeaderTransitions    int         `json:"leaderTransitions"`
+	EndOfTerm            bool        `json:"endOfTerm"`
 }
 
 // EventRecorder records a change in the ResourceLock.
