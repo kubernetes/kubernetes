@@ -399,6 +399,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 		entry.Freshness = apidiscoveryv2beta1.DiscoveryFreshnessCurrent
 	} else {
 		entry.Freshness = apidiscoveryv2beta1.DiscoveryFreshnessStale
+		klog.V(3).Infof("DiscoveryManager: err fetching discovery for %s: err: %v", info.service.String())
 	}
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
