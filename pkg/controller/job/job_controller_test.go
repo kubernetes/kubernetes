@@ -2106,6 +2106,18 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedSucceeded:     2,
 			expectedCondition:     batch.JobComplete,
 		},
+		"elasticIndexed job is scaled down and exceeded activeDeadlineSeconds; the number of succeeded pods already reached the completions": {
+			parallelism:           1,
+			completions:           1,
+			activeDeadlineSeconds: 10,
+			startTime:             15,
+			succeededPods:         1,
+			activePods:            2,
+			expectedFailed:        2,
+			expectedSucceeded:     1,
+			expectedDeletions:     2,
+			expectedCondition:     batch.JobComplete,
+		},
 	}
 
 	for name, tc := range testCases {
