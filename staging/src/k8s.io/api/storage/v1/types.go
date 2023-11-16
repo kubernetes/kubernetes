@@ -56,6 +56,7 @@ type StorageClass struct {
 	// e.g. ["ro", "soft"]. Not validated -
 	// mount of the PVs will simply fail if one is invalid.
 	// +optional
+	// +listType=atomic
 	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,5,opt,name=mountOptions"`
 
 	// allowVolumeExpansion shows whether the storage class allow volume expand.
@@ -517,6 +518,8 @@ type CSINodeSpec struct {
 	// If all drivers in the list are uninstalled, this can become empty.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Drivers []CSINodeDriver `json:"drivers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=drivers"`
 }
 
@@ -549,6 +552,7 @@ type CSINodeDriver struct {
 	// It is possible for different nodes to use different topology keys.
 	// This can be empty if driver does not support topology.
 	// +optional
+	// +listType=atomic
 	TopologyKeys []string `json:"topologyKeys" protobuf:"bytes,3,rep,name=topologyKeys"`
 
 	// allocatable represents the volume resources of a node that are available for scheduling.
@@ -680,7 +684,5 @@ type CSIStorageCapacityList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is the list of CSIStorageCapacity objects.
-	// +listType=map
-	// +listMapKey=name
 	Items []CSIStorageCapacity `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
