@@ -53,6 +53,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -6051,4 +6052,85 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 	assert.Equal(t, 1, len(fakeRecorder.Events))
 	event := <-fakeRecorder.Events
 	assert.Equal(t, event, expectedEvent)
+}
+
+func TestGeneratePodHostNameAndDomain(t *testing.T) {
+	const (
+		podName      = "pod-foo"
+		podNamespace = "ns-foo"
+	)
+	tt := []struct {
+		name             string
+		podSpecHostname  string
+		podSpecSubdomain string
+		clusterDomain    string
+		wantHostname     string
+		wantHostDomain   string
+		mustErr          bool
+	}{
+		{
+			name:             "Full specified domain",
+			podSpecHostname:  "foo",
+			podSpecSubdomain: "bar",
+			clusterDomain:    "cluster-domain",
+			wantHostname:     "foo",
+			wantHostDomain:   "bar.ns-foo.svc.cluster-domain",
+		},
+		{
+			name:         "Empty pod spec hostname, empty pod spec subdomain, empty cluster domain",
+			wantHostname: podName,
+		},
+		{
+			name:             "Empty cluster domain",
+			podSpecHostname:  "foo",
+			podSpecSubdomain: "bar",
+			wantHostname:     "foo",
+			wantHostDomain:   "bar.ns-foo.svc",
+		},
+		{
+			name:            "Invalid pod spec hostname",
+			podSpecHostname: "podFoo",
+			mustErr:         true,
+		},
+		{
+			name:             "Invalid subdomain",
+			podSpecSubdomain: "podSubdomainFoo",
+			mustErr:          true,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			kl.dnsConfigurer = &dns.Configurer{}
+			kl.dnsConfigurer.ClusterDomain = tc.clusterDomain
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        podName,
+					Namespace:   podNamespace,
+					Annotations: map[string]string{},
+				},
+				Spec: v1.PodSpec{
+					Hostname:  tc.podSpecHostname,
+					Subdomain: tc.podSpecSubdomain,
+				},
+			}
+
+			hostname, hostDomain, err := kl.GeneratePodHostNameAndDomain(pod)
+			if tc.mustErr && err == nil {
+				t.Errorf("GeneratePodHostNameAndDomain() must error, but got nil")
+			}
+			if hostname != tc.wantHostname {
+				t.Errorf("GeneratePodHostNameAndDomain() hostname = %v, wantHostname %v", hostname, tc.wantHostname)
+			}
+			if hostDomain != tc.wantHostDomain {
+				t.Errorf("GeneratePodHostNameAndDomain() hostDomain = %v, wantHostDomain %v", hostDomain, tc.wantHostDomain)
+			}
+		})
+	}
+
 }
