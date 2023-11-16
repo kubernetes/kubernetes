@@ -283,6 +283,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 	}
 
+	// TODO: Add component identity registration here..
+	// kubeapiserver and kubelet use k8s.io.component-helpers.apimachinery.lease.NewController
+	c.Client.CoordinationV1().Leases("kube-system").Create
+
 	// Start the main lock
 	go leaderElectAndRun(ctx, c, id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
