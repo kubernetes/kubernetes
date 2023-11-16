@@ -1,4 +1,3 @@
-API rule violation: list_type_missing,k8s.io/api/imagepolicy/v1alpha1,ImageReviewSpec,Containers
 API rule violation: list_type_missing,k8s.io/api/networking/v1,IPBlock,Except
 API rule violation: list_type_missing,k8s.io/api/networking/v1,IngressLoadBalancerStatus,Ingress
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyEgressRule,Ports
