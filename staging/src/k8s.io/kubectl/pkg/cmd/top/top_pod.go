@@ -168,7 +168,7 @@ func (o *TopPodOptions) Validate() error {
 	return nil
 }
 
-func (o TopPodOptions) RunTopPod() error {
+func (o *TopPodOptions) RunTopPod() error {
 	var err error
 	labelSelector := labels.Everything()
 	if len(o.LabelSelector) > 0 {
@@ -204,7 +204,7 @@ func (o TopPodOptions) RunTopPod() error {
 	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
-		err := verifyEmptyMetrics(o, labelSelector, fieldSelector)
+		err := verifyEmptyMetrics(*o, labelSelector, fieldSelector)
 		if err != nil {
 			return err
 		}

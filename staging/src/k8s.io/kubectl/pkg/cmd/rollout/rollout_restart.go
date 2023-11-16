@@ -142,7 +142,7 @@ func (o *RestartOptions) Validate() error {
 }
 
 // RunRestart performs the execution of 'rollout restart' sub command
-func (o RestartOptions) RunRestart() error {
+func (o *RestartOptions) RunRestart() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().

@@ -167,7 +167,7 @@ var (
 )
 
 // Run prints all user attributes.
-func (o WhoAmIOptions) Run() error {
+func (o *WhoAmIOptions) Run() error {
 	var (
 		res runtime.Object
 		err error

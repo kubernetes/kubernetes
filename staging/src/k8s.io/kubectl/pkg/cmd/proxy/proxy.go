@@ -189,7 +189,7 @@ func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 }
 
 // Validate checks to the ProxyOptions to see if there is sufficient information to run the command.
-func (o ProxyOptions) Validate() error {
+func (o *ProxyOptions) Validate() error {
 	if o.port != defaultPort && o.unixSocket != "" {
 		return errors.New("cannot set --unix-socket and --port at the same time")
 	}
