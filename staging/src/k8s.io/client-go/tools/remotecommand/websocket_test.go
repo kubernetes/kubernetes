@@ -714,6 +714,7 @@ func TestWebSocketClient_ProtocolVersions(t *testing.T) {
 			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
 		}
 		defer conn.Close()
+		time.Sleep(100 * time.Millisecond)
 	}))
 	defer websocketServer.Close()
 
@@ -895,6 +896,7 @@ func TestWebSocketClient_TextMessageTypeError(t *testing.T) {
 			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
 		}
 		defer conn.Close()
+		time.Sleep(100 * time.Millisecond)
 		msg := []byte("test message with wrong message type.")
 		stdOutMsg := append([]byte{remotecommand.StreamStdOut}, msg...)
 		// Wrong message type "TextMessage".
@@ -902,7 +904,6 @@ func TestWebSocketClient_TextMessageTypeError(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error writing text message to websocket: %v", err)
 		}
-
 	}))
 	defer websocketServer.Close()
 
@@ -962,6 +963,7 @@ func TestWebSocketClient_EmptyMessageHandled(t *testing.T) {
 			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
 		}
 		defer conn.Close()
+		time.Sleep(100 * time.Millisecond)
 		// Send completely empty message, including missing initial stream id.
 		conn.WriteMessage(gwebsocket.BinaryMessage, []byte{}) //nolint:errcheck
 	}))
