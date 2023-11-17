@@ -48,7 +48,7 @@ func TestLibraryCompatibility(t *testing.T) {
 		// Kubernetes <1.29>:
 		"add", "asApproximateFloat", "asInteger", "compareTo", "isGreaterThan", "isInteger", "isLessThan", "isQuantity", "quantity", "sign", "sub",
 		// Kubernetes <1.30>:
-		"ip", "family", "ip.isCanonical", "isIP", "string",
+		"ip", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast", "ip.isCanonical", "isIP", "string",
 		// Kubernetes <1.??>:
 	)
 
