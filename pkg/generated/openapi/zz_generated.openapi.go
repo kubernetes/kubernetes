@@ -52591,6 +52591,11 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 						},
 					},
 					"sourceIPs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Source IPs, from where the request originated and intermediate proxies. The source IPs are listed from (in order): 1. X-Forwarded-For request header IPs 2. X-Real-Ip header, if not present in the X-Forwarded-For list 3. The remote address for the connection, if it doesn't match the last\n   IP in the list up to here (X-Forwarded-For or X-Real-Ip).\nNote: All but the last IP can be arbitrarily set by the client.",
 							Type:        []string{"array"},
@@ -52737,6 +52742,11 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 						},
 					},
 					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Resources is a list of resources this rule applies to.\n\nFor example: - `pods` matches pods. - `pods/log` matches the log subresource of pods. - `*` matches all resources and their subresources. - `pods/*` matches all subresources of pods. - `*/scale` matches all scale subresources.\n\nIf wildcard is present, the validation rule will ensure resources do not overlap with each other.\n\nAn empty list implies all resources and subresources in this API groups apply.",
 							Type:        []string{"array"},
@@ -52752,6 +52762,11 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 						},
 					},
 					"resourceNames": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "ResourceNames is a list of resource instance names that the policy matches. Using this field requires Resources to be specified. An empty list implies that every instance of the resource is matched.",
 							Type:        []string{"array"},
@@ -52864,6 +52879,11 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 						},
 					},
 					"rules": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Rules specify the audit Level a request should be recorded at. A request may match multiple rules, in which case the FIRST matching rule is used. The default audit level is None, but can be overridden by a catch-all rule at the end of the list. PolicyRules are strictly ordered.",
 							Type:        []string{"array"},
@@ -52878,6 +52898,11 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 						},
 					},
 					"omitStages": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "OmitStages is a list of stages for which no events are created. Note that this can also be specified per rule in which case the union of both are omitted.",
 							Type:        []string{"array"},
@@ -52973,6 +52998,11 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 						},
 					},
 					"users": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The users (by authenticated user name) this rule applies to. An empty list implies every user.",
 							Type:        []string{"array"},
@@ -52988,6 +53018,11 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 						},
 					},
 					"userGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The user groups this rule applies to. A user is considered matching if it is a member of any of the UserGroups. An empty list implies every user group.",
 							Type:        []string{"array"},
@@ -53003,6 +53038,11 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 						},
 					},
 					"verbs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The verbs that match this rule. An empty list implies every verb.",
 							Type:        []string{"array"},
@@ -53018,6 +53058,11 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 						},
 					},
 					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Resources that this rule matches. An empty list implies all kinds in all API groups.",
 							Type:        []string{"array"},
@@ -53032,6 +53077,11 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 						},
 					},
 					"namespaces": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Namespaces that this rule matches. The empty string \"\" matches non-namespaced resources. An empty list implies every namespace.",
 							Type:        []string{"array"},
@@ -53047,6 +53097,11 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 						},
 					},
 					"nonResourceURLs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "NonResourceURLs is a set of URL paths that should be audited. `*`s are allowed, but only as the full, final step in the path. Examples: - `/metrics` - Log requests for apiserver metrics - `/healthz*` - Log all health checks",
 							Type:        []string{"array"},
@@ -53062,6 +53117,11 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 						},
 					},
 					"omitStages": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "OmitStages is a list of stages for which no events are created. Note that this can also be specified policy wide in which case the union of both are omitted. An empty list means no restrictions will apply.",
 							Type:        []string{"array"},
