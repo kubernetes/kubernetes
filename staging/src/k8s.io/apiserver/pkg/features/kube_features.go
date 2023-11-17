@@ -17,9 +17,6 @@ limitations under the License.
 package features
 
 import (
-	"k8s.io/apimachinery/pkg/util/runtime"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -287,10 +284,6 @@ const (
 	// priority level.
 	ZeroLimitedNominalConcurrencyShares featuregate.Feature = "ZeroLimitedNominalConcurrencyShares"
 )
-
-func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
-}
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be

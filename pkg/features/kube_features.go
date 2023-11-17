@@ -995,6 +995,10 @@ func init() {
 	ca := &clientAdapter{utilfeature.DefaultMutableFeatureGate}
 	runtime.Must(clientfeatures.AddFeaturesToExistingFeatureGates(ca))
 	clientfeatures.ReplaceFeatureGates(ca)
+
+	// replace apiservers's feature gate instance with kube's
+	runtime.Must(genericfeatures.AddFeaturesToExistingFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	genericfeatures.UseFeatureGateInstance(utilfeature.DefaultMutableFeatureGate)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -1249,67 +1253,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	UserNamespacesPodSecurityStandards: {Default: false, PreRelease: featuregate.Alpha},
 
 	SELinuxMount: {Default: false, PreRelease: featuregate.Alpha},
-
-	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
-	// unintentionally on either side:
-
-	genericfeatures.AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
-
-	genericfeatures.AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
-
-	genericfeatures.APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	genericfeatures.APIPriorityAndFairness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
-	genericfeatures.APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.APIServerIdentity: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
-
-	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
-	genericfeatures.EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	genericfeatures.KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
-
-	genericfeatures.KMSv2: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
-	genericfeatures.KMSv2KDF: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
-	genericfeatures.MutatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
-
-	genericfeatures.OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	genericfeatures.SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	genericfeatures.ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	genericfeatures.StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
-
-	genericfeatures.StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.StructuredAuthenticationConfiguration: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.StructuredAuthorizationConfiguration: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	genericfeatures.WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	genericfeatures.WatchList: {Default: false, PreRelease: featuregate.Alpha},
-
-	genericfeatures.ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
