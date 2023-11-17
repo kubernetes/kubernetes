@@ -42,7 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -399,7 +398,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		<-cacher.timer.C
 	}
 	var contextMetadata metadata.MD
-	if utilfeature.DefaultFeatureGate.Enabled(features.SeparateCacheWatchRPC) {
+	if features.Enabled(features.SeparateCacheWatchRPC) {
 		// Add grpc context metadata to watch and progress notify requests done by cacher to:
 		// * Prevent starvation of watch opened by cacher, by moving it to separate Watch RPC than watch request that bypass cacher.
 		// * Ensure that progress notification requests are executed on the same Watch RPC as their watch, which is required for it to work.
@@ -519,7 +518,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	//
 	// it should never happen due to our validation but let's just be super-safe here
 	// and disable sendingInitialEvents when the feature wasn't enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
+	if !features.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
 		opts.SendInitialEvents = nil
 	}
 	// TODO: we should eventually get rid of this legacy case
@@ -727,7 +726,7 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
 	match := opts.ResourceVersionMatch
-	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+	consistentListFromCacheEnabled := features.Enabled(features.ConsistentListFromCache)
 
 	// Serve consistent reads from storage if ConsistentListFromCache is disabled
 	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled
@@ -773,7 +772,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		// minimal resource version, simply forward the request to storage.
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
-	if listRV == 0 && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+	if listRV == 0 && features.Enabled(features.ConsistentListFromCache) {
 		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
 		if err != nil {
 			return err
@@ -1300,7 +1299,7 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 		// TODO(p0lyn0mial): adapt the following logic once
 		//   https://github.com/kubernetes/kubernetes/pull/123264 merges
-		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && c.watchCache.notFresh(requestedWatchRV) {
+		if features.Enabled(features.ConsistentListFromCache) && c.watchCache.notFresh(requestedWatchRV) {
 			c.watchCache.waitingUntilFresh.Add()
 			defer c.watchCache.waitingUntilFresh.Remove()
 		}

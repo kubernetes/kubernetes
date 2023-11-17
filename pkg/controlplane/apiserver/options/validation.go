@@ -72,7 +72,7 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 
 func validateUnknownVersionInteroperabilityProxyFeature() []error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
+		if genericfeatures.Enabled(genericfeatures.StorageVersionAPI) {
 			return nil
 		}
 		return []error{fmt.Errorf("UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled")}

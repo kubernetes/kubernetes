@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/feature"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -72,7 +71,7 @@ func (o *CoreAPIOptions) ApplyTo(config *server.RecommendedConfig) error {
 			return err
 		}
 	}
-	if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+	if features.Enabled(features.APIServerTracing) {
 		kubeconfig.Wrap(tracing.WrapperFor(config.TracerProvider))
 	}
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeconfig)

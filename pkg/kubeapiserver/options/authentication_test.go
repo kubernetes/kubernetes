@@ -874,7 +874,7 @@ func TestValidateOIDCOptions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, tt.structuredAuthenticationConfigEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StructuredAuthenticationConfiguration, tt.structuredAuthenticationConfigEnabled)()
 
 			opts := NewBuiltInAuthenticationOptions().WithOIDC()
 			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)

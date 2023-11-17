@@ -36,7 +36,6 @@ import (
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
@@ -47,7 +46,7 @@ var (
 )
 
 func TestValidateAuthenticationConfiguration(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StructuredAuthenticationConfiguration, true)()
 
 	testCases := []struct {
 		name              string
@@ -1599,7 +1598,7 @@ type (
 )
 
 func TestValidateAuthorizationConfiguration(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StructuredAuthorizationConfiguration, true)()
 
 	badKubeConfigFile := "../some/relative/path/kubeconfig"
 
@@ -2476,7 +2475,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StructuredAuthorizationConfiguration, tt.featureEnabled)()
 			celMatcher, errList := ValidateAndCompileMatchConditions(tt.matchConditions)
 			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
 				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")

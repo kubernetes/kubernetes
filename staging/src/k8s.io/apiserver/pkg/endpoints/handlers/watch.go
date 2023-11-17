@@ -36,7 +36,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // nothing will ever be sent down this channel
@@ -342,7 +341,7 @@ func (w *websocketFramer) Write(p []byte) (int, error) {
 var _ io.Writer = &websocketFramer{}
 
 func shouldRecordWatchListLatency(event watch.Event) bool {
-	if event.Type != watch.Bookmark || !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+	if event.Type != watch.Bookmark || !features.Enabled(features.WatchList) {
 		return false
 	}
 	// as of today the initial-events-end annotation is added only to a single event

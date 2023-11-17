@@ -36,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 )
@@ -175,21 +174,21 @@ func TestList(t *testing.T) {
 func TestListWithListFromCache(t *testing.T) {
 	// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove skip.
 	t.Skip("This test flakes flakes due to https://github.com/etcd-io/etcd/issues/17507")
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.ConsistentListFromCache, true)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.ConsistentListFromCache, false)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
 }
 
 func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.ConsistentListFromCache, true)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	// Wait before sending watch progress request to avoid https://github.com/etcd-io/etcd/issues/17507

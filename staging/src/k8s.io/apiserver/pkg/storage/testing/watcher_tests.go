@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
@@ -1440,7 +1439,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 	for idx, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			// set up env
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.WatchList, true)()
 			if scenario.expectedInitialEvents == nil {
 				scenario.expectedInitialEvents = func(_ []*example.Pod) []watch.Event { return nil }
 			}
@@ -1518,7 +1517,7 @@ func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, st
 		}})
 		return watchEvents
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.WatchList, true)()
 
 	initialPods := []*example.Pod{}
 	ns := "ns-foo"

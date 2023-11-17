@@ -40,7 +40,6 @@ import (
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -319,7 +318,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			// transition rules are evaluated only if there is a comparable existing value
 			// But if the rule uses optional oldSelf and gate is enabled we allow
 			// the rule to be evaluated
-			if !utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+			if !features.Enabled(features.CRDValidationRatcheting) {
 				continue
 			}
 

@@ -46,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -192,7 +191,7 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 
 	t.Run("ConsistentListFromStorage", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.ConsistentListFromCache, false)()
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
 		)
@@ -202,7 +201,7 @@ func TestGetListCacheBypass(t *testing.T) {
 
 	})
 	t.Run("ConsistentListFromCache", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.ConsistentListFromCache, true)()
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
 		)
@@ -1619,8 +1618,8 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.WatchList, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.ConsistentListFromCache, true)()
 
 	scenarios := []struct {
 		name               string
@@ -1880,7 +1879,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 // a bookmark event will be delivered after the cacher has seen an event.
 // Previously the watchers have been removed from the "want bookmark" queue.
 func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.WatchList, true)()
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2384,7 +2383,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)()
 			_, cacher, _, terminate := testSetupWithEtcdServer(t)
 			t.Cleanup(terminate)
 			if err := cacher.ready.wait(context.TODO()); err != nil {

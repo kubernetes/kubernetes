@@ -592,7 +592,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
+	if apiserverfeatures.Enabled(apiserverfeatures.APIServerIdentity) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 			// TODO: See if we can pass ctx to the current method

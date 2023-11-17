@@ -46,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
 )
 
@@ -483,7 +482,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var apiResource metav1.APIResource
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
+	if features.Enabled(features.StorageVersionHash) &&
 		isStorageVersionProvider &&
 		storageVersionProvider.StorageVersion() != nil {
 		versioner := storageVersionProvider.StorageVersion()
@@ -594,8 +593,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var resourceInfo *storageversion.ResourceInfo
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) &&
+	if features.Enabled(features.StorageVersionAPI) &&
+		features.Enabled(features.APIServerIdentity) &&
 		isStorageVersionProvider &&
 		storageVersionProvider.StorageVersion() != nil {
 

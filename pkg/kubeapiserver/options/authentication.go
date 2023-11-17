@@ -761,7 +761,7 @@ func (o *BuiltInAuthenticationOptions) validateOIDCOptions() []error {
 	// New validation when authentication config file is provided
 
 	// Authentication config file is only supported when the StructuredAuthenticationConfiguration feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
+	if !genericfeatures.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
 		allErrors = append(allErrors, fmt.Errorf("set --feature-gates=%s=true to use authentication-config file", genericfeatures.StructuredAuthenticationConfiguration))
 	}
 
