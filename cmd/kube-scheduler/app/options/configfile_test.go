@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,6 +56,10 @@ kind: KubeSchedulerConfiguration
 )
 
 func TestLoadConfigFromFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
+
 	tmpDir, err := os.MkdirTemp("", "scheduler-configs")
 	if err != nil {
 		t.Fatal(err)

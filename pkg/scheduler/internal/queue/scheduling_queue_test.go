@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	goRuntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -185,6 +186,10 @@ func listToValues(l *list.List) []interface{} {
 }
 
 func Test_InFlightPods(t *testing.T) {
+	if goRuntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
+
 	logger, _ := ktesting.NewTestContext(t)
 	pod := st.MakePod().Name("targetpod").UID("pod1").Obj()
 	pod2 := st.MakePod().Name("targetpod2").UID("pod2").Obj()

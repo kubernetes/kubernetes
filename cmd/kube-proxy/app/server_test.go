@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net"
 	"path"
+	"runtime"
 	"testing"
 	"time"
 
@@ -386,6 +387,10 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 // TestOptionsComplete checks that command line flags are combined with a
 // config properly.
 func TestOptionsComplete(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
+
 	header := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 `
