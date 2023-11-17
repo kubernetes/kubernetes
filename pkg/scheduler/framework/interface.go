@@ -636,9 +636,6 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator PodNominator)
-
-	// SetBackgroundRunner sets the BackgroundRunner
-	SetBackgroundRunner(runner BackgroundRunner)
 }
 
 // Handle provides data and some tools that plugins can use. It is
@@ -649,9 +646,6 @@ type Handle interface {
 	PodNominator
 	// PluginsRunner abstracts operations to run some plugins.
 	PluginsRunner
-	// BackgroundRunner abstracts operations to run some code provided by a plugin
-	// in the background.
-	BackgroundRunner
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Permit" point. There is no guarantee that the information
@@ -766,16 +760,6 @@ type PodNominator interface {
 	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo *PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
 	NominatedPodsForNode(nodeName string) []*PodInfo
-}
-
-// BackgroundRunner abstracts operations to run some code provided by a plugin
-// in the background.
-type BackgroundRunner interface {
-	// RunInBackground will execute the callback. If the callback fails, whether it
-	// is with an explicit error or a panic, scheduling the pod will be retried.
-	// The context passed to RunInBackground is the one from the current plugin
-	// operation. The context passed to the callback will be different.
-	RunInBackground(ctx context.Context, pod *v1.Pod, cb func(ctx context.Context) error)
 }
 
 // PluginsRunner abstracts operations to run some plugins.

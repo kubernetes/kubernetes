@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -41,7 +39,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -158,13 +155,7 @@ var (
 // result defines the expected outcome of some operation. It covers
 // operation's status and the state of the world (= objects).
 type result struct {
-	// status is the immediate response from some operation.
 	status *framework.Status
-
-	// failure is an error string that is expected to get reported
-	// by a background callback.
-	failure string
-
 	// changes contains a mapping of name to an update function for
 	// the corresponding object. These functions apply exactly the expected
 	// changes to a copy of the object as it existed before the operation.
@@ -360,8 +351,8 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
-				reserve: result{
-					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
+				prebind: result{
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
 					added:  []metav1.Object{schedulingSelectedPotential},
 				},
 			},
@@ -374,8 +365,8 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim, pendingDelayedClaim2},
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
-				reserve: result{
-					status: framework.NewStatus(framework.Pending, `waiting for resource driver to provide information`),
+				prebind: result{
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
 					added:  []metav1.Object{schedulingPotential},
 				},
 			},
@@ -388,8 +379,8 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
-				reserve: result{
-					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
+				prebind: result{
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
 					changes: change{
 						scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
 							return st.FromPodSchedulingContexts(in).
@@ -408,7 +399,7 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			prepare: prepare{
-				reserve: change{
+				prebind: change{
 					scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
 						// This does not actually conflict with setting the
 						// selected node, but because the plugin is not using
@@ -420,9 +411,8 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 			want: want{
-				reserve: result{
-					status:  framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
-					failure: `ResourceVersion must match the object that gets updated`,
+				prebind: result{
+					status: framework.AsStatus(errors.New(`ResourceVersion must match the object that gets updated`)),
 				},
 			},
 		},
@@ -476,7 +466,6 @@ func TestPlugin(t *testing.T) {
 				},
 				postfilter: result{
 					// Claims with delayed allocation get deallocated.
-					status: framework.NewStatus(framework.Unschedulable, `waiting for deallocation of claim`),
 					changes: change{
 						claim: func(in *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
 							return st.FromResourceClaim(in).
@@ -689,20 +678,12 @@ type testContext struct {
 	p               *dynamicResources
 	nodeInfos       []*framework.NodeInfo
 	state           *framework.CycleState
-	backgroundCB    atomic.Pointer[func(context.Context) error]
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
-	cb := tc.backgroundCB.Swap(nil)
-	actualFailure := ""
-	if cb != nil {
-		_, ctx := ktesting.NewTestContext(t)
-		if err := (*cb)(ctx); err != nil {
-			actualFailure = err.Error()
-		}
-	}
 	assert.Equal(t, expected.status, status)
+	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
 	wantObjects = append(wantObjects, expected.added...)
 	for _, remove := range expected.removed {
@@ -717,15 +698,6 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	}
 	sortObjects(wantObjects)
 	stripObjects(wantObjects)
-
-	if expected.failure != "" {
-		if !strings.Contains(actualFailure, expected.failure) {
-			t.Errorf("Expected background failure to contain %q, got instead: %q", expected.failure, actualFailure)
-		}
-	} else if actualFailure != "" {
-		t.Errorf("Expected no background failure, got instead: %q", actualFailure)
-	}
-	objects := tc.listAll(t)
 	stripObjects(objects)
 	assert.Equal(t, wantObjects, objects)
 }
@@ -804,11 +776,6 @@ func sortObjects(objects []metav1.Object) {
 	})
 }
 
-func (tc *testContext) RunInBackground(ctx context.Context, pod *v1.Pod, cb func(context.Context) error) {
-	klog.FromContext(ctx).Info("Storing background callback", "pod", klog.KObj(pod))
-	tc.backgroundCB.Store(&cb)
-}
-
 // update walks through all existing objects, finds the corresponding update
 // function based on name and kind, and replaces those objects that have an
 // update function. The rest is left unchanged.
@@ -852,7 +819,6 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 		runtime.WithInformerFactory(tc.informerFactory),
 	}
 	fh, err := runtime.NewFramework(ctx, nil, nil, opts...)
-	fh.SetBackgroundRunner(tc)
 	if err != nil {
 		t.Fatal(err)
 	}
