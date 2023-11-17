@@ -999,6 +999,10 @@ func init() {
 	// replace apiservers's feature gate instance with kube's
 	runtime.Must(genericfeatures.AddFeaturesToExistingFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	genericfeatures.UseFeatureGateInstance(utilfeature.DefaultMutableFeatureGate)
+
+	// replace extension apiserver's feature gate instance with kube's
+	runtime.Must(apiextensionsfeatures.AddFeaturesToExistingFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	apiextensionsfeatures.UseFeatureGateInstance(utilfeature.DefaultMutableFeatureGate)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -1253,13 +1257,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	UserNamespacesPodSecurityStandards: {Default: false, PreRelease: featuregate.Alpha},
 
 	SELinuxMount: {Default: false, PreRelease: featuregate.Alpha},
-
-	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
-	// unintentionally on either side:
-
-	apiextensionsfeatures.CRDValidationRatcheting: {Default: true, PreRelease: featuregate.Beta},
-
-	apiextensionsfeatures.CustomResourceFieldSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

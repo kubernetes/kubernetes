@@ -17,7 +17,6 @@ limitations under the License.
 package features
 
 import (
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -42,10 +41,6 @@ const (
 	// may be used as field selectors.
 	CustomResourceFieldSelectors featuregate.Feature = "CustomResourceFieldSelectors"
 )
-
-func init() {
-	utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)
-}
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
