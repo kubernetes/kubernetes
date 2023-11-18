@@ -550,7 +550,7 @@ func TestPlugin(t *testing.T) {
 			}
 			unschedulable := status.Code() != framework.Success
 
-			var potentialNodes []*v1.Node
+			var potentialNodes []*framework.NodeInfo
 
 			initialObjects = testCtx.listAll(t)
 			testCtx.updateAPIServer(t, initialObjects, tc.prepare.filter)
@@ -565,7 +565,7 @@ func TestPlugin(t *testing.T) {
 					if status.Code() != framework.Success {
 						unschedulable = true
 					} else {
-						potentialNodes = append(potentialNodes, nodeInfo.Node())
+						potentialNodes = append(potentialNodes, nodeInfo)
 					}
 				}
 			}
@@ -582,13 +582,13 @@ func TestPlugin(t *testing.T) {
 				}
 			}
 
-			var selectedNode *v1.Node
+			var selectedNode *framework.NodeInfo
 			if !unschedulable && len(potentialNodes) > 0 {
 				selectedNode = potentialNodes[0]
 
 				initialObjects = testCtx.listAll(t)
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.reserve)
-				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
+				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
 				t.Run("reserve", func(t *testing.T) {
 					testCtx.verify(t, tc.want.reserve, initialObjects, nil, status)
 				})
@@ -601,14 +601,14 @@ func TestPlugin(t *testing.T) {
 				if unschedulable {
 					initialObjects = testCtx.listAll(t)
 					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.unreserve)
-					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
+					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
 					t.Run("unreserve", func(t *testing.T) {
 						testCtx.verify(t, tc.want.unreserve, initialObjects, nil, status)
 					})
 				} else {
 					initialObjects = testCtx.listAll(t)
 					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postbind)
-					testCtx.p.PostBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
+					testCtx.p.PostBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
 					t.Run("postbind", func(t *testing.T) {
 						testCtx.verify(t, tc.want.postbind, initialObjects, nil, status)
 					})

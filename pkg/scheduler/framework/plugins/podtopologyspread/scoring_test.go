@@ -37,6 +37,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/utils/ptr"
 )
 
@@ -103,7 +104,7 @@ func TestPreScoreSkip(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := p.PreScore(ctx, cs, tt.pod, tt.nodes); !s.IsSkip() {
+			if s := p.PreScore(ctx, cs, tt.pod, tf.BuildNodeInfos(tt.nodes)); !s.IsSkip() {
 				t.Fatalf("Expected skip but got %v", s.AsError())
 			}
 		})
@@ -590,7 +591,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := p.PreScore(ctx, cs, tt.pod, tt.nodes); !s.IsSuccess() {
+			if s := p.PreScore(ctx, cs, tt.pod, tf.BuildNodeInfos(tt.nodes)); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -1347,7 +1348,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			p.enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
 
-			status := p.PreScore(ctx, state, tt.pod, tt.nodes)
+			status := p.PreScore(ctx, state, tt.pod, tf.BuildNodeInfos(tt.nodes))
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -1418,7 +1419,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			pl := plugintesting.SetupPlugin(ctx, b, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
 			p := pl.(*PodTopologySpread)
 
-			status := p.PreScore(ctx, state, tt.pod, filteredNodes)
+			status := p.PreScore(ctx, state, tt.pod, tf.BuildNodeInfos(filteredNodes))
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
