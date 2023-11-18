@@ -189,7 +189,6 @@ func TestCIDRAllocateMultiple(t *testing.T) {
 	if _, err := r.AllocateNext(); err == nil {
 		t.Fatal(err)
 	}
-
 }
 
 func TestCIDRAllocateShadow(t *testing.T) {
@@ -214,7 +213,7 @@ func TestCIDRAllocateShadow(t *testing.T) {
 	r.addServiceCIDR(cidr)
 	// wait for the cidr to be processed and set the informer synced
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.1.0"))
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.1.1"))
 		if err != nil {
 			return false, nil
 		}
@@ -225,12 +224,12 @@ func TestCIDRAllocateShadow(t *testing.T) {
 		t.Fatal(err)
 	}
 	// allocate one IP from the new allocator
-	err = r.Allocate(netutils.ParseIPSloppy("192.168.1.0"))
-	if err == nil {
-		t.Fatalf("unexpected allocation for IP 192.168.1.0")
+	err = r.Allocate(netutils.ParseIPSloppy("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("expected allocation for IP 192.168.1.1")
 	}
 
-	if f := r.Used(); f != 0 {
+	if f := r.Used(); f != 1 {
 		t.Errorf("used: %d", f)
 	}
 
@@ -242,7 +241,7 @@ func TestCIDRAllocateShadow(t *testing.T) {
 	r.addServiceCIDR(cidr2)
 	// wait for the cidr to be processed
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.0"))
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"))
 		if err != nil {
 			return false, nil
 		}
@@ -253,12 +252,12 @@ func TestCIDRAllocateShadow(t *testing.T) {
 		t.Fatal(err)
 	}
 	// allocate one IP from the new allocator
-	err = r.Allocate(netutils.ParseIPSloppy("192.168.1.0"))
+	err = r.Allocate(netutils.ParseIPSloppy("192.168.0.1"))
 	if err != nil {
-		t.Fatalf("error allocating IP 192.168.1.0 from new allocator: %v", err)
+		t.Fatalf("error allocating IP 192.168.0.1 from new allocator: %v", err)
 	}
 
-	if f := r.Used(); f != 1 {
+	if f := r.Used(); f != 2 {
 		t.Errorf("used: %d", f)
 	}
 
@@ -433,7 +432,6 @@ func TestCIDRAllocateShrink(t *testing.T) {
 		if err != nil {
 			return true, nil
 		}
-
 		return false, nil
 	})
 	if err != nil {
