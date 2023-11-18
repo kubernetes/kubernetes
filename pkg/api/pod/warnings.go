@@ -170,6 +170,60 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 	}
 
+	items := sets.NewString()
+	for _, v := range podSpec.Volumes {
+		if v.Projected != nil {
+			for _, k := range v.Projected.Sources {
+				if k.ServiceAccountToken != nil {
+					items.Insert(k.ServiceAccountToken.Path)
+				}
+			}
+		}
+
+	}
+
+	if items.Len() > 0 {
+		for i, item := range podSpec.Volumes {
+			if item.Projected != nil {
+				for _, k := range item.Projected.Sources {
+					if k.ConfigMap != nil {
+						if len(k.ConfigMap.Items) > 0 {
+							for j, item := range k.ConfigMap.Items {
+								if items.Has(item.Path) {
+									warnings = append(warnings, fmt.Sprintf("%s: has duplicated path with ServiceAccountToken %q", fieldPath.Child("spec", "volumes").Index(i).Child("projected", "sources", "configMap").Index(j), item.Path))
+								}
+							}
+						}
+					}
+
+					if k.Secret != nil {
+						if len(k.Secret.Items) > 0 {
+							for j, item := range k.Secret.Items {
+								if items.Has(item.Path) {
+									warnings = append(warnings, fmt.Sprintf("%s: has duplicated path with ServiceAccountToken %q", fieldPath.Child("spec", "volumes").Index(i).Child("projected", "sources", "secrets").Index(j), item.Path))
+								}
+							}
+						}
+					}
+
+					if k.DownwardAPI != nil {
+						for j, item := range k.DownwardAPI.Items {
+							if items.Has(item.Path) {
+								warnings = append(warnings, fmt.Sprintf("%s: has duplicated path with ServiceAccountToken %q", fieldPath.Child("spec", "volumes").Index(i).Child("projected", "sources", "downwardAPI").Index(j), item.Path))
+							}
+						}
+					}
+
+					if k.ClusterTrustBundle != nil {
+						if items.Has(k.ClusterTrustBundle.Path) {
+							warnings = append(warnings, fmt.Sprintf("%s: has duplicated path with ServiceAccountToken %q", fieldPath.Child("spec", "volumes").Index(i).Child("projected", "sources", "ClusterTrustBundle"), k.ClusterTrustBundle.Path))
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// duplicate hostAliases (#91670, #58477)
 	if len(podSpec.HostAliases) > 1 {
 		items := sets.New[string]()
