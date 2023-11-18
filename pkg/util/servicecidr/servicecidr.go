@@ -46,6 +46,26 @@ func ContainsAddress(serviceCIDRLister networkinglisters.ServiceCIDRLister, addr
 	return result
 }
 
+// ContainsPrefix return the list of ServiceCIDR that contains the prefix passed as argument
+func ContainsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefix netip.Prefix) []*networkingv1alpha1.ServiceCIDR {
+	result := []*networkingv1alpha1.ServiceCIDR{}
+	serviceCIDRList, err := serviceCIDRLister.List(labels.Everything())
+	if err != nil {
+		return result
+	}
+
+	for _, serviceCIDR := range serviceCIDRList {
+		for _, cidr := range serviceCIDR.Spec.CIDRs {
+			if p, err := netip.ParsePrefix(cidr); err == nil { // it can not fail since is already validated
+				if p.Overlaps(prefix) && p.Bits() <= prefix.Bits() {
+					result = append(result, serviceCIDR)
+				}
+			}
+		}
+	}
+	return result
+}
+
 // PrefixContainIP returns true if the given IP is contained with the prefix,
 // is not the network address and also, if IPv4, is not the broadcast address.
 // This is required because the Kubernetes allocators reserve these addresses
