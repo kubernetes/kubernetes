@@ -2,7 +2,7 @@
 
 module k8s.io/code-generator/examples
 
-go 1.21.3
+go 1.21
 
 require (
 	k8s.io/api v0.0.0

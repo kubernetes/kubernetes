@@ -516,6 +516,41 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
+func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
+	ctx := context.Background()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+
+	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{
+		MinAge: time.Second * 3, // set minAge to 3 seconds,
+	}, mockStatsProvider)
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+		makeImage(1, 2048),
+		makeImage(2, 2048),
+	}
+	fakeRuntime.AllPodList = []*containertest.FakePod{
+		{Pod: &container.Pod{
+			Containers: []*container.Container{
+				makeContainer(2),
+			},
+		}},
+	}
+	// start to detect images
+	manager.Start()
+	// try to delete images, but images are not old enough,so no image will be deleted
+	err := manager.DeleteUnusedImages(ctx)
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.Len(fakeRuntime.ImageList, 3)
+	// sleep 3 seconds, then images will be old enough to be deleted
+	time.Sleep(time.Second * 3)
+	err = manager.DeleteUnusedImages(ctx)
+	require.NoError(t, err)
+	assert.Len(fakeRuntime.ImageList, 1)
+}
+
 func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)

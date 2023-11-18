@@ -480,7 +480,7 @@ func TestWriteKubeConfig(t *testing.T) {
 
 			if test.withClientCert {
 				// checks that kubeconfig files have expected client cert
-				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, "myUser")
+				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, "myUser", "myOrg")
 			}
 
 			if test.withToken {

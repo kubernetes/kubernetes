@@ -2,7 +2,7 @@
 
 module k8s.io/dynamic-resource-allocation
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/go-logr/logr v1.3.0

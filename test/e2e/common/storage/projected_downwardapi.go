@@ -211,7 +211,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_limit")
 
 		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
-			fmt.Sprintf("67108864\n"),
+			"134217728\n",
 		})
 	})
 

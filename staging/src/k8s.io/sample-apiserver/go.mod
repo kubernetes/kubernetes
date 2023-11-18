@@ -2,7 +2,7 @@
 
 module k8s.io/sample-apiserver
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/google/gofuzz v1.2.0
