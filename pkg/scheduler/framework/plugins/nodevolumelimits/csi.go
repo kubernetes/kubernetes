@@ -131,7 +131,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		}
 
 		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
-		deletedPodDrivers = deletedPodDrivers.Insert(driverName)
+		deletedPodDrivers.Insert(driverName)
 	}
 
 	for _, vol := range pod.Spec.Volumes {
