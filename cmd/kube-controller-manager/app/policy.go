@@ -54,6 +54,7 @@ func startDisruptionController(ctx context.Context, controllerContext Controller
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
+		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		client,
 		controllerContext.RESTMapper,
 		scaleClient,

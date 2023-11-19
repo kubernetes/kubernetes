@@ -729,6 +729,7 @@ func rmSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().StatefulSets(),
+		informers.Batch().V1().Jobs(),
 		client,
 		mapper,
 		scaleClient,

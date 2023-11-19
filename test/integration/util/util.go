@@ -678,6 +678,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().StatefulSets(),
+		informers.Batch().V1().Jobs(),
 		testCtx.ClientSet,
 		mapper,
 		scaleClient,

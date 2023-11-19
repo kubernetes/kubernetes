@@ -22,6 +22,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
+	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1"
@@ -36,12 +37,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
+	batchv1informers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
+	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	scaleclient "k8s.io/client-go/scale"
@@ -102,6 +105,9 @@ type DisruptionController struct {
 	ssLister       appsv1listers.StatefulSetLister
 	ssListerSynced cache.InformerSynced
 
+	jobLister       batchv1listers.JobLister
+	jobListerSynced cache.InformerSynced
+
 	// PodDisruptionBudget keys that need to be synced.
 	queue        workqueue.RateLimitingInterface
 	recheckQueue workqueue.DelayingInterface
@@ -137,6 +143,7 @@ func NewDisruptionController(
 	rsInformer appsv1informers.ReplicaSetInformer,
 	dInformer appsv1informers.DeploymentInformer,
 	ssInformer appsv1informers.StatefulSetInformer,
+	jobInformer batchv1informers.JobInformer,
 	kubeClient clientset.Interface,
 	restMapper apimeta.RESTMapper,
 	scaleNamespacer scaleclient.ScalesGetter,
@@ -150,6 +157,7 @@ func NewDisruptionController(
 		rsInformer,
 		dInformer,
 		ssInformer,
+		jobInformer,
 		kubeClient,
 		restMapper,
 		scaleNamespacer,
@@ -168,6 +176,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 	rsInformer appsv1informers.ReplicaSetInformer,
 	dInformer appsv1informers.DeploymentInformer,
 	ssInformer appsv1informers.StatefulSetInformer,
+	jobInformer batchv1informers.JobInformer,
 	kubeClient clientset.Interface,
 	restMapper apimeta.RESTMapper,
 	scaleNamespacer scaleclient.ScalesGetter,
@@ -228,6 +237,9 @@ func NewDisruptionControllerInternal(ctx context.Context,
 	dc.ssLister = ssInformer.Lister()
 	dc.ssListerSynced = ssInformer.Informer().HasSynced
 
+	dc.jobLister = jobInformer.Lister()
+	dc.jobListerSynced = jobInformer.Informer().HasSynced
+
 	dc.mapper = restMapper
 	dc.scaleNamespacer = scaleNamespacer
 	dc.discoveryClient = discoveryClient
@@ -243,13 +255,14 @@ func NewDisruptionControllerInternal(ctx context.Context,
 // resources directly and only fall back to the scale subresource when needed.
 func (dc *DisruptionController) finders() []podControllerFinder {
 	return []podControllerFinder{dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
-		dc.getPodStatefulSet, dc.getScaleController}
+		dc.getPodStatefulSet, dc.getPodJob, dc.getScaleController}
 }
 
 var (
 	controllerKindRS  = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
 	controllerKindSS  = apps.SchemeGroupVersion.WithKind("StatefulSet")
 	controllerKindRC  = v1.SchemeGroupVersion.WithKind("ReplicationController")
+	controllerKindJob = batch.SchemeGroupVersion.WithKind("Job")
 	controllerKindDep = v1beta1.SchemeGroupVersion.WithKind("Deployment")
 )
 
@@ -341,6 +354,27 @@ func (dc *DisruptionController) getPodReplicationController(ctx context.Context,
 		return nil, nil
 	}
 	return &controllerAndScale{rc.UID, *(rc.Spec.Replicas)}, nil
+}
+
+func (dc *DisruptionController) getPodJob(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+	ok, err := verifyGroupKind(controllerRef, controllerKindJob.Kind, []string{"batch"})
+	if !ok || err != nil {
+		return nil, err
+	}
+	job, err := dc.jobLister.Jobs(namespace).Get(controllerRef.Name)
+	if err != nil {
+		// The only possible error is NotFound, which is ok here.
+		return nil, nil
+	}
+	if job.UID != controllerRef.UID {
+		return nil, nil
+	}
+	scale := *job.Spec.Parallelism
+	remain := *job.Spec.Completions - job.Status.Succeeded - job.Status.Failed
+	if scale > remain {
+		scale = remain
+	}
+	return &controllerAndScale{job.UID, scale}, nil
 }
 
 func (dc *DisruptionController) getScaleController(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
