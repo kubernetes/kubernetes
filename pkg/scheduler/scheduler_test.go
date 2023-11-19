@@ -340,13 +340,13 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 			name:             "node is deleted during a scheduling cycle",
 			nodes:            []v1.Node{*nodeFoo, *nodeBar},
 			nodeNameToDelete: "foo",
-			injectErr:        apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
+			injectErr:        apierrors.NewNotFound(v1.Resource("nodes"), nodeFoo.Name),
 			expectNodeNames:  sets.New("bar"),
 		},
 		{
 			name:            "node is not deleted but NodeNotFound is received incorrectly",
 			nodes:           []v1.Node{*nodeFoo, *nodeBar},
-			injectErr:       apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
+			injectErr:       apierrors.NewNotFound(v1.Resource("nodes"), nodeFoo.Name),
 			expectNodeNames: sets.New("foo", "bar"),
 		},
 	}
