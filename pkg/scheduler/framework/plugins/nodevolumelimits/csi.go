@@ -121,7 +121,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 			continue
 		}
 
-		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(deletedPod.Namespace).Get(pvcName)
 		if errors.IsNotFound(err) {
 			logger.V(5).Info("A PVC is not found", "namespace", pod.Namespace, "pvc name", pvcName)
 			return framework.QueueSkip, nil
