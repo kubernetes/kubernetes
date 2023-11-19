@@ -50,10 +50,8 @@ type Waiter interface {
 	WaitForStaticPodHashChange(nodeName, component, previousHash string) error
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
-	// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-	WaitForHealthyKubelet(initialTimeout time.Duration, healthzEndpoint string) error
-	// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
-	WaitForKubeletAndFunc(f func() error) error
+	// WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
+	WaitForKubelet() error
 	// SetTimeout adjusts the timeout to the specified duration
 	SetTimeout(timeout time.Duration)
 }
@@ -76,17 +74,28 @@ func NewKubeWaiter(client clientset.Interface, timeout time.Duration, writer io.
 
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
 func (w *KubeWaiter) WaitForAPI() error {
-	start := time.Now()
-	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-		healthStatus := 0
-		w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
-		if healthStatus != http.StatusOK {
-			return false, nil
-		}
+	fmt.Printf("[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
 
-		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
-		return true, nil
-	})
+	start := time.Now()
+	err := wait.PollUntilContextTimeout(
+		context.Background(),
+		kubeadmconstants.APICallRetryInterval,
+		w.timeout,
+		true, func(ctx context.Context) (bool, error) {
+			healthStatus := 0
+			w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
+			if healthStatus != http.StatusOK {
+				return false, nil
+			}
+			return true, nil
+		})
+	if err != nil {
+		fmt.Printf("[api-check] The API server is not healthy after %v\n", time.Since(start))
+		return err
+	}
+
+	fmt.Printf("[api-check] The API server is healthy after %v\n", time.Since(start))
+	return nil
 }
 
 // WaitForPodsWithLabel will lookup pods with the given label and wait until they are all
@@ -133,47 +142,54 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	})
 }
 
-// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-func (w *KubeWaiter) WaitForHealthyKubelet(initialTimeout time.Duration, healthzEndpoint string) error {
-	time.Sleep(initialTimeout)
-	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initialTimeout)
-	return TryRunCommand(func() error {
-		client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
-		resp, err := client.Get(healthzEndpoint)
-		if err != nil {
-			fmt.Println("[kubelet-check] It seems like the kubelet isn't running or healthy.")
-			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' failed with error: %v.\n", healthzEndpoint, err)
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			fmt.Println("[kubelet-check] It seems like the kubelet isn't running or healthy.")
-			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' returned HTTP code %d\n", healthzEndpoint, resp.StatusCode)
-			return errors.New("the kubelet healthz endpoint is unhealthy")
-		}
-		return nil
-	}, 5) // a failureThreshold of five means waiting for a total of 155 seconds
-}
+// WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'.
+func (w *KubeWaiter) WaitForKubelet() error {
+	var (
+		lastError       error
+		start           = time.Now()
+		healthzEndpoint = fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)
+	)
 
-// WaitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
-// /healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
-func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
-	errorChan := make(chan error, 1)
+	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet. This can take up to %v\n", w.timeout)
 
-	go func(errC chan error, waiter Waiter) {
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
-			errC <- err
-		}
-	}(errorChan, w)
+	formatError := func(cause string) error {
+		return errors.Errorf("The HTTP call equal to 'curl -sSL %s' returned %s\n",
+			healthzEndpoint, cause)
+	}
 
-	go func(errC chan error) {
-		// This main goroutine sends whatever the f function returns (error or not) to the channel
-		// This in order to continue on success (nil error), or just fail if the function returns an error
-		errC <- f()
-	}(errorChan)
+	err := wait.PollUntilContextTimeout(
+		context.Background(),
+		kubeadmconstants.APICallRetryInterval,
+		w.timeout,
+		true, func(ctx context.Context) (bool, error) {
+			client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthzEndpoint, nil)
+			if err != nil {
+				lastError = formatError(fmt.Sprintf("error: %v", err))
+				return false, err
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				lastError = formatError(fmt.Sprintf("error: %v", err))
+				return false, nil
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+			if resp.StatusCode != http.StatusOK {
+				lastError = formatError(fmt.Sprintf("status code: %d", resp.StatusCode))
+				return false, nil
+			}
 
-	// This call is blocking until one of the goroutines sends to errorChan
-	return <-errorChan
+			return true, nil
+		})
+	if err != nil {
+		fmt.Printf("[kubelet-check] The kubelet is not healthy after %v\n", time.Since(start))
+		return lastError
+	}
+
+	fmt.Printf("[kubelet-check] The kubelet is healthy after %v\n", time.Since(start))
+	return nil
 }
 
 // SetTimeout adjusts the timeout to the specified duration
