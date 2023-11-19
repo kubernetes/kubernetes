@@ -495,7 +495,7 @@ func TestCSILimits(t *testing.T) {
 			ephemeralEnabled: true,
 			driverNames:      []string{ebsCSIDriverName},
 			test:             "ephemeral volume missing",
-			wantStatus:       framework.AsStatus(errors.New(`looking up PVC test/abc-xyz: persistentvolumeclaims "abc-xyz" not found`)),
+			wantStatus:       framework.NewStatus(framework.UnschedulableAndUnresolvable, `looking up PVC test/abc-xyz: persistentvolumeclaims "abc-xyz" not found`),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -595,7 +595,7 @@ func TestCSILimits(t *testing.T) {
 			ephemeralEnabled: true,
 			driverNames:      []string{ebsCSIDriverName},
 			test:             "don't skip Filter when the pod has ephemeral volumes",
-			wantStatus:       framework.AsStatus(errors.New(`looking up PVC test/abc-xyz: persistentvolumeclaims "abc-xyz" not found`)),
+			wantStatus:       framework.NewStatus(framework.UnschedulableAndUnresolvable, `looking up PVC test/abc-xyz: persistentvolumeclaims "abc-xyz" not found`),
 		},
 		{
 			newPod:           inlineMigratablePodWithConfigmapAndSecret,
