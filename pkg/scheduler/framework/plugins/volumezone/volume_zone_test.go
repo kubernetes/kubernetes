@@ -494,9 +494,9 @@ func TestWithBinding(t *testing.T) {
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
 			Node: testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"unable to find storage class: Class_0"),
+				`storageclasses.storage.k8s.io "Class_0" not found`),
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"unable to find storage class: Class_0"),
+				`storageclasses.storage.k8s.io "Class_0" not found`),
 		},
 		{
 			name:                "unbound volume immediate binding mode",
