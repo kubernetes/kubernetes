@@ -93,11 +93,11 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	}
 
 	if deletedPod.Namespace != pod.Namespace {
-		return framework.Queue, nil
+		return framework.QueueSkip, nil
 	}
 
 	if len(deletedPod.Spec.Volumes) == 0 {
-		return framework.Queue, nil
+		return framework.QueueSkip, nil
 	}
 
 	csiNode, err := pl.csiNodeLister.Get(deletedPod.Spec.NodeName)
@@ -165,7 +165,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	}
 
 	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", fmt.Sprintf("%s/%s", deletedPod.Namespace, deletedPod.Name), "pod", fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
-	return framework.Queue, nil
+	return framework.QueueSkip, nil
 }
 
 // PreFilter invoked at the prefilter extension point
