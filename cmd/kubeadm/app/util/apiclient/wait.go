@@ -280,21 +280,3 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
 	return staticPodHash, nil
 }
-
-// TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned
-func TryRunCommand(f func() error, failureThreshold int) error {
-	backoff := wait.Backoff{
-		Duration: 5 * time.Second,
-		Factor:   2, // double the timeout for every failure
-		Steps:    failureThreshold,
-	}
-	return wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err := f()
-		if err != nil {
-			// Retry until the timeout
-			return false, nil
-		}
-		// The last f() call was a success, return cleanly
-		return true, nil
-	})
-}
