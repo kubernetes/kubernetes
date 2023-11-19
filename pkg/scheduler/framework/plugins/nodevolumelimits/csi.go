@@ -87,7 +87,7 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		logger.V(5).Info("Unexpected objects in isSchedulableAfterPodDeleted", "oldObj", oldObj, "err", err)
+		logger.V(5).Error(err, "Unexpected objects in isSchedulableAfterPodDeleted", "oldObj", oldObj)
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
 	}
 
@@ -101,7 +101,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 	csiNode, err := pl.csiNodeLister.Get(deletedPod.Spec.NodeName)
 	if err != nil {
-		logger.V(5).Info("Could not get a CSINode object", "nodeName", deletedPod.Spec.NodeName, "err", err)
+		logger.V(5).Error(err, "Could not get a CSINode object", "nodeName", deletedPod.Spec.NodeName)
 		return framework.Queue, fmt.Errorf("could not get a CSINode object: %w", err)
 	}
 
@@ -119,7 +119,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if err != nil {
-			logger.V(5).Info("Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName, "err", err)
+			logger.V(5).Error(err, "Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
 			return framework.Queue, fmt.Errorf("unable to look up PVC info: %w", err)
 		}
 
@@ -140,7 +140,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if err != nil {
-			logger.V(5).Info("Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName, "err", err)
+			logger.V(5).Error(err, "Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
 			return framework.Queue, fmt.Errorf("unable to look up PVC info: %w", err)
 		}
 
