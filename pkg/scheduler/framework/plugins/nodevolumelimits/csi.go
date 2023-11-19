@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -100,7 +101,10 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	}
 
 	csiNode, err := pl.csiNodeLister.Get(deletedPod.Spec.NodeName)
-	if err != nil {
+	if errors.IsNotFound(err) {
+		logger.V(5).Info("csiNodeLister is not found", "nodeName", deletedPod.Spec.NodeName)
+		return framework.QueueSkip, nil
+	} else if err != nil {
 		logger.V(5).Error(err, "Could not get a CSINode object", "nodeName", deletedPod.Spec.NodeName)
 		return framework.Queue, fmt.Errorf("could not get a CSINode object: %w", err)
 	}
@@ -118,9 +122,12 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		}
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-		if err != nil {
-			logger.V(5).Error(err, "Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
-			return framework.Queue, fmt.Errorf("unable to look up PVC info: %w", err)
+		if errors.IsNotFound(err) {
+			logger.V(5).Info("A PVC is not found", "namespace", pod.Namespace, "pvc name", pvcName)
+			return framework.QueueSkip, nil
+		} else if err != nil {
+			logger.V(5).Error(err, "Unable to look up a PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
+			return framework.Queue, fmt.Errorf("unable to look up a PVC info: %w", err)
 		}
 
 		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
@@ -139,9 +146,12 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		}
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-		if err != nil {
-			logger.V(5).Error(err, "Unable to look up PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
-			return framework.Queue, fmt.Errorf("unable to look up PVC info: %w", err)
+		if errors.IsNotFound(err) {
+			logger.V(5).Info("A PVC info is not found", "namespace", pod.Namespace, "pvc name", pvcName)
+			return framework.QueueSkip, nil
+		} else if err != nil {
+			logger.V(5).Error(err, "Unable to look up a PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
+			return framework.Queue, fmt.Errorf("unable to look up a PVC info: %w", err)
 		}
 
 		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
