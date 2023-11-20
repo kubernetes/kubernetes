@@ -51,11 +51,10 @@ type ctnAttribute struct {
 	restartPolicy *v1.ContainerRestartPolicy
 }
 
-// makeCPUMangerPod returns a pod with the provided ctnAttributes.
-func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
+// makeCPUMangerPodWCommand returns a pod with the provided ctnAttributes and configured shell command
+func makeCPUManagerPodWCommand(podName string, ctnAttributes []ctnAttribute, command string) *v1.Pod {
 	var containers []v1.Container
 	for _, ctnAttr := range ctnAttributes {
-		cpusetCmd := fmt.Sprintf("grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
 		ctn := v1.Container{
 			Name:  ctnAttr.ctnName,
 			Image: busyboxImage,
@@ -69,7 +68,7 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			},
-			Command: []string{"sh", "-c", cpusetCmd},
+			Command: []string{"sh", "-c", command},
 		}
 		containers = append(containers, ctn)
 	}
@@ -83,6 +82,17 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 			Containers:    containers,
 		},
 	}
+}
+
+// makeCPUMangerPod returns a pod with the provided ctnAttributes.
+func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
+	return makeCPUManagerPodWCommand(podName, ctnAttributes, "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
+}
+
+// makeCPUManagerPodQuota returns a pod with the provided ctnAttributes that prints its cpu quota configuration.
+func makeCPUManagerPodQuota(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
+	// Support both cgroup v2 and v1
+	return makeCPUManagerPodWCommand(podName, ctnAttributes, "([ -r /sys/fs/cgroup/cpu.max ] && cat /sys/fs/cgroup/cpu.max || cat /sys/fs/cgroup/cpu.cfs_quota_us) | cut -f1 -d' ' && sleep 1d")
 }
 
 // makeCPUMangerInitContainersPod returns a pod with init containers with the
@@ -302,6 +312,55 @@ func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int) {
 
 		gomega.Expect(cpus.Size()).To(gomega.Equal(cpuCount), "expected cpu set size == %d, got %q", cpuCount, cpus.String())
 	}
+
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(ctx, f, []string{pod.Name})
+	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
+}
+
+func runGuPodQuotaTest(ctx context.Context, f *framework.Framework, cpuCount int) {
+	var pod *v1.Pod
+
+	ctnAttrs := []ctnAttribute{
+		{
+			ctnName:    "gu-container-quota",
+			cpuRequest: fmt.Sprintf("%dm", 1000*cpuCount),
+			cpuLimit:   fmt.Sprintf("%dm", 1000*cpuCount),
+		},
+		{
+			ctnName:    "plain-container",
+			cpuRequest: fmt.Sprintf("%dm", 500*cpuCount),
+			cpuLimit:   fmt.Sprintf("%dm", 500*cpuCount),
+		},
+	}
+	pod = makeCPUManagerPodQuota("gu-pod-quota", ctnAttrs)
+	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+	ginkgo.By("checking if the quota was disabled for pinned containers only")
+	// A guaranteed and pinned container and pod should have cpu quota set to maximum (or -1 in cgroups v1)
+	for _, cnt := range pod.Spec.Containers {
+		ginkgo.By(fmt.Sprintf("validating the cpu quota inside container %s on Gu quota pod %s", cnt.Name, pod.Name))
+
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		framework.Logf("got pod logs: %v", logs)
+		quotas := strings.TrimSpace(logs)
+		framework.ExpectNoError(err, "parsing quota setting from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		// Needs to support both cgroup v1 and cgroup v2 value
+		if strings.HasPrefix(cnt.Name, "gu") {
+			gomega.Expect(quotas).To(gomega.Or(gomega.Equal("max"), gomega.Equal("-1")), "expected quota == max, got %q", quotas)
+		} else {
+			gomega.Expect(quotas).To(gomega.Not(gomega.Or(gomega.Equal("max"), gomega.Equal("-1"))), "expected quota to be enabled, got %q", quotas)
+		}
+	}
+
+	ginkgo.By(fmt.Sprintf("validating the cpu quota on Gu quota pod %s", pod.Name))
+
+	// TODO cpu manager reconcile period?
+	// podCgroupName, _ := m.GetPodContainerName(pod)
+	// containerConfig, _ := m.cgroupManager.GetCgroupConfig(podCgroupName, v1.ResourceCPU)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(ctx, f, []string{pod.Name})
@@ -608,6 +667,9 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		ginkgo.By("running a Gu pod")
 		runGuPodTest(ctx, f, 1)
+
+		ginkgo.By("running a Gu pod and checking quota")
+		runGuPodQuotaTest(ctx, f, 1)
 
 		ginkgo.By("running multiple Gu and non-Gu pods")
 		runMultipleGuNonGuPods(ctx, f, cpuCap, cpuAlloc)
