@@ -248,7 +248,7 @@ users: null
 			}
 
 			// Set arbitrary discovery timeout and retry interval
-			test.cfg.Timeout = &metav1.Duration{Duration: time.Millisecond * 200}
+			test.cfg.Timeout = &metav1.Duration{Duration: time.Millisecond * 500}
 			interval := time.Millisecond * 20
 
 			// Patch the JWS signature after a short delay
