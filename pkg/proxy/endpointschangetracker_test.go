@@ -1745,6 +1745,6 @@ func initializeCache(endpointSliceCache *EndpointSliceCache, endpointSlices []*d
 
 	for _, tracker := range endpointSliceCache.trackerByServiceMap {
 		tracker.applied = tracker.pending
-		tracker.pending = endpointSliceInfoByName{}
+		tracker.pending = endpointSliceDataByName{}
 	}
 }
