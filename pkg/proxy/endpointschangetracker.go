@@ -34,12 +34,6 @@ var supportedEndpointSliceAddressTypes = sets.New[string](
 	string(discovery.AddressTypeIPv6),
 )
 
-type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName) Endpoint
-
-// This handler is invoked by the apply function on every change. This function should not modify the
-// EndpointsMap's but just use the changes for any Proxier specific cleanup.
-type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
-
 // EndpointsChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
 type EndpointsChangeTracker struct {
@@ -58,6 +52,12 @@ type EndpointsChangeTracker struct {
 	// created hours or days before.
 	trackerStartTime time.Time
 }
+
+type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName) Endpoint
+
+// This handler is invoked by the apply function on every change. This function should not modify the
+// EndpointsMap's but just use the changes for any Proxier specific cleanup.
+type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
 // NewEndpointsChangeTracker initializes an EndpointsChangeTracker
 func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {

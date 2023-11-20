@@ -29,20 +29,6 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
-type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServicePortInfo) ServicePort
-
-// This handler is invoked by the apply function on every change. This function should not modify the
-// ServicePortMap's but just use the changes for any Proxier specific cleanup.
-type processServiceMapChangeFunc func(previous, current ServicePortMap)
-
-// serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
-// changes are accumulated, i.e. previous is state from before applying the changes,
-// current is state after applying all of the changes.
-type serviceChange struct {
-	previous ServicePortMap
-	current  ServicePortMap
-}
-
 // ServiceChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Services, keyed by their namespace and name.
 type ServiceChangeTracker struct {
@@ -56,6 +42,20 @@ type ServiceChangeTracker struct {
 	ipFamily                v1.IPFamily
 
 	recorder events.EventRecorder
+}
+
+type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServicePortInfo) ServicePort
+
+// This handler is invoked by the apply function on every change. This function should not modify the
+// ServicePortMap's but just use the changes for any Proxier specific cleanup.
+type processServiceMapChangeFunc func(previous, current ServicePortMap)
+
+// serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
+// changes are accumulated, i.e. previous is state from before applying the changes,
+// current is state after applying all of the changes.
+type serviceChange struct {
+	previous ServicePortMap
+	current  ServicePortMap
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
@@ -112,6 +112,9 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	return len(sct.items) > 0
 }
 
+// ServicePortMap maps a service to its ServicePort.
+type ServicePortMap map[ServicePortName]ServicePort
+
 // UpdateServiceMapResult is the updated results after applying service changes.
 type UpdateServiceMapResult struct {
 	// UpdatedServices lists the names of all services added/updated/deleted since the
@@ -137,9 +140,6 @@ func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 
 	}
 	return ports
 }
-
-// ServicePortMap maps a service to its ServicePort.
-type ServicePortMap map[ServicePortName]ServicePort
 
 // serviceToServiceMap translates a single Service object to a ServicePortMap.
 //

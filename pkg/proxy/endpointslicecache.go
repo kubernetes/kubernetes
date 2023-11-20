@@ -88,10 +88,6 @@ type endpointInfo struct {
 	Terminating bool
 }
 
-// spToEndpointMap stores groups Endpoint objects by ServicePortName and
-// endpoint string (returned by Endpoint.String()).
-type spToEndpointMap map[ServicePortName]map[string]Endpoint
-
 // NewEndpointSliceCache initializes an EndpointSliceCache.
 func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
@@ -221,6 +217,10 @@ func (cache *EndpointSliceCache) checkoutChanges() map[types.NamespacedName]*end
 
 	return changes
 }
+
+// spToEndpointMap stores groups Endpoint objects by ServicePortName and
+// endpoint string (returned by Endpoint.String()).
+type spToEndpointMap map[ServicePortName]map[string]Endpoint
 
 // getEndpointsMap computes an EndpointsMap for a given set of EndpointSlices.
 func (cache *EndpointSliceCache) getEndpointsMap(serviceNN types.NamespacedName, sliceInfoByName endpointSliceInfoByName) EndpointsMap {
