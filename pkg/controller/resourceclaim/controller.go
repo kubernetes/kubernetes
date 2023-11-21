@@ -195,7 +195,7 @@ func NewController(
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
-	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(claimInformerCache, claimInformerCache,
+	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(klog.NewContext(context.Background(), logger), claimInformerCache, claimInformerCache,
 		// Very long time to live, unlikely to be needed because
 		// the informer cache should get updated soon.
 		time.Hour,

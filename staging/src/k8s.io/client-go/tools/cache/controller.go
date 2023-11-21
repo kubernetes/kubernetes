@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -109,8 +110,8 @@ type Controller interface {
 	// to the Config's Queue and possibly invoke the occasional Resync
 	// on that Queue.  The other is to repeatedly Pop from the Queue
 	// and process with the Config's ProcessFunc.  Both of these
-	// continue until `stopCh` is closed.
-	Run(stopCh <-chan struct{})
+	// continue until the context is canceled.
+	Run(ctx context.Context)
 
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
@@ -132,10 +133,10 @@ func New(c *Config) Controller {
 // Run begins processing items, and will continue until a value is sent down stopCh or it is closed.
 // It's an error to call Run more than once.
 // Run blocks; call via go.
-func (c *controller) Run(stopCh <-chan struct{}) {
+func (c *controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	go func() {
-		<-stopCh
+		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
 	r := NewReflectorWithOptions(
@@ -161,9 +162,9 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 
 	var wg wait.Group
 
-	wg.StartWithChannel(stopCh, r.Run)
+	wg.StartWithContext(ctx, r.Run)
 
-	wait.Until(c.processLoop, time.Second, stopCh)
+	wait.UntilWithContext(ctx, c.processLoop, time.Second)
 	wg.Wait()
 }
 
@@ -185,13 +186,11 @@ func (c *controller) LastSyncResourceVersion() string {
 // TODO: Consider doing the processing in parallel. This will require a little thought
 // to make sure that we don't end up processing the same object multiple times
 // concurrently.
-//
-// TODO: Plumb through the stopCh here (and down to the queue) so that this can
-// actually exit when the controller is stopped. Or just give up on this stuff
-// ever being stoppable. Converting this whole package to use Context would
-// also be helpful.
-func (c *controller) processLoop() {
+func (c *controller) processLoop(ctx context.Context) {
 	for {
+		// TODO: Plumb through the ctx so that this can
+		// actually exit when the controller is stopped. Or just give up on this stuff
+		// ever being stoppable.
 		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
 			if err == ErrFIFOClosed {

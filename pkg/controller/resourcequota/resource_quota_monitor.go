@@ -124,15 +124,16 @@ func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactor
 type monitor struct {
 	controller cache.Controller
 
-	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
+	// ctx stops Controller. If ctx is nil, the monitor is considered to be
 	// not yet started.
-	stopCh chan struct{}
+	ctx    context.Context
+	cancel func()
 }
 
 // Run is intended to be called in a goroutine. Multiple calls of this is an
 // error.
-func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+func (m *monitor) run() {
+	m.controller.Run(m.ctx)
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -234,8 +235,8 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 	qm.monitors = current
 
 	for _, monitor := range toRemove {
-		if monitor.stopCh != nil {
-			close(monitor.stopCh)
+		if monitor.cancel != nil {
+			monitor.cancel()
 		}
 	}
 
@@ -264,10 +265,10 @@ func (qm *QuotaMonitor) StartMonitors(ctx context.Context) {
 	monitors := qm.monitors
 	started := 0
 	for _, monitor := range monitors {
-		if monitor.stopCh == nil {
-			monitor.stopCh = make(chan struct{})
+		if monitor.ctx == nil {
+			monitor.ctx, monitor.cancel = context.WithCancel(ctx)
 			qm.informerFactory.Start(qm.stopCh)
-			go monitor.Run()
+			go monitor.run()
 			started++
 		}
 	}
@@ -334,9 +335,9 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	monitors := qm.monitors
 	stopped := 0
 	for _, monitor := range monitors {
-		if monitor.stopCh != nil {
+		if monitor.cancel != nil {
 			stopped++
-			close(monitor.stopCh)
+			monitor.cancel()
 		}
 	}
 	logger.Info("QuotaMonitor stopped monitors", "stopped", stopped, "total", len(monitors))

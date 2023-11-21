@@ -17,6 +17,7 @@ limitations under the License.
 package watch
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -291,48 +292,42 @@ func (f *RaceFreeFakeWatcher) Action(action EventType, obj runtime.Object) {
 // ProxyWatcher lets you wrap your channel in watch Interface. threadsafe.
 type ProxyWatcher struct {
 	result chan Event
-	stopCh chan struct{}
-
-	mutex   sync.Mutex
-	stopped bool
+	ctx    context.Context
+	cancel func()
 }
 
 var _ Interface = &ProxyWatcher{}
 
-// NewProxyWatcher creates new ProxyWatcher by wrapping a channel
-func NewProxyWatcher(ch chan Event) *ProxyWatcher {
-	return &ProxyWatcher{
-		result:  ch,
-		stopCh:  make(chan struct{}),
-		stopped: false,
+// NewProxyWatcher creates new ProxyWatcher by wrapping a channel.
+// The ProxyWatcher runs until the context is done or Stop is called.
+func NewProxyWatcher(ctx context.Context, ch chan Event) *ProxyWatcher {
+	pw := &ProxyWatcher{
+		result: ch,
 	}
+	pw.ctx, pw.cancel = context.WithCancel(ctx)
+	return pw
 }
 
 // Stop implements Interface
 func (pw *ProxyWatcher) Stop() {
-	pw.mutex.Lock()
-	defer pw.mutex.Unlock()
-	if !pw.stopped {
-		pw.stopped = true
-		close(pw.stopCh)
-	}
+	pw.cancel()
 }
 
-// Stopping returns true if Stop() has been called
+// Context returns the context used by the watcher.
+// It will be done when Stop gets called or the parent
+// context is done.
+func (pw *ProxyWatcher) Context() context.Context {
+	return pw.ctx
+}
+
+// Stopping returns true if the context is done.
 func (pw *ProxyWatcher) Stopping() bool {
-	pw.mutex.Lock()
-	defer pw.mutex.Unlock()
-	return pw.stopped
+	return pw.ctx.Err() != nil
 }
 
 // ResultChan implements Interface
 func (pw *ProxyWatcher) ResultChan() <-chan Event {
 	return pw.result
-}
-
-// StopChan returns stop channel
-func (pw *ProxyWatcher) StopChan() <-chan struct{} {
-	return pw.stopCh
 }
 
 // MockWatcher implements watch.Interface with mockable functions.

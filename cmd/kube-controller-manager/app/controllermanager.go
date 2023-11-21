@@ -668,7 +668,7 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 	// Initialize the cloud provider with a reference to the clientBuilder only after token controller
 	// has started in case the cloud provider uses the client builder.
 	if controllerCtx.Cloud != nil {
-		controllerCtx.Cloud.Initialize(controllerCtx.ClientBuilder, ctx.Done())
+		controllerCtx.Cloud.Initialize(ctx, controllerCtx.ClientBuilder)
 	}
 
 	// Each controller is passed a context where the logger has the name of
@@ -800,6 +800,7 @@ func startServiceAccountTokenController(ctx context.Context, controllerContext C
 		return nil, false, fmt.Errorf("failed to build token generator: %v", err)
 	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		rootClientBuilder.ClientOrDie("tokens-controller"),

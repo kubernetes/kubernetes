@@ -144,7 +144,7 @@ func createTestController(ctx context.Context, cs clientset.Interface, observedD
 		},
 	)
 	framework.Logf("Starting informer...")
-	go controller.Run(ctx.Done())
+	go controller.Run(ctx)
 }
 
 const (
