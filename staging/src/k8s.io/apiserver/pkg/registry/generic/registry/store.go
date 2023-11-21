@@ -1350,7 +1350,11 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 		resourceVersion = options.ResourceVersion
 		predicate.AllowWatchBookmarks = options.AllowWatchBookmarks
 	}
-	return e.WatchPredicate(ctx, predicate, resourceVersion, options.SendInitialEvents)
+	var sendInitialEvents *bool
+	if options != nil {
+		sendInitialEvents = options.SendInitialEvents
+	}
+	return e.WatchPredicate(ctx, predicate, resourceVersion, sendInitialEvents)
 }
 
 // WatchPredicate starts a watch for the items that matches.

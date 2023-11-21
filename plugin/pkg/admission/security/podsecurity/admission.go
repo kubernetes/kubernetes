@@ -34,11 +34,13 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -49,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controlplane/storageinformers"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
 	podsecurityadmissionapi "k8s.io/pod-security-admission/api"
@@ -120,11 +123,26 @@ func newPlugin(reader io.Reader) (*Plugin, error) {
 	}, nil
 }
 
+func (p *Plugin) SetStorage(sm map[schema.GroupVersionResource]rest.Storage) {
+	f := storageinformers.NewSharedInformerFactoryWithOptions(
+		sm,
+		0,
+		storageinformers.WithTweakListOptions(
+			func(options *v1.ListOptions) {
+				if options.ResourceVersion == "" {
+					// read from cache
+					options.ResourceVersion = "1"
+				}
+			}))
+	informer := f.Core().V1().Pods()
+	p.podLister = informer.Lister()
+	f.Start(make(chan struct{}))
+}
+
 // SetExternalKubeInformerFactory registers an informer
 func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
-	p.podLister = f.Core().V1().Pods().Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 	p.updateDelegate()
 }

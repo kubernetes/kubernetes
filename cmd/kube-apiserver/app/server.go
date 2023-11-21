@@ -31,11 +31,13 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	registryrest "k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -142,6 +144,24 @@ cluster's shared state through which all other components interact.`,
 	return cmd
 }
 
+type WantsStorage interface {
+	SetStorage(map[schema.GroupVersionResource]registryrest.Storage)
+}
+
+type PluginInitializer struct {
+	groupVersionResourceStorageMap map[schema.GroupVersionResource]registryrest.Storage
+}
+
+func newPluginInitializer(groupVersionResourceStorageMap map[schema.GroupVersionResource]registryrest.Storage) *PluginInitializer {
+	return &PluginInitializer{groupVersionResourceStorageMap}
+}
+
+func (i *PluginInitializer) Initialize(plugin admission.Interface) {
+	if wants, ok := plugin.(WantsStorage); ok {
+		wants.SetStorage(i.groupVersionResourceStorageMap)
+	}
+}
+
 // Run runs the specified APIServer.  This should never exit.
 func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
@@ -149,7 +169,7 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
-	config, err := NewConfig(opts)
+	config, pluginInitializer, err := NewConfig(opts)
 	if err != nil {
 		return err
 	}
@@ -161,6 +181,21 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+
+	pluginInitializer = append(
+		pluginInitializer,
+		newPluginInitializer(completed.GroupVersionResourceStorageMap))
+	c := config.ControlPlane
+	clientgoExternalClient, _ := clientset.NewForConfig(c.GenericConfig.LoopbackClientConfig)
+	dynamicExternalClient, _ := dynamic.NewForConfig(c.GenericConfig.LoopbackClientConfig)
+	opts.Admission.ApplyTo(
+		c.GenericConfig,
+		c.ExtraConfig.VersionedInformers,
+		clientgoExternalClient,
+		dynamicExternalClient,
+		utilfeature.DefaultFeatureGate,
+		pluginInitializer...,
+	)
 
 	prepared, err := server.PrepareRun()
 	if err != nil {
@@ -183,6 +218,7 @@ func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregat
 	if err != nil {
 		return nil, err
 	}
+	config.GroupVersionResourceStorageMap = kubeAPIServer.GenericAPIServer.GroupVersionResourceStorageMap
 
 	// aggregator comes last in the chain
 	aggregatorServer, err := createAggregatorServer(config.Aggregator, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers, crdAPIEnabled)
@@ -302,24 +338,6 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	pluginInitializers, admissionPostStartHook, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
-	}
-	clientgoExternalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
-	}
-	dynamicExternalClient, err := dynamic.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
-	}
-	err = opts.Admission.ApplyTo(
-		genericConfig,
-		versionedInformers,
-		clientgoExternalClient,
-		dynamicExternalClient,
-		utilfeature.DefaultFeatureGate,
-		pluginInitializers...)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)
 	}
 	if err := config.GenericConfig.AddPostStartHook("start-kube-apiserver-admission-initializer", admissionPostStartHook); err != nil {
 		return nil, nil, nil, err

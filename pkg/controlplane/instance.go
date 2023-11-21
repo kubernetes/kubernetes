@@ -63,6 +63,7 @@ import (
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -692,6 +693,16 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			// This can happen when an entire API group, version, or development-stage (alpha, beta, GA) is disabled.
 			klog.Infof("API group %q is not enabled, skipping.", groupName)
 			continue
+		}
+
+		for version, resource := range apiGroupInfo.VersionedResourcesStorageMap {
+			if m.GenericAPIServer.GroupVersionResourceStorageMap == nil {
+				m.GenericAPIServer.GroupVersionResourceStorageMap = make(map[schema.GroupVersionResource]rest.Storage)
+			}
+			for name, storage := range resource {
+				gvr := schema.GroupVersionResource{groupName, version, name}
+				m.GenericAPIServer.GroupVersionResourceStorageMap[gvr] = storage
+			}
 		}
 
 		// Remove resources that serving kinds that are removed.

@@ -284,6 +284,8 @@ type GenericAPIServer struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+
+	GroupVersionResourceStorageMap map[schema.GroupVersionResource]rest.Storage
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
