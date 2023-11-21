@@ -745,6 +745,10 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 			AbsPath("/").
 			SetHeader("Accept", "application/json").DoRaw(ctx)
 		if err != nil {
+			if apierrors.IsForbidden(err) {
+				framework.Logf("Skip checking the removal of the group path due to lack of permission of reading the root path")
+				return true, nil
+			}
 			return false, err
 		}
 		err = json.Unmarshal(statusContent, &rootPaths)
