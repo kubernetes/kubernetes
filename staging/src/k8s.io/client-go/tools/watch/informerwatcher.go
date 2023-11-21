@@ -17,6 +17,7 @@ limitations under the License.
 package watch
 
 import (
+	"context"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -103,9 +104,10 @@ func (e *eventProcessor) stop() {
 // NewIndexerInformerWatcher will create an IndexerInformer and wrap it into watch.Interface
 // so you can use it anywhere where you'd have used a regular Watcher returned from Watch method.
 // it also returns a channel you can use to wait for the informers to fully shutdown.
-func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
+// The watcher will run until the context is done.
+func NewIndexerInformerWatcher(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
 	ch := make(chan watch.Event)
-	w := watch.NewProxyWatcher(ch)
+	w := watch.NewProxyWatcher(ctx, ch)
 	e := newEventProcessor(ch)
 
 	indexer, informer := cache.NewIndexerInformer(lw, objType, 0, cache.ResourceEventHandlerFuncs{
@@ -143,7 +145,7 @@ func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (
 	go func() {
 		defer close(doneCh)
 		defer e.stop()
-		informer.Run(w.StopChan())
+		informer.Run(w.Context())
 	}()
 
 	return indexer, informer, w, doneCh

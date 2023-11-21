@@ -274,7 +274,7 @@ func init() {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (vs *VSphere) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (vs *VSphere) Initialize(ctx context.Context, clientBuilder cloudprovider.ControllerClientBuilder) {
 	vs.kubeClient = clientBuilder.ClientOrDie("vsphere-legacy-cloud-provider")
 	vs.nodeManager.SetNodeGetter(vs.kubeClient.CoreV1())
 }

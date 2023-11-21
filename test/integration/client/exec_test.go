@@ -920,7 +920,7 @@ func startConfigMapInformer(ctx context.Context, t *testing.T, client clientset.
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, 0, informers.WithNamespace(namespace))
 	cmInformer := informerFactory.Core().V1().ConfigMaps().Informer()
 	cmInformer.AddEventHandler(&informerSpy)
-	if err := cmInformer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
+	if err := cmInformer.SetWatchErrorHandler(func(ctx context.Context, r *cache.Reflector, err error) {
 		// t.Logf("watch error handler: failure in reflector %#v: %v", r, err) // Uncomment for more verbose logging
 	}); err != nil {
 		t.Fatalf("could not set watch error handler: %v", err)

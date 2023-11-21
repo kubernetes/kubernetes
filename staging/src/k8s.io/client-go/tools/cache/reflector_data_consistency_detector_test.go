@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestWatchListConsistency(t *testing.T) {
@@ -89,16 +91,17 @@ func TestWatchListConsistency(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			listWatcher, store, _, stopCh := testData()
+			listWatcher, store, _, ctx, cancel := testData(t)
+			defer cancel()
 			for _, obj := range scenario.storeContent {
 				require.NoError(t, store.Add(obj))
 			}
 			listWatcher.customListResponse = scenario.podList
 
 			if scenario.expectPanic {
-				require.Panics(t, func() { checkWatchListConsistency(stopCh, "", scenario.podList.ResourceVersion, listWatcher, store) })
+				require.Panics(t, func() { checkWatchListConsistency(ctx, "", scenario.podList.ResourceVersion, listWatcher, store) })
 			} else {
-				checkWatchListConsistency(stopCh, "", scenario.podList.ResourceVersion, listWatcher, store)
+				checkWatchListConsistency(ctx, "", scenario.podList.ResourceVersion, listWatcher, store)
 			}
 
 			verifyListCounter(t, listWatcher, scenario.expectedListRequests)
@@ -108,20 +111,22 @@ func TestWatchListConsistency(t *testing.T) {
 }
 
 func TestDriveWatchLisConsistencyIfRequired(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	checkWatchListConsistencyIfRequested(stopCh, "", "", nil, nil)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	checkWatchListConsistencyIfRequested(ctx, "", "", nil, nil)
 }
 
 func TestWatchListConsistencyRetry(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	stopListErrorAfter := 5
 	errLister := &errorLister{stopErrorAfter: stopListErrorAfter}
 
-	checkWatchListConsistency(stopCh, "", "", errLister, store)
+	checkWatchListConsistency(ctx, "", "", errLister, store)
 	require.Equal(t, errLister.listCounter, errLister.stopErrorAfter)
 }
 

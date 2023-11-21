@@ -43,7 +43,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -647,7 +647,7 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 
 // Initialize takes in a clientBuilder and spawns a goroutine for watching the clusterid configmap.
 // This must be called before utilizing the funcs of gce.ClusterID
-func (g *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (g *Cloud) Initialize(ctx context.Context, clientBuilder cloudprovider.ControllerClientBuilder) {
 	g.clientBuilder = clientBuilder
 	g.client = clientBuilder.ClientOrDie("cloud-provider")
 
@@ -655,8 +655,8 @@ func (g *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
 	g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
 
-	go g.watchClusterID(stop)
-	go g.metricsCollector.Run(stop)
+	go g.watchClusterID(ctx)
+	go g.metricsCollector.Run(ctx.Done())
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.

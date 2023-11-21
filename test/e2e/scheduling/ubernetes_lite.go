@@ -120,7 +120,7 @@ func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCou
 	// Based on the callers, replicas is always positive number: zoneCount >= 0 implies (2*zoneCount)+1 > 0.
 	// Thus, no need to test for it. Once the precondition changes to zero number of replicas,
 	// test for replicaCount > 0. Otherwise, StartPods panics.
-	framework.ExpectNoError(testutils.StartPods(f.ClientSet, replicaCount, f.Namespace.Name, serviceName, *podSpec, false, framework.Logf))
+	framework.ExpectNoError(testutils.StartPods(ctx, f.ClientSet, replicaCount, f.Namespace.Name, serviceName, *podSpec, false, framework.Logf))
 
 	// Wait for all of them to be scheduled
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"service": serviceName}))

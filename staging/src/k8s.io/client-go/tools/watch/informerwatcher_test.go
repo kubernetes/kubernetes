@@ -36,6 +36,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestEventProcessorExit is expected to timeout if the event processor fails
@@ -206,6 +207,10 @@ func TestNewInformerWatcher(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			var expected []watch.Event
 			for _, o := range tc.objects {
 				expected = append(expected, watch.Event{
@@ -227,13 +232,13 @@ func TestNewInformerWatcher(t *testing.T) {
 
 			lw := &cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return fake.CoreV1().Secrets("").List(context.TODO(), options)
+					return fake.CoreV1().Secrets("").List(ctx, options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return fake.CoreV1().Secrets("").Watch(context.TODO(), options)
+					return fake.CoreV1().Secrets("").Watch(ctx, options)
 				},
 			}
-			_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+			_, _, w, done := NewIndexerInformerWatcher(ctx, lw, &corev1.Secret{})
 
 			var result []watch.Event
 		loop:
@@ -285,6 +290,10 @@ func TestNewInformerWatcher(t *testing.T) {
 //
 // Code from @liggitt
 func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	listCalls := 0
 	watchCalls := 0
 	lw := &cache.ListWatch{
@@ -314,7 +323,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			return w, nil
 		},
 	}
-	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+	_, _, w, done := NewIndexerInformerWatcher(ctx, lw, &corev1.Secret{})
 	defer w.Stop()
 
 	// Expect secret add

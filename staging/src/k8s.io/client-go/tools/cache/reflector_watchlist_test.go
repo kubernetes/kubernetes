@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -397,7 +399,8 @@ func TestWatchList(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			scenario := s // capture as local variable
-			listWatcher, store, reflector, stopCh := testData()
+			listWatcher, store, reflector, ctx, cancel := testData(t)
+			defer cancel()
 			go func() {
 				for i, e := range scenario.watchEvents {
 					listWatcher.fakeWatcher.Action(e.Type, e.Object)
@@ -406,7 +409,7 @@ func TestWatchList(t *testing.T) {
 						continue
 					}
 					if i+1 == scenario.closeAfterWatchEvents {
-						close(stopCh)
+						cancel()
 					}
 				}
 			}()
@@ -418,7 +421,7 @@ func TestWatchList(t *testing.T) {
 				reflector.UseWatchList = false
 			}
 
-			err := reflector.ListAndWatch(stopCh)
+			err := reflector.ListAndWatch(ctx)
 			if scenario.expectedError != nil && err == nil {
 				t.Fatalf("expected error %q, got nil", scenario.expectedError)
 			}
@@ -495,19 +498,20 @@ func makePod(name, rv string) *v1.Pod {
 	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv, UID: types.UID(name)}}
 }
 
-func testData() (*fakeListWatcher, Store, *Reflector, chan struct{}) {
+func testData(t *testing.T) (*fakeListWatcher, Store, *Reflector, context.Context, func()) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	stopCh := make(chan struct{})
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	lw := &fakeListWatcher{
 		fakeWatcher: watch.NewFake(),
 		stop: func() {
-			close(stopCh)
+			cancel()
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	r.UseWatchList = true
 
-	return lw, s, r, stopCh
+	return lw, s, r, ctx, cancel
 }
 
 type fakeListWatcher struct {

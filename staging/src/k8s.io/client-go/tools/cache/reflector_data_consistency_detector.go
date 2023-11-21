@@ -47,11 +47,11 @@ func init() {
 //
 // Note that this function will panic when data inconsistency is detected.
 // This is intentional because we want to catch it in the CI.
-func checkWatchListConsistencyIfRequested(stopCh <-chan struct{}, identity string, lastSyncedResourceVersion string, listerWatcher Lister, store Store) {
+func checkWatchListConsistencyIfRequested(ctx context.Context, identity string, lastSyncedResourceVersion string, listerWatcher Lister, store Store) {
 	if !dataConsistencyDetectionEnabled {
 		return
 	}
-	checkWatchListConsistency(stopCh, identity, lastSyncedResourceVersion, listerWatcher, store)
+	checkWatchListConsistency(ctx, identity, lastSyncedResourceVersion, listerWatcher, store)
 }
 
 // checkWatchListConsistency exists solely for testing purposes.
@@ -59,26 +59,27 @@ func checkWatchListConsistencyIfRequested(stopCh <-chan struct{}, identity strin
 // it is guarded by an environmental variable.
 // we cannot manipulate the environmental variable because
 // it will affect other tests in this package.
-func checkWatchListConsistency(stopCh <-chan struct{}, identity string, lastSyncedResourceVersion string, listerWatcher Lister, store Store) {
-	klog.Warningf("%s: data consistency check for the watch-list feature is enabled, this will result in an additional call to the API server.", identity)
+func checkWatchListConsistency(ctx context.Context, identity string, lastSyncedResourceVersion string, listerWatcher Lister, store Store) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Data consistency check for the watch-list feature is enabled, this will result in an additional call to the API server", "identity", identity)
 	opts := metav1.ListOptions{
 		ResourceVersion:      lastSyncedResourceVersion,
 		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 	}
 	var list runtime.Object
-	err := wait.PollUntilContextCancel(wait.ContextForChannel(stopCh), time.Second, true, func(_ context.Context) (done bool, err error) {
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(_ context.Context) (done bool, err error) {
 		list, err = listerWatcher.List(opts)
 		if err != nil {
 			// the consistency check will only be enabled in the CI
 			// and LIST calls in general will be retired by the client-go library
 			// if we fail simply log and retry
-			klog.Errorf("failed to list data from the server, retrying until stopCh is closed, err: %v", err)
+			logger.Error(err, "Failed to list data from the server, retrying until stopCh is closed")
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		klog.Errorf("failed to list data from the server, the watch-list consistency check won't be performed, stopCh was closed, err: %v", err)
+		logger.Error(err, "Failed to list data from the server, the watch-list consistency check won't be performed, stopCh was closed")
 		return
 	}
 
@@ -94,7 +95,7 @@ func checkWatchListConsistency(stopCh <-chan struct{}, identity string, lastSync
 	sort.Sort(byUID(storeItems))
 
 	if !cmp.Equal(listItems, storeItems) {
-		klog.Infof("%s: data received by the new watch-list api call is different than received by the standard list api call, diff: %v", identity, cmp.Diff(listItems, storeItems))
+		logger.Info("Data received by the new watch-list api call is different than received by the standard list api call", "reflector", identity, "diff", cmp.Diff(listItems, storeItems))
 		msg := "data inconsistency detected for the watch-list feature, panicking!"
 		panic(msg)
 	}

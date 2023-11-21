@@ -41,6 +41,7 @@ import (
 	kubectlproxy "k8s.io/kubectl/pkg/proxy"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type extractRT struct {
@@ -255,6 +256,7 @@ func testWatchClientTimeouts(t *testing.T, config *restclient.Config) {
 }
 
 func testWatchClientTimeout(t *testing.T, config *restclient.Config, timeout, timeoutSeconds time.Duration) {
+	_, ctx := ktesting.NewTestContext(t)
 	config.Timeout = timeout
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -263,14 +265,15 @@ func testWatchClientTimeout(t *testing.T, config *restclient.Config, timeout, ti
 
 	listCount := 0
 	watchCount := 0
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	listWatch := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			t.Logf("listing (version=%s continue=%s)", options.ResourceVersion, options.Continue)
 			listCount++
 			if listCount > 1 {
 				t.Errorf("listed more than once")
-				close(stopCh)
+				cancel()
 			}
 			return client.CoreV1().ConfigMaps(metav1.NamespaceAll).List(context.TODO(), options)
 		},
@@ -283,15 +286,15 @@ func testWatchClientTimeout(t *testing.T, config *restclient.Config, timeout, ti
 			watchCount++
 			if watchCount > 1 {
 				// success, restarted watch
-				close(stopCh)
+				cancel()
 			}
 			return client.CoreV1().ConfigMaps(metav1.NamespaceAll).Watch(context.TODO(), options)
 		},
 	}
 	_, informer := cache.NewIndexerInformer(listWatch, &corev1.ConfigMap{}, 30*time.Minute, cache.ResourceEventHandlerFuncs{}, cache.Indexers{})
-	informer.Run(stopCh)
+	informer.Run(ctx)
 	select {
-	case <-stopCh:
+	case <-ctx.Done():
 	case <-time.After(time.Minute):
 		t.Fatal("timeout")
 	}

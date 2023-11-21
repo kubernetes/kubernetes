@@ -651,7 +651,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 					},
 				},
 			)
-			go podController.Run(ctx.Done())
+			go podController.Run(ctx)
 
 			// prepare three ReplicaSet
 			rsConfs := []pauseRSConfig{

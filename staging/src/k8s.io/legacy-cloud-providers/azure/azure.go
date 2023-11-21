@@ -20,6 +20,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -667,7 +668,7 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (az *Cloud) Initialize(ctx context.Context, clientBuilder cloudprovider.ControllerClientBuilder) {
 	az.KubeClient = clientBuilder.ClientOrDie("azure-cloud-provider")
 	az.eventBroadcaster = record.NewBroadcaster()
 	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.KubeClient.CoreV1().Events("")})

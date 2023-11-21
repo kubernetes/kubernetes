@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,7 +71,7 @@ type ClusterID struct {
 }
 
 // Continually watches for changes to the cluster id config map
-func (g *Cloud) watchClusterID(stop <-chan struct{}) {
+func (g *Cloud) watchClusterID(ctx context.Context) {
 	g.ClusterID = ClusterID{
 		cfgMapKey: fmt.Sprintf("%v/%v", UIDNamespace, UIDConfigMapName),
 		client:    g.client,
@@ -117,7 +117,7 @@ func (g *Cloud) watchClusterID(stop <-chan struct{}) {
 	var controller cache.Controller
 	g.ClusterID.store, controller = cache.NewInformer(newSingleObjectListerWatcher(listerWatcher, UIDConfigMapName), &v1.ConfigMap{}, updateFuncFrequency, mapEventHandler)
 
-	controller.Run(stop)
+	controller.Run(ctx)
 }
 
 // GetID returns the id which is unique to this cluster

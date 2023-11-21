@@ -119,7 +119,7 @@ func deleteObjectAndWaitForGC(ctx context.Context, c clientset.Interface, rtObje
 		return err
 	}
 
-	ps, err := testutils.NewPodStore(c, ns, selector, fields.Everything())
+	ps, err := testutils.NewPodStore(ctx, c, ns, selector, fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -229,7 +229,7 @@ func WaitForControlledPodsRunning(ctx context.Context, c clientset.Interface, ns
 	if err != nil {
 		return err
 	}
-	err = testutils.WaitForEnoughPodsWithLabelRunning(c, ns, selector, int(replicas))
+	err = testutils.WaitForEnoughPodsWithLabelRunning(ctx, c, ns, selector, int(replicas))
 	if err != nil {
 		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %w", name, err)
 	}
