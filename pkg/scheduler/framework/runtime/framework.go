@@ -355,32 +355,14 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		options.captureProfile(outputProfile)
 	}
 
-	for _, e := range f.getExtensionPoints(profile.Plugins) {
-		plugins := reflect.ValueOf(e.slicePtr).Elem()
-		pluginType := plugins.Type().Elem()
+	// Logs the enabled plugins enabled for each extension point
+	m := f.ListPlugins()
+	pluginMap := reflect.ValueOf(*m)
+	typeOfMap := pluginMap.Type()
+
+	for i := 0; i < pluginMap.NumField(); i++ {
 		loggerV := logger.V(2)
-
-		enabledSet := newOrderedSet()
-		for _, plugin := range e.plugins.Enabled {
-			enabledSet.insert(plugin.Name)
-		}
-
-		disabledSet := sets.New[string]()
-		for _, disabledPlugin := range e.plugins.Disabled {
-			disabledSet.Insert(disabledPlugin.Name)
-		}
-
-		if disabledSet.Has("*") {
-			continue
-		}
-
-		for _, ep := range profile.Plugins.MultiPoint.Enabled {
-			if !enabledSet.has(ep.Name) {
-				enabledSet.insert(ep.Name)
-			}
-		}
-
-		loggerV.Info("Plugins enabled for", "extension", pluginType, "plugins", enabledSet.list)
+		loggerV.Info("Plugins enabled for", "extension", typeOfMap.Field(i).Name, "plugins", pluginMap.Field(i).Interface())
 	}
 
 	f.setInstrumentedPlugins()
