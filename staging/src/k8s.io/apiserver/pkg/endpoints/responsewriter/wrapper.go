@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime"
+
+	"k8s.io/klog/v2"
 )
 
 // UserProvidedDecorator represensts a user (client that uses this package)
@@ -101,6 +104,13 @@ func WrapForHTTP1Or2(decorator UserProvidedDecorator) http.ResponseWriter {
 	}
 
 	// we should never be here for either http/1.x or http2 request
+
+	// TODO: debug only, remove
+	const size = 64 << 10
+	buf := make([]byte, size)
+	buf = buf[:runtime.Stack(buf, false)]
+	klog.Infof("ResponseWriter object is not a CloseNotifierFlusher: %T, call stack: %s", inner, buf)
+
 	return decorator
 }
 
