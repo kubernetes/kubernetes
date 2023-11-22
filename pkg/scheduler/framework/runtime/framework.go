@@ -355,9 +355,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		options.captureProfile(outputProfile)
 	}
 
-	// Logs the enabled plugins enabled for each extension point
-	m := f.ListPlugins()
-	pluginMap := reflect.ValueOf(*m)
+	m := *f.ListPlugins()
+	pluginMap := reflect.ValueOf(m)
 	typeOfMap := pluginMap.Type()
 
 	for i := 0; i < pluginMap.NumField(); i++ {
