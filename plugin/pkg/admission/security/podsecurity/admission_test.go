@@ -19,7 +19,7 @@ package podsecurity
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 
@@ -116,7 +116,7 @@ func BenchmarkVerifyPod(b *testing.B) {
 
 	corePod := &core.Pod{}
 	v1Pod := &corev1.Pod{}
-	data, err := ioutil.ReadFile("testdata/pod_restricted.yaml")
+	data, err := os.ReadFile("testdata/pod_restricted.yaml")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 	}
 
 	v1Pod := &corev1.Pod{}
-	data, err := ioutil.ReadFile("testdata/pod_baseline.yaml")
+	data, err := os.ReadFile("testdata/pod_baseline.yaml")
 	if err != nil {
 		b.Fatal(err)
 	}
