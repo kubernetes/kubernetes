@@ -6,9 +6,15 @@ go 1.20
 
 require (
 	github.com/gogo/protobuf v1.3.2
+<<<<<<< HEAD
 	google.golang.org/grpc v1.54.0
 	k8s.io/apimachinery v0.28.2
 	k8s.io/client-go v0.28.2
+=======
+	google.golang.org/grpc v1.56.3
+	k8s.io/apimachinery v0.0.0
+	k8s.io/client-go v0.0.0
+>>>>>>> v1.28.4
 	k8s.io/klog/v2 v2.100.1
 )
 
@@ -20,8 +26,13 @@ require (
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230525234030-28d5490b6b19 // indirect
+<<<<<<< HEAD
 	google.golang.org/protobuf v1.30.0 // indirect
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
+=======
+	google.golang.org/protobuf v1.31.0 // indirect
+	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
+>>>>>>> v1.28.4
 )
 
 replace (

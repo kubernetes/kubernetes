@@ -22,9 +22,15 @@ require (
 	golang.org/x/oauth2 v0.8.0
 	golang.org/x/term v0.13.0
 	golang.org/x/time v0.3.0
+<<<<<<< HEAD
 	google.golang.org/protobuf v1.30.0
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
+=======
+	google.golang.org/protobuf v1.31.0
+	k8s.io/api v0.0.0
+	k8s.io/apimachinery v0.0.0
+>>>>>>> v1.28.4
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b

@@ -286,7 +286,7 @@ type PickResult struct {
 	//
 	// LB policies with child policies are responsible for propagating metadata
 	// injected by their children to the ClientConn, as part of Pick().
-	Metatada metadata.MD
+	Metadata metadata.MD
 }
 
 // TransientFailureError returns e.  It exists for backward compatibility and

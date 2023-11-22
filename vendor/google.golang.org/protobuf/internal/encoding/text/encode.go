@@ -53,8 +53,10 @@ type encoderState struct {
 // If outputASCII is true, strings will be serialized in such a way that
 // multi-byte UTF-8 sequences are escaped. This property ensures that the
 // overall output is ASCII (as opposed to UTF-8).
-func NewEncoder(indent string, delims [2]byte, outputASCII bool) (*Encoder, error) {
-	e := &Encoder{}
+func NewEncoder(buf []byte, indent string, delims [2]byte, outputASCII bool) (*Encoder, error) {
+	e := &Encoder{
+		encoderState: encoderState{out: buf},
+	}
 	if len(indent) > 0 {
 		if strings.Trim(indent, " \t") != "" {
 			return nil, errors.New("indent may only be composed of space and tab characters")
@@ -195,13 +197,13 @@ func appendFloat(out []byte, n float64, bitSize int) []byte {
 // WriteInt writes out the given signed integer value.
 func (e *Encoder) WriteInt(n int64) {
 	e.prepareNext(scalar)
-	e.out = append(e.out, strconv.FormatInt(n, 10)...)
+	e.out = strconv.AppendInt(e.out, n, 10)
 }
 
 // WriteUint writes out the given unsigned integer value.
 func (e *Encoder) WriteUint(n uint64) {
 	e.prepareNext(scalar)
-	e.out = append(e.out, strconv.FormatUint(n, 10)...)
+	e.out = strconv.AppendUint(e.out, n, 10)
 }
 
 // WriteLiteral writes out the given string as a literal value without quotes.
