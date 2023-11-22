@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 )
 
-var supportedEndpointSliceAddressTypes = sets.New[string](
-	string(discovery.AddressTypeIPv4),
-	string(discovery.AddressTypeIPv6),
+var supportedEndpointSliceAddressTypes = sets.New[discovery.AddressType](
+	discovery.AddressTypeIPv4,
+	discovery.AddressTypeIPv6,
 )
 
 // EndpointsChangeTracker carries state about uncommitted changes to an arbitrary number of
@@ -76,7 +76,7 @@ func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFun
 // change that needs to be synced; note that this is different from the return value of
 // ServiceChangeTracker.Update().
 func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
-	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
+	if !supportedEndpointSliceAddressTypes.Has(endpointSlice.AddressType) {
 		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "addressType", endpointSlice.AddressType)
 		return false
 	}
