@@ -117,7 +117,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Min Available", Type: "string", Description: "The minimum number of pods that must be available."},
 		{Name: "Max Unavailable", Type: "string", Description: "The maximum number of pods that may be unavailable."},
-		{Name: "Allowed Disruptions", Type: "integer", Description: "Calculated number of pods that may be disrupted at this time."},
+		{Name: "Disruptions Allowed", Type: "integer", Description: "Calculated number of pods that may be disrupted at this time."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(podDisruptionBudgetColumnDefinitions, printPodDisruptionBudget)
