@@ -41,7 +41,7 @@ import (
 	"k8s.io/utils/path"
 )
 
-const apiserverService = "apiserver"
+const defaultApiserverService = "apiserver"
 
 var (
 	cfgScheme = runtime.NewScheme()
@@ -109,9 +109,14 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		}
 	}
 
+	serviceName := defaultApiserverService
+	if traceConfig != nil && traceConfig.ServiceName != nil {
+		serviceName := *traceConfig.ServiceName
+	}
+
 	resourceOpts := []resource.Option{
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String(apiserverService),
+			semconv.ServiceNameKey.String(serviceName),
 			semconv.ServiceInstanceIDKey.String(c.APIServerID),
 		),
 	}

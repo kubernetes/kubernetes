@@ -41,6 +41,9 @@ func ValidateTracingConfiguration(traceConfig *TracingConfiguration, featureGate
 	if traceConfig.Endpoint != nil {
 		allErrs = append(allErrs, validateEndpoint(*traceConfig.Endpoint, fldPath.Child("endpoint"))...)
 	}
+	if traceConfig.ServiceName != nil {
+		allErrs = append(allErrs, validateServiceName(*traceConfig.ServiceName, fldPath.Child("serviceName"))...)
+	}
 	return allErrs
 }
 
@@ -84,5 +87,18 @@ func validateEndpoint(endpoint string, fldPath *field.Path) field.ErrorList {
 			fmt.Sprintf("unsupported scheme: %v.  Options are none, dns, unix, or unix-abstract.  See https://github.com/grpc/grpc/blob/master/doc/naming.md", url.Scheme),
 		))
 	}
+	return errs
+}
+
+func validateServiceName(serviceName string, fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
+	if serviceName == "" {
+		errs = append(errs, field.Invalid(
+			fldPath, serviceName,
+			"serviceName must be non-empty",
+		))
+		return errs
+	}
+
 	return errs
 }

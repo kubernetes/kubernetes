@@ -31,6 +31,7 @@ var (
 	localhost    = "localhost:4317"
 	ipAddress    = "127.0.0.1:4317"
 	samplingRate = int32(12345)
+	serviceName  = "customServiceName"
 )
 
 func strptr(s string) *string {
@@ -106,10 +107,12 @@ apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: TracingConfiguration
 endpoint: localhost:4317
 samplingRatePerMillion: 12345
+serviceName: customServiceName
 `,
 			expectedResult: &tracingapi.TracingConfiguration{
 				Endpoint:               &localhost,
 				SamplingRatePerMillion: &samplingRate,
+				ServiceName:            &serviceName,
 			},
 			expectedError: nil,
 		},

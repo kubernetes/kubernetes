@@ -31,6 +31,8 @@ func TestValidateTracingConfiguration(t *testing.T) {
 	unixEndpoint := "unix://path/to/socket"
 	invalidURL := "dn%2s://localhost:4317"
 	httpEndpoint := "http://localhost:4317"
+	validServiceName := "customServiceName"
+	invalidServiceName := ""
 	testcases := []struct {
 		name        string
 		expectError bool
@@ -90,6 +92,20 @@ func TestValidateTracingConfiguration(t *testing.T) {
 			expectError: true,
 			contents: &TracingConfiguration{
 				Endpoint: &invalidURL,
+			},
+		},
+		{
+			name:        "valid serviceName",
+			expectError: false,
+			contents: &TracingConfiguration{
+				ServiceName: &validServiceName,
+			},
+		},
+		{
+			name:        "invalid serviceName",
+			expectError: true,
+			contents: &TracingConfiguration{
+				ServiceName: &invalidServiceName,
 			},
 		},
 	}

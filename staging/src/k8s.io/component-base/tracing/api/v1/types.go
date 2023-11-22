@@ -29,4 +29,9 @@ type TracingConfiguration struct {
 	// rate, but otherwise never samples.
 	// +optional
 	SamplingRatePerMillion *int32 `json:"samplingRatePerMillion,omitempty"`
+
+	// ServiceName defines the service.name of traces sent out
+	// Defaults to 'apiserver'
+	// +optional
+	ServiceName *string `json:"serviceName,omitempty"`
 }
