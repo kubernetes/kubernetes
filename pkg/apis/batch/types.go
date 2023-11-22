@@ -129,7 +129,7 @@ const (
 	// This is an action which might be taken on a pod failure - mark the
 	// Job's index as failed to avoid restarts within this index. This action
 	// can only be used when backoffLimitPerIndex is set.
-	// This value is alpha-level.
+	// This value is beta-level.
 	PodFailurePolicyActionFailIndex PodFailurePolicyAction = "FailIndex"
 
 	// This is an action which might be taken on a pod failure - the counter towards
@@ -449,9 +449,6 @@ type JobStatus struct {
 	Terminating *int32
 
 	// The number of active pods which have a Ready condition.
-	//
-	// This field is beta-level. The job controller populates the field when
-	// the feature gate JobReadyPods is enabled (enabled by default).
 	// +optional
 	Ready *int32
 

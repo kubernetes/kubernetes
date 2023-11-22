@@ -41,6 +41,10 @@ type Interface interface {
 	// Returns usage information about the root filesystem.
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 
+	// Returns usage information about the writeable layer.
+	// KEP 4191 can separate the image filesystem
+	ContainerFsInfo() (cadvisorapiv2.FsInfo, error)
+
 	// Get events streamed through passedChannel that fit the request.
 	WatchEvents(request *events.Request) (*events.EventChannel, error)
 
@@ -52,4 +56,6 @@ type Interface interface {
 type ImageFsInfoProvider interface {
 	// ImageFsInfoLabel returns the label cAdvisor should use to find the filesystem holding container images.
 	ImageFsInfoLabel() (string, error)
+	// In split image filesystem this will be different from ImageFsInfoLabel
+	ContainerFsInfoLabel() (string, error)
 }

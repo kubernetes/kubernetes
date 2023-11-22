@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	volumeevents "k8s.io/kubernetes/pkg/controller/volume/events"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -86,7 +87,7 @@ import (
 	5. Tests to verify dynamic pv creation using availability zones work across different datacenters in the same VC.
 */
 
-var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Zone Support", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("zone-support")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

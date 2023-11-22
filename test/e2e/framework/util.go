@@ -136,7 +136,7 @@ var (
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
-	ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
+	ProvidersWithSSH = []string{"gce", "gke", "aws", "local", "azure"}
 
 	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)

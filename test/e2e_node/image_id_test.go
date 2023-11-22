@@ -24,13 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
+var _ = SIGDescribe("ImageID", nodefeature.ImageID, func() {
 
 	busyBoxImage := "registry.k8s.io/e2e-test-images/busybox@sha256:a9155b13325b2abef48e71de77bb8ac015412a566829f621d06bfae5c699b1b9"
 
@@ -60,12 +61,12 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 		framework.ExpectNoError(err)
 
 		status := runningPod.Status
-
-		if len(status.ContainerStatuses) == 0 {
-			framework.Failf("Unexpected pod status; %s", dump.Pretty(status))
-			return
-		}
-
-		gomega.Expect(status.ContainerStatuses[0].ImageID).To(gomega.ContainSubstring(busyBoxImage))
+		gomega.Expect(status.ContainerStatuses).To(gomega.HaveLen(1), dump.Pretty(status))
+		gomega.Expect(status.ContainerStatuses[0].ImageID).To(
+			gomega.SatisfyAny(
+				gomega.Equal(busyBoxImage),
+				gomega.MatchRegexp(`[[:xdigit:]]{64}`),
+			),
+		)
 	})
 })

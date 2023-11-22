@@ -172,6 +172,7 @@ type JWTAuthenticator struct {
 	Issuer               Issuer
 	ClaimValidationRules []ClaimValidationRule
 	ClaimMappings        ClaimMappings
+	UserValidationRules  []UserValidationRule
 }
 
 // Issuer provides the configuration for a external provider specific settings.
@@ -185,18 +186,43 @@ type Issuer struct {
 type ClaimValidationRule struct {
 	Claim         string
 	RequiredValue string
+
+	Expression string
+	Message    string
 }
 
 // ClaimMappings provides the configuration for claim mapping
 type ClaimMappings struct {
 	Username PrefixedClaimOrExpression
 	Groups   PrefixedClaimOrExpression
+	UID      ClaimOrExpression
+	Extra    []ExtraMapping
 }
 
 // PrefixedClaimOrExpression provides the configuration for a single prefixed claim or expression.
 type PrefixedClaimOrExpression struct {
 	Claim  string
 	Prefix *string
+
+	Expression string
+}
+
+// ClaimOrExpression provides the configuration for a single claim or expression.
+type ClaimOrExpression struct {
+	Claim      string
+	Expression string
+}
+
+// ExtraMapping provides the configuration for a single extra mapping.
+type ExtraMapping struct {
+	Key             string
+	ValueExpression string
+}
+
+// UserValidationRule provides the configuration for a single user validation rule.
+type UserValidationRule struct {
+	Expression string
+	Message    string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

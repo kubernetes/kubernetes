@@ -90,6 +90,7 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	framework.TestContext.NodeE2E = true
 	flags.StringVar(&framework.TestContext.BearerToken, "bearer-token", "", "The bearer token to authenticate with. If not specified, it would be a random token. Currently this token is only used in node e2e tests.")
 	flags.StringVar(&framework.TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
+	flags.StringVar(&framework.TestContext.KubeletConfigDropinDir, "config-dir", "", "Path to a directory containing drop-in configurations for the kubelet.")
 	// TODO(random-liu): Move kubelet start logic out of the test.
 	// TODO(random-liu): Move log fetch logic out of the test.
 	// There are different ways to start kubelet (systemd, initd, docker, manually started etc.)
@@ -200,6 +201,14 @@ func TestE2eNode(t *testing.T) {
 
 	// We're not running in a special mode so lets run tests.
 	gomega.RegisterFailHandler(ginkgo.Fail)
+	// Initialize the KubeletConfigDropinDir again if the test doesn't run in run-kubelet-mode.
+	if framework.TestContext.KubeletConfigDropinDir == "" {
+		var err error
+		framework.TestContext.KubeletConfigDropinDir, err = services.KubeletConfigDirCWDDir()
+		if err != nil {
+			klog.Errorf("failed to create kubelet config directory: %v", err)
+		}
+	}
 	reportDir := framework.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exist

@@ -60,7 +60,7 @@ func TestIsStandardResource(t *testing.T) {
 		{"requests.hugepages-2Mi", true},
 	}
 	for i, tc := range testCases {
-		if IsStandardResourceName(tc.input) != tc.output {
+		if IsStandardResourceName(core.ResourceName(tc.input)) != tc.output {
 			t.Errorf("case[%d], input: %s, expected: %t, got: %t", i, tc.input, tc.output, !tc.output)
 		}
 	}
@@ -77,7 +77,7 @@ func TestIsStandardContainerResource(t *testing.T) {
 		{"hugepages-2Mi", true},
 	}
 	for i, tc := range testCases {
-		if IsStandardContainerResourceName(tc.input) != tc.output {
+		if IsStandardContainerResourceName(core.ResourceName(tc.input)) != tc.output {
 			t.Errorf("case[%d], input: %s, expected: %t, got: %t", i, tc.input, tc.output, !tc.output)
 		}
 	}

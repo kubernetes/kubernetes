@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -39,7 +40,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = sigDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", skipUnlessWindows(func() {
+var _ = sigDescribe(feature.Windows, "Memory Limits", framework.WithSerial(), framework.WithSlow(), skipUnlessWindows(func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

@@ -333,6 +333,13 @@ type KubeletVolumeHost interface {
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
+
+	// Returns trust anchors from the named ClusterTrustBundle.
+	GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error)
+
+	// Returns trust anchors from the ClusterTrustBundles selected by signer
+	// name and label selector.
+	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use

@@ -38,6 +38,7 @@ import (
 	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -53,13 +54,13 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		Testname: Pod with the non-existing RuntimeClass is rejected.
 		Description: The Pod requesting the non-existing RuntimeClass must be rejected.
 	*/
-	framework.ConformanceIt("should reject a Pod requesting a non-existent RuntimeClass [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should reject a Pod requesting a non-existent RuntimeClass", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := f.Namespace.Name + "-nonexistent"
 		expectPodRejection(ctx, f, e2eruntimeclass.NewRuntimeClassPod(rcName))
 	})
 
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler not being installed.
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func(ctx context.Context) {
+	f.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", nodefeature.RuntimeHandler, func(ctx context.Context) {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(ctx, f, "unconfigured-handler", handler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
@@ -83,7 +84,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 	// This test requires that the PreconfiguredRuntimeClassHandler has already been set up on nodes.
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler installed and working.
-	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func(ctx context.Context) {
+	f.It("should run a Pod requesting a RuntimeClass with a configured handler", nodefeature.RuntimeHandler, func(ctx context.Context) {
 		if err := e2eruntimeclass.NodeSupportsPreconfiguredRuntimeClassHandler(ctx, f); err != nil {
 			e2eskipper.Skipf("Skipping test as node does not have E2E runtime class handler preconfigured in container runtime config: %v", err)
 		}
@@ -102,7 +103,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		depends on container runtime and preconfigured handler. Runtime-specific functionality
 		is not being tested here.
 	*/
-	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := createRuntimeClass(ctx, f, "preconfigured-handler", e2eruntimeclass.PreconfiguredRuntimeClassHandler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
 		pod := e2epod.NewPodClient(f).Create(ctx, e2eruntimeclass.NewRuntimeClassPod(rcName))
@@ -127,7 +128,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		depends on container runtime and preconfigured handler. Runtime-specific functionality
 		is not being tested here.
 	*/
-	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass and initialize its Overhead [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass and initialize its Overhead", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := createRuntimeClass(ctx, f, "preconfigured-handler", e2eruntimeclass.PreconfiguredRuntimeClassHandler, &nodev1.Overhead{
 			PodFixed: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
@@ -154,7 +155,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		Testname: Pod with the deleted RuntimeClass is rejected.
 		Description: Pod requesting the deleted RuntimeClass must be rejected.
 	*/
-	framework.ConformanceIt("should reject a Pod requesting a deleted RuntimeClass [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should reject a Pod requesting a deleted RuntimeClass", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := createRuntimeClass(ctx, f, "delete-me", "runc", nil)
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 

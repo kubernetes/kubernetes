@@ -710,7 +710,7 @@ metadata:
 				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
-			ginkgo.It("[Slow] running a failing command without --restart=Never", func(ctx context.Context) {
+			f.It(f.WithSlow(), "running a failing command without --restart=Never", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -723,7 +723,7 @@ metadata:
 				}
 			})
 
-			ginkgo.It("[Slow] running a failing command without --restart=Never, but with --rm", func(ctx context.Context) {
+			f.It(f.WithSlow(), "running a failing command without --restart=Never, but with --rm", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", podRunningTimeoutArg, "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -737,7 +737,7 @@ metadata:
 				framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "failure-3", ns, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
 			})
 
-			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func(ctx context.Context) {
+			f.It(f.WithSlow(), "running a failing command with --leave-stdin-open", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -1892,7 +1892,7 @@ metadata:
 
 	// This test must run [Serial] because it modifies the node so it doesn't allow pods to execute on
 	// it, which will affect anything else running in parallel.
-	ginkgo.Describe("Kubectl taint [Serial]", func() {
+	f.Describe("Kubectl taint", framework.WithSerial(), func() {
 		ginkgo.It("should update the taint on a node", func(ctx context.Context) {
 			testTaint := v1.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-001-%s", string(uuid.NewUUID())),

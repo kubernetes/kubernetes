@@ -390,19 +390,19 @@ func TestValidateStatefulSet(t *testing.T) {
 		name: "invalid restart policy 1",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyOnFailure)),
 		errs: field.ErrorList{
-			field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 		},
 	}, {
 		name: "invalid restart policy 2",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyNever)),
 		errs: field.ErrorList{
-			field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 		},
 	}, {
 		name: "empty restart policy",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 		errs: field.ErrorList{
-			field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 		},
 	}, {
 		name: "invalid update strategy",
@@ -468,8 +468,8 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakPVCPolicy(mkPVCPolicy()),
 		),
 		errs: field.ErrorList{
-			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
-			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
 		},
 	}, {
 		name: "invalid PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
@@ -480,8 +480,8 @@ func TestValidateStatefulSet(t *testing.T) {
 			)),
 		),
 		errs: field.ErrorList{
-			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
-			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
 		},
 	}, {
 		name: "zero maxUnavailable",

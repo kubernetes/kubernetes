@@ -50,10 +50,10 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
-	flowcontrolapplyconfiguration "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
-	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
+	flowcontrolapplyconfiguration "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
+	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1"
 )
 
 const timeFmt = "2006-01-02T15:04:05.999"
@@ -143,7 +143,7 @@ type configController struct {
 	fsLister         flowcontrollister.FlowSchemaLister
 	fsInformerSynced cache.InformerSynced
 
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta3Interface
+	flowcontrolClient flowcontrolclient.FlowcontrolV1Interface
 
 	// serverConcurrencyLimit is the limit on the server's total
 	// number of non-exempt requests being served at once.  This comes
@@ -295,7 +295,7 @@ func newTestableController(config TestableConfig) *configController {
 	cfgCtlr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "priority_and_fairness_config_queue")
 	// ensure the data structure reflects the mandatory config
 	cfgCtlr.lockAndDigestConfigObjects(nil, nil)
-	fci := config.InformerFactory.Flowcontrol().V1beta3()
+	fci := config.InformerFactory.Flowcontrol().V1()
 	pli := fci.PriorityLevelConfigurations()
 	fsi := fci.FlowSchemas()
 	cfgCtlr.plLister = pli.Lister()
@@ -702,7 +702,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 			state.quiescing = false
 		}
 		nominalConcurrencyShares, _, _ := plSpecCommons(state.pl)
-		meal.shareSum += float64(nominalConcurrencyShares)
+		meal.shareSum += float64(*nominalConcurrencyShares)
 		meal.haveExemptPL = meal.haveExemptPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameCatchAll
 	}
@@ -807,7 +807,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 		// allocation determined by all the share values in the
 		// regular way.
 		nominalConcurrencyShares, _, _ := plSpecCommons(plState.pl)
-		meal.shareSum += float64(nominalConcurrencyShares)
+		meal.shareSum += float64(*nominalConcurrencyShares)
 		meal.haveExemptPL = meal.haveExemptPL || plName == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || plName == flowcontrol.PriorityLevelConfigurationNameCatchAll
 		meal.newPLStates[plName] = plState
@@ -823,7 +823,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 		// The use of math.Ceil here means that the results might sum
 		// to a little more than serverConcurrencyLimit but the
 		// difference will be negligible.
-		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(nominalConcurrencyShares) / meal.shareSum))
+		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(*nominalConcurrencyShares) / meal.shareSum))
 		var lendableCL, borrowingCL int
 		if lendablePercent != nil {
 			lendableCL = int(math.Round(float64(concurrencyLimit) * float64(*lendablePercent) / 100))
@@ -974,7 +974,7 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration) {
 		seatDemandRatioedGauge: seatDemandRatioedGauge,
 	}
 	nominalConcurrencyShares, _, _ := plSpecCommons(proto)
-	meal.shareSum += float64(nominalConcurrencyShares)
+	meal.shareSum += float64(*nominalConcurrencyShares)
 }
 
 // startRequest classifies and, if appropriate, enqueues the request.
@@ -1112,7 +1112,7 @@ func relDiff(x, y float64) float64 {
 }
 
 // plSpecCommons returns the (NominalConcurrencyShares, LendablePercent, BorrowingLimitPercent) of the given priority level config
-func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (int32, *int32, *int32) {
+func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (*int32, *int32, *int32) {
 	if limiter := pl.Spec.Limited; limiter != nil {
 		return limiter.NominalConcurrencyShares, limiter.LendablePercent, limiter.BorrowingLimitPercent
 	}
@@ -1121,5 +1121,5 @@ func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (int32, *int32, *
 	if limiter.NominalConcurrencyShares != nil {
 		nominalConcurrencyShares = *limiter.NominalConcurrencyShares
 	}
-	return nominalConcurrencyShares, limiter.LendablePercent, nil
+	return &nominalConcurrencyShares, limiter.LendablePercent, nil
 }

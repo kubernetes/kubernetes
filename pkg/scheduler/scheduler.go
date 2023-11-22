@@ -373,6 +373,13 @@ func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.Queuei
 	for _, e := range es {
 		events := e.EventsToRegister()
 
+		// This will happen when plugin registers with empty events, it's usually the case a pod
+		// will become reschedulable only for self-update, e.g. schedulingGates plugin, the pod
+		// will enter into the activeQ via priorityQueue.Update().
+		if len(events) == 0 {
+			continue
+		}
+
 		// Note: Rarely, a plugin implements EnqueueExtensions but returns nil.
 		// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
 		// cannot be moved by any regular cluster event.

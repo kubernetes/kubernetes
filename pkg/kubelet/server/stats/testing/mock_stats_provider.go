@@ -221,12 +221,13 @@ func (mr *MockProviderMockRecorder) GetRequestedContainersInfo(containerName, op
 }
 
 // ImageFsStats mocks base method.
-func (m *MockProvider) ImageFsStats(ctx context.Context) (*v1alpha1.FsStats, error) {
+func (m *MockProvider) ImageFsStats(ctx context.Context) (*v1alpha1.FsStats, *v1alpha1.FsStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageFsStats", ctx)
 	ret0, _ := ret[0].(*v1alpha1.FsStats)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(*v1alpha1.FsStats)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // ImageFsStats indicates an expected call of ImageFsStats.

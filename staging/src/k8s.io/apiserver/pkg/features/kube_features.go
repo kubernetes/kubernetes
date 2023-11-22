@@ -63,6 +63,7 @@ const (
 	// owner: @MikeSpreitzer @yue9944882
 	// alpha: v1.18
 	// beta: v1.20
+	// stable: 1.29
 	//
 	// Enables managing request concurrency with prioritization and fairness at each server.
 	// The FeatureGate was introduced in release 1.15 but the feature
@@ -100,6 +101,7 @@ const (
 	// kep: https://kep.k8s.io/2876
 	// alpha: v1.23
 	// beta: v1.25
+	// stable: v1.29
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
@@ -250,6 +252,14 @@ const (
 	//
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
+
+	// owner: @tkashem
+	// beta: v1.29
+	//
+	// Allow Priority & Fairness in the API server to use a zero value for
+	// the 'nominalConcurrencyShares' field of the 'limited' section of a
+	// priority level.
+	ZeroLimitedNominalConcurrencyShares featuregate.Feature = "ZeroLimitedNominalConcurrencyShares"
 )
 
 func init() {
@@ -267,7 +277,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
+	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
@@ -277,7 +287,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
-	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
@@ -314,4 +324,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
 	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
+
+	ZeroLimitedNominalConcurrencyShares: {Default: false, PreRelease: featuregate.Beta},
 }

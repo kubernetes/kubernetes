@@ -19,6 +19,7 @@ package authorizer
 import (
 	"errors"
 	"fmt"
+
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
@@ -117,11 +118,22 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			if err != nil {
 				return nil, nil, err
 			}
+			var decisionOnError authorizer.Decision
+			switch configuredAuthorizer.Webhook.FailurePolicy {
+			case authzconfig.FailurePolicyNoOpinion:
+				decisionOnError = authorizer.DecisionNoOpinion
+			case authzconfig.FailurePolicyDeny:
+				decisionOnError = authorizer.DecisionDeny
+			default:
+				return nil, nil, fmt.Errorf("unknown failurePolicy %q", configuredAuthorizer.Webhook.FailurePolicy)
+			}
 			webhookAuthorizer, err := webhook.New(clientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
 				configuredAuthorizer.Webhook.AuthorizedTTL.Duration,
 				configuredAuthorizer.Webhook.UnauthorizedTTL.Duration,
 				*config.WebhookRetryBackoff,
+				decisionOnError,
+				configuredAuthorizer.Webhook.MatchConditions,
 			)
 			if err != nil {
 				return nil, nil, err

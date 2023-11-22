@@ -32,6 +32,10 @@ func (c *FakeNetworkingV1alpha1) IPAddresses() v1alpha1.IPAddressInterface {
 	return &FakeIPAddresses{c}
 }
 
+func (c *FakeNetworkingV1alpha1) ServiceCIDRs() v1alpha1.ServiceCIDRInterface {
+	return &FakeServiceCIDRs{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeNetworkingV1alpha1) RESTClient() rest.Interface {

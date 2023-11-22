@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -46,7 +47,7 @@ const (
 	totalResizeWaitPeriod = 10 * time.Minute
 )
 
-var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]", func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", framework.WithSlow(), func() {
 	var (
 		c                 clientset.Interface
 		ns                string

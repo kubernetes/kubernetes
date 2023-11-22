@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -44,7 +45,7 @@ var (
 	image = imageutils.GetE2EImage(imageutils.Pause)
 )
 
-var _ = sigDescribe("[Feature:Windows] Windows volume mounts", skipUnlessWindows(func() {
+var _ = sigDescribe(feature.Windows, "Windows volume mounts", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("windows-volumes")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

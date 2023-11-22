@@ -212,3 +212,13 @@ func TestAsPartialObjectMetadataList(t *testing.T) {
 		})
 	}
 }
+
+func TestWatchEncoderIdentifier(t *testing.T) {
+	eventFields := reflect.VisibleFields(reflect.TypeOf(metav1.WatchEvent{}))
+	if len(eventFields) != 2 {
+		t.Error("New field was added to metav1.WatchEvent.")
+		t.Error("  Ensure that the following places are updated accordingly:")
+		t.Error("  - watchEncoder::doEncode method when creating outEvent")
+		t.Error("  - watchEncoder::typeIdentifier to capture all relevant fields in identifier")
+	}
+}

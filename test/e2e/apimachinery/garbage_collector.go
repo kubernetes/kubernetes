@@ -1101,14 +1101,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("timeout in waiting for the owner to be deleted: %v", err)
 		}
 
-		// Wait 30s and ensure the dependent is not deleted.
-		ginkgo.By("wait for 30 seconds to see if the garbage collector mistakenly deletes the dependent crd")
-		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
-			_, err := resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
-			return false, err
-		}); err != nil && !wait.Interrupted(err) {
-			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
-		}
+		timeout := 30*time.Second + gcInformerResyncRetryTimeout
+		ginkgo.By(fmt.Sprintf("wait for %s to see if the garbage collector mistakenly deletes the dependent crd\n", timeout))
+		gomega.Consistently(ctx, framework.HandleRetry(func(ctx context.Context) (*unstructured.Unstructured, error) {
+			return resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
+		})).WithTimeout(timeout).WithPolling(5 * time.Second).ShouldNot(gomega.BeNil())
 	})
 
 	ginkgo.It("should delete jobs and pods created by cronjob", func(ctx context.Context) {

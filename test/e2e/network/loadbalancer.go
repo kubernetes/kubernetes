@@ -137,7 +137,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 	})
 
-	ginkgo.It("should be able to change the type and ports of a TCP service [Slow]", func(ctx context.Context) {
+	f.It("should be able to change the type and ports of a TCP service", f.WithSlow(), func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -330,7 +330,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
-	ginkgo.It("should be able to change the type and ports of a UDP service [Slow]", func(ctx context.Context) {
+	f.It("should be able to change the type and ports of a UDP service", f.WithSlow(), func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
@@ -524,7 +524,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		testNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
-	ginkgo.It("should only allow access from service loadbalancer source ranges [Slow]", func(ctx context.Context) {
+	f.It("should only allow access from service loadbalancer source ranges", f.WithSlow(), func(ctx context.Context) {
 		// this feature currently supported only on GCE/GKE/AWS/AZURE
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "azure")
 
@@ -608,7 +608,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 	})
 
-	ginkgo.It("should be able to create an internal type load balancer [Slow]", func(ctx context.Context) {
+	f.It("should be able to create an internal type load balancer", f.WithSlow(), func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("azure", "gke", "gce")
 
 		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
@@ -738,7 +738,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func(ctx context.Context) {
+	f.It("should have session affinity work for LoadBalancer service with ESIPP on", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -749,7 +749,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be able to switch session affinity for LoadBalancer service with ESIPP on", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -760,7 +760,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func(ctx context.Context) {
+	f.It("should have session affinity work for LoadBalancer service with ESIPP off", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -771,7 +771,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be able to switch session affinity for LoadBalancer service with ESIPP off", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -787,7 +787,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// 2. Update service to type=ClusterIP. Finalizer should be removed.
 	// 3. Update service to type=LoadBalancer. Finalizer should be added.
 	// 4. Delete service with type=LoadBalancer. Finalizer should be removed.
-	ginkgo.It("should handle load balancer cleanup finalizer for service [Slow]", func(ctx context.Context) {
+	f.It("should handle load balancer cleanup finalizer for service", f.WithSlow(), func(ctx context.Context) {
 		jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "lb-finalizer")
 
 		ginkgo.By("Create load balancer service")
@@ -819,7 +819,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		e2eservice.WaitForServiceUpdatedWithFinalizer(ctx, cs, svc.Namespace, svc.Name, true)
 	})
 
-	ginkgo.It("should be able to create LoadBalancer Service without NodePort and change it [Slow]", func(ctx context.Context) {
+	f.It("should be able to create LoadBalancer Service without NodePort and change it", f.WithSlow(), func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -1203,7 +1203,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 	})
 
-	ginkgo.It("should not have connectivity disruption during rolling update with externalTrafficPolicy=Cluster [Slow]", func(ctx context.Context) {
+	f.It("should not have connectivity disruption during rolling update with externalTrafficPolicy=Cluster", f.WithSlow(), func(ctx context.Context) {
 		// We start with a low but reasonable threshold to analyze the results.
 		// The goal is to achieve 99% minimum success rate.
 		// TODO: We should do incremental steps toward the goal.
@@ -1212,7 +1212,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		testRollingUpdateLBConnectivityDisruption(ctx, f, v1.ServiceExternalTrafficPolicyTypeCluster, minSuccessRate)
 	})
 
-	ginkgo.It("should not have connectivity disruption during rolling update with externalTrafficPolicy=Local [Slow]", func(ctx context.Context) {
+	f.It("should not have connectivity disruption during rolling update with externalTrafficPolicy=Local", f.WithSlow(), func(ctx context.Context) {
 		// We start with a low but reasonable threshold to analyze the results.
 		// The goal is to achieve 99% minimum success rate.
 		// TODO: We should do incremental steps toward the goal.
@@ -1222,7 +1222,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 })
 
-var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
+var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("esipp")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var loadBalancerCreateTimeout time.Duration

@@ -32,7 +32,7 @@ func TestMakeFuncs(t *testing.T) {
 			ErrorTypeInvalid,
 		},
 		{
-			func() *Error { return NotSupported(NewPath("f"), "v", nil) },
+			func() *Error { return NotSupported[string](NewPath("f"), "v", nil) },
 			ErrorTypeNotSupported,
 		},
 		{

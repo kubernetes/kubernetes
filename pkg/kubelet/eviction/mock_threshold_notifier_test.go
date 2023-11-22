@@ -218,6 +218,20 @@ func (mr *MockContainerGCMockRecorder) DeleteAllUnusedContainers(ctx interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUnusedContainers", reflect.TypeOf((*MockContainerGC)(nil).DeleteAllUnusedContainers), ctx)
 }
 
+// IsContainerFsSeparateFromImageFs mocks base method.
+func (m *MockContainerGC) IsContainerFsSeparateFromImageFs(ctx context.Context) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsContainerFsSeparateFromImageFs", ctx)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsContainerFsSeparateFromImageFs indicates an expected call of IsContainerFsSeparateFromImageFs.
+func (mr *MockContainerGCMockRecorder) IsContainerFsSeparateFromImageFs(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsContainerFsSeparateFromImageFs", reflect.TypeOf((*MockContainerGC)(nil).IsContainerFsSeparateFromImageFs), ctx)
+}
+
 // MockCgroupNotifier is a mock of CgroupNotifier interface.
 type MockCgroupNotifier struct {
 	ctrl     *gomock.Controller

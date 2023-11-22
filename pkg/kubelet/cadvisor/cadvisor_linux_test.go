@@ -57,3 +57,32 @@ func TestImageFsInfoLabel(t *testing.T) {
 		})
 	}
 }
+
+func TestContainerFsInfoLabel(t *testing.T) {
+	testcases := []struct {
+		description     string
+		runtime         string
+		runtimeEndpoint string
+		expectedLabel   string
+		expectedError   error
+	}{{
+		description:     "LabelCrioWriteableImages should be returned",
+		runtimeEndpoint: crio.CrioSocket,
+		expectedLabel:   LabelCrioContainers,
+		expectedError:   nil,
+	}, {
+		description:     "Cannot find valid imagefs label",
+		runtimeEndpoint: "",
+		expectedLabel:   "",
+		expectedError:   fmt.Errorf("no containerfs label for configured runtime"),
+	}}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			infoProvider := NewImageFsInfoProvider(tc.runtimeEndpoint)
+			label, err := infoProvider.ContainerFsInfoLabel()
+			assert.Equal(t, tc.expectedLabel, label)
+			assert.Equal(t, tc.expectedError, err)
+		})
+	}
+}

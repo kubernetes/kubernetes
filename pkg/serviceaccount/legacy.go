@@ -193,10 +193,10 @@ func (v *legacyValidator) patchSecretWithLastUsedDate(ctx context.Context, secre
 	if lastUsed != today && lastUsed != tomorrow {
 		patchContent, err := json.Marshal(applyv1.Secret(secret.Name, secret.Namespace).WithUID(secret.UID).WithLabels(map[string]string{LastUsedLabelKey: today}))
 		if err != nil {
-			klog.Errorf("Failed to marshal legacy service account token %s/%s tracking labels, err: %w", secret.Name, secret.Namespace, err)
+			klog.Errorf("Failed to marshal legacy service account token %s/%s tracking labels, err: %v", secret.Name, secret.Namespace, err)
 		} else {
 			if _, err := v.secretsWriter.Secrets(secret.Namespace).Patch(ctx, secret.Name, types.MergePatchType, patchContent, metav1.PatchOptions{}); err != nil {
-				klog.Errorf("Failed to label legacy service account token %s/%s with last-used date, err: %w", secret.Name, secret.Namespace, err)
+				klog.Errorf("Failed to label legacy service account token %s/%s with last-used date, err: %v", secret.Name, secret.Namespace, err)
 			}
 		}
 	}

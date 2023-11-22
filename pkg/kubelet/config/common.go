@@ -19,6 +19,7 @@ package config
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -102,6 +103,9 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 
 type defaultFunc func(pod *api.Pod) error
 
+// A static pod tried to use a ClusterTrustBundle projected volume source.
+var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not use ClusterTrustBundle projected volume sources")
+
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
 func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
 	// JSON is valid YAML, so this should work for everything.
@@ -136,6 +140,19 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		klog.ErrorS(err, "Pod failed to convert to v1", "pod", klog.KObj(newPod))
 		return true, nil, err
 	}
+
+	for _, v := range v1Pod.Spec.Volumes {
+		if v.Projected == nil {
+			continue
+		}
+
+		for _, s := range v.Projected.Sources {
+			if s.ClusterTrustBundle != nil {
+				return true, nil, ErrStaticPodTriedToUseClusterTrustBundle
+			}
+		}
+	}
+
 	return true, v1Pod, nil
 }
 

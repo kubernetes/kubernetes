@@ -68,6 +68,7 @@ const (
 	TokenCleanerController                       = "token-cleaner-controller"
 	NodeIpamController                           = "node-ipam-controller"
 	NodeLifecycleController                      = "node-lifecycle-controller"
+	TaintEvictionController                      = "taint-eviction-controller"
 	PersistentVolumeBinderController             = "persistentvolume-binder-controller"
 	PersistentVolumeAttachDetachController       = "persistentvolume-attach-detach-controller"
 	PersistentVolumeExpanderController           = "persistentvolume-expander-controller"
@@ -81,4 +82,5 @@ const (
 	ResourceClaimController                      = "resourceclaim-controller"
 	LegacyServiceAccountTokenCleanerController   = "legacy-serviceaccount-token-cleaner-controller"
 	ValidatingAdmissionPolicyStatusController    = "validatingadmissionpolicy-status-controller"
+	ServiceCIDRController                        = "service-cidr-controller"
 )

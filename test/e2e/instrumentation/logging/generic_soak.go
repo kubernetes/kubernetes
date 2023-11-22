@@ -43,7 +43,7 @@ var loggingSoak struct {
 }
 var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 
-var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
+var _ = instrumentation.SIGDescribe("Logging soak [Performance]", framework.WithSlow(), framework.WithDisruptive(), func() {
 
 	f := framework.NewDefaultFramework("logging-soak")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

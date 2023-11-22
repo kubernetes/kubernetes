@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -44,7 +45,7 @@ var (
 	durationForStuckMount = 110 * time.Second
 )
 
-var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -69,7 +70,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 		suffix = ns.Name
 	})
 
-	ginkgo.It("should not work when mount is in progress [Slow]", func(ctx context.Context) {
+	f.It("should not work when mount is in progress", f.WithSlow(), func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		driver := "attachable-with-long-mount"

@@ -45,6 +45,7 @@ var (
 	ErrFull              = errors.New("range is full")
 	ErrAllocated         = errors.New("provided IP is already allocated")
 	ErrMismatchedNetwork = errors.New("the provided network does not match the current range")
+	ErrNotReady          = errors.New("allocator not ready")
 )
 
 type ErrNotInRange struct {

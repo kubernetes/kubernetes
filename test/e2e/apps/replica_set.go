@@ -498,7 +498,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err, "Failed to create pods: %s", err)
 
 	// Scale the ReplicaSet
-	ginkgo.By(fmt.Sprintf("Scaling up %q replicaset ", rsName))
+	ginkgo.By(fmt.Sprintf("Scaling up %q replicaset", rsName))
 	_, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, ns, rsName, func(update *appsv1.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x

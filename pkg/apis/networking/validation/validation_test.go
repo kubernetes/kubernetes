@@ -2046,3 +2046,205 @@ func TestValidateIPAddressUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateServiceCIDR(t *testing.T) {
+
+	testCases := map[string]struct {
+		expectedErrors int
+		ipRange        *networking.ServiceCIDR
+	}{
+		"empty-iprange": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+			},
+		},
+		"three-ipranges": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.0.0/24", "fd00::/64", "10.0.0.0/16"},
+				},
+			},
+		},
+		"good-iprange-ipv4": {
+			expectedErrors: 0,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.0.0/24"},
+				},
+			},
+		},
+		"good-iprange-ipv6": {
+			expectedErrors: 0,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"fd00:1234::/64"},
+				},
+			},
+		},
+		"good-iprange-ipv4-ipv6": {
+			expectedErrors: 0,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.0.0/24", "fd00:1234::/64"},
+				},
+			},
+		},
+		"not-iprange-ipv4": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"asdasdasd"},
+				},
+			},
+		},
+		"iponly-iprange-ipv4": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.0.1"},
+				},
+			},
+		},
+		"badip-iprange-ipv4": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.0.1/24"},
+				},
+			},
+		},
+		"badip-iprange-ipv6": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"fd00:1234::2/64"},
+				},
+			},
+		},
+		"badip-iprange-caps-ipv6": {
+			expectedErrors: 2,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"FD00:1234::2/64"},
+				},
+			},
+		},
+		"good-iprange-ipv4-bad-ipv6": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.0.0/24", "FD00:1234::/64"},
+				},
+			},
+		},
+		"good-iprange-ipv6-bad-ipv4": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.007.0/24", "fd00:1234::/64"},
+				},
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateServiceCIDR(testCase.ipRange)
+			if len(errs) != testCase.expectedErrors {
+				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
+			}
+		})
+	}
+}
+
+func TestValidateServiceCIDRUpdate(t *testing.T) {
+	oldServiceCIDR := &networking.ServiceCIDR{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "mysvc",
+			ResourceVersion: "1",
+		},
+		Spec: networking.ServiceCIDRSpec{
+			CIDRs: []string{"192.168.0.0/24", "fd00:1234::/64"},
+		},
+	}
+
+	testCases := []struct {
+		name      string
+		svc       func(svc *networking.ServiceCIDR) *networking.ServiceCIDR
+		expectErr bool
+	}{
+		{
+			name: "Successful update, no changes",
+			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
+				out := svc.DeepCopy()
+				return out
+			},
+			expectErr: false,
+		},
+
+		{
+			name: "Failed update, update spec.CIDRs single stack",
+			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
+				out := svc.DeepCopy()
+				out.Spec.CIDRs = []string{"10.0.0.0/16"}
+				return out
+			}, expectErr: true,
+		},
+		{
+			name: "Failed update, update spec.CIDRs dual stack",
+			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
+				out := svc.DeepCopy()
+				out.Spec.CIDRs = []string{"10.0.0.0/24", "fd00:1234::/64"}
+				return out
+			}, expectErr: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateServiceCIDRUpdate(testCase.svc(oldServiceCIDR), oldServiceCIDR)
+			if !testCase.expectErr && err != nil {
+				t.Errorf("ValidateServiceCIDRUpdate must be successful for test '%s', got %v", testCase.name, err)
+			}
+			if testCase.expectErr && err == nil {
+				t.Errorf("ValidateServiceCIDRUpdate must return error for test: %s, but got nil", testCase.name)
+			}
+		})
+	}
+}

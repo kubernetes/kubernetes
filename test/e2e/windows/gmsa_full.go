@@ -56,6 +56,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -90,7 +91,7 @@ const (
 	gmsaSharedFolder = "write_test"
 )
 
-var _ = sigDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", skipUnlessWindows(func() {
+var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framework.WithSlow(), skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

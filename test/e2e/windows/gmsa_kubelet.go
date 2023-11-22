@@ -29,6 +29,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -39,7 +40,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = sigDescribe("[Feature:Windows] GMSA Kubelet [Slow]", skipUnlessWindows(func() {
+var _ = sigDescribe(feature.Windows, "GMSA Kubelet", framework.WithSlow(), skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("gmsa-kubelet-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

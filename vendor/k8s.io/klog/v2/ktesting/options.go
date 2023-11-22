@@ -29,11 +29,6 @@ import (
 // bind command line flags to the instance before passing it to NewTestContext.
 //
 // Must be constructed with NewConfig.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type Config struct {
 	vstate *verbosity.VState
 	co     configOptions
@@ -54,11 +49,6 @@ func (c *Config) VModule() flag.Value {
 }
 
 // ConfigOption implements functional parameters for NewConfig.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type ConfigOption func(co *configOptions)
 
 type configOptions struct {
@@ -72,11 +62,6 @@ type configOptions struct {
 // AnyToString overrides the default formatter for values that are not
 // supported directly by klog. The default is `fmt.Sprintf("%+v")`.
 // The formatter must not panic.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func AnyToString(anyToString func(value interface{}) string) ConfigOption {
 	return func(co *configOptions) {
 		co.anyToString = anyToString
@@ -84,11 +69,6 @@ func AnyToString(anyToString func(value interface{}) string) ConfigOption {
 }
 
 // VerbosityFlagName overrides the default -testing.v for the verbosity level.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func VerbosityFlagName(name string) ConfigOption {
 	return func(co *configOptions) {
 		co.verbosityFlagName = name
@@ -97,11 +77,6 @@ func VerbosityFlagName(name string) ConfigOption {
 
 // VModulFlagName overrides the default -testing.vmodule for the per-module
 // verbosity levels.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func VModuleFlagName(name string) ConfigOption {
 	return func(co *configOptions) {
 		co.vmoduleFlagName = name
@@ -114,11 +89,6 @@ func VModuleFlagName(name string) ConfigOption {
 // https://github.com/kubernetes/community/blob/9406b4352fe2d5810cb21cc3cb059ce5886de157/contributors/devel/sig-instrumentation/logging.md#logging-conventions),
 // which is useful when debugging a failed test. `go test` only shows the log
 // output for failed tests. To see all output, use `go test -v`.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func Verbosity(level int) ConfigOption {
 	return func(co *configOptions) {
 		co.verbosityDefault = level
@@ -129,11 +99,6 @@ func Verbosity(level int) ConfigOption {
 // to being printed. Off by default. Unit tests that want to verify that
 // log entries are emitted as expected can turn this on and then retrieve
 // the captured log through the Underlier LogSink interface.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func BufferLogs(enabled bool) ConfigOption {
 	return func(co *configOptions) {
 		co.bufferLogs = enabled
@@ -142,11 +107,6 @@ func BufferLogs(enabled bool) ConfigOption {
 
 // NewConfig returns a configuration with recommended defaults and optional
 // modifications. Command line flags are not bound to any FlagSet yet.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func NewConfig(opts ...ConfigOption) *Config {
 	c := &Config{
 		co: configOptions{
@@ -160,16 +120,12 @@ func NewConfig(opts ...ConfigOption) *Config {
 	}
 
 	c.vstate = verbosity.New()
-	c.vstate.V().Set(strconv.FormatInt(int64(c.co.verbosityDefault), 10))
+	// Cannot fail for this input.
+	_ = c.vstate.V().Set(strconv.FormatInt(int64(c.co.verbosityDefault), 10))
 	return c
 }
 
 // AddFlags registers the command line flags that control the configuration.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func (c *Config) AddFlags(fs *flag.FlagSet) {
 	fs.Var(c.vstate.V(), c.co.verbosityFlagName, "number for the log level verbosity of the testing logger")
 	fs.Var(c.vstate.VModule(), c.co.vmoduleFlagName, "comma-separated list of pattern=N log level settings for files matching the patterns")

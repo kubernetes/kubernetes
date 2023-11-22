@@ -18,11 +18,6 @@ package test
 
 // ZaprOutputMappingDirect provides a mapping from klog output to the
 // corresponding zapr output when zapr is called directly.
-//
-// # Experimental
-//
-// Notice: This package is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func ZaprOutputMappingDirect() map[string]string {
 	return map[string]string{
 		`I output.go:<LINE>] "test" akey="<&>"
@@ -41,7 +36,7 @@ func ZaprOutputMappingDirect() map[string]string {
 `: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue","akey":"avalue2"}
 `,
 
-		`I output.go:<LINE>] "hello/world: test" akey="avalue"
+		`I output.go:<LINE>] "test" logger="hello.world" akey="avalue"
 `: `{"logger":"hello.world","caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue"}
 `,
 
@@ -97,7 +92,7 @@ func ZaprOutputMappingDirect() map[string]string {
 `: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue"}
 `,
 
-		`I output.go:<LINE>] "me: test" akey="avalue"
+		`I output.go:<LINE>] "test" logger="me" akey="avalue"
 `: `{"logger":"me","caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue"}
 `,
 
@@ -171,22 +166,22 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 
 		// klog.Info
 		`I output.go:<LINE>] "helloworld\n"
-`: `{"caller":"test/output.go:<LINE>","msg":"helloworld\n","v":0}
+`: `{"caller":"test/output.go:<LINE>","msg":"helloworld","v":0}
 `,
 
 		// klog.Infoln
 		`I output.go:<LINE>] "hello world\n"
-`: `{"caller":"test/output.go:<LINE>","msg":"hello world\n","v":0}
+`: `{"caller":"test/output.go:<LINE>","msg":"hello world","v":0}
 `,
 
 		// klog.Error
 		`E output.go:<LINE>] "helloworld\n"
-`: `{"caller":"test/output.go:<LINE>","msg":"helloworld\n"}
+`: `{"caller":"test/output.go:<LINE>","msg":"helloworld"}
 `,
 
 		// klog.Errorln
 		`E output.go:<LINE>] "hello world\n"
-`: `{"caller":"test/output.go:<LINE>","msg":"hello world\n"}
+`: `{"caller":"test/output.go:<LINE>","msg":"hello world"}
 `,
 
 		// klog.ErrorS
@@ -201,12 +196,12 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 
 		// klog.V(1).Info
 		`I output.go:<LINE>] "hellooneworld\n"
-`: `{"caller":"test/output.go:<LINE>","msg":"hellooneworld\n","v":1}
+`: `{"caller":"test/output.go:<LINE>","msg":"hellooneworld","v":1}
 `,
 
 		// klog.V(1).Infoln
 		`I output.go:<LINE>] "hello one world\n"
-`: `{"caller":"test/output.go:<LINE>","msg":"hello one world\n","v":1}
+`: `{"caller":"test/output.go:<LINE>","msg":"hello one world","v":1}
 `,
 
 		// klog.V(1).ErrorS
@@ -282,21 +277,16 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 //   - zap drops keys with missing values, here we get "(MISSING)".
 //   - zap does not de-duplicate key/value pairs, here klog does that
 //     for it.
-//
-// # Experimental
-//
-// Notice: This package is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func ZaprOutputMappingIndirect() map[string]string {
 	mapping := ZaprOutputMappingDirect()
 
 	for key, value := range map[string]string{
-		`I output.go:<LINE>] "hello/world: test" akey="avalue"
-`: `{"caller":"test/output.go:<LINE>","msg":"hello/world: test","v":0,"akey":"avalue"}
+		`I output.go:<LINE>] "test" logger="hello.world" akey="avalue"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"logger":"hello.world","akey":"avalue"}
 `,
 
-		`I output.go:<LINE>] "me: test" akey="avalue"
-`: `{"caller":"test/output.go:<LINE>","msg":"me: test","v":0,"akey":"avalue"}
+		`I output.go:<LINE>] "test" logger="me" akey="avalue"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"logger":"me","akey":"avalue"}
 `,
 
 		`I output.go:<LINE>] "odd parameters" basekey1="basevar1" basekey2="(MISSING)" akey="avalue" akey2="(MISSING)"

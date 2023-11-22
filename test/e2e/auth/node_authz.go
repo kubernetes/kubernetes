@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -41,7 +42,7 @@ const (
 	nodeNamePrefix = "system:node:"
 )
 
-var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
+var _ = SIGDescribe(feature.NodeAuthorizer, func() {
 
 	f := framework.NewDefaultFramework("node-authz")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline

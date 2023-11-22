@@ -37,16 +37,17 @@ var (
 	GracefulNodeShutdownBasedOnPodPriority = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GracefulNodeShutdownBasedOnPodPriority"))
 	HostAccess                             = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("HostAccess"))
 	ImageID                                = framework.WithNodeFeature(framework.ValidNodeFeatures.Add(" ImageID"))
+	KubeletConfigDropInDir                 = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletConfigDropInDir"))
 	LSCIQuotaMonitoring                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("LSCIQuotaMonitoring"))
 	NodeAllocatable                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeAllocatable"))
 	NodeProblemDetector                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeProblemDetector"))
 	OOMScoreAdj                            = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
 	PodDisruptionConditions                = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodDisruptionConditions"))
+	PodHostIPs                             = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodHostIPs"))
 	PodResources                           = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 	ResourceMetrics                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))
 	RuntimeHandler                         = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
 	SystemNodeCriticalPod                  = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
-	TopologyManager                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("TopologyManager"))
 )
 
 func init() {

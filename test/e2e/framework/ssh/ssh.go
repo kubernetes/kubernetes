@@ -86,6 +86,11 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		if keyfile == "" {
 			keyfile = "id_rsa"
 		}
+	case "azure":
+		keyfile = os.Getenv("AZURE_SSH_KEY")
+		if keyfile == "" {
+			keyfile = "id_rsa"
+		}
 	default:
 		return nil, fmt.Errorf("GetSigner(...) not implemented for %s", provider)
 	}

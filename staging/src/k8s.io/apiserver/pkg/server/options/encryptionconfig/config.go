@@ -504,6 +504,24 @@ func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.C
 
 // loadConfig parses the encryption configuration file at filepath and returns the parsed config and hash of the file.
 func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfiguration, string, error) {
+	data, contentHash, err := loadDataAndHash(filepath)
+	if err != nil {
+		return nil, "", fmt.Errorf("error while loading file: %w", err)
+	}
+
+	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("error decoding encryption provider configuration file %q: %w", filepath, err)
+	}
+	config, ok := configObj.(*apiserverconfig.EncryptionConfiguration)
+	if !ok {
+		return nil, "", fmt.Errorf("got unexpected config type: %v", gvk)
+	}
+
+	return config, contentHash, validation.ValidateEncryptionConfiguration(config, reload).ToAggregate()
+}
+
+func loadDataAndHash(filepath string) ([]byte, string, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, "", fmt.Errorf("error opening encryption provider configuration file %q: %w", filepath, err)
@@ -518,16 +536,14 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 		return nil, "", fmt.Errorf("encryption provider configuration file %q is empty", filepath)
 	}
 
-	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
-	if err != nil {
-		return nil, "", fmt.Errorf("error decoding encryption provider configuration file %q: %w", filepath, err)
-	}
-	config, ok := configObj.(*apiserverconfig.EncryptionConfiguration)
-	if !ok {
-		return nil, "", fmt.Errorf("got unexpected config type: %v", gvk)
-	}
+	return data, computeEncryptionConfigHash(data), nil
+}
 
-	return config, computeEncryptionConfigHash(data), validation.ValidateEncryptionConfiguration(config, reload).ToAggregate()
+// GetEncryptionConfigHash reads the encryption configuration file at filepath and returns the hash of the file.
+// It does not attempt to decode or load the config, and serves as a cheap check to determine if the file has changed.
+func GetEncryptionConfigHash(filepath string) (string, error) {
+	_, contentHash, err := loadDataAndHash(filepath)
+	return contentHash, err
 }
 
 // prefixTransformersAndProbes creates the set of transformers and KMS probes based on the given resource config.

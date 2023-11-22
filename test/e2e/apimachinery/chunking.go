@@ -141,7 +141,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		MUST return the remaining items in chunks of the size not exceeding the limit, with appropriately
 		set RemainingItems field in the response and with the ResourceVersion returned as part of the inconsistent list.
 	*/
-	framework.ConformanceIt("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent", f.WithSlow(), func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)

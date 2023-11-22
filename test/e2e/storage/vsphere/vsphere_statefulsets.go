@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -55,7 +56,7 @@ const (
 	storageclassname = "nginx-sc"
 )
 
-var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("vsphere statefulset", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("vsphere-statefulset")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

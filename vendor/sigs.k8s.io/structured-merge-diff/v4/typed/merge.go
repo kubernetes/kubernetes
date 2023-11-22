@@ -180,14 +180,18 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	}
 	out := make([]interface{}, 0, outLen)
 
-	rhsOrder, observedRHS, rhsErrs := w.indexListPathElements(t, rhs)
+	rhsPEs, observedRHS, rhsErrs := w.indexListPathElements(t, rhs, false)
 	errs = append(errs, rhsErrs...)
-	lhsOrder, observedLHS, lhsErrs := w.indexListPathElements(t, lhs)
+	lhsPEs, observedLHS, lhsErrs := w.indexListPathElements(t, lhs, true)
 	errs = append(errs, lhsErrs...)
 
+	if len(errs) != 0 {
+		return errs
+	}
+
 	sharedOrder := make([]*fieldpath.PathElement, 0, rLen)
-	for i := range rhsOrder {
-		pe := &rhsOrder[i]
+	for i := range rhsPEs {
+		pe := &rhsPEs[i]
 		if _, ok := observedLHS.Get(*pe); ok {
 			sharedOrder = append(sharedOrder, pe)
 		}
@@ -199,13 +203,15 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 		sharedOrder = sharedOrder[1:]
 	}
 
-	lLen, rLen = len(lhsOrder), len(rhsOrder)
+	mergedRHS := fieldpath.MakePathElementMap(len(rhsPEs))
+	lLen, rLen = len(lhsPEs), len(rhsPEs)
 	for lI, rI := 0, 0; lI < lLen || rI < rLen; {
 		if lI < lLen && rI < rLen {
-			pe := lhsOrder[lI]
-			if pe.Equals(rhsOrder[rI]) {
+			pe := lhsPEs[lI]
+			if pe.Equals(rhsPEs[rI]) {
 				// merge LHS & RHS items
-				lChild, _ := observedLHS.Get(pe)
+				mergedRHS.Insert(pe, struct{}{})
+				lChild, _ := observedLHS.Get(pe) // may be nil if the PE is duplicaated.
 				rChild, _ := observedRHS.Get(pe)
 				mergeOut, errs := w.mergeListItem(t, pe, lChild, rChild)
 				errs = append(errs, errs...)
@@ -222,17 +228,17 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 				}
 				continue
 			}
-			if _, ok := observedRHS.Get(pe); ok && nextShared != nil && !nextShared.Equals(lhsOrder[lI]) {
+			if _, ok := observedRHS.Get(pe); ok && nextShared != nil && !nextShared.Equals(lhsPEs[lI]) {
 				// shared item, but not the one we want in this round
 				lI++
 				continue
 			}
 		}
 		if lI < lLen {
-			pe := lhsOrder[lI]
+			pe := lhsPEs[lI]
 			if _, ok := observedRHS.Get(pe); !ok {
-				// take LHS item
-				lChild, _ := observedLHS.Get(pe)
+				// take LHS item using At to make sure we get the right item (observed may not contain the right item).
+				lChild := lhs.AtUsing(w.allocator, lI)
 				mergeOut, errs := w.mergeListItem(t, pe, lChild, nil)
 				errs = append(errs, errs...)
 				if mergeOut != nil {
@@ -240,12 +246,16 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 				}
 				lI++
 				continue
+			} else if _, ok := mergedRHS.Get(pe); ok {
+				// we've already merged it with RHS, we don't want to duplicate it, skip it.
+				lI++
 			}
 		}
 		if rI < rLen {
 			// Take the RHS item, merge with matching LHS item if possible
-			pe := rhsOrder[rI]
-			lChild, _ := observedLHS.Get(pe) // may be nil
+			pe := rhsPEs[rI]
+			mergedRHS.Insert(pe, struct{}{})
+			lChild, _ := observedLHS.Get(pe) // may be nil if absent or duplicaated.
 			rChild, _ := observedRHS.Get(pe)
 			mergeOut, errs := w.mergeListItem(t, pe, lChild, rChild)
 			errs = append(errs, errs...)
@@ -272,7 +282,7 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	return errs
 }
 
-func (w *mergingWalker) indexListPathElements(t *schema.List, list value.List) ([]fieldpath.PathElement, fieldpath.PathElementValueMap, ValidationErrors) {
+func (w *mergingWalker) indexListPathElements(t *schema.List, list value.List, allowDuplicates bool) ([]fieldpath.PathElement, fieldpath.PathElementValueMap, ValidationErrors) {
 	var errs ValidationErrors
 	length := 0
 	if list != nil {
@@ -282,7 +292,7 @@ func (w *mergingWalker) indexListPathElements(t *schema.List, list value.List) (
 	pes := make([]fieldpath.PathElement, 0, length)
 	for i := 0; i < length; i++ {
 		child := list.At(i)
-		pe, err := listItemToPathElement(w.allocator, w.schema, t, i, child)
+		pe, err := listItemToPathElement(w.allocator, w.schema, t, child)
 		if err != nil {
 			errs = append(errs, errorf("element %v: %v", i, err.Error())...)
 			// If we can't construct the path element, we can't
@@ -290,11 +300,15 @@ func (w *mergingWalker) indexListPathElements(t *schema.List, list value.List) (
 			// this element.
 			continue
 		}
-		if _, found := observed.Get(pe); found {
+		if _, found := observed.Get(pe); found && !allowDuplicates {
 			errs = append(errs, errorf("duplicate entries for key %v", pe.String())...)
 			continue
+		} else if !found {
+			observed.Insert(pe, child)
+		} else {
+			// Duplicated items are not merged with the new value, make them nil.
+			observed.Insert(pe, value.NewValueInterface(nil))
 		}
-		observed.Insert(pe, child)
 		pes = append(pes, pe)
 	}
 	return pes, observed, errs

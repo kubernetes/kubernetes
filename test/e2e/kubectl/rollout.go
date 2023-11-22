@@ -39,6 +39,7 @@ import (
 
 var _ = SIGDescribe("Kubectl rollout", func() {
 	defer ginkgo.GinkgoRecover()
+	var deploymentYaml string
 	f := framework.NewDefaultFramework("kubectl-rollout")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -47,10 +48,10 @@ var _ = SIGDescribe("Kubectl rollout", func() {
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		deploymentYaml = commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment1Filename)))
 	})
 
 	ginkgo.Describe("undo", func() {
-		deploymentYaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment1Filename)))
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(deploymentYaml, ns, "app=httpd")
 		})

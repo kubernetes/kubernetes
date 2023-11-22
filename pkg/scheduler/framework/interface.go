@@ -370,6 +370,8 @@ type EnqueueExtensions interface {
 	// and leveraged to build event handlers dynamically.
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
+	//
+	// Appropriate implementation of this function will make Pod's re-scheduling accurate and performant.
 	EventsToRegister() []ClusterEventWithHint
 }
 

@@ -764,7 +764,7 @@ func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper,
 	nodes := make([]*v1.Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nodeName := fmt.Sprintf("%v-%d", prefix, i)
-		node, err := CreateNode(cs, wrapper.Name(nodeName).Obj())
+		node, err := CreateNode(cs, wrapper.Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj())
 		if err != nil {
 			return nodes[:], err
 		}

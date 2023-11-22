@@ -21,6 +21,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/pem"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -32,11 +33,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
+	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 )
 
+var (
+	compiler = authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+)
+
 func TestValidateAuthenticationConfiguration(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+
 	testCases := []struct {
 		name string
 		in   *api.AuthenticationConfiguration
@@ -130,7 +142,37 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 					},
 				},
 			},
-			want: "jwt[0].claimMappings.username.claim: Required value: claim name is required",
+			want: "jwt[0].claimMappings.username: Required value: claim or expression is required",
+		},
+		{
+			name: "failed userValidationRule validation",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:       "https://issuer-url",
+							Audiences: []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String("prefix"),
+							},
+						},
+						UserValidationRules: []api.UserValidationRule{
+							{Expression: "user.username == 'foo'"},
+							{Expression: "user.username == 'foo'"},
+						},
+					},
+				},
+			},
+			want: `jwt[0].userValidationRules[1].expression: Duplicate value: "user.username == 'foo'"`,
 		},
 		{
 			name: "valid authentication configuration",
@@ -310,31 +352,98 @@ func TestValidateCertificateAuthority(t *testing.T) {
 	}
 }
 
-func TestClaimValidationRules(t *testing.T) {
+func TestValidateClaimValidationRules(t *testing.T) {
 	fldPath := field.NewPath("issuer", "claimValidationRules")
 
 	testCases := []struct {
-		name string
-		in   []api.ClaimValidationRule
-		want string
+		name                          string
+		in                            []api.ClaimValidationRule
+		structuredAuthnFeatureEnabled bool
+		want                          string
+		wantCELMapper                 bool
 	}{
 		{
-			name: "claim validation rule claim is empty",
-			in:   []api.ClaimValidationRule{{Claim: ""}},
-			want: "issuer.claimValidationRules[0].claim: Required value: claim name is required",
+			name:                          "claim and expression are empty, structured authn feature enabled",
+			in:                            []api.ClaimValidationRule{{}},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "issuer.claimValidationRules[0]: Required value: claim or expression is required",
+		},
+		{
+			name: "claim and expression are set",
+			in: []api.ClaimValidationRule{
+				{Claim: "claim", Expression: "expression"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimValidationRules[0]: Invalid value: "claim": claim and expression can't both be set`,
+		},
+		{
+			name: "message set when claim is set",
+			in: []api.ClaimValidationRule{
+				{Claim: "claim", Message: "message"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimValidationRules[0].message: Invalid value: "message": message can't be set when claim is set`,
+		},
+		{
+			name: "requiredValue set when expression is set",
+			in: []api.ClaimValidationRule{
+				{Expression: "claims.foo == 'bar'", RequiredValue: "value"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimValidationRules[0].requiredValue: Invalid value: "value": requiredValue can't be set when expression is set`,
 		},
 		{
 			name: "duplicate claim",
-			in: []api.ClaimValidationRule{{
-				Claim: "claim", RequiredValue: "value1"},
-				{Claim: "claim", RequiredValue: "value2"},
+			in: []api.ClaimValidationRule{
+				{Claim: "claim"},
+				{Claim: "claim"},
 			},
-			want: `issuer.claimValidationRules[1].claim: Duplicate value: "claim"`,
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimValidationRules[1].claim: Duplicate value: "claim"`,
 		},
 		{
-			name: "valid claim validation rule",
-			in:   []api.ClaimValidationRule{{Claim: "claim", RequiredValue: "value"}},
-			want: "",
+			name: "duplicate expression",
+			in: []api.ClaimValidationRule{
+				{Expression: "claims.foo == 'bar'"},
+				{Expression: "claims.foo == 'bar'"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimValidationRules[1].expression: Duplicate value: "claims.foo == 'bar'"`,
+		},
+		{
+			name: "expression set when structured authn feature is disabled",
+			in: []api.ClaimValidationRule{
+				{Expression: "claims.foo == 'bar'"},
+			},
+			structuredAuthnFeatureEnabled: false,
+			want:                          `issuer.claimValidationRules[0].expression: Invalid value: "claims.foo == 'bar'": expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+		},
+		{
+			name: "CEL expression compilation error",
+			in: []api.ClaimValidationRule{
+				{Expression: "foo.bar"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want: `issuer.claimValidationRules[0].expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^`,
+		},
+		{
+			name: "expression does not evaluate to bool",
+			in: []api.ClaimValidationRule{
+				{Expression: "claims.foo"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimValidationRules[0].expression: Invalid value: "claims.foo": must evaluate to bool`,
+		},
+		{
+			name: "valid claim validation rule with expression",
+			in: []api.ClaimValidationRule{
+				{Expression: "claims.foo == 'bar'"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "",
+			wantCELMapper:                 true,
 		},
 		{
 			name: "valid claim validation rule with multiple rules",
@@ -342,15 +451,20 @@ func TestClaimValidationRules(t *testing.T) {
 				{Claim: "claim1", RequiredValue: "value1"},
 				{Claim: "claim2", RequiredValue: "value2"},
 			},
-			want: "",
+			structuredAuthnFeatureEnabled: true,
+			want:                          "",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateClaimValidationRules(tt.in, fldPath).ToAggregate()
+			celMapper := &authenticationcel.CELMapper{}
+			got := validateClaimValidationRules(compiler, celMapper, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("ClaimValidationRules validation mismatch (-want +got):\n%s", d)
+			}
+			if tt.wantCELMapper && celMapper.ClaimValidationRules == nil {
+				t.Fatalf("ClaimValidationRules validation mismatch: CELMapper.ClaimValidationRules is nil")
 			}
 		})
 	}
@@ -360,51 +474,420 @@ func TestValidateClaimMappings(t *testing.T) {
 	fldPath := field.NewPath("issuer", "claimMappings")
 
 	testCases := []struct {
-		name string
-		in   api.ClaimMappings
-		want string
+		name                          string
+		in                            api.ClaimMappings
+		structuredAuthnFeatureEnabled bool
+		want                          string
+		wantCELMapper                 bool
 	}{
 		{
-			name: "username claim is empty",
-			in:   api.ClaimMappings{Username: api.PrefixedClaimOrExpression{Claim: "", Prefix: pointer.String("prefix")}},
-			want: "issuer.claimMappings.username.claim: Required value: claim name is required",
-		},
-		{
-			name: "username prefix is empty",
-			in:   api.ClaimMappings{Username: api.PrefixedClaimOrExpression{Claim: "claim"}},
-			want: "issuer.claimMappings.username.prefix: Required value: prefix is required",
-		},
-		{
-			name: "groups prefix is empty",
+			name: "username expression and claim are set",
 			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Claim: "claim", Prefix: pointer.String("prefix")},
-				Groups:   api.PrefixedClaimOrExpression{Claim: "claim"},
+				Username: api.PrefixedClaimOrExpression{
+					Claim:      "claim",
+					Expression: "claims.username",
+				},
 			},
-			want: "issuer.claimMappings.groups.prefix: Required value: prefix is required when claim is set",
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.username: Invalid value: "": claim and expression can't both be set`,
 		},
 		{
-			name: "groups prefix set but claim is empty",
+			name:                          "username expression and claim are empty",
+			in:                            api.ClaimMappings{Username: api.PrefixedClaimOrExpression{}},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "issuer.claimMappings.username: Required value: claim or expression is required",
+		},
+		{
+			name: "username prefix set when expression is set",
 			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Claim: "claim", Prefix: pointer.String("prefix")},
-				Groups:   api.PrefixedClaimOrExpression{Prefix: pointer.String("prefix")},
+				Username: api.PrefixedClaimOrExpression{
+					Expression: "claims.username",
+					Prefix:     pointer.String("prefix"),
+				},
 			},
-			want: "issuer.claimMappings.groups.claim: Required value: non-empty claim name is required when prefix is set",
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.username.prefix: Invalid value: "prefix": prefix can't be set when expression is set`,
+		},
+		{
+			name: "username prefix is nil when claim is set",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim: "claim",
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.username.prefix: Required value: prefix is required when claim is set. It can be set to an empty string to disable prefixing`,
+		},
+		{
+			name: "username expression is invalid",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Expression: "foo.bar",
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want: `issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^`,
+		},
+		{
+			name: "groups expression and claim are set",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Groups: api.PrefixedClaimOrExpression{
+					Claim:      "claim",
+					Expression: "claims.groups",
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.groups: Invalid value: "": claim and expression can't both be set`,
+		},
+		{
+			name: "groups prefix set when expression is set",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Groups: api.PrefixedClaimOrExpression{
+					Expression: "claims.groups",
+					Prefix:     pointer.String("prefix"),
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.groups.prefix: Invalid value: "prefix": prefix can't be set when expression is set`,
+		},
+		{
+			name: "groups prefix is nil when claim is set",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Groups: api.PrefixedClaimOrExpression{
+					Claim: "claim",
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.groups.prefix: Required value: prefix is required when claim is set. It can be set to an empty string to disable prefixing`,
+		},
+		{
+			name: "groups expression is invalid",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Groups: api.PrefixedClaimOrExpression{
+					Expression: "foo.bar",
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want: `issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^`,
+		},
+		{
+			name: "uid claim and expression are set",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				UID: api.ClaimOrExpression{
+					Claim:      "claim",
+					Expression: "claims.uid",
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.uid: Invalid value: "": claim and expression can't both be set`,
+		},
+		{
+			name: "uid expression is invalid",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				UID: api.ClaimOrExpression{
+					Expression: "foo.bar",
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want: `issuer.claimMappings.uid.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^`,
+		},
+		{
+			name: "extra mapping key is empty",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Extra: []api.ExtraMapping{
+					{Key: "", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Required value`,
+		},
+		{
+			name: "extra mapping value expression is empty",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Extra: []api.ExtraMapping{
+					{Key: "example.org/foo", ValueExpression: ""},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].valueExpression: Required value: valueExpression is required`,
+		},
+		{
+			name: "extra mapping value expression is invalid",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Extra: []api.ExtraMapping{
+					{Key: "example.org/foo", ValueExpression: "foo.bar"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want: `issuer.claimMappings.extra[0].valueExpression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^`,
+		},
+		{
+			name: "username expression is invalid when structured authn feature is disabled",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Expression: "foo.bar",
+				},
+			},
+			structuredAuthnFeatureEnabled: false,
+			want: `[issuer.claimMappings.username.expression: Invalid value: "foo.bar": expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^]`,
+		},
+		{
+			name: "groups expression is invalid when structured authn feature is disabled",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Groups: api.PrefixedClaimOrExpression{
+					Expression: "foo.bar",
+				},
+			},
+			structuredAuthnFeatureEnabled: false,
+			want: `[issuer.claimMappings.groups.expression: Invalid value: "foo.bar": expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^]`,
+		},
+		{
+			name: "uid expression is invalid when structured authn feature is disabled",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				UID: api.ClaimOrExpression{
+					Expression: "foo.bar",
+				},
+			},
+			structuredAuthnFeatureEnabled: false,
+			want: `[issuer.claimMappings.uid: Invalid value: "": uid claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.uid.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^]`,
+		},
+		{
+			name: "uid claim is invalid when structured authn feature is disabled",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				UID: api.ClaimOrExpression{
+					Claim: "claim",
+				},
+			},
+			structuredAuthnFeatureEnabled: false,
+			want:                          `issuer.claimMappings.uid: Invalid value: "": uid claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+		},
+		{
+			name: "extra mapping is invalid when structured authn feature is disabled",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{
+					Claim:  "claim",
+					Prefix: pointer.String("prefix"),
+				},
+				Extra: []api.ExtraMapping{
+					{Key: "example.org/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: false,
+			want:                          `issuer.claimMappings.extra: Invalid value: "": extra claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+		},
+		{
+			name: "duplicate extra mapping key",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.org/foo", ValueExpression: "claims.extra"},
+					{Key: "example.org/foo", ValueExpression: "claims.extras"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[1].key: Duplicate value: "example.org/foo"`,
+		},
+		{
+			name: "extra mapping key is not domain prefix path",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "foo": must be a domain-prefixed path (such as "acme.io/foo")`,
+		},
+		{
+			name: "extra mapping key is not lower case",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.org/Foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.org/Foo": key must be lowercase`,
 		},
 		{
 			name: "valid claim mappings",
 			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Claim: "claim", Prefix: pointer.String("prefix")},
-				Groups:   api.PrefixedClaimOrExpression{Claim: "claim", Prefix: pointer.String("prefix")},
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.org/foo", ValueExpression: "claims.extra"},
+				},
 			},
-			want: "",
+			structuredAuthnFeatureEnabled: true,
+			wantCELMapper:                 true,
+			want:                          "",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateClaimMappings(tt.in, fldPath).ToAggregate()
+			celMapper := &authenticationcel.CELMapper{}
+			got := validateClaimMappings(compiler, celMapper, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
+				fmt.Println(errString(got))
 				t.Fatalf("ClaimMappings validation mismatch (-want +got):\n%s", d)
+			}
+			if tt.wantCELMapper {
+				if len(tt.in.Username.Expression) > 0 && celMapper.Username == nil {
+					t.Fatalf("ClaimMappings validation mismatch: CELMapper.Username is nil")
+				}
+				if len(tt.in.Groups.Expression) > 0 && celMapper.Groups == nil {
+					t.Fatalf("ClaimMappings validation mismatch: CELMapper.Groups is nil")
+				}
+				if len(tt.in.UID.Expression) > 0 && celMapper.UID == nil {
+					t.Fatalf("ClaimMappings validation mismatch: CELMapper.UID is nil")
+				}
+				if len(tt.in.Extra) > 0 && celMapper.Extra == nil {
+					t.Fatalf("ClaimMappings validation mismatch: CELMapper.Extra is nil")
+				}
+			}
+		})
+	}
+}
+
+func TestValidateUserValidationRules(t *testing.T) {
+	fldPath := field.NewPath("issuer", "userValidationRules")
+
+	testCases := []struct {
+		name                          string
+		in                            []api.UserValidationRule
+		structuredAuthnFeatureEnabled bool
+		want                          string
+		wantCELMapper                 bool
+	}{
+		{
+			name:                          "user info validation rule, expression is empty",
+			in:                            []api.UserValidationRule{{}},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "issuer.userValidationRules[0].expression: Required value: expression is required",
+		},
+		{
+			name: "duplicate expression",
+			in: []api.UserValidationRule{
+				{Expression: "user.username == 'foo'"},
+				{Expression: "user.username == 'foo'"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.userValidationRules[1].expression: Duplicate value: "user.username == 'foo'"`,
+		},
+		{
+			name: "user validation rule is invalid when structured authn feature is disabled",
+			in: []api.UserValidationRule{
+				{Expression: "user.username == 'foo'"},
+			},
+			structuredAuthnFeatureEnabled: false,
+			want:                          `issuer.userValidationRules: Invalid value: "": user validation rules are not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+		},
+		{
+			name: "expression is invalid",
+			in: []api.UserValidationRule{
+				{Expression: "foo.bar"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want: `issuer.userValidationRules[0].expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+ | foo.bar
+ | ^`,
+		},
+		{
+			name: "expression does not return bool",
+			in: []api.UserValidationRule{
+				{Expression: "user.username"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.userValidationRules[0].expression: Invalid value: "user.username": must evaluate to bool`,
+		},
+		{
+			name: "valid user info validation rule",
+			in: []api.UserValidationRule{
+				{Expression: "user.username == 'foo'"},
+				{Expression: "!user.username.startsWith('system:')", Message: "username cannot used reserved system: prefix"},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "",
+			wantCELMapper:                 true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			celMapper := &authenticationcel.CELMapper{}
+			got := validateUserValidationRules(compiler, celMapper, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			if d := cmp.Diff(tt.want, errString(got)); d != "" {
+				t.Fatalf("UserValidationRules validation mismatch (-want +got):\n%s", d)
+			}
+			if tt.wantCELMapper && celMapper.UserValidationRules == nil {
+				t.Fatalf("UserValidationRules validation mismatch: CELMapper.UserValidationRules is nil")
 			}
 		})
 	}
@@ -428,6 +911,8 @@ type (
 )
 
 func TestValidateAuthorizationConfiguration(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+
 	badKubeConfigFile := "../some/relative/path/kubeconfig"
 
 	tempKubeConfigFile, err := os.CreateTemp("/tmp", "kubeconfig")
@@ -548,6 +1033,39 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 							MatchConditionSubjectAccessReviewVersion: "v1",
 							ConnectionInfo: api.WebhookConnectionInfo{
 								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "bare minimum configuration with Webhook and MatchConditions",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+							MatchConditions: []api.WebhookMatchCondition{
+								{
+									Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
+								},
+								{
+									Expression: "request.user == 'admin'",
+								},
 							},
 						},
 					},
@@ -920,6 +1438,7 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 							ConnectionInfo: api.WebhookConnectionInfo{
 								Type: "InClusterConfig",
 							},
+							MatchConditions: []api.WebhookMatchCondition{{Expression: "true"}},
 						},
 					},
 				},
@@ -1156,8 +1675,6 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			knownTypes:      sets.NewString(string("Webhook")),
 			repeatableTypes: sets.NewString(string("Webhook")),
 		},
-
-		// TODO: When the CEL expression validator is implemented, add a few test cases to typecheck the expression
 	}
 
 	for _, test := range tests {
@@ -1166,20 +1683,120 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			if len(errList) != len(test.expectedErrList) {
 				t.Errorf("expected %d errs, got %d, errors %v", len(test.expectedErrList), len(errList), errList)
 			}
-
-			for i, expected := range test.expectedErrList {
-				if expected.Type.String() != errList[i].Type.String() {
-					t.Errorf("expected err type %s, got %s",
-						expected.Type.String(),
-						errList[i].Type.String())
-				}
-				if expected.BadValue != errList[i].BadValue {
-					t.Errorf("expected bad value '%s', got '%s'",
-						expected.BadValue,
-						errList[i].BadValue)
+			if len(errList) == len(test.expectedErrList) {
+				for i, expected := range test.expectedErrList {
+					if expected.Type.String() != errList[i].Type.String() {
+						t.Errorf("expected err type %s, got %s",
+							expected.Type.String(),
+							errList[i].Type.String())
+					}
+					if expected.BadValue != errList[i].BadValue {
+						t.Errorf("expected bad value '%s', got '%s'",
+							expected.BadValue,
+							errList[i].BadValue)
+					}
 				}
 			}
 		})
 
+	}
+}
+
+func TestValidateAndCompileMatchConditions(t *testing.T) {
+	testCases := []struct {
+		name            string
+		matchConditions []api.WebhookMatchCondition
+		featureEnabled  bool
+		expectedErr     string
+	}{
+		{
+			name: "match conditions are used With feature enabled",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
+				},
+				{
+					Expression: "request.user == 'admin'",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "",
+		},
+		{
+			name: "should fail when match conditions are used without feature enabled",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
+				},
+				{
+					Expression: "request.user == 'admin'",
+				},
+			},
+			featureEnabled: false,
+			expectedErr:    `matchConditions: Invalid value: "": matchConditions are not supported when StructuredAuthorizationConfiguration feature gate is disabled`,
+		},
+		{
+			name:            "no matchConditions should not require feature enablement",
+			matchConditions: []api.WebhookMatchCondition{},
+			featureEnabled:  false,
+			expectedErr:     "",
+		},
+		{
+			name: "match conditions with invalid expressions",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "  ",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "matchConditions[0].expression: Required value",
+		},
+		{
+			name: "match conditions with duplicate expressions",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "request.user == 'admin'",
+				},
+				{
+					Expression: "request.user == 'admin'",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    `matchConditions[1].expression: Duplicate value: "request.user == 'admin'"`,
+		},
+		{
+			name: "match conditions with undeclared reference",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "test",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test' (in container '')\n | test\n | ^",
+		},
+		{
+			name: "match conditions with bad return type",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "request.user = 'test'",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "matchConditions[0].expression: Invalid value: \"request.user = 'test'\": compilation failed: ERROR: <input>:1:14: Syntax error: token recognition error at: '= '\n | request.user = 'test'\n | .............^\nERROR: <input>:1:16: Syntax error: extraneous input ''test'' expecting <EOF>\n | request.user = 'test'\n | ...............^",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)()
+			celMatcher, errList := ValidateAndCompileMatchConditions(tt.matchConditions)
+			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
+				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")
+			}
+			got := errList.ToAggregate()
+			if d := cmp.Diff(tt.expectedErr, errString(got)); d != "" {
+				t.Fatalf("ValidateAndCompileMatchConditions validation mismatch (-want +got):\n%s", d)
+			}
+		})
 	}
 }

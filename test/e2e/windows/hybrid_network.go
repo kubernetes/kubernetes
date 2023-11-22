@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -76,7 +77,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 
 		})
 
-		ginkgo.It("should provide Internet connection for Linux containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
+		f.It("should provide Internet connection for Linux containers using DNS", feature.NetworkingDNS, func(ctx context.Context) {
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
 			linuxPod = e2epod.NewPodClient(f).CreateSync(ctx, linuxPod)
@@ -87,7 +88,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
 		})
 
-		ginkgo.It("should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
+		f.It("should provide Internet connection for Windows containers using DNS", feature.NetworkingDNS, func(ctx context.Context) {
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 			ginkgo.By("creating a windows pod and waiting for it to be running")
 			windowsPod = e2epod.NewPodClient(f).CreateSync(ctx, windowsPod)

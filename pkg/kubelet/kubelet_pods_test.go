@@ -3781,6 +3781,118 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	}
 }
 
+func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	testContainerName := "ctr0"
+	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
+
+	CPU1AndMem1G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
+	CPU1AndMem1GAndStorage2G := CPU1AndMem1G.DeepCopy()
+	CPU1AndMem1GAndStorage2G[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
+	CPU1AndMem1GAndStorage2GAndCustomResource := CPU1AndMem1GAndStorage2G.DeepCopy()
+	CPU1AndMem1GAndStorage2GAndCustomResource["unknown-resource"] = resource.MustParse("1")
+
+	testKubecontainerPodStatus := kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:   testContainerID,
+				Name: testContainerName,
+				Resources: &kubecontainer.ContainerResources{
+					CPURequest:    CPU1AndMem1G.Cpu(),
+					MemoryRequest: CPU1AndMem1G.Memory(),
+					CPULimit:      CPU1AndMem1G.Cpu(),
+					MemoryLimit:   CPU1AndMem1G.Memory(),
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		pod       *v1.Pod
+		oldStatus *v1.PodStatus
+	}{
+		{
+			name: "custom resource in ResourcesAllocated, resize should be null",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "1234560",
+					Name:      "foo0",
+					Namespace: "bar0",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					Containers: []v1.Container{
+						{
+							Name:      testContainerName,
+							Image:     "img",
+							Resources: v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2GAndCustomResource, Requests: CPU1AndMem1GAndStorage2GAndCustomResource},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               testContainerName,
+							Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+							AllocatedResources: CPU1AndMem1GAndStorage2GAndCustomResource,
+						},
+					},
+					Resize: "InProgress",
+				},
+			},
+		},
+		{
+			name: "cpu/memory resource in ResourcesAllocated, resize should be null",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "1234560",
+					Name:      "foo0",
+					Namespace: "bar0",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					Containers: []v1.Container{
+						{
+							Name:      testContainerName,
+							Image:     "img",
+							Resources: v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               testContainerName,
+							Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+							AllocatedResources: CPU1AndMem1GAndStorage2G,
+						},
+					},
+					Resize: "InProgress",
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			oldStatus := test.pod.Status
+			kl.statusManager = status.NewFakeManager()
+			kl.statusManager.SetPodStatus(test.pod, oldStatus)
+			actual := kl.generateAPIPodStatus(test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
+
+			if actual.Resize != "" {
+				t.Fatalf("Unexpected Resize status: %s", actual.Resize)
+			}
+		})
+	}
+}
+
 func findContainerStatusByName(status v1.PodStatus, name string) *v1.ContainerStatus {
 	for i, c := range status.InitContainerStatuses {
 		if c.Name == name {

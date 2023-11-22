@@ -37,7 +37,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Directory", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-directory")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -104,7 +104,7 @@ var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType File", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-file")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -173,7 +173,7 @@ var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Socket", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-socket")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -239,7 +239,7 @@ var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Character Device", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-char-dev")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -309,7 +309,7 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Block Device", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-block-dev")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

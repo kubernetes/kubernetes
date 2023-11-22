@@ -26,6 +26,9 @@ const IsDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-c
 // TODO: remove Beta when no longer used
 const BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 
+// AlphaIsDefaultVolumeAttributesClassAnnotation is the alpha version of IsDefaultVolumeAttributesClassAnnotation.
+const AlphaIsDefaultVolumeAttributesClassAnnotation = "volumeattributesclass.alpha.kubernetes.io/is-default-class"
+
 // IsDefaultAnnotation returns a boolean if
 // the annotation is set
 // TODO: remove Beta when no longer needed
@@ -38,4 +41,10 @@ func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
 	}
 
 	return false
+}
+
+// IsDefaultAnnotationForVolumeAttributesClass returns a boolean if
+// the annotation is set
+func IsDefaultAnnotationForVolumeAttributesClass(obj metav1.ObjectMeta) bool {
+	return obj.Annotations[AlphaIsDefaultVolumeAttributesClassAnnotation] == "true"
 }

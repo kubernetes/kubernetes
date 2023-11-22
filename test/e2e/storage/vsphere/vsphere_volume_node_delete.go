@@ -24,6 +24,7 @@ import (
 	"github.com/vmware/govmomi/object"
 
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -31,7 +32,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]", func() {
+var _ = utils.SIGDescribe("Node Unregister", feature.Vsphere, framework.WithSlow(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("node-unregister")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

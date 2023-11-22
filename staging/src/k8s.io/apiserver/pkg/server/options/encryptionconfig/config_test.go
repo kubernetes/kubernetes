@@ -2177,3 +2177,48 @@ func logLines(logs string) []string {
 	}
 	return lines
 }
+
+func TestGetEncryptionConfigHash(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		filepath string
+		wantHash string
+		wantErr  string
+	}{
+		{
+			name:     "empty config file content",
+			filepath: "testdata/invalid-configs/kms/invalid-content.yaml",
+			wantHash: "",
+			wantErr:  `encryption provider configuration file "testdata/invalid-configs/kms/invalid-content.yaml" is empty`,
+		},
+		{
+			name:     "missing file",
+			filepath: "testdata/invalid-configs/kms/file-that-does-not-exist.yaml",
+			wantHash: "",
+			wantErr:  `error opening encryption provider configuration file "testdata/invalid-configs/kms/file-that-does-not-exist.yaml": open testdata/invalid-configs/kms/file-that-does-not-exist.yaml: no such file or directory`,
+		},
+		{
+			name:     "valid file",
+			filepath: "testdata/valid-configs/secret-box-first.yaml",
+			wantHash: "c638c0327dbc3276dd1fcf3e67895d19ebca16b91ae0d19af24ef0759b8e0f66",
+			wantErr:  ``,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := GetEncryptionConfigHash(tt.filepath)
+			if errString(err) != tt.wantErr {
+				t.Errorf("GetEncryptionConfigHash() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.wantHash {
+				t.Errorf("GetEncryptionConfigHash() got = %v, want %v", got, tt.wantHash)
+			}
+		})
+	}
+}

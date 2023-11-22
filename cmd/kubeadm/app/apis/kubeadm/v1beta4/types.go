@@ -122,6 +122,9 @@ type ClusterConfiguration struct {
 	// +optional
 	DNS DNS `json:"dns,omitempty"`
 
+	// Proxy defines the options for the proxy add-on installed in the cluster.
+	Proxy Proxy `json:"proxy,omitempty"`
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	// +optional
 	CertificatesDir string `json:"certificatesDir,omitempty"`
@@ -181,8 +184,19 @@ type APIServer struct {
 
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
-	// ImageMeta allows to customize the image used for the DNS component
+	// ImageMeta allows to customize the image used for the DNS addon
 	ImageMeta `json:",inline"`
+
+	// Disabled specifies whether to disable this addon in the cluster
+	// +optional
+	Disabled bool `json:"disabled,omitempty"`
+}
+
+// Proxy defines the proxy addon that should be used in the cluster
+type Proxy struct {
+	// Disabled specifies whether to disable this addon in the cluster
+	// +optional
+	Disabled bool `json:"disabled,omitempty"`
 }
 
 // ImageMeta allows to customize the image used for components that are not

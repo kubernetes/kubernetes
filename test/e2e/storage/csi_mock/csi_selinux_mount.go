@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -45,7 +46,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
-	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinux]", func() {
+	f.Context("SELinuxMount [LinuxOnly]", feature.SELinux, func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
@@ -250,7 +251,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	m := newMockDriverSetup(f)
 
 	// [Serial]: the tests read global kube-controller-manager metrics, so no other test changes them in parallel.
-	ginkgo.Context("SELinuxMount metrics [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod][Serial]", func() {
+	f.Context("SELinuxMount metrics [LinuxOnly]", feature.SELinux, feature.SELinuxMountReadWriteOncePod, f.WithSerial(), func() {
 
 		// All SELinux metrics. Unless explicitly mentioned in test.expectIncreases, these metrics must not grow during
 		// a test.

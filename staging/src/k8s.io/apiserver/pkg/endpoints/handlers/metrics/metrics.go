@@ -18,8 +18,10 @@ package metrics
 
 import (
 	"context"
+	"sync"
 
 	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 type RequestBodyVerb string
@@ -46,6 +48,15 @@ var (
 		[]string{"resource", "verb"},
 	)
 )
+
+var registerMetrics sync.Once
+
+// Register all metrics.
+func Register() {
+	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(RequestBodySizes)
+	})
+}
 
 func RecordRequestBodySize(ctx context.Context, resource string, verb RequestBodyVerb, size int) {
 	RequestBodySizes.WithContext(ctx).WithLabelValues(resource, string(verb)).Observe(float64(size))

@@ -205,7 +205,7 @@ func getContainerRestarts(ctx context.Context, c clientset.Interface, ns string,
 	return failedContainers, containerRestartNodes.List()
 }
 
-var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
+var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

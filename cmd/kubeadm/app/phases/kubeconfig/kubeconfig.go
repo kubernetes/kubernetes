@@ -683,13 +683,31 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 		kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding,
 		kubeadmconstants.SuperAdminKubeConfigFileName)
 
-	if _, err := superAdminClient.RbacV1().ClusterRoleBindings().Create(
+	err = wait.PollUntilContextTimeout(
 		ctx,
-		clusterRoleBinding,
-		metav1.CreateOptions{},
-	); err != nil {
-		return nil, errors.Wrapf(err, "unable to create the %s ClusterRoleBinding",
-			kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding)
+		retryInterval,
+		retryTimeout,
+		true, func(ctx context.Context) (bool, error) {
+			if _, err := superAdminClient.RbacV1().ClusterRoleBindings().Create(
+				ctx,
+				clusterRoleBinding,
+				metav1.CreateOptions{},
+			); err != nil {
+				lastError = err
+				if apierrors.IsAlreadyExists(err) {
+					// This should not happen, as the previous "create" call that uses
+					// the admin.conf should have passed. Return the error.
+					return true, err
+				}
+				// Retry on any other type of error.
+				return false, nil
+			}
+			return true, nil
+		})
+	if err != nil {
+		return nil, errors.Wrapf(lastError, "unable to create the %s ClusterRoleBinding by using %s",
+			kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding,
+			kubeadmconstants.SuperAdminKubeConfigFileName)
 	}
 
 	// Once the CRB is in place, start using the admin.conf client.

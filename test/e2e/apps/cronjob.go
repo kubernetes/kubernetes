@@ -94,7 +94,7 @@ var _ = SIGDescribe("CronJob", func() {
 	   Testname: CronJob Suspend
 	   Description: CronJob MUST support suspension, which suppresses creation of new jobs.
 	*/
-	framework.ConformanceIt("should not schedule jobs when suspended [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should not schedule jobs when suspended", f.WithSlow(), func(ctx context.Context) {
 		ginkgo.By("Creating a suspended cronjob")
 		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batchv1.AllowConcurrent,
 			sleepCommand, nil, nil)
@@ -122,7 +122,7 @@ var _ = SIGDescribe("CronJob", func() {
 	   Testname: CronJob ForbidConcurrent
 	   Description: CronJob MUST support ForbidConcurrent policy, allowing to run single, previous job at the time.
 	*/
-	framework.ConformanceIt("should not schedule new jobs when ForbidConcurrent [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should not schedule new jobs when ForbidConcurrent", f.WithSlow(), func(ctx context.Context) {
 		ginkgo.By("Creating a ForbidConcurrent cronjob")
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1.ForbidConcurrent,
 			sleepCommand, nil, nil)

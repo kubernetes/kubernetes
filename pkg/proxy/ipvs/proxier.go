@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -53,6 +52,7 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 )
 
 const (
@@ -93,11 +93,6 @@ const (
 
 	// defaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
 	defaultDummyDevice = "kube-ipvs0"
-
-	connReuseMinSupportedKernelVersion = "4.1"
-
-	// https://github.com/torvalds/linux/commit/35dfb013149f74c2be1ff9c78f14e6a3cd1539d1
-	connReuseFixedKernelVersion = "5.9"
 )
 
 // iptablesJumpChain is tables of iptables chains that ipvs proxier used to install iptables or cleanup iptables.
@@ -339,7 +334,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	healthzServer *healthcheck.ProxierHealthServer,
 	scheduler string,
 	nodePortAddressStrings []string,
-	kernelHandler KernelHandler,
 	initOnly bool,
 ) (*Proxier, error) {
 	// Set the conntrack sysctl we need for
@@ -347,17 +341,14 @@ func NewProxier(ipFamily v1.IPFamily,
 		return nil, err
 	}
 
-	kernelVersionStr, err := kernelHandler.GetKernelVersion()
+	kernelVersion, err := utilkernel.GetVersion()
 	if err != nil {
-		return nil, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+		return nil, fmt.Errorf("failed to get kernel version: %w", err)
 	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	if kernelVersion.LessThan(version.MustParseGeneric(connReuseMinSupportedKernelVersion)) {
-		klog.ErrorS(nil, "Can't set sysctl, kernel version doesn't satisfy minimum version requirements", "sysctl", sysctlConnReuse, "minimumKernelVersion", connReuseMinSupportedKernelVersion)
-	} else if kernelVersion.AtLeast(version.MustParseGeneric(connReuseFixedKernelVersion)) {
+
+	if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.IPVSConnReuseModeMinSupportedKernelVersion)) {
+		klog.ErrorS(nil, "Can't set sysctl, kernel version doesn't satisfy minimum version requirements", "sysctl", sysctlConnReuse, "minimumKernelVersion", utilkernel.IPVSConnReuseModeMinSupportedKernelVersion)
+	} else if kernelVersion.AtLeast(version.MustParseGeneric(utilkernel.IPVSConnReuseModeFixedKernelVersion)) {
 		// https://github.com/kubernetes/kubernetes/issues/93297
 		klog.V(2).InfoS("Left as-is", "sysctl", sysctlConnReuse)
 	} else {
@@ -495,7 +486,6 @@ func NewDualStackProxier(
 	healthzServer *healthcheck.ProxierHealthServer,
 	scheduler string,
 	nodePortAddresses []string,
-	kernelHandler KernelHandler,
 	initOnly bool,
 ) (proxy.Provider, error) {
 
@@ -505,8 +495,8 @@ func NewDualStackProxier(
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler, initOnly)
+		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol], recorder,
+		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -514,8 +504,8 @@ func NewDualStackProxier(
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler, initOnly)
+		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol], recorder,
+		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -557,23 +547,6 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 	return svcPort
 }
 
-// KernelHandler can handle the current installed kernel modules.
-type KernelHandler interface {
-	GetKernelVersion() (string, error)
-}
-
-// LinuxKernelHandler implements KernelHandler interface.
-type LinuxKernelHandler struct {
-	executor utilexec.Interface
-}
-
-// NewLinuxKernelHandler initializes LinuxKernelHandler with exec.
-func NewLinuxKernelHandler() *LinuxKernelHandler {
-	return &LinuxKernelHandler{
-		executor: utilexec.New(),
-	}
-}
-
 // getFirstColumn reads all the content from r into memory and return a
 // slice which consists of the first word from each line.
 func getFirstColumn(r io.Reader) ([]string, error) {
@@ -591,17 +564,6 @@ func getFirstColumn(r io.Reader) ([]string, error) {
 		}
 	}
 	return words, nil
-}
-
-// GetKernelVersion returns currently running kernel version.
-func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
-	kernelVersionFile := "/proc/sys/kernel/osrelease"
-	fileContent, err := os.ReadFile(kernelVersionFile)
-	if err != nil {
-		return "", fmt.Errorf("error reading osrelease file %q: %v", kernelVersionFile, err)
-	}
-
-	return strings.TrimSpace(string(fileContent)), nil
 }
 
 // CanUseIPVSProxier checks if we can use the ipvs Proxier.

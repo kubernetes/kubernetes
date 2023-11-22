@@ -99,6 +99,11 @@ func Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(
 	return autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in, out, s)
 }
 
+// Convert_kubeadm_DNS_To_v1beta3_DNS converts a private DNS to public DNS.
+func Convert_kubeadm_DNS_To_v1beta3_DNS(in *kubeadm.DNS, out *DNS, s conversion.Scope) error {
+	return autoConvert_kubeadm_DNS_To_v1beta3_DNS(in, out, s)
+}
+
 // convertToArgs takes a argument map and converts it to a slice of arguments.
 // Te resulting argument slice is sorted alpha-numerically.
 func convertToArgs(in map[string]string) []kubeadm.Arg {

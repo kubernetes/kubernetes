@@ -291,7 +291,7 @@ func KubeadmCertKubeletClient() *KubeadmCert {
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
 				CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Organization: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 		},

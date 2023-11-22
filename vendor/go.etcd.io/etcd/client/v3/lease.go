@@ -294,7 +294,9 @@ func (l *lessor) KeepAlive(ctx context.Context, id LeaseID) (<-chan *LeaseKeepAl
 	}
 	l.mu.Unlock()
 
-	go l.keepAliveCtxCloser(ctx, id, ka.donec)
+	if ctx.Done() != nil {
+		go l.keepAliveCtxCloser(ctx, id, ka.donec)
+	}
 	l.firstKeepAliveOnce.Do(func() {
 		go l.recvKeepAliveLoop()
 		go l.deadlineLoop()

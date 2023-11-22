@@ -466,6 +466,80 @@ done`}
 	})
 
 	/*
+		Testcase: Terminate job execution when the maxFailedIndexes is exceeded
+		Description: Create an indexed job with backoffLimitPerIndex and maxFailedIndexes.
+		Verify the job execution is terminated as soon as the number of failed
+		indexes exceeds maxFailedIndexes.
+	*/
+	ginkgo.It("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
+		// we use parallelism=1 to make sure in the asserts only one pod was created
+		parallelism := int32(1)
+		ginkgo.By("Creating an indexed job with backoffLimit per index and maxFailedIndexes")
+		job := e2ejob.NewTestJob("fail", "with-max-failed-indexes", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.BackoffLimit = nil
+		job.Spec.BackoffLimitPerIndex = ptr.To[int32](0)
+		job.Spec.MaxFailedIndexes = ptr.To[int32](0)
+
+		mode := batchv1.IndexedCompletion
+		job.Spec.CompletionMode = &mode
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to fail as the number of max failed indexes is exceeded")
+		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verifying the Job status fields to ensure early termination of the job")
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		gomega.Expect(job.Status.FailedIndexes).Should(gomega.HaveValue(gomega.Equal("0")))
+		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(1)))
+	})
+
+	/*
+		Testcase: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
+		Description: Create an indexed job with backoffLimitPerIndex, and podFailurePolicy
+		with the FailIndex action. Verify the failed pods matching the pod failure policy
+		result in marking the corresponding indexes as failed without restarts, despite
+		backoffLimitPerIndex > 0.
+	*/
+	ginkgo.It("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
+		completions := int32(2)
+
+		ginkgo.By("Creating an indexed job with failing pods matching the FailIndex action")
+		job := e2ejob.NewTestJob("failOddSucceedEven", "matching-fail-index-action", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.BackoffLimit = nil
+		job.Spec.BackoffLimitPerIndex = ptr.To[int32](1)
+		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{
+				{
+					Action: batchv1.PodFailurePolicyActionFailIndex,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{1},
+					},
+				},
+			},
+		}
+		mode := batchv1.IndexedCompletion
+		job.Spec.CompletionMode = &mode
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to fail as all indexes are failed")
+		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verifying the Job status fields to ensure the upper indexes didn't execute")
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		gomega.Expect(job.Status.FailedIndexes).Should(gomega.HaveValue(gomega.Equal("1")))
+		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
+		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(1)))
+		gomega.Expect(job.Status.Succeeded).Should(gomega.Equal(int32(1)))
+	})
+
+	/*
 		Testcase: Ensure that the pods associated with the job are removed once the job is deleted
 		Description: Create a job and ensure the associated pod count is equal to parallelism count. Delete the
 		job and ensure if the pods associated with the job have been removed
@@ -652,7 +726,7 @@ done`}
 		}
 	})
 
-	ginkgo.It("should run a job to completion with CPU requests [Serial]", func(ctx context.Context) {
+	f.It("should run a job to completion with CPU requests", f.WithSerial(), func(ctx context.Context) {
 		ginkgo.By("Creating a job that with CPU requests")
 
 		testNodeName := scheduling.GetNodeThatCanRunPod(ctx, f)

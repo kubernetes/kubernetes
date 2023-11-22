@@ -18,13 +18,13 @@ package raw
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 
 	inotify "k8s.io/utils/inotify"
 
+	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/watcher"
@@ -43,8 +43,8 @@ type rawContainerWatcher struct {
 	stopWatcher chan error
 }
 
-func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(nil)
+func NewRawContainerWatcher(includedMetrics container.MetricSet) (watcher.ContainerWatcher, error) {
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
@@ -139,7 +139,7 @@ func (w *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEvent,
 
 	// TODO(vmarmol): We should re-do this once we're done to ensure directories were not added in the meantime.
 	// Watch subdirectories as well.
-	entries, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return alreadyWatching, err
 	}

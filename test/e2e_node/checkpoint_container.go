@@ -35,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -74,7 +75,7 @@ func proxyPostRequest(ctx context.Context, c clientset.Interface, node, endpoint
 	}
 }
 
-var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", func() {
+var _ = SIGDescribe("Checkpoint Container", nodefeature.CheckpointContainer, func() {
 	f := framework.NewDefaultFramework("checkpoint-container-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("will checkpoint a container out of a pod", func(ctx context.Context) {

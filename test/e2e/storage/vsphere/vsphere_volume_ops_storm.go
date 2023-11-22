@@ -28,6 +28,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -52,7 +53,7 @@ import (
 		10. Delete storage class.
 */
 
-var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Operations Storm", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const defaultVolumeOpsScale = 30

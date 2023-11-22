@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -72,7 +73,9 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		admissionregistration.Resource("validatingadmissionpolicies").WithVersion("v1beta1"),
 		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1beta1"),
 		networking.Resource("ipaddresses").WithVersion("v1alpha1"),
+		networking.Resource("servicecidrs").WithVersion("v1alpha1"),
 		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
+		storage.Resource("volumeattributesclasses").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{

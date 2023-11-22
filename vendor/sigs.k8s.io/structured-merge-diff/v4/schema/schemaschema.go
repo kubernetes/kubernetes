@@ -145,6 +145,7 @@ var SchemaSchemaYAML = `types:
         list:
           elementType:
             scalar: string
+          elementRelationship: atomic
 - name: untyped
   map:
     fields:

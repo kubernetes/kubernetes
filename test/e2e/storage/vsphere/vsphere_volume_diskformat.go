@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -56,7 +57,7 @@ import (
 	11. Delete PVC, PV and Storage Class
 */
 
-var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Disk Format", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const (

@@ -20,6 +20,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,7 +35,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/imdario/mergo"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/codes"
@@ -312,30 +313,34 @@ is checked every 20 seconds (also configurable with a flag).`,
 // potentially overriding the previous values.
 func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConfiguration, kubeletDropInConfigDir string) error {
 	const dropinFileExtension = ".conf"
-
+	baseKubeletConfigJSON, err := json.Marshal(kubeletConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal base config: %w", err)
+	}
 	// Walk through the drop-in directory and update the configuration for each file
-	err := filepath.WalkDir(kubeletDropInConfigDir, func(path string, info fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(kubeletDropInConfigDir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() && filepath.Ext(info.Name()) == dropinFileExtension {
-			dropinConfig, err := loadConfigFile(path)
+			dropinConfigJSON, err := loadDropinConfigFileIntoJSON(path)
 			if err != nil {
 				return fmt.Errorf("failed to load kubelet dropin file, path: %s, error: %w", path, err)
 			}
-
-			// Merge dropinConfig with kubeletConfig
-			if err := mergo.Merge(kubeletConfig, dropinConfig, mergo.WithOverride); err != nil {
-				return fmt.Errorf("failed to merge kubelet drop-in config, path: %s, error: %w", path, err)
+			mergedConfigJSON, err := jsonpatch.MergePatch(baseKubeletConfigJSON, dropinConfigJSON)
+			if err != nil {
+				return fmt.Errorf("failed to merge drop-in and current config: %w", err)
 			}
+			baseKubeletConfigJSON = mergedConfigJSON
 		}
 		return nil
-	})
-
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to walk through kubelet dropin directory %q: %w", kubeletDropInConfigDir, err)
 	}
 
+	if err := json.Unmarshal(baseKubeletConfigJSON, kubeletConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal merged JSON into kubelet configuration: %w", err)
+	}
 	return nil
 }
 
@@ -413,6 +418,20 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 		kc.EvictionHard = eviction.DefaultEvictionHard
 	}
 	return kc, err
+}
+
+func loadDropinConfigFileIntoJSON(name string) ([]byte, error) {
+	const errFmt = "failed to load drop-in kubelet config file %s, error %v"
+	// compute absolute path based on current working dir
+	kubeletConfigFile, err := filepath.Abs(name)
+	if err != nil {
+		return nil, fmt.Errorf(errFmt, name, err)
+	}
+	loader, err := configfiles.NewFsLoader(&utilfs.DefaultFs{}, kubeletConfigFile)
+	if err != nil {
+		return nil, fmt.Errorf(errFmt, name, err)
+	}
+	return loader.LoadIntoJSON()
 }
 
 // UnsecuredDependencies returns a Dependencies suitable for being run, or an error if the server setup

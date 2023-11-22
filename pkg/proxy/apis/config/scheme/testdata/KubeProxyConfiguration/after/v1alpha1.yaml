@@ -12,6 +12,7 @@ configSyncPeriod: 15m0s
 conntrack:
   maxPerCore: 32768
   min: 131072
+  tcpBeLiberal: false
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
   udpStreamTimeout: 0s
@@ -48,6 +49,11 @@ logging:
   verbosity: 0
 metricsBindAddress: 127.0.0.1:10249
 mode: ""
+nftables:
+  masqueradeAll: false
+  masqueradeBit: 14
+  minSyncPeriod: 1s
+  syncPeriod: 30s
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""

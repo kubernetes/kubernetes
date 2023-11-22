@@ -1348,6 +1348,133 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
 }
 
+func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
+	// Requesting to create a pod that requests resourceName1 in restartable
+	// init containers and normal containers should succeed with devices
+	// allocated to init containers not reallocated to normal containers.
+	oneDevice := resource.NewQuantity(int64(1), resource.DecimalSI)
+	twoDevice := resource.NewQuantity(int64(2), resource.DecimalSI)
+	threeDevice := resource.NewQuantity(int64(3), resource.DecimalSI)
+	res1 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(6), resource.DecimalSI),
+		devs: checkpoint.DevicesPerNUMA{
+			0: []string{"dev1", "dev2", "dev3", "dev4", "dev5", "dev6"},
+		},
+		topology: false,
+	}
+	testResources := []TestResource{
+		res1,
+	}
+	as := require.New(t)
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
+
+	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	as.Nil(err)
+
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+	podWithPluginResourcesInRestartableInitContainers := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): *threeDevice,
+						},
+					},
+				},
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): *oneDevice,
+						},
+					},
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): *twoDevice,
+						},
+					},
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): *oneDevice,
+						},
+					},
+				},
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(res1.resourceName): *twoDevice,
+						},
+					},
+				},
+			},
+		},
+	}
+	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInRestartableInitContainers})
+	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers {
+		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+	}
+	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.Containers {
+		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+	}
+	as.Nil(err)
+	podUID := string(podWithPluginResourcesInRestartableInitContainers.UID)
+	regularInitCont1 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[0].Name
+	restartableInitCont2 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[1].Name
+	restartableInitCont3 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[2].Name
+	normalCont1 := podWithPluginResourcesInRestartableInitContainers.Spec.Containers[0].Name
+	normalCont2 := podWithPluginResourcesInRestartableInitContainers.Spec.Containers[1].Name
+	regularInitCont1Devices := testManager.podDevices.containerDevices(podUID, regularInitCont1, res1.resourceName)
+	restartableInitCont2Devices := testManager.podDevices.containerDevices(podUID, restartableInitCont2, res1.resourceName)
+	restartableInitCont3Devices := testManager.podDevices.containerDevices(podUID, restartableInitCont3, res1.resourceName)
+	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
+	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
+	as.Equal(3, regularInitCont1Devices.Len())
+	as.Equal(1, restartableInitCont2Devices.Len())
+	as.Equal(2, restartableInitCont3Devices.Len())
+	as.Equal(1, normalCont1Devices.Len())
+	as.Equal(2, normalCont2Devices.Len())
+	as.True(regularInitCont1Devices.IsSuperset(restartableInitCont2Devices))
+	as.True(regularInitCont1Devices.IsSuperset(restartableInitCont3Devices))
+	// regularInitCont1Devices are sharable with other containers
+
+	dedicatedContainerDevices := []sets.Set[string]{
+		restartableInitCont2Devices,
+		restartableInitCont3Devices,
+		normalCont1Devices,
+		normalCont2Devices,
+	}
+
+	for i := 0; i < len(dedicatedContainerDevices)-1; i++ {
+		for j := i + 1; j < len(dedicatedContainerDevices); j++ {
+			t.Logf("containerDevices[%d] = %v", i, dedicatedContainerDevices[i])
+			t.Logf("containerDevices[%d] = %v", j, dedicatedContainerDevices[j])
+			as.Empty(dedicatedContainerDevices[i].Intersection(dedicatedContainerDevices[j]))
+		}
+	}
+}
+
 func TestUpdatePluginResources(t *testing.T) {
 	pod := &v1.Pod{}
 	pod.UID = types.UID("testPod")

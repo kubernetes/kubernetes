@@ -289,8 +289,10 @@ func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage(_ context.Context) ([]
 func (*fakeKubelet) ListPodCPUAndMemoryStats(_ context.Context) ([]statsapi.PodStats, error) {
 	return nil, nil
 }
-func (*fakeKubelet) ImageFsStats(_ context.Context) (*statsapi.FsStats, error) { return nil, nil }
-func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)               { return nil, nil }
+func (*fakeKubelet) ImageFsStats(_ context.Context) (*statsapi.FsStats, *statsapi.FsStats, error) {
+	return nil, nil, nil
+}
+func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error) { return nil, nil }
 func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }

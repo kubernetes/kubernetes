@@ -341,6 +341,26 @@
                     "audience": "audienceValue",
                     "expirationSeconds": 2,
                     "path": "pathValue"
+                  },
+                  "clusterTrustBundle": {
+                    "name": "nameValue",
+                    "signerName": "signerNameValue",
+                    "labelSelector": {
+                      "matchLabels": {
+                        "matchLabelsKey": "matchLabelsValue"
+                      },
+                      "matchExpressions": [
+                        {
+                          "key": "keyValue",
+                          "operator": "operatorValue",
+                          "values": [
+                            "valuesValue"
+                          ]
+                        }
+                      ]
+                    },
+                    "optional": true,
+                    "path": "pathValue"
                   }
                 }
               ],
@@ -468,7 +488,8 @@
                     "kind": "kindValue",
                     "name": "nameValue",
                     "namespace": "namespaceValue"
-                  }
+                  },
+                  "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
             }
@@ -1806,7 +1827,8 @@
             "kind": "kindValue",
             "name": "nameValue",
             "namespace": "namespaceValue"
-          }
+          },
+          "volumeAttributesClassName": "volumeAttributesClassNameValue"
         },
         "status": {
           "phase": "phaseValue",
@@ -1831,6 +1853,11 @@
           },
           "allocatedResourceStatuses": {
             "allocatedResourceStatusesKey": "allocatedResourceStatusesValue"
+          },
+          "currentVolumeAttributesClassName": "currentVolumeAttributesClassNameValue",
+          "modifyVolumeStatus": {
+            "targetVolumeAttributesClassName": "targetVolumeAttributesClassNameValue",
+            "status": "statusValue"
           }
         }
       }

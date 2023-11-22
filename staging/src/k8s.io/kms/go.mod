@@ -2,11 +2,11 @@
 
 module k8s.io/kms
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/gogo/protobuf v1.3.2
-	google.golang.org/grpc v1.58.2
+	google.golang.org/grpc v1.58.3
 )
 
 require (

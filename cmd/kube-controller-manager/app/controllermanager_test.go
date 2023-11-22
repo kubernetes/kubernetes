@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"regexp"
 	"strings"
 	"testing"
@@ -28,8 +29,10 @@ import (
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
+	controllermanagercontroller "k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestControllerNamesConsistency(t *testing.T) {
@@ -73,6 +76,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.TokenCleanerController,
 		names.NodeIpamController,
 		names.NodeLifecycleController,
+		names.TaintEvictionController,
 		cpnames.ServiceLBController,
 		cpnames.NodeRouteController,
 		cpnames.CloudNodeLifecycleController,
@@ -89,6 +93,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ResourceClaimController,
 		names.LegacyServiceAccountTokenCleanerController,
 		names.ValidatingAdmissionPolicyStatusController,
+		names.ServiceCIDRController,
 	)
 
 	for _, name := range KnownControllers() {
@@ -103,6 +108,9 @@ func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
 }
 
 func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", false)()
+
 	controllersWithoutFeatureGates := KnownControllers()
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)()
@@ -154,5 +162,59 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 		if areAllRequiredFeaturesAlpha {
 			t.Errorf("alias check failed: controller name %q should not be aliased as it is still guarded by alpha feature gates (%v) and thus should have only a canonical name", name, requiredFeatureGates)
 		}
+	}
+}
+
+// TestTaintEvictionControllerGating ensures that it is possible to run taint-manager as a separated controller
+// only when the SeparateTaintEvictionController feature is enabled
+func TestTaintEvictionControllerGating(t *testing.T) {
+	tests := []struct {
+		name               string
+		enableFeatureGate  bool
+		expectInitFuncCall bool
+	}{
+		{
+			name:               "standalone taint-eviction-controller should run when SeparateTaintEvictionController feature gate is enabled",
+			enableFeatureGate:  true,
+			expectInitFuncCall: true,
+		},
+		{
+			name:               "standalone taint-eviction-controller should not run when SeparateTaintEvictionController feature gate is not enabled",
+			enableFeatureGate:  false,
+			expectInitFuncCall: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			controllerCtx := ControllerContext{}
+			controllerCtx.ComponentConfig.Generic.Controllers = []string{names.TaintEvictionController}
+
+			initFuncCalled := false
+
+			taintEvictionControllerDescriptor := NewControllerDescriptors()[names.TaintEvictionController]
+			taintEvictionControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller controllermanagercontroller.Interface, enabled bool, err error) {
+				initFuncCalled = true
+				return nil, true, nil
+			}
+
+			healthCheck, err := StartController(ctx, controllerCtx, taintEvictionControllerDescriptor, nil)
+			if err != nil {
+				t.Errorf("starting a TaintEvictionController controller should not return an error")
+			}
+			if test.expectInitFuncCall != initFuncCalled {
+				t.Errorf("TaintEvictionController init call check failed: expected=%v, got=%v", test.expectInitFuncCall, initFuncCalled)
+			}
+			hasHealthCheck := healthCheck != nil
+			expectHealthCheck := test.expectInitFuncCall
+			if expectHealthCheck != hasHealthCheck {
+				t.Errorf("TaintEvictionController healthCheck check failed: expected=%v, got=%v", expectHealthCheck, hasHealthCheck)
+			}
+		})
 	}
 }

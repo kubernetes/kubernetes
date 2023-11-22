@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"fmt"
 	"net/netip"
 
 	fuzz "github.com/google/gofuzz"
@@ -84,6 +85,18 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			ip := generateRandomIP(is6, c)
 			obj.Name = ip
 		},
+		func(obj *networking.ServiceCIDR, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			boolean := []bool{false, true}
+
+			is6 := boolean[c.Rand.Intn(2)]
+			primary := generateRandomCIDR(is6, c)
+			obj.Spec.CIDRs = []string{primary}
+
+			if boolean[c.Rand.Intn(2)] {
+				obj.Spec.CIDRs = append(obj.Spec.CIDRs, generateRandomCIDR(!is6, c))
+			}
+		},
 	}
 }
 
@@ -101,10 +114,23 @@ func generateRandomIP(is6 bool, c fuzz.Continue) string {
 	if ok {
 		return ip.String()
 	}
-	// this should not happen but is better to
-	// return a good IP address than nothing
-	if is6 {
-		return "2001:db8::1"
+	// this should not happen
+	panic(fmt.Sprintf("invalid IP %v", bytes))
+}
+
+func generateRandomCIDR(is6 bool, c fuzz.Continue) string {
+	ip, err := netip.ParseAddr(generateRandomIP(is6, c))
+	if err != nil {
+		// generateRandomIP already panics if returns a not valid ip
+		panic(err)
 	}
-	return "192.168.1.1"
+
+	n := 32
+	if is6 {
+		n = 128
+	}
+
+	bits := c.Rand.Intn(n)
+	prefix := netip.PrefixFrom(ip, bits)
+	return prefix.Masked().String()
 }

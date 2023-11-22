@@ -71,11 +71,20 @@ type EncryptedObject struct {
 	// EncryptedData is the encrypted data.
 	EncryptedData []byte `protobuf:"bytes,1,opt,name=encryptedData,proto3" json:"encryptedData,omitempty"`
 	// KeyID is the KMS key ID used for encryption operations.
+	// keyID must satisfy the following constraints:
+	// 1. The keyID is not empty.
+	// 2. The size of keyID is less than 1 kB.
 	KeyID string `protobuf:"bytes,2,opt,name=keyID,proto3" json:"keyID,omitempty"`
 	// EncryptedDEKSource is the ciphertext of the source of the DEK used to encrypt the data stored in encryptedData.
 	// encryptedDEKSourceType defines the process of using the plaintext of this field to determine the aforementioned DEK.
+	// encryptedDEKSource must satisfy the following constraints:
+	// 1. The encrypted DEK source is not empty.
+	// 2. The size of encrypted DEK source is less than 1 kB.
 	EncryptedDEKSource []byte `protobuf:"bytes,3,opt,name=encryptedDEKSource,proto3" json:"encryptedDEKSource,omitempty"`
 	// Annotations is additional metadata that was provided by the KMS plugin.
+	// Annotations must satisfy the following constraints:
+	//  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+	//  2. The size of annotations keys + values is less than 32 kB.
 	Annotations map[string][]byte `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// encryptedDEKSourceType defines the process of using the plaintext of encryptedDEKSource to determine the DEK.
 	EncryptedDEKSourceType EncryptedDEKSourceType `protobuf:"varint,5,opt,name=encryptedDEKSourceType,proto3,enum=v2.EncryptedDEKSourceType" json:"encryptedDEKSourceType,omitempty"`

@@ -96,8 +96,8 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.4.1
-readonly __default_go_runner_version=v2.3.1-go1.21.3-bookworm.0
+readonly __default_distroless_iptables_version=v0.4.2
+readonly __default_go_runner_version=v2.3.1-go1.21.4-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.0
 
 # These are the base images for the Docker-wrapped binaries.
@@ -538,6 +538,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
     --env "KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-}"
     --env "KUBE_CGO_OVERRIDES=' ${KUBE_CGO_OVERRIDES[*]:-} '"
+    --env "KUBE_STATIC_OVERRIDES=' ${KUBE_STATIC_OVERRIDES[*]:-} '"
     --env "FORCE_HOST_GO=${FORCE_HOST_GO:-}"
     --env "GO_VERSION=${GO_VERSION:-}"
     --env "GOTOOLCHAIN=${GOTOOLCHAIN:-}"

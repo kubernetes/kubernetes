@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v1beta1"
@@ -308,6 +309,9 @@ resources:
 func TestEncryptionConfigHotReload(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
+	// this makes the test super responsive. It's set to a default of 1 minute.
+	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
+
 	storageConfig := framework.SharedEtcd()
 	encryptionConfig := `
 kind: EncryptionConfiguration
@@ -407,7 +411,7 @@ resources:
 
 	// implementing this brute force approach instead of fancy channel notification to avoid test specific code in prod.
 	// wait for config to be observed
-	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, test)
+	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, "", test)
 
 	// run storage migration
 	// get secrets
@@ -477,6 +481,10 @@ resources:
 	}
 
 	// remove old KMS provider
+	// verifyIfKMSTransformersSwapped sometimes passes even before the changes in the encryption config file are observed.
+	// this causes the metrics tests to fail, which validate two config changes.
+	// this may happen when an existing KMS provider is already running (e.g., new-kms-provider-for-secrets in this case).
+	// to ensure that the changes are observed, we added one more provider (kms-provider-to-encrypt-all) and are validating it in verifyIfKMSTransformersSwapped.
 	encryptionConfigWithoutOldProvider := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -495,13 +503,25 @@ resources:
        name: new-kms-provider-for-configmaps
        cachesize: 1000
        endpoint: unix:///@new-kms-provider.sock
+  - resources:
+    - '*.*'
+    providers:
+    - kms:
+        name: kms-provider-to-encrypt-all
+        cachesize: 1000
+        endpoint: unix:///@new-encrypt-all-kms-provider.sock
+    - identity: {}
 `
+	// start new KMS Plugin
+	_ = mock.NewBase64Plugin(t, "@new-encrypt-all-kms-provider.sock")
 
 	// update encryption config and wait for hot reload
 	updateFile(t, test.configDir, encryptionConfigFileName, []byte(encryptionConfigWithoutOldProvider))
 
+	wantPrefixForEncryptAll := "k8s:enc:kms:v1:kms-provider-to-encrypt-all:"
+
 	// wait for config to be observed
-	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, test)
+	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, wantPrefixForEncryptAll, test)
 
 	// confirm that reading secrets still works
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
@@ -801,8 +821,11 @@ resources:
 	}
 }
 
-func TestEncryptionConfigHotReloadFileWatch(t *testing.T) {
+func TestEncryptionConfigHotReloadFilePolling(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+
+	// this makes the test super responsive. It's set to a default of 1 minute.
+	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
 
 	testCases := []struct {
 		sleep      time.Duration
@@ -948,7 +971,7 @@ resources:
 func verifyPrefixOfSecretResource(t *testing.T, wantPrefix string, test *transformTest) {
 	// implementing this brute force approach instead of fancy channel notification to avoid test specific code in prod.
 	// wait for config to be observed
-	verifyIfKMSTransformersSwapped(t, wantPrefix, test)
+	verifyIfKMSTransformersSwapped(t, wantPrefix, "", test)
 
 	// run storage migration
 	secretsList, err := test.restClient.CoreV1().Secrets("").List(
@@ -982,7 +1005,7 @@ func verifyPrefixOfSecretResource(t *testing.T, wantPrefix string, test *transfo
 	}
 }
 
-func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix string, test *transformTest) {
+func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix, wantPrefixForEncryptAll string, test *transformTest) {
 	t.Helper()
 
 	var swapErr error
@@ -1011,6 +1034,29 @@ func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix string, test *trans
 
 			// return nil error to continue polling till timeout
 			return false, nil
+		}
+
+		if wantPrefixForEncryptAll != "" {
+			deploymentName := fmt.Sprintf("deployment-%d", idx)
+			_, err := test.createDeployment(deploymentName, "default")
+			if err != nil {
+				t.Fatalf("Failed to create test secret, error: %v", err)
+			}
+
+			rawEnvelope, err := test.readRawRecordFromETCD(test.getETCDPathForResource(test.storageConfig.Prefix, "", "deployments", deploymentName, "default"))
+			if err != nil {
+				t.Fatalf("failed to read %s from etcd: %v", test.getETCDPathForResource(test.storageConfig.Prefix, "", "deployments", deploymentName, "default"), err)
+			}
+
+			// check prefix
+			if !bytes.HasPrefix(rawEnvelope.Kvs[0].Value, []byte(wantPrefixForEncryptAll)) {
+				idx++
+
+				swapErr = fmt.Errorf("expected deployment to be prefixed with %s, but got %s", wantPrefixForEncryptAll, rawEnvelope.Kvs[0].Value)
+
+				// return nil error to continue polling till timeout
+				return false, nil
+			}
 		}
 
 		return true, nil

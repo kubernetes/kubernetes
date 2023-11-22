@@ -70,7 +70,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			Testname: Mirror Pod, update
 			Description: Updating a static Pod MUST recreate an updated mirror Pod. Create a static pod, verify that a mirror pod is created. Update the static pod by changing the container image, the mirror pod MUST be re-created and updated with the new image.
 		*/
-		ginkgo.It("should be updated when static pod updated [NodeConformance]", func(ctx context.Context) {
+		f.It("should be updated when static pod updated", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -97,7 +97,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			Testname: Mirror Pod, delete
 			Description:  When a mirror-Pod is deleted then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod, the mirror pod MUST be re-created and running.
 		*/
-		ginkgo.It("should be recreated when mirror pod gracefully deleted [NodeConformance]", func(ctx context.Context) {
+		f.It("should be recreated when mirror pod gracefully deleted", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -117,7 +117,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			Testname: Mirror Pod, force delete
 			Description: When a mirror-Pod is deleted, forcibly, then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod with delete wait time set to zero forcing immediate deletion, the mirror pod MUST be re-created and running.
 		*/
-		ginkgo.It("should be recreated when mirror pod forcibly deleted [NodeConformance]", func(ctx context.Context) {
+		f.It("should be recreated when mirror pod forcibly deleted", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -152,7 +152,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			Testname: Mirror Pod, recreate
 			Description: When a static pod's manifest is removed and readded, the mirror pod MUST successfully recreate. Create the static pod, verify it is running, remove its manifest and then add it back, and verify the static pod runs again.
 		*/
-		ginkgo.It("should successfully recreate when file is removed and recreated [NodeConformance]", func(ctx context.Context) {
+		f.It("should successfully recreate when file is removed and recreated", f.WithNodeConformance(), func(ctx context.Context) {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
@@ -199,7 +199,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 	})
 	ginkgo.Context("when recreating a static pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
-		ginkgo.It("it should launch successfully even if it temporarily failed termination due to volume failing to unmount [NodeConformance] [Serial]", func(ctx context.Context) {
+		f.It("it should launch successfully even if it temporarily failed termination due to volume failing to unmount", f.WithNodeConformance(), f.WithSerial(), func(ctx context.Context) {
 			node := getNodeName(ctx, f)
 			ns = f.Namespace.Name
 			c := f.ClientSet

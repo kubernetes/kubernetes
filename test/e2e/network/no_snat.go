@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -63,7 +64,7 @@ var (
 
 // This test verifies that a Pod on each node in a cluster can talk to Pods on every other node without SNAT.
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
-var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
+var _ = common.SIGDescribe("NoSNAT", feature.NoSNAT, framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.It("Should be able to send traffic between Pods without SNAT", func(ctx context.Context) {
