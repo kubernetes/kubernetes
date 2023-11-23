@@ -48,6 +48,7 @@ type cmdDoc struct {
 	SeeAlso          []string    `yaml:"see_also,omitempty"`
 }
 
+// Entry point to generate YAML documentation for kubectl commands.
 func main() {
 	path := "docs/yaml/kubectl"
 	if len(os.Args) == 2 {
@@ -82,6 +83,7 @@ func forceMultiLine(s string) string {
 	return s
 }
 
+// genFlagResult generates a list of command options from a given flag set.
 func genFlagResult(flags *pflag.FlagSet) []cmdOption {
 	result := []cmdOption{}
 
@@ -110,6 +112,7 @@ func genFlagResult(flags *pflag.FlagSet) []cmdOption {
 	return result
 }
 
+// genYaml generates a YAML documentation file for the given command and its subcommands.
 func genYaml(command *cobra.Command, parent, docsDir string) {
 	doc := cmdDoc{}
 
