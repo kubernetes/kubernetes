@@ -492,8 +492,7 @@ func (s sortableStoreElements) Swap(i, j int) {
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) ([]interface{}, uint64, string, error) {
-	var err error
+func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) (result []interface{}, rv uint64, index string, err error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
@@ -501,12 +500,14 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	} else {
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 	}
+
+	defer func() { sort.Sort(sortableStoreElements(result)) }()
 	defer w.RUnlock()
 	if err != nil {
-		return nil, 0, "", err
+		return result, rv, index, err
 	}
 
-	result, rv, index, err := func() ([]interface{}, uint64, string, error) {
+	result, rv, index, err = func() ([]interface{}, uint64, string, error) {
 		// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 		// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 		// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
@@ -519,7 +520,6 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 		return w.store.List(), w.resourceVersion, "", nil
 	}()
 
-	sort.Sort(sortableStoreElements(result))
 	return result, rv, index, err
 }
 
