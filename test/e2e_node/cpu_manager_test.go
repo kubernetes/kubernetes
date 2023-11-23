@@ -18,8 +18,10 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -92,7 +94,8 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 // makeCPUManagerPodQuota returns a pod with the provided ctnAttributes that prints its cpu quota configuration.
 func makeCPUManagerPodQuota(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	// Support both cgroup v2 and v1
-	return makeCPUManagerPodWCommand(podName, ctnAttributes, "([ -r /sys/fs/cgroup/cpu.max ] && cat /sys/fs/cgroup/cpu.max || cat /sys/fs/cgroup/cpu.cfs_quota_us) | cut -f1 -d' ' && sleep 1d")
+	// Keep the podName comment at the end of the command line, the test code uses it to find the pid easier
+	return makeCPUManagerPodWCommand(podName, ctnAttributes, "([ -r /sys/fs/cgroup/cpu.max ] && cat /sys/fs/cgroup/cpu.max || cat /sys/fs/cgroup/cpu.cfs_quota_us) | cut -f1 -d' ' && sleep 1d #"+podName)
 }
 
 // makeCPUMangerInitContainersPod returns a pod with init containers with the
@@ -318,6 +321,11 @@ func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int) {
 	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 }
 
+// Structure of CRI Info block, used to retrieve the entrypoint pid
+type InfoPid struct {
+	Pid int `json:"pid"`
+}
+
 func runGuPodQuotaTest(ctx context.Context, f *framework.Framework, cpuCount int) {
 	var pod *v1.Pod
 
@@ -337,7 +345,9 @@ func runGuPodQuotaTest(ctx context.Context, f *framework.Framework, cpuCount int
 	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 	ginkgo.By("checking if the quota was disabled for pinned containers only")
+
 	// A guaranteed and pinned container and pod should have cpu quota set to maximum (or -1 in cgroups v1)
+	// The same applies to all parent cgroups (= the sandbox)
 	for _, cnt := range pod.Spec.Containers {
 		ginkgo.By(fmt.Sprintf("validating the cpu quota inside container %s on Gu quota pod %s", cnt.Name, pod.Name))
 
@@ -352,19 +362,121 @@ func runGuPodQuotaTest(ctx context.Context, f *framework.Framework, cpuCount int
 		if strings.HasPrefix(cnt.Name, "gu") {
 			gomega.Expect(quotas).To(gomega.Or(gomega.Equal("max"), gomega.Equal("-1")), "expected quota == max, got %q", quotas)
 		} else {
-			gomega.Expect(quotas).To(gomega.Not(gomega.Or(gomega.Equal("max"), gomega.Equal("-1"))), "expected quota to be enabled, got %q", quotas)
+			gomega.Expect(quotas).ToNot(gomega.Or(gomega.Equal("max"), gomega.Equal("-1")), "expected quota to be enabled, got %q", quotas)
 		}
 	}
 
+	// TODO Make sure the cpu manager reconcile loop executed already?
+
 	ginkgo.By(fmt.Sprintf("validating the cpu quota on Gu quota pod %s", pod.Name))
 
-	// TODO cpu manager reconcile period?
-	// podCgroupName, _ := m.GetPodContainerName(pod)
-	// containerConfig, _ := m.cgroupManager.GetCgroupConfig(podCgroupName, v1.ResourceCPU)
+	// Find the pinned container pid using the CRI Info interface
+	// This only works on linux
+	runtime, _, err := getCRIClient()
+	framework.ExpectNoError(err)
+	containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
+		State: &runtimeapi.ContainerStateValue{
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+		},
+	})
+	framework.ExpectNoError(err)
+
+	// Identify the container
+	var guContainer *runtimeapi.Container
+	for _, c := range containers {
+		if c.Metadata.Name == "gu-container-quota" {
+			guContainer = c
+		}
+	}
+	gomega.Expect(guContainer).ToNot(gomega.Equal(nil), "could not find the pinned container via CRI")
+
+	// Retrieve the info block
+	containerStatus, err := runtime.ContainerStatus(context.Background(), guContainer.Id, true)
+	framework.ExpectNoError(err)
+	guPodInfo, ok := containerStatus.Info["info"]
+	gomega.Expect(ok).To(gomega.BeTrue(), "could not find info of the pinned container in %v", containerStatus.Info)
+
+	// The info block is retrieved in JSON format
+	// Search for a top level "pid" field
+	framework.Logf("Info: '%v'", guPodInfo)
+	info := InfoPid{}
+	err = json.Unmarshal([]byte(guPodInfo), &info)
+	framework.ExpectNoError(err)
+	gomega.Expect(info.Pid).ToNot(gomega.Equal(0), "could not find pid of the pinned container in %v", guPodInfo)
+	framework.Logf("Pinned process pid: %d", info.Pid)
+
+	// Use linux /proc APIs to detect the cgroup structure for the cpuset controller
+	cpusetRootPath, cpusetPath, cpuQuotaFileName, err := getLocalCpusetRootPath(info.Pid)
+	framework.ExpectNoError(err)
+
+	// Check quota in the container's and all parent cgroups to make sure there is no cgroup
+	// level that would introduce cpu throttling.
+	for {
+		cpuQuotaPath := path.Join(cpusetRootPath, cpusetPath, cpuQuotaFileName)
+		framework.Logf("Cpu quota path: %s", cpuQuotaPath)
+
+		out, err := exec.Command("sudo", "cat", cpuQuotaPath).Output()
+		if err == nil {
+			quotas := string(out)
+			gomega.Expect(quotas).To(gomega.Or(gomega.HavePrefix("max"), gomega.HavePrefix("-1")), "expected quota == max, got %q", quotas)
+		} else {
+			framework.Logf("could not read the cpu quota file: %s: %v", cpuQuotaPath, err)
+		}
+
+		// Compute the parent directory, quit traversal when at root (= no change in path)
+		cpusetPathNext := path.Dir(cpusetPath)
+		if cpusetPath == cpusetPathNext {
+			break
+		}
+		cpusetPath = cpusetPathNext
+	}
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(ctx, f, []string{pod.Name})
 	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
+}
+
+func getLocalCpusetRootPath(pid int) (cpusetRoot string, cpusetPath string, quotaFilename string, err error) {
+	// Find the cgroup fs mount point
+	out, err := exec.Command("sudo", "cat", "/proc/mounts").Output()
+	if err != nil {
+		return
+	}
+
+	var cgroupRoot string
+	for _, l := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(l, "cgroup") {
+			cols := strings.Split(l, " ")
+			cgroupRoot = cols[1]
+			break
+		}
+	}
+	gomega.Expect(cgroupRoot).ToNot(gomega.BeEmpty(), "could not detect cgroup fs root")
+
+	// Find the cpuset controller path for pid
+	procfsPath := path.Join("/proc", strconv.Itoa(pid), "cgroup")
+	out, err = exec.Command("sudo", "cat", procfsPath).Output()
+	if err != nil {
+		return
+	}
+
+	for _, l := range strings.Split(string(out), "\n") {
+		framework.Logf("cgroup fs entry: '%s'", l)
+
+		// cgroupv2 only has one global path entry
+		if strings.HasPrefix(l, "0:") {
+			cols := strings.SplitN(l, ":", 3)
+			return cgroupRoot, strings.TrimSpace(cols[2]), "cpu.max", nil
+		}
+
+		// cgroupv1 has one row per controller, look for the cpuset one
+		cols := strings.SplitN(l, ":", 3)
+		if cols[1] == "cpuset" {
+			return cpusetRoot + "/cpuset", strings.TrimSpace(cols[2]), "cpu.cfs_quota_us", nil
+		}
+	}
+
+	return "", "", "", fmt.Errorf("could not find cpuset path for pid %d", pid)
 }
 
 func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64) {
