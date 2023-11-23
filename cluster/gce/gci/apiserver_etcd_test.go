@@ -42,6 +42,7 @@ type kubeAPIServeETCDEnv struct {
 	CompactionInterval     string
 }
 
+// TestServerOverride tests etcd server configuration overrides based on environment variables.
 func TestServerOverride(t *testing.T) {
 	testCases := []struct {
 		desc string
@@ -92,6 +93,7 @@ func TestServerOverride(t *testing.T) {
 	}
 }
 
+// TestStorageOptions tests the application of storage options based on environment variables.
 func TestStorageOptions(t *testing.T) {
 	testCases := []struct {
 		desc     string
@@ -155,6 +157,7 @@ func TestStorageOptions(t *testing.T) {
 	}
 }
 
+// TestTLSFlags tests the configuration of TLS flags based on environment variables.
 func TestTLSFlags(t *testing.T) {
 	testCases := []struct {
 		desc string

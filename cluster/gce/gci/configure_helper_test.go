@@ -47,6 +47,7 @@ type ManifestTestCase struct {
 	t                   *testing.T
 }
 
+// newManifestTestCase initializes a test case for manifest processing with given parameters.
 func newManifestTestCase(t *testing.T, manifest, funcName string, auxManifests []string) *ManifestTestCase {
 	c := &ManifestTestCase{
 		t:                t,
@@ -79,6 +80,7 @@ func newManifestTestCase(t *testing.T, manifest, funcName string, auxManifests [
 	return c
 }
 
+// mustCopyFromTemplate copies the manifest template to the test's source directory.
 func (c *ManifestTestCase) mustCopyFromTemplate() {
 	if err := os.MkdirAll(c.manifestSources, os.ModePerm); err != nil {
 		c.t.Fatalf("Failed to create source directory: %v", err)
@@ -89,6 +91,7 @@ func (c *ManifestTestCase) mustCopyFromTemplate() {
 	}
 }
 
+// mustCopyAuxFromTemplate copies auxiliary manifest templates to the test's source directory.
 func (c *ManifestTestCase) mustCopyAuxFromTemplate() {
 	for _, m := range c.auxManifests {
 		err := copyFile(filepath.Join(c.manifestTemplateDir, m), filepath.Join(c.manifestSources, m))
@@ -98,6 +101,7 @@ func (c *ManifestTestCase) mustCopyAuxFromTemplate() {
 	}
 }
 
+// mustCreateManifestDstDir creates the destination directory for the manifest in the test environment.
 func (c *ManifestTestCase) mustCreateManifestDstDir() {
 	p := filepath.Join(filepath.Join(c.kubeHome, "etc", "kubernetes", "manifests"))
 	if err := os.MkdirAll(p, os.ModePerm); err != nil {
@@ -105,6 +109,7 @@ func (c *ManifestTestCase) mustCreateManifestDstDir() {
 	}
 }
 
+// mustInvokeFunc executes the specified manifest function with provided environment and scripts.
 func (c *ManifestTestCase) mustInvokeFunc(env interface{}, scriptNames []string, targetTemplate string, templates ...string) {
 	envScriptPath := c.mustCreateEnv(env, targetTemplate, templates...)
 	args := fmt.Sprintf("source %q ;", envScriptPath)
@@ -122,6 +127,7 @@ func (c *ManifestTestCase) mustInvokeFunc(env interface{}, scriptNames []string,
 	c.t.Logf("%s", string(bs))
 }
 
+// mustCreateEnv creates an environment script from the provided templates and returns its file name.
 func (c *ManifestTestCase) mustCreateEnv(env interface{}, target string, templates ...string) string {
 	f, err := os.Create(filepath.Join(c.kubeHome, envScriptFileName))
 	if err != nil {
@@ -141,6 +147,7 @@ func (c *ManifestTestCase) mustCreateEnv(env interface{}, target string, templat
 	return f.Name()
 }
 
+// mustLoadPodFromManifest loads a Kubernetes Pod object from a saved manifest file.
 func (c *ManifestTestCase) mustLoadPodFromManifest() {
 	json, err := os.ReadFile(c.manifestDestination)
 	if err != nil {
@@ -152,12 +159,14 @@ func (c *ManifestTestCase) mustLoadPodFromManifest() {
 	}
 }
 
+// tearDown cleans up the test environment by removing the kubeHome directory.
 func (c *ManifestTestCase) tearDown() {
 	if err := os.RemoveAll(c.kubeHome); err != nil {
 		c.t.Fatalf("Failed to teardown: %s", err)
 	}
 }
 
+// copyFile copies the content from the source file to the destination file.
 func copyFile(src, dst string) (err error) {
 	in, err := os.Open(src)
 	if err != nil {

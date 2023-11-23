@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// TestAppendOrReplacePrefix tests the `append_or_replace_prefixed_line` function with various inputs.
 func TestAppendOrReplacePrefix(t *testing.T) {
 	testCases := []struct {
 		desc                string

@@ -44,6 +44,7 @@ type kubeAPIServerEnv struct {
 	CloudKMSIntegration          bool
 }
 
+// TestEncryptionProvider tests the inclusion of the encryption provider flag based on environment variables.
 func TestEncryptionProviderFlag(t *testing.T) {
 	var (
 		encryptionConfigFlag = "--encryption-provider-config"
@@ -102,6 +103,7 @@ func TestEncryptionProviderFlag(t *testing.T) {
 	}
 }
 
+// TestEncryptionProviderConfig tests the creation and content of the encryption provider configuration file.
 func TestEncryptionProviderConfig(t *testing.T) {
 	c := newManifestTestCase(t, kubeAPIServerManifestFileName, kubeAPIServerStartFuncName, nil)
 	defer c.tearDown()
@@ -138,6 +140,7 @@ func TestEncryptionProviderConfig(t *testing.T) {
 	}
 }
 
+// TestKMSIntegration tests the integration of the KMS plugin with cloud KMS, checking volume and mount configurations.
 func TestKMSIntegration(t *testing.T) {
 	var (
 		socketPath  = "/var/run/kmsplugin"
