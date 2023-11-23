@@ -37,6 +37,7 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 )
 
+// main generates man pages for Kubernetes modules.
 func main() {
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
 	path := "docs/man/man1"
@@ -115,6 +116,7 @@ func main() {
 	}
 }
 
+// preamble generates a man page preamble for Kubernetes commands.
 func preamble(out *bytes.Buffer, name, short, long string) {
 	out.WriteString(`% KUBERNETES(1) kubernetes User Manuals
 % Eric Paris
@@ -128,6 +130,7 @@ func preamble(out *bytes.Buffer, name, short, long string) {
 	fmt.Fprintf(out, "%s\n\n", long)
 }
 
+// printFlags formats and prints the command flags for a man page.
 func printFlags(out *bytes.Buffer, flags *pflag.FlagSet) {
 	flags.VisitAll(func(flag *pflag.Flag) {
 		format := "**--%s**=%s\n\t%s\n\n"
@@ -148,6 +151,7 @@ func printFlags(out *bytes.Buffer, flags *pflag.FlagSet) {
 	})
 }
 
+// printOptions prints command-specific and inherited options for a man page.
 func printOptions(out *bytes.Buffer, command *cobra.Command) {
 	flags := command.NonInheritedFlags()
 	if flags.HasFlags() {
@@ -163,6 +167,7 @@ func printOptions(out *bytes.Buffer, command *cobra.Command) {
 	}
 }
 
+// genMarkdown generates a man page for a given command and its sub-commands.
 func genMarkdown(command *cobra.Command, parent, docsDir string) {
 	dparent := strings.Replace(parent, " ", "-", -1)
 	name := command.Name()

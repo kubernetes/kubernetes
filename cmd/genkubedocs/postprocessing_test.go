@@ -20,6 +20,7 @@ import (
 	"testing"
 )
 
+// TestCleanupForInclude tests the cleanup function for processing markdown content to be included elsewhere.
 func TestCleanupForInclude(t *testing.T) {
 
 	var tests = []struct {

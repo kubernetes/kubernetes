@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/genutils"
 )
 
+// main generates markdown docs for kubectl commands.
 func main() {
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
 	path := "docs/"

@@ -36,6 +36,7 @@ var (
 // kubeTypesMap is a map from field name to its tag name and doc.
 type kubeTypesMap map[string]kruntime.Pair
 
+// main validates API type field docs and tags, exits on inconsistencies.
 func main() {
 	flag.Parse()
 
@@ -69,6 +70,7 @@ func main() {
 	}
 }
 
+// Checks documentation consistency with struct field names and tags.
 func checkFieldNameAndDoc(structName, fieldName, doc string, typesMap kubeTypesMap) bool {
 	rc := false
 	visited := sets.Set[string]{}
