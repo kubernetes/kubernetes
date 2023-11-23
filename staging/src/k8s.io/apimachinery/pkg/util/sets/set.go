@@ -17,6 +17,7 @@ limitations under the License.
 package sets
 
 import (
+	"cmp"
 	"sort"
 )
 
@@ -67,14 +68,8 @@ func (s Set[T]) Delete(items ...T) Set[T] {
 // Clear empties the set.
 // It is preferable to replace the set with a newly constructed set,
 // but not all callers can do that (when there are other references to the map).
-// In some cases the set *won't* be fully cleared, e.g. a Set[float32] containing NaN
-// can't be cleared because NaN can't be removed.
-// For sets containing items of a type that is reflexive for ==,
-// this is optimized to a single call to runtime.mapclear().
 func (s Set[T]) Clear() Set[T] {
-	for key := range s {
-		delete(s, key)
-	}
+	clear(s)
 	return s
 }
 
@@ -193,7 +188,7 @@ func (s1 Set[T]) Equal(s2 Set[T]) bool {
 	return len(s1) == len(s2) && s1.IsSuperset(s2)
 }
 
-type sortableSliceOfGeneric[T ordered] []T
+type sortableSliceOfGeneric[T cmp.Ordered] []T
 
 func (g sortableSliceOfGeneric[T]) Len() int           { return len(g) }
 func (g sortableSliceOfGeneric[T]) Less(i, j int) bool { return less[T](g[i], g[j]) }
@@ -203,7 +198,7 @@ func (g sortableSliceOfGeneric[T]) Swap(i, j int)      { g[i], g[j] = g[j], g[i]
 //
 // This is a separate function and not a method because not all types supported
 // by Generic are ordered and only those can be sorted.
-func List[T ordered](s Set[T]) []T {
+func List[T cmp.Ordered](s Set[T]) []T {
 	res := make(sortableSliceOfGeneric[T], 0, len(s))
 	for key := range s {
 		res = append(res, key)
@@ -236,6 +231,6 @@ func (s Set[T]) Len() int {
 	return len(s)
 }
 
-func less[T ordered](lhs, rhs T) bool {
+func less[T cmp.Ordered](lhs, rhs T) bool {
 	return lhs < rhs
 }
