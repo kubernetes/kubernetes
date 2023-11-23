@@ -48,16 +48,13 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -123,29 +120,6 @@ func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
 	return &summary, nil
-}
-
-func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResourcesResponse, error) {
-	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-	if err != nil {
-		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
-	}
-	client, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-	if err != nil {
-		return nil, fmt.Errorf("Error getting gRPC client: %w", err)
-	}
-	defer conn.Close()
-	framework.Logf("podresources gRPC client available")
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	resp, err := client.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
-	if err != nil {
-		return nil, fmt.Errorf("%v.List(_) = _, %v", client, err)
-	}
-	framework.Logf("podresources List call done (%d entries)", len(resp.PodResources))
-
-	return resp, nil
 }
 
 // Returns the current KubeletConfiguration

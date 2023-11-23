@@ -113,7 +113,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// This is done in a gomega.Eventually with retries since a prior test in a different test suite could've run and the deletion of it's resources may still be in progress.
 			// xref: https://issue.k8s.io/115381
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %v", err)
 				}
@@ -179,7 +179,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
-			v1PodResources, err = getV1NodeDevices(ctx)
+			v1PodResources, err = GetV1NodeDevices(ctx)
 			framework.ExpectNoError(err)
 
 			framework.Logf("v1PodResources.PodResources:%+v\n", v1PodResources.PodResources)
@@ -247,7 +247,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
 			// needs to match the container perspective.
 			ginkgo.By("Verifying the device assignment after container restart using podresources API")
-			v1PodResources, err = getV1NodeDevices(ctx)
+			v1PodResources, err = GetV1NodeDevices(ctx)
 			if err != nil {
 				framework.ExpectNoError(err, "getting pod resources assignment after pod restart")
 			}
@@ -266,7 +266,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID2).To(gomega.Not(gomega.Equal("")), "pod2 requested a device but started successfully without")
 
 			ginkgo.By("Verifying the device assignment after extra container start using podresources API")
-			v1PodResources, err = getV1NodeDevices(ctx)
+			v1PodResources, err = GetV1NodeDevices(ctx)
 			if err != nil {
 				framework.ExpectNoError(err, "getting pod resources assignment after pod restart")
 			}
@@ -323,7 +323,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// is useless.
 			ginkgo.By("Verifying the device assignment after kubelet restart using podresources API")
 			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
@@ -388,7 +388,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying the device assignment after pod and kubelet restart using podresources API")
 			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
@@ -442,7 +442,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// is useless.
 			ginkgo.By("Verifying the device assignment after device plugin restart using podresources API")
 			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
@@ -484,7 +484,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// is useless.
 			ginkgo.By("Verifying the device assignment after kubelet restart using podresources API")
 			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
@@ -565,7 +565,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying the device assignment after device plugin restart using podresources API")
 			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 			err, allocated := checkPodResourcesAssignment(v1PodResources, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
@@ -634,7 +634,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			gomega.Expect(devID3).NotTo(gomega.Equal(devID2), "pod1's restartable init container and regular container should not share the same device")
 
-			podResources, err := getV1NodeDevices(ctx)
+			podResources, err := GetV1NodeDevices(ctx)
 			framework.ExpectNoError(err)
 
 			framework.Logf("PodResources.PodResources:%+v\n", podResources.PodResources)
@@ -694,7 +694,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			// This is done in a gomega.Eventually with retries since a prior test in a different test suite could've run and the deletion of it's resources may still be in progress.
 			// xref: https://issue.k8s.io/115381
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %v", err)
 				}
@@ -858,7 +858,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			// is useless.
 			ginkgo.By("Verifying the device assignment after kubelet restart using podresources API")
 			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
+				v1PodResources, err = GetV1NodeDevices(ctx)
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
