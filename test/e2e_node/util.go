@@ -49,7 +49,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
-	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -124,25 +123,6 @@ func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
 	return &summary, nil
-}
-
-func getV1alpha1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1alpha1.ListPodResourcesResponse, error) {
-	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-	if err != nil {
-		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
-	}
-	client, conn, err := podresources.GetV1alpha1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-	if err != nil {
-		return nil, fmt.Errorf("Error getting grpc client: %w", err)
-	}
-	defer conn.Close()
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	resp, err := client.List(ctx, &kubeletpodresourcesv1alpha1.ListPodResourcesRequest{})
-	if err != nil {
-		return nil, fmt.Errorf("%v.Get(_) = _, %v", client, err)
-	}
-	return resp, nil
 }
 
 func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResourcesResponse, error) {
