@@ -20,6 +20,8 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
+      - effect: NoSchedule
+        operator: Exists
       hostNetwork: true
       serviceAccountName: calico
       containers:
