@@ -26,6 +26,7 @@ import (
 	cmdsanity "k8s.io/kubectl/pkg/cmd/util/sanity"
 )
 
+// main validates kubectl commands and global settings, printing errors if found.
 func main() {
 	var errorCount int
 
