@@ -27,6 +27,7 @@ import (
 	"sync"
 )
 
+// Connects to TCP host/port and streams data between it and standard I/O.
 func main() {
 	if len(os.Args) != 3 {
 		log.Fatalln("usage: wincat <host> <port>")
