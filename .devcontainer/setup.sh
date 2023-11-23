@@ -16,15 +16,11 @@
 
 set -eux
 
-cd "$(dirname "$0")"
-cd ../
 
-# Install pyyaml as required by verify.publishing-bot
-apt-get -y install python3-yaml
 
 # Copies over welcome message
 cp .devcontainer/welcome-message.txt /usr/local/etc/vscode-dev-containers/first-run-notice.txt
 
-git remote add upstream https://github.com/kubernetes/kubernetes.git || true
+git remote add upstream https://github.com/kubernetes/kubernetes.git
 # Never push to upstream master
 git remote set-url --push upstream no_push
