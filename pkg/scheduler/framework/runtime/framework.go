@@ -356,13 +356,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 
 	m := *f.ListPlugins()
-	pluginMap := reflect.ValueOf(m)
-	typeOfMap := pluginMap.Type()
-
-	for i := 0; i < pluginMap.NumField(); i++ {
-		loggerV := logger.V(2)
-		loggerV.Info("Plugins enabled for", "extension", typeOfMap.Field(i).Name, "plugins", pluginMap.Field(i).Interface())
-	}
+	loggerV := logger.V(2)
+	loggerV.Info("Plugins", "config.Plugins", m)
 
 	f.setInstrumentedPlugins()
 	return f, nil
