@@ -388,7 +388,7 @@ func runGuPodQuotaTest(ctx context.Context, f *framework.Framework, cpuCount int
 			guContainer = c
 		}
 	}
-	gomega.Expect(guContainer).ToNot(gomega.Equal(nil), "could not find the pinned container via CRI")
+	gomega.Expect(guContainer).ToNot(gomega.BeNil(), "could not find the pinned container via CRI")
 
 	// Retrieve the info block
 	containerStatus, err := runtime.ContainerStatus(context.Background(), guContainer.Id, true)
@@ -415,7 +415,7 @@ func runGuPodQuotaTest(ctx context.Context, f *framework.Framework, cpuCount int
 		cpuQuotaPath := path.Join(cpusetRootPath, cpusetPath, cpuQuotaFileName)
 		framework.Logf("Cpu quota path: %s", cpuQuotaPath)
 
-		out, err := exec.Command("sudo", "cat", cpuQuotaPath).Output()
+		out, err := exec.Command("cat", cpuQuotaPath).Output()
 		if err == nil {
 			quotas := string(out)
 			gomega.Expect(quotas).To(gomega.Or(gomega.HavePrefix("max"), gomega.HavePrefix("-1")), "expected quota == max, got %q", quotas)
@@ -438,7 +438,7 @@ func runGuPodQuotaTest(ctx context.Context, f *framework.Framework, cpuCount int
 
 func getLocalCpusetRootPath(pid int) (cpusetRoot string, cpusetPath string, quotaFilename string, err error) {
 	// Find the cgroup fs mount point
-	out, err := exec.Command("sudo", "cat", "/proc/mounts").Output()
+	out, err := exec.Command("cat", "/proc/mounts").Output()
 	if err != nil {
 		return
 	}
@@ -455,7 +455,7 @@ func getLocalCpusetRootPath(pid int) (cpusetRoot string, cpusetPath string, quot
 
 	// Find the cpuset controller path for pid
 	procfsPath := path.Join("/proc", strconv.Itoa(pid), "cgroup")
-	out, err = exec.Command("sudo", "cat", procfsPath).Output()
+	out, err = exec.Command("cat", procfsPath).Output()
 	if err != nil {
 		return
 	}
