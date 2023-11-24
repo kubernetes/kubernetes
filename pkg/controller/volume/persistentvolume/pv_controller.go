@@ -1953,6 +1953,18 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		if metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnMigratedTo) {
+			// CSI migration scenario - do not depend on in-tree plugin
+			return nil, nil
+		}
+
+		if volume.Spec.CSI != nil {
+			// CSI volume source scenario - external provisioner is requested
+			return nil, nil
+		}
+	}
+
 	// The plugin that provisioned the volume was not found or the volume
 	// was not dynamically provisioned. Try to find a plugin by spec.
 	spec := vol.NewSpecFromPersistentVolume(volume, false)
