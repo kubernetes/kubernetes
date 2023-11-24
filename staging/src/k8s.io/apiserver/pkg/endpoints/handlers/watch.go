@@ -269,6 +269,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	defer ws.Close()
 	done := make(chan struct{})
+	// ensure the connection times out
+	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
+	defer cleanup()
 
 	go func() {
 		defer utilruntime.HandleCrash()
@@ -288,6 +291,8 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	for {
 		select {
 		case <-done:
+			return
+		case <-timeoutCh:
 			return
 		case event, ok := <-ch:
 			if !ok {

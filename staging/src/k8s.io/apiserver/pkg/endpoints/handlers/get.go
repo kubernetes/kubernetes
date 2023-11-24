@@ -258,8 +258,10 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
 			klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "timeout", timeout)
-			ctx, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
+			// We don't cancel ctx explicitly because
+			//   1) a timeout is only needed to prevent rw.Watch from running forever
+			//   2) serveWatch respects the timeout and closes the watcher
+			ctx, _ := context.WithTimeout(ctx, timeout)
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
 				scope.err(err, w, req)
