@@ -355,8 +355,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		options.captureProfile(outputProfile)
 	}
 
+	// Logs Enabled and Disabled Plugins at  each extension point
 	logger.V(2).Info("Plugins enabled and disabled at each extension point", "config.Plugins", *f.ListPlugins())
-
 	f.setInstrumentedPlugins()
 	return f, nil
 }
