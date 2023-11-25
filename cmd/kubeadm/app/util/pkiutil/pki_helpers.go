@@ -218,7 +218,7 @@ func WriteCSR(csrDir, name string, csr *x509.CertificateRequest) error {
 		return errors.Wrapf(err, "failed to make directory %s", filepath.Dir(csrPath))
 	}
 
-	if err := os.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0600) | os.FileMode(syscall.S_IWUSR)); err != nil {
 		return errors.Wrapf(err, "unable to write CSR to file %s", csrPath)
 	}
 
