@@ -830,7 +830,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	lastRestartDate := metav1.NewTime(time.Time{})
 	lastRestartableInitContainerRestartDate := metav1.NewTime(time.Time{})
 
-	reason := string(pod.Status.Phase)
+	podPhase := pod.Status.Phase
+	reason := string(podPhase)
 	if pod.Status.Reason != "" {
 		reason = pod.Status.Reason
 	}
@@ -955,6 +956,9 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		reason = "Unknown"
 	} else if pod.DeletionTimestamp != nil {
 		reason = "Terminating"
+		if podPhase == api.PodSucceeded || podPhase == api.PodFailed {
+			reason = string(podPhase)
+		}
 	}
 
 	restartsStr := strconv.Itoa(restarts)
