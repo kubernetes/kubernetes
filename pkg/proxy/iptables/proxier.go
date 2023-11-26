@@ -797,11 +797,12 @@ func (proxier *Proxier) syncProxyRules() {
 	if tryPartialSync {
 		serviceChanged = proxier.serviceChanges.PendingChanges()
 		endpointsChanged = proxier.endpointsChanges.PendingChanges()
+		klog.V(2).InfoS("Syncing iptables rules (partial)", "servicesChanged", len(serviceChanged), "endpointsChanged", len(endpointsChanged))
+	} else {
+		klog.V(2).InfoS("Syncing iptables rules (full)")
 	}
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
-
-	klog.V(2).InfoS("Syncing iptables rules")
 
 	success := false
 	defer func() {
@@ -1207,9 +1208,15 @@ func (proxier *Proxier) syncProxyRules() {
 		// them in activeNATChains, so they won't get deleted.) However, we have
 		// to still figure out how many chains we _would_ have written to make the
 		// metrics come out right, so we just compute them and throw them away.
-		if tryPartialSync && !serviceChanged.Has(svcName.NamespacedName.String()) && !endpointsChanged.Has(svcName.NamespacedName.String()) {
-			natChains = skippedNatChains
-			natRules = skippedNatRules
+		if tryPartialSync {
+			svcNN := svcName.NamespacedName.String()
+			if !serviceChanged.Has(svcNN) && !endpointsChanged.Has(svcNN) {
+				klog.V(4).InfoS("Skipping update for unchanged service", "service", svcNN)
+				natChains = skippedNatChains
+				natRules = skippedNatRules
+			} else {
+				klog.V(4).InfoS("Updating rules for service", "service", svcNN)
+			}
 		}
 
 		// Set up internal traffic handling.
@@ -1517,8 +1524,20 @@ func (proxier *Proxier) syncProxyRules() {
 		"numEndpoints", totalEndpoints,
 		"numFilterChains", proxier.filterChains.Lines(),
 		"numFilterRules", proxier.filterRules.Lines(),
-		"numNATChains", proxier.natChains.Lines(),
-		"numNATRules", proxier.natRules.Lines(),
+		// updatedNATChains and updatedNATRules give the number of NAT
+		// chains/rules mentioned in this transaction (and thus they just count
+		// the number of lines we passed to iptables-restore), while
+		// totalNATChains and totalNATRules indicate the number of
+		// kube-proxy-related chains/rules you would see if you did an
+		// iptables-save after this transaction completed (and thus they need to
+		// also include the chains/rules that we skipped because they're
+		// unchanged, but need to *not* include the chains that we are deleting,
+		// which are included in proxier.natChains/.natRules but won't be part of
+		// the ruleset after that).
+		"totalNATChains", proxier.natChains.Lines()+skippedNatChains.Lines()-deletedChains,
+		"totalNATRules", proxier.natRules.Lines()+skippedNatRules.Lines()-deletedChains,
+		"updatedNATChains", proxier.natChains.Lines(),
+		"updatedNATRules", proxier.natRules.Lines(),
 	)
 	klog.V(9).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 

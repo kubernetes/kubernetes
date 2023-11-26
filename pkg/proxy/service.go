@@ -324,6 +324,7 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	// if change.previous equal to change.current, it means no change
 	if reflect.DeepEqual(change.previous, change.current) {
 		delete(sct.items, namespacedName)
+		klog.V(4).InfoS("Service update does not affect proxying", "service", klog.KObj(svc))
 	} else {
 		klog.V(4).InfoS("Service updated ports", "service", klog.KObj(svc), "portCount", len(change.current))
 	}

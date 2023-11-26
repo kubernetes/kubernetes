@@ -200,6 +200,9 @@ func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.
 			ect.lastChangeTriggerTimes[namespacedName] =
 				append(ect.lastChangeTriggerTimes[namespacedName], t)
 		}
+		klog.V(4).InfoS("EndpointSlice updated", "service", namespacedName, "endpointSlice", klog.KObj(endpointSlice))
+	} else {
+		klog.V(4).InfoS("EndpointSlice update does not affect proxying", "service", namespacedName, "endpointSlice", klog.KObj(endpointSlice))
 	}
 
 	return changeNeeded
