@@ -30,11 +30,14 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	utilpointer "k8s.io/utils/pointer"
@@ -51,7 +54,7 @@ func networkResources() app.Resources {
 	}
 }
 
-var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", func() {
+var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, func() {
 	f := framework.NewDefaultFramework("dra")
 
 	// The driver containers have to run with sufficient privileges to
@@ -204,6 +207,68 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			pod.Spec.ResourceClaims[0].Name = strings.Repeat("c", 63)
 			pod.Spec.Containers[0].Resources.Claims[0].Name = pod.Spec.ResourceClaims[0].Name
 			b.create(ctx, parameters, template, pod)
+
+			b.testPod(ctx, f.ClientSet, pod)
+		})
+
+		ginkgo.It("retries pod scheduling after creating resource class", func(ctx context.Context) {
+			parameters := b.parameters()
+			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			class, err := f.ClientSet.ResourceV1alpha2().ResourceClasses().Get(ctx, template.Spec.Spec.ResourceClassName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			template.Spec.Spec.ResourceClassName += "-b"
+			b.create(ctx, parameters, template, pod)
+
+			// There's no way to be sure that the scheduler has checked the pod.
+			// But if we sleep for a short while, it's likely and if there are any
+			// bugs that prevent the scheduler from handling creation of the class,
+			// those bugs should show up as test flakes.
+			time.Sleep(time.Second)
+
+			class.UID = ""
+			class.ResourceVersion = ""
+			class.Name = template.Spec.Spec.ResourceClassName
+			b.create(ctx, class)
+
+			b.testPod(ctx, f.ClientSet, pod)
+		})
+
+		ginkgo.It("retries pod scheduling after updating resource class", func(ctx context.Context) {
+			parameters := b.parameters()
+			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+
+			// First modify the class so that it matches no nodes.
+			class, err := f.ClientSet.ResourceV1alpha2().ResourceClasses().Get(ctx, template.Spec.Spec.ResourceClassName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			class.SuitableNodes = &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "no-such-label",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"no-such-value"},
+							},
+						},
+					},
+				},
+			}
+			class, err = f.ClientSet.ResourceV1alpha2().ResourceClasses().Update(ctx, class, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			// Now create the pod.
+			b.create(ctx, parameters, template, pod)
+
+			// There's no way to be sure that the scheduler has checked the pod.
+			// But if we sleep for a short while, it's likely and if there are any
+			// bugs that prevent the scheduler from handling updates of the class,
+			// those bugs should show up as test flakes.
+			time.Sleep(time.Second)
+
+			// Unblock the pod.
+			class.SuitableNodes = nil
+			_, err = f.ClientSet.ResourceV1alpha2().ResourceClasses().Update(ctx, class, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
 
 			b.testPod(ctx, f.ClientSet, pod)
 		})
@@ -452,6 +517,52 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 					err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 					framework.ExpectNoError(err, "start pod")
 				}
+			})
+
+			// This test covers aspects of non graceful node shutdown by DRA controller
+			// More details about this can be found in the KEP:
+			// https://github.com/kubernetes/enhancements/tree/master/keps/sig-storage/2268-non-graceful-shutdown
+			// NOTE: this test depends on kind. It will only work with kind cluster as it shuts down one of the
+			// nodes by running `docker stop <node name>`, which is very kind-specific.
+			f.It(f.WithSerial(), f.WithDisruptive(), f.WithSlow(), "must deallocate on non graceful node shutdown", func(ctx context.Context) {
+				ginkgo.By("create test pod")
+				parameters := b.parameters()
+				label := "app.kubernetes.io/instance"
+				instance := f.UniqueName + "-test-app"
+				pod := b.podExternal()
+				pod.Labels[label] = instance
+				claim := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				b.create(ctx, parameters, claim, pod)
+
+				ginkgo.By("wait for test pod " + pod.Name + " to run")
+				labelSelector := labels.SelectorFromSet(labels.Set(pod.Labels))
+				pods, err := e2epod.WaitForPodsWithLabelRunningReady(ctx, f.ClientSet, pod.Namespace, labelSelector, 1, framework.PodStartTimeout)
+				framework.ExpectNoError(err, "start pod")
+				runningPod := &pods.Items[0]
+
+				nodeName := runningPod.Spec.NodeName
+				// Prevent builder tearDown to fail waiting for unprepared resources
+				delete(b.driver.Nodes, nodeName)
+				ginkgo.By("stop node " + nodeName + " non gracefully")
+				_, stderr, err := framework.RunCmd("docker", "stop", nodeName)
+				gomega.Expect(stderr).To(gomega.BeEmpty())
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(framework.RunCmd, "docker", "start", nodeName)
+				if ok := e2enode.WaitForNodeToBeNotReady(ctx, f.ClientSet, nodeName, f.Timeouts.NodeNotReady); !ok {
+					framework.Failf("Node %s failed to enter NotReady state", nodeName)
+				}
+
+				ginkgo.By("apply out-of-service taint on node " + nodeName)
+				taint := v1.Taint{
+					Key:    v1.TaintNodeOutOfService,
+					Effect: v1.TaintEffectNoExecute,
+				}
+				e2enode.AddOrUpdateTaintOnNode(ctx, f.ClientSet, nodeName, taint)
+				e2enode.ExpectNodeHasTaint(ctx, f.ClientSet, nodeName, &taint)
+				ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName, taint)
+
+				ginkgo.By("waiting for claim to get deallocated")
+				gomega.Eventually(ctx, framework.GetObject(b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Get, claim.Name, metav1.GetOptions{})).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
 			})
 		})
 

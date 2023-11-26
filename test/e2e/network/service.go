@@ -210,7 +210,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 		return false, nil
 	}); pollErr != nil {
 		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
-		if pollErr != wait.ErrWaitTimeout {
+		if !wait.Interrupted(pollErr) {
 			checkAffinityFailed(tracker, pollErr.Error())
 			return false
 		}
@@ -772,7 +772,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Kubernetes Service
 		Description: By default when a kubernetes cluster is running there MUST be a 'kubernetes' service running in the cluster.
 	*/
-	framework.ConformanceIt("should provide secure master service ", func(ctx context.Context) {
+	framework.ConformanceIt("should provide secure master service", func(ctx context.Context) {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the service object for the service named kubernetes")
 	})
@@ -782,7 +782,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, endpoints
 		Description: Create a service with a endpoint without any Pods, the service MUST run and show empty endpoints. Add a pod to the service and the service MUST validate to show all the endpoints for the ports exposed by the Pod. Add another Pod then the list of all Ports exposed by both the Pods MUST be valid and have corresponding service endpoint. Once the second Pod is deleted then set of endpoint MUST be validated to show only ports from the first container that are exposed. Once both pods are deleted the endpoints from the service MUST be empty.
 	*/
-	framework.ConformanceIt("should serve a basic endpoint from pods ", func(ctx context.Context) {
+	framework.ConformanceIt("should serve a basic endpoint from pods", func(ctx context.Context) {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -843,7 +843,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, endpoints with multiple ports
 		Description: Create a service with two ports but no Pods are added to the service yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first port, service MUST list one endpoint for the Pod on that port. Add another Pod to the second port, service MUST list both the endpoints. Delete the first Pod and the service MUST list only the endpoint to the second Pod. Delete the second Pod and the service must now have empty set of endpoints.
 	*/
-	framework.ConformanceIt("should serve multiport endpoints from pods ", func(ctx context.Context) {
+	framework.ConformanceIt("should serve multiport endpoints from pods", func(ctx context.Context) {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := f.Namespace.Name
@@ -1195,7 +1195,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podNames, svc.Spec.ClusterIP, servicePort))
 	})
 
-	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func(ctx context.Context) {
+	f.It("should work after restarting kube-proxy", f.WithDisruptive(), func(ctx context.Context) {
 		kubeProxyLabelSet := map[string]string{clusterAddonLabelKey: kubeProxyLabelName}
 		e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx, kubeProxyLabelName, cs, metav1.NamespaceSystem, kubeProxyLabelSet)
 
@@ -1228,7 +1228,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podNames2, svc2IP, servicePort))
 	})
 
-	ginkgo.It("should work after restarting apiserver [Disruptive]", func(ctx context.Context) {
+	f.It("should work after restarting apiserver", f.WithDisruptive(), func(ctx context.Context) {
 
 		if !framework.ProviderIs("gke") {
 			e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx, kubeAPIServerLabelName, cs, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
@@ -1401,7 +1401,7 @@ var _ = common.SIGDescribe("Services", func() {
 		gomega.Expect(nodePortCounts).To(gomega.Equal(2), "updated service should have two Ports but found %d Ports", nodePortCounts)
 
 		for _, port := range nodePortService.Spec.Ports {
-			framework.ExpectNotEqual(port.NodePort, 0, "NodePort service failed to allocate NodePort for Port %s", port.Name)
+			gomega.Expect(port.NodePort).ToNot(gomega.BeZero(), "NodePort service failed to allocate NodePort for Port %s", port.Name)
 			framework.Logf("NodePort service allocates NodePort: %d for Port: %s over Protocol: %s", port.NodePort, port.Name, port.Protocol)
 		}
 	})
@@ -1822,7 +1822,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execPodName := execPod.Name
 		cmd := fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
 		var stdout string
-		if pollErr := wait.PollImmediateWithContext(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, func(ctx context.Context) (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
@@ -2118,36 +2118,48 @@ var _ = common.SIGDescribe("Services", func() {
 		if err != nil {
 			framework.Failf("error waiting for pod %s to be unready %v", webserverPod0.Name, err)
 		}
-		// Wait the change has been propagated and the service start to fail
-		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
-		cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
+
+		nodeIPs0 := e2enode.GetAddresses(&node0, v1.NodeInternalIP)
+		nodeIPs1 := e2enode.GetAddresses(&node1, v1.NodeInternalIP)
+		nodePortAddress0 := net.JoinHostPort(nodeIPs0[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
+		nodePortAddress1 := net.JoinHostPort(nodeIPs1[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
+
+		// Wait until the change has been propagated to both nodes.
+		cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress0)
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, true, func(_ context.Context) (bool, error) {
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			if err != nil {
 				return true, nil
 			}
 			return false, nil
 		}); pollErr != nil {
-			framework.ExpectNoError(pollErr, "service still serves traffic")
+			framework.ExpectNoError(pollErr, "pod on node0 still serves traffic")
+		}
+		cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, true, func(_ context.Context) (bool, error) {
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			if err != nil {
+				return true, nil
+			}
+			return false, nil
+		}); pollErr != nil {
+			framework.ExpectNoError(pollErr, "pod on node1 still serves traffic")
 		}
 
-		nodeIPs0 := e2enode.GetAddresses(&node0, v1.NodeInternalIP)
-		nodeIPs1 := e2enode.GetAddresses(&node1, v1.NodeInternalIP)
-		nodePortAddress0 := net.JoinHostPort(nodeIPs0[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
-		nodePortAddress1 := net.JoinHostPort(nodeIPs1[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
+		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
 		// connect 3 times every 5 seconds to the Service and expect a failure
 		for i := 0; i < 5; i++ {
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress0)
 			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to NodePort address")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to NodePort address")
 
 			time.Sleep(5 * time.Second)
 		}
@@ -2529,7 +2541,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2599,7 +2611,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2672,7 +2684,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 
 		ginkgo.By("Creating 2 pause hostNetwork pods that will try to connect to the webserver")
@@ -2701,7 +2713,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2943,7 +2955,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 
 			time.Sleep(5 * time.Second)
 		}
@@ -3099,7 +3111,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// connections are neither internal nor external and always get Cluster traffic policy.
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to node port for pausePod0")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
@@ -3311,7 +3323,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("fetching the Endpoint")
 		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		framework.ExpectError(err, "should not be able to fetch Endpoint")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "should not be able to fetch Endpoint")
 	})
 
 	/*
@@ -3624,7 +3636,17 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.Logf("Collection of services has been deleted")
 	})
 
-	ginkgo.It("should serve endpoints on same port and different protocols", func(ctx context.Context) {
+	/*
+		Release: v1.29
+		Testname: Service, should serve endpoints on same port and different protocols.
+		Description: Create one service with two ports, same port number and different protocol TCP and UDP.
+		It MUST be able to forward traffic to both ports.
+		Update the Service to expose only the TCP port, it MUST succeed to connect to the TCP port and fail
+		to connect to the UDP port.
+		Update the Service to expose only the UDP port, it MUST succeed to connect to the UDP port and fail
+		to connect to the TCP port.
+	*/
+	framework.ConformanceIt("should serve endpoints on same port and different protocols", func(ctx context.Context) {
 		serviceName := "multiprotocol-test"
 		testLabels := map[string]string{"app": "multiport"}
 		ns := f.Namespace.Name
@@ -3805,7 +3827,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 	// These is [Serial] because it can't run at the same time as the
 	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
-	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]", func(ctx context.Context) {
+	f.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly]", f.WithSerial(), func(ctx context.Context) {
 		serviceName := "sctp-endpoint-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)

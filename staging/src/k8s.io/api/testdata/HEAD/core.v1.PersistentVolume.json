@@ -299,7 +299,8 @@
           }
         ]
       }
-    }
+    },
+    "volumeAttributesClassName": "volumeAttributesClassNameValue"
   },
   "status": {
     "phase": "phaseValue",

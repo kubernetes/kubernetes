@@ -37,12 +37,13 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -305,6 +306,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Status", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["phase"]},
 		{Name: "Claim", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["claimRef"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pv"},
+		{Name: "VolumeAttributesClass", Type: "string", Description: "VolumeAttributesClass of the pv"},
 		{Name: "Reason", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["reason"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "VolumeMode", Type: "string", Priority: 1, Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["volumeMode"]},
@@ -319,6 +321,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Capacity", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["capacity"]},
 		{Name: "Access Modes", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["accessModes"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pvc"},
+		{Name: "VolumeAttributesClass", Type: "string", Description: "VolumeAttributesClass of the pvc"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "VolumeMode", Type: "string", Priority: 1, Description: apiv1.PersistentVolumeClaimSpec{}.SwaggerDoc()["volumeMode"]},
 	}
@@ -434,6 +437,15 @@ func AddHandlers(h printers.PrintHandler) {
 
 	_ = h.TableHandler(storageClassColumnDefinitions, printStorageClass)
 	_ = h.TableHandler(storageClassColumnDefinitions, printStorageClassList)
+
+	volumeAttributesClassColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "DriverName", Type: "string", Description: storagev1alpha1.VolumeAttributesClass{}.SwaggerDoc()["driverName"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+
+	_ = h.TableHandler(volumeAttributesClassColumnDefinitions, printVolumeAttributesClass)
+	_ = h.TableHandler(volumeAttributesClassColumnDefinitions, printVolumeAttributesClassList)
 
 	statusColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Status", Type: "string", Description: metav1.Status{}.SwaggerDoc()["status"]},
@@ -569,9 +581,9 @@ func AddHandlers(h printers.PrintHandler) {
 
 	flowSchemaColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "PriorityLevel", Type: "string", Description: flowcontrolv1beta3.PriorityLevelConfigurationReference{}.SwaggerDoc()["name"]},
-		{Name: "MatchingPrecedence", Type: "string", Description: flowcontrolv1beta3.FlowSchemaSpec{}.SwaggerDoc()["matchingPrecedence"]},
-		{Name: "DistinguisherMethod", Type: "string", Description: flowcontrolv1beta3.FlowSchemaSpec{}.SwaggerDoc()["distinguisherMethod"]},
+		{Name: "PriorityLevel", Type: "string", Description: flowcontrolv1.PriorityLevelConfigurationReference{}.SwaggerDoc()["name"]},
+		{Name: "MatchingPrecedence", Type: "string", Description: flowcontrolv1.FlowSchemaSpec{}.SwaggerDoc()["matchingPrecedence"]},
+		{Name: "DistinguisherMethod", Type: "string", Description: flowcontrolv1.FlowSchemaSpec{}.SwaggerDoc()["distinguisherMethod"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "MissingPL", Type: "string", Description: "references a broken or non-existent PriorityLevelConfiguration"},
 	}
@@ -580,11 +592,11 @@ func AddHandlers(h printers.PrintHandler) {
 
 	priorityLevelColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Type", Type: "string", Description: flowcontrolv1beta3.PriorityLevelConfigurationSpec{}.SwaggerDoc()["type"]},
-		{Name: "NominalConcurrencyShares", Type: "string", Description: flowcontrolv1beta3.LimitedPriorityLevelConfiguration{}.SwaggerDoc()["nominalConcurrencyShares"]},
-		{Name: "Queues", Type: "string", Description: flowcontrolv1beta3.QueuingConfiguration{}.SwaggerDoc()["queues"]},
-		{Name: "HandSize", Type: "string", Description: flowcontrolv1beta3.QueuingConfiguration{}.SwaggerDoc()["handSize"]},
-		{Name: "QueueLengthLimit", Type: "string", Description: flowcontrolv1beta3.QueuingConfiguration{}.SwaggerDoc()["queueLengthLimit"]},
+		{Name: "Type", Type: "string", Description: flowcontrolv1.PriorityLevelConfigurationSpec{}.SwaggerDoc()["type"]},
+		{Name: "NominalConcurrencyShares", Type: "string", Description: flowcontrolv1.LimitedPriorityLevelConfiguration{}.SwaggerDoc()["nominalConcurrencyShares"]},
+		{Name: "Queues", Type: "string", Description: flowcontrolv1.QueuingConfiguration{}.SwaggerDoc()["queues"]},
+		{Name: "HandSize", Type: "string", Description: flowcontrolv1.QueuingConfiguration{}.SwaggerDoc()["handSize"]},
+		{Name: "QueueLengthLimit", Type: "string", Description: flowcontrolv1.QueuingConfiguration{}.SwaggerDoc()["queueLengthLimit"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfiguration)
@@ -606,18 +618,6 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(scaleColumnDefinitions, printScale)
-
-	clusterCIDRColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "PerNodeHostBits", Type: "string", Description: networkingv1alpha1.ClusterCIDRSpec{}.SwaggerDoc()["perNodeHostBits"]},
-		{Name: "IPv4", Type: "string", Description: networkingv1alpha1.ClusterCIDRSpec{}.SwaggerDoc()["ipv4"]},
-		{Name: "IPv6", Type: "string", Description: networkingv1alpha1.ClusterCIDRSpec{}.SwaggerDoc()["ipv6"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-		{Name: "NodeSelector", Type: "string", Priority: 1, Description: networkingv1alpha1.ClusterCIDRSpec{}.SwaggerDoc()["nodeSelector"]},
-	}
-
-	_ = h.TableHandler(clusterCIDRColumnDefinitions, printClusterCIDR)
-	_ = h.TableHandler(clusterCIDRColumnDefinitions, printClusterCIDRList)
 
 	resourceClassColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -654,13 +654,22 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContextList)
 
+	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "CIDRs", Type: "string", Description: networkingv1alpha1.ServiceCIDRSpec{}.SwaggerDoc()["cidrs"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+
+	_ = h.TableHandler(serviceCIDRColumnDefinitions, printServiceCIDR)
+	_ = h.TableHandler(serviceCIDRColumnDefinitions, printServiceCIDRList)
+
 	ipAddressColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "ParentRef", Type: "string", Description: networkingv1alpha1.IPAddressSpec{}.SwaggerDoc()["parentRef"]},
 	}
 
-	h.TableHandler(ipAddressColumnDefinitions, printIPAddress)
-	h.TableHandler(ipAddressColumnDefinitions, printIPAddressList)
+	_ = h.TableHandler(ipAddressColumnDefinitions, printIPAddress)
+	_ = h.TableHandler(ipAddressColumnDefinitions, printIPAddressList)
 }
 
 // Pass ports=nil for all ports.
@@ -828,8 +837,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 
 	// If the Pod carries {type:PodScheduled, reason:WaitingForGates}, set reason to 'SchedulingGated'.
 	for _, condition := range pod.Status.Conditions {
-		if condition.Type == api.PodScheduled && condition.Reason == api.PodReasonSchedulingGated {
-			reason = api.PodReasonSchedulingGated
+		if condition.Type == api.PodScheduled && condition.Reason == apiv1.PodReasonSchedulingGated {
+			reason = apiv1.PodReasonSchedulingGated
 		}
 	}
 
@@ -1894,8 +1903,13 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.GenerateO
 		volumeMode = string(*obj.Spec.VolumeMode)
 	}
 
+	volumeAttributeClass := "<unset>"
+	if obj.Spec.VolumeAttributesClassName != nil {
+		volumeAttributeClass = *obj.Spec.VolumeAttributesClassName
+	}
+
 	row.Cells = append(row.Cells, obj.Name, aSize, modesStr, reclaimPolicyStr,
-		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj),
+		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj), volumeAttributeClass,
 		obj.Status.Reason, translateTimestampSince(obj.CreationTimestamp), volumeMode)
 	return []metav1.TableRow{row}, nil
 }
@@ -1922,10 +1936,16 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 		phase = "Terminating"
 	}
 
+	volumeAttributeClass := "<unset>"
 	storage := obj.Spec.Resources.Requests[api.ResourceStorage]
 	capacity := ""
 	accessModes := ""
 	volumeMode := "<unset>"
+
+	if obj.Spec.VolumeAttributesClassName != nil {
+		volumeAttributeClass = *obj.Spec.VolumeAttributesClassName
+	}
+
 	if obj.Spec.VolumeName != "" {
 		accessModes = helper.GetAccessModesAsString(obj.Status.AccessModes)
 		storage = obj.Status.Capacity[api.ResourceStorage]
@@ -1937,7 +1957,7 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 	}
 
 	row.Cells = append(row.Cells, obj.Name, string(phase), obj.Spec.VolumeName, capacity, accessModes,
-		helper.GetPersistentVolumeClaimClass(obj), translateTimestampSince(obj.CreationTimestamp), volumeMode)
+		helper.GetPersistentVolumeClaimClass(obj), volumeAttributeClass, translateTimestampSince(obj.CreationTimestamp), volumeMode)
 	return []metav1.TableRow{row}, nil
 }
 
@@ -2446,6 +2466,33 @@ func printStorageClassList(list *storage.StorageClassList, options printers.Gene
 	return rows, nil
 }
 
+func printVolumeAttributesClass(obj *storage.VolumeAttributesClass, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	name := obj.Name
+	if storageutil.IsDefaultAnnotationForVolumeAttributesClass(obj.ObjectMeta) {
+		name += " (default)"
+	}
+
+	row.Cells = append(row.Cells, name, obj.DriverName, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printVolumeAttributesClassList(list *storage.VolumeAttributesClassList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printVolumeAttributesClass(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
 func printLease(obj *coordination.Lease, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
@@ -2800,49 +2847,20 @@ func printPriorityLevelConfigurationList(list *flowcontrol.PriorityLevelConfigur
 	return rows, nil
 }
 
-func printClusterCIDR(obj *networking.ClusterCIDR, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printServiceCIDR(obj *networking.ServiceCIDR, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	ipv4 := "<none>"
-	ipv6 := "<none>"
 
-	if obj.Spec.IPv4 != "" {
-		ipv4 = obj.Spec.IPv4
-	}
-	if obj.Spec.IPv6 != "" {
-		ipv6 = obj.Spec.IPv6
-	}
-
-	row.Cells = append(row.Cells, obj.Name, fmt.Sprint(obj.Spec.PerNodeHostBits), ipv4, ipv6, translateTimestampSince(obj.CreationTimestamp))
-	if options.Wide {
-		nodeSelector := "<none>"
-		if obj.Spec.NodeSelector != nil {
-			allTerms := make([]string, 0)
-			for _, term := range obj.Spec.NodeSelector.NodeSelectorTerms {
-				if len(term.MatchExpressions) > 0 {
-					matchExpressions := fmt.Sprintf("MatchExpressions: %v", term.MatchExpressions)
-					allTerms = append(allTerms, matchExpressions)
-				}
-
-				if len(term.MatchFields) > 0 {
-					matchFields := fmt.Sprintf("MatchFields: %v", term.MatchFields)
-					allTerms = append(allTerms, matchFields)
-				}
-			}
-			nodeSelector = strings.Join(allTerms, ",")
-		}
-
-		row.Cells = append(row.Cells, nodeSelector)
-	}
-
+	cidrs := strings.Join(obj.Spec.CIDRs, ",")
+	row.Cells = append(row.Cells, obj.Name, cidrs, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
 }
 
-func printClusterCIDRList(list *networking.ClusterCIDRList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printServiceCIDRList(list *networking.ServiceCIDRList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		r, err := printClusterCIDR(&list.Items[i], options)
+		r, err := printServiceCIDR(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

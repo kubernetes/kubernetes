@@ -29,10 +29,10 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
@@ -40,7 +40,7 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestSingleZone(t *testing.T) {
-	pvLister := fakeframework.PersistentVolumeLister{
+	pvLister := tf.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
 		},
@@ -61,7 +61,7 @@ func TestSingleZone(t *testing.T) {
 		},
 	}
 
-	pvcLister := fakeframework.PersistentVolumeClaimLister{
+	pvcLister := tf.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -283,7 +283,7 @@ func TestSingleZone(t *testing.T) {
 }
 
 func TestMultiZone(t *testing.T) {
-	pvLister := fakeframework.PersistentVolumeLister{
+	pvLister := tf.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
 		},
@@ -301,7 +301,7 @@ func TestMultiZone(t *testing.T) {
 		},
 	}
 
-	pvcLister := fakeframework.PersistentVolumeClaimLister{
+	pvcLister := tf.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -423,7 +423,7 @@ func TestWithBinding(t *testing.T) {
 		classImmediate = "Class_Immediate"
 	)
 
-	scLister := fakeframework.StorageClassLister{
+	scLister := tf.StorageClassLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
 		},
@@ -433,13 +433,13 @@ func TestWithBinding(t *testing.T) {
 		},
 	}
 
-	pvLister := fakeframework.PersistentVolumeLister{
+	pvLister := tf.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
 		},
 	}
 
-	pvcLister := fakeframework.PersistentVolumeClaimLister{
+	pvcLister := tf.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},

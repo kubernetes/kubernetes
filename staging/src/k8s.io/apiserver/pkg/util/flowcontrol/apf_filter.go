@@ -33,8 +33,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 )
 
 // ConfigConsumerAsFieldManager is how the config consuminng
@@ -88,9 +88,8 @@ type Interface interface {
 // New creates a new instance to implement API priority and fairness
 func New(
 	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta3Interface,
+	flowcontrolClient flowcontrolclient.FlowcontrolV1Interface,
 	serverConcurrencyLimit int,
-	requestWaitLimit time.Duration,
 ) Interface {
 	clk := eventclock.Real{}
 	return NewTestable(TestableConfig{
@@ -101,7 +100,6 @@ func New(
 		InformerFactory:        informerFactory,
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: serverConcurrencyLimit,
-		RequestWaitLimit:       requestWaitLimit,
 		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
@@ -134,13 +132,10 @@ type TestableConfig struct {
 	InformerFactory kubeinformers.SharedInformerFactory
 
 	// FlowcontrolClient to use for manipulating config objects
-	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta3Interface
+	FlowcontrolClient flowcontrolclient.FlowcontrolV1Interface
 
 	// ServerConcurrencyLimit for the controller to enforce
 	ServerConcurrencyLimit int
-
-	// RequestWaitLimit configured on the server
-	RequestWaitLimit time.Duration
 
 	// GaugeVec for metrics about requests, broken down by phase and priority_level
 	ReqsGaugeVec metrics.RatioedGaugeVec

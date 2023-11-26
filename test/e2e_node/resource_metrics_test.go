@@ -27,6 +27,7 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/prometheus/common/model"
@@ -43,7 +44,7 @@ const (
 	maxStatsAge = time.Minute
 )
 
-var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
+var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, func() {
 	f := framework.NewDefaultFramework("resource-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {
@@ -163,6 +164,10 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 		"Metric": gstruct.Ignore(),
 		"Value":  gomega.And(gomega.BeNumerically(">=", lower), gomega.BeNumerically("<=", upper)),
 		"Timestamp": gomega.WithTransform(func(t model.Time) time.Time {
+			if t.Unix() <= 0 {
+				return time.Now()
+			}
+
 			// model.Time is in Milliseconds since epoch
 			return time.Unix(0, int64(t)*int64(time.Millisecond))
 		},

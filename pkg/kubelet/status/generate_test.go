@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/pointer"
 )
 
@@ -615,7 +614,7 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			test.expected.Type = kubetypes.PodReadyToStartContainers
+			test.expected.Type = v1.PodReadyToStartContainers
 			condition := GeneratePodReadyToStartContainersCondition(test.pod, test.status)
 			require.Equal(t, test.expected.Type, condition.Type)
 			require.Equal(t, test.expected.Status, condition.Status)

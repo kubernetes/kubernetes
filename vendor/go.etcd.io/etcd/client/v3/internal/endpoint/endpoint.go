@@ -41,10 +41,6 @@ func extractHostFromHostPort(ep string) string {
 	return host
 }
 
-func extractHostFromPath(pathStr string) string {
-	return extractHostFromHostPort(path.Base(pathStr))
-}
-
 // mustSplit2 returns the values from strings.SplitN(s, sep, 2).
 // If sep is not found, it returns ("", "", false) instead.
 func mustSplit2(s, sep string) (string, string) {
@@ -96,29 +92,29 @@ func translateEndpoint(ep string) (addr string, serverName string, requireCreds 
 		if strings.HasPrefix(ep, "unix:///") || strings.HasPrefix(ep, "unixs:///") {
 			// absolute path case
 			schema, absolutePath := mustSplit2(ep, "://")
-			return "unix://" + absolutePath, extractHostFromPath(absolutePath), schemeToCredsRequirement(schema)
+			return "unix://" + absolutePath, path.Base(absolutePath), schemeToCredsRequirement(schema)
 		}
 		if strings.HasPrefix(ep, "unix://") || strings.HasPrefix(ep, "unixs://") {
 			// legacy etcd local path
 			schema, localPath := mustSplit2(ep, "://")
-			return "unix:" + localPath, extractHostFromPath(localPath), schemeToCredsRequirement(schema)
+			return "unix:" + localPath, path.Base(localPath), schemeToCredsRequirement(schema)
 		}
 		schema, localPath := mustSplit2(ep, ":")
-		return "unix:" + localPath, extractHostFromPath(localPath), schemeToCredsRequirement(schema)
+		return "unix:" + localPath, path.Base(localPath), schemeToCredsRequirement(schema)
 	}
 
 	if strings.Contains(ep, "://") {
 		url, err := url.Parse(ep)
 		if err != nil {
-			return ep, extractHostFromHostPort(ep), CREDS_OPTIONAL
+			return ep, ep, CREDS_OPTIONAL
 		}
 		if url.Scheme == "http" || url.Scheme == "https" {
-			return url.Host, url.Hostname(), schemeToCredsRequirement(url.Scheme)
+			return url.Host, url.Host, schemeToCredsRequirement(url.Scheme)
 		}
-		return ep, url.Hostname(), schemeToCredsRequirement(url.Scheme)
+		return ep, url.Host, schemeToCredsRequirement(url.Scheme)
 	}
 	// Handles plain addresses like 10.0.0.44:437.
-	return ep, extractHostFromHostPort(ep), CREDS_OPTIONAL
+	return ep, ep, CREDS_OPTIONAL
 }
 
 // RequiresCredentials returns whether given endpoint requires

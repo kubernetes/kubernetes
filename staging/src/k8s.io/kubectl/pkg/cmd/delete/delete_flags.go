@@ -160,10 +160,8 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Raw != nil {
 		cmd.Flags().StringVar(f.Raw, "raw", *f.Raw, "Raw URI to DELETE to the server.  Uses the transport specified by the kubeconfig file.")
 	}
-	if cmdutil.InteractiveDelete.IsEnabled() {
-		if f.Interactive != nil {
-			cmd.Flags().BoolVarP(f.Interactive, "interactive", "i", *f.Interactive, "If true, delete resource only when user confirms. This flag is in Alpha.")
-		}
+	if f.Interactive != nil {
+		cmd.Flags().BoolVarP(f.Interactive, "interactive", "i", *f.Interactive, "If true, delete resource only when user confirms. This flag is in Alpha.")
 	}
 }
 

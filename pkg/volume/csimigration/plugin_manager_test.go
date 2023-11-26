@@ -123,28 +123,6 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			csiMigrationResult:            true,
 			csiMigrationCompleteResult:    true,
 		},
-		{
-			name:                          "vsphere-volume migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                    "kubernetes.io/vsphere-volume",
-			pluginFeature:                 features.CSIMigrationvSphere,
-			pluginFeatureEnabled:          true,
-			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
-			inTreePluginUnregisterEnabled: false,
-			csiMigrationResult:            true,
-			csiMigrationCompleteResult:    false,
-		},
-		{
-			name:                          "vsphere-volume migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
-			pluginName:                    "kubernetes.io/vsphere-volume",
-			pluginFeature:                 features.CSIMigrationvSphere,
-			pluginFeatureEnabled:          true,
-			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
-			inTreePluginUnregisterEnabled: true,
-			csiMigrationResult:            true,
-			csiMigrationCompleteResult:    true,
-		},
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {

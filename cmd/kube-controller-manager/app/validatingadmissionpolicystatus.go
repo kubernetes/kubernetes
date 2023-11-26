@@ -19,23 +19,41 @@ package app
 import (
 	"context"
 
+	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	pluginvalidatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
-	"k8s.io/client-go/kubernetes/scheme"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
-func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.ValidatingAdmissionPolicyStatusController,
+		initFunc: startValidatingAdmissionPolicyStatusController,
+		requiredFeatureGates: []featuregate.Feature{
+			genericfeatures.ValidatingAdmissionPolicy,
+		},
+	}
+}
+
+func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	// KCM won't start the controller without the feature gate set.
+
+	schemaResolver := resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme).
+		Combine(&resolver.ClientDiscoveryResolver{Discovery: controllerContext.ClientBuilder.DiscoveryClientOrDie(names.ValidatingAdmissionPolicyStatusController)})
+
 	typeChecker := &pluginvalidatingadmissionpolicy.TypeChecker{
-		SchemaResolver: resolver.NewDefinitionsSchemaResolver(scheme.Scheme, openapi.GetOpenAPIDefinitions),
+		SchemaResolver: schemaResolver,
 		RestMapper:     controllerContext.RESTMapper,
 	}
 	c, err := validatingadmissionpolicystatus.NewController(
 		controllerContext.InformerFactory.Admissionregistration().V1beta1().ValidatingAdmissionPolicies(),
-		controllerContext.ClientBuilder.ClientOrDie("validatingadmissionpolicy-status-controller").AdmissionregistrationV1beta1().ValidatingAdmissionPolicies(),
+		controllerContext.ClientBuilder.ClientOrDie(names.ValidatingAdmissionPolicyStatusController).AdmissionregistrationV1beta1().ValidatingAdmissionPolicies(),
 		typeChecker,
 	)
 

@@ -13,15 +13,15 @@ import (
 	"github.com/google/go-cmp/cmp/internal/function"
 )
 
-// Option configures for specific behavior of Equal and Diff. In particular,
-// the fundamental Option functions (Ignore, Transformer, and Comparer),
+// Option configures for specific behavior of [Equal] and [Diff]. In particular,
+// the fundamental Option functions ([Ignore], [Transformer], and [Comparer]),
 // configure how equality is determined.
 //
-// The fundamental options may be composed with filters (FilterPath and
-// FilterValues) to control the scope over which they are applied.
+// The fundamental options may be composed with filters ([FilterPath] and
+// [FilterValues]) to control the scope over which they are applied.
 //
-// The cmp/cmpopts package provides helper functions for creating options that
-// may be used with Equal and Diff.
+// The [github.com/google/go-cmp/cmp/cmpopts] package provides helper functions
+// for creating options that may be used with [Equal] and [Diff].
 type Option interface {
 	// filter applies all filters and returns the option that remains.
 	// Each option may only read s.curPath and call s.callTTBFunc.
@@ -56,9 +56,9 @@ type core struct{}
 
 func (core) isCore() {}
 
-// Options is a list of Option values that also satisfies the Option interface.
+// Options is a list of [Option] values that also satisfies the [Option] interface.
 // Helper comparison packages may return an Options value when packing multiple
-// Option values into a single Option. When this package processes an Options,
+// [Option] values into a single [Option]. When this package processes an Options,
 // it will be implicitly expanded into a flat list.
 //
 // Applying a filter on an Options is equivalent to applying that same filter
@@ -105,16 +105,16 @@ func (opts Options) String() string {
 	return fmt.Sprintf("Options{%s}", strings.Join(ss, ", "))
 }
 
-// FilterPath returns a new Option where opt is only evaluated if filter f
-// returns true for the current Path in the value tree.
+// FilterPath returns a new [Option] where opt is only evaluated if filter f
+// returns true for the current [Path] in the value tree.
 //
 // This filter is called even if a slice element or map entry is missing and
 // provides an opportunity to ignore such cases. The filter function must be
 // symmetric such that the filter result is identical regardless of whether the
 // missing value is from x or y.
 //
-// The option passed in may be an Ignore, Transformer, Comparer, Options, or
-// a previously filtered Option.
+// The option passed in may be an [Ignore], [Transformer], [Comparer], [Options], or
+// a previously filtered [Option].
 func FilterPath(f func(Path) bool, opt Option) Option {
 	if f == nil {
 		panic("invalid path filter function")
@@ -142,7 +142,7 @@ func (f pathFilter) String() string {
 	return fmt.Sprintf("FilterPath(%s, %v)", function.NameOf(reflect.ValueOf(f.fnc)), f.opt)
 }
 
-// FilterValues returns a new Option where opt is only evaluated if filter f,
+// FilterValues returns a new [Option] where opt is only evaluated if filter f,
 // which is a function of the form "func(T, T) bool", returns true for the
 // current pair of values being compared. If either value is invalid or
 // the type of the values is not assignable to T, then this filter implicitly
@@ -154,8 +154,8 @@ func (f pathFilter) String() string {
 // If T is an interface, it is possible that f is called with two values with
 // different concrete types that both implement T.
 //
-// The option passed in may be an Ignore, Transformer, Comparer, Options, or
-// a previously filtered Option.
+// The option passed in may be an [Ignore], [Transformer], [Comparer], [Options], or
+// a previously filtered [Option].
 func FilterValues(f interface{}, opt Option) Option {
 	v := reflect.ValueOf(f)
 	if !function.IsType(v.Type(), function.ValueFilter) || v.IsNil() {
@@ -192,9 +192,9 @@ func (f valuesFilter) String() string {
 	return fmt.Sprintf("FilterValues(%s, %v)", function.NameOf(f.fnc), f.opt)
 }
 
-// Ignore is an Option that causes all comparisons to be ignored.
-// This value is intended to be combined with FilterPath or FilterValues.
-// It is an error to pass an unfiltered Ignore option to Equal.
+// Ignore is an [Option] that causes all comparisons to be ignored.
+// This value is intended to be combined with [FilterPath] or [FilterValues].
+// It is an error to pass an unfiltered Ignore option to [Equal].
 func Ignore() Option { return ignore{} }
 
 type ignore struct{ core }
@@ -234,6 +234,8 @@ func (validator) apply(s *state, vx, vy reflect.Value) {
 			name = fmt.Sprintf("%q.%v", t.PkgPath(), t.Name()) // e.g., "path/to/package".MyType
 			if _, ok := reflect.New(t).Interface().(error); ok {
 				help = "consider using cmpopts.EquateErrors to compare error values"
+			} else if t.Comparable() {
+				help = "consider using cmpopts.EquateComparable to compare comparable Go types"
 			}
 		} else {
 			// Unnamed type with unexported fields. Derive PkgPath from field.
@@ -254,7 +256,7 @@ const identRx = `[_\p{L}][_\p{L}\p{N}]*`
 
 var identsRx = regexp.MustCompile(`^` + identRx + `(\.` + identRx + `)*$`)
 
-// Transformer returns an Option that applies a transformation function that
+// Transformer returns an [Option] that applies a transformation function that
 // converts values of a certain type into that of another.
 //
 // The transformer f must be a function "func(T) R" that converts values of
@@ -265,13 +267,14 @@ var identsRx = regexp.MustCompile(`^` + identRx + `(\.` + identRx + `)*$`)
 // same transform to the output of itself (e.g., in the case where the
 // input and output types are the same), an implicit filter is added such that
 // a transformer is applicable only if that exact transformer is not already
-// in the tail of the Path since the last non-Transform step.
+// in the tail of the [Path] since the last non-[Transform] step.
 // For situations where the implicit filter is still insufficient,
-// consider using cmpopts.AcyclicTransformer, which adds a filter
-// to prevent the transformer from being recursively applied upon itself.
+// consider using [github.com/google/go-cmp/cmp/cmpopts.AcyclicTransformer],
+// which adds a filter to prevent the transformer from
+// being recursively applied upon itself.
 //
-// The name is a user provided label that is used as the Transform.Name in the
-// transformation PathStep (and eventually shown in the Diff output).
+// The name is a user provided label that is used as the [Transform.Name] in the
+// transformation [PathStep] (and eventually shown in the [Diff] output).
 // The name must be a valid identifier or qualified identifier in Go syntax.
 // If empty, an arbitrary name is used.
 func Transformer(name string, f interface{}) Option {
@@ -329,7 +332,7 @@ func (tr transformer) String() string {
 	return fmt.Sprintf("Transformer(%s, %s)", tr.name, function.NameOf(tr.fnc))
 }
 
-// Comparer returns an Option that determines whether two values are equal
+// Comparer returns an [Option] that determines whether two values are equal
 // to each other.
 //
 // The comparer f must be a function "func(T, T) bool" and is implicitly
@@ -377,35 +380,32 @@ func (cm comparer) String() string {
 	return fmt.Sprintf("Comparer(%s)", function.NameOf(cm.fnc))
 }
 
-// Exporter returns an Option that specifies whether Equal is allowed to
+// Exporter returns an [Option] that specifies whether [Equal] is allowed to
 // introspect into the unexported fields of certain struct types.
 //
 // Users of this option must understand that comparing on unexported fields
 // from external packages is not safe since changes in the internal
-// implementation of some external package may cause the result of Equal
+// implementation of some external package may cause the result of [Equal]
 // to unexpectedly change. However, it may be valid to use this option on types
 // defined in an internal package where the semantic meaning of an unexported
 // field is in the control of the user.
 //
-// In many cases, a custom Comparer should be used instead that defines
+// In many cases, a custom [Comparer] should be used instead that defines
 // equality as a function of the public API of a type rather than the underlying
 // unexported implementation.
 //
-// For example, the reflect.Type documentation defines equality to be determined
+// For example, the [reflect.Type] documentation defines equality to be determined
 // by the == operator on the interface (essentially performing a shallow pointer
-// comparison) and most attempts to compare *regexp.Regexp types are interested
+// comparison) and most attempts to compare *[regexp.Regexp] types are interested
 // in only checking that the regular expression strings are equal.
-// Both of these are accomplished using Comparers:
+// Both of these are accomplished using [Comparer] options:
 //
 //	Comparer(func(x, y reflect.Type) bool { return x == y })
 //	Comparer(func(x, y *regexp.Regexp) bool { return x.String() == y.String() })
 //
-// In other cases, the cmpopts.IgnoreUnexported option can be used to ignore
-// all unexported fields on specified struct types.
+// In other cases, the [github.com/google/go-cmp/cmp/cmpopts.IgnoreUnexported]
+// option can be used to ignore all unexported fields on specified struct types.
 func Exporter(f func(reflect.Type) bool) Option {
-	if !supportExporters {
-		panic("Exporter is not supported on purego builds")
-	}
 	return exporter(f)
 }
 
@@ -415,10 +415,10 @@ func (exporter) filter(_ *state, _ reflect.Type, _, _ reflect.Value) applicableO
 	panic("not implemented")
 }
 
-// AllowUnexported returns an Options that allows Equal to forcibly introspect
+// AllowUnexported returns an [Option] that allows [Equal] to forcibly introspect
 // unexported fields of the specified struct types.
 //
-// See Exporter for the proper use of this option.
+// See [Exporter] for the proper use of this option.
 func AllowUnexported(types ...interface{}) Option {
 	m := make(map[reflect.Type]bool)
 	for _, typ := range types {
@@ -432,7 +432,7 @@ func AllowUnexported(types ...interface{}) Option {
 }
 
 // Result represents the comparison result for a single node and
-// is provided by cmp when calling Report (see Reporter).
+// is provided by cmp when calling Report (see [Reporter]).
 type Result struct {
 	_     [0]func() // Make Result incomparable
 	flags resultFlags
@@ -445,7 +445,7 @@ func (r Result) Equal() bool {
 }
 
 // ByIgnore reports whether the node is equal because it was ignored.
-// This never reports true if Equal reports false.
+// This never reports true if [Result.Equal] reports false.
 func (r Result) ByIgnore() bool {
 	return r.flags&reportByIgnore != 0
 }
@@ -455,7 +455,7 @@ func (r Result) ByMethod() bool {
 	return r.flags&reportByMethod != 0
 }
 
-// ByFunc reports whether a Comparer function determined equality.
+// ByFunc reports whether a [Comparer] function determined equality.
 func (r Result) ByFunc() bool {
 	return r.flags&reportByFunc != 0
 }
@@ -478,7 +478,7 @@ const (
 	reportByCycle
 )
 
-// Reporter is an Option that can be passed to Equal. When Equal traverses
+// Reporter is an [Option] that can be passed to [Equal]. When [Equal] traverses
 // the value trees, it calls PushStep as it descends into each node in the
 // tree and PopStep as it ascend out of the node. The leaves of the tree are
 // either compared (determined to be equal or not equal) or ignored and reported

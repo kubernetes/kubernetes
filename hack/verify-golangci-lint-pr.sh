@@ -28,12 +28,4 @@ fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# include shell2junit library
-source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
-
-# TODO (https://github.com/kubernetes/test-infra/issues/17056):
-# take this additional artifact and convert it to GitHub annotations
-# to make it easier to see these problems during a PR review.
-#
-# -g "${ARTIFACTS}/golangci-lint-githubactions.log"
-juLog -output="${ARTIFACTS:-/tmp/results}" -class="golangci" -name="golangci-strict-pr" -fail="^ERROR: " "${KUBE_ROOT}/hack/verify-golangci-lint.sh" -r "${PULL_BASE_SHA}" -s
+"${KUBE_ROOT}/hack/verify-golangci-lint.sh" -r "${PULL_BASE_SHA}" -s

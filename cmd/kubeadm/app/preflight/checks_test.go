@@ -1071,10 +1071,12 @@ func TestJoinIPCheck(t *testing.T) {
 	if _, err := isPrivileged.Check(); err != nil {
 		t.Skip("not a privileged user")
 	}
+
+	opts := configutil.LoadOrDefaultConfigurationOptions{
+		SkipCRIDetect: true,
+	}
+
 	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
-		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: constants.UnknownCRISocket,
-		},
 		Discovery: kubeadmapiv1.Discovery{
 			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
 				Token:                    configutil.PlaceholderToken.Token.String(),
@@ -1082,7 +1084,7 @@ func TestJoinIPCheck(t *testing.T) {
 				UnsafeSkipCAVerification: true,
 			},
 		},
-	})
+	}, opts)
 	if err != nil {
 		t.Fatalf("unexpected failure when defaulting JoinConfiguration: %v", err)
 	}

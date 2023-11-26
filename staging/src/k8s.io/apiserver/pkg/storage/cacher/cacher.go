@@ -112,11 +112,8 @@ func (wm watchersMap) addWatcher(w *cacheWatcher, number int) {
 	wm[number] = w
 }
 
-func (wm watchersMap) deleteWatcher(number int, done func(*cacheWatcher)) {
-	if watcher, ok := wm[number]; ok {
-		delete(wm, number)
-		done(watcher)
-	}
+func (wm watchersMap) deleteWatcher(number int) {
+	delete(wm, number)
 }
 
 func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
@@ -147,14 +144,14 @@ func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespac
 	}
 }
 
-func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool, done func(*cacheWatcher)) {
+func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool) {
 	if supported {
-		i.valueWatchers[value].deleteWatcher(number, done)
+		i.valueWatchers[value].deleteWatcher(number)
 		if len(i.valueWatchers[value]) == 0 {
 			delete(i.valueWatchers, value)
 		}
 	} else {
-		i.allWatchers[scope].deleteWatcher(number, done)
+		i.allWatchers[scope].deleteWatcher(number)
 		if len(i.allWatchers[scope]) == 0 {
 			delete(i.allWatchers, scope)
 		}
@@ -1223,7 +1220,8 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported, c.stopWatcherLocked)
+		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported)
+		c.stopWatcherLocked(w)
 	}
 }
 
@@ -1252,7 +1250,7 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 //
 // The returned function must be called under the watchCache lock.
 func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(ctx context.Context, parsedResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
-	if opts.SendInitialEvents == nil || *opts.SendInitialEvents == false || !opts.Predicate.AllowWatchBookmarks {
+	if opts.SendInitialEvents == nil || !*opts.SendInitialEvents || !opts.Predicate.AllowWatchBookmarks {
 		return func() uint64 { return 0 }, nil
 	}
 	return c.getCommonResourceVersionLockedFunc(ctx, parsedResourceVersion, opts)
@@ -1267,7 +1265,7 @@ func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(ctx context.Context, 
 //
 // The returned function must be called under the watchCache lock.
 func (c *Cacher) getStartResourceVersionForWatchLockedFunc(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
-	if opts.SendInitialEvents == nil || *opts.SendInitialEvents == true {
+	if opts.SendInitialEvents == nil || *opts.SendInitialEvents {
 		return func() uint64 { return parsedWatchResourceVersion }, nil
 	}
 	return c.getCommonResourceVersionLockedFunc(ctx, parsedWatchResourceVersion, opts)
@@ -1298,7 +1296,7 @@ func (c *Cacher) getCommonResourceVersionLockedFunc(ctx context.Context, parsedW
 // Additionally, it instructs the caller whether it should ask for
 // all events from the cache (full state) or not.
 func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, requestedWatchRV uint64, opts storage.ListOptions) (bool, error) {
-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents == true {
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 		err := c.watchCache.waitUntilFreshAndBlock(ctx, requestedWatchRV)
 		defer c.watchCache.RUnlock()
 		return err == nil, err

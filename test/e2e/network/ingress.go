@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
@@ -85,7 +86,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 	//
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
-	ginkgo.Describe("GCE [Slow] [Feature:Ingress]", func() {
+	f.Describe("GCE", framework.WithSlow(), feature.Ingress, func() {
 		var gceController *gce.IngressController
 
 		// Platform specific setup
@@ -130,7 +131,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 	})
 
-	ginkgo.Describe("GCE [Slow] [Feature:NEG]", func() {
+	f.Describe("GCE", framework.WithSlow(), feature.NEG, func() {
 		var gceController *gce.IngressController
 
 		// Platform specific setup
@@ -786,7 +787,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("deleting")
 
 		expectFinalizer := func(ing *networkingv1.Ingress, msg string) {
-			framework.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
+			gomega.Expect(ing.DeletionTimestamp).ToNot(gomega.BeNil(), "expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing)
 			if len(ing.Finalizers) == 0 {
 				framework.Failf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing)
 			}

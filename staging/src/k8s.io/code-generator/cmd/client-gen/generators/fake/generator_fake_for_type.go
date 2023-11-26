@@ -77,7 +77,7 @@ func genStatus(t *types.Type) bool {
 // hasObjectMeta returns true if the type has a ObjectMeta field.
 func hasObjectMeta(t *types.Type) bool {
 	for _, m := range t.Members {
-		if m.Embedded == true && m.Name == "ObjectMeta" {
+		if m.Embedded && m.Name == "ObjectMeta" {
 			return true
 		}
 	}

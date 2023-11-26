@@ -114,7 +114,7 @@ func (ba *BalancedAllocation) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewBalancedAllocation initializes a new plugin and returns it.
-func NewBalancedAllocation(baArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := baArgs.(*config.NodeResourcesBalancedAllocationArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesBalancedAllocationArgs, got %T", baArgs)

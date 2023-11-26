@@ -17,13 +17,21 @@ limitations under the License.
 package proxy
 
 import (
+	"strconv"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 )
 
 func TestNodePodCIDRHandlerAdd(t *testing.T) {
+	oldKlogOsExit := klog.OsExit
+	defer func() {
+		klog.OsExit = oldKlogOsExit
+	}()
+	klog.OsExit = customExit
+
 	tests := []struct {
 		name            string
 		oldNodePodCIDRs []string
@@ -71,12 +79,19 @@ func TestNodePodCIDRHandlerAdd(t *testing.T) {
 					t.Errorf("The code did panic")
 				}
 			}()
+
 			n.OnNodeAdd(node)
 		})
 	}
 }
 
 func TestNodePodCIDRHandlerUpdate(t *testing.T) {
+	oldKlogOsExit := klog.OsExit
+	defer func() {
+		klog.OsExit = oldKlogOsExit
+	}()
+	klog.OsExit = customExit
+
 	tests := []struct {
 		name            string
 		oldNodePodCIDRs []string
@@ -125,7 +140,12 @@ func TestNodePodCIDRHandlerUpdate(t *testing.T) {
 					t.Errorf("The code did panic")
 				}
 			}()
+
 			n.OnNodeUpdate(oldNode, node)
 		})
 	}
+}
+
+func customExit(exitCode int) {
+	panic(strconv.Itoa(exitCode))
 }

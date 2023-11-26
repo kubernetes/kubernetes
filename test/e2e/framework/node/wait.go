@@ -51,7 +51,7 @@ func WaitForTotalHealthy(ctx context.Context, c clientset.Interface, timeout tim
 
 	var notReady []v1.Node
 	var missingPodsPerNode map[string][]string
-	err := wait.PollImmediateWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, poll, timeout, true, func(ctx context.Context) (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{ResourceVersion: "0"})
@@ -96,7 +96,7 @@ func WaitForTotalHealthy(ctx context.Context, c clientset.Interface, timeout tim
 		return len(notReady) == 0 && len(missingPodsPerNode) == 0, nil
 	})
 
-	if err != nil && err != wait.ErrWaitTimeout {
+	if err != nil && !wait.Interrupted(err) {
 		return err
 	}
 
@@ -192,7 +192,7 @@ func CheckReady(ctx context.Context, c clientset.Interface, size int, timeout ti
 func waitListSchedulableNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
-	if wait.PollImmediateWithContext(ctx, poll, singleCallTimeout, func(ctx context.Context) (bool, error) {
+	if wait.PollUntilContextTimeout(ctx, poll, singleCallTimeout, true, func(ctx context.Context) (bool, error) {
 		nodes, err = c.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})

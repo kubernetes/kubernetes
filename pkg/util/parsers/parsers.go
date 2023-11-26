@@ -23,7 +23,7 @@ import (
 	//  Import the crypto/sha512 algorithm for the docker image parser to work with 384 and 512 sha hashes
 	_ "crypto/sha512"
 
-	dockerref "github.com/docker/distribution/reference"
+	dockerref "github.com/distribution/reference"
 )
 
 // ParseImageName parses a docker image string into three parts: repo, tag and digest.

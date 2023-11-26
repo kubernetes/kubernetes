@@ -904,7 +904,7 @@ func (ss *scaleSet) getPrimaryNetworkInterfaceConfiguration(networkConfiguration
 
 	for idx := range networkConfigurations {
 		networkConfig := &networkConfigurations[idx]
-		if networkConfig.Primary != nil && *networkConfig.Primary == true {
+		if networkConfig.Primary != nil && *networkConfig.Primary {
 			return networkConfig, nil
 		}
 	}
@@ -920,7 +920,7 @@ func (ss *scaleSet) getPrimaryNetworkInterfaceConfigurationForScaleSet(networkCo
 
 	for idx := range networkConfigurations {
 		networkConfig := &networkConfigurations[idx]
-		if networkConfig.Primary != nil && *networkConfig.Primary == true {
+		if networkConfig.Primary != nil && *networkConfig.Primary {
 			return networkConfig, nil
 		}
 	}
@@ -936,7 +936,7 @@ func getPrimaryIPConfigFromVMSSNetworkConfig(config *compute.VirtualMachineScale
 
 	for idx := range ipConfigurations {
 		ipConfig := &ipConfigurations[idx]
-		if ipConfig.Primary != nil && *ipConfig.Primary == true {
+		if ipConfig.Primary != nil && *ipConfig.Primary {
 			return ipConfig, nil
 		}
 	}

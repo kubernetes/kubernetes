@@ -67,6 +67,13 @@ func GetLoadBalancerSourceRanges(service *api.Service) (utilnet.IPNetSet, error)
 	return ipnets, nil
 }
 
+// ExternallyAccessible checks if service is externally accessible.
+func ExternallyAccessible(service *api.Service) bool {
+	return service.Spec.Type == api.ServiceTypeLoadBalancer ||
+		service.Spec.Type == api.ServiceTypeNodePort ||
+		(service.Spec.Type == api.ServiceTypeClusterIP && len(service.Spec.ExternalIPs) > 0)
+}
+
 // RequestsOnlyLocalTraffic checks if service requests OnlyLocal traffic.
 func RequestsOnlyLocalTraffic(service *api.Service) bool {
 	if service.Spec.Type != api.ServiceTypeLoadBalancer &&

@@ -264,7 +264,7 @@ type Config struct {
 	GRPCKeepAliveTimeout time.Duration `json:"grpc-keepalive-timeout"`
 
 	// SocketOpts are socket options passed to listener config.
-	SocketOpts transport.SocketOpts
+	SocketOpts transport.SocketOpts `json:"socket-options"`
 
 	// PreVote is true to enable Raft Pre-Vote.
 	// If enabled, Raft runs an additional election phase
@@ -470,7 +470,10 @@ func NewConfig() *Config {
 		GRPCKeepAliveInterval: DefaultGRPCKeepAliveInterval,
 		GRPCKeepAliveTimeout:  DefaultGRPCKeepAliveTimeout,
 
-		SocketOpts: transport.SocketOpts{},
+		SocketOpts: transport.SocketOpts{
+			ReusePort:    false,
+			ReuseAddress: false,
+		},
 
 		TickMs:                     100,
 		ElectionMs:                 1000,

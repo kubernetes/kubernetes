@@ -506,9 +506,13 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		migrated := getMigratedStatusBySpec(volumeToDetach.VolumeSpec)
 
 		if err != nil {
-			// On failure, add volume back to ReportAsAttached list
-			actualStateOfWorld.AddVolumeToReportAsAttached(
-				logger, volumeToDetach.VolumeName, volumeToDetach.NodeName)
+			// On failure, mark the volume as uncertain. Attach() must succeed before adding the volume back
+			// to node status as attached.
+			uncertainError := actualStateOfWorld.MarkVolumeAsUncertain(
+				logger, volumeToDetach.VolumeName, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
+			if uncertainError != nil {
+				klog.Errorf("DetachVolume.MarkVolumeAsUncertain failed to add the volume %q to actual state after detach error: %s", volumeToDetach.VolumeName, uncertainError)
+			}
 			eventErr, detailedErr := volumeToDetach.GenerateError("DetachVolume.Detach failed", err)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
@@ -576,8 +580,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Enforce ReadWriteOncePod access mode if it is the only one present. This is also enforced during scheduling.
-		if utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod) &&
-			actualStateOfWorld.IsVolumeMountedElsewhere(volumeToMount.VolumeName, volumeToMount.PodName) &&
+		if actualStateOfWorld.IsVolumeMountedElsewhere(volumeToMount.VolumeName, volumeToMount.PodName) &&
 			// Because we do not know what access mode the pod intends to use if there are multiple.
 			len(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes) == 1 &&
 			v1helper.ContainsAccessMode(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes, v1.ReadWriteOncePod) {
@@ -1067,8 +1070,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
 
 		// Enforce ReadWriteOncePod access mode. This is also enforced during scheduling.
-		if utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod) &&
-			actualStateOfWorld.IsVolumeMountedElsewhere(volumeToMount.VolumeName, volumeToMount.PodName) &&
+		if actualStateOfWorld.IsVolumeMountedElsewhere(volumeToMount.VolumeName, volumeToMount.PodName) &&
 			// Because we do not know what access mode the pod intends to use if there are multiple.
 			len(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes) == 1 &&
 			v1helper.ContainsAccessMode(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes, v1.ReadWriteOncePod) {

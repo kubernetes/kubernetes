@@ -430,9 +430,9 @@ func TestEvictionWithFinalizers(t *testing.T) {
 				t.Fatalf("Failed to get the pod %q with error: %q", klog.KObj(pod), e)
 			}
 			_, cond := podutil.GetPodCondition(&updatedPod.Status, v1.PodConditionType(v1.DisruptionTarget))
-			if tc.wantDisruptionTargetCond == true && cond == nil {
+			if tc.wantDisruptionTargetCond && cond == nil {
 				t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(updatedPod), v1.DisruptionTarget)
-			} else if tc.wantDisruptionTargetCond == false && cond != nil {
+			} else if !tc.wantDisruptionTargetCond && cond != nil {
 				t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(updatedPod), v1.DisruptionTarget)
 			}
 		})

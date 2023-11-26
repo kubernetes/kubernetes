@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -31,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] DNS", func() {
+var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
@@ -136,4 +137,4 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 		// TODO: Add more test cases for other DNSPolicies.
 	})
-})
+}))

@@ -38,8 +38,10 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -47,7 +49,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 )
 
-var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
+var _ = SIGDescribe("AppArmor", feature.AppArmor, nodefeature.AppArmor, func() {
 	if isAppArmorEnabled() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Loading AppArmor profiles for testing")
@@ -229,10 +231,10 @@ func createPodWithAppArmor(ctx context.Context, f *framework.Framework, profile 
 
 func expectSoftRejection(status v1.PodStatus) {
 	args := []interface{}{"PodStatus: %+v", status}
-	framework.ExpectEqual(status.Phase, v1.PodPending, args...)
-	framework.ExpectEqual(status.Reason, "AppArmor", args...)
+	gomega.Expect(status.Phase).To(gomega.Equal(v1.PodPending), args...)
+	gomega.Expect(status.Reason).To(gomega.Equal("AppArmor"), args...)
 	gomega.Expect(status.Message).To(gomega.ContainSubstring("AppArmor"), args...)
-	framework.ExpectEqual(status.ContainerStatuses[0].State.Waiting.Reason, "Blocked", args...)
+	gomega.Expect(status.ContainerStatuses[0].State.Waiting.Reason).To(gomega.Equal("Blocked"), args...)
 }
 
 func isAppArmorEnabled() bool {

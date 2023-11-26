@@ -72,18 +72,18 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	podresourcesgrpc "k8s.io/kubernetes/pkg/kubelet/apis/podresources/grpc"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
@@ -219,7 +219,7 @@ type PodResourcesProviders struct {
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
 func ListenAndServePodResources(endpoint string, providers podresources.PodResourcesProviders) {
-	server := grpc.NewServer(podresourcesgrpc.WithRateLimiter(podresourcesgrpc.DefaultQPS, podresourcesgrpc.DefaultBurstTokens))
+	server := grpc.NewServer(apisgrpc.WithRateLimiter("podresources", podresources.DefaultQPS, podresources.DefaultBurstTokens))
 
 	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(providers))
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(providers))
@@ -377,9 +377,8 @@ func (s *Server) InstallDefaultHandlers() {
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.ComponentSLIs) {
-		slis.SLIMetricsWithReset{}.Install(s.restfulCont)
-	}
+	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
+
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
 	ws.

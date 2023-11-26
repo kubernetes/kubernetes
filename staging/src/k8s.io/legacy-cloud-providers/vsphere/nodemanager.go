@@ -134,7 +134,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 		for vc, vsi := range nm.vsphereInstanceMap {
 
 			found := getVMFound()
-			if found == true {
+			if found {
 				break
 			}
 
@@ -175,7 +175,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 			for _, datacenterObj := range datacenterObjs {
 				found := getVMFound()
-				if found == true {
+				if found {
 					break
 				}
 
@@ -283,7 +283,7 @@ func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
 	}
 
 	if nm.nodeLister != nil {
-		klog.V(4).Infof("Node %s missing in vSphere cloud provider cache, trying node informer")
+		klog.V(4).Infof("Node %s missing in vSphere cloud provider cache, trying node informer", nodeName)
 		node, err := nm.nodeLister.Get(convertToString(nodeName))
 		if err != nil {
 			if !errors.IsNotFound(err) {
@@ -299,7 +299,7 @@ func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
 	}
 
 	if nm.nodeGetter != nil {
-		klog.V(4).Infof("Node %s missing in vSphere cloud provider caches, trying the API server")
+		klog.V(4).Infof("Node %s missing in vSphere cloud provider caches, trying the API server", nodeName)
 		node, err := nm.nodeGetter.Nodes().Get(context.TODO(), convertToString(nodeName), metav1.GetOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {

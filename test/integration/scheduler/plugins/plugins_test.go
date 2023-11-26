@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
@@ -62,7 +63,7 @@ var (
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		switch pl := plugin.(type) {
 		case *PermitPlugin:
 			pl.fh = fh
@@ -475,7 +476,7 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
 	}
 	if bp.bindStatus.IsSuccess() {
-		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(context.TODO(), &v1.Binding{
+		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(ctx, &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID, Annotations: map[string]string{bindPluginAnnotation: bp.Name()}},
 			Target: v1.ObjectReference{
 				Kind: "Node",
@@ -1559,20 +1560,24 @@ func TestBindPlugin(t *testing.T) {
 
 	tests := []struct {
 		name                   string
+		enabledBindPlugins     []configv1.Plugin
 		bindPluginStatuses     []*framework.Status
 		expectBoundByScheduler bool   // true means this test case expecting scheduler would bind pods
 		expectBoundByPlugin    bool   // true means this test case expecting a plugin would bind pods
+		expectBindFailed       bool   // true means this test case expecting a plugin binding pods with error
 		expectBindPluginName   string // expecting plugin name to bind pods
 		expectInvokeEvents     []pluginInvokeEvent
 	}{
 		{
 			name:                   "bind plugins skipped to bind the pod and scheduler bond the pod",
+			enabledBindPlugins:     []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:     []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
 			expectBoundByScheduler: true,
 			expectInvokeEvents:     []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
 		},
 		{
 			name:                 "bindplugin2 succeeded to bind the pod",
+			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin2Name,
@@ -1580,6 +1585,7 @@ func TestBindPlugin(t *testing.T) {
 		},
 		{
 			name:                 "bindplugin1 succeeded to bind the pod",
+			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Success, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin1Name,
@@ -1587,8 +1593,16 @@ func TestBindPlugin(t *testing.T) {
 		},
 		{
 			name:               "bind plugin fails to bind the pod",
+			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
+			expectBindFailed:   true,
 			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Error, "failed to bind"), framework.NewStatus(framework.Success, "")},
 			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: reservePluginName, val: 1}},
+		},
+		{
+			name:               "all bind plugins will be skipped(this should not happen for most of the cases)",
+			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}},
+			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
+			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}},
 		},
 	}
 
@@ -1624,7 +1638,7 @@ func TestBindPlugin(t *testing.T) {
 						},
 						Bind: configv1.PluginSet{
 							// Put DefaultBinder last.
-							Enabled:  []configv1.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
+							Enabled:  test.enabledBindPlugins,
 							Disabled: []configv1.Plugin{{Name: defaultbinder.Name}},
 						},
 						PostBind: configv1.PluginSet{
@@ -1696,7 +1710,7 @@ func TestBindPlugin(t *testing.T) {
 				if reservePlugin.numUnreserveCalled != 0 {
 					t.Errorf("Expected unreserve to not be called, was called %d times.", reservePlugin.numUnreserveCalled)
 				}
-			} else {
+			} else if test.expectBindFailed {
 				// bind plugin fails to bind the pod
 				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
 					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
@@ -1706,7 +1720,11 @@ func TestBindPlugin(t *testing.T) {
 				if p.numPostBindCalled > 0 {
 					t.Errorf("Didn't expect the postbind plugin to be called %d times.", p.numPostBindCalled)
 				}
+			} else if postBindPlugin.numPostBindCalled > 0 {
+				// all bind plugins are skipped
+				t.Errorf("Didn't expect the postbind plugin to be called %d times.", postBindPlugin.numPostBindCalled)
 			}
+
 			for j := range test.expectInvokeEvents {
 				expectEvent := test.expectInvokeEvents[j]
 				select {
@@ -2290,8 +2308,11 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 			preemptor:              st.MakePod().Name("preemptor-pod").Namespace(ns).Priority(highPriority).Req(preemptorReq).ZeroTerminationGracePeriod().Obj(),
 		},
 		{
-			name:                   "rejecting a waiting pod to trigger retrying unschedulable pods immediately, but the waiting pod itself won't be retried",
-			maxNumWaitingPodCalled: 1,
+			// The waiting Pod has once gone through the scheduling cycle,
+			// and we don't know if it's schedulable or not after it's preempted.
+			// So, we should retry the scheduling of it so that it won't stuck in the unschedulable Pod pool.
+			name:                   "rejecting a waiting pod to trigger retrying unschedulable pods immediately, and the waiting pod itself will be retried",
+			maxNumWaitingPodCalled: 2,
 			waitingPod:             st.MakePod().Name("waiting-pod").Namespace(ns).Priority(lowPriority).Req(resReq).ZeroTerminationGracePeriod().Obj(),
 			preemptor:              st.MakePod().Name("preemptor-pod").Namespace(ns).Priority(highPriority).Req(preemptorReq).ZeroTerminationGracePeriod().Obj(),
 		},
@@ -2498,7 +2519,7 @@ func (j *JobPlugin) PostBind(_ context.Context, state *framework.CycleState, p *
 func TestActivatePods(t *testing.T) {
 	var jobPlugin *JobPlugin
 	// Create a plugin registry for testing. Register a Job plugin.
-	registry := frameworkruntime.Registry{jobPluginName: func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	registry := frameworkruntime.Registry{jobPluginName: func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		jobPlugin = &JobPlugin{podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister()}
 		return jobPlugin, nil
 	}}
@@ -2566,5 +2587,199 @@ func TestActivatePods(t *testing.T) {
 	// Lastly verify the pods activation logic is really called.
 	if jobPlugin.podsActivated == false {
 		t.Errorf("JobPlugin's pods activation logic is not called")
+	}
+}
+
+var _ framework.PreEnqueuePlugin = &SchedulingGatesPluginWithEvents{}
+var _ framework.EnqueueExtensions = &SchedulingGatesPluginWithEvents{}
+var _ framework.PreEnqueuePlugin = &SchedulingGatesPluginWOEvents{}
+var _ framework.EnqueueExtensions = &SchedulingGatesPluginWOEvents{}
+
+const (
+	schedulingGatesPluginWithEvents = "scheduling-gates-with-events"
+	schedulingGatesPluginWOEvents   = "scheduling-gates-without-events"
+)
+
+type SchedulingGatesPluginWithEvents struct {
+	called int
+	schedulinggates.SchedulingGates
+}
+
+func (pl *SchedulingGatesPluginWithEvents) Name() string {
+	return schedulingGatesPluginWithEvents
+}
+
+func (pl *SchedulingGatesPluginWithEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+	pl.called++
+	return pl.SchedulingGates.PreEnqueue(ctx, p)
+}
+
+func (pl *SchedulingGatesPluginWithEvents) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
+	}
+}
+
+type SchedulingGatesPluginWOEvents struct {
+	called int
+	schedulinggates.SchedulingGates
+}
+
+func (pl *SchedulingGatesPluginWOEvents) Name() string {
+	return schedulingGatesPluginWOEvents
+}
+
+func (pl *SchedulingGatesPluginWOEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+	pl.called++
+	return pl.SchedulingGates.PreEnqueue(ctx, p)
+}
+
+func (pl *SchedulingGatesPluginWOEvents) EventsToRegister() []framework.ClusterEventWithHint {
+	return nil
+}
+
+// This test helps to verify registering nil events for schedulingGates plugin works as expected.
+func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
+
+	testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
+
+	num := func(pl framework.Plugin) int {
+		switch item := pl.(type) {
+		case *SchedulingGatesPluginWithEvents:
+			return item.called
+		case *SchedulingGatesPluginWOEvents:
+			return item.called
+		default:
+			t.Error("unsupported plugin")
+		}
+		return 0
+	}
+
+	tests := []struct {
+		name          string
+		enqueuePlugin framework.PreEnqueuePlugin
+		count         int
+	}{
+		{
+			name:          "preEnqueue plugin without event registered",
+			enqueuePlugin: &SchedulingGatesPluginWOEvents{SchedulingGates: schedulinggates.SchedulingGates{EnablePodSchedulingReadiness: true}},
+			count:         2,
+		},
+		{
+			name:          "preEnqueue plugin with event registered",
+			enqueuePlugin: &SchedulingGatesPluginWithEvents{SchedulingGates: schedulinggates.SchedulingGates{EnablePodSchedulingReadiness: true}},
+			count:         3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := frameworkruntime.Registry{
+				tt.enqueuePlugin.Name(): newPlugin(tt.enqueuePlugin),
+			}
+
+			// Setup plugins for testing.
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
+					SchedulerName: pointer.String(v1.DefaultSchedulerName),
+					Plugins: &configv1.Plugins{
+						PreEnqueue: configv1.PluginSet{
+							Enabled: []configv1.Plugin{
+								{Name: tt.enqueuePlugin.Name()},
+							},
+							Disabled: []configv1.Plugin{
+								{Name: "*"},
+							},
+						},
+					},
+				}},
+			})
+
+			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2,
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+			)
+			defer teardown()
+
+			// Create a pod with schedulingGates.
+			gatedPod := st.MakePod().Name("p").Namespace(testContext.NS.Name).
+				SchedulingGates([]string{"foo"}).
+				PodAffinity("kubernetes.io/hostname", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAffinityWithRequiredReq).
+				Container("pause").Obj()
+			gatedPod, err := testutils.CreatePausePod(testCtx.ClientSet, gatedPod)
+			if err != nil {
+				t.Errorf("Error while creating a gated pod: %v", err)
+				return
+			}
+
+			if err := testutils.WaitForPodSchedulingGated(testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
+				t.Errorf("Expected the pod to be gated, but got: %v", err)
+				return
+			}
+			if num(tt.enqueuePlugin) != 1 {
+				t.Errorf("Expected the preEnqueue plugin to be called once, but got %v", num(tt.enqueuePlugin))
+				return
+			}
+
+			// Create a best effort pod.
+			pausePod, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+				Name:      "pause-pod",
+				Namespace: testCtx.NS.Name,
+				Labels:    map[string]string{"foo": "bar"},
+			}))
+			if err != nil {
+				t.Errorf("Error while creating a pod: %v", err)
+				return
+			}
+
+			// Wait for the pod schedulabled.
+			if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pausePod, 10*time.Second); err != nil {
+				t.Errorf("Expected the pod to be schedulable, but got: %v", err)
+				return
+			}
+
+			// Update the pod which will trigger the requeue logic if plugin registers the events.
+			pausePod, err = testCtx.ClientSet.CoreV1().Pods(pausePod.Namespace).Get(testCtx.Ctx, pausePod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Error while getting a pod: %v", err)
+				return
+			}
+			pausePod.Annotations = map[string]string{"foo": "bar"}
+			_, err = testCtx.ClientSet.CoreV1().Pods(pausePod.Namespace).Update(testCtx.Ctx, pausePod, metav1.UpdateOptions{})
+			if err != nil {
+				t.Errorf("Error while updating a pod: %v", err)
+				return
+			}
+
+			// Pod should still be unschedulable because scheduling gates still exist, theoretically, it's a waste rescheduling.
+			if err := testutils.WaitForPodSchedulingGated(testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
+				t.Errorf("Expected the pod to be gated, but got: %v", err)
+				return
+			}
+			if num(tt.enqueuePlugin) != tt.count {
+				t.Errorf("Expected the preEnqueue plugin to be called %v, but got %v", tt.count, num(tt.enqueuePlugin))
+				return
+			}
+
+			// Remove gated pod's scheduling gates.
+			gatedPod, err = testCtx.ClientSet.CoreV1().Pods(gatedPod.Namespace).Get(testCtx.Ctx, gatedPod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Error while getting a pod: %v", err)
+				return
+			}
+			gatedPod.Spec.SchedulingGates = nil
+			_, err = testCtx.ClientSet.CoreV1().Pods(gatedPod.Namespace).Update(testCtx.Ctx, gatedPod, metav1.UpdateOptions{})
+			if err != nil {
+				t.Errorf("Error while updating a pod: %v", err)
+				return
+			}
+
+			// Ungated pod should be schedulable now.
+			if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
+				t.Errorf("Expected the pod to be schedulable, but got: %v", err)
+				return
+			}
+		})
 	}
 }

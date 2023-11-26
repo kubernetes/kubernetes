@@ -102,7 +102,7 @@ func getSignature(t reflect.Type, depth *depthCounter) (sig string) {
 			}
 		}
 		if len(s) == 0 {
-			panic("empty struct")
+			panic(InvalidTypeError{t})
 		}
 		return "(" + s + ")"
 	case reflect.Array, reflect.Slice:

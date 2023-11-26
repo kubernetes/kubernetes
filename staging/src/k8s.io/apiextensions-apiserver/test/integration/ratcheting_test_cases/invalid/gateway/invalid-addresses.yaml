@@ -1,0 +1,28 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: invalid-addresses
+spec:
+  gatewayClassName: acme-lb
+  addresses:
+  - value: 1200:0000:::AB00:1234:0000:2552:7777:1313
+  - value: 21DA:D3:0:2F3B:2AY:FF:FE28:9C5A
+  - value: "2001:db8:3c4d:15:0:d234:3eee:"
+  - value: "2001:db8:3c4d:15:0:d234:3eee:::"
+  - value: ":::1234::"
+  - value: "1.1.1"
+  - value: "1.a.3.4"
+  - value: "foo.com"
+  - type: IPAddress
+    value: "256.255.255.255"
+  - type: "Hostname"
+    value: "foo.com:80"
+  - type: "example.com/custom"
+    value: "anything goes"
+  listeners:
+  - protocol: HTTP
+    port: 80
+    name: prod-web-gw
+    allowedRoutes:
+      namespaces:
+        from: Same

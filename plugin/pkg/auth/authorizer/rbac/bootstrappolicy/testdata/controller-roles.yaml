@@ -436,6 +436,7 @@ items:
     - pods/status
     verbs:
     - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -829,6 +830,31 @@ items:
     - create
     - patch
     - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:legacy-service-account-token-cleaner
+  rules:
+  - apiGroups:
+    - ""
+    resourceNames:
+    - kube-apiserver-legacy-service-account-token-tracking
+    resources:
+    - configmaps
+    verbs:
+    - get
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    verbs:
+    - delete
+    - patch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

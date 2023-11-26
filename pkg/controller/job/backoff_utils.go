@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type backoffRecord struct {
@@ -207,7 +207,7 @@ func getFinishTimeFromPodReadyFalseCondition(p *v1.Pod) *time.Time {
 
 func getFinishTimeFromDeletionTimestamp(p *v1.Pod) *time.Time {
 	if p.DeletionTimestamp != nil {
-		finishTime := p.DeletionTimestamp.Time.Add(-time.Duration(pointer.Int64Deref(p.DeletionGracePeriodSeconds, 0)) * time.Second)
+		finishTime := p.DeletionTimestamp.Time.Add(-time.Duration(ptr.Deref(p.DeletionGracePeriodSeconds, 0)) * time.Second)
 		return &finishTime
 	}
 	return nil

@@ -110,7 +110,7 @@ func TestEventIsSorted(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	clientset, err := kubernetes.NewForConfig(cmdtesting.DefaultClientConfig())
-	if err != err {
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -148,7 +148,7 @@ func TestEventNoHeaders(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	clientset, err := kubernetes.NewForConfig(cmdtesting.DefaultClientConfig())
-	if err != err {
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -185,7 +185,7 @@ func TestEventFiltered(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	clientset, err := kubernetes.NewForConfig(cmdtesting.DefaultClientConfig())
-	if err != err {
+	if err != nil {
 		t.Fatal(err)
 	}
 

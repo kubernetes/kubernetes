@@ -36,7 +36,7 @@ const (
 	logContainerName = "logger"
 )
 
-var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
+var _ = SIGDescribe("ContainerLogPath", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient

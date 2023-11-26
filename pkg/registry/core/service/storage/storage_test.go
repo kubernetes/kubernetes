@@ -11671,7 +11671,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			if tc.err == false && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if tc.err == true && err == nil {
+			if tc.err && err == nil {
 				t.Fatalf("unexpected success")
 			}
 			if !tc.err {

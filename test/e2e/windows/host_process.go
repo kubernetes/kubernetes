@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -85,7 +86,7 @@ var (
 	User_NTAuthoritySystem       = "NT AUTHORITY\\SYSTEM"
 )
 
-var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
+var _ = sigDescribe(feature.WindowsHostProcessContainers, "[MinimumKubeletVersion:1.22] HostProcess containers", skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
@@ -724,15 +725,9 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		framework.Logf("Logs: %s\n", logs)
 
-		framework.ExpectEqual(
-			strings.Contains(logs, "calling /healthz"),
-			true,
-			"app logs should contain 'calling /healthz'")
+		gomega.Expect(logs).Should(gomega.ContainSubstring("calling /healthz"), "app logs should contain 'calling /healthz'")
 
-		framework.ExpectEqual(
-			strings.Contains(logs, "status=failed"),
-			false,
-			"app logs should not contain 'status=failed")
+		gomega.Expect(logs).ShouldNot(gomega.ContainSubstring("status=failed"), "app logs should not contain 'status=failed'")
 	})
 
 	ginkgo.It("should run as localgroup accounts", func(ctx context.Context) {
@@ -802,15 +797,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, "localgroup-container")
 		framework.ExpectNoError(err, "error retrieving container logs")
 		framework.Logf("Pod logs: %s", logs)
-		framework.ExpectEqual(
-			strings.Contains(
-				strings.ToLower(logs),
-				"nt authority"),
-			false,
-			"Container runs 'whoami' and logs should not contain 'nt authority'")
+		gomega.Expect(strings.ToLower(logs)).ShouldNot(gomega.ContainSubstring("nt authority"), "Container runs 'whoami' and logs should not contain 'nt authority'")
 	})
 
-})
+}))
 
 func makeTestPodWithVolumeMounts(name string) *v1.Pod {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

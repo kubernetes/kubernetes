@@ -82,9 +82,9 @@ func (mp *MultipointExample) PreBind(ctx context.Context, state *framework.Cycle
 }
 
 // New initializes a new plugin and returns it.
-func New(config *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
+func New(ctx context.Context, config *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
 	if config == nil {
-		klog.ErrorS(nil, "MultipointExample configuration cannot be empty")
+		klog.FromContext(ctx).Error(nil, "MultipointExample configuration cannot be empty")
 		return nil, fmt.Errorf("MultipointExample configuration cannot be empty")
 	}
 	mp := MultipointExample{}

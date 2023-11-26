@@ -201,9 +201,11 @@ func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	switch style {
 	case node:
 		useHostNamespaces(pod)
-		setPrivileged(pod, containerName)
 
-	case podCopy, ephemeral:
+	case podCopy:
+		shareProcessNamespace(pod)
+
+	case ephemeral:
 		// no additional modifications needed
 	}
 
@@ -269,20 +271,6 @@ func clearSecurityContext(p *corev1.Pod, containerName string) {
 	})
 }
 
-// setPrivileged configures the containers as privileged.
-func setPrivileged(p *corev1.Pod, containerName string) {
-	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
-		if c.Name != containerName {
-			return true
-		}
-		if c.SecurityContext == nil {
-			c.SecurityContext = &corev1.SecurityContext{}
-		}
-		c.SecurityContext.Privileged = pointer.Bool(true)
-		return false
-	})
-}
-
 // disallowRoot configures the container to run as a non-root user.
 func disallowRoot(p *corev1.Pod, containerName string) {
 	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
@@ -326,13 +314,14 @@ func allowProcessTracing(p *corev1.Pod, containerName string) {
 	})
 }
 
-// allowNetadminCapability grants NET_ADMIN capability to the container.
+// allowNetadminCapability grants NET_ADMIN and NET_RAW capability to the container.
 func allowNetadminCapability(p *corev1.Pod, containerName string) {
 	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
 		if c.Name != containerName {
 			return true
 		}
 		addCapability(c, "NET_ADMIN")
+		addCapability(c, "NET_RAW")
 		return false
 	})
 }

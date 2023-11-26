@@ -97,24 +97,25 @@ func NewHollowKubelet(
 	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
 	d := &kubelet.Dependencies{
-		KubeClient:               client,
-		HeartbeatClient:          heartbeatClient,
-		ProbeManager:             probetest.FakeManager{},
-		RemoteRuntimeService:     runtimeService,
-		RemoteImageService:       imageService,
-		CAdvisorInterface:        cadvisorInterface,
-		Cloud:                    nil,
-		OSInterface:              &containertest.FakeOS{},
-		ContainerManager:         containerManager,
-		VolumePlugins:            volumePlugins(),
-		TLSOptions:               nil,
-		OOMAdjuster:              oom.NewFakeOOMAdjuster(),
-		Mounter:                  &mount.FakeMounter{},
-		Subpather:                &subpath.FakeSubpath{},
-		HostUtil:                 hostutil.NewFakeHostUtil(nil),
-		PodStartupLatencyTracker: kubeletutil.NewPodStartupLatencyTracker(),
-		TracerProvider:           trace.NewNoopTracerProvider(),
-		Recorder:                 &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
+		KubeClient:                client,
+		HeartbeatClient:           heartbeatClient,
+		ProbeManager:              probetest.FakeManager{},
+		RemoteRuntimeService:      runtimeService,
+		RemoteImageService:        imageService,
+		CAdvisorInterface:         cadvisorInterface,
+		Cloud:                     nil,
+		OSInterface:               &containertest.FakeOS{},
+		ContainerManager:          containerManager,
+		VolumePlugins:             volumePlugins(),
+		TLSOptions:                nil,
+		OOMAdjuster:               oom.NewFakeOOMAdjuster(),
+		Mounter:                   &mount.FakeMounter{},
+		Subpather:                 &subpath.FakeSubpath{},
+		HostUtil:                  hostutil.NewFakeHostUtil(nil),
+		PodStartupLatencyTracker:  kubeletutil.NewPodStartupLatencyTracker(),
+		NodeStartupLatencyTracker: kubeletutil.NewNodeStartupLatencyTracker(),
+		TracerProvider:            trace.NewNoopTracerProvider(),
+		Recorder:                  &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
 	}
 
 	return &HollowKubelet{

@@ -432,9 +432,9 @@ func TestMatchConditions(t *testing.T) {
 
 			for _, pod := range testcase.pods {
 				_, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, dryRunCreate)
-				if testcase.expectErrorPod == false && err != nil {
+				if !testcase.expectErrorPod && err != nil {
 					t.Fatalf("unexpected error creating test pod: %v", err)
-				} else if testcase.expectErrorPod == true && err == nil {
+				} else if testcase.expectErrorPod && err == nil {
 					t.Fatal("expected error creating pods")
 				}
 			}

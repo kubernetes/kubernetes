@@ -14,6 +14,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2/config"
@@ -285,6 +286,9 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 		TestSuites: []JUnitTestSuite{suite},
 	}
 
+	if err := os.MkdirAll(path.Dir(dst), 0770); err != nil {
+		return err
+	}
 	f, err := os.Create(dst)
 	if err != nil {
 		return err
@@ -322,6 +326,9 @@ func MergeAndCleanupJUnitReports(sources []string, dst string) ([]string, error)
 		mergedReport.TestSuites = append(mergedReport.TestSuites, report.TestSuites...)
 	}
 
+	if err := os.MkdirAll(path.Dir(dst), 0770); err != nil {
+		return messages, err
+	}
 	f, err := os.Create(dst)
 	if err != nil {
 		return messages, err

@@ -72,7 +72,7 @@ type Scheduler struct {
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func() (*framework.QueuedPodInfo, error)
+	NextPod func(logger klog.Logger) (*framework.QueuedPodInfo, error)
 
 	// FailureHandler is called upon a scheduling failure.
 	FailureHandler FailureHandlerFn
@@ -363,15 +363,22 @@ func New(ctx context.Context,
 }
 
 // defaultQueueingHintFn is the default queueing hint function.
-// It always returns QueueAfterBackoff as the queueing hint.
-var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
-	return framework.QueueAfterBackoff
+// It always returns Queue as the queueing hint.
+var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+	return framework.Queue, nil
 }
 
 func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.QueueingHintMap {
 	queueingHintMap := make(internalqueue.QueueingHintMap)
 	for _, e := range es {
 		events := e.EventsToRegister()
+
+		// This will happen when plugin registers with empty events, it's usually the case a pod
+		// will become reschedulable only for self-update, e.g. schedulingGates plugin, the pod
+		// will enter into the activeQ via priorityQueue.Update().
+		if len(events) == 0 {
+			continue
+		}
 
 		// Note: Rarely, a plugin implements EnqueueExtensions but returns nil.
 		// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin

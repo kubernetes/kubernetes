@@ -77,6 +77,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				NodeStatusReportFrequency:                 metav1.Duration{Duration: 5 * time.Minute},
 				NodeLeaseDurationSeconds:                  40,
 				ImageMinimumGCAge:                         metav1.Duration{Duration: 2 * time.Minute},
+				ImageMaximumGCAge:                         metav1.Duration{},
 				ImageGCHighThresholdPercent:               utilpointer.Int32(85),
 				ImageGCLowThresholdPercent:                utilpointer.Int32(80),
 				ContainerRuntimeEndpoint:                  "unix:///run/containerd/containerd.sock",

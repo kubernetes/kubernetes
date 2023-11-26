@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -75,7 +76,7 @@ const (
 
 */
 
-var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-vsan-policy")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

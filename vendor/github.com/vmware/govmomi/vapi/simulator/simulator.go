@@ -1,11 +1,11 @@
 /*
-Copyright (c) 2018-2022 VMware, Inc. All Rights Reserved.
+Copyright (c) 2018-2023 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -88,6 +88,7 @@ type download struct {
 
 type handler struct {
 	sync.Mutex
+	sm          *simulator.SessionManager
 	ServeMux    *http.ServeMux
 	URL         url.URL
 	Category    map[string]*tags.Category
@@ -104,7 +105,7 @@ type handler struct {
 func init() {
 	simulator.RegisterEndpoint(func(s *simulator.Service, r *simulator.Registry) {
 		if r.IsVPX() {
-			patterns, h := New(s.Listen, r.OptionManager().Setting)
+			patterns, h := New(s.Listen, r)
 			for _, p := range patterns {
 				s.Handle(p, h)
 			}
@@ -113,8 +114,9 @@ func init() {
 }
 
 // New creates a vAPI simulator.
-func New(u *url.URL, settings []vim.BaseOptionValue) ([]string, http.Handler) {
+func New(u *url.URL, r *simulator.Registry) ([]string, http.Handler) {
 	s := &handler{
+		sm:          r.SessionManager(),
 		ServeMux:    http.NewServeMux(),
 		URL:         *u,
 		Category:    make(map[string]*tags.Category),
@@ -237,10 +239,7 @@ func (s *handler) isAuthorized(r *http.Request) bool {
 func (s *handler) hasAuthorization(r *http.Request) (string, bool) {
 	u, p, ok := r.BasicAuth()
 	if ok { // user+pass auth
-		if u == "" || p == "" {
-			return u, false
-		}
-		return u, true
+		return u, s.sm.Authenticate(s.URL, &vim.Login{UserName: u, Password: p})
 	}
 	auth := r.Header.Get("Authorization")
 	return "TODO", strings.HasPrefix(auth, "SIGN ") // token auth

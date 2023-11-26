@@ -264,3 +264,63 @@ func TestGetValueFromIntOrPercentNil(t *testing.T) {
 		t.Errorf("expected error got none")
 	}
 }
+
+func TestParse(t *testing.T) {
+	tests := []struct {
+		input  string
+		output IntOrString
+	}{
+		{
+			input:  "0",
+			output: IntOrString{Type: Int, IntVal: 0},
+		},
+		{
+			input:  "2147483647", // math.MaxInt32
+			output: IntOrString{Type: Int, IntVal: 2147483647},
+		},
+		{
+			input:  "-2147483648", // math.MinInt32
+			output: IntOrString{Type: Int, IntVal: -2147483648},
+		},
+		{
+			input:  "2147483648", // math.MaxInt32+1
+			output: IntOrString{Type: String, StrVal: "2147483648"},
+		},
+		{
+			input:  "-2147483649", // math.MinInt32-1
+			output: IntOrString{Type: String, StrVal: "-2147483649"},
+		},
+		{
+			input:  "9223372036854775807", // math.MaxInt64
+			output: IntOrString{Type: String, StrVal: "9223372036854775807"},
+		},
+		{
+			input:  "-9223372036854775808", // math.MinInt64
+			output: IntOrString{Type: String, StrVal: "-9223372036854775808"},
+		},
+		{
+			input:  "9223372036854775808", // math.MaxInt64+1
+			output: IntOrString{Type: String, StrVal: "9223372036854775808"},
+		},
+		{
+			input:  "-9223372036854775809", // math.MinInt64-1
+			output: IntOrString{Type: String, StrVal: "-9223372036854775809"},
+		},
+	}
+
+	for i, test := range tests {
+		t.Logf("test case %d", i)
+		value := Parse(test.input)
+		if test.output.Type != value.Type {
+			t.Errorf("expected type %d (%v), but got %d (%v)", test.output.Type, test.output, value.Type, value)
+			continue
+		}
+		if value.Type == Int && test.output.IntVal != value.IntVal {
+			t.Errorf("expected int value %d (%v), but got %d (%v)", test.output.IntVal, test.output, value.IntVal, value)
+			continue
+		}
+		if value.Type == String && test.output.StrVal != value.StrVal {
+			t.Errorf("expected string value %q (%v), but got %q (%v)", test.output.StrVal, test.output, value.StrVal, value)
+		}
+	}
+}

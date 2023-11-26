@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -79,7 +81,7 @@ func (t *DeploymentUpgradeTest) Setup(ctx context.Context, f *framework.Framewor
 	rsList, err := rsClient.List(ctx, metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
-	framework.ExpectEqual(len(rss), 1, "expected one replicaset, got %d", len(rss))
+	gomega.Expect(rss).To(gomega.HaveLen(1), "expected one replicaset, got %d", len(rss))
 	t.oldRSUID = rss[0].UID
 
 	ginkgo.By(fmt.Sprintf("Waiting for revision of the deployment %q to become 1", deploymentName))
@@ -99,7 +101,7 @@ func (t *DeploymentUpgradeTest) Setup(ctx context.Context, f *framework.Framewor
 	rsList, err = rsClient.List(ctx, metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss = rsList.Items
-	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
+	gomega.Expect(rss).To(gomega.HaveLen(2), "expected 2 replicaset, got %d", len(rss))
 
 	ginkgo.By(fmt.Sprintf("Checking replicaset of deployment %q that is created before rollout survives the rollout", deploymentName))
 	switch t.oldRSUID {
@@ -132,7 +134,7 @@ func (t *DeploymentUpgradeTest) Test(ctx context.Context, f *framework.Framework
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Checking UID to verify deployment %q survives upgrade", deploymentName))
-	framework.ExpectEqual(deployment.UID, t.oldDeploymentUID)
+	gomega.Expect(deployment.UID).To(gomega.Equal(t.oldDeploymentUID))
 
 	ginkgo.By(fmt.Sprintf("Verifying deployment %q does not create new replicasets", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
@@ -140,19 +142,19 @@ func (t *DeploymentUpgradeTest) Test(ctx context.Context, f *framework.Framework
 	rsList, err := rsClient.List(ctx, metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
-	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
+	gomega.Expect(rss).To(gomega.HaveLen(2), "expected 2 replicaset, got %d", len(rss))
 
 	switch t.oldRSUID {
 	case rss[0].UID:
-		framework.ExpectEqual(rss[1].UID, t.newRSUID)
+		gomega.Expect(rss[1].UID).To(gomega.Equal(t.newRSUID))
 	case rss[1].UID:
-		framework.ExpectEqual(rss[0].UID, t.newRSUID)
+		gomega.Expect(rss[0].UID).To(gomega.Equal(t.newRSUID))
 	default:
 		framework.ExpectNoError(fmt.Errorf("new replicasets are created during upgrade of deployment %q", deploymentName))
 	}
 
 	ginkgo.By(fmt.Sprintf("Verifying revision of the deployment %q is still 2", deploymentName))
-	framework.ExpectEqual(deployment.Annotations[deploymentutil.RevisionAnnotation], "2")
+	gomega.Expect(deployment.Annotations).To(gomega.HaveKeyWithValue(deploymentutil.RevisionAnnotation, "2"))
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deploymentName))
 	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))

@@ -214,13 +214,15 @@ func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter a
 	recoverManifests[component] = backupManifestPath
 
 	// Skip upgrade if current and new manifests are equal
-	equal, err := staticpod.ManifestFilesAreEqual(currentManifestPath, newManifestPath)
+	equal, diff, err := staticpod.ManifestFilesAreEqual(currentManifestPath, newManifestPath)
 	if err != nil {
 		return err
 	}
 	if equal {
 		fmt.Printf("[upgrade/staticpods] Current and new manifests of %s are equal, skipping upgrade\n", component)
 		return nil
+	} else {
+		klog.V(4).Infof("Pod manifest files diff:\n%s\n", diff)
 	}
 
 	// if certificate renewal should be performed
@@ -494,6 +496,20 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 		if !renewed {
 			// if not error, but not renewed because of external CA detected, inform the user
 			fmt.Printf("[upgrade/staticpods] External CA detected, %s certificate can't be renewed\n", constants.AdminKubeConfigFileName)
+		}
+
+		// Do the same for super-admin.conf, but only if it exists
+		if _, err := os.Stat(filepath.Join(pathMgr.KubernetesDir(), constants.SuperAdminKubeConfigFileName)); err == nil {
+			// renew the certificate embedded in the super-admin.conf file
+			renewed, err := certsRenewMgr.RenewUsingLocalCA(constants.SuperAdminKubeConfigFileName)
+			if err != nil {
+				return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to upgrade the %s certificates", constants.SuperAdminKubeConfigFileName), pathMgr, false)
+			}
+
+			if !renewed {
+				// if not error, but not renewed because of external CA detected, inform the user
+				fmt.Printf("[upgrade/staticpods] External CA detected, %s certificate can't be renewed\n", constants.SuperAdminKubeConfigFileName)
+			}
 		}
 	}
 

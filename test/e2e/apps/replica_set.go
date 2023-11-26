@@ -45,10 +45,11 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -108,7 +109,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		Testname: Replica Set, run basic image
 		Description: Create a ReplicaSet with a Pod and a single Container. Make sure that the Pod is running. Pod SHOULD send a valid response when queried.
 	*/
-	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func(ctx context.Context) {
+	framework.ConformanceIt("should serve a basic image on each replica with a public image", func(ctx context.Context) {
 		testReplicaSetServeImageOrFail(ctx, f, "basic", framework.ServeHostnameImage)
 	})
 
@@ -221,7 +222,7 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 	}
 
 	// Sanity check
-	framework.ExpectEqual(running, replicas, "unexpected number of running pods: %+v", pods.Items)
+	gomega.Expect(running).To(gomega.Equal(replicas), "unexpected number of running pods: %+v", pods.Items)
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
@@ -251,7 +252,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 		podQuota := quota.Status.Hard[v1.ResourcePods]
 		return (&podQuota).Cmp(quantity) == 0, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("resource quota %q never synced", name)
 	}
 	framework.ExpectNoError(err)
@@ -279,7 +280,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 		return cond != nil, nil
 
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
@@ -308,7 +309,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
 		return cond == nil, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
@@ -423,8 +424,8 @@ func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to get scale subresource: %v", err)
 	}
-	framework.ExpectEqual(scale.Spec.Replicas, int32(1))
-	framework.ExpectEqual(scale.Status.Replicas, int32(1))
+	gomega.Expect(scale.Spec.Replicas).To(gomega.Equal(int32(1)))
+	gomega.Expect(scale.Status.Replicas).To(gomega.Equal(int32(1)))
 
 	ginkgo.By("updating a scale subresource")
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -433,14 +434,14 @@ func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to put scale subresource: %v", err)
 	}
-	framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
+	gomega.Expect(scaleResult.Spec.Replicas).To(gomega.Equal(int32(2)))
 
 	ginkgo.By("verifying the replicaset Spec.Replicas was modified")
 	rs, err = c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get statefulset resource: %v", err)
 	}
-	framework.ExpectEqual(*(rs.Spec.Replicas), int32(2))
+	gomega.Expect(*(rs.Spec.Replicas)).To(gomega.Equal(int32(2)))
 
 	ginkgo.By("Patch a scale subresource")
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -457,8 +458,7 @@ func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
 
 	rs, err = c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Failed to get replicaset resource: %v", err)
-	framework.ExpectEqual(*(rs.Spec.Replicas), int32(4), "replicaset should have 4 replicas")
-
+	gomega.Expect(*(rs.Spec.Replicas)).To(gomega.Equal(int32(4)), "replicaset should have 4 replicas")
 }
 
 // ReplicaSet Replace and Patch tests
@@ -498,7 +498,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err, "Failed to create pods: %s", err)
 
 	// Scale the ReplicaSet
-	ginkgo.By(fmt.Sprintf("Scaling up %q replicaset ", rsName))
+	ginkgo.By(fmt.Sprintf("Scaling up %q replicaset", rsName))
 	_, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, ns, rsName, func(update *appsv1.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x
@@ -585,7 +585,7 @@ func listRSDeleteCollection(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Listing all ReplicaSets")
 	rsList, err := c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
 	framework.ExpectNoError(err, "failed to list ReplicaSets")
-	framework.ExpectEqual(len(rsList.Items), 1, "filtered list wasn't found")
+	gomega.Expect(rsList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 	ginkgo.By("DeleteCollection of the ReplicaSets")
 	err = rsClient.DeleteCollection(ctx, metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
@@ -594,7 +594,7 @@ func listRSDeleteCollection(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("After DeleteCollection verify that ReplicaSets have been deleted")
 	rsList, err = c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
 	framework.ExpectNoError(err, "failed to list ReplicaSets")
-	framework.ExpectEqual(len(rsList.Items), 0, "filtered list should have no replicas")
+	gomega.Expect(rsList.Items).To(gomega.BeEmpty(), "filtered list should have no replicas")
 }
 
 func testRSStatus(ctx context.Context, f *framework.Framework) {

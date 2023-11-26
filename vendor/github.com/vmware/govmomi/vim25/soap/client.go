@@ -369,24 +369,10 @@ func (c *Client) dialTLSContext(
 		return conn, nil
 	}
 
-	switch err.(type) {
-	case x509.UnknownAuthorityError:
-	case x509.HostnameError:
-	default:
-		// Allow a thumbprint verification attempt if the error indicates
-		// the failure was due to lack of trust.
-		//
-		// Please note the err variable is not a special type of x509 or HTTP
-		// error that can be validated by a type assertion. The err variable is
-		// in fact an *errors.errorString.
-		switch {
-		case strings.HasSuffix(err.Error(), "certificate is not trusted"):
-			// darwin and linux
-		case strings.HasSuffix(err.Error(), "certificate signed by unknown authority"):
-			// windows
-		default:
-			return nil, err
-		}
+	// Allow a thumbprint verification attempt if the error indicates
+	// the failure was due to lack of trust.
+	if !IsCertificateUntrusted(err) {
+		return nil, err
 	}
 
 	thumbprint := c.Thumbprint(addr)
@@ -409,10 +395,6 @@ func (c *Client) dialTLSContext(
 	}
 
 	return conn, nil
-}
-
-func (c *Client) dialTLS(network, addr string) (net.Conn, error) {
-	return c.dialTLSContext(context.Background(), network, addr)
 }
 
 // splitHostPort is similar to net.SplitHostPort,

@@ -37,6 +37,9 @@ type Responses struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Responses as JSON
 func (r *Responses) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(r)
+	}
 	b1, err := json.Marshal(r.ResponsesProps)
 	if err != nil {
 		return nil, err
@@ -46,6 +49,25 @@ func (r *Responses) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2), nil
+}
+
+func (r Responses) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type ArbitraryKeys map[string]interface{}
+	var x struct {
+		ArbitraryKeys
+		Default *Response `json:"default,omitzero"`
+	}
+	x.ArbitraryKeys = make(map[string]any, len(r.Extensions)+len(r.StatusCodeResponses))
+	for k, v := range r.Extensions {
+		if internal.IsExtensionKey(k) {
+			x.ArbitraryKeys[k] = v
+		}
+	}
+	for k, v := range r.StatusCodeResponses {
+		x.ArbitraryKeys[strconv.Itoa(k)] = v
+	}
+	x.Default = r.Default
+	return opts.MarshalNext(enc, x)
 }
 
 func (r *Responses) UnmarshalJSON(data []byte) error {
@@ -179,6 +201,9 @@ type Response struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Response as JSON
 func (r *Response) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(r)
+	}
 	b1, err := json.Marshal(r.Refable)
 	if err != nil {
 		return nil, err
@@ -192,6 +217,18 @@ func (r *Response) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
+}
+
+func (r Response) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref string `json:"$ref,omitempty"`
+		spec.Extensions
+		ResponseProps `json:",inline"`
+	}
+	x.Ref = r.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(r.Extensions)
+	x.ResponseProps = r.ResponseProps
+	return opts.MarshalNext(enc, x)
 }
 
 func (r *Response) UnmarshalJSON(data []byte) error {
@@ -247,6 +284,9 @@ type Link struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Link as JSON
 func (r *Link) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(r)
+	}
 	b1, err := json.Marshal(r.Refable)
 	if err != nil {
 		return nil, err
@@ -260,6 +300,18 @@ func (r *Link) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
+}
+
+func (r *Link) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref string `json:"$ref,omitempty"`
+		spec.Extensions
+		LinkProps `json:",inline"`
+	}
+	x.Ref = r.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(r.Extensions)
+	x.LinkProps = r.LinkProps
+	return opts.MarshalNext(enc, x)
 }
 
 func (r *Link) UnmarshalJSON(data []byte) error {

@@ -33,9 +33,8 @@ import (
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
 type VolumeRestrictions struct {
-	pvcLister              corelisters.PersistentVolumeClaimLister
-	sharedLister           framework.SharedLister
-	enableReadWriteOncePod bool
+	pvcLister    corelisters.PersistentVolumeClaimLister
+	sharedLister framework.SharedLister
 }
 
 var _ framework.PreFilterPlugin = &VolumeRestrictions{}
@@ -169,13 +168,6 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 		}
 	}
 
-	if !pl.enableReadWriteOncePod {
-		if needsCheck {
-			return nil, nil
-		}
-		return nil, framework.NewStatus(framework.Skip)
-	}
-
 	pvcs, err := pl.readWriteOncePodPVCsForPod(ctx, pod)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -198,9 +190,6 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 
 // AddPod from pre-computed data in cycleState.
 func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
-	if !pl.enableReadWriteOncePod {
-		return nil
-	}
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -211,9 +200,6 @@ func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState *framework.
 
 // RemovePod from pre-computed data in cycleState.
 func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
-	if !pl.enableReadWriteOncePod {
-		return nil
-	}
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -321,9 +307,6 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
 		return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	}
-	if !pl.enableReadWriteOncePod {
-		return nil
-	}
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -348,14 +331,13 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHin
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	sharedLister := handle.SnapshotSharedLister()
 
 	return &VolumeRestrictions{
-		pvcLister:              pvcLister,
-		sharedLister:           sharedLister,
-		enableReadWriteOncePod: fts.EnableReadWriteOncePod,
+		pvcLister:    pvcLister,
+		sharedLister: sharedLister,
 	}, nil
 }

@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 var supportedEndpointSliceAddressTypes = sets.New[string](
@@ -43,108 +42,85 @@ var supportedEndpointSliceAddressTypes = sets.New[string](
 // or can be used for constructing a more specific EndpointInfo struct
 // defined by the proxier if needed.
 type BaseEndpointInfo struct {
-	Endpoint string // TODO: should be an endpointString type
-	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
-	IsLocal bool
+	// Cache this values to improve performance
+	ip   string
+	port int
+	// endpoint is the same as net.JoinHostPort(ip,port)
+	endpoint string
 
-	// ZoneHints represent the zone hints for the endpoint. This is based on
-	// endpoint.hints.forZones[*].name in the EndpointSlice API.
-	ZoneHints sets.Set[string]
-	// Ready indicates whether this endpoint is ready and NOT terminating.
-	// For pods, this is true if a pod has a ready status and a nil deletion timestamp.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// true since only ready endpoints are read from Endpoints.
-	// TODO: Ready can be inferred from Serving and Terminating below when enabled by default.
-	Ready bool
-	// Serving indiciates whether this endpoint is ready regardless of its terminating state.
+	// isLocal indicates whether the endpoint is running on same host as kube-proxy.
+	isLocal bool
+
+	// ready indicates whether this endpoint is ready and NOT terminating, unless
+	// PublishNotReadyAddresses is set on the service, in which case it will just
+	// always be true.
+	ready bool
+	// serving indicates whether this endpoint is ready regardless of its terminating state.
 	// For pods this is true if it has a ready status regardless of its deletion timestamp.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// true since only ready endpoints are read from Endpoints.
-	Serving bool
-	// Terminating indicates whether this endpoint is terminating.
+	serving bool
+	// terminating indicates whether this endpoint is terminating.
 	// For pods this is true if it has a non-nil deletion timestamp.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// false since terminating endpoints are always excluded from Endpoints.
-	Terminating bool
+	terminating bool
 
-	// NodeName is the name of the node this endpoint belongs to
-	NodeName string
-	// Zone is the name of the zone this endpoint belongs to
-	Zone string
+	// zoneHints represent the zone hints for the endpoint. This is based on
+	// endpoint.hints.forZones[*].name in the EndpointSlice API.
+	zoneHints sets.Set[string]
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
 
 // String is part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) String() string {
-	return info.Endpoint
+	return info.endpoint
 }
 
-// GetIsLocal is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) GetIsLocal() bool {
-	return info.IsLocal
+// IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
+func (info *BaseEndpointInfo) IP() string {
+	return info.ip
+}
+
+// Port returns just the Port part of the endpoint.
+func (info *BaseEndpointInfo) Port() int {
+	return info.port
+}
+
+// IsLocal is part of proxy.Endpoint interface.
+func (info *BaseEndpointInfo) IsLocal() bool {
+	return info.isLocal
 }
 
 // IsReady returns true if an endpoint is ready and not terminating.
 func (info *BaseEndpointInfo) IsReady() bool {
-	return info.Ready
+	return info.ready
 }
 
 // IsServing returns true if an endpoint is ready, regardless of if the
 // endpoint is terminating.
 func (info *BaseEndpointInfo) IsServing() bool {
-	return info.Serving
+	return info.serving
 }
 
 // IsTerminating retruns true if an endpoint is terminating. For pods,
 // that is any pod with a deletion timestamp.
 func (info *BaseEndpointInfo) IsTerminating() bool {
-	return info.Terminating
+	return info.terminating
 }
 
-// GetZoneHints returns the zone hint for the endpoint.
-func (info *BaseEndpointInfo) GetZoneHints() sets.Set[string] {
-	return info.ZoneHints
+// ZoneHints returns the zone hint for the endpoint.
+func (info *BaseEndpointInfo) ZoneHints() sets.Set[string] {
+	return info.zoneHints
 }
 
-// IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) IP() string {
-	return proxyutil.IPPart(info.Endpoint)
-}
-
-// Port returns just the Port part of the endpoint.
-func (info *BaseEndpointInfo) Port() (int, error) {
-	return proxyutil.PortPart(info.Endpoint)
-}
-
-// Equal is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
-	return info.String() == other.String() &&
-		info.GetIsLocal() == other.GetIsLocal() &&
-		info.IsReady() == other.IsReady()
-}
-
-// GetNodeName returns the NodeName for this endpoint.
-func (info *BaseEndpointInfo) GetNodeName() string {
-	return info.NodeName
-}
-
-// GetZone returns the Zone for this endpoint.
-func (info *BaseEndpointInfo) GetZone() string {
-	return info.Zone
-}
-
-func newBaseEndpointInfo(IP, nodeName, zone string, port int, isLocal bool,
-	ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
+func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
-		Endpoint:    net.JoinHostPort(IP, strconv.Itoa(port)),
-		IsLocal:     isLocal,
-		Ready:       ready,
-		Serving:     serving,
-		Terminating: terminating,
-		ZoneHints:   zoneHints,
-		NodeName:    nodeName,
-		Zone:        zone,
+		ip:          ip,
+		port:        port,
+		endpoint:    net.JoinHostPort(ip, strconv.Itoa(port)),
+		isLocal:     isLocal,
+		ready:       ready,
+		serving:     serving,
+		terminating: terminating,
+		zoneHints:   zoneHints,
 	}
 }
 
@@ -154,9 +130,9 @@ type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName)
 // EndpointsMap's but just use the changes for any Proxier specific cleanup.
 type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
-// EndpointChangeTracker carries state about uncommitted changes to an arbitrary number of
+// EndpointsChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
-type EndpointChangeTracker struct {
+type EndpointsChangeTracker struct {
 	// lock protects lastChangeTriggerTimes
 	lock sync.Mutex
 
@@ -166,16 +142,16 @@ type EndpointChangeTracker struct {
 	// Map from the Endpoints namespaced-name to the times of the triggers that caused the endpoints
 	// object to change. Used to calculate the network-programming-latency.
 	lastChangeTriggerTimes map[types.NamespacedName][]time.Time
-	// record the time when the endpointChangeTracker was created so we can ignore the endpoints
+	// record the time when the endpointsChangeTracker was created so we can ignore the endpoints
 	// that were generated before, because we can't estimate the network-programming-latency on those.
 	// This is specially problematic on restarts, because we process all the endpoints that may have been
 	// created hours or days before.
 	trackerStartTime time.Time
 }
 
-// NewEndpointChangeTracker initializes an EndpointsChangeMap
-func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
-	return &EndpointChangeTracker{
+// NewEndpointsChangeTracker initializes an EndpointsChangeTracker
+func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
+	return &EndpointsChangeTracker{
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 		trackerStartTime:          time.Now(),
 		processEndpointsMapChange: processEndpointsMapChange,
@@ -184,9 +160,9 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 }
 
 // EndpointSliceUpdate updates given service's endpoints change map based on the <previous, current> endpoints pair.
-// It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeMap.
+// It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeTracker.
 // If removeSlice is true, slice will be removed, otherwise it will be added or updated.
-func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
+func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
 	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
 		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "addressType", endpointSlice.AddressType)
 		return false
@@ -232,13 +208,13 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 // PendingChanges returns a set whose keys are the names of the services whose endpoints
 // have changed since the last time ect was used to update an EndpointsMap. (You must call
 // this _before_ calling em.Update(ect).)
-func (ect *EndpointChangeTracker) PendingChanges() sets.Set[string] {
+func (ect *EndpointsChangeTracker) PendingChanges() sets.Set[string] {
 	return ect.endpointSliceCache.pendingChanges()
 }
 
 // checkoutChanges returns a list of pending endpointsChanges and marks them as
 // applied.
-func (ect *EndpointChangeTracker) checkoutChanges() []*endpointsChange {
+func (ect *EndpointsChangeTracker) checkoutChanges() []*endpointsChange {
 	metrics.EndpointChangesPending.Set(0)
 
 	return ect.endpointSliceCache.checkoutChanges()
@@ -246,7 +222,7 @@ func (ect *EndpointChangeTracker) checkoutChanges() []*endpointsChange {
 
 // checkoutTriggerTimes applies the locally cached trigger times to a map of
 // trigger times that have been passed in and empties the local cache.
-func (ect *EndpointChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+func (ect *EndpointsChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
 	ect.lock.Lock()
 	defer ect.lock.Unlock()
 
@@ -291,8 +267,8 @@ type endpointsChange struct {
 	current  EndpointsMap
 }
 
-// UpdateEndpointMapResult is the updated results after applying endpoints changes.
-type UpdateEndpointMapResult struct {
+// UpdateEndpointsMapResult is the updated results after applying endpoints changes.
+type UpdateEndpointsMapResult struct {
 	// DeletedUDPEndpoints identifies UDP endpoints that have just been deleted.
 	// Existing conntrack NAT entries pointing to these endpoints must be deleted to
 	// ensure that no further traffic for the Service gets delivered to them.
@@ -311,7 +287,7 @@ type UpdateEndpointMapResult struct {
 }
 
 // Update updates endpointsMap base on the given changes.
-func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
+func (em EndpointsMap) Update(changes *EndpointsChangeTracker) (result UpdateEndpointsMapResult) {
 	result.DeletedUDPEndpoints = make([]ServiceEndpoint, 0)
 	result.NewlyActiveUDPServices = make([]ServicePortName, 0)
 	result.LastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
@@ -328,7 +304,7 @@ type EndpointsMap map[ServicePortName][]Endpoint
 // and clear the changes map. In addition it returns (via argument) and resets the
 // lastChangeTriggerTimes for all endpoints that were changed and will result in syncing
 // the proxy rules. apply triggers processEndpointsMapChange on every change.
-func (em EndpointsMap) apply(ect *EndpointChangeTracker, deletedUDPEndpoints *[]ServiceEndpoint,
+func (em EndpointsMap) apply(ect *EndpointsChangeTracker, deletedUDPEndpoints *[]ServiceEndpoint,
 	newlyActiveUDPServices *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
 	if ect == nil {
 		return
@@ -371,7 +347,7 @@ func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.
 				continue
 			}
 
-			if ep.GetIsLocal() {
+			if ep.IsLocal() {
 				nsn := svcPortName.NamespacedName
 				if localIPs[nsn] == nil {
 					localIPs[nsn] = sets.New[string]()
@@ -403,7 +379,7 @@ func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
 }
 
 // detectStaleConntrackEntries detects services that may be associated with stale conntrack entries.
-// (See UpdateEndpointMapResult.DeletedUDPEndpoints and .NewlyActiveUDPServices.)
+// (See UpdateEndpointsMapResult.DeletedUDPEndpoints and .NewlyActiveUDPServices.)
 func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, deletedUDPEndpoints *[]ServiceEndpoint, newlyActiveUDPServices *[]ServicePortName) {
 	// Find the UDP endpoints that we were sending traffic to in oldEndpointsMap, but
 	// are no longer sending to newEndpointsMap. The proxier should make sure that
@@ -414,18 +390,18 @@ func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, 
 		}
 
 		for _, ep := range epList {
-			// If the old endpoint wasn't Ready then there can't be stale
+			// If the old endpoint wasn't Serving then there can't be stale
 			// conntrack entries since there was no traffic sent to it.
-			if !ep.IsReady() {
+			if !ep.IsServing() {
 				continue
 			}
 
 			deleted := true
 			// Check if the endpoint has changed, including if it went from
-			// ready to not ready. If it did change stale entries for the old
+			// serving to not serving. If it did change stale entries for the old
 			// endpoint have to be cleared.
 			for i := range newEndpointsMap[svcPortName] {
-				if newEndpointsMap[svcPortName][i].Equal(ep) {
+				if newEndpointsMap[svcPortName][i].String() == ep.String() {
 					deleted = false
 					break
 				}
@@ -446,21 +422,21 @@ func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, 
 			continue
 		}
 
-		epReady := 0
+		epServing := 0
 		for _, ep := range epList {
-			if ep.IsReady() {
-				epReady++
+			if ep.IsServing() {
+				epServing++
 			}
 		}
 
-		oldEpReady := 0
+		oldEpServing := 0
 		for _, ep := range oldEndpointsMap[svcPortName] {
-			if ep.IsReady() {
-				oldEpReady++
+			if ep.IsServing() {
+				oldEpServing++
 			}
 		}
 
-		if epReady > 0 && oldEpReady == 0 {
+		if epServing > 0 && oldEpServing == 0 {
 			*newlyActiveUDPServices = append(*newlyActiveUDPServices, svcPortName)
 		}
 	}

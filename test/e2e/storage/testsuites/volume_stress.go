@@ -185,7 +185,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.migrationCheck.validateMigrationVolumeOpCounts(ctx)
 	}
 
-	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func(ctx context.Context) {
+	f.It("multiple pods should access different volumes repeatedly", f.WithSlow(), f.WithSerial(), func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 		createPodsAndVolumes(ctx)

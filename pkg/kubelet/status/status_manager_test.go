@@ -500,7 +500,7 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 			Name: fmt.Sprintf("container%d", i),
 			LastTerminationState: v1.ContainerState{
 				Terminated: &v1.ContainerStateTerminated{
-					Message: strings.Repeat("abcdefgh", int(24+i%3)),
+					Message: strings.Repeat("abcdefgh", 24+i%3),
 				},
 			},
 		}

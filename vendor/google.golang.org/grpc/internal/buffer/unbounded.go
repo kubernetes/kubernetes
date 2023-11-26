@@ -28,35 +28,38 @@ import "sync"
 // the underlying mutex used for synchronization.
 //
 // Unbounded supports values of any type to be stored in it by using a channel
-// of `interface{}`. This means that a call to Put() incurs an extra memory
-// allocation, and also that users need a type assertion while reading. For
-// performance critical code paths, using Unbounded is strongly discouraged and
-// defining a new type specific implementation of this buffer is preferred. See
+// of `any`. This means that a call to Put() incurs an extra memory allocation,
+// and also that users need a type assertion while reading. For performance
+// critical code paths, using Unbounded is strongly discouraged and defining a
+// new type specific implementation of this buffer is preferred. See
 // internal/transport/transport.go for an example of this.
 type Unbounded struct {
-	c       chan interface{}
+	c       chan any
+	closed  bool
 	mu      sync.Mutex
-	backlog []interface{}
+	backlog []any
 }
 
 // NewUnbounded returns a new instance of Unbounded.
 func NewUnbounded() *Unbounded {
-	return &Unbounded{c: make(chan interface{}, 1)}
+	return &Unbounded{c: make(chan any, 1)}
 }
 
 // Put adds t to the unbounded buffer.
-func (b *Unbounded) Put(t interface{}) {
+func (b *Unbounded) Put(t any) {
 	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
 	if len(b.backlog) == 0 {
 		select {
 		case b.c <- t:
-			b.mu.Unlock()
 			return
 		default:
 		}
 	}
 	b.backlog = append(b.backlog, t)
-	b.mu.Unlock()
 }
 
 // Load sends the earliest buffered data, if any, onto the read channel
@@ -64,6 +67,10 @@ func (b *Unbounded) Put(t interface{}) {
 // value from the read channel.
 func (b *Unbounded) Load() {
 	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
 	if len(b.backlog) > 0 {
 		select {
 		case b.c <- b.backlog[0]:
@@ -72,7 +79,6 @@ func (b *Unbounded) Load() {
 		default:
 		}
 	}
-	b.mu.Unlock()
 }
 
 // Get returns a read channel on which values added to the buffer, via Put(),
@@ -80,6 +86,20 @@ func (b *Unbounded) Load() {
 //
 // Upon reading a value from this channel, users are expected to call Load() to
 // send the next buffered value onto the channel if there is any.
-func (b *Unbounded) Get() <-chan interface{} {
+//
+// If the unbounded buffer is closed, the read channel returned by this method
+// is closed.
+func (b *Unbounded) Get() <-chan any {
 	return b.c
+}
+
+// Close closes the unbounded buffer.
+func (b *Unbounded) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
+	b.closed = true
+	close(b.c)
 }

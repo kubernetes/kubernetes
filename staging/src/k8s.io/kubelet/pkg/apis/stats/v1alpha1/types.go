@@ -83,6 +83,11 @@ type RuntimeStats struct {
 	// Usage here refers to the total number of bytes occupied by images on the filesystem.
 	// +optional
 	ImageFs *FsStats `json:"imageFs,omitempty"`
+	// Stats about the underlying filesystem where container's writeable layer is stored.
+	// This filesystem could be the same as the primary (root) filesystem or the ImageFS.
+	// Usage here refers to the total number of bytes occupied by the writeable layer on the filesystem.
+	// +optional
+	ContainerFs *FsStats `json:"containerFs,omitempty"`
 }
 
 const (

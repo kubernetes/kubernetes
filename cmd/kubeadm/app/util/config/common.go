@@ -44,6 +44,14 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
+// LoadOrDefaultConfigurationOptions holds the common LoadOrDefaultConfiguration options.
+type LoadOrDefaultConfigurationOptions struct {
+	// AllowExperimental indicates whether the experimental / work in progress APIs can be used.
+	AllowExperimental bool
+	// SkipCRIDetect indicates whether to skip the CRI socket detection when no CRI socket is provided.
+	SkipCRIDetect bool
+}
+
 // MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration or ClusterConfiguration, some extra logic is run
 func MarshalKubeadmConfigObject(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
 	switch internalcfg := obj.(type) {
@@ -265,7 +273,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 	}
 	// Migrate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		o, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true)
+		o, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true, false)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -278,7 +286,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 
 	// Migrate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		o, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true)
+		o, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true, false)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -291,7 +299,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 
 	// Migrate ResetConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
-		o, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true)
+		o, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, false)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -324,21 +332,21 @@ func ValidateConfig(config []byte, allowExperimental bool) error {
 
 	// Validate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		if _, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true); err != nil {
+		if _, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true); err != nil {
+		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate ResetConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
-		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true); err != nil {
+		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}

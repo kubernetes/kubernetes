@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // Mutate modifies absolute path fields in the KubeletConfiguration to be Windows compatible absolute paths.
@@ -70,7 +70,7 @@ func mutatePaths(cfg *kubeletconfig.KubeletConfiguration, drive string) {
 
 	// Mutate the fields we care about.
 	klog.V(2).Infof("[componentconfig] kubelet/Windows: changing field \"resolverConfig\" to empty")
-	cfg.ResolverConfig = utilpointer.String("")
+	cfg.ResolverConfig = ptr.To("")
 	mutateStringField("staticPodPath", &cfg.StaticPodPath)
 	mutateStringField("authentication.x509.clientCAFile", &cfg.Authentication.X509.ClientCAFile)
 }

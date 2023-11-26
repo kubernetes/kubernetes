@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
@@ -66,22 +66,32 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 		obj.IPTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
 	}
 	if obj.IPTables.LocalhostNodePorts == nil {
-		obj.IPTables.LocalhostNodePorts = pointer.Bool(true)
+		obj.IPTables.LocalhostNodePorts = ptr.To(true)
 	}
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
+	if obj.NFTables.SyncPeriod.Duration == 0 {
+		obj.NFTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	}
+	if obj.NFTables.MinSyncPeriod.Duration == 0 {
+		obj.NFTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
+	}
 
 	if obj.Conntrack.MaxPerCore == nil {
-		obj.Conntrack.MaxPerCore = pointer.Int32(32 * 1024)
+		obj.Conntrack.MaxPerCore = ptr.To[int32](32 * 1024)
 	}
 	if obj.Conntrack.Min == nil {
-		obj.Conntrack.Min = pointer.Int32(128 * 1024)
+		obj.Conntrack.Min = ptr.To[int32](128 * 1024)
 	}
 
 	if obj.IPTables.MasqueradeBit == nil {
 		temp := int32(14)
 		obj.IPTables.MasqueradeBit = &temp
+	}
+	if obj.NFTables.MasqueradeBit == nil {
+		temp := int32(14)
+		obj.NFTables.MasqueradeBit = &temp
 	}
 	if obj.Conntrack.TCPEstablishedTimeout == nil {
 		obj.Conntrack.TCPEstablishedTimeout = &metav1.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)

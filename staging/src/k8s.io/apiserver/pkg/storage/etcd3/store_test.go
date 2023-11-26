@@ -141,9 +141,24 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, store)
 }
 
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, store)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, store)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, store)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -199,11 +214,6 @@ func TestTransformationFailure(t *testing.T) {
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	storagetesting.RunTestList(ctx, t, store, compactStorage(client), false)
-}
-
-func TestListWithoutPaging(t *testing.T) {
-	ctx, store, _ := testSetup(t, withoutPaging())
-	storagetesting.RunTestListWithoutPaging(ctx, t, store)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -480,7 +490,6 @@ type setupOptions struct {
 	resourcePrefix string
 	groupResource  schema.GroupResource
 	transformer    value.Transformer
-	pagingEnabled  bool
 	leaseConfig    LeaseManagerConfig
 
 	recorderEnabled bool
@@ -499,12 +508,6 @@ func withClientConfig(config *embed.Config) setupOption {
 func withPrefix(prefix string) setupOption {
 	return func(options *setupOptions) {
 		options.prefix = prefix
-	}
-}
-
-func withoutPaging() setupOption {
-	return func(options *setupOptions) {
-		options.pagingEnabled = false
 	}
 }
 
@@ -531,7 +534,6 @@ func withDefaults(options *setupOptions) {
 	options.resourcePrefix = "/pods"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
 	options.transformer = newTestTransformer()
-	options.pagingEnabled = true
 	options.leaseConfig = newTestLeaseManagerConfig()
 }
 
@@ -556,7 +558,6 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 		setupOpts.resourcePrefix,
 		setupOpts.groupResource,
 		setupOpts.transformer,
-		setupOpts.pagingEnabled,
 		setupOpts.leaseConfig,
 	)
 	ctx := context.Background()

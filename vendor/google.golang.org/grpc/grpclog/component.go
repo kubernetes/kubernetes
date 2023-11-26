@@ -31,71 +31,71 @@ type componentData struct {
 
 var cache = map[string]*componentData{}
 
-func (c *componentData) InfoDepth(depth int, args ...interface{}) {
-	args = append([]interface{}{"[" + string(c.name) + "]"}, args...)
+func (c *componentData) InfoDepth(depth int, args ...any) {
+	args = append([]any{"[" + string(c.name) + "]"}, args...)
 	grpclog.InfoDepth(depth+1, args...)
 }
 
-func (c *componentData) WarningDepth(depth int, args ...interface{}) {
-	args = append([]interface{}{"[" + string(c.name) + "]"}, args...)
+func (c *componentData) WarningDepth(depth int, args ...any) {
+	args = append([]any{"[" + string(c.name) + "]"}, args...)
 	grpclog.WarningDepth(depth+1, args...)
 }
 
-func (c *componentData) ErrorDepth(depth int, args ...interface{}) {
-	args = append([]interface{}{"[" + string(c.name) + "]"}, args...)
+func (c *componentData) ErrorDepth(depth int, args ...any) {
+	args = append([]any{"[" + string(c.name) + "]"}, args...)
 	grpclog.ErrorDepth(depth+1, args...)
 }
 
-func (c *componentData) FatalDepth(depth int, args ...interface{}) {
-	args = append([]interface{}{"[" + string(c.name) + "]"}, args...)
+func (c *componentData) FatalDepth(depth int, args ...any) {
+	args = append([]any{"[" + string(c.name) + "]"}, args...)
 	grpclog.FatalDepth(depth+1, args...)
 }
 
-func (c *componentData) Info(args ...interface{}) {
+func (c *componentData) Info(args ...any) {
 	c.InfoDepth(1, args...)
 }
 
-func (c *componentData) Warning(args ...interface{}) {
+func (c *componentData) Warning(args ...any) {
 	c.WarningDepth(1, args...)
 }
 
-func (c *componentData) Error(args ...interface{}) {
+func (c *componentData) Error(args ...any) {
 	c.ErrorDepth(1, args...)
 }
 
-func (c *componentData) Fatal(args ...interface{}) {
+func (c *componentData) Fatal(args ...any) {
 	c.FatalDepth(1, args...)
 }
 
-func (c *componentData) Infof(format string, args ...interface{}) {
+func (c *componentData) Infof(format string, args ...any) {
 	c.InfoDepth(1, fmt.Sprintf(format, args...))
 }
 
-func (c *componentData) Warningf(format string, args ...interface{}) {
+func (c *componentData) Warningf(format string, args ...any) {
 	c.WarningDepth(1, fmt.Sprintf(format, args...))
 }
 
-func (c *componentData) Errorf(format string, args ...interface{}) {
+func (c *componentData) Errorf(format string, args ...any) {
 	c.ErrorDepth(1, fmt.Sprintf(format, args...))
 }
 
-func (c *componentData) Fatalf(format string, args ...interface{}) {
+func (c *componentData) Fatalf(format string, args ...any) {
 	c.FatalDepth(1, fmt.Sprintf(format, args...))
 }
 
-func (c *componentData) Infoln(args ...interface{}) {
+func (c *componentData) Infoln(args ...any) {
 	c.InfoDepth(1, args...)
 }
 
-func (c *componentData) Warningln(args ...interface{}) {
+func (c *componentData) Warningln(args ...any) {
 	c.WarningDepth(1, args...)
 }
 
-func (c *componentData) Errorln(args ...interface{}) {
+func (c *componentData) Errorln(args ...any) {
 	c.ErrorDepth(1, args...)
 }
 
-func (c *componentData) Fatalln(args ...interface{}) {
+func (c *componentData) Fatalln(args ...any) {
 	c.FatalDepth(1, args...)
 }
 

@@ -115,7 +115,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			pdb.Spec.MinAvailable = &newMinAvailable
 			return pdb
 		}, cs.PolicyV1().PodDisruptionBudgets(ns).Update)
-		framework.ExpectEqual(updatedPDB.Spec.MinAvailable.String(), "2%")
+		gomega.Expect(updatedPDB.Spec.MinAvailable.String()).To(gomega.Equal("2%"))
 
 		ginkgo.By("patching the pdb")
 		patchedPDB := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
@@ -127,7 +127,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			framework.ExpectNoError(err, "failed to marshal JSON for new data")
 			return newBytes, nil
 		})
-		framework.ExpectEqual(patchedPDB.Spec.MinAvailable.String(), "3%")
+		gomega.Expect(patchedPDB.Spec.MinAvailable.String()).To(gomega.Equal("3%"))
 
 		deletePDBOrDie(ctx, cs, ns, defaultName)
 	})
@@ -146,7 +146,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
-		err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 			pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, defaultName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -177,7 +177,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}, cs.PolicyV1().PodDisruptionBudgets(ns).UpdateStatus)
 		// fetch again to make sure the update from API was effective
 		updated := getPDBStatusOrDie(ctx, dc, ns, defaultName)
-		framework.ExpectHaveKey(updated.Status.DisruptedPods, pod.Name, "Expecting the DisruptedPods have %s", pod.Name)
+		gomega.Expect(updated.Status.DisruptedPods).To(gomega.HaveKey(pod.Name), "Expecting the DisruptedPods have %s", pod.Name)
 
 		ginkgo.By("Patching PodDisruptionBudget status")
 		patched := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
@@ -283,11 +283,11 @@ var _ = SIGDescribe("DisruptionController", func() {
 		// tests with exclusive set to true relies on HostPort to make sure
 		// only one pod from the replicaset is assigned to each node. This
 		// requires these tests to be run serially.
-		var serial string
+		args := []interface{}{fmt.Sprintf("evictions: %s => %s", c.description, expectation)}
 		if c.exclusive {
-			serial = " [Serial]"
+			args = append(args, framework.WithSerial())
 		}
-		ginkgo.It(fmt.Sprintf("evictions: %s => %s%s", c.description, expectation, serial), func(ctx context.Context) {
+		f.It(append(args, func(ctx context.Context) {
 			if c.skipForBigClusters {
 				e2eskipper.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
 			}
@@ -329,7 +329,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
-				err = wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+				err = wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 					err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
 					if err != nil {
 						return false, nil
@@ -338,7 +338,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				})
 				framework.ExpectNoError(err)
 			}
-		})
+		})...)
 	}
 
 	/*
@@ -500,7 +500,7 @@ func deletePDBOrDie(ctx context.Context, cs kubernetes.Interface, ns string, nam
 func listPDBs(ctx context.Context, cs kubernetes.Interface, ns string, labelSelector string, count int, expectedPDBNames []string) {
 	pdbList, err := cs.PolicyV1().PodDisruptionBudgets(ns).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	framework.ExpectNoError(err, "Listing PDB set in namespace %s", ns)
-	framework.ExpectEqual(len(pdbList.Items), count, "Expecting %d PDBs returned in namespace %s", count, ns)
+	gomega.Expect(pdbList.Items).To(gomega.HaveLen(count), "Expecting %d PDBs returned in namespace %s", count, ns)
 
 	pdbNames := make([]string, 0)
 	for _, item := range pdbList.Items {
@@ -519,7 +519,7 @@ func deletePDBCollection(ctx context.Context, cs kubernetes.Interface, ns string
 
 func waitForPDBCollectionToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns string) {
 	ginkgo.By("Waiting for the PDB collection to be deleted")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pdbList, err := cs.PolicyV1().PodDisruptionBudgets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -558,7 +558,7 @@ func createPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n 
 
 func waitForPodsOrDie(ctx context.Context, cs kubernetes.Interface, ns string, n int) {
 	ginkgo.By("Waiting for all pods to be running")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {
 			return false, err
@@ -624,7 +624,7 @@ func createReplicaSetOrDie(ctx context.Context, cs kubernetes.Interface, ns stri
 
 func locateRunningPod(ctx context.Context, cs kubernetes.Interface, ns string) (pod *v1.Pod, err error) {
 	ginkgo.By("locating a running pod")
-	err = wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -645,7 +645,7 @@ func locateRunningPod(ctx context.Context, cs kubernetes.Interface, ns string) (
 
 func waitForPdbToBeProcessed(ctx context.Context, cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be processed")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -660,7 +660,7 @@ func waitForPdbToBeProcessed(ctx context.Context, cs kubernetes.Interface, ns st
 
 func waitForPdbToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns string, name string) {
 	ginkgo.By("Waiting for the pdb to be deleted")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, schedulingTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, schedulingTimeout, true, func(ctx context.Context) (bool, error) {
 		_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil // done
@@ -675,7 +675,7 @@ func waitForPdbToBeDeleted(ctx context.Context, cs kubernetes.Interface, ns stri
 
 func waitForPdbToObserveHealthyPods(ctx context.Context, cs kubernetes.Interface, ns string, healthyCount int32) {
 	ginkgo.By("Waiting for the pdb to observed all healthy pods")
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, wait.ForeverTestTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, "foo", metav1.GetOptions{})
 		if err != nil {
 			return false, err

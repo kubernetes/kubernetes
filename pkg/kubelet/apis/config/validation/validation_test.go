@@ -521,6 +521,30 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery",
+	}, {
+		name: "imageMaximumGCAge should not be specified without feature gate",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.ImageMaximumGCAge = metav1.Duration{Duration: 1}
+			return conf
+		},
+		errMsg: "invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option ImageMaximumGCAge",
+	}, {
+		name: "imageMaximumGCAge should not be negative",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"ImageMaximumGCAge": true}
+			conf.ImageMaximumGCAge = metav1.Duration{Duration: -1}
+			return conf
+		},
+		errMsg: "invalid configuration: imageMaximumGCAge -1ns must not be negative",
+	}, {
+		name: "imageMaximumGCAge should not be less than imageMinimumGCAge",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"ImageMaximumGCAge": true}
+			conf.ImageMaximumGCAge = metav1.Duration{Duration: 1}
+			conf.ImageMinimumGCAge = metav1.Duration{Duration: 2}
+			return conf
+		},
+		errMsg: "invalid configuration: imageMaximumGCAge 1ns must be greater than imageMinimumGCAge 2ns",
 	}}
 
 	for _, tc := range cases {

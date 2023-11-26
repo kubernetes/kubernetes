@@ -57,6 +57,12 @@ const (
 // All data access is performed through transactions which can be obtained through the DB.
 // All the functions on DB will return a ErrDatabaseNotOpen if accessed before Open() is called.
 type DB struct {
+	// Put `stats` at the first field to ensure it's 64-bit aligned. Note that
+	// the first word in an allocated struct can be relied upon to be 64-bit
+	// aligned. Refer to https://pkg.go.dev/sync/atomic#pkg-note-BUG. Also
+	// refer to discussion in https://github.com/etcd-io/bbolt/issues/577.
+	stats Stats
+
 	// When enabled, the database will perform a Check() after every commit.
 	// A panic is issued if the database is in an inconsistent state. This
 	// flag has a large performance impact so it should only be used for
@@ -147,7 +153,6 @@ type DB struct {
 	opened   bool
 	rwtx     *Tx
 	txs      []*Tx
-	stats    Stats
 
 	freelist     *freelist
 	freelistLoad sync.Once
@@ -424,7 +429,7 @@ func (db *DB) hasSyncedFreelist() bool {
 
 // mmap opens the underlying memory-mapped file and initializes the meta references.
 // minsz is the minimum size that the new mmap can be.
-func (db *DB) mmap(minsz int) error {
+func (db *DB) mmap(minsz int) (err error) {
 	db.mmaplock.Lock()
 	defer db.mmaplock.Unlock()
 
@@ -459,16 +464,26 @@ func (db *DB) mmap(minsz int) error {
 	}
 
 	// Unmap existing data before continuing.
-	if err := db.munmap(); err != nil {
+	if err = db.munmap(); err != nil {
 		return err
 	}
 
 	// Memory-map the data file as a byte slice.
 	// gofail: var mapError string
 	// return errors.New(mapError)
-	if err := mmap(db, size); err != nil {
+	if err = mmap(db, size); err != nil {
 		return err
 	}
+
+	// Perform unmmap on any error to reset all data fields:
+	// dataref, data, datasz, meta0 and meta1.
+	defer func() {
+		if err != nil {
+			if unmapErr := db.munmap(); unmapErr != nil {
+				err = fmt.Errorf("%w; rollback unmap also failed: %v", err, unmapErr)
+			}
+		}
+	}()
 
 	if db.Mlock {
 		// Don't allow swapping of data file
@@ -553,6 +568,8 @@ func (db *DB) mmapSize(size int) (int, error) {
 }
 
 func (db *DB) munlock(fileSize int) error {
+	// gofail: var munlockError string
+	// return errors.New(munlockError)
 	if err := munlock(db, fileSize); err != nil {
 		return fmt.Errorf("munlock error: " + err.Error())
 	}
@@ -560,6 +577,8 @@ func (db *DB) munlock(fileSize int) error {
 }
 
 func (db *DB) mlock(fileSize int) error {
+	// gofail: var mlockError string
+	// return errors.New(mlockError)
 	if err := mlock(db, fileSize); err != nil {
 		return fmt.Errorf("mlock error: " + err.Error())
 	}
@@ -649,9 +668,10 @@ func (db *DB) close() error {
 	// Clear ops.
 	db.ops.writeAt = nil
 
+	var errs []error
 	// Close the mmap.
 	if err := db.munmap(); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	// Close file handles.
@@ -660,18 +680,22 @@ func (db *DB) close() error {
 		if !db.readOnly {
 			// Unlock the file.
 			if err := funlock(db); err != nil {
-				return fmt.Errorf("bolt.Close(): funlock error: %w", err)
+				errs = append(errs, fmt.Errorf("bolt.Close(): funlock error: %w", err))
 			}
 		}
 
 		// Close the file descriptor.
 		if err := db.file.Close(); err != nil {
-			return fmt.Errorf("db file close: %s", err)
+			errs = append(errs, fmt.Errorf("db file close: %w", err))
 		}
 		db.file = nil
 	}
 
 	db.path = ""
+
+	if len(errs) > 0 {
+		return errs[0]
+	}
 	return nil
 }
 
@@ -1263,6 +1287,12 @@ var DefaultOptions = &Options{
 
 // Stats represents statistics about the database.
 type Stats struct {
+	// Put `TxStats` at the first field to ensure it's 64-bit aligned. Note
+	// that the first word in an allocated struct can be relied upon to be
+	// 64-bit aligned. Refer to https://pkg.go.dev/sync/atomic#pkg-note-BUG.
+	// Also refer to discussion in https://github.com/etcd-io/bbolt/issues/577.
+	TxStats TxStats // global, ongoing stats.
+
 	// Freelist stats
 	FreePageN     int // total number of free pages on the freelist
 	PendingPageN  int // total number of pending pages on the freelist
@@ -1272,8 +1302,6 @@ type Stats struct {
 	// Transaction stats
 	TxN     int // total number of started read transactions
 	OpenTxN int // number of currently open read transactions
-
-	TxStats TxStats // global, ongoing stats.
 }
 
 // Sub calculates and returns the difference between two sets of database stats.

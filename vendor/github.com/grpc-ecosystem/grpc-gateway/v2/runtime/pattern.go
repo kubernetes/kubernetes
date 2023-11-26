@@ -15,8 +15,6 @@ var (
 	ErrNotMatch = errors.New("not match to the path pattern")
 	// ErrInvalidPattern indicates that the given definition of Pattern is not valid.
 	ErrInvalidPattern = errors.New("invalid pattern")
-	// ErrMalformedSequence indicates that an escape sequence was malformed.
-	ErrMalformedSequence = errors.New("malformed escape sequence")
 )
 
 type MalformedSequenceError string

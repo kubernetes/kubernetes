@@ -33,7 +33,8 @@ source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
-  "verify-golangci-lint-pr.sh"   # Don't run this as part of the block pull-kubernetes-verify yet. TODO(pohly): try this in a non-blocking job and then reconsider this.
+  "verify-golangci-lint-pr.sh"       # Runs in a separate job for PRs.
+  "verify-golangci-lint-pr-hints.sh" # Runs in a separate job for PRs.
   "verify-licenses.sh"           # runs in a separate job to monitor availability of the dependencies periodically
   "verify-openapi-docs-urls.sh"  # Spams docs URLs, don't run in CI.
   )

@@ -159,7 +159,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 	return nil
 }
 
-var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
+var _ = SIGDescribe("InitContainer", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("init-container")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient

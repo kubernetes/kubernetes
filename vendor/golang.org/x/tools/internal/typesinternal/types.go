@@ -53,9 +53,16 @@ func ReadGo116ErrorData(err types.Error) (code ErrorCode, start, end token.Pos, 
 
 var SetGoVersion = func(conf *types.Config, version string) bool { return false }
 
-// NewObjectpathEncoder returns a function closure equivalent to
-// objectpath.For but amortized for multiple (sequential) calls.
-// It is a temporary workaround, pending the approval of proposal 58668.
+// SkipEncoderMethodSorting marks the encoder as not requiring sorted methods,
+// as an optimization for gopls (which guarantees the order of parsed source files).
 //
-//go:linkname NewObjectpathFunc golang.org/x/tools/go/types/objectpath.newEncoderFor
-func NewObjectpathFunc() func(types.Object) (objectpath.Path, error)
+// TODO(golang/go#61443): eliminate this parameter one way or the other.
+//
+//go:linkname SkipEncoderMethodSorting golang.org/x/tools/go/types/objectpath.skipMethodSorting
+func SkipEncoderMethodSorting(enc *objectpath.Encoder)
+
+// ObjectpathObject is like objectpath.Object, but allows suppressing method
+// sorting (which is not necessary for gopls).
+//
+//go:linkname ObjectpathObject golang.org/x/tools/go/types/objectpath.object
+func ObjectpathObject(pkg *types.Package, p objectpath.Path, skipMethodSorting bool) (types.Object, error)

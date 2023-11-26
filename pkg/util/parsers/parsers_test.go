@@ -41,7 +41,7 @@ func TestParseImageName(t *testing.T) {
 		{Input: "url:5000/repo:tag", Repo: "url:5000/repo", Tag: "tag"},
 		{Input: "url:5000/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Repo: "url:5000/repo", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 		{Input: "url:5000/repo:latest@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Tag: "latest", Repo: "url:5000/repo", Digest: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
-		{Input: "ROOT", expectedError: "repository name must be lowercase"},
+		{Input: "ROOT", expectedError: "must be lowercase"},
 		{Input: "http://root", expectedError: "invalid reference format"},
 		{Input: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", expectedError: "cannot specify 64-byte hexadecimal strings"},
 	}

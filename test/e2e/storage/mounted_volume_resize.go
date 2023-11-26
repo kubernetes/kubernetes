@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/conditions"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -44,7 +45,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", func() {
+var _ = utils.SIGDescribe("Mounted volume expand", feature.StorageProvider, func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -119,7 +120,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		ginkgo.By("Checking for bound PVC")
 		pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		framework.ExpectEqual(len(pvs), 1)
+		gomega.Expect(pvs).To(gomega.HaveLen(1))
 
 		ginkgo.By("Wait for a pod from deployment to be running")
 		podList, err := e2edeployment.GetPodsForDeployment(ctx, c, deployment)
@@ -164,7 +165,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 	})
 })
 

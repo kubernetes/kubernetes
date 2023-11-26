@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -49,10 +51,12 @@ import (
 )
 
 const (
-	testText        = "abcdefghijklmnopqrstuvwxyz"
-	testContextText = "0123456789"
-	testKeyHash     = "sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-	testKeyVersion  = "1"
+	testText            = "abcdefghijklmnopqrstuvwxyz"
+	testContextText     = "0123456789"
+	testKeyHash         = "sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+	testKeyVersion      = "1"
+	testAPIServerID     = "testAPIServerID"
+	testAPIServerIDHash = "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"
 )
 
 // testEnvelopeService is a mock Envelope service which can be used to simulate remote Envelope services
@@ -178,7 +182,7 @@ func TestEnvelopeCaching(t *testing.T) {
 			}
 
 			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-				func() (State, error) { return state, nil },
+				func() (State, error) { return state, nil }, testAPIServerID,
 				tt.cacheTTL, fakeClock)
 
 			dataCtx := value.DefaultContext(testContextText)
@@ -319,7 +323,7 @@ func TestEnvelopeTransformerStaleness(t *testing.T) {
 			var stateErr error
 
 			transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
-				func() (State, error) { return state, stateErr },
+				func() (State, error) { return state, stateErr }, testAPIServerID,
 			)
 
 			dataCtx := value.DefaultContext(testContextText)
@@ -376,7 +380,7 @@ func TestEnvelopeTransformerStateFunc(t *testing.T) {
 	stateErr := fmt.Errorf("some state error")
 
 	transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
-		func() (State, error) { return state, stateErr },
+		func() (State, error) { return state, stateErr }, testAPIServerID,
 	)
 
 	dataCtx := value.DefaultContext(testContextText)
@@ -513,6 +517,7 @@ func TestTransformToStorageError(t *testing.T) {
 			envelopeService.SetAnnotations(tt.annotations)
 			transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
 				testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool()),
+				testAPIServerID,
 			)
 			dataCtx := value.DefaultContext(testContextText)
 
@@ -838,6 +843,7 @@ func TestEnvelopeMetrics(t *testing.T) {
 	envelopeService := newTestEnvelopeService()
 	transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
 		testStateFunc(testContext(t), envelopeService, clock.RealClock{}, randomBool()),
+		testAPIServerID,
 	)
 
 	dataCtx := value.DefaultContext(testContextText)
@@ -859,11 +865,11 @@ func TestEnvelopeMetrics(t *testing.T) {
 				"apiserver_envelope_encryption_key_id_hash_total",
 			},
 			want: fmt.Sprintf(`
-				# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+				# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 				# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-				apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-				apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-				`, testKeyHash, testProviderName, metrics.FromStorageLabel, testKeyHash, testProviderName, metrics.ToStorageLabel),
+				apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+				apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+				`, testAPIServerIDHash, testKeyHash, testProviderName, metrics.FromStorageLabel, testAPIServerIDHash, testKeyHash, testProviderName, metrics.ToStorageLabel),
 		},
 	}
 
@@ -931,10 +937,10 @@ func TestEnvelopeMetricsCache(t *testing.T) {
 	transformer1 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) {
 		// return different states to ensure we get expected number of cache keys after restart on decryption
 		return testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
-	})
-	transformer2 := NewEnvelopeTransformer(envelopeService, provider2, func() (State, error) { return state, nil })
+	}, testAPIServerID)
+	transformer2 := NewEnvelopeTransformer(envelopeService, provider2, func() (State, error) { return state, nil }, testAPIServerID)
 	// used for restart
-	transformer3 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) { return state, nil })
+	transformer3 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) { return state, nil }, testAPIServerID)
 	var transformedDatas [][]byte
 	for j := 0; j < numOfStates; j++ {
 		transformedData, err := transformer1.TransformToStorage(ctx, []byte(testText), dataCtx)
@@ -1029,8 +1035,7 @@ func TestEnvelopeLogging(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-				testStateFunc(tc.ctx, envelopeService, clock.RealClock{}, randomBool()),
-				1*time.Second, fakeClock)
+				testStateFunc(tc.ctx, envelopeService, clock.RealClock{}, randomBool()), testAPIServerID, 1*time.Second, fakeClock)
 
 			dataCtx := value.DefaultContext([]byte(testContextText))
 			originalText := []byte(testText)
@@ -1082,7 +1087,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 	}
 
 	transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-		func() (State, error) { return state, nil },
+		func() (State, error) { return state, nil }, testAPIServerID,
 		1*time.Second, fakeClock)
 
 	dataCtx := value.DefaultContext(testContextText)
@@ -1108,7 +1113,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 	}
 
 	transformer = newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-		func() (State, error) { return state, nil },
+		func() (State, error) { return state, nil }, testAPIServerID,
 		1*time.Second, fakeClock)
 
 	transformedData2, err := transformer.TransformToStorage(ctx, originalText, dataCtx)
@@ -1256,6 +1261,165 @@ func TestGenerateTransformer(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEnvelopeTracing_TransformToStorage(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		expected []string
+	}{
+		{
+			desc: "encrypt",
+			expected: []string{
+				"About to encrypt data using DEK",
+				"Data encryption succeeded",
+				"About to encode encrypted object",
+				"Encoded encrypted object",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			fakeRecorder := tracetest.NewSpanRecorder()
+			otelTracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer("test")
+
+			ctx := testContext(t)
+			ctx, span := otelTracer.Start(ctx, "parent")
+			defer span.End()
+
+			envelopeService := newTestEnvelopeService()
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			state, err := testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+				func() (State, error) { return state, nil }, testAPIServerID, 1*time.Second, fakeClock)
+
+			dataCtx := value.DefaultContext([]byte(testContextText))
+			originalText := []byte(testText)
+
+			if _, err := transformer.TransformToStorage(ctx, originalText, dataCtx); err != nil {
+				t.Fatalf("envelopeTransformer: error while transforming data to storage: %v", err)
+			}
+
+			output := fakeRecorder.Ended()
+			if len(output) != 1 {
+				t.Fatalf("expected 1 span, got %d", len(output))
+			}
+			out := output[0]
+			validateTraceSpan(t, out, "TransformToStorage with envelopeTransformer", testProviderName, testAPIServerID, tc.expected)
+		})
+	}
+}
+
+func TestEnvelopeTracing_TransformFromStorage(t *testing.T) {
+	testCases := []struct {
+		desc                     string
+		cacheTTL                 time.Duration
+		simulateKMSPluginFailure bool
+		expected                 []string
+	}{
+		{
+			desc:     "decrypt",
+			cacheTTL: 5 * time.Second,
+			expected: []string{
+				"About to decode encrypted object",
+				"Decoded encrypted object",
+				"About to decrypt data using DEK",
+				"Data decryption succeeded",
+			},
+		},
+		{
+			desc:     "decrypt with cache miss",
+			cacheTTL: 1 * time.Second,
+			expected: []string{
+				"About to decode encrypted object",
+				"Decoded encrypted object",
+				"About to decrypt DEK using remote service",
+				"DEK decryption succeeded",
+				"About to decrypt data using DEK",
+				"Data decryption succeeded",
+			},
+		},
+		{
+			desc:                     "decrypt with cache miss, simulate KMS plugin failure",
+			cacheTTL:                 1 * time.Second,
+			simulateKMSPluginFailure: true,
+			expected: []string{
+				"About to decode encrypted object",
+				"Decoded encrypted object",
+				"About to decrypt DEK using remote service",
+				"DEK decryption failed",
+				"exception",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			fakeRecorder := tracetest.NewSpanRecorder()
+			otelTracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer("test")
+
+			ctx := testContext(t)
+
+			envelopeService := newTestEnvelopeService()
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			state, err := testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+				func() (State, error) { return state, nil }, testAPIServerID, tc.cacheTTL, fakeClock)
+
+			dataCtx := value.DefaultContext([]byte(testContextText))
+			originalText := []byte(testText)
+
+			transformedData, _ := transformer.TransformToStorage(ctx, originalText, dataCtx)
+
+			// advance the clock to allow cache entries to expire depending on TTL
+			fakeClock.Step(2 * time.Second)
+			// force GC to run by performing a write
+			transformer.(*envelopeTransformer).cache.set([]byte("some-other-unrelated-key"), &envelopeTransformer{})
+
+			envelopeService.SetDisabledStatus(tc.simulateKMSPluginFailure)
+
+			// start recording only for the decrypt call
+			ctx, span := otelTracer.Start(ctx, "parent")
+			defer span.End()
+
+			_, _, _ = transformer.TransformFromStorage(ctx, transformedData, dataCtx)
+
+			output := fakeRecorder.Ended()
+			validateTraceSpan(t, output[0], "TransformFromStorage with envelopeTransformer", testProviderName, testAPIServerID, tc.expected)
+		})
+	}
+}
+
+func validateTraceSpan(t *testing.T, span trace.ReadOnlySpan, spanName, providerName, apiserverID string, expected []string) {
+	t.Helper()
+
+	if span.Name() != spanName {
+		t.Fatalf("expected span name %q, got %q", spanName, span.Name())
+	}
+	attrs := span.Attributes()
+	if len(attrs) != 1 {
+		t.Fatalf("expected 1 attributes, got %d", len(attrs))
+	}
+	if attrs[0].Key != "transformer.provider.name" && attrs[0].Value.AsString() != providerName {
+		t.Errorf("expected providerName %q, got %q", providerName, attrs[0].Value.AsString())
+	}
+	if len(span.Events()) != len(expected) {
+		t.Fatalf("expected %d events, got %d", len(expected), len(span.Events()))
+	}
+	for i, event := range span.Events() {
+		if event.Name != expected[i] {
+			t.Errorf("expected event %q, got %q", expected[i], event.Name)
+		}
 	}
 }
 

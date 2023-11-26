@@ -159,7 +159,7 @@ func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
 	registry := make(frameworkruntime.Registry)
-	err := registry.Register(filterPluginName, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	err := registry.Register(filterPluginName, func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		return &filter, nil
 	})
 	if err != nil {
@@ -513,7 +513,7 @@ func TestPreemption(t *testing.T) {
 						t.Errorf("Error %v when getting the updated status for pod %v/%v ", err, p.Namespace, p.Name)
 					}
 					_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
-					if test.enablePodDisruptionConditions == true && cond == nil {
+					if test.enablePodDisruptionConditions && cond == nil {
 						t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 					} else if test.enablePodDisruptionConditions == false && cond != nil {
 						t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
@@ -1046,7 +1046,7 @@ func (af *alwaysFail) PreBind(_ context.Context, _ *framework.CycleState, p *v1.
 	return framework.NewStatus(framework.Unschedulable)
 }
 
-func newAlwaysFail(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &alwaysFail{}, nil
 }
 
@@ -1521,8 +1521,8 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	testutils.SyncSchedulerInformerFactory(testCtx)
 	// wraps the NextPod() method to make it appear the preemption has been done already and the nominated node has been set.
 	f := testCtx.Scheduler.NextPod
-	testCtx.Scheduler.NextPod = func() (*framework.QueuedPodInfo, error) {
-		podInfo, _ := f()
+	testCtx.Scheduler.NextPod = func(logger klog.Logger) (*framework.QueuedPodInfo, error) {
+		podInfo, _ := f(klog.FromContext(testCtx.Ctx))
 		// Scheduler.Next() may return nil when scheduler is shutting down.
 		if podInfo != nil {
 			podInfo.Pod.Status.NominatedNodeName = "node-1"
@@ -1648,8 +1648,6 @@ func TestPreferNominatedNode(t *testing.T) {
 // TestReadWriteOncePodPreemption tests preemption scenarios for pods with
 // ReadWriteOncePod PVCs.
 func TestReadWriteOncePodPreemption(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
-
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),

@@ -29,6 +29,10 @@
 
 // Package apierror implements a wrapper error for parsing error details from
 // API calls. Both HTTP & gRPC status errors are supported.
+//
+// For examples of how to use [APIError] with client libraries please reference
+// [Inspecting errors](https://pkg.go.dev/cloud.google.com/go#hdr-Inspecting_errors)
+// in the client library documentation.
 package apierror
 
 import (
@@ -344,4 +348,14 @@ func parseHTTPDetails(gae *googleapi.Error) ErrDetails {
 	}
 
 	return parseDetails(details)
+}
+
+// HTTPCode returns the underlying HTTP response status code. This method returns
+// `-1` if the underlying error is a [google.golang.org/grpc/status.Status]. To
+// check gRPC error codes use [google.golang.org/grpc/status.Code].
+func (a *APIError) HTTPCode() int {
+	if a.httpErr == nil {
+		return -1
+	}
+	return a.httpErr.Code
 }

@@ -238,7 +238,7 @@ func (c *TypeChecker) typesToCheck(p *v1beta1.ValidatingAdmissionPolicy) []schem
 	if p.Spec.MatchConstraints == nil || len(p.Spec.MatchConstraints.ResourceRules) == 0 {
 		return nil
 	}
-
+	restMapperRefreshAttempted := false // at most once per policy, refresh RESTMapper and retry resolution.
 	for _, rule := range p.Spec.MatchConstraints.ResourceRules {
 		groups := extractGroups(&rule.Rule)
 		if len(groups) == 0 {
@@ -268,7 +268,16 @@ func (c *TypeChecker) typesToCheck(p *v1beta1.ValidatingAdmissionPolicy) []schem
 					}
 					resolved, err := c.RestMapper.KindsFor(gvr)
 					if err != nil {
-						continue
+						if restMapperRefreshAttempted {
+							// RESTMapper refresh happens at most once per policy
+							continue
+						}
+						c.tryRefreshRESTMapper()
+						restMapperRefreshAttempted = true
+						resolved, err = c.RestMapper.KindsFor(gvr)
+						if err != nil {
+							continue
+						}
 					}
 					for _, r := range resolved {
 						if !r.Empty() {
@@ -342,6 +351,13 @@ func sortGVKList(list []schema.GroupVersionKind) []schema.GroupVersionKind {
 		return strings.Compare(list[i].Kind, list[j].Kind) < 0
 	})
 	return list
+}
+
+// tryRefreshRESTMapper refreshes the RESTMapper if it supports refreshing.
+func (c *TypeChecker) tryRefreshRESTMapper() {
+	if r, ok := c.RestMapper.(meta.ResettableRESTMapper); ok {
+		r.Reset()
+	}
 }
 
 func buildEnv(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*cel.Env, error) {

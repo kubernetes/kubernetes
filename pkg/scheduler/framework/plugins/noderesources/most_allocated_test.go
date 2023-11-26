@@ -351,7 +351,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
-			p, err := NewFit(
+			p, err := NewFit(ctx,
 				&config.NodeResourcesFitArgs{
 					ScoringStrategy: &config.ScoringStrategy{
 						Type:      config.MostAllocated,

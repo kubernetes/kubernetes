@@ -106,10 +106,6 @@ while getopts "ar:sng:c:" o; do
   esac
 done
 
-if [ "${golangci_config}" ]; then
-    golangci+=(--config="${golangci_config}")
-fi
-
 # Below the output of golangci-lint is going to be piped into sed to add
 # a prefix to each output line. This helps make the output more visible
 # in the Prow log viewer ("error" is a key word there) and ensures that
@@ -158,6 +154,22 @@ pushd "${KUBE_ROOT}/hack/tools" >/dev/null
     go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
   fi
 popd >/dev/null
+
+if [ "${golangci_config}" ]; then
+  # The relative path to _output/local/bin only works if that actually is the
+  # GOBIN. If not, then we have to make a temporary copy of the config and
+  # replace the path with an absolute one. This could be done also
+  # unconditionally, but the invocation that is printed below is nicer if we
+  # don't to do it when not required.
+  if grep -q 'path: ../_output/local/bin/' "${golangci_config}" &&
+     [ "${GOBIN}" != "${KUBE_ROOT}/_output/local/bin" ]; then
+    kube::util::ensure-temp-dir
+    patched_golangci_config="${KUBE_TEMP}/$(basename "${golangci_config}")"
+    sed -e "s;path: ../_output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
+    golangci_config="${patched_golangci_config}"
+  fi
+  golangci+=(--config="${golangci_config}")
+fi
 
 cd "${KUBE_ROOT}"
 

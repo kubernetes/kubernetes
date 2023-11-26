@@ -625,7 +625,12 @@ func (state *golistState) createDriverResponse(words ...string) (*driverResponse
 		}
 
 		if pkg.PkgPath == "unsafe" {
-			pkg.GoFiles = nil // ignore fake unsafe.go file
+			pkg.CompiledGoFiles = nil // ignore fake unsafe.go file (#59929)
+		} else if len(pkg.CompiledGoFiles) == 0 {
+			// Work around for pre-go.1.11 versions of go list.
+			// TODO(matloob): they should be handled by the fallback.
+			// Can we delete this?
+			pkg.CompiledGoFiles = pkg.GoFiles
 		}
 
 		// Assume go list emits only absolute paths for Dir.
@@ -663,16 +668,12 @@ func (state *golistState) createDriverResponse(words ...string) (*driverResponse
 			response.Roots = append(response.Roots, pkg.ID)
 		}
 
-		// Work around for pre-go.1.11 versions of go list.
-		// TODO(matloob): they should be handled by the fallback.
-		// Can we delete this?
-		if len(pkg.CompiledGoFiles) == 0 {
-			pkg.CompiledGoFiles = pkg.GoFiles
-		}
-
 		// Temporary work-around for golang/go#39986. Parse filenames out of
 		// error messages. This happens if there are unrecoverable syntax
 		// errors in the source, so we can't match on a specific error message.
+		//
+		// TODO(rfindley): remove this heuristic, in favor of considering
+		// InvalidGoFiles from the list driver.
 		if err := p.Error; err != nil && state.shouldAddFilenameFromError(p) {
 			addFilenameFromPos := func(pos string) bool {
 				split := strings.Split(pos, ":")
@@ -891,6 +892,15 @@ func golistargs(cfg *Config, words []string, goVersion int) []string {
 		// probably because you'd just get the TestMain.
 		fmt.Sprintf("-find=%t", !cfg.Tests && cfg.Mode&findFlags == 0 && !usesExportData(cfg)),
 	}
+
+	// golang/go#60456: with go1.21 and later, go list serves pgo variants, which
+	// can be costly to compute and may result in redundant processing for the
+	// caller. Disable these variants. If someone wants to add e.g. a NeedPGO
+	// mode flag, that should be a separate proposal.
+	if goVersion >= 21 {
+		fullargs = append(fullargs, "-pgo=off")
+	}
+
 	fullargs = append(fullargs, cfg.BuildFlags...)
 	fullargs = append(fullargs, "--")
 	fullargs = append(fullargs, words...)

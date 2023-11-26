@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -66,6 +67,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
+		errs = append(errs, err)
+	}
+
+	// TODO: remove this in the 1.30 release cycle:
+	// https://github.com/kubernetes/kubeadm/issues/2414
+	if err := createSuperAdminKubeConfig(cfg, kubeadmconstants.KubernetesDir, dryRun, nil, nil); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -248,6 +255,7 @@ func unupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 	return nil, nil
 }
 
+// WriteKubeletConfigFiles writes the kubelet config file to disk, but first creates a backup of any existing one.
 func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
 	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
 	kubeletDir, err := GetKubeletDir(dryRun)
@@ -295,4 +303,65 @@ func GetKubeletDir(dryRun bool) (string, error) {
 		return kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
+}
+
+// createSuperAdminKubeConfig creates new admin.conf and super-admin.conf and then
+// ensures that the admin.conf client has RBAC permissions to be cluster-admin.
+// TODO: this code must not be present in the 1.30 release, remove it during the 1.30
+// release cycle:
+// https://github.com/kubernetes/kubeadm/issues/2414
+func createSuperAdminKubeConfig(cfg *kubeadmapi.InitConfiguration, outDir string, dryRun bool,
+	ensureRBACFunc kubeconfigphase.EnsureRBACFunc,
+	createKubeConfigFileFunc kubeconfigphase.CreateKubeConfigFileFunc) error {
+
+	if dryRun {
+		fmt.Printf("[dryrun] Would create a separate %s and RBAC for %s",
+			kubeadmconstants.SuperAdminKubeConfigFileName, kubeadmconstants.AdminKubeConfigFileName)
+		return nil
+	}
+
+	if ensureRBACFunc == nil {
+		ensureRBACFunc = kubeconfigphase.EnsureAdminClusterRoleBindingImpl
+	}
+	if createKubeConfigFileFunc == nil {
+		createKubeConfigFileFunc = kubeconfigphase.CreateKubeConfigFile
+	}
+
+	var (
+		err                  error
+		adminPath            = filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName)
+		adminBackupPath      = adminPath + ".backup"
+		superAdminPath       = filepath.Join(outDir, kubeadmconstants.SuperAdminKubeConfigFileName)
+		superAdminBackupPath = superAdminPath + ".backup"
+	)
+
+	// Create new admin.conf and super-admin.conf.
+	// If something goes wrong, old existing files will be restored from backup as a best effort.
+
+	restoreBackup := func() {
+		_ = os.Rename(adminBackupPath, adminPath)
+		_ = os.Rename(superAdminBackupPath, superAdminPath)
+	}
+
+	_ = os.Rename(adminPath, adminBackupPath)
+	if err = createKubeConfigFileFunc(kubeadmconstants.AdminKubeConfigFileName, outDir, cfg); err != nil {
+		restoreBackup()
+		return err
+	}
+
+	_ = os.Rename(superAdminPath, superAdminBackupPath)
+	if err = createKubeConfigFileFunc(kubeadmconstants.SuperAdminKubeConfigFileName, outDir, cfg); err != nil {
+		restoreBackup()
+		return err
+	}
+
+	// Ensure the RBAC for admin.conf exists.
+	if _, err = kubeconfigphase.EnsureAdminClusterRoleBinding(outDir, ensureRBACFunc); err != nil {
+		restoreBackup()
+		return err
+	}
+
+	_ = os.Remove(adminBackupPath)
+	_ = os.Remove(superAdminBackupPath)
+	return nil
 }

@@ -85,7 +85,7 @@ func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
 	// test data
 	newEtcdTestStorage := func(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 		server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-		storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion, example2v1.SchemeGroupVersion), func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, prefix, "/pods", schema.GroupResource{Resource: "pods"}, identity.NewEncryptCheckTransformer(), true, etcd3.NewDefaultLeaseManagerConfig())
+		storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion, example2v1.SchemeGroupVersion), func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, prefix, "/pods", schema.GroupResource{Resource: "pods"}, identity.NewEncryptCheckTransformer(), etcd3.NewDefaultLeaseManagerConfig())
 		return server, storage
 	}
 	server, etcdStorage := newEtcdTestStorage(t, "")
@@ -145,4 +145,43 @@ func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
 	currentPodRV, err := versioner.ParseResourceVersion(currentPod.ResourceVersion)
 	require.NoError(t, err)
 	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
+}
+
+func TestHasInitialEventsEndBookmarkAnnotation(t *testing.T) {
+	createPod := func(name string) *example.Pod {
+		return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+	createAnnotatedPod := func(name, value string) *example.Pod {
+		p := createPod(name)
+		p.Annotations = map[string]string{}
+		p.Annotations["k8s.io/initial-events-end"] = value
+		return p
+	}
+	scenarios := []struct {
+		name             string
+		object           runtime.Object
+		expectAnnotation bool
+	}{
+		{
+			name:             "a standard obj with the initial-events-end annotation set to true",
+			object:           createAnnotatedPod("p1", "true"),
+			expectAnnotation: true,
+		},
+		{
+			name:   "a standard obj with the initial-events-end annotation set to false",
+			object: createAnnotatedPod("p1", "false"),
+		},
+		{
+			name:   "a standard obj without the annotation",
+			object: createPod("p1"),
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			hasAnnotation, err := storage.HasInitialEventsEndBookmarkAnnotation(scenario.object)
+			require.NoError(t, err)
+			require.Equal(t, scenario.expectAnnotation, hasAnnotation)
+		})
+	}
 }

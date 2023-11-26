@@ -86,7 +86,7 @@ func nodesAreTooUtilized(ctx context.Context, cs clientset.Interface, nodeList *
 }
 
 // This test suite is used to verifies scheduler priority functions based on the default provider
-var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
+var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var systemPodsNo int
@@ -199,7 +199,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		labelPod, err := cs.CoreV1().Pods(ns).Get(ctx, labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
-		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
+		gomega.Expect(labelPod.Spec.NodeName).ToNot(gomega.Equal(nodeName))
 	})
 
 	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func(ctx context.Context) {
@@ -364,7 +364,7 @@ func createBalancedPodForNodes(ctx context.Context, f *framework.Framework, cs c
 		if err != nil {
 			framework.Logf("Failed to delete memory balanced pods: %v.", err)
 		} else {
-			err := wait.PollImmediateWithContext(ctx, 2*time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+			err := wait.PollUntilContextTimeout(ctx, 2*time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 				podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
 					LabelSelector: labels.SelectorFromSet(labels.Set(balancePodLabel)).String(),
 				})

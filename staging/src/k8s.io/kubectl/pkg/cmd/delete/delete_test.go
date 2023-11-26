@@ -54,41 +54,37 @@ func TestDeleteFlagValidation(t *testing.T) {
 	defer f.Cleanup()
 
 	tests := []struct {
-		flags        DeleteFlags
-		enableAlphas []cmdutil.FeatureGate
-		args         [][]string
-		expectedErr  string
+		flags       DeleteFlags
+		args        [][]string
+		expectedErr string
 	}{
 		{
 			flags: DeleteFlags{
 				Raw:         pointer.String("test"),
 				Interactive: pointer.Bool(true),
 			},
-			enableAlphas: []cmdutil.FeatureGate{cmdutil.InteractiveDelete},
-			expectedErr:  "--interactive can not be used with --raw",
+			expectedErr: "--interactive can not be used with --raw",
 		},
 	}
 
 	for _, test := range tests {
 		cmd := fakecmd()
-		cmdtesting.WithAlphaEnvs(test.enableAlphas, t, func(t *testing.T) {
-			deleteOptions, err := test.flags.ToOptions(nil, genericiooptions.NewTestIOStreamsDiscard())
-			if err != nil {
-				t.Fatalf("unexpected error creating delete options: %s", err)
-			}
-			deleteOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
-			err = deleteOptions.Complete(f, nil, cmd)
-			if err != nil {
-				t.Fatalf("unexpected error creating delete options: %s", err)
-			}
-			err = deleteOptions.Validate()
-			if err == nil {
-				t.Fatalf("missing expected error")
-			}
-			if test.expectedErr != err.Error() {
-				t.Errorf("expected error %s, got %s", test.expectedErr, err)
-			}
-		})
+		deleteOptions, err := test.flags.ToOptions(nil, genericiooptions.NewTestIOStreamsDiscard())
+		if err != nil {
+			t.Fatalf("unexpected error creating delete options: %s", err)
+		}
+		deleteOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+		err = deleteOptions.Complete(f, nil, cmd)
+		if err != nil {
+			t.Fatalf("unexpected error creating delete options: %s", err)
+		}
+		err = deleteOptions.Validate()
+		if err == nil {
+			t.Fatalf("missing expected error")
+		}
+		if test.expectedErr != err.Error() {
+			t.Errorf("expected error %s, got %s", test.expectedErr, err)
+		}
 	}
 }
 
@@ -362,34 +358,50 @@ func TestDeleteObjectWithInteractive(t *testing.T) {
 		}),
 	}
 
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.InteractiveDelete}, t, func(t *testing.T) {
-		streams, in, buf, _ := genericiooptions.NewTestIOStreams()
-		fmt.Fprint(in, "y")
-		cmd := NewCmdDelete(tf, streams)
-		cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
-		cmd.Flags().Set("output", "name")
-		cmd.Flags().Set("interactive", "true")
-		cmd.Run(cmd, []string{})
+	streams, in, buf, _ := genericiooptions.NewTestIOStreams()
+	fmt.Fprint(in, "y")
+	cmd := NewCmdDelete(tf, streams)
+	err := cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("output", "name")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("interactive", "true")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	cmd.Run(cmd, []string{})
 
-		if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): replicationcontroller/redis-master\n" {
-			t.Errorf("unexpected output: %s", buf.String())
-		}
+	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): replicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
 
-		streams, in, buf, _ = genericiooptions.NewTestIOStreams()
-		fmt.Fprint(in, "n")
-		cmd = NewCmdDelete(tf, streams)
-		cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
-		cmd.Flags().Set("output", "name")
-		cmd.Flags().Set("interactive", "true")
-		cmd.Run(cmd, []string{})
+	streams, in, buf, _ = genericiooptions.NewTestIOStreams()
+	fmt.Fprint(in, "n")
+	cmd = NewCmdDelete(tf, streams)
+	err = cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("output", "name")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("interactive", "true")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	cmd.Run(cmd, []string{})
 
-		if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): deletion is cancelled\n" {
-			t.Errorf("unexpected output: %s", buf.String())
-		}
-		if buf.String() == ": replicationcontroller/redis-master\n" {
-			t.Errorf("unexpected output: %s", buf.String())
-		}
-	})
+	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): deletion is cancelled\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+	if buf.String() == ": replicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
 }
 
 func TestGracePeriodScenarios(t *testing.T) {

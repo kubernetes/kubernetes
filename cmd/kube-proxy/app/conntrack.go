@@ -37,8 +37,14 @@ type Conntracker interface {
 	SetMax(max int) error
 	// SetTCPEstablishedTimeout adjusts nf_conntrack_tcp_timeout_established.
 	SetTCPEstablishedTimeout(seconds int) error
-	// SetTCPCloseWaitTimeout nf_conntrack_tcp_timeout_close_wait.
+	// SetTCPCloseWaitTimeout adjusts nf_conntrack_tcp_timeout_close_wait.
 	SetTCPCloseWaitTimeout(seconds int) error
+	// SetTCPBeLiberal adjusts nf_conntrack_tcp_be_liberal.
+	SetTCPBeLiberal(value int) error
+	// SetUDPTimeout adjusts nf_conntrack_udp_timeout.
+	SetUDPTimeout(seconds int) error
+	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
+	SetUDPStreamTimeout(seconds int) error
 }
 
 type realConntracker struct{}
@@ -92,11 +98,23 @@ func (rct realConntracker) SetTCPCloseWaitTimeout(seconds int) error {
 	return rct.setIntSysCtl("nf_conntrack_tcp_timeout_close_wait", seconds)
 }
 
+func (rct realConntracker) SetTCPBeLiberal(value int) error {
+	return rct.setIntSysCtl("nf_conntrack_tcp_be_liberal", value)
+}
+
+func (rct realConntracker) SetUDPTimeout(seconds int) error {
+	return rct.setIntSysCtl("nf_conntrack_udp_timeout", seconds)
+}
+
+func (rct realConntracker) SetUDPStreamTimeout(seconds int) error {
+	return rct.setIntSysCtl("nf_conntrack_udp_timeout_stream", seconds)
+}
+
 func (realConntracker) setIntSysCtl(name string, value int) error {
 	entry := "net/netfilter/" + name
 
 	sys := sysctl.New()
-	if val, _ := sys.GetSysctl(entry); val != value && val < value {
+	if val, _ := sys.GetSysctl(entry); val != value {
 		klog.InfoS("Set sysctl", "entry", entry, "value", value)
 		if err := sys.SetSysctl(entry, value); err != nil {
 			return err

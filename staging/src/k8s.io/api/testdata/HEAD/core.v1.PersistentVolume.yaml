@@ -225,6 +225,7 @@ spec:
       uid: uidValue
     volumeName: volumeNameValue
     volumeNamespace: volumeNamespaceValue
+  volumeAttributesClassName: volumeAttributesClassNameValue
   volumeMode: volumeModeValue
   vsphereVolume:
     fsType: fsTypeValue

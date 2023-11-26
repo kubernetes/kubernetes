@@ -61,11 +61,10 @@ var (
 	// have a brand new API on the server-side and users explicitly need to use
 	// the new API to get security integration on the server.
 	XDSClientSideSecurity = boolFromEnv("GRPC_XDS_EXPERIMENTAL_SECURITY_SUPPORT", true)
-	// XDSAggregateAndDNS indicates whether processing of aggregated cluster
-	// and DNS cluster is enabled, which can be enabled by setting the
-	// environment variable
-	// "GRPC_XDS_EXPERIMENTAL_ENABLE_AGGREGATE_AND_LOGICAL_DNS_CLUSTER" to
-	// "true".
+	// XDSAggregateAndDNS indicates whether processing of aggregated cluster and
+	// DNS cluster is enabled, which can be disabled by setting the environment
+	// variable "GRPC_XDS_EXPERIMENTAL_ENABLE_AGGREGATE_AND_LOGICAL_DNS_CLUSTER"
+	// to "false".
 	XDSAggregateAndDNS = boolFromEnv("GRPC_XDS_EXPERIMENTAL_ENABLE_AGGREGATE_AND_LOGICAL_DNS_CLUSTER", true)
 
 	// XDSRBAC indicates whether xDS configured RBAC HTTP Filter is enabled,
@@ -79,14 +78,18 @@ var (
 	// XDSFederation indicates whether federation support is enabled, which can
 	// be enabled by setting the environment variable
 	// "GRPC_EXPERIMENTAL_XDS_FEDERATION" to "true".
-	XDSFederation = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FEDERATION", false)
+	XDSFederation = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FEDERATION", true)
 
 	// XDSRLS indicates whether processing of Cluster Specifier plugins and
-	// support for the RLS CLuster Specifier is enabled, which can be enabled by
+	// support for the RLS CLuster Specifier is enabled, which can be disabled by
 	// setting the environment variable "GRPC_EXPERIMENTAL_XDS_RLS_LB" to
-	// "true".
-	XDSRLS = boolFromEnv("GRPC_EXPERIMENTAL_XDS_RLS_LB", false)
+	// "false".
+	XDSRLS = boolFromEnv("GRPC_EXPERIMENTAL_XDS_RLS_LB", true)
 
 	// C2PResolverTestOnlyTrafficDirectorURI is the TD URI for testing.
 	C2PResolverTestOnlyTrafficDirectorURI = os.Getenv("GRPC_TEST_ONLY_GOOGLE_C2P_RESOLVER_TRAFFIC_DIRECTOR_URI")
+	// XDSCustomLBPolicy indicates whether Custom LB Policies are enabled, which
+	// can be disabled by setting the environment variable
+	// "GRPC_EXPERIMENTAL_XDS_CUSTOM_LB_CONFIG" to "false".
+	XDSCustomLBPolicy = boolFromEnv("GRPC_EXPERIMENTAL_XDS_CUSTOM_LB_CONFIG", true)
 )

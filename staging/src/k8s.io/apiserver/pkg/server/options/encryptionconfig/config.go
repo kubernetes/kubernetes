@@ -43,12 +43,13 @@ import (
 	"k8s.io/apiserver/pkg/apis/config/validation"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
+	envelopemetrics "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -104,6 +105,38 @@ const (
 	kmsReloadHealthCheckName = "kms-providers"
 )
 
+var codecs serializer.CodecFactory
+
+// this atomic bool allows us to swap enablement of the KMSv2KDF feature in tests
+// as the feature gate is now locked to true starting with v1.29
+// Note: it cannot be set by an end user
+var kdfDisabled atomic.Bool
+
+// this function should only be called in tests to swap enablement of the KMSv2KDF feature
+func SetKDFForTests(b bool) func() {
+	kdfDisabled.Store(!b)
+	return func() {
+		kdfDisabled.Store(false)
+	}
+}
+
+// this function should be used to determine enablement of the KMSv2KDF feature
+// instead of getting it from DefaultFeatureGate as the feature gate is now locked
+// to true starting with v1.29
+func GetKDF() bool {
+	return !kdfDisabled.Load()
+}
+
+func init() {
+	configScheme := runtime.NewScheme()
+	utilruntime.Must(apiserverconfig.AddToScheme(configScheme))
+	utilruntime.Must(apiserverconfigv1.AddToScheme(configScheme))
+	codecs = serializer.NewCodecFactory(configScheme)
+	envelopemetrics.RegisterMetrics()
+	storagevalue.RegisterMetrics()
+	metrics.RegisterMetrics()
+}
+
 type kmsPluginHealthzResponse struct {
 	err      error
 	received time.Time
@@ -124,6 +157,8 @@ type kmsv2PluginProbe struct {
 	service      kmsservice.Service
 	lastResponse *kmsPluginHealthzResponse
 	l            *sync.Mutex
+	apiServerID  string
+	version      string
 }
 
 type kmsHealthChecker []healthz.HealthChecker
@@ -177,13 +212,13 @@ type EncryptionConfiguration struct {
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
 // If reload is true, or KMS v2 plugins are used with no KMS v1 plugins, the returned slice of health checkers will always be of length 1.
-func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool) (*EncryptionConfiguration, error) {
+func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool, apiServerID string) (*EncryptionConfiguration, error) {
 	config, contentHash, err := loadConfig(filepath, reload)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing file: %w", err)
 	}
 
-	transformers, kmsHealthChecks, kmsUsed, err := getTransformerOverridesAndKMSPluginHealthzCheckers(ctx, config)
+	transformers, kmsHealthChecks, kmsUsed, err := getTransformerOverridesAndKMSPluginHealthzCheckers(ctx, config, apiServerID)
 	if err != nil {
 		return nil, fmt.Errorf("error while building transformers: %w", err)
 	}
@@ -208,9 +243,9 @@ func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool) (*E
 // getTransformerOverridesAndKMSPluginHealthzCheckers creates the set of transformers and KMS healthz checks based on the given config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, config *apiserverconfig.EncryptionConfiguration) (map[schema.GroupResource]storagevalue.Transformer, []healthz.HealthChecker, *kmsState, error) {
+func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, config *apiserverconfig.EncryptionConfiguration, apiServerID string) (map[schema.GroupResource]storagevalue.Transformer, []healthz.HealthChecker, *kmsState, error) {
 	var kmsHealthChecks []healthz.HealthChecker
-	transformers, probes, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(ctx, config)
+	transformers, probes, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(ctx, config, apiServerID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -229,7 +264,7 @@ type healthChecker interface {
 // getTransformerOverridesAndKMSPluginProbes creates the set of transformers and KMS probes based on the given config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apiserverconfig.EncryptionConfiguration) (map[schema.GroupResource]storagevalue.Transformer, []healthChecker, *kmsState, error) {
+func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apiserverconfig.EncryptionConfiguration, apiServerID string) (map[schema.GroupResource]storagevalue.Transformer, []healthChecker, *kmsState, error) {
 	resourceToPrefixTransformer := map[schema.GroupResource][]storagevalue.PrefixTransformer{}
 	var probes []healthChecker
 	var kmsUsed kmsState
@@ -238,7 +273,7 @@ func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apis
 	for _, resourceConfig := range config.Resources {
 		resourceConfig := resourceConfig
 
-		transformers, p, used, err := prefixTransformersAndProbes(ctx, resourceConfig)
+		transformers, p, used, err := prefixTransformersAndProbes(ctx, resourceConfig, apiServerID)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -355,7 +390,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// this gate can only change during tests, but the check is cheap enough to always make
 	// this allows us to easily exercise both modes without restarting the API server
 	// TODO integration test that this dynamically takes effect
-	useSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+	useSeed := GetKDF()
 	stateUseSeed := state.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 
 	// state is valid and status keyID is unchanged from when we generated this DEK/seed so there is no need to rotate it
@@ -440,15 +475,23 @@ func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.C
 	if response.Healthz != "ok" {
 		errs = append(errs, fmt.Errorf("got unexpected healthz status: %s", response.Healthz))
 	}
-	if response.Version != envelopekmsv2.KMSAPIVersion {
-		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersion, response.Version))
+	if response.Version != envelopekmsv2.KMSAPIVersionv2 && response.Version != envelopekmsv2.KMSAPIVersionv2beta1 {
+		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersionv2, response.Version))
+	} else {
+		// set version for the first status response
+		if len(h.version) == 0 {
+			h.version = response.Version
+		}
+		if h.version != response.Version {
+			errs = append(errs, fmt.Errorf("KMSv2 API version should not change after the initial status response version %s, got %s", h.version, response.Version))
+		}
 	}
 
 	if errCode, err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
-		metrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
+		envelopemetrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
 		errs = append(errs, fmt.Errorf("got invalid KMSv2 KeyID hash %q: %w", envelopekmsv2.GetHashIfNotEmpty(response.KeyID), err))
 	} else {
-		metrics.RecordKeyIDFromStatus(h.name, response.KeyID)
+		envelopemetrics.RecordKeyIDFromStatus(h.name, response.KeyID, h.apiServerID)
 		// unconditionally append as we filter out nil errors below
 		errs = append(errs, h.rotateDEKOnKeyIDChange(ctx, response.KeyID, string(uuid.NewUUID())))
 	}
@@ -461,6 +504,24 @@ func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.C
 
 // loadConfig parses the encryption configuration file at filepath and returns the parsed config and hash of the file.
 func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfiguration, string, error) {
+	data, contentHash, err := loadDataAndHash(filepath)
+	if err != nil {
+		return nil, "", fmt.Errorf("error while loading file: %w", err)
+	}
+
+	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("error decoding encryption provider configuration file %q: %w", filepath, err)
+	}
+	config, ok := configObj.(*apiserverconfig.EncryptionConfiguration)
+	if !ok {
+		return nil, "", fmt.Errorf("got unexpected config type: %v", gvk)
+	}
+
+	return config, contentHash, validation.ValidateEncryptionConfiguration(config, reload).ToAggregate()
+}
+
+func loadDataAndHash(filepath string) ([]byte, string, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, "", fmt.Errorf("error opening encryption provider configuration file %q: %w", filepath, err)
@@ -475,27 +536,20 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 		return nil, "", fmt.Errorf("encryption provider configuration file %q is empty", filepath)
 	}
 
-	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
-	utilruntime.Must(apiserverconfig.AddToScheme(scheme))
-	utilruntime.Must(apiserverconfigv1.AddToScheme(scheme))
+	return data, computeEncryptionConfigHash(data), nil
+}
 
-	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
-	if err != nil {
-		return nil, "", fmt.Errorf("error decoding encryption provider configuration file %q: %w", filepath, err)
-	}
-	config, ok := configObj.(*apiserverconfig.EncryptionConfiguration)
-	if !ok {
-		return nil, "", fmt.Errorf("got unexpected config type: %v", gvk)
-	}
-
-	return config, computeEncryptionConfigHash(data), validation.ValidateEncryptionConfiguration(config, reload).ToAggregate()
+// GetEncryptionConfigHash reads the encryption configuration file at filepath and returns the hash of the file.
+// It does not attempt to decode or load the config, and serves as a cheap check to determine if the file has changed.
+func GetEncryptionConfigHash(filepath string) (string, error) {
+	_, contentHash, err := loadDataAndHash(filepath)
+	return contentHash, err
 }
 
 // prefixTransformersAndProbes creates the set of transformers and KMS probes based on the given resource config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.ResourceConfiguration) ([]storagevalue.PrefixTransformer, []healthChecker, *kmsState, error) {
+func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.ResourceConfiguration, apiServerID string) ([]storagevalue.PrefixTransformer, []healthChecker, *kmsState, error) {
 	var transformers []storagevalue.PrefixTransformer
 	var probes []healthChecker
 	var kmsUsed kmsState
@@ -523,7 +577,7 @@ func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.Res
 			transformer, transformerErr = secretboxPrefixTransformer(provider.Secretbox)
 
 		case provider.KMS != nil:
-			transformer, probe, used, transformerErr = kmsPrefixTransformer(ctx, provider.KMS)
+			transformer, probe, used, transformerErr = kmsPrefixTransformer(ctx, provider.KMS, apiServerID)
 			if transformerErr == nil {
 				probes = append(probes, probe)
 				kmsUsed.accumulate(used)
@@ -682,7 +736,7 @@ func (s *kmsState) accumulate(other *kmsState) {
 // kmsPrefixTransformer creates a KMS transformer and probe based on the given KMS config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfiguration) (storagevalue.PrefixTransformer, healthChecker, *kmsState, error) {
+func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfiguration, apiServerID string) (storagevalue.PrefixTransformer, healthChecker, *kmsState, error) {
 	kmsName := config.Name
 	switch config.APIVersion {
 	case kmsAPIVersionV1:
@@ -728,14 +782,14 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 			service:      envelopeService,
 			l:            &sync.Mutex{},
 			lastResponse: &kmsPluginHealthzResponse{},
+			apiServerID:  apiServerID,
 		}
 		// initialize state so that Load always works
 		probe.state.Store(&envelopekmsv2.State{})
 
 		primeAndProbeKMSv2(ctx, probe, kmsName)
-
 		transformer := storagevalue.PrefixTransformer{
-			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentState),
+			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentState, apiServerID),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
 		}
 

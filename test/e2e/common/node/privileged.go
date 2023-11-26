@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,7 +42,7 @@ type PrivilegedPodTestConfig struct {
 	pod *v1.Pod
 }
 
-var _ = SIGDescribe("PrivilegedPod [NodeConformance]", func() {
+var _ = SIGDescribe("PrivilegedPod", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("e2e-privileged-pod")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	config := &PrivilegedPodTestConfig{
@@ -81,7 +82,7 @@ func (c *PrivilegedPodTestConfig) run(containerName string, expectSuccess bool) 
 		framework.ExpectNoError(err,
 			fmt.Sprintf("could not remove dummy1 link: %v", err))
 	} else {
-		framework.ExpectError(err, msg)
+		gomega.Expect(err).To(gomega.HaveOccurred(), msg)
 	}
 }
 

@@ -492,43 +492,6 @@ func returnedOpenAPI() *openapi_v2.Document {
 	}
 }
 
-func openapiSchemaDeprecatedFakeServer(status int, t *testing.T) (*httptest.Server, error) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/openapi/v2" {
-			// write the error status for the new endpoint request
-			w.WriteHeader(status)
-			return
-		}
-		if req.URL.Path != "/swagger-2.0.0.pb-v1" {
-			errMsg := fmt.Sprintf("Unexpected url %v", req.URL)
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(errMsg))
-			t.Errorf("testing should fail as %s", errMsg)
-			return
-		}
-		if req.Method != "GET" {
-			errMsg := fmt.Sprintf("Unexpected method %v", req.Method)
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			w.Write([]byte(errMsg))
-			t.Errorf("testing should fail as %s", errMsg)
-			return
-		}
-
-		output, err := proto.Marshal(returnedOpenAPI())
-		if err != nil {
-			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(errMsg))
-			t.Errorf("testing should fail as %s", errMsg)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write(output)
-	}))
-
-	return server, nil
-}
-
 func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path != "/openapi/v2" {
@@ -670,57 +633,6 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 			}
 
 		})
-	}
-}
-
-func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusForbidden, t)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotFound, t)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotAcceptable, t)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
 	}
 }
 
@@ -2762,54 +2674,76 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 }
 
 func TestDiscoveryContentTypeVersion(t *testing.T) {
+	v2beta1 := schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2beta1", Kind: "APIGroupDiscoveryList"}
 	tests := []struct {
 		contentType string
-		isV2Beta1   bool
+		gvk         schema.GroupVersionKind
+		match       bool
+		expectErr   bool
 	}{
 		{
 			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			// content-type parameters are not in correct order, but comparison ignores order.
 			contentType: "application/json; v=v2beta1;as=APIGroupDiscoveryList;g=apidiscovery.k8s.io",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			// content-type parameters are not in correct order, but comparison ignores order.
 			contentType: "application/json; as=APIGroupDiscoveryList;g=apidiscovery.k8s.io;v=v2beta1",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			// Ignores extra parameter "charset=utf-8"
 			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList;charset=utf-8",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			contentType: "application/json",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "application/json; charset=UTF-8",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "text/json",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "text/html",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   true,
 		},
 	}
 
 	for _, test := range tests {
-		isV2Beta1 := isV2Beta1ContentType(test.contentType)
-		assert.Equal(t, test.isV2Beta1, isV2Beta1)
+		match, err := ContentTypeIsGVK(test.contentType, test.gvk)
+		assert.Equal(t, test.expectErr, err != nil)
+		assert.Equal(t, test.match, match)
 	}
 }
 

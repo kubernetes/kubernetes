@@ -32,11 +32,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -123,9 +125,17 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 		if externalCloudProvider {
 			// If --cloud-provider=external and node address is already set,
 			// then we return early because provider set addresses should take precedence.
-			// Otherwise, we try to look up the node IP and let the cloud provider override it later
+			// Otherwise, we try to use the node IP defined via flags and let the cloud provider override it later
 			// This should alleviate a lot of the bootstrapping issues with out-of-tree providers
 			if len(node.Status.Addresses) > 0 {
+				return nil
+			}
+			// If nodeIPs are not specified wait for the external cloud-provider to set the node addresses.
+			// Otherwise uses them on the assumption that the installer/administrator has the previous knowledge
+			// required to ensure the external cloud provider will use the same addresses to avoid the issues explained
+			// in https://github.com/kubernetes/kubernetes/issues/120720.
+			// We are already hinting the external cloud provider via the annotation AnnotationAlphaProvidedIPAddr.
+			if !nodeIPSpecified {
 				return nil
 			}
 		}
@@ -402,8 +412,14 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 		node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", runtimeTypeFunc(), runtimeVersion)
 
 		node.Status.NodeInfo.KubeletVersion = version.Get().String()
-		// TODO: kube-proxy might be different version from kubelet in the future
-		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DisableNodeKubeProxyVersion) {
+			// This field is deprecated and should be cleared if it was previously set.
+			node.Status.NodeInfo.KubeProxyVersion = ""
+		} else {
+			node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
+		}
+
 		return nil
 	}
 }

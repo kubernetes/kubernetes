@@ -674,9 +674,7 @@ func (r *remoteRuntimeService) containerStatsV1(ctx context.Context, containerID
 // ListContainerStats returns the list of ContainerStats given the filter.
 func (r *remoteRuntimeService) ListContainerStats(ctx context.Context, filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	klog.V(10).InfoS("[RemoteRuntimeService] ListContainerStats", "filter", filter)
-	// Do not set timeout, because writable layer stats collection takes time.
-	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	return r.listContainerStatsV1(ctx, filter)

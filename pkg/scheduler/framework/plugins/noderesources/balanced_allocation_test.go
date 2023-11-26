@@ -389,7 +389,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			p, _ := NewBalancedAllocation(&test.args, fh, feature.Features{})
+			p, _ := NewBalancedAllocation(ctx, &test.args, fh, feature.Features{})
 			state := framework.NewCycleState()
 			for i := range test.nodes {
 				if test.runPreScore {

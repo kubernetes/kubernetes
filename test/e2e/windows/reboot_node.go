@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -34,7 +35,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] RebootHost containers [Serial] [Disruptive] [Slow]", func() {
+var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] RebootHost containers", framework.WithSerial(), framework.WithDisruptive(), framework.WithSlow(), skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
@@ -254,4 +255,4 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 		framework.ExpectNoError(err, "Error retrieving pod")
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 	})
-})
+}))

@@ -53,6 +53,14 @@ func (s *SearchIndex) FindByDatastorePath(r *types.FindByDatastorePath) soap.Has
 func (s *SearchIndex) FindByInventoryPath(req *types.FindByInventoryPath) soap.HasFault {
 	body := &methods.FindByInventoryPathBody{Res: new(types.FindByInventoryPathResponse)}
 
+	root := Map.content().RootFolder
+	o := &root
+
+	if req.InventoryPath == "/" {
+		body.Res.Returnval = o
+		return body
+	}
+
 	split := func(c rune) bool {
 		return c == '/'
 	}
@@ -60,9 +68,6 @@ func (s *SearchIndex) FindByInventoryPath(req *types.FindByInventoryPath) soap.H
 	if len(path) < 1 {
 		return body
 	}
-
-	root := Map.content().RootFolder
-	o := &root
 
 	for _, name := range path {
 		f := s.FindChild(&types.FindChild{Entity: *o, Name: name})

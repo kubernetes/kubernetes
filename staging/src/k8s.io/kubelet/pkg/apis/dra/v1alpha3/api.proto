@@ -34,7 +34,7 @@ option (gogoproto.goproto_unrecognized_all) = false;
 service Node {
   // NodePrepareResources prepares several ResourceClaims
   // for use on the node. If an error is returned, the
-  // response is ignored. Failures for individidual claims
+  // response is ignored. Failures for individual claims
   // can be reported inside NodePrepareResourcesResponse.
   rpc NodePrepareResources (NodePrepareResourcesRequest)
     returns (NodePrepareResourcesResponse) {}

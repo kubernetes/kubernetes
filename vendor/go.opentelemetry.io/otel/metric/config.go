@@ -14,15 +14,28 @@
 
 package metric // import "go.opentelemetry.io/otel/metric"
 
+import "go.opentelemetry.io/otel/attribute"
+
 // MeterConfig contains options for Meters.
 type MeterConfig struct {
 	instrumentationVersion string
 	schemaURL              string
+	attrs                  attribute.Set
+
+	// Ensure forward compatibility by explicitly making this not comparable.
+	noCmp [0]func() //nolint: unused  // This is indeed used.
 }
 
-// InstrumentationVersion is the version of the library providing instrumentation.
+// InstrumentationVersion returns the version of the library providing
+// instrumentation.
 func (cfg MeterConfig) InstrumentationVersion() string {
 	return cfg.instrumentationVersion
+}
+
+// InstrumentationAttributes returns the attributes associated with the library
+// providing instrumentation.
+func (cfg MeterConfig) InstrumentationAttributes() attribute.Set {
+	return cfg.attrs
 }
 
 // SchemaURL is the schema_url of the library providing instrumentation.
@@ -56,6 +69,16 @@ func (fn meterOptionFunc) applyMeter(cfg MeterConfig) MeterConfig {
 func WithInstrumentationVersion(version string) MeterOption {
 	return meterOptionFunc(func(config MeterConfig) MeterConfig {
 		config.instrumentationVersion = version
+		return config
+	})
+}
+
+// WithInstrumentationAttributes sets the instrumentation attributes.
+//
+// The passed attributes will be de-duplicated.
+func WithInstrumentationAttributes(attr ...attribute.KeyValue) MeterOption {
+	return meterOptionFunc(func(config MeterConfig) MeterConfig {
+		config.attrs = attribute.NewSet(attr...)
 		return config
 	})
 }

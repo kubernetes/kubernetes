@@ -58,7 +58,7 @@ import (
 	kubeversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
+	flowcontrolv1bet3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/storageversionhashdata"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -453,8 +453,8 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 	// beta versions enabled by default.  Nothing new should be added here.  There are no future exceptions because there
 	// are no more beta resources enabled by default.
 	legacyBetaResourcesWithoutStableEquivalents := map[schema.GroupResource]bool{
-		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas").GroupResource():                 true,
-		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
+		flowcontrolv1bet3.SchemeGroupVersion.WithResource("flowschemas").GroupResource():                 true,
+		flowcontrolv1bet3.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
 	}
 
 	config := DefaultAPIResourceConfigSource()

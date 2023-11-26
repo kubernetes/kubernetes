@@ -52,13 +52,15 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.9.0",
-		Scheduler: kubeadmapi.ControlPlaneComponent{ExtraEnvs: []v1.EnvVar{
-			{Name: "Foo", Value: "Bar"},
+		Scheduler: kubeadmapi.ControlPlaneComponent{ExtraEnvs: []kubeadmapi.EnvVar{
+			{
+				EnvVar: v1.EnvVar{Name: "Foo", Value: "Bar"},
+			},
 		}},
 	}
 
 	// Executes GetStaticPodSpecs
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, []v1.EnvVar{})
+	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, []kubeadmapi.EnvVar{})
 
 	var tests = []struct {
 		name          string

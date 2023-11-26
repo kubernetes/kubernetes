@@ -37,9 +37,6 @@ func validateClusterIPFlags(options Extra) []error {
 	var errs []error
 	// maxCIDRBits is used to define the maximum CIDR size for the cluster ip(s)
 	maxCIDRBits := 20
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		maxCIDRBits = 64
-	}
 
 	// validate that primary has been processed by user provided values or it has been defaulted
 	if options.PrimaryServiceClusterIPRange.IP == nil {
@@ -51,10 +48,12 @@ func validateClusterIPFlags(options Extra) []error {
 		errs = append(errs, errors.New("--service-cluster-ip-range must not contain more than two entries"))
 	}
 
-	// Complete() expected to have set Primary* and Secondary*
-	// primary CIDR validation
-	if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
-		errs = append(errs, err)
+	// Complete() expected to have set Primary* and Secondary
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		// primary CIDR validation
+		if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
@@ -72,9 +71,10 @@ func validateClusterIPFlags(options Extra) []error {
 		if !dualstack {
 			errs = append(errs, errors.New("--service-cluster-ip-range[0] and --service-cluster-ip-range[1] must be of different IP family"))
 		}
-
-		if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
-			errs = append(errs, err)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+			if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 
@@ -130,6 +130,7 @@ func (s CompletedOptions) Validate() []error {
 	var errs []error
 
 	errs = append(errs, s.CompletedOptions.Validate()...)
+	errs = append(errs, s.CloudProvider.Validate()...)
 	errs = append(errs, validateClusterIPFlags(s.Extra)...)
 	errs = append(errs, validateServiceNodePort(s.Extra)...)
 	errs = append(errs, validatePublicIPServiceClusterIPRangeIPFamilies(s.Extra, *s.GenericServerRunOptions)...)

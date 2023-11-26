@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -56,7 +57,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func(ctx context.Context) {
+	f.It("should have accelerator metrics", feature.StackdriverAcceleratorMonitoring, func(ctx context.Context) {
 		testStackdriverAcceleratorMonitoring(ctx, f)
 	})
 

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/pointer"
@@ -122,11 +123,9 @@ func SetDefaults_Service(obj *v1.Service) {
 			sp.TargetPort = intstr.FromInt32(sp.Port)
 		}
 	}
-	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service
+	// Defaults ExternalTrafficPolicy field for externally-accessible service
 	// to Global for consistency.
-	if (obj.Spec.Type == v1.ServiceTypeNodePort ||
-		obj.Spec.Type == v1.ServiceTypeLoadBalancer) &&
-		obj.Spec.ExternalTrafficPolicy == "" {
+	if service.ExternallyAccessible(obj) && obj.Spec.ExternalTrafficPolicy == "" {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 	}
 

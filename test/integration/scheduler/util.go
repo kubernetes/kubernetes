@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 
 // NewPlugin returns a plugin factory with specified Plugin.
 func NewPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		return plugin, nil
 	}
 }

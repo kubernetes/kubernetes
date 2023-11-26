@@ -790,7 +790,7 @@ func (e *Etcd) grpcGatewayDial(splitHttp bool) (grpcDial func(ctx context.Contex
 	addr := sctx.addr
 	if network := sctx.network; network == "unix" {
 		// explicitly define unix network for gRPC socket support
-		addr = fmt.Sprintf("%s://%s", network, addr)
+		addr = fmt.Sprintf("%s:%s", network, addr)
 	}
 
 	opts := []grpc.DialOption{grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt32))}

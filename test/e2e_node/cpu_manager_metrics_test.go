@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -39,7 +40,7 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
-var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
+var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUManager, func() {
 	f := framework.NewDefaultFramework("cpumanager-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

@@ -79,6 +79,9 @@ func SetDefaults_Job(obj *batchv1.Job) {
 			}
 		}
 	}
+	if obj.Spec.ManualSelector == nil {
+		obj.Spec.ManualSelector = utilpointer.Bool(false)
+	}
 }
 
 func SetDefaults_CronJob(obj *batchv1.CronJob) {

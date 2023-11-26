@@ -653,7 +653,7 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 	}
 
 	if len(buf) > 1 {
-		return []error{errors.New("swap is enabled; production deployments should disable swap unless testing the NodeSwap feature gate of the kubelet")}, nil
+		return []error{errors.New("swap is supported for cgroup v2 only; the NodeSwap feature gate of the kubelet is beta but disabled by default")}, nil
 	}
 
 	return nil, nil
@@ -893,6 +893,7 @@ func (MemCheck) Name() string {
 	return "Mem"
 }
 
+// InitNodeChecks returns checks specific to "kubeadm init"
 func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) ([]Checker, error) {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
@@ -1013,6 +1014,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
+// JoinNodeChecks returns checks specific to "kubeadm join"
 func JoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) ([]Checker, error) {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {

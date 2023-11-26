@@ -17,9 +17,11 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"path"
 	"testing"
 	"time"
@@ -36,7 +38,8 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/utils/pointer"
+	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 // TestLoadConfig tests proper operation of loadConfig()
@@ -71,6 +74,11 @@ ipvs:
   excludeCIDRs:
     - "10.20.30.40/16"
     - "fd00:1::0/64"
+nftables:
+  masqueradeAll: true
+  masqueradeBit: 18
+  minSyncPeriod: 10s
+  syncPeriod: 60s
 kind: KubeProxyConfiguration
 metricsBindAddress: "%s"
 mode: "%s"
@@ -195,8 +203,8 @@ nodePortAddresses:
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            pointer.Int32(2),
-				Min:                   pointer.Int32(1),
+				MaxPerCore:            ptr.To[int32](2),
+				Min:                   ptr.To[int32](1),
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
@@ -205,8 +213,8 @@ nodePortAddresses:
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeAll:      true,
-				MasqueradeBit:      pointer.Int32(17),
-				LocalhostNodePorts: pointer.Bool(true),
+				MasqueradeBit:      ptr.To[int32](17),
+				LocalhostNodePorts: ptr.To(true),
 				MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
 			},
@@ -215,9 +223,15 @@ nodePortAddresses:
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 				ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 			},
+			NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
+				MasqueradeAll: true,
+				MasqueradeBit: ptr.To[int32](18),
+				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+			},
 			MetricsBindAddress: tc.metricsBindAddress,
 			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
-			OOMScoreAdj:        pointer.Int32(17),
+			OOMScoreAdj:        ptr.To[int32](17),
 			PortRange:          "2-7",
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
@@ -593,11 +607,7 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 	}
 }
 
-func makeNodeWithAddresses(name, internal, external string) *v1.Node {
-	if name == "" {
-		return &v1.Node{}
-	}
-
+func makeNodeWithAddress(name, primaryIP string) *v1.Node {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -607,26 +617,76 @@ func makeNodeWithAddresses(name, internal, external string) *v1.Node {
 		},
 	}
 
-	if internal != "" {
+	if primaryIP != "" {
 		node.Status.Addresses = append(node.Status.Addresses,
-			v1.NodeAddress{Type: v1.NodeInternalIP, Address: internal},
-		)
-	}
-
-	if external != "" {
-		node.Status.Addresses = append(node.Status.Addresses,
-			v1.NodeAddress{Type: v1.NodeExternalIP, Address: external},
+			v1.NodeAddress{Type: v1.NodeInternalIP, Address: primaryIP},
 		)
 	}
 
 	return node
 }
 
+// Test that getNodeIPs retries on failure
+func Test_getNodeIPs(t *testing.T) {
+	var chans [3]chan error
+
+	client := clientsetfake.NewSimpleClientset(
+		// node1 initially has no IP address.
+		makeNodeWithAddress("node1", ""),
+
+		// node2 initially has an invalid IP address.
+		makeNodeWithAddress("node2", "invalid-ip"),
+
+		// node3 initially does not exist.
+	)
+
+	for i := range chans {
+		chans[i] = make(chan error)
+		ch := chans[i]
+		nodeName := fmt.Sprintf("node%d", i+1)
+		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
+		go func() {
+			ips := getNodeIPs(client, nodeName)
+			if len(ips) == 0 {
+				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
+			} else if ips[0].String() != expectIP {
+				ch <- fmt.Errorf("expected IP %s for %s but got %s", expectIP, nodeName, ips[0].String())
+			} else if len(ips) != 1 {
+				ch <- fmt.Errorf("expected IP %s for %s but got multiple IPs", expectIP, nodeName)
+			}
+			close(ch)
+		}()
+	}
+
+	// Give the goroutines time to fetch the bad/non-existent nodes, then fix them.
+	time.Sleep(1200 * time.Millisecond)
+
+	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
+		makeNodeWithAddress("node1", "192.168.0.1"),
+		metav1.UpdateOptions{},
+	)
+	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
+		makeNodeWithAddress("node2", "192.168.0.2"),
+		metav1.UpdateOptions{},
+	)
+	_, _ = client.CoreV1().Nodes().Create(context.TODO(),
+		makeNodeWithAddress("node3", "192.168.0.3"),
+		metav1.CreateOptions{},
+	)
+
+	// Ensure each getNodeIP completed as expected
+	for i := range chans {
+		err := <-chans[i]
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+}
+
 func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
 		name           string
-		nodeInfo       *v1.Node
-		hostname       string
+		rawNodeIPs     []net.IP
 		bindAddress    string
 		expectedFamily v1.IPFamily
 		expectedIPv4   string
@@ -634,120 +694,138 @@ func Test_detectNodeIPs(t *testing.T) {
 	}{
 		{
 			name:           "Bind address IPv4 unicast address and no Node object",
-			nodeInfo:       makeNodeWithAddresses("", "", ""),
-			hostname:       "fakeHost",
+			rawNodeIPs:     nil,
 			bindAddress:    "10.0.0.1",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "10.0.0.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address IPv6 unicast address and no Node object",
-			nodeInfo:       makeNodeWithAddresses("", "", ""),
-			hostname:       "fakeHost",
+			rawNodeIPs:     nil,
 			bindAddress:    "fd00:4321::2",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:4321::2",
 		},
 		{
-			name:           "No Valid IP found",
-			nodeInfo:       makeNodeWithAddresses("", "", ""),
-			hostname:       "fakeHost",
+			name:           "No Valid IP found and no bind address",
+			rawNodeIPs:     nil,
 			bindAddress:    "",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "127.0.0.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
-		// Disabled because the GetNodeIP method has a backoff retry mechanism
-		// and the test takes more than 30 seconds
-		// ok  	k8s.io/kubernetes/cmd/kube-proxy/app	34.136s
-		// {
-		//	name:           "No Valid IP found and unspecified bind address",
-		//	nodeInfo:       makeNodeWithAddresses("", "", ""),
-		//	hostname:       "fakeHost",
-		//	bindAddress:    "0.0.0.0",
-		//	expectedFamily: v1.IPv4Protocol,
-		//	expectedIPv4:   "127.0.0.1",
-		//	expectedIPv6:   "::",
-		// },
+		{
+			name:           "No Valid IP found and unspecified bind address",
+			rawNodeIPs:     nil,
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "127.0.0.1",
+			expectedIPv6:   "::1",
+		},
 		{
 			name:           "Bind address 0.0.0.0 and node with IPv4 InternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
-			hostname:       "fakeHost",
+			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
 			bindAddress:    "0.0.0.0",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "192.168.1.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address :: and node with IPv4 InternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
-			hostname:       "fakeHost",
+			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
 			bindAddress:    "::",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "192.168.1.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address 0.0.0.0 and node with IPv6 InternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
-			hostname:       "fakeHost",
+			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("fd00:1234::1")},
 			bindAddress:    "0.0.0.0",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:1234::1",
 		},
 		{
 			name:           "Bind address :: and node with IPv6 InternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
-			hostname:       "fakeHost",
+			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("fd00:1234::1")},
 			bindAddress:    "::",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:1234::1",
 		},
 		{
-			name:           "Bind address 0.0.0.0 and node with only IPv4 ExternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
-			hostname:       "fakeHost",
-			bindAddress:    "0.0.0.0",
-			expectedFamily: v1.IPv4Protocol,
-			expectedIPv4:   "90.90.90.90",
-			expectedIPv6:   "::",
-		},
-		{
-			name:           "Bind address :: and node with only IPv4 ExternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
-			hostname:       "fakeHost",
+			name: "Dual stack, primary IPv4",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("90.90.90.90"),
+				netutils.ParseIPSloppy("2001:db8::2"),
+			},
 			bindAddress:    "::",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "90.90.90.90",
-			expectedIPv6:   "::",
+			expectedIPv6:   "2001:db8::2",
 		},
 		{
-			name:           "Bind address 0.0.0.0 and node with only IPv6 ExternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
-			hostname:       "fakeHost",
+			name: "Dual stack, primary IPv6",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("2001:db8::2"),
+				netutils.ParseIPSloppy("90.90.90.90"),
+			},
 			bindAddress:    "0.0.0.0",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "90.90.90.90",
 			expectedIPv6:   "2001:db8::2",
 		},
 		{
-			name:           "Bind address :: and node with only IPv6 ExternalIP set",
-			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
-			hostname:       "fakeHost",
-			bindAddress:    "::",
-			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			name: "Dual stack, override IPv4",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("2001:db8::2"),
+				netutils.ParseIPSloppy("90.90.90.90"),
+			},
+			bindAddress:    "80.80.80.80",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "80.80.80.80",
 			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name: "Dual stack, override IPv6",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("90.90.90.90"),
+				netutils.ParseIPSloppy("2001:db8::2"),
+			},
+			bindAddress:    "2001:db8::555",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "2001:db8::555",
+		},
+		{
+			name: "Dual stack, override primary family, IPv4",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("2001:db8::2"),
+				netutils.ParseIPSloppy("90.90.90.90"),
+			},
+			bindAddress:    "127.0.0.1",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "127.0.0.1",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name: "Dual stack, override primary family, IPv6",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("90.90.90.90"),
+				netutils.ParseIPSloppy("2001:db8::2"),
+			},
+			bindAddress:    "::1",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "::1",
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset(c.nodeInfo)
-			primaryFamily, ips := detectNodeIPs(client, c.hostname, c.bindAddress)
+			primaryFamily, ips := detectNodeIPs(c.rawNodeIPs, c.bindAddress)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}
@@ -763,11 +841,12 @@ func Test_detectNodeIPs(t *testing.T) {
 
 func Test_checkIPConfig(t *testing.T) {
 	cases := []struct {
-		name  string
-		proxy *ProxyServer
-		ssErr bool
-		dsErr bool
-		fatal bool
+		name    string
+		proxy   *ProxyServer
+		ssErr   bool
+		ssFatal bool
+		dsErr   bool
+		dsFatal bool
 	}{
 		{
 			name: "empty config",
@@ -820,9 +899,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 		{
 			name: "wrong-family clusterCIDR when using ClusterCIDR LocalDetector",
@@ -833,9 +913,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: true,
+			ssErr:   true,
+			ssFatal: true,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -879,9 +960,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -929,9 +1011,10 @@ func Test_checkIPConfig(t *testing.T) {
 				PrimaryIPFamily: v1.IPv4Protocol,
 				podCIDRs:        []string{"fd01:2345::/64"},
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: true,
+			ssErr:   true,
+			ssFatal: true,
+			dsErr:   true,
+			dsFatal: true,
 		},
 
 		{
@@ -957,9 +1040,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -1003,9 +1087,9 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: false,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   false,
 		},
 
 		{
@@ -1031,9 +1115,9 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: false,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   false,
 		},
 	}
 
@@ -1044,8 +1128,8 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("unexpected error in single-stack case: %v", err)
 			} else if err == nil && c.ssErr {
 				t.Errorf("unexpected lack of error in single-stack case")
-			} else if fatal != c.fatal {
-				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			} else if fatal != c.ssFatal {
+				t.Errorf("expected fatal=%v, got %v", c.ssFatal, fatal)
 			}
 
 			err, fatal = checkIPConfig(c.proxy, true)
@@ -1053,8 +1137,8 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("unexpected error in dual-stack case: %v", err)
 			} else if err == nil && c.dsErr {
 				t.Errorf("unexpected lack of error in dual-stack case")
-			} else if fatal != c.fatal {
-				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			} else if fatal != c.dsFatal {
+				t.Errorf("expected fatal=%v, got %v", c.dsFatal, fatal)
 			}
 		})
 	}

@@ -27,7 +27,7 @@ spec:
         env:
         # Defaults, used if no overrides are found in fluentd-gcp-scaling-policy
         - name: CPU_REQUEST
-          value: 100m
+          value: 10m
         - name: MEMORY_REQUEST
           value: 200Mi
         - name: CPU_LIMIT

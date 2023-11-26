@@ -1,0 +1,13 @@
+freebsd_task:
+  name: 'FreeBSD'
+  freebsd_instance:
+    image_family: freebsd-13-2
+  install_script:
+    - pkg update -f
+    - pkg install -y go
+  test_script:
+      # run tests as user "cirrus" instead of root
+    - pw useradd cirrus -m
+    - chown -R cirrus:cirrus .
+    - FSNOTIFY_BUFFER=4096 sudo --preserve-env=FSNOTIFY_BUFFER -u cirrus go test -parallel 1 -race ./...
+    -                      sudo --preserve-env=FSNOTIFY_BUFFER -u cirrus go test -parallel 1 -race ./...

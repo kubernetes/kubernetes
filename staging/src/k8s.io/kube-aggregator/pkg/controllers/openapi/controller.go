@@ -139,7 +139,10 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 
 // UpdateAPIService updates API Service's info and handler.
 func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *v1.APIService) {
-	if err := c.openAPIAggregationManager.AddUpdateAPIService(apiService, handler); err != nil {
+	if apiService.Spec.Service == nil {
+		return
+	}
+	if err := c.openAPIAggregationManager.UpdateAPIServiceSpec(apiService.Name); err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error updating APIService %q with err: %v", apiService.Name, err))
 	}
 	key := apiService.Name
@@ -155,9 +158,7 @@ func (c *AggregationController) UpdateAPIService(handler http.Handler, apiServic
 
 // RemoveAPIService removes API Service from OpenAPI Aggregation Controller.
 func (c *AggregationController) RemoveAPIService(apiServiceName string) {
-	if err := c.openAPIAggregationManager.RemoveAPIService(apiServiceName); err != nil {
-		utilruntime.HandleError(fmt.Errorf("removing %q from AggregationController failed with: %v", apiServiceName, err))
-	}
+	c.openAPIAggregationManager.RemoveAPIService(apiServiceName)
 	// This will only remove it if it was failing before. If it was successful, processNextWorkItem will figure it out
 	// and will not add it again to the queue.
 	c.queue.Forget(apiServiceName)

@@ -263,7 +263,7 @@ func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabl
 	if o.WebhookServing != nil {
 		errors = append(errors, o.WebhookServing.Validate()...)
 
-		if o.WebhookServing.BindPort == o.SecureServing.BindPort {
+		if o.WebhookServing.BindPort == o.SecureServing.BindPort && o.WebhookServing.BindPort != 0 {
 			errors = append(errors, fmt.Errorf("--webhook-secure-port cannot be the same value as --secure-port"))
 		}
 	}

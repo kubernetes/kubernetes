@@ -26,6 +26,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -56,7 +58,7 @@ const (
 	minNodes            = 2
 )
 
-var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
+var _ = utils.SIGDescribe("Pod Disks", feature.StorageProvider, func() {
 	var (
 		ns         string
 		cs         clientset.Interface
@@ -88,7 +90,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
 	})
 
-	ginkgo.Context("schedule pods each with a PD, delete pod and verify detach [Slow]", func() {
+	f.Context("schedule pods each with a PD, delete pod and verify detach", f.WithSlow(), func() {
 		const (
 			podDefaultGrace   = "default (30s)"
 			podImmediateGrace = "immediate (0s)"
@@ -226,7 +228,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		}
 	})
 
-	ginkgo.Context("schedule a pod w/ RW PD(s) mounted to 1 or more containers, write to PD, verify content, delete pod, and repeat in rapid succession [Slow]", func() {
+	f.Context("schedule a pod w/ RW PD(s) mounted to 1 or more containers, write to PD, verify content, delete pod, and repeat in rapid succession", f.WithSlow(), func() {
 		type testT struct {
 			numContainers int
 			numPDs        int
@@ -315,7 +317,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		}
 	})
 
-	ginkgo.Context("detach in a disrupted environment [Slow] [Disruptive]", func() {
+	f.Context("detach in a disrupted environment", f.WithSlow(), f.WithDisruptive(), func() {
 		const (
 			deleteNode    = 1 // delete physical node
 			deleteNodeObj = 2 // delete node's api object only
@@ -403,17 +405,17 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
 					output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					framework.ExpectEqual(true, strings.Contains(string(output), string(host0Name)))
+					gomega.Expect(string(output)).Should(gomega.ContainSubstring(string(host0Name)))
 
 					ginkgo.By("deleting host0")
 					err = gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v", err))
 					ginkgo.By("expecting host0 node to be re-created")
 					numNodes := countReadyNodes(ctx, cs, host0Name)
-					framework.ExpectEqual(numNodes, origNodeCnt, fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
+					gomega.Expect(numNodes).To(gomega.Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					framework.ExpectEqual(true, strings.Contains(string(output), string(host0Name)))
+					gomega.Expect(string(output)).Should(gomega.ContainSubstring(string(host0Name)))
 
 				} else if disruptOp == deleteNodeObj {
 					ginkgo.By("deleting host0's node api object")
@@ -454,7 +456,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 	// This test is marked to run as serial so as device selection on AWS does not
 	// conflict with other concurrent attach operations.
-	ginkgo.It("[Serial] attach on previously attached volumes should work", func(ctx context.Context) {
+	f.It(f.WithSerial(), "attach on previously attached volumes should work", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		ginkgo.By("creating PD")
 		diskName, err := e2epv.CreatePDWithRetry(ctx)

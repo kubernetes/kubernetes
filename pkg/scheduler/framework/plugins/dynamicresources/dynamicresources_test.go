@@ -330,13 +330,11 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			want: want{
-				filter: perNodeResult{
-					workerNode.Name: {
-						status: framework.AsStatus(fmt.Errorf(`look up resource class: resourceclass.resource.k8s.io "%s" not found`, className)),
-					},
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("resource class %s does not exist", className)),
 				},
 				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
 				},
 			},
 		},
@@ -348,7 +346,7 @@ func TestPlugin(t *testing.T) {
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
 					added:  []metav1.Object{schedulingSelectedPotential},
 				},
 			},
@@ -362,7 +360,7 @@ func TestPlugin(t *testing.T) {
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to provide information`),
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver to provide information`),
 					added:  []metav1.Object{schedulingPotential},
 				},
 			},
@@ -376,7 +374,7 @@ func TestPlugin(t *testing.T) {
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				reserve: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
 					changes: change{
 						scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
 							return st.FromPodSchedulingContexts(in).
@@ -642,9 +640,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	assert.Equal(t, expected.status, status)
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
-	for _, add := range expected.added {
-		wantObjects = append(wantObjects, add)
-	}
+	wantObjects = append(wantObjects, expected.added...)
 	for _, remove := range expected.removed {
 		for i, obj := range wantObjects {
 			// This is a bit relaxed (no GVR comparison, no UID
@@ -782,7 +778,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 		t.Fatal(err)
 	}
 
-	pl, err := New(nil, fh, feature.Features{EnableDynamicResourceAllocation: true})
+	pl, err := New(ctx, nil, fh, feature.Features{EnableDynamicResourceAllocation: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -891,6 +887,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		claims         []*resourcev1alpha2.ResourceClaim
 		oldObj, newObj interface{}
 		expectedHint   framework.QueueingHint
+		expectedErr    bool
 	}{
 		"skip-deletes": {
 			pod:          podWithClaimTemplate,
@@ -899,9 +896,9 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 		},
 		"backoff-wrong-new-object": {
-			pod:          podWithClaimTemplate,
-			newObj:       "not-a-claim",
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimTemplate,
+			newObj:      "not-a-claim",
+			expectedErr: true,
 		},
 		"skip-wrong-claim": {
 			pod: podWithClaimTemplate,
@@ -926,13 +923,13 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		"queue-on-add": {
 			pod:          podWithClaimName,
 			newObj:       pendingImmediateClaim,
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 		"backoff-wrong-old-object": {
-			pod:          podWithClaimName,
-			oldObj:       "not-a-claim",
-			newObj:       pendingImmediateClaim,
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimName,
+			oldObj:      "not-a-claim",
+			newObj:      pendingImmediateClaim,
+			expectedErr: true,
 		},
 		"skip-adding-finalizer": {
 			pod:    podWithClaimName,
@@ -954,7 +951,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
 				return claim
 			}(),
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 	}
 
@@ -971,7 +968,13 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					require.NoError(t, store.Update(claim))
 				}
 			}
-			actualHint := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
 			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}
@@ -984,6 +987,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		claims         []*resourcev1alpha2.ResourceClaim
 		oldObj, newObj interface{}
 		expectedHint   framework.QueueingHint
+		expectedErr    bool
 	}{
 		"skip-deleted": {
 			pod:          podWithClaimTemplate,
@@ -998,18 +1002,18 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 		},
 		"backoff-wrong-old-object": {
-			pod:          podWithClaimTemplate,
-			oldObj:       "not-a-scheduling-context",
-			newObj:       scheduling,
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimTemplate,
+			oldObj:      "not-a-scheduling-context",
+			newObj:      scheduling,
+			expectedErr: true,
 		},
 		"backoff-missed-wrong-old-object": {
 			pod: podWithClaimTemplate,
 			oldObj: cache.DeletedFinalStateUnknown{
 				Obj: "not-a-scheduling-context",
 			},
-			newObj:       scheduling,
-			expectedHint: framework.QueueAfterBackoff,
+			newObj:      scheduling,
+			expectedErr: true,
 		},
 		"skip-unrelated-object": {
 			pod:    podWithClaimTemplate,
@@ -1022,10 +1026,10 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 		},
 		"backoff-wrong-new-object": {
-			pod:          podWithClaimTemplate,
-			oldObj:       scheduling,
-			newObj:       "not-a-scheduling-context",
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimTemplate,
+			oldObj:      scheduling,
+			newObj:      "not-a-scheduling-context",
+			expectedErr: true,
 		},
 		"skip-missing-claim": {
 			pod:          podWithClaimTemplate,
@@ -1045,7 +1049,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			claims:       []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			oldObj:       scheduling,
 			newObj:       schedulingInfo,
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 		"queue-bad-selected-node": {
 			pod:    podWithClaimTemplateInStatus,
@@ -1061,7 +1065,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 				scheduling.Status.ResourceClaims[0].UnsuitableNodes = append(scheduling.Status.ResourceClaims[0].UnsuitableNodes, scheduling.Spec.SelectedNode)
 				return scheduling
 			}(),
-			expectedHint: framework.QueueImmediately,
+			expectedHint: framework.Queue,
 		},
 		"skip-spec-changes": {
 			pod:    podWithClaimTemplateInStatus,
@@ -1083,7 +1087,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 				scheduling.Finalizers = append(scheduling.Finalizers, "foo")
 				return scheduling
 			}(),
-			expectedHint: framework.QueueAfterBackoff,
+			expectedHint: framework.Queue,
 		},
 	}
 
@@ -1093,7 +1097,13 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			t.Parallel()
 			logger, _ := ktesting.NewTestContext(t)
 			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings)
-			actualHint := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
 			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}

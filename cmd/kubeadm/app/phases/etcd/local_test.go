@@ -22,11 +22,13 @@ package etcd
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 
 	v1 "k8s.io/api/core/v1"
@@ -44,8 +46,10 @@ func TestGetEtcdPodSpec(t *testing.T) {
 		Etcd: kubeadmapi.Etcd{
 			Local: &kubeadmapi.LocalEtcd{
 				DataDir: "/var/lib/etcd",
-				ExtraEnvs: []v1.EnvVar{
-					{Name: "Foo", Value: "Bar"},
+				ExtraEnvs: []kubeadmapi.EnvVar{
+					{
+						EnvVar: v1.EnvVar{Name: "Foo", Value: "Bar"},
+					},
 				},
 			},
 		},
@@ -71,8 +75,9 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	var tests = []struct {
-		cfg           *kubeadmapi.ClusterConfiguration
-		expectedError bool
+		cfg              *kubeadmapi.ClusterConfiguration
+		expectedError    bool
+		expectedManifest string
 	}{
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
@@ -84,6 +89,89 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 				},
 			},
 			expectedError: false,
+			expectedManifest: fmt.Sprintf(`apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubeadm.kubernetes.io/etcd.advertise-client-urls: https://:2379
+  creationTimestamp: null
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - etcd
+    - --advertise-client-urls=https://:2379
+    - --cert-file=etcd/server.crt
+    - --client-cert-auth=true
+    - --data-dir=%s/etcd
+    - --experimental-initial-corrupt-check=true
+    - --experimental-watch-progress-notify-interval=5s
+    - --initial-advertise-peer-urls=https://:2380
+    - --initial-cluster==https://:2380
+    - --key-file=etcd/server.key
+    - --listen-client-urls=https://127.0.0.1:2379,https://:2379
+    - --listen-metrics-urls=http://127.0.0.1:2381
+    - --listen-peer-urls=https://:2380
+    - --name=
+    - --peer-cert-file=etcd/peer.crt
+    - --peer-client-cert-auth=true
+    - --peer-key-file=etcd/peer.key
+    - --peer-trusted-ca-file=etcd/ca.crt
+    - --snapshot-count=10000
+    - --trusted-ca-file=etcd/ca.crt
+    image: /etcd:%s
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: 127.0.0.1
+        path: /health?exclude=NOSPACE&serializable=true
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+    name: etcd
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    startupProbe:
+      failureThreshold: 24
+      httpGet:
+        host: 127.0.0.1
+        path: /health?serializable=false
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+    volumeMounts:
+    - mountPath: %s/etcd
+      name: etcd-data
+    - mountPath: /etcd
+      name: etcd-certs
+  hostNetwork: true
+  priority: 2000001000
+  priorityClassName: system-node-critical
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+  - hostPath:
+      path: /etcd
+      type: DirectoryOrCreate
+    name: etcd-certs
+  - hostPath:
+      path: %s/etcd
+      type: DirectoryOrCreate
+    name: etcd-data
+status: {}
+`, tmpdir, kubeadmconstants.DefaultEtcdVersion, tmpdir, tmpdir),
 		},
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
@@ -115,6 +203,16 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 			// Assert expected files are there
 			testutil.AssertFilesCount(t, manifestPath, 1)
 			testutil.AssertFileExists(t, manifestPath, kubeadmconstants.Etcd+".yaml")
+			manifestBytes, err := os.ReadFile(path.Join(manifestPath, kubeadmconstants.Etcd+".yaml"))
+			if err != nil {
+				t.Errorf("failed to load generated manifest file: %v", err)
+			}
+			if test.expectedManifest != string(manifestBytes) {
+				t.Errorf(
+					"File created by CreateLocalEtcdStaticPodManifestFile is not as expected. Diff: \n%s",
+					cmp.Diff(string(manifestBytes), test.expectedManifest),
+				)
+			}
 		} else {
 			testutil.AssertError(t, err, "etcd static pod manifest cannot be generated for cluster using external etcd")
 		}
@@ -164,6 +262,9 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error executing ReadStaticPodFromDisk: %v", err)
 		return
+	}
+	if pod.Spec.DNSPolicy != "" {
+		t.Errorf("DNSPolicy should be empty but: %v", pod.Spec.DNSPolicy)
 	}
 
 	if _, ok := pod.ObjectMeta.Annotations["patched"]; !ok {

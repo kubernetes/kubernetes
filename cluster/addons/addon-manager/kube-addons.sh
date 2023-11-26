@@ -133,7 +133,7 @@ if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
   read -ra extra_prune_allowlist <<< "${KUBECTL_EXTRA_PRUNE_WHITELIST}"
 fi
 prune_allowlist=( "${KUBECTL_PRUNE_WHITELIST[@]}"  "${extra_prune_allowlist[@]}" )
-prune_allowlist_flags=$(generate_prune_allowallowlist_flags "${prune_allowlist[@]}")
+prune_allowlist_flags=$(generate_prune_allowlist_flags "${prune_allowlist[@]}")
 
 log INFO "== Generated kubectl prune allowlist flags: $prune_allowlist_flags =="
 

@@ -28,7 +28,7 @@ import (
 func TestCacherListerWatcher(t *testing.T) {
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix, true)
+	server, store := newEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
 
 	objects := []*example.Pod{
@@ -62,7 +62,7 @@ func TestCacherListerWatcher(t *testing.T) {
 func TestCacherListerWatcherPagination(t *testing.T) {
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix, true)
+	server, store := newEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
 
 	// We need the list to be sorted by name to later check the alphabetical order of

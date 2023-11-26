@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -45,6 +46,8 @@ type UnwantedStatus struct {
 	// references to modules in the spec.unwantedModules list, based on `go mod graph` content.
 	// eliminating things from this list is good, and sometimes requires working with upstreams to do so.
 	UnwantedReferences map[string][]string `json:"unwantedReferences"`
+	// list of modules in the spec.unwantedModules list which are vendored
+	UnwantedVendored []string `json:"unwantedVendored"`
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
@@ -272,6 +275,25 @@ func main() {
 		}
 	}
 
+	vendorModulesTxt, err := ioutil.ReadFile("vendor/modules.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	vendoredModules := map[string]bool{}
+	for _, l := range strings.Split(string(vendorModulesTxt), "\n") {
+		parts := strings.Split(l, " ")
+		if len(parts) == 3 && parts[0] == "#" && strings.HasPrefix(parts[2], "v") {
+			vendoredModules[parts[1]] = true
+		}
+	}
+	config.Status.UnwantedVendored = []string{}
+	for unwanted := range configFromFile.Spec.UnwantedModules {
+		if vendoredModules[unwanted] {
+			config.Status.UnwantedVendored = append(config.Status.UnwantedVendored, unwanted)
+		}
+	}
+	sort.Strings(config.Status.UnwantedVendored)
+
 	needUpdate := false
 
 	// Compare unwanted list from unwanted-dependencies.json with current status from `go mod graph`
@@ -286,7 +308,8 @@ func main() {
 	if !bytes.Equal(expected, actual) {
 		log.Printf("Expected status of\n%s", string(expected))
 		log.Printf("Got status of\n%s", string(actual))
-		log.Fatal("Status diff:\n", cmp.Diff(expected, actual))
+		needUpdate = true
+		log.Print("Status diff:\n", cmp.Diff(expected, actual))
 	}
 	for expectedRef, expectedFrom := range configFromFile.Status.UnwantedReferences {
 		actualFrom, ok := config.Status.UnwantedReferences[expectedRef]
@@ -324,6 +347,18 @@ func main() {
 			log.Printf("   %s", reference)
 		}
 		log.Printf("!!! Avoid updating referencing modules to versions that reintroduce use of unwanted dependencies\n")
+		needUpdate = true
+	}
+
+	removedVendored, addedVendored := difference(configFromFile.Status.UnwantedVendored, config.Status.UnwantedVendored)
+	if len(removedVendored) > 0 {
+		log.Printf("Good news! Unwanted modules are no longer vendered: %q", removedVendored)
+		log.Printf("!!! Remove those from status.unwantedVendored in %s to ensure they don't get reintroduced.", dependenciesJSONPath)
+		needUpdate = true
+	}
+	if len(addedVendored) > 0 {
+		log.Printf("Unwanted modules are newly vendored: %q", addedVendored)
+		log.Printf("!!! Avoid updates that increase vendoring of unwanted dependencies\n")
 		needUpdate = true
 	}
 

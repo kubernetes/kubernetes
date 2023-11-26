@@ -136,7 +136,7 @@ var (
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
-	ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
+	ProvidersWithSSH = []string{"gce", "gke", "aws", "local", "azure"}
 
 	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -352,7 +352,7 @@ func CreateTestingNS(ctx context.Context, baseName string, c clientset.Interface
 	}
 	// Be robust about making the namespace creation call.
 	var got *v1.Namespace
-	if err := wait.PollImmediateWithContext(ctx, Poll, 30*time.Second, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, Poll, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(ctx, namespaceObj, metav1.CreateOptions{})
 		if err != nil {
@@ -808,7 +808,7 @@ retriesLoop:
 		if errs.Len() > 0 {
 			Failf("Unexpected error(s): %v", strings.Join(errs.List(), "\n - "))
 		}
-		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
+		gomega.Expect(expectedWatchEvents).To(gomega.HaveLen(totalValidWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
 		break retriesLoop
 	}
 }

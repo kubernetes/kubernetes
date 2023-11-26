@@ -131,6 +131,19 @@ func TestV2APIService(t *testing.T) {
 
 	apiServiceNames := specProxier.GetAPIServiceNames()
 	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
+
+	// Ensure that OpenAPI v3 for legacy APIService is removed.
+	specProxier.RemoveAPIServiceSpec(apiService.Name)
+	data = sendReq(t, serveHandler, "/openapi/v3")
+	groupVersionList = handler3.OpenAPIV3Discovery{}
+	if err := json.Unmarshal(data, &groupVersionList); err != nil {
+		t.Fatal(err)
+	}
+
+	path, ok = groupVersionList.Paths["apis/group.example.com/v1"]
+	if ok {
+		t.Error("Expected group.example.com/v1 not to be in group version list")
+	}
 }
 
 func TestV3APIService(t *testing.T) {

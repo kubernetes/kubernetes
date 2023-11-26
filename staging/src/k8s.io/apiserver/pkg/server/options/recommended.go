@@ -17,20 +17,15 @@ limitations under the License.
 package options
 
 import (
-	"fmt"
-
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/feature"
-	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/klog/v2"
 )
 
 // RecommendedOptions contains the recommended options for running an API server.
@@ -122,17 +117,17 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Audit.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Features.ApplyTo(&config.Config); err != nil {
-		return err
-	}
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	initializers, err := o.ExtraAdmissionInitializers(config)
+	kubeClient, err := kubernetes.NewForConfig(config.ClientConfig)
 	if err != nil {
 		return err
 	}
-	kubeClient, err := kubernetes.NewForConfig(config.ClientConfig)
+	if err := o.Features.ApplyTo(&config.Config, kubeClient, config.SharedInformerFactory); err != nil {
+		return err
+	}
+	initializers, err := o.ExtraAdmissionInitializers(config)
 	if err != nil {
 		return err
 	}
@@ -143,22 +138,6 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, kubeClient, dynamicClient, o.FeatureGate,
 		initializers...); err != nil {
 		return err
-	}
-	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
-		if config.ClientConfig != nil {
-			if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {
-				return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", config.MaxRequestsInFlight, config.MaxMutatingRequestsInFlight)
-
-			}
-			config.FlowControl = utilflowcontrol.New(
-				config.SharedInformerFactory,
-				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta3(),
-				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
-				config.RequestTimeout/4,
-			)
-		} else {
-			klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")
-		}
 	}
 	return nil
 }

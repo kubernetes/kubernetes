@@ -25,12 +25,14 @@ import (
 // PersistentVolumeClaimStatusApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimStatus type for use
 // with apply.
 type PersistentVolumeClaimStatusApplyConfiguration struct {
-	Phase                     *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
-	AccessModes               []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty"`
-	Capacity                  *v1.ResourceList                                   `json:"capacity,omitempty"`
-	Conditions                []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty"`
-	AllocatedResources        *v1.ResourceList                                   `json:"allocatedResources,omitempty"`
-	AllocatedResourceStatuses map[v1.ResourceName]v1.ClaimResourceStatus         `json:"allocatedResourceStatuses,omitempty"`
+	Phase                            *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
+	AccessModes                      []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty"`
+	Capacity                         *v1.ResourceList                                   `json:"capacity,omitempty"`
+	Conditions                       []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty"`
+	AllocatedResources               *v1.ResourceList                                   `json:"allocatedResources,omitempty"`
+	AllocatedResourceStatuses        map[v1.ResourceName]v1.ClaimResourceStatus         `json:"allocatedResourceStatuses,omitempty"`
+	CurrentVolumeAttributesClassName *string                                            `json:"currentVolumeAttributesClassName,omitempty"`
+	ModifyVolumeStatus               *ModifyVolumeStatusApplyConfiguration              `json:"modifyVolumeStatus,omitempty"`
 }
 
 // PersistentVolumeClaimStatusApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimStatus type for use with
@@ -97,5 +99,21 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAllocatedResourceSta
 	for k, v := range entries {
 		b.AllocatedResourceStatuses[k] = v
 	}
+	return b
+}
+
+// WithCurrentVolumeAttributesClassName sets the CurrentVolumeAttributesClassName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CurrentVolumeAttributesClassName field is set to the value of the last call.
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithCurrentVolumeAttributesClassName(value string) *PersistentVolumeClaimStatusApplyConfiguration {
+	b.CurrentVolumeAttributesClassName = &value
+	return b
+}
+
+// WithModifyVolumeStatus sets the ModifyVolumeStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ModifyVolumeStatus field is set to the value of the last call.
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithModifyVolumeStatus(value *ModifyVolumeStatusApplyConfiguration) *PersistentVolumeClaimStatusApplyConfiguration {
+	b.ModifyVolumeStatus = value
 	return b
 }

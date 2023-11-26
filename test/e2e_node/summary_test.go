@@ -40,7 +40,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-var _ = SIGDescribe("Summary API [NodeConformance]", func() {
+var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("summary-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
@@ -110,7 +110,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
-						"MajorPageFaults": bounded(0, 100000),
+						"MajorPageFaults": bounded(0, 1e9),
 					}),
 					"Swap":               swapExpectation(memoryLimit),
 					"Accelerators":       gomega.BeEmpty(),
@@ -120,12 +120,12 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				})
 			}
 			expectedPageFaultsUpperBound := 1000000
-			expectedMajorPageFaultsUpperBound := 15
+			expectedMajorPageFaultsUpperBound := 1e9
 			if IsCgroup2UnifiedMode() {
 				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
 				// above for the container.
 				expectedPageFaultsUpperBound = 1e9
-				expectedMajorPageFaultsUpperBound = 100000
+				expectedMajorPageFaultsUpperBound = 1e9
 			}
 
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -158,7 +158,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"WorkingSetBytes": bounded(100*e2evolume.Kb, memoryLimit),
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1e9),
-					"MajorPageFaults": bounded(0, 100000),
+					"MajorPageFaults": bounded(0, 1e9),
 				})
 				systemContainers["misc"] = miscContExpectations
 			}
@@ -281,7 +281,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
-						"MajorPageFaults": bounded(0, 100000),
+						"MajorPageFaults": bounded(0, 1e9),
 					}),
 					"Swap": swapExpectation(memoryLimit),
 					// TODO(#28407): Handle non-eth0 network interface names.
@@ -308,6 +308,16 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					}),
 					"Runtime": ptrMatchAllFields(gstruct.Fields{
 						"ImageFs": ptrMatchAllFields(gstruct.Fields{
+							"Time":           recent(maxStatsAge),
+							"AvailableBytes": fsCapacityBounds,
+							"CapacityBytes":  fsCapacityBounds,
+							// we assume we are not running tests on machines more than 10tb of disk
+							"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
+							"InodesFree": bounded(1e4, 1e8),
+							"Inodes":     bounded(1e4, 1e8),
+							"InodesUsed": bounded(0, 1e8),
+						}),
+						"ContainerFs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,

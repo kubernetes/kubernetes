@@ -183,13 +183,58 @@ const (
 // Field names for google.protobuf.ExtensionRangeOptions.
 const (
 	ExtensionRangeOptions_UninterpretedOption_field_name protoreflect.Name = "uninterpreted_option"
+	ExtensionRangeOptions_Declaration_field_name         protoreflect.Name = "declaration"
+	ExtensionRangeOptions_Verification_field_name        protoreflect.Name = "verification"
 
 	ExtensionRangeOptions_UninterpretedOption_field_fullname protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.uninterpreted_option"
+	ExtensionRangeOptions_Declaration_field_fullname         protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.declaration"
+	ExtensionRangeOptions_Verification_field_fullname        protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.verification"
 )
 
 // Field numbers for google.protobuf.ExtensionRangeOptions.
 const (
 	ExtensionRangeOptions_UninterpretedOption_field_number protoreflect.FieldNumber = 999
+	ExtensionRangeOptions_Declaration_field_number         protoreflect.FieldNumber = 2
+	ExtensionRangeOptions_Verification_field_number        protoreflect.FieldNumber = 3
+)
+
+// Full and short names for google.protobuf.ExtensionRangeOptions.VerificationState.
+const (
+	ExtensionRangeOptions_VerificationState_enum_fullname = "google.protobuf.ExtensionRangeOptions.VerificationState"
+	ExtensionRangeOptions_VerificationState_enum_name     = "VerificationState"
+)
+
+// Names for google.protobuf.ExtensionRangeOptions.Declaration.
+const (
+	ExtensionRangeOptions_Declaration_message_name     protoreflect.Name     = "Declaration"
+	ExtensionRangeOptions_Declaration_message_fullname protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration"
+)
+
+// Field names for google.protobuf.ExtensionRangeOptions.Declaration.
+const (
+	ExtensionRangeOptions_Declaration_Number_field_name     protoreflect.Name = "number"
+	ExtensionRangeOptions_Declaration_FullName_field_name   protoreflect.Name = "full_name"
+	ExtensionRangeOptions_Declaration_Type_field_name       protoreflect.Name = "type"
+	ExtensionRangeOptions_Declaration_IsRepeated_field_name protoreflect.Name = "is_repeated"
+	ExtensionRangeOptions_Declaration_Reserved_field_name   protoreflect.Name = "reserved"
+	ExtensionRangeOptions_Declaration_Repeated_field_name   protoreflect.Name = "repeated"
+
+	ExtensionRangeOptions_Declaration_Number_field_fullname     protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.number"
+	ExtensionRangeOptions_Declaration_FullName_field_fullname   protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.full_name"
+	ExtensionRangeOptions_Declaration_Type_field_fullname       protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.type"
+	ExtensionRangeOptions_Declaration_IsRepeated_field_fullname protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.is_repeated"
+	ExtensionRangeOptions_Declaration_Reserved_field_fullname   protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.reserved"
+	ExtensionRangeOptions_Declaration_Repeated_field_fullname   protoreflect.FullName = "google.protobuf.ExtensionRangeOptions.Declaration.repeated"
+)
+
+// Field numbers for google.protobuf.ExtensionRangeOptions.Declaration.
+const (
+	ExtensionRangeOptions_Declaration_Number_field_number     protoreflect.FieldNumber = 1
+	ExtensionRangeOptions_Declaration_FullName_field_number   protoreflect.FieldNumber = 2
+	ExtensionRangeOptions_Declaration_Type_field_number       protoreflect.FieldNumber = 3
+	ExtensionRangeOptions_Declaration_IsRepeated_field_number protoreflect.FieldNumber = 4
+	ExtensionRangeOptions_Declaration_Reserved_field_number   protoreflect.FieldNumber = 5
+	ExtensionRangeOptions_Declaration_Repeated_field_number   protoreflect.FieldNumber = 6
 )
 
 // Names for google.protobuf.FieldDescriptorProto.
@@ -540,6 +585,7 @@ const (
 	FieldOptions_DebugRedact_field_name         protoreflect.Name = "debug_redact"
 	FieldOptions_Retention_field_name           protoreflect.Name = "retention"
 	FieldOptions_Target_field_name              protoreflect.Name = "target"
+	FieldOptions_Targets_field_name             protoreflect.Name = "targets"
 	FieldOptions_UninterpretedOption_field_name protoreflect.Name = "uninterpreted_option"
 
 	FieldOptions_Ctype_field_fullname               protoreflect.FullName = "google.protobuf.FieldOptions.ctype"
@@ -552,6 +598,7 @@ const (
 	FieldOptions_DebugRedact_field_fullname         protoreflect.FullName = "google.protobuf.FieldOptions.debug_redact"
 	FieldOptions_Retention_field_fullname           protoreflect.FullName = "google.protobuf.FieldOptions.retention"
 	FieldOptions_Target_field_fullname              protoreflect.FullName = "google.protobuf.FieldOptions.target"
+	FieldOptions_Targets_field_fullname             protoreflect.FullName = "google.protobuf.FieldOptions.targets"
 	FieldOptions_UninterpretedOption_field_fullname protoreflect.FullName = "google.protobuf.FieldOptions.uninterpreted_option"
 )
 
@@ -567,6 +614,7 @@ const (
 	FieldOptions_DebugRedact_field_number         protoreflect.FieldNumber = 16
 	FieldOptions_Retention_field_number           protoreflect.FieldNumber = 17
 	FieldOptions_Target_field_number              protoreflect.FieldNumber = 18
+	FieldOptions_Targets_field_number             protoreflect.FieldNumber = 19
 	FieldOptions_UninterpretedOption_field_number protoreflect.FieldNumber = 999
 )
 

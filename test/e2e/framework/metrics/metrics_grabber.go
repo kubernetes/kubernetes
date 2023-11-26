@@ -252,7 +252,7 @@ func (g *Grabber) GrabFromScheduler(ctx context.Context) (SchedulerMetrics, erro
 
 	var lastMetricsFetchErr error
 	var output string
-	if metricsWaitErr := wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+	if metricsWaitErr := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output, lastMetricsFetchErr = g.getSecureMetricsFromPod(ctx, g.kubeScheduler, metav1.NamespaceSystem, kubeSchedulerPort)
 		return lastMetricsFetchErr == nil, nil
 	}); metricsWaitErr != nil {
@@ -303,7 +303,7 @@ func (g *Grabber) GrabFromControllerManager(ctx context.Context) (ControllerMana
 
 	var output string
 	var lastMetricsFetchErr error
-	if metricsWaitErr := wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+	if metricsWaitErr := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output, lastMetricsFetchErr = g.getSecureMetricsFromPod(ctx, g.kubeControllerManager, metav1.NamespaceSystem, kubeControllerManagerPort)
 		return lastMetricsFetchErr == nil, nil
 	}); metricsWaitErr != nil {
@@ -342,7 +342,7 @@ func (g *Grabber) GrabFromSnapshotController(ctx context.Context, podName string
 
 	var output string
 	var lastMetricsFetchErr error
-	if metricsWaitErr := wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+	if metricsWaitErr := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output, lastMetricsFetchErr = g.getMetricsFromPod(ctx, g.client, podName, metav1.NamespaceSystem, port)
 		return lastMetricsFetchErr == nil, nil
 	}); metricsWaitErr != nil {

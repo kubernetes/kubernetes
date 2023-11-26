@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -34,26 +35,22 @@ import (
 // only the instances of this argument in the overrides to be applied.
 func ArgumentsToCommand(base []kubeadmapi.Arg, overrides []kubeadmapi.Arg) []string {
 	var command []string
-	// Copy the base arguments into a new slice.
-	args := make([]kubeadmapi.Arg, len(base))
-	copy(args, base)
+	// Copy the overrides arguments into a new slice.
+	args := make([]kubeadmapi.Arg, len(overrides))
+	copy(args, overrides)
 
-	// Go trough the override arguments and delete all instances of arguments with the same name
-	// in the base list of arguments.
-	for i := 0; i < len(overrides); i++ {
-	repeat:
-		for j := 0; j < len(args); j++ {
-			if overrides[i].Name == args[j].Name {
-				// Remove this existing argument and search for another argument
-				// with the same name in base.
-				args = append(args[:j], args[j+1:]...)
-				goto repeat
-			}
+	// overrideArgs is a set of args which will replace the args defined in the base
+	overrideArgs := sets.New[string]()
+	for _, arg := range overrides {
+		overrideArgs.Insert(arg.Name)
+	}
+
+	for _, arg := range base {
+		if !overrideArgs.Has(arg.Name) {
+			args = append(args, arg)
 		}
 	}
 
-	// Concatenate the overrides and the base arguments and then sort them.
-	args = append(args, overrides...)
 	sort.Slice(args, func(i, j int) bool {
 		if args[i].Name == args[j].Name {
 			return args[i].Value < args[j].Value

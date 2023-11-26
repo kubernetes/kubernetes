@@ -28,19 +28,25 @@ import (
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/openapi3"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][Feature:ValidatingAdmissionPolicy]", func() {
+var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", framework.WithFeatureGate(features.ValidatingAdmissionPolicy), func() {
 	f := framework.NewDefaultFramework("validating-admission-policy")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var client clientset.Interface
+	var extensionsClient apiextensionsclientset.Interface
 
 	ginkgo.BeforeEach(func() {
 		var err error
@@ -51,6 +57,8 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][
 			// TODO: feature check should fail after GA graduation
 			ginkgo.Skip(fmt.Sprintf("server does not support ValidatingAdmissionPolicy v1beta1: %v, feature gate not enabled?", err))
 		}
+		extensionsClient, err = apiextensionsclientset.NewForConfig(f.ClientConfig())
+		framework.ExpectNoError(err, "initializing api-extensions client")
 	})
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -205,11 +213,14 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][
 					Expression: "object.spec.replicas",
 				}).
 				WithVariable(admissionregistrationv1beta1.Variable{
-					Name:       "replicasReminder", // a bit artificial but good for testing purpose
-					Expression: "variables.replicas % 2",
+					Name:       "oddReplicas",
+					Expression: "variables.replicas % 2 == 1",
 				}).
 				WithValidation(admissionregistrationv1beta1.Validation{
-					Expression: "variables.replicas > 1 && variables.replicasReminder == 1",
+					Expression: "variables.replicas > 1",
+				}).
+				WithValidation(admissionregistrationv1beta1.Validation{
+					Expression: "variables.oddReplicas",
 				}).
 				Build()
 			policy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
@@ -250,6 +261,98 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][
 			replicaSet, err := client.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, replicaSet, metav1.CreateOptions{})
 			defer client.AppsV1().ReplicaSets(f.Namespace.Name).Delete(ctx, replicaSet.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "create non-replicated ReplicaSet")
+		})
+	})
+
+	ginkgo.It("should type check a CRD", func(ctx context.Context) {
+		crd := crontabExampleCRD()
+		crd.Spec.Group = "stable." + f.UniqueName
+		crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
+		var policy *admissionregistrationv1beta1.ValidatingAdmissionPolicy
+		ginkgo.By("creating the CRD", func() {
+			var err error
+			crd, err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create CRD")
+			err = wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+				// wait for the CRD to be published.
+				root := openapi3.NewRoot(client.Discovery().OpenAPIV3())
+				_, err = root.GVSpec(schema.GroupVersion{Group: crd.Spec.Group, Version: "v1"})
+				return err == nil, nil
+			})
+			framework.ExpectNoError(err, "wait for CRD.")
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, name, metav1.DeleteOptions{})
+			}, crd.Name)
+		})
+		ginkgo.By("creating a vaild policy for crontabs", func() {
+			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".correct-crd-policy.example.com").
+				MatchUniqueNamespace(f.UniqueName).
+				StartResourceRule().
+				MatchResource([]string{crd.Spec.Group}, []string{"v1"}, []string{"crontabs"}).
+				EndResourceRule().
+				WithValidation(admissionregistrationv1beta1.Validation{
+					Expression: "object.spec.replicas > 1",
+				}).
+				Build()
+			policy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create policy")
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
+			}, policy.Name)
+		})
+		ginkgo.By("waiting for the type check to finish without warnings", func() {
+			err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+				policy, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if policy.Status.TypeChecking != nil {
+					return true, nil
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for type checking")
+			gomega.Expect(policy.Status.TypeChecking.ExpressionWarnings).To(gomega.BeEmpty(), "expect no warnings")
+		})
+		ginkgo.By("creating a policy with type-confused expressions for crontabs", func() {
+			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".confused-crd-policy.example.com").
+				MatchUniqueNamespace(f.UniqueName).
+				StartResourceRule().
+				MatchResource([]string{crd.Spec.Group}, []string{"v1"}, []string{"crontabs"}).
+				EndResourceRule().
+				WithValidation(admissionregistrationv1beta1.Validation{
+					Expression: "object.spec.replicas > '1'", // type confusion
+				}).
+				WithValidation(admissionregistrationv1beta1.Validation{
+					Expression: "object.spec.maxRetries < 10", // not yet existing field
+				}).
+				Build()
+			policy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create policy")
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
+			}, policy.Name)
+		})
+		ginkgo.By("waiting for the type check to finish with warnings", func() {
+			err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+				policy, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if policy.Status.TypeChecking != nil {
+					return true, nil
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for type checking")
+
+			gomega.Expect(policy.Status.TypeChecking.ExpressionWarnings).To(gomega.HaveLen(2))
+			warning := policy.Status.TypeChecking.ExpressionWarnings[0]
+			gomega.Expect(warning.FieldRef).To(gomega.Equal("spec.validations[0].expression"))
+			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("found no matching overload for '_>_' applied to '(int, string)'"))
+			warning = policy.Status.TypeChecking.ExpressionWarnings[1]
+			gomega.Expect(warning.FieldRef).To(gomega.Equal("spec.validations[1].expression"))
+			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("undefined field 'maxRetries'"))
 		})
 	})
 })
@@ -403,4 +506,49 @@ func (b *validatingAdmissionPolicyBuilder) WithVariable(variable admissionregist
 
 func (b *validatingAdmissionPolicyBuilder) Build() *admissionregistrationv1beta1.ValidatingAdmissionPolicy {
 	return b.policy
+}
+
+func crontabExampleCRD() *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "crontabs.stable.example.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "stable.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"cronSpec": {
+											Type: "string",
+										},
+										"image": {
+											Type: "string",
+										},
+										"replicas": {
+											Type: "integer",
+										},
+									},
+								},
+							},
+						}},
+				},
+			},
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:     "crontabs",
+				Singular:   "crontab",
+				Kind:       "CronTab",
+				ShortNames: []string{"ct"},
+			},
+		},
+	}
 }

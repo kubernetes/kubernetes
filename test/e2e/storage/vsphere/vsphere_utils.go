@@ -91,7 +91,7 @@ func waitForVSphereDisksToDetach(ctx context.Context, nodeVolumes map[string][]s
 		return true, nil
 	})
 	if waitErr != nil {
-		if waitErr == wait.ErrWaitTimeout {
+		if wait.Interrupted(waitErr) {
 			return fmt.Errorf("volumes have not detached after %v: %v", detachTimeout, waitErr)
 		}
 		return fmt.Errorf("error waiting for volumes to detach: %v", waitErr)
@@ -132,7 +132,7 @@ func waitForVSphereDiskStatus(ctx context.Context, volumePath string, nodeName s
 		return false, nil
 	})
 	if waitErr != nil {
-		if waitErr == wait.ErrWaitTimeout {
+		if wait.Interrupted(waitErr) {
 			return fmt.Errorf("volume %q is not %s %q after %v: %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout, waitErr)
 		}
 		return fmt.Errorf("error waiting for volume %q to be %s %q: %v", volumePath, attachedStateMsg[expectedState], nodeName, waitErr)
@@ -753,13 +753,15 @@ func getUUIDFromProviderID(providerID string) string {
 
 // GetReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos(ctx context.Context, c clientset.Interface) []*NodeInfo {
-	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
-	framework.ExpectNoError(err)
 	var nodesInfo []*NodeInfo
-	for _, node := range nodeList.Items {
-		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node.Name)
-		if nodeInfo != nil {
-			nodesInfo = append(nodesInfo, nodeInfo)
+	if TestContext.NodeMapper != nil {
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		for _, node := range nodeList.Items {
+			nodeInfo := TestContext.NodeMapper.GetNodeInfo(node.Name)
+			if nodeInfo != nil {
+				nodesInfo = append(nodesInfo, nodeInfo)
+			}
 		}
 	}
 	return nodesInfo

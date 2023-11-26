@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -34,7 +35,7 @@ import (
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes:vsphere", feature.Vsphere, func() {
 	var (
 		c          clientset.Interface
 		ns         string
@@ -157,7 +158,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		2. Restart kubelet
 		3. Verify that written file is accessible after kubelet restart
 	*/
-	ginkgo.It("should test that a file written to the vsphere volume mount before kubelet restart can be read after restart [Disruptive]", func(ctx context.Context) {
+	f.It("should test that a file written to the vsphere volume mount before kubelet restart can be read after restart", f.WithDisruptive(), func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		utils.TestKubeletRestartsAndRestoresMount(ctx, c, f, clientPod, e2epod.VolumeMountPath1)
 	})
@@ -173,7 +174,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		4. Start kubelet.
 		5. Verify that volume mount not to be found.
 	*/
-	ginkgo.It("should test that a vsphere volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func(ctx context.Context) {
+	f.It("should test that a vsphere volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns", f.WithDisruptive(), func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		utils.TestVolumeUnmountsFromDeletedPod(ctx, c, f, clientPod, e2epod.VolumeMountPath1)
 	})

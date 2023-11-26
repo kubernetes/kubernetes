@@ -43,13 +43,11 @@ import (
 )
 
 type fakeRemoteAttach struct {
-	method string
-	url    *url.URL
-	err    error
+	url *url.URL
+	err error
 }
 
-func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	f.method = method
+func (f *fakeRemoteAttach) Attach(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	f.url = url
 	return f.err
 }
@@ -327,7 +325,7 @@ func TestAttach(t *testing.T) {
 						return err
 					}
 
-					return options.Attach.Attach("POST", u, nil, nil, nil, nil, raw, sizeQueue)
+					return options.Attach.Attach(u, nil, nil, nil, nil, raw, sizeQueue)
 				}
 			}
 
@@ -346,9 +344,6 @@ func TestAttach(t *testing.T) {
 			if remoteAttach.url.Path != test.attachPath {
 				t.Errorf("%s: Did not get expected path for exec request: %q %q", test.name, test.attachPath, remoteAttach.url.Path)
 				return
-			}
-			if remoteAttach.method != "POST" {
-				t.Errorf("%s: Did not get method for attach request: %s", test.name, remoteAttach.method)
 			}
 			if remoteAttach.url.Query().Get("container") != "bar" {
 				t.Errorf("%s: Did not have query parameters: %s", test.name, remoteAttach.url.Query())
@@ -428,7 +423,7 @@ func TestAttachWarnings(t *testing.T) {
 						return err
 					}
 
-					return options.Attach.Attach("POST", u, nil, nil, nil, nil, raw, sizeQueue)
+					return options.Attach.Attach(u, nil, nil, nil, nil, raw, sizeQueue)
 				}
 			}
 

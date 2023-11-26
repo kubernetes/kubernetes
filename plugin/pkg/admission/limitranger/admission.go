@@ -186,9 +186,7 @@ func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRan
 		}
 		lruEntry := lruItemObj.(liveLookupEntry)
 
-		for i := range lruEntry.items {
-			items = append(items, lruEntry.items[i])
-		}
+		items = append(items, lruEntry.items...)
 
 	}
 

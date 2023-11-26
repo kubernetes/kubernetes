@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -39,7 +40,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
+var _ = sigDescribe(feature.Windows, "Memory Limits", framework.WithSerial(), framework.WithSlow(), skipUnlessWindows(func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -60,8 +61,7 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 			overrideAllocatableMemoryTest(ctx, f, framework.TestContext.CloudConfig.NumNodes)
 		})
 	})
-
-})
+}))
 
 type nodeMemory struct {
 	// capacity
@@ -105,9 +105,12 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 	})
 	framework.ExpectNoError(err)
 
+	framework.Logf("Scheduling 1 pod per node to consume all allocatable memory")
 	for _, node := range nodeList.Items {
 		status := node.Status
+		podMemLimt := resource.NewQuantity(status.Allocatable.Memory().Value()-(1024*1024*100), resource.BinarySI)
 		podName := "mem-test-" + string(uuid.NewUUID())
+		framework.Logf("Scheduling pod %s on node %s (allocatable memory=%v) with memory limit %v", podName, node.Name, status.Allocatable.Memory(), podMemLimt)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
@@ -119,7 +122,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceMemory: status.Allocatable[v1.ResourceMemory],
+								v1.ResourceMemory: *podMemLimt,
 							},
 						},
 					},
@@ -133,6 +136,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
+	framework.Logf("Schedule additional pod which should not get scheduled")
 	podName := "mem-failure-pod"
 	failurePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -155,6 +159,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 			},
 		},
 	}
+	framework.Logf("Ensuring that pod %s fails to schedule", podName)
 	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, failurePod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	gomega.Eventually(ctx, func() bool {
@@ -169,7 +174,6 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 		}
 		return false
 	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrue())
-
 }
 
 // getNodeMemory populates a nodeMemory struct with information from the first

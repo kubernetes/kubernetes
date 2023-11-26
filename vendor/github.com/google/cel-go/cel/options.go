@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
+	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/containers"
 	"github.com/google/cel-go/common/functions"
 	"github.com/google/cel-go/common/types"
@@ -465,6 +466,24 @@ func EvalOptions(opts ...EvalOption) ProgramOption {
 func InterruptCheckFrequency(checkFrequency uint) ProgramOption {
 	return func(p *prog) (*prog, error) {
 		p.interruptCheckFrequency = checkFrequency
+		return p, nil
+	}
+}
+
+// CostEstimatorOptions configure type-check time options for estimating expression cost.
+func CostEstimatorOptions(costOpts ...checker.CostOption) EnvOption {
+	return func(e *Env) (*Env, error) {
+		e.costOptions = append(e.costOptions, costOpts...)
+		return e, nil
+	}
+}
+
+// CostTrackerOptions configures a set of options for cost-tracking.
+//
+// Note, CostTrackerOptions is a no-op unless CostTracking is also enabled.
+func CostTrackerOptions(costOpts ...interpreter.CostTrackerOption) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.costOptions = append(p.costOptions, costOpts...)
 		return p, nil
 	}
 }

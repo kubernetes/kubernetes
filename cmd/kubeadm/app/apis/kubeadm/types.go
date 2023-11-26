@@ -17,8 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	"crypto/x509"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -60,6 +58,7 @@ type InitConfiguration struct {
 
 	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
 	// a secret in the cluster during the uploadcerts init phase.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	CertificateKey string
 
 	// SkipPhases is a list of phases to skip during command execution.
@@ -121,6 +120,9 @@ type ClusterConfiguration struct {
 	// DNS defines the options for the DNS add-on installed in the cluster.
 	DNS DNS
 
+	// Proxy defines the options for the proxy add-on installed in the cluster.
+	Proxy Proxy
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
 
@@ -140,6 +142,10 @@ type ClusterConfiguration struct {
 
 	// The cluster name
 	ClusterName string
+
+	// EncryptionAlgorithm holds the type of asymmetric encryption algorithm used for keys and certificates.
+	// Can be "RSA" (default algorithm, key size is 2048) or "ECDSA" (uses the P-256 elliptic curve).
+	EncryptionAlgorithm EncryptionAlgorithmType
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
@@ -156,7 +162,7 @@ type ControlPlaneComponent struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []v1.EnvVar
+	ExtraEnvs []EnvVar
 }
 
 // APIServer holds settings necessary for API server deployments in the cluster
@@ -172,8 +178,17 @@ type APIServer struct {
 
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
-	// ImageMeta allows to customize the image used for the DNS component
+	// ImageMeta allows to customize the image used for the DNS addon
 	ImageMeta `json:",inline"`
+
+	// Disabled specifies whether to disable this addon in the cluster
+	Disabled bool
+}
+
+// Proxy defines the proxy addon that should be used in the cluster
+type Proxy struct {
+	// Disabled specifies whether to disable this addon in the cluster
+	Disabled bool
 }
 
 // ImageMeta allows to customize the image used for components that are not
@@ -274,7 +289,7 @@ type LocalEtcd struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []v1.EnvVar
+	ExtraEnvs []EnvVar
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	ServerCertSANs []string
@@ -337,6 +352,7 @@ type JoinControlPlane struct {
 
 	// CertificateKey is the key that is used for decryption of certificates after they are downloaded from the secret
 	// upon joining a new control plane node. The corresponding encryption key is in the InitConfiguration.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	CertificateKey string
 }
 
@@ -401,13 +417,18 @@ func (cfg *ClusterConfiguration) GetControlPlaneImageRepository() string {
 	return cfg.ImageRepository
 }
 
-// PublicKeyAlgorithm returns the type of encryption keys used in the cluster.
-func (cfg *ClusterConfiguration) PublicKeyAlgorithm() x509.PublicKeyAlgorithm {
-	if features.Enabled(cfg.FeatureGates, features.PublicKeysECDSA) {
-		return x509.ECDSA
+// EncryptionAlgorithmType returns the type of encryption keys used in the cluster.
+func (cfg *ClusterConfiguration) EncryptionAlgorithmType() EncryptionAlgorithmType {
+	// If the feature gate is set to true, or false respect it.
+	// If the feature gate is not set, use the EncryptionAlgorithm field (v1beta4).
+	// TODO: remove this function when the feature gate is removed.
+	if enabled, ok := cfg.FeatureGates[features.PublicKeysECDSA]; ok {
+		if enabled {
+			return EncryptionAlgorithmECDSA
+		}
+		return EncryptionAlgorithmRSA
 	}
-
-	return x509.RSA
+	return cfg.EncryptionAlgorithm
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the
@@ -511,3 +532,18 @@ type Arg struct {
 	Name  string
 	Value string
 }
+
+// EnvVar represents an environment variable present in a Container.
+type EnvVar struct {
+	v1.EnvVar
+}
+
+// EncryptionAlgorithmType can define an asymmetric encryption algorithm type.
+type EncryptionAlgorithmType string
+
+const (
+	// EncryptionAlgorithmECDSA defines the ECDSA encryption algorithm type.
+	EncryptionAlgorithmECDSA EncryptionAlgorithmType = "ECDSA"
+	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
+	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
+)

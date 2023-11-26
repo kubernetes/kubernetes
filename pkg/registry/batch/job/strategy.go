@@ -92,6 +92,7 @@ func (jobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 // PrepareForCreate clears the status of a job before creation.
 func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
+	generateSelectorIfNeeded(job)
 	job.Status = batch.JobStatus{}
 
 	job.Generation = 1
@@ -163,10 +164,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new job.
 func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
-	// TODO: move UID generation earlier and do this in defaulting logic?
-	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
-		generateSelector(job)
-	}
 	opts := validationOptionsForJob(job, nil)
 	return batchvalidation.ValidateJob(job, opts)
 }
@@ -211,6 +208,13 @@ func (jobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 	}
 	warnings = append(warnings, job.WarningsForJobSpec(ctx, field.NewPath("spec"), &newJob.Spec, nil)...)
 	return warnings
+}
+
+// generateSelectorIfNeeded checks the job's manual selector flag and generates selector labels if the flag is true.
+func generateSelectorIfNeeded(obj *batch.Job) {
+	if !*obj.Spec.ManualSelector {
+		generateSelector(obj)
+	}
 }
 
 // generateSelector adds a selector to a job and labels to its template

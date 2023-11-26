@@ -138,8 +138,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 			})
 			framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
-			framework.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
-			framework.ExpectNotEqual(lastPod.Spec.TerminationGracePeriodSeconds, 0)
+			gomega.Expect(lastPod.DeletionTimestamp).ToNot(gomega.BeNil())
+			gomega.Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(gomega.BeZero())
 
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
@@ -726,7 +726,7 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 	}
 
 	if status := e2epod.FindContainerStatusInPod(pod, "blocked"); status != nil {
-		if (status.Started != nil && *status.Started == true) || status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
+		if (status.Started != nil && *status.Started) || status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
 			return fmt.Errorf("pod %s on node %s should not have started the blocked container: %#v", pod.Name, pod.Spec.NodeName, status)
 		}
 	}

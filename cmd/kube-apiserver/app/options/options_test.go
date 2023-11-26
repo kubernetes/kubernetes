@@ -157,7 +157,6 @@ func TestAddFlags(t *testing.T) {
 						CertFile:       "/var/run/kubernetes/etcdce.crt",
 						TracerProvider: oteltrace.NewNoopTracerProvider(),
 					},
-					Paging:                true,
 					Prefix:                "/registry",
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
 					CountMetricPollPeriod: time.Minute,
@@ -257,11 +256,8 @@ func TestAddFlags(t *testing.T) {
 					RetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 				},
 				BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
-				OIDC: &kubeoptions.OIDCAuthenticationOptions{
-					UsernameClaim: "sub",
-					SigningAlgs:   []string{"RS256"},
-				},
-				RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
+				OIDC:           s.Authentication.OIDC,
+				RequestHeader:  &apiserveroptions.RequestHeaderAuthenticationOptions{},
 				ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
 					Lookup:           true,
 					ExtendExpiration: true,
@@ -327,7 +323,17 @@ func TestAddFlags(t *testing.T) {
 		},
 	}
 
+	expected.Authentication.OIDC.UsernameClaim = "sub"
+	expected.Authentication.OIDC.SigningAlgs = []string{"RS256"}
+
+	if !s.Authorization.AreLegacyFlagsSet() {
+		t.Errorf("expected legacy authorization flags to be set")
+	}
+
+	// setting the method to nil since methods can't be compared with reflect.DeepEqual
+	s.Authorization.AreLegacyFlagsSet = nil
+
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
 	}
 }

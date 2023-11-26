@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -141,10 +142,28 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, cacher)
 }
 
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, cacher)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, cacher)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, cacher)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
 }
 
 func TestList(t *testing.T) {
@@ -158,12 +177,6 @@ func TestListWithListFromCache(t *testing.T) {
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
-}
-
-func TestListWithoutPaging(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withoutPaging)
-	t.Cleanup(terminate)
-	storagetesting.RunTestListWithoutPaging(ctx, t, cacher)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -312,7 +325,7 @@ func TestNamespaceScopedWatch(t *testing.T) {
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher)
+	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
 }
 
 func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
@@ -327,6 +340,18 @@ func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
 	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
 }
 
+func TestCacherWatchSemantics(t *testing.T) {
+	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+	t.Cleanup(terminate)
+	storagetesting.RunWatchSemantics(context.TODO(), t, store)
+}
+
+func TestCacherWatchSemanticInitialEventsExtended(t *testing.T) {
+	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+	t.Cleanup(terminate)
+	storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)
+}
+
 // ===================================================
 // Test-setup related function are following.
 // ===================================================
@@ -337,7 +362,6 @@ type setupOptions struct {
 	resourcePrefix string
 	keyFunc        func(runtime.Object) (string, error)
 	indexerFuncs   map[string]storage.IndexerFunc
-	pagingEnabled  bool
 	clock          clock.WithTicker
 }
 
@@ -348,7 +372,6 @@ func withDefaults(options *setupOptions) {
 
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
-	options.pagingEnabled = true
 	options.clock = clock.RealClock{}
 }
 
@@ -370,10 +393,6 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 	}
 }
 
-func withoutPaging(options *setupOptions) {
-	options.pagingEnabled = false
-}
-
 func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
 	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 	return ctx, cacher, tearDown
@@ -386,7 +405,7 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		opt(&setupOpts)
 	}
 
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix(), setupOpts.pagingEnabled)
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	// Inject one list error to make sure we test the relist case.
 	wrappedStorage := &storagetesting.StorageInjectingListErrors{
 		Interface: etcdStorage,
@@ -423,4 +442,37 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 	}
 
 	return ctx, cacher, server, terminate
+}
+
+func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
+	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
+
+	if err := cacher.ready.wait(context.TODO()); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
+	return &createWrapper{Cacher: cacher}, tearDown
+}
+
+type createWrapper struct {
+	*Cacher
+}
+
+func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	if err := c.Cacher.Create(ctx, key, obj, out, ttl); err != nil {
+		return err
+	}
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		currentObj := c.Cacher.newFunc()
+		err := c.Cacher.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
+		if err != nil {
+			if storage.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		if !apiequality.Semantic.DeepEqual(currentObj, out) {
+			return false, nil
+		}
+		return true, nil
+	})
 }

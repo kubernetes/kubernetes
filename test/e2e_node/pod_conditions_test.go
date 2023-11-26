@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -41,13 +41,14 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 	f := framework.NewDefaultFramework("pod-conditions")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	ginkgo.Context("including PodReadyToStartContainers condition [Serial] [Feature:PodReadyToStartContainersCondition]", func() {
+	f.Context("including PodReadyToStartContainers condition", f.WithSerial(), feature.PodReadyToStartContainersCondition, func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.PodReadyToStartContainersCondition): true,
@@ -113,7 +114,7 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 
 		// Verify PodReadyToStartContainers is not set (since sandboxcreation is blocked)
 		if checkPodReadyToStart {
-			_, err := getTransitionTimeForPodConditionWithStatus(p, kubetypes.PodReadyToStartContainers, false)
+			_, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodReadyToStartContainers, false)
 			framework.ExpectNoError(err)
 		}
 
@@ -125,7 +126,7 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 			// Verify PodInitialized is set if init containers are not present (since without init containers, it gets set very early)
 			initializedTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodInitialized, true)
 			framework.ExpectNoError(err)
-			framework.ExpectNotEqual(initializedTime.Before(scheduledTime), true, fmt.Sprintf("pod without init containers is initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
+			gomega.Expect(initializedTime.Before(scheduledTime)).NotTo(gomega.BeTrue(), fmt.Sprintf("pod without init containers is initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
 		}
 
 		// Verify ContainersReady is not set (since sandboxcreation is blocked)
@@ -148,7 +149,9 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		if !isReady {
+			framework.Failf("pod %q should be ready", p.Name)
+		}
 
 		ginkgo.By("checking order of pod condition transitions for a pod with no container/sandbox restarts")
 
@@ -160,33 +163,33 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 		condBeforeContainersReadyTransitionTime := initializedTime
 		errSubstrIfContainersReadyTooEarly := "is initialized"
 		if checkPodReadyToStart {
-			readyToStartContainersTime, err := getTransitionTimeForPodConditionWithStatus(p, kubetypes.PodReadyToStartContainers, true)
+			readyToStartContainersTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodReadyToStartContainers, true)
 			framework.ExpectNoError(err)
 
 			if hasInitContainers {
 				// With init containers, verify the sequence of conditions is: Scheduled => PodReadyToStartContainers => Initialized
-				framework.ExpectNotEqual(readyToStartContainersTime.Before(scheduledTime), true, fmt.Sprintf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime))
-				framework.ExpectNotEqual(initializedTime.Before(readyToStartContainersTime), true, fmt.Sprintf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime))
+				gomega.Expect(readyToStartContainersTime.Before(scheduledTime)).ToNot(gomega.BeTrue(), fmt.Sprintf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime))
+				gomega.Expect(initializedTime.Before(readyToStartContainersTime)).ToNot(gomega.BeTrue(), fmt.Sprintf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime))
 			} else {
 				// Without init containers, verify the sequence of conditions is: Scheduled => Initialized => PodReadyToStartContainers
 				condBeforeContainersReadyTransitionTime = readyToStartContainersTime
 				errSubstrIfContainersReadyTooEarly = "ready to start"
-				framework.ExpectNotEqual(initializedTime.Before(scheduledTime), true, fmt.Sprintf("pod without init containers initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
-				framework.ExpectNotEqual(readyToStartContainersTime.Before(initializedTime), true, fmt.Sprintf("pod without init containers has ready to start at: %v which is before pod is initialized at: %v", readyToStartContainersTime, initializedTime))
+				gomega.Expect(initializedTime.Before(scheduledTime)).NotTo(gomega.BeTrue(), fmt.Sprintf("pod without init containers initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
+				gomega.Expect(readyToStartContainersTime.Before(initializedTime)).NotTo(gomega.BeTrue(), fmt.Sprintf("pod without init containers has ready to start at: %v which is before pod is initialized at: %v", readyToStartContainersTime, initializedTime))
 			}
 		} else {
 			// In the absence of PodHasReadyToStartContainers feature disabled, verify the sequence is: Scheduled => Initialized
-			framework.ExpectNotEqual(initializedTime.Before(scheduledTime), true, fmt.Sprintf("pod initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
+			gomega.Expect(initializedTime.Before(scheduledTime)).NotTo(gomega.BeTrue(), fmt.Sprintf("pod initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
 		}
 		// Verify the next condition to get set is ContainersReady
 		containersReadyTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.ContainersReady, true)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(containersReadyTime.Before(condBeforeContainersReadyTransitionTime), true, fmt.Sprintf("containers ready at: %v which is before pod %s: %v", containersReadyTime, errSubstrIfContainersReadyTooEarly, initializedTime))
+		gomega.Expect(containersReadyTime.Before(condBeforeContainersReadyTransitionTime)).NotTo(gomega.BeTrue(), fmt.Sprintf("containers ready at: %v which is before pod %s: %v", containersReadyTime, errSubstrIfContainersReadyTooEarly, initializedTime))
 
 		// Verify ContainersReady => PodReady
 		podReadyTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodReady, true)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(podReadyTime.Before(containersReadyTime), true, fmt.Sprintf("pod ready at: %v which is before pod containers ready at: %v", podReadyTime, containersReadyTime))
+		gomega.Expect(podReadyTime.Before(containersReadyTime)).NotTo(gomega.BeTrue(), fmt.Sprintf("pod ready at: %v which is before pod containers ready at: %v", podReadyTime, containersReadyTime))
 	}
 }
 

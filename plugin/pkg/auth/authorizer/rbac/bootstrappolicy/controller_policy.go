@@ -140,7 +140,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-			role.Rules = append(role.Rules, rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie())
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("pods/status").RuleOrDie())
 		}
 		return role
 	}())
@@ -369,6 +369,18 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "service-cidrs-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch", "patch", "update").Groups(networkingGroup).Resources("servicecidrs").RuleOrDie(),
+				rbacv1helpers.NewRule("patch", "update").Groups(networkingGroup).Resources("servicecidrs/finalizers").RuleOrDie(),
+				rbacv1helpers.NewRule("patch", "update").Groups(networkingGroup).Resources("servicecidrs/status").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(networkingGroup).Resources("ipaddresses").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
 		role := rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "statefulset-controller"},
@@ -472,7 +484,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "legacy-service-account-token-cleaner"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("configmaps").Names(legacytokentracking.ConfigMapName).RuleOrDie(),
-				rbacv1helpers.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+				rbacv1helpers.NewRule("patch", "delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 			},
 		})
 	}

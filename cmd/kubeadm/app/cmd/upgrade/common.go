@@ -92,7 +92,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	// The resulting configs overwrite the existing cluster ones at the end of a successful upgrade apply operation.
 	if isKubeadmConfigPresent(docmap) {
 		klog.Warning("WARNING: Usage of the --config flag with kubeadm config types for reconfiguring the cluster during upgrade is not recommended!")
-		cfg, err := configutil.BytesToInitConfiguration(configBytes)
+		cfg, err := configutil.BytesToInitConfiguration(configBytes, false)
 		return cfg, true, err
 	}
 
@@ -120,6 +120,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	return initCfg, false, nil
 }
 
+// LoadConfigFunc is a function type that loads configuration from a file and/or the cluster.
 type LoadConfigFunc func(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error)
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
@@ -184,7 +185,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration, printer); err != nil {
+	if err := runPreflightChecks(client, ignorePreflightErrorsSet, printer); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -236,7 +237,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
+func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
 	printer.Printf("[preflight] Running pre-flight checks.\n")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {

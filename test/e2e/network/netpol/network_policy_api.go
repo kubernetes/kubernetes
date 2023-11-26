@@ -29,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -233,14 +234,14 @@ var _ = common.SIGDescribe("Netpol API", func() {
 			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
 			SetSpecEgressRules(egressRule))
 		_, err := npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field cannot be defined if the Port field is defined as a named (string) port.")
 		egressRule = networkingv1.NetworkPolicyEgressRule{}
 		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"}, EndPort: &endport})
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field must be equal or greater than port.")
 		ginkgo.By("When EndPort field is smaller than port, it will failed")
@@ -248,7 +249,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 30000}, EndPort: &endport})
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field is equal with port.")
 		egressRule.Ports[0].Port = &intstr.IntOrString{Type: intstr.Int, IntVal: 20000}

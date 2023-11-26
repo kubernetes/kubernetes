@@ -291,7 +291,6 @@ run_kubectl_debug_restricted_tests() {
   kube::log::status "Testing kubectl debug profile restricted"
 
   ### Pod Troubleshooting by ephemeral containers with restricted profile
-  
   # Pre-Condition: Pod "nginx" is created
   kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -304,6 +303,7 @@ run_kubectl_debug_restricted_tests() {
   # Clean up
   kubectl delete pod target "${kube_flags[@]:?}"
 
+  ### Pod Troubleshooting by pod copy with restricted profile
   # Pre-Condition: Pod "nginx" is created
   kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -324,6 +324,7 @@ run_kubectl_debug_restricted_tests() {
   output_message=$(kubectl get namespaces "${ns_name}" --show-labels)
   kube::test::if_has_string "${output_message}" 'pod-security.kubernetes.io/enforce=restricted'
  
+  ### Pod Troubleshooting by ephemeral containers with restricted profile (restricted namespace)
   # Pre-Condition: Pod "busybox" is created that complies with the restricted policy
   kubectl create -f hack/testdata/pod-restricted-runtime-default.yaml -n "${ns_name}"
   kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -336,6 +337,7 @@ run_kubectl_debug_restricted_tests() {
   # Clean up
   kubectl delete pod target -n "${ns_name}" "${kube_flags[@]:?}"
 
+  ### Pod Troubleshooting by pod copy with restricted profile (restricted namespace)
   # Pre-Condition: Pod "nginx" is created
   kubectl create -f hack/testdata/pod-restricted-runtime-default.yaml -n "${ns_name}"
   kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -349,6 +351,7 @@ run_kubectl_debug_restricted_tests() {
   # Clean up
   kubectl delete pod target target-copy -n "${ns_name}" "${kube_flags[@]:?}"
 
+  ### Pod Troubleshooting by ephemeral containers with restricted profile (restricted namespace)
   # Pre-Condition: Pod "busybox" is created that complies with the restricted policy
   kubectl create -f hack/testdata/pod-restricted-localhost.yaml -n "${ns_name}"
   kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -361,6 +364,7 @@ run_kubectl_debug_restricted_tests() {
   # Clean up
   kubectl delete pod target -n ${ns_name} "${kube_flags[@]:?}"
 
+  ### Pod Troubleshooting by pod copy with restricted profile (restricted namespace)
   # Pre-Condition: Pod "nginx" is created
   kubectl create -f hack/testdata/pod-restricted-localhost.yaml -n "${ns_name}"
   kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -388,8 +392,7 @@ run_kubectl_debug_restricted_node_tests() {
   create_and_use_new_namespace  
   kube::log::status "Testing kubectl debug profile restricted (node)"
 
-  ### Debug node with restrected profile
-  
+  ### Debug node with restricted profile
   # Pre-Condition: node exists
   kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
   # Restricted profile just works in not restricted namespace
@@ -422,6 +425,7 @@ run_kubectl_debug_restricted_node_tests() {
   output_message=$(kubectl get namespaces "${ns_name}" --show-labels)
   kube::test::if_has_string "${output_message}" 'pod-security.kubernetes.io/enforce=restricted'
 
+  ### Debug node with restricted profile (restricted namespace)
   # Pre-Condition: node exists
   kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
   # Restricted profile works in restricted namespace
@@ -449,6 +453,74 @@ run_kubectl_debug_restricted_node_tests() {
 
   # Clean up restricted namespace
   kubectl delete namespace "${ns_name}"
+
+  set +o nounset
+  set +o errexit
+}
+
+run_kubectl_debug_netadmin_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace  
+  kube::log::status "Testing kubectl debug profile netadmin"
+
+  ### Pod Troubleshooting by ephemeral containers with netadmin profile  
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Command: add a new debug container with netadmin profile
+  output_message=$(kubectl debug target -it --image=busybox --attach=false -c debug-container --profile=netadmin "${kube_flags[@]:?}")
+  # Post-Conditions
+  kube::test::get_object_assert pod/target '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  kube::test::get_object_assert pod/target '{{(index (index .spec.ephemeralContainers 0).securityContext.capabilities.add)}}' '\[NET_ADMIN NET_RAW\]'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
+  ### Pod Troubleshooting by pod copy with netadmin profile
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=netadmin "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
+  kube::test::get_object_assert pod/target-copy '{{.spec.shareProcessNamespace}}' 'true'
+  kube::test::get_object_assert pod/target-copy '{{(index (index .spec.containers 1).securityContext.capabilities.add)}}' '\[NET_ADMIN NET_RAW\]'
+  # Clean up
+  kubectl delete pod target target-copy "${kube_flags[@]:?}"
+
+  set +o nounset
+  set +o errexit
+}
+
+run_kubectl_debug_netadmin_node_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace  
+  kube::log::status "Testing kubectl debug profile netadmin (node)"
+
+  ### Debug node with netadmin profile
+  # Pre-Condition: node exists
+  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
+  # Command: create a new node debugger pod
+  output_message=$(kubectl debug --profile netadmin node/127.0.0.1 --image=busybox --attach=false "${kube_flags[@]:?}" -- true)
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{(len .items)}}" '1'
+  debugger=$(kubectl get pod -o go-template="{{(index .items 0)${id_field:?}}}")
+  kube::test::if_has_string "${output_message:?}" "${debugger:?}"
+  kube::test::get_object_assert "pod/${debugger:?}" "{{${image_field:?}}}" 'busybox'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.nodeName}}' '127.0.0.1'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.hostNetwork}}' 'true'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.hostPID}}' 'true'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{index .spec.containers 0 "securityContext" "capabilities" "add"}}' '\[NET_ADMIN NET_RAW\]'
+  # Clean up
+  # pod.spec.nodeName is set by kubectl debug node which causes the delete to hang,
+  # presumably waiting for a kubelet that's not present. Force the delete.
+  kubectl delete --force pod "${debugger:?}" "${kube_flags[@]:?}"
 
   set +o nounset
   set +o errexit

@@ -866,6 +866,11 @@ const (
 	POLLNVAL = 0x20
 )
 
+type sigset_argpack struct {
+	ss    *Sigset_t
+	ssLen uintptr
+}
+
 type SignalfdSiginfo struct {
 	Signo     uint32
 	Errno     int32
@@ -1972,7 +1977,7 @@ const (
 	NFT_MSG_GETFLOWTABLE              = 0x17
 	NFT_MSG_DELFLOWTABLE              = 0x18
 	NFT_MSG_GETRULE_RESET             = 0x19
-	NFT_MSG_MAX                       = 0x21
+	NFT_MSG_MAX                       = 0x22
 	NFTA_LIST_UNSPEC                  = 0x0
 	NFTA_LIST_ELEM                    = 0x1
 	NFTA_HOOK_UNSPEC                  = 0x0
@@ -4494,7 +4499,7 @@ const (
 	NL80211_ATTR_MAC_HINT                                   = 0xc8
 	NL80211_ATTR_MAC_MASK                                   = 0xd7
 	NL80211_ATTR_MAX_AP_ASSOC_STA                           = 0xca
-	NL80211_ATTR_MAX                                        = 0x145
+	NL80211_ATTR_MAX                                        = 0x146
 	NL80211_ATTR_MAX_CRIT_PROT_DURATION                     = 0xb4
 	NL80211_ATTR_MAX_CSA_COUNTERS                           = 0xce
 	NL80211_ATTR_MAX_MATCH_SETS                             = 0x85
@@ -4864,7 +4869,7 @@ const (
 	NL80211_CMD_LEAVE_IBSS                                  = 0x2c
 	NL80211_CMD_LEAVE_MESH                                  = 0x45
 	NL80211_CMD_LEAVE_OCB                                   = 0x6d
-	NL80211_CMD_MAX                                         = 0x99
+	NL80211_CMD_MAX                                         = 0x9a
 	NL80211_CMD_MICHAEL_MIC_FAILURE                         = 0x29
 	NL80211_CMD_MODIFY_LINK_STA                             = 0x97
 	NL80211_CMD_NAN_MATCH                                   = 0x78
@@ -5498,7 +5503,7 @@ const (
 	NL80211_RATE_INFO_HE_RU_ALLOC_52                        = 0x1
 	NL80211_RATE_INFO_HE_RU_ALLOC_996                       = 0x5
 	NL80211_RATE_INFO_HE_RU_ALLOC                           = 0x11
-	NL80211_RATE_INFO_MAX                                   = 0x16
+	NL80211_RATE_INFO_MAX                                   = 0x1d
 	NL80211_RATE_INFO_MCS                                   = 0x2
 	NL80211_RATE_INFO_SHORT_GI                              = 0x4
 	NL80211_RATE_INFO_VHT_MCS                               = 0x6
@@ -5863,3 +5868,18 @@ const (
 	VIRTIO_NET_HDR_GSO_UDP_L4 = 0x5
 	VIRTIO_NET_HDR_GSO_ECN    = 0x80
 )
+
+type SchedAttr struct {
+	Size     uint32
+	Policy   uint32
+	Flags    uint64
+	Nice     int32
+	Priority uint32
+	Runtime  uint64
+	Deadline uint64
+	Period   uint64
+	Util_min uint32
+	Util_max uint32
+}
+
+const SizeofSchedAttr = 0x38

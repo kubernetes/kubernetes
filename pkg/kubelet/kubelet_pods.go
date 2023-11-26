@@ -477,7 +477,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	if err != nil {
 		return nil, nil, err
 	}
-	// nodename will be equals to hostname if SetHostnameAsFQDN is nil or false. If SetHostnameFQDN
+	// nodename will be equal to hostname if SetHostnameAsFQDN is nil or false. If SetHostnameFQDN
 	// is true and hostDomainName is defined, nodename will be the FQDN (hostname.hostDomainName)
 	nodename, err := util.GetNodenameForKernel(hostname, hostDomainName, pod.Spec.SetHostnameAsFQDN)
 	if err != nil {
@@ -981,7 +981,7 @@ func (kl *Kubelet) isAdmittedPodTerminal(pod *v1.Pod) bool {
 		return true
 	}
 	// a pod that has been marked terminal within the Kubelet is considered
-	// inactive (may have been rejected by Kubelet admision)
+	// inactive (may have been rejected by Kubelet admission)
 	if status, ok := kl.statusManager.GetPodStatus(pod.UID); ok {
 		if status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed {
 			return true
@@ -1625,12 +1625,30 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	}
 }
 
+func deleteCustomResourceFromResourceRequirements(target *v1.ResourceRequirements) {
+	for resource := range target.Limits {
+		if resource != v1.ResourceCPU && resource != v1.ResourceMemory && resource != v1.ResourceEphemeralStorage {
+			delete(target.Limits, resource)
+		}
+	}
+	for resource := range target.Requests {
+		if resource != v1.ResourceCPU && resource != v1.ResourceMemory && resource != v1.ResourceEphemeralStorage {
+			delete(target.Requests, resource)
+		}
+	}
+}
+
 func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
 	var podResizeStatus v1.PodResizeStatus
 	specStatusDiffer := false
 	for _, c := range pod.Spec.Containers {
 		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
-			if cs.Resources != nil && !cmp.Equal(c.Resources, *cs.Resources) {
+			cResourceCopy := c.Resources.DeepCopy()
+			// for both requests and limits, we only compare the cpu, memory and ephemeralstorage
+			// which are included in convertToAPIContainerStatuses
+			deleteCustomResourceFromResourceRequirements(cResourceCopy)
+			csResourceCopy := cs.Resources.DeepCopy()
+			if csResourceCopy != nil && !cmp.Equal(*cResourceCopy, *csResourceCopy) {
 				specStatusDiffer = true
 				break
 			}

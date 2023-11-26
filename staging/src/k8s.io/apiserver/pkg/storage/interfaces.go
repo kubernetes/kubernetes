@@ -282,6 +282,19 @@ type ListOptions struct {
 	Recursive bool
 	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
 	// be delivered to the users. The option is ignored for non-watch requests.
+	//
+	// Firstly, note that this field is different from the Predicate.AllowWatchBookmarks field.
+	// Secondly, this field is intended for internal clients only such as the watch cache.
+	//
+	// This means that external clients do not have the ability to set this field directly.
+	// For example by setting the allowWatchBookmarks query parameter.
+	//
+	// The motivation for this approach is the fact that the frequency
+	// of bookmark events from a storage like etcd might be very high.
+	// As the number of watch requests increases, the server load would also increase.
+	//
+	// Furthermore, the server is not obligated to provide bookmark events at all,
+	// as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/956-watch-bookmark#proposal
 	ProgressNotify bool
 	// SendInitialEvents, when set together with Watch option,
 	// begin the watch stream with synthetic init events to build the

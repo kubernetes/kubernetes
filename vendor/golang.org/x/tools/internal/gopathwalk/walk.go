@@ -9,8 +9,6 @@ package gopathwalk
 import (
 	"bufio"
 	"bytes"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -78,7 +76,7 @@ func walkDir(root Root, add func(Root, string), skip func(root Root, dir string)
 	}
 	start := time.Now()
 	if opts.Logf != nil {
-		opts.Logf("gopathwalk: scanning %s", root.Path)
+		opts.Logf("scanning %s", root.Path)
 	}
 	w := &walker{
 		root: root,
@@ -88,11 +86,15 @@ func walkDir(root Root, add func(Root, string), skip func(root Root, dir string)
 	}
 	w.init()
 	if err := fastwalk.Walk(root.Path, w.walk); err != nil {
-		log.Printf("gopathwalk: scanning directory %v: %v", root.Path, err)
+		logf := opts.Logf
+		if logf == nil {
+			logf = log.Printf
+		}
+		logf("scanning directory %v: %v", root.Path, err)
 	}
 
 	if opts.Logf != nil {
-		opts.Logf("gopathwalk: scanned %s in %v", root.Path, time.Since(start))
+		opts.Logf("scanned %s in %v", root.Path, time.Since(start))
 	}
 }
 
@@ -135,7 +137,7 @@ func (w *walker) init() {
 // The provided path is one of the $GOPATH entries with "src" appended.
 func (w *walker) getIgnoredDirs(path string) []string {
 	file := filepath.Join(path, ".goimportsignore")
-	slurp, err := ioutil.ReadFile(file)
+	slurp, err := os.ReadFile(file)
 	if w.opts.Logf != nil {
 		if err != nil {
 			w.opts.Logf("%v", err)
@@ -222,7 +224,11 @@ func (w *walker) walk(path string, typ os.FileMode) error {
 func (w *walker) shouldTraverse(path string) bool {
 	ts, err := os.Stat(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		logf := w.opts.Logf
+		if logf == nil {
+			logf = log.Printf
+		}
+		logf("%v", err)
 		return false
 	}
 	if !ts.IsDir() {

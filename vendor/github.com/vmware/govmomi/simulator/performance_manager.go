@@ -19,6 +19,7 @@ package simulator
 import (
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vmware/govmomi/simulator/esx"
@@ -174,9 +175,6 @@ func (p *PerformanceManager) QueryPerf(ctx *Context, req *types.QueryPerf) soap.
 	body.Res.Returnval = make([]types.BasePerfEntityMetricBase, len(req.QuerySpec))
 
 	for i, qs := range req.QuerySpec {
-		metrics := new(types.PerfEntityMetric)
-		metrics.Entity = qs.Entity
-
 		// Get metric data for this entity type
 		metricData, ok := p.metricData[qs.Entity.Type]
 		if !ok {
@@ -202,9 +200,12 @@ func (p *PerformanceManager) QueryPerf(ctx *Context, req *types.QueryPerf) soap.
 			interval = 20 // TODO: Determine from entity type
 		}
 		n := 1 + int32(end.Sub(start).Seconds())/interval
-		if n > qs.MaxSample {
+		if qs.MaxSample > 0 && n > qs.MaxSample {
 			n = qs.MaxSample
 		}
+
+		metrics := new(types.PerfEntityMetric)
+		metrics.Entity = qs.Entity
 
 		// Loop through each interval "tick"
 		metrics.SampleInfo = make([]types.PerfSampleInfo, n)
@@ -213,10 +214,11 @@ func (p *PerformanceManager) QueryPerf(ctx *Context, req *types.QueryPerf) soap.
 			metrics.SampleInfo[tick] = types.PerfSampleInfo{Timestamp: end.Add(time.Duration(-interval*tick) * time.Second), Interval: interval}
 		}
 
+		series := make([]*types.PerfMetricIntSeries, len(qs.MetricId))
 		for j, mid := range qs.MetricId {
 			// Create list of metrics for this tick
-			series := &types.PerfMetricIntSeries{Value: make([]int64, n)}
-			series.Id = mid
+			series[j] = &types.PerfMetricIntSeries{Value: make([]int64, n)}
+			series[j].Id = mid
 			points := metricData[mid.CounterId]
 			offset := int64(start.Unix()) / int64(interval)
 
@@ -237,11 +239,56 @@ func (p *PerformanceManager) QueryPerf(ctx *Context, req *types.QueryPerf) soap.
 				} else {
 					p = 0
 				}
-				series.Value[tick] = p
+				series[j].Value[tick] = p
 			}
-			metrics.Value[j] = series
+			metrics.Value[j] = series[j]
 		}
-		body.Res.Returnval[i] = metrics
+
+		if qs.Format == string(types.PerfFormatCsv) {
+			metricsCsv := new(types.PerfEntityMetricCSV)
+			metricsCsv.Entity = qs.Entity
+
+			//PerfSampleInfo encoded in the following CSV format: [interval1], [date1], [interval2], [date2], and so on.
+			metricsCsv.SampleInfoCSV = sampleInfoCSV(metrics)
+			metricsCsv.Value = make([]types.PerfMetricSeriesCSV, len(qs.MetricId))
+
+			for j, mid := range qs.MetricId {
+				seriesCsv := &types.PerfMetricSeriesCSV{Value: ""}
+				seriesCsv.Id = mid
+				seriesCsv.Value = valueCSV(series[j])
+				metricsCsv.Value[j] = *seriesCsv
+			}
+
+			body.Res.Returnval[i] = metricsCsv
+		} else {
+			body.Res.Returnval[i] = metrics
+		}
 	}
 	return body
+}
+
+// sampleInfoCSV converts the SampleInfo field to a CSV string
+func sampleInfoCSV(m *types.PerfEntityMetric) string {
+	values := make([]string, len(m.SampleInfo)*2)
+
+	i := 0
+	for _, s := range m.SampleInfo {
+		values[i] = strconv.Itoa(int(s.Interval))
+		i++
+		values[i] = s.Timestamp.Format(time.RFC3339)
+		i++
+	}
+
+	return strings.Join(values, ",")
+}
+
+// valueCSV converts the Value field to a CSV string
+func valueCSV(s *types.PerfMetricIntSeries) string {
+	values := make([]string, len(s.Value))
+
+	for i := range s.Value {
+		values[i] = strconv.FormatInt(s.Value[i], 10)
+	}
+
+	return strings.Join(values, ",")
 }

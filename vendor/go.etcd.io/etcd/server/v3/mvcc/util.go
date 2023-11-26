@@ -35,3 +35,25 @@ func WriteKV(be backend.Backend, kv mvccpb.KeyValue) {
 	be.BatchTx().UnsafePut(buckets.Key, ibytes, d)
 	be.BatchTx().Unlock()
 }
+
+func UnsafeSetScheduledCompact(tx backend.BatchTx, value int64) {
+	rbytes := newRevBytes()
+	revToBytes(revision{main: value}, rbytes)
+	tx.UnsafePut(buckets.Meta, scheduledCompactKeyName, rbytes)
+}
+
+func UnsafeReadFinishedCompact(tx backend.ReadTx) (int64, bool) {
+	_, finishedCompactBytes := tx.UnsafeRange(buckets.Meta, finishedCompactKeyName, nil, 0)
+	if len(finishedCompactBytes) != 0 {
+		return bytesToRev(finishedCompactBytes[0]).main, true
+	}
+	return 0, false
+}
+
+func UnsafeReadScheduledCompact(tx backend.ReadTx) (int64, bool) {
+	_, scheduledCompactBytes := tx.UnsafeRange(buckets.Meta, scheduledCompactKeyName, nil, 0)
+	if len(scheduledCompactBytes) != 0 {
+		return bytesToRev(scheduledCompactBytes[0]).main, true
+	}
+	return 0, false
+}

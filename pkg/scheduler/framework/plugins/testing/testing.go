@@ -49,7 +49,7 @@ func SetupPluginWithInformers(
 	if err != nil {
 		tb.Fatalf("Failed creating framework runtime: %v", err)
 	}
-	p, err := pf(config, fh)
+	p, err := pf(ctx, config, fh)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func SetupPlugin(
 	if err != nil {
 		tb.Fatalf("Failed creating framework runtime: %v", err)
 	}
-	p, err := pf(config, fh)
+	p, err := pf(ctx, config, fh)
 	if err != nil {
 		tb.Fatal(err)
 	}

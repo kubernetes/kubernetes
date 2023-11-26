@@ -64,7 +64,7 @@ const (
 	testFinalizer = "example.com/test-finalizer"
 )
 
-var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
+var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var ns string
@@ -328,7 +328,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		podRes := v1.ResourceList{testExtendedResource: resource.MustParse("1")}
 
 		ginkgo.By("Select a node to run the lower and higher priority pods")
-		framework.ExpectNotEqual(len(nodeList.Items), 0, "We need at least one node for the test to run")
+		gomega.Expect(nodeList.Items).ToNot(gomega.BeEmpty(), "We need at least one node for the test to run")
 		node := nodeList.Items[0]
 		nodeCopy := node.DeepCopy()
 		nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("1")
@@ -814,13 +814,13 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			pcCopy := pcs[0].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10
 			err := patchPriorityClass(ctx, cs, pcs[0], pcCopy)
-			framework.ExpectError(err, "expect a patch error on an immutable field")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expect a patch error on an immutable field")
 			framework.Logf("%v", err)
 
 			pcCopy = pcs[1].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10
 			_, err = cs.SchedulingV1().PriorityClasses().Update(ctx, pcCopy, metav1.UpdateOptions{})
-			framework.ExpectError(err, "expect an update error on an immutable field")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expect an update error on an immutable field")
 			framework.Logf("%v", err)
 
 			// 2. Patch/Update on mutable fields will succeed.

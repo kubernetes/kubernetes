@@ -23,7 +23,6 @@ package v1beta4
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -42,37 +41,21 @@ func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 	if in.Etcd.Local != nil {
 		for i := range in.Etcd.Local.ExtraEnvs {
 			a := &in.Etcd.Local.ExtraEnvs[i]
-			if a.ValueFrom != nil {
-				if a.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
-				}
-			}
+			SetDefaults_EnvVar(a)
 		}
 	}
 	SetDefaults_APIServer(&in.APIServer)
 	for i := range in.APIServer.ControlPlaneComponent.ExtraEnvs {
 		a := &in.APIServer.ControlPlaneComponent.ExtraEnvs[i]
-		if a.ValueFrom != nil {
-			if a.ValueFrom.FieldRef != nil {
-				v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
-			}
-		}
+		SetDefaults_EnvVar(a)
 	}
 	for i := range in.ControllerManager.ExtraEnvs {
 		a := &in.ControllerManager.ExtraEnvs[i]
-		if a.ValueFrom != nil {
-			if a.ValueFrom.FieldRef != nil {
-				v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
-			}
-		}
+		SetDefaults_EnvVar(a)
 	}
 	for i := range in.Scheduler.ExtraEnvs {
 		a := &in.Scheduler.ExtraEnvs[i]
-		if a.ValueFrom != nil {
-			if a.ValueFrom.FieldRef != nil {
-				v1.SetDefaults_ObjectFieldSelector(a.ValueFrom.FieldRef)
-			}
-		}
+		SetDefaults_EnvVar(a)
 	}
 }
 

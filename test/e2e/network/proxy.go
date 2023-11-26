@@ -98,7 +98,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Testname: Proxy, logs service endpoint
 			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
 		*/
-		framework.ConformanceIt("should proxy through a service and a pod ", func(ctx context.Context) {
+		framework.ConformanceIt("should proxy through a service and a pod", func(ctx context.Context) {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
 			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, &v1.Service{

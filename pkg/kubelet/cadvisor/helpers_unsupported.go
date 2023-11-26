@@ -29,6 +29,10 @@ func (i *unsupportedImageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 	return "", errors.New("unsupported")
 }
 
+func (i *unsupportedImageFsInfoProvider) ContainerFsInfoLabel() (string, error) {
+	return "", errors.New("unsupported")
+}
+
 // NewImageFsInfoProvider returns a provider for the specified runtime configuration.
 func NewImageFsInfoProvider(runtimeEndpoint string) ImageFsInfoProvider {
 	return &unsupportedImageFsInfoProvider{}

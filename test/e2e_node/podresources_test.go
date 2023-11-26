@@ -31,8 +31,8 @@ import (
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	podresourcesgrpc "k8s.io/kubernetes/pkg/kubelet/apis/podresources/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -43,11 +43,13 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 )
 
 const (
@@ -566,7 +568,7 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 	ginkgo.By(fmt.Sprintf("expecting some %q devices reported", sd.resourceName))
 	gomega.ExpectWithOffset(1, devs).ToNot(gomega.BeEmpty())
 	for _, dev := range devs {
-		framework.ExpectEqual(dev.ResourceName, sd.resourceName)
+		gomega.Expect(dev.ResourceName).To(gomega.Equal(sd.resourceName))
 		gomega.ExpectWithOffset(1, dev.DeviceIds).ToNot(gomega.BeEmpty())
 	}
 }
@@ -577,7 +579,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	expected := []podDesc{}
 	resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
 	podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
-	framework.ExpectError(err, "pod not found")
+	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
 	res := convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
@@ -619,7 +621,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:PodResources]", func() {
+var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResources, nodefeature.PodResources, func() {
 	f := framework.NewDefaultFramework("podresources-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -757,6 +759,27 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					podresourcesGetAllocatableResourcesTests(ctx, cli, nil, onlineCPUs, reservedSystemCPUs)
 					podresourcesGetTests(ctx, f, cli)
 				})
+				ginkgo.It("should account for resources of pods in terminal phase", func(ctx context.Context) {
+					pd := podDesc{
+						cntName:    "e2e-test-cnt",
+						podName:    "e2e-test-pod",
+						cpuRequest: 1000,
+					}
+					pod := makePodResourcesTestPod(pd)
+					pod.Spec.Containers[0].Command = []string{"sh", "-c", "/bin/true"}
+					pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, time.Minute)
+					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
+					framework.ExpectNoError(err)
+					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+					framework.ExpectNoError(err)
+					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+					framework.ExpectNoError(err)
+					defer conn.Close()
+					// although the pod moved into terminal state, PodResourcesAPI still list its cpus
+					expectPodResources(ctx, 1, cli, []podDesc{pd})
+
+				})
 			})
 		})
 
@@ -788,7 +811,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				ginkgo.By("checking Get fail if the feature gate is not enabled")
 				getRes, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
 				framework.Logf("Get result: %v, err: %v", getRes, err)
-				framework.ExpectError(err, "With feature gate disabled, the call must fail")
+				gomega.Expect(err).To(gomega.HaveOccurred(), "With feature gate disabled, the call must fail")
 			})
 		})
 	})
@@ -838,8 +861,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 						if dev.ResourceName != defaultTopologyUnawareResourceName {
 							continue
 						}
-
-						framework.ExpectEqual(dev.Topology == nil, true, "Topology is expected to be empty for topology unaware resources")
+						gomega.Expect(dev.Topology).To(gomega.BeNil(), "Topology is expected to be empty for topology unaware resources")
 					}
 
 					desc := podDesc{
@@ -872,7 +894,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		})
 	})
 
-	ginkgo.Context("when querying /metrics [NodeConformance]", func() {
+	f.Context("when querying /metrics", f.WithNodeConformance(), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
@@ -953,7 +975,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
 			defer conn.Close()
 
-			tries := podresourcesgrpc.DefaultQPS * 2 // This should also be greater than DefaultBurstTokens
+			tries := podresources.DefaultQPS * 2 // This should also be greater than DefaultBurstTokens
 			errs := []error{}
 
 			ginkgo.By(fmt.Sprintf("Issuing %d List() calls in a tight loop", tries))
@@ -973,7 +995,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			// constraints than to risk flakes at this stage.
 			errLimitExceededCount := 0
 			for _, err := range errs[1:] {
-				if errors.Is(err, podresourcesgrpc.ErrorLimitExceeded) {
+				if errors.Is(err, apisgrpc.ErrorLimitExceeded) {
 					errLimitExceededCount++
 				}
 			}

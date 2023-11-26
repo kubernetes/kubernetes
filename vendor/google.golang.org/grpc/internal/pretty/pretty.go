@@ -35,7 +35,7 @@ const jsonIndent = "  "
 // ToJSON marshals the input into a json string.
 //
 // If marshal fails, it falls back to fmt.Sprintf("%+v").
-func ToJSON(e interface{}) string {
+func ToJSON(e any) string {
 	switch ee := e.(type) {
 	case protov1.Message:
 		mm := jsonpb.Marshaler{Indent: jsonIndent}

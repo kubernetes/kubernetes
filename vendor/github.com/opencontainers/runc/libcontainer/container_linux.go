@@ -40,7 +40,7 @@ type linuxContainer struct {
 	root                 string
 	config               *configs.Config
 	cgroupManager        cgroups.Manager
-	intelRdtManager      intelrdt.Manager
+	intelRdtManager      *intelrdt.Manager
 	initPath             string
 	initArgs             []string
 	initProcess          parentProcess
@@ -146,19 +146,21 @@ func (c *linuxContainer) OCIState() (*specs.State, error) {
 	return c.currentOCIState()
 }
 
-func (c *linuxContainer) Processes() ([]int, error) {
-	var pids []int
-	status, err := c.currentStatus()
-	if err != nil {
-		return pids, err
+// ignoreCgroupError filters out cgroup-related errors that can be ignored,
+// because the container is stopped and its cgroup is gone.
+func (c *linuxContainer) ignoreCgroupError(err error) error {
+	if err == nil {
+		return nil
 	}
-	// for systemd cgroup, the unit's cgroup path will be auto removed if container's all processes exited
-	if status == Stopped && !c.cgroupManager.Exists() {
-		return pids, nil
+	if errors.Is(err, os.ErrNotExist) && c.runType() == Stopped && !c.cgroupManager.Exists() {
+		return nil
 	}
+	return err
+}
 
-	pids, err = c.cgroupManager.GetAllPids()
-	if err != nil {
+func (c *linuxContainer) Processes() ([]int, error) {
+	pids, err := c.cgroupManager.GetAllPids()
+	if err = c.ignoreCgroupError(err); err != nil {
 		return nil, fmt.Errorf("unable to get all container pids: %w", err)
 	}
 	return pids, nil
@@ -382,11 +384,12 @@ func (c *linuxContainer) Signal(s os.Signal, all bool) error {
 		return err
 	}
 	if all {
-		// for systemd cgroup, the unit's cgroup path will be auto removed if container's all processes exited
 		if status == Stopped && !c.cgroupManager.Exists() {
+			// Avoid calling signalAllProcesses which may print
+			// a warning trying to freeze a non-existing cgroup.
 			return nil
 		}
-		return signalAllProcesses(c.cgroupManager, s)
+		return c.ignoreCgroupError(signalAllProcesses(c.cgroupManager, s))
 	}
 	// to avoid a PID reuse attack
 	if status == Running || status == Created || status == Paused {

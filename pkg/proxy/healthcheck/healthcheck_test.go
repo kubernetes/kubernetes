@@ -470,7 +470,7 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -480,26 +480,7 @@ func TestHealthzServer(t *testing.T) {
 		tracking503: 0,
 	}
 
-	// Should return 200 "OK" by default.
-	testHTTPHandler(hsTest, http.StatusOK, t)
-
-	// Should return 200 "OK" after first update
-	hs.Updated()
-	testHTTPHandler(hsTest, http.StatusOK, t)
-
-	// Should continue to return 200 "OK" as long as no further updates are queued
-	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
-
-	// Should return 503 "ServiceUnavailable" if exceed max update-processing time
-	hs.QueuedUpdate()
-	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
-
-	// Should return 200 "OK" after processing update
-	hs.Updated()
-	fakeClock.Step(5 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	testProxierHealthUpdater(hs, hsTest, fakeClock, t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
 	hs.SyncNode(makeNode(tweakTainted("other")))
@@ -524,7 +505,7 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
 	server := hs.httpFactory.New(hs.addr, livezHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -534,26 +515,7 @@ func TestLivezServer(t *testing.T) {
 		tracking503: 0,
 	}
 
-	// Should return 200 "OK" by default.
-	testHTTPHandler(hsTest, http.StatusOK, t)
-
-	// Should return 200 "OK" after first update
-	hs.Updated()
-	testHTTPHandler(hsTest, http.StatusOK, t)
-
-	// Should continue to return 200 "OK" as long as no further updates are queued
-	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
-
-	// Should return 503 "ServiceUnavailable" if exceed max update-processing time
-	hs.QueuedUpdate()
-	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
-
-	// Should return 200 "OK" after processing update
-	hs.Updated()
-	fakeClock.Step(5 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	testProxierHealthUpdater(hs, hsTest, fakeClock, t)
 
 	// Should return 200 "OK" irrespective of node syncs
 	hs.SyncNode(makeNode(tweakTainted("other")))
@@ -578,6 +540,77 @@ var (
 	healthzURL url = "/healthz"
 	livezURL   url = "/livez"
 )
+
+func testProxierHealthUpdater(hs *ProxierHealthServer, hsTest *serverTest, fakeClock *testingclock.FakeClock, t *testing.T) {
+	// Should return 200 "OK" by default.
+	testHTTPHandler(hsTest, http.StatusOK, t)
+
+	// Should return 200 "OK" after first update for both IPv4 and IPv6 proxiers.
+	hs.Updated(v1.IPv4Protocol)
+	hs.Updated(v1.IPv6Protocol)
+	testHTTPHandler(hsTest, http.StatusOK, t)
+
+	// Should continue to return 200 "OK" as long as no further updates are queued for any proxier.
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(hsTest, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if IPv4 proxier exceed max update-processing time.
+	hs.QueuedUpdate(v1.IPv4Protocol)
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+
+	// Should return 200 "OK" after processing update for both IPv4 and IPv6 proxiers.
+	hs.Updated(v1.IPv4Protocol)
+	hs.Updated(v1.IPv6Protocol)
+	fakeClock.Step(5 * time.Second)
+	testHTTPHandler(hsTest, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if IPv6 proxier exceed max update-processing time.
+	hs.QueuedUpdate(v1.IPv6Protocol)
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+
+	// Should return 200 "OK" after processing update for both IPv4 and IPv6 proxiers.
+	hs.Updated(v1.IPv4Protocol)
+	hs.Updated(v1.IPv6Protocol)
+	fakeClock.Step(5 * time.Second)
+	testHTTPHandler(hsTest, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if both IPv4 and IPv6 proxiers exceed max update-processing time.
+	hs.QueuedUpdate(v1.IPv4Protocol)
+	hs.QueuedUpdate(v1.IPv6Protocol)
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+
+	// Should return 200 "OK" after processing update for both IPv4 and IPv6 proxiers.
+	hs.Updated(v1.IPv4Protocol)
+	hs.Updated(v1.IPv6Protocol)
+	fakeClock.Step(5 * time.Second)
+	testHTTPHandler(hsTest, http.StatusOK, t)
+
+	// If IPv6 proxier is late for an update but IPv4 proxier is not then updating IPv4 proxier should have no effect.
+	hs.QueuedUpdate(v1.IPv6Protocol)
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+
+	hs.Updated(v1.IPv4Protocol)
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+
+	hs.Updated(v1.IPv6Protocol)
+	testHTTPHandler(hsTest, http.StatusOK, t)
+
+	// If both IPv4 and IPv6 proxiers are late for an update, we shouldn't report 200 "OK" until after both of them update.
+	hs.QueuedUpdate(v1.IPv4Protocol)
+	hs.QueuedUpdate(v1.IPv6Protocol)
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+
+	hs.Updated(v1.IPv4Protocol)
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+
+	hs.Updated(v1.IPv6Protocol)
+	testHTTPHandler(hsTest, http.StatusOK, t)
+}
 
 func testHTTPHandler(hsTest *serverTest, status int, t *testing.T) {
 	handler := hsTest.server.(*fakeHTTPServer).handler

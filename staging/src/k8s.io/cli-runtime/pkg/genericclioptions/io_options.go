@@ -18,7 +18,7 @@ package genericclioptions
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
@@ -48,7 +48,7 @@ func NewTestIOStreamsDiscard() genericiooptions.IOStreams {
 	in := &bytes.Buffer{}
 	return IOStreams{
 		In:     in,
-		Out:    ioutil.Discard,
-		ErrOut: ioutil.Discard,
+		Out:    io.Discard,
+		ErrOut: io.Discard,
 	}
 }

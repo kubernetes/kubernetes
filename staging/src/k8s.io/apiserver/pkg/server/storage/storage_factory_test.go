@@ -197,30 +197,30 @@ func TestConfigs(t *testing.T) {
 	}{
 		{
 			wantConfigs: []storagebackend.Config{
-				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry"},
 			},
 		},
 		{
 			resource: &schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{},
 			wantConfigs: []storagebackend.Config{
-				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry"},
 			},
 		},
 		{
 			resource: &schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000"},
 			wantConfigs: []storagebackend.Config{
-				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1:10000"}}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry"},
+				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1:10000"}}, Prefix: "/registry"},
 			},
 		},
 		{
 			resource: &schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000", "https://127.0.0.1", "http://127.0.0.2"},
 			wantConfigs: []storagebackend.Config{
-				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1:10000", "https://127.0.0.1", "http://127.0.0.2"}}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry"},
+				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1:10000", "https://127.0.0.1", "http://127.0.0.2"}}, Prefix: "/registry"},
 			},
 		},
 	}

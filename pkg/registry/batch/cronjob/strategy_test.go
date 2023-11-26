@@ -273,20 +273,6 @@ func TestCronJobStrategy_WarningsOnCreate(t *testing.T) {
 				},
 			},
 		},
-		"timezone invalid": {
-			wantWarningsCount: 1,
-			cronjob: &batch.CronJob{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "mycronjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "9",
-				},
-				Spec: cronjobSpecWithTZinSchedule,
-				Status: batch.CronJobStatus{
-					LastScheduleTime: &now,
-				},
-			},
-		},
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {

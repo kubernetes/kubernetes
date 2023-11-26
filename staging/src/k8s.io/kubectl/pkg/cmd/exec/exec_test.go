@@ -40,13 +40,11 @@ import (
 )
 
 type fakeRemoteExecutor struct {
-	method  string
 	url     *url.URL
 	execErr error
 }
 
-func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	f.method = method
+func (f *fakeRemoteExecutor) Execute(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	f.url = url
 	return f.execErr
 }
@@ -263,9 +261,6 @@ func TestExec(t *testing.T) {
 			if strings.Count(ex.url.RawQuery, "container=bar") != 1 {
 				t.Errorf("%s: Did not get expected container query param for exec request", test.name)
 				return
-			}
-			if ex.method != "POST" {
-				t.Errorf("%s: Did not get method for exec request: %s", test.name, ex.method)
 			}
 		})
 	}

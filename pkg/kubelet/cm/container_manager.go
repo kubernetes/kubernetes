@@ -164,7 +164,7 @@ type NodeAllocatableConfig struct {
 	KubeReservedCgroupName   string
 	SystemReservedCgroupName string
 	ReservedSystemCPUs       cpuset.CPUSet
-	EnforceNodeAllocatable   sets.String
+	EnforceNodeAllocatable   sets.Set[string]
 	KubeReserved             v1.ResourceList
 	SystemReserved           v1.ResourceList
 	HardEvictionThresholds   []evictionapi.Threshold
@@ -190,7 +190,7 @@ func parsePercentage(v string) (int64, error) {
 	return percentage, nil
 }
 
-// ParseQOSReserved parses the --qos-reserve-requests option
+// ParseQOSReserved parses the --qos-reserved option
 func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 	reservations := make(map[v1.ResourceName]int64)
 	for k, v := range m {

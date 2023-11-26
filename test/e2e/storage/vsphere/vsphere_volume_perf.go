@@ -27,6 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -55,7 +56,7 @@ const (
 	DeleteOp                  = "DeleteOp"
 )
 
-var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("vcp-performance", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("vcp-performance")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

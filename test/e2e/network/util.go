@@ -233,7 +233,7 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 		return fmt.Errorf("service reachability check is not supported for %v", protocol)
 	}
 
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)

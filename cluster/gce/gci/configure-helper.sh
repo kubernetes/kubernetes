@@ -781,6 +781,18 @@ function create-master-pki {
     KONNECTIVITY_AGENT_CERT_PATH="${pki_dir}/konnectivity-agent/server.crt"
     write-pki-data "${KONNECTIVITY_AGENT_CERT}" "${KONNECTIVITY_AGENT_CERT_PATH}"
   fi
+
+  if [[ -n "${CLOUD_PVL_ADMISSION_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/cloud-pvl-admission
+    CLOUD_PVL_ADMISSION_CA_CERT_PATH="${pki_dir}/cloud-pvl-admission/ca.crt"
+    write-pki-data "${CLOUD_PVL_ADMISSION_CA_CERT}" "${CLOUD_PVL_ADMISSION_CA_CERT_PATH}"
+
+    CLOUD_PVL_ADMISSION_KEY_PATH="${pki_dir}/cloud-pvl-admission/server.key"
+    write-pki-data "${CLOUD_PVL_ADMISSION_KEY}" "${CLOUD_PVL_ADMISSION_KEY_PATH}"
+
+    CLOUD_PVL_ADMISSION_CERT_PATH="${pki_dir}/cloud-pvl-admission/server.crt"
+    write-pki-data "${CLOUD_PVL_ADMISSION_CERT}" "${CLOUD_PVL_ADMISSION_CERT_PATH}"
+  fi
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
@@ -1765,6 +1777,7 @@ function prepare-kube-proxy-manifest-variables {
   if [[ -n "${DETECT_LOCAL_MODE:-}" ]]; then
     params+=" --detect-local-mode=${DETECT_LOCAL_MODE}"
   fi
+
   local container_env=""
   local kube_cache_mutation_detector_env_name=""
   local kube_cache_mutation_detector_env_value=""
@@ -1772,6 +1785,15 @@ function prepare-kube-proxy-manifest-variables {
     container_env="env:"
     kube_cache_mutation_detector_env_name="- name: KUBE_CACHE_MUTATION_DETECTOR"
     kube_cache_mutation_detector_env_value="value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
+  fi
+  local kube_watchlist_inconsistency_detector_env_name=""
+  local kube_watchlist_inconsistency_detector_env_value=""
+  if [[ -n "${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR:-}" ]]; then
+    if [[ -z "${container_env}" ]]; then
+      container_env="env:"
+    fi
+    kube_watchlist_inconsistency_detector_env_name="- name: KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"
+    kube_watchlist_inconsistency_detector_env_value="value: \"${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR}\""
   fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" "${src_file}"
@@ -1782,6 +1804,8 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" "${src_file}"
+  sed -i -e "s@{{kube_watchlist_inconsistency_detector_env_name}}@${kube_watchlist_inconsistency_detector_env_name}@g" "${src_file}"
+  sed -i -e "s@{{kube_watchlist_inconsistency_detector_env_value}}@${kube_watchlist_inconsistency_detector_env_value}@g" "${src_file}"
   sed -i -e "s@{{ cpurequest }}@${KUBE_PROXY_CPU_REQUEST:-100m}@g" "${src_file}"
   sed -i -e "s@{{ memoryrequest }}@${KUBE_PROXY_MEMORY_REQUEST:-50Mi}@g" "${src_file}"
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" "${src_file}"
@@ -2154,10 +2178,10 @@ function start-kube-controller-manager {
   create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
   prepare-log-file /var/log/kube-controller-manager.log "${KUBE_CONTROLLER_MANAGER_RUNASUSER:-0}"
   # Calculate variables and assemble the command line.
-  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
+  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${KUBE_CONTROLLER_MANAGER_TEST_ARGS:-}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
   local config_path='/etc/srv/kubernetes/kube-controller-manager/kubeconfig'
   params+=("--use-service-account-credentials")
-  params+=("--cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}")
+  params+=("--cloud-provider=${CLOUD_PROVIDER_FLAG:-external}")
   params+=("--kubeconfig=${config_path}" "--authentication-kubeconfig=${config_path}" "--authorization-kubeconfig=${config_path}")
   params+=("--root-ca-file=${CA_CERT_BUNDLE_PATH}")
   params+=("--service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}")
@@ -2213,7 +2237,16 @@ function start-kube-controller-manager {
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
-    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+    container_env="{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}"
+  fi
+  if [[ -n "${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR:-}" ]]; then
+    if [[ -n "${container_env}" ]]; then
+      container_env="${container_env}, "
+    fi
+    container_env+="{\"name\": \"KUBE_WATCHLIST_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR}\"}"
+  fi
+  if [[ -n "${container_env}" ]]; then
+    container_env="\"env\":[${container_env}],"
   fi
 
   local paramstring
@@ -2318,7 +2351,16 @@ function start-cloud-controller-manager {
   paramstring="$(convert-manifest-params "${params[*]}")"
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
-    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+    container_env="{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}"
+  fi
+  if [[ -n "${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR:-}" ]]; then
+    if [[ -n "${container_env}" ]]; then
+      container_env="${container_env}, "
+    fi
+    container_env+="{\"name\": \"KUBE_WATCHLIST_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR}\"}"
+  fi
+  if [[ -n "${container_env}" ]]; then
+    container_env="\"env\":[${container_env}],"
   fi
 
   echo "Applying over-rides for manifest for cloud provider controller-manager"
@@ -2350,6 +2392,9 @@ function start-cloud-controller-manager {
 
   echo "Writing manifest for cloud provider controller-manager"
   cp "${src_file}" /etc/kubernetes/manifests
+
+  setup-addon-manifests "addons" "cloud-pvl-admission"
+  setup-cloud-pvl-admission-manifest
 }
 
 # Starts kubernetes scheduler.
@@ -2968,6 +3013,11 @@ function setup-konnectivity-agent-manifest {
     fi
 }
 
+function setup-cloud-pvl-admission-manifest {
+  local -r manifest="/etc/kubernetes/addons/cloud-pvl-admission/mutating-webhook-configuration.yaml"
+  sed -i "s|__CLOUD_PVL_ADMISSION_CA_CERT__|${CLOUD_PVL_ADMISSION_CA_CERT}|g" "${manifest}"
+}
+
 # Setups manifests for ingress controller and gce-specific policies for service controller.
 function start-lb-controller {
   setup-addon-manifests "addons" "loadbalancing"
@@ -3111,7 +3161,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: registry.k8s.io/debian-base:v2.0.0
+    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.0
     command:
     - /bin/sh
     args:
@@ -3572,7 +3622,7 @@ function main() {
       log-wrap 'StartKonnectivityServer' start-konnectivity-server
     fi
     log-wrap 'StartKubeControllerManager' start-kube-controller-manager
-    if [[ "${CLOUD_PROVIDER_FLAG:-gce}" == "external" ]]; then
+    if [[ "${CLOUD_PROVIDER_FLAG:-external}" == "external" ]]; then
       log-wrap 'StartCloudControllerManager' start-cloud-controller-manager
     fi
     log-wrap 'StartKubeScheduler' start-kube-scheduler
