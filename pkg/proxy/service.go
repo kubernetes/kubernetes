@@ -52,7 +52,6 @@ type BaseServicePortInfo struct {
 	healthCheckNodePort      int
 	externalPolicyLocal      bool
 	internalPolicyLocal      bool
-	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicy
 	hintsAnnotation          string
 }
 
@@ -123,11 +122,6 @@ func (bsvcPortInfo *BaseServicePortInfo) InternalPolicyLocal() bool {
 	return bsvcPortInfo.internalPolicyLocal
 }
 
-// InternalTrafficPolicy is part of ServicePort interface
-func (bsvcPortInfo *BaseServicePortInfo) InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicy {
-	return bsvcPortInfo.internalTrafficPolicy
-}
-
 // HintsAnnotation is part of ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) HintsAnnotation() string {
 	return bsvcPortInfo.hintsAnnotation
@@ -163,15 +157,14 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 	clusterIP := proxyutil.GetClusterIPByFamily(sct.ipFamily, service)
 	info := &BaseServicePortInfo{
-		clusterIP:             netutils.ParseIPSloppy(clusterIP),
-		port:                  int(port.Port),
-		protocol:              port.Protocol,
-		nodePort:              int(port.NodePort),
-		sessionAffinityType:   service.Spec.SessionAffinity,
-		stickyMaxAgeSeconds:   stickyMaxAgeSeconds,
-		externalPolicyLocal:   externalPolicyLocal,
-		internalPolicyLocal:   internalPolicyLocal,
-		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
+		clusterIP:           netutils.ParseIPSloppy(clusterIP),
+		port:                int(port.Port),
+		protocol:            port.Protocol,
+		nodePort:            int(port.NodePort),
+		sessionAffinityType: service.Spec.SessionAffinity,
+		stickyMaxAgeSeconds: stickyMaxAgeSeconds,
+		externalPolicyLocal: externalPolicyLocal,
+		internalPolicyLocal: internalPolicyLocal,
 	}
 
 	// v1.DeprecatedAnnotationTopologyAwareHints has precedence over v1.AnnotationTopologyMode.
@@ -426,30 +419,8 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 // merge adds other ServicePortMap's elements to current ServicePortMap.
 // If collision, other ALWAYS win. Otherwise add the other to current.
 // In other words, if some elements in current collisions with other, update the current by other.
-// It returns a string type set which stores all the newly merged services' identifier, ServicePortName.String(), to help users
-// tell if a service is deleted or updated.
-// The returned value is one of the arguments of ServicePortMap.unmerge().
-// ServicePortMap A Merge ServicePortMap B will do following 2 things:
-//   - update ServicePortMap A.
-//   - produce a string set which stores all other ServicePortMap's ServicePortName.String().
-//
-// For example,
-//
-//	A{}
-//	B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//	  A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//	  produce string set {"ns/cluster-ip:http"}
-//
-//	A{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 345, "UDP"}}
-//	B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//	  A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//	  produce string set {"ns/cluster-ip:http"}
-func (sm *ServicePortMap) merge(other ServicePortMap) sets.Set[string] {
-	// existingPorts is going to store all identifiers of all services in `other` ServicePortMap.
-	existingPorts := sets.New[string]()
+func (sm *ServicePortMap) merge(other ServicePortMap) {
 	for svcPortName, info := range other {
-		// Take ServicePortName.String() as the newly merged service's identifier and put it into existingPorts.
-		existingPorts.Insert(svcPortName.String())
 		_, exists := (*sm)[svcPortName]
 		if !exists {
 			klog.V(4).InfoS("Adding new service port", "portName", svcPortName, "servicePort", info)
@@ -458,7 +429,6 @@ func (sm *ServicePortMap) merge(other ServicePortMap) sets.Set[string] {
 		}
 		(*sm)[svcPortName] = info
 	}
-	return existingPorts
 }
 
 // filter filters out elements from ServicePortMap base on given ports string sets.

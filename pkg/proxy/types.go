@@ -87,8 +87,6 @@ type ServicePort interface {
 	ExternalPolicyLocal() bool
 	// InternalPolicyLocal returns if a service has only node local endpoints for internal traffic.
 	InternalPolicyLocal() bool
-	// InternalTrafficPolicy returns service InternalTrafficPolicy
-	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicy
 	// HintsAnnotation returns the value of the v1.DeprecatedAnnotationTopologyAwareHints annotation.
 	HintsAnnotation() string
 	// ExternallyAccessible returns true if the service port is reachable via something
