@@ -61,11 +61,13 @@ func (ll *LeaseLock) GetFromCache(ctx context.Context) (*LeaderElectionRecord, [
 		return nil, nil, fmt.Errorf("lease informer is not available")
 	}
 
-	lease, err := ll.leaseInformer.Lister().Leases(ll.LeaseMeta.Namespace).Get(ll.LeaseMeta.Name)
+	cachedLease, err := ll.leaseInformer.Lister().Leases(ll.LeaseMeta.Namespace).Get(ll.LeaseMeta.Name)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	// Avoid data race
+	lease := cachedLease.DeepCopy()
 	ll.lease = lease
 	record := LeaseSpecToLeaderElectionRecord(&ll.lease.Spec)
 	recordByte, err := json.Marshal(*record)
