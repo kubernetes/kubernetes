@@ -1225,7 +1225,22 @@ func (proxier *Proxier) syncProxyRules() {
 		// metrics come out right, so we just compute them and throw them away.
 		if tryPartialSync {
 			svcNN := svcName.NamespacedName.String()
-			if !serviceChanged.Has(svcNN) && !endpointsChanged.Has(svcNN) {
+			canSkip := !serviceChanged.Has(svcNN) && !endpointsChanged.Has(svcNN)
+			if canSkip && len(existingNATChains) > 0 {
+				// FIXME: This shouldn't happen, but apparently it does
+				// sometimes. https://issues.k8s.io/121362.
+				for _, ep := range allLocallyReachableEndpoints {
+					if epInfo, ok := ep.(*endpointInfo); ok {
+						if _, exists := existingNATChains[epInfo.ChainName]; !exists {
+							klog.InfoS("Service has not changed but endpoint chain is missing?", "service", svcNN, "chain", epInfo.ChainName)
+							metrics.IptablesPartialRestoreMistakesTotal.Inc()
+							canSkip = false
+						}
+					}
+				}
+			}
+
+			if canSkip {
 				klog.V(4).InfoS("Skipping update for unchanged service", "service", svcNN)
 				natChains = skippedNatChains
 				natRules = skippedNatRules

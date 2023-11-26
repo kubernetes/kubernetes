@@ -6786,6 +6786,107 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
+
+	// Now add another svc3 endpoint (we pass sliceNum=2 so this is an additional
+	// slice, not a replacement for the old one), but cause the update to be "lost"
+	// before syncProxyRules is called, simulating #121362. syncProxyRules should
+	// detect this and resync svc3 even though it doesn't appear in either
+	// PendingChanges.
+	partialRestoreMistakes, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreMistakesTotal)
+	if err != nil {
+		t.Fatalf("Could not get partial restore mistakes metric: %v", err)
+	}
+	if partialRestoreMistakes != 0.0 {
+		t.Errorf("Already saw a partial resync mistake? Something failed earlier!")
+	}
+
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice("ns3", "svc3", 2, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.0.3.5"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To("p80"),
+				Port:     ptr.To[int32](80),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+	fp.endpointsMap.Update(fp.endpointsChanges)
+
+	if len(fp.serviceChanges.PendingChanges()) != 0 {
+		t.Errorf("ServiceChangeTracker has unexpected PendingChanges: %v", fp.serviceChanges.PendingChanges().UnsortedList())
+	}
+	if len(fp.endpointsChanges.PendingChanges()) != 0 {
+		t.Errorf("EndpointsChangeTracker has unexpected PendingChanges: %v", fp.endpointsChanges.PendingChanges().UnsortedList())
+	}
+
+	fp.syncProxyRules()
+
+	expected = dedent.Dedent(`
+		*filter
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FIREWALL - [0:0]
+		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
+		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+		COMMIT
+		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
+		:KUBE-SEP-DEJRSGB35PAZOTV7 - [0:0]
+		:KUBE-SEP-DKCFIS26GWF2WLWC - [0:0]
+		:KUBE-SEP-JVVZVJ7BSEPPRNBS - [0:0]
+		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
+		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-SEP-DEJRSGB35PAZOTV7 -m comment --comment ns3/svc3:p80 -s 10.0.3.5 -j KUBE-MARK-MASQ
+		-A KUBE-SEP-DEJRSGB35PAZOTV7 -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.5:80
+		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
+		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.2:80
+		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -s 10.0.3.3 -j KUBE-MARK-MASQ
+		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.3:80
+		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.2:80" -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-DKCFIS26GWF2WLWC
+		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.3:80" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-JVVZVJ7BSEPPRNBS
+		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.5:80" -j KUBE-SEP-DEJRSGB35PAZOTV7
+		COMMIT
+		`)
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	partialRestoreMistakes, err = testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreMistakesTotal)
+	if err != nil {
+		t.Fatalf("Could not get partial restore mistakes metric: %v", err)
+	}
+	if partialRestoreMistakes != 1.0 {
+		t.Errorf("Failed to detect partial restore mistake? Expected 1.0, got %f", partialRestoreMistakes)
+	}
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// We added 1 KUBE-SVC rule and 2 KUBE-SEP rules for the new endpoint
+	rulesTotal += 3
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
