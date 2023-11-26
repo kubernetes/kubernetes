@@ -40,23 +40,25 @@ type EndpointsChangeTracker struct {
 	// lock protects lastChangeTriggerTimes
 	lock sync.Mutex
 
+	// processEndpointsMapChange is invoked by the apply function on every change.
+	// This function should not modify the EndpointsMaps, but just use the changes for
+	// any Proxier-specific cleanup.
 	processEndpointsMapChange processEndpointsMapChangeFunc
+
 	// endpointSliceCache holds a simplified version of endpoint slices.
 	endpointSliceCache *EndpointSliceCache
-	// Map from the Endpoints namespaced-name to the times of the triggers that caused the endpoints
-	// object to change. Used to calculate the network-programming-latency.
+
+	// lastChangeTriggerTimes maps from the Service's NamespacedName to the times of
+	// the triggers that caused its EndpointSlice objects to change. Used to calculate
+	// the network-programming-latency metric.
 	lastChangeTriggerTimes map[types.NamespacedName][]time.Time
-	// record the time when the endpointsChangeTracker was created so we can ignore the endpoints
-	// that were generated before, because we can't estimate the network-programming-latency on those.
-	// This is specially problematic on restarts, because we process all the endpoints that may have been
-	// created hours or days before.
+	// trackerStartTime is the time when the EndpointsChangeTracker was created, so
+	// we can avoid generating network-programming-latency metrics for changes that
+	// occurred before that.
 	trackerStartTime time.Time
 }
 
 type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName) Endpoint
-
-// This handler is invoked by the apply function on every change. This function should not modify the
-// EndpointsMap's but just use the changes for any Proxier specific cleanup.
 type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
 // NewEndpointsChangeTracker initializes an EndpointsChangeTracker
@@ -69,9 +71,10 @@ func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFun
 	}
 }
 
-// EndpointSliceUpdate updates given service's endpoints change map based on the <previous, current> endpoints pair.
-// It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeTracker.
-// If removeSlice is true, slice will be removed, otherwise it will be added or updated.
+// EndpointSliceUpdate updates the EndpointsChangeTracker by adding/updating or removing
+// endpointSlice (depending on removeSlice). It returns true if this update contained a
+// change that needs to be synced; note that this is different from the return value of
+// ServiceChangeTracker.Update().
 func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
 	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
 		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "addressType", endpointSlice.AddressType)

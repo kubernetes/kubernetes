@@ -36,18 +36,20 @@ type ServiceChangeTracker struct {
 	lock sync.Mutex
 	// items maps a service to its serviceChange.
 	items map[types.NamespacedName]*serviceChange
-	// makeServiceInfo allows proxier to inject customized information when processing service.
-	makeServiceInfo         makeServicePortFunc
-	processServiceMapChange processServiceMapChangeFunc
-	ipFamily                v1.IPFamily
 
+	// makeServiceInfo allows the proxier to inject customized information when
+	// processing services.
+	makeServiceInfo makeServicePortFunc
+	// processServiceMapChange is invoked by the apply function on every change. This
+	// function should not modify the ServicePortMaps, but just use the changes for
+	// any Proxier-specific cleanup.
+	processServiceMapChange processServiceMapChangeFunc
+
+	ipFamily v1.IPFamily
 	recorder events.EventRecorder
 }
 
 type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServicePortInfo) ServicePort
-
-// This handler is invoked by the apply function on every change. This function should not modify the
-// ServicePortMap's but just use the changes for any Proxier specific cleanup.
 type processServiceMapChangeFunc func(previous, current ServicePortMap)
 
 // serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
@@ -69,16 +71,11 @@ func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IP
 	}
 }
 
-// Update updates given service's change map based on the <previous, current> service pair.  It returns true if items changed,
-// otherwise return false.  Update can be used to add/update/delete items of ServiceChangeMap.  For example,
-// Add item
-//   - pass <nil, service> as the <previous, current> pair.
-//
-// Update item
-//   - pass <oldService, service> as the <previous, current> pair.
-//
-// Delete item
-//   - pass <service, nil> as the <previous, current> pair.
+// Update updates the ServiceChangeTracker based on the <previous, current> service pair
+// (where either previous or current, but not both, can be nil). It returns true if sct
+// contains changes that need to be synced (whether or not those changes were caused by
+// this update); note that this is different from the return value of
+// EndpointChangeTracker.EndpointSliceUpdate().
 func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	// This is unexpected, we should return false directly.
 	if previous == nil && current == nil {
