@@ -123,9 +123,12 @@ endef
 ifeq ($(PRINT_HELP),y)
 verify:
 	echo "$$VERIFY_HELP_INFO"
-else
+else ifeq ($(origin KUBE_VERIFY_GIT_BRANCH), undefined)
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh
+else
+verify:
+	hack/make-rules/verify.sh
 endif
 
 define QUICK_VERIFY_HELP_INFO
