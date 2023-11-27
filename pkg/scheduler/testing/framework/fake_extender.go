@@ -137,6 +137,30 @@ func (pl *node2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
+type equalPrioritizerPlugin struct{}
+
+// NewEqualPrioritizerPlugin returns a factory function to build equalPrioritizerPlugin.
+func NewEqualPrioritizerPlugin() frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &equalPrioritizerPlugin{}, nil
+	}
+}
+
+// Name returns the name of the plugin.
+func (pl *equalPrioritizerPlugin) Name() string {
+	return "EqualPrioritizerPlugin"
+}
+
+// Score returns score 1 for each node.
+func (pl *equalPrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
+	return int64(1), nil
+}
+
+// ScoreExtensions returns nil.
+func (pl *equalPrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
+	return nil
+}
+
 // FakeExtender is a data struct which implements the Extender interface.
 type FakeExtender struct {
 	// ExtenderName indicates this fake extender's name.
