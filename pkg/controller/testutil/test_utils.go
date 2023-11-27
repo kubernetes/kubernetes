@@ -38,12 +38,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	v1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	ref "k8s.io/client-go/tools/reference"
 	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -423,7 +423,7 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, 
 	f.Lock()
 	defer f.Unlock()
 	ctx := context.TODO()
-	ref, err := ref.GetReference(legacyscheme.Scheme, obj)
+	ref, err := ref.GetReference(clientsetscheme.Scheme, obj)
 	if err != nil {
 		klog.FromContext(ctx).Error(err, "Encountered error while getting reference")
 		return

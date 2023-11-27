@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
@@ -259,7 +259,7 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 			return true, &metrics, nil
 		}
 		name := getForAction.GetName()
-		mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
+		mapper := testrestmapper.TestOnlyStaticRESTMapper(clientsetscheme.Scheme)
 		metrics := &cmapi.MetricValueList{}
 		assert.NotNil(t, tc.metric.singleObject, "should have only requested a single-object metric when calling GetObjectMetricReplicas")
 		gk := schema.FromAPIVersionAndKind(tc.metric.singleObject.APIVersion, tc.metric.singleObject.Kind).GroupKind()

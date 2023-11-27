@@ -39,8 +39,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

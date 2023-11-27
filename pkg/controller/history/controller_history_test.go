@@ -27,13 +27,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
-	clientscheme "k8s.io/client-go/kubernetes/scheme"
-	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/pointer"
 )
 
@@ -969,16 +967,16 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 					return true, nil, errors.NewNotFound(apps.Resource("controllerrevisions"), test.revision.Name)
 				}
 				b, err := strategicpatch.StrategicMergePatch(
-					[]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), test.revision)),
+					[]byte(runtime.EncodeOrDie(clientsetscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), test.revision)),
 					action.GetPatch(), test.revision)
 				if err != nil {
 					return true, nil, err
 				}
-				obj, err := runtime.Decode(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), b)
+				obj, err := runtime.Decode(clientsetscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), b)
 				if err != nil {
 					return true, nil, err
 				}
-				patched, err := legacyscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
+				patched, err := clientsetscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
 				if err != nil {
 					return true, nil, err
 				}
@@ -1220,16 +1218,16 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 						test.revision.GroupVersionKind().GroupKind(), test.revision.Name, nil)
 				}
 				b, err := strategicpatch.StrategicMergePatch(
-					[]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), test.revision)),
+					[]byte(runtime.EncodeOrDie(clientsetscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), test.revision)),
 					action.GetPatch(), test.revision)
 				if err != nil {
 					return true, nil, err
 				}
-				obj, err := runtime.Decode(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), b)
+				obj, err := runtime.Decode(clientsetscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), b)
 				if err != nil {
 					return true, nil, err
 				}
-				patched, err := legacyscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
+				patched, err := clientsetscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
 				if err != nil {
 					return true, nil, err
 				}
