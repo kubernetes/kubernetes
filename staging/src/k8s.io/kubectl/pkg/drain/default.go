@@ -17,6 +17,7 @@ limitations under the License.
 package drain
 
 import (
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,9 +29,21 @@ import (
 // directly, or their functionality copied into your own code, for
 // example if you want different output behaviour.
 
+var (
+	nilHelperOutNilError    = errors.New("RunNodeDrain error: drain.Helper.Out can't be nil")
+	nilHelperErrOutNilError = errors.New("RunNodeDrain error: drain.Helper.ErrOut can't be nil")
+)
+
 // RunNodeDrain shows the canonical way to drain a node.
 // You should first cordon the node, e.g. using RunCordonOrUncordon
 func RunNodeDrain(drainer *Helper, nodeName string) error {
+	if drainer.Out == nil {
+		return nilHelperOutNilError
+	}
+	if drainer.ErrOut == nil {
+		return nilHelperErrOutNilError
+	}
+
 	// TODO(justinsb): Ensure we have adequate e2e coverage of this function in library consumers
 	list, errs := drainer.GetPodsForDeletion(nodeName)
 	if errs != nil {

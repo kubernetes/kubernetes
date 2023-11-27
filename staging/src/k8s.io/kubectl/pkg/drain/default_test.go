@@ -19,11 +19,51 @@ package drain
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+func TestRunNodeDrain(t *testing.T) {
+	tests := []struct {
+		description   string
+		drainer       *Helper
+		expectedError *error
+	}{
+		{
+			description: "nil drainer.Out",
+			drainer: &Helper{
+				Client: fake.NewSimpleClientset(),
+				ErrOut: os.Stderr,
+			},
+			expectedError: &nilHelperOutNilError,
+		},
+		{
+			description: "nil drainer.ErrOut",
+			drainer: &Helper{
+				Ctx: context.TODO(),
+				Out: os.Stderr,
+			},
+			expectedError: &nilHelperErrOutNilError,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.description, func(t *testing.T) {
+			err := RunNodeDrain(test.drainer, "test-node")
+			if test.expectedError == nil {
+				if err != nil {
+					t.Fatalf("%s: did not expect error, got err=%s", test.description, err.Error())
+				}
+			} else if err.Error() != (*test.expectedError).Error() {
+				t.Fatalf("%s: the error does not match expected error, got err=%s, expected err=%s", test.description, err, *test.expectedError)
+			}
+		})
+	}
+}
 
 func TestRunCordonOrUncordon(t *testing.T) {
 	nilContextError := fmt.Errorf("RunCordonOrUncordon error: drainer.Ctx can't be nil")
