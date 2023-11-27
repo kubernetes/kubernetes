@@ -2343,6 +2343,33 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
 			wantNodes: sets.New("node1", "node2"),
 		},
+		{
+			name: "test without score plugin no extra nodes are evaluated",
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:              []string{"node1", "node2", "node3"},
+			pod:                st.MakePod().Name("pod1").UID("pod1").Obj(),
+			wantNodes:          sets.New("node1", "node2", "node3"),
+			wantEvaluatedNodes: ptr.To[int32](1),
+		},
+		{
+			name: "test no score plugin, prefilter plugin returning 2 nodes, only 1 node is evaluated",
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPreFilterPlugin(
+					"FakePreFilter",
+					tf.NewFakePreFilterPlugin("FakePreFilter", &framework.PreFilterResult{NodeNames: sets.New("node1", "node2")}, nil),
+				),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:              []string{"node1", "node2", "node3"},
+			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wantNodes:          sets.New("node1", "node2"),
+			wantEvaluatedNodes: ptr.To[int32](1),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
