@@ -265,9 +265,15 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				scope.err(err, w, req)
 				return
 			}
+			handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts))
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
 			requestInfo, _ := request.RequestInfoFrom(ctx)
 			metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-				serveWatch(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts))
+				defer watcher.Stop()
+				handler.ServeHTTP(w, req)
 			})
 			return
 		}
