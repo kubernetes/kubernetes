@@ -527,6 +527,19 @@ func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, 
 	return feasibleNodes, nil
 }
 
+// hasScoring checks if scoring nodes is configured.
+func (sched *Scheduler) hasScoring(fwk framework.Framework) bool {
+	if fwk.HasScorePlugins() {
+		return true
+	}
+	for _, extender := range sched.Extenders {
+		if extender.IsPrioritizer() {
+			return true
+		}
+	}
+	return false
+}
+
 // findNodesThatPassFilters finds the nodes that fit the filter plugins.
 func (sched *Scheduler) findNodesThatPassFilters(
 	ctx context.Context,
@@ -537,6 +550,9 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
 	numAllNodes := len(nodes)
 	numNodesToFind := sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes))
+	if !sched.hasScoring(fwk) {
+		numNodesToFind = 1
+	}
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.

@@ -91,6 +91,7 @@ type fakeExtender struct {
 	interestedPodName string
 	ignorable         bool
 	gotBind           bool
+	isPrioritizer     bool
 }
 
 func (f *fakeExtender) Name() string {
@@ -138,6 +139,10 @@ func (f *fakeExtender) IsBinder() bool {
 
 func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 	return pod != nil && pod.Name == f.interestedPodName
+}
+
+func (f *fakeExtender) IsPrioritizer() bool {
+	return f.isPrioritizer
 }
 
 type falseMapPlugin struct{}
