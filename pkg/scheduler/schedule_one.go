@@ -987,7 +987,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else if apierrors.IsNotFound(err) {
 		logger.V(2).Info("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", errMsg)
-		if errStatus, ok := err.(apierrors.APIStatus); ok && (errStatus.Status().Details.Kind == "nodes" || errStatus.Status().Details.Kind == "node") { // Ususally `node` is used as the Kind, but `nodes` is also possible.
+		if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "nodes" {
 			nodeName := errStatus.Status().Details.Name
 			// when node is not found, We do not remove the node right away. Trying again to get
 			// the node and if the node is still not found, then remove it from the scheduler cache.
