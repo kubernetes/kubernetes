@@ -380,6 +380,16 @@ func (f *FakeExtender) IsBinder() bool {
 	return true
 }
 
+// IsPrioritizer returns true if there are any prioritizers.
+func (f *FakeExtender) IsPrioritizer() bool {
+	return len(f.Prioritizers) > 0
+}
+
+// IsFilter returns true if there are any filters.
+func (f *FakeExtender) IsFilter() bool {
+	return len(f.Predicates) > 0
+}
+
 // IsInterested returns a bool indicating whether this extender is interested in this Pod.
 func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
 	return !f.UnInterested
