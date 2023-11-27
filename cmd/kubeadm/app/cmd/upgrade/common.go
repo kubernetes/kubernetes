@@ -25,8 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
@@ -37,7 +35,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -131,23 +128,12 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	printer.Printf("[upgrade/config] Making sure the configuration is correct:\n")
+	_, _ = printer.Println("[upgrade/config] Loading the kubeadm configuration")
 
 	var newK8sVersion string
 	cfg, legacyReconfigure, err := loadConfig(flags.cfgPath, client, !upgradeApply, printer)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			printer.Printf("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.\n")
-			printer.Println()
-			printer.Printf("[upgrade/config] Next steps:\n")
-			printer.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
-			printer.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
-			printer.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
-			printer.Println()
-			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-		}
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
+		return nil, nil, nil, errors.Wrap(err, "could not load the kubeadm configuration")
 	} else if legacyReconfigure {
 		// Set the newK8sVersion to the value in the ClusterConfiguration. This is done, so that users who use the --config option
 		// to supply a new ClusterConfiguration don't have to specify the Kubernetes version twice,
