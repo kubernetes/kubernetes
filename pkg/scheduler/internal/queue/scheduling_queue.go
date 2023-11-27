@@ -580,7 +580,7 @@ func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) error {
 	return nil
 }
 
-// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
+// Activate moves the given pods to activeQ if they're in unschedulablePods or backoffQ.
 func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
