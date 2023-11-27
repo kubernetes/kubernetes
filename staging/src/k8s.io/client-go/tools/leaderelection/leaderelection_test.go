@@ -315,6 +315,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				observedRawRecord: observedRawRecord,
 				observedTime:      test.observedTime,
 				clock:             clock,
+				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				if test.retryAfter != 0 {
@@ -491,6 +492,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 				observedRawRecord: observedRawRecord,
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
+				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
 			if !le.tryAcquireOrRenew(context.Background()) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", true)
