@@ -232,6 +232,20 @@ func TestWarnings(t *testing.T) {
 				`spec.rbd: deprecated in v1.28, non-functional in v1.31+`},
 		},
 		{
+			name: "PV FlexVolume deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						FlexVolume: &api.FlexPersistentVolumeSource{
+							Driver: "example/driver",
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.flexVolume: deprecated in v1.23`},
+		},
+		{
 			name: "PV ScaleIO deprecation warning",
 			template: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{

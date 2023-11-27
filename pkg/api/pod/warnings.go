@@ -166,6 +166,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		if v.RBD != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "volumes").Index(i).Child("rbd")))
 		}
+		if v.FlexVolume != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.23", fieldPath.Child("spec", "volumes").Index(i).Child("flexVolume")))
+		}
 	}
 
 	// duplicate hostAliases (#91670, #58477)

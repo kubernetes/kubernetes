@@ -224,7 +224,6 @@ func TestWarnings(t *testing.T) {
 			},
 			expected: []string{`spec.volumes[0].cephfs: deprecated in v1.28, non-functional in v1.31+`},
 		},
-
 		{
 			name: "rbd",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
@@ -233,6 +232,15 @@ func TestWarnings(t *testing.T) {
 				}},
 			},
 			expected: []string{`spec.volumes[0].rbd: deprecated in v1.28, non-functional in v1.31+`},
+		},
+		{
+			name: "flexVolume",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].flexVolume: deprecated in v1.23`},
 		},
 		{
 			name: "duplicate hostAlias",
