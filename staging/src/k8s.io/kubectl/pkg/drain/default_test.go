@@ -38,7 +38,7 @@ func TestRunNodeDrain(t *testing.T) {
 				Client: fake.NewSimpleClientset(),
 				ErrOut: os.Stderr,
 			},
-			expectedError: &nilHelperOutNilError,
+			expectedError: &errHelperOutNil,
 		},
 		{
 			description: "nil drainer.ErrOut",
@@ -46,7 +46,7 @@ func TestRunNodeDrain(t *testing.T) {
 				Ctx: context.TODO(),
 				Out: os.Stderr,
 			},
-			expectedError: &nilHelperErrOutNilError,
+			expectedError: &errHelperErrOutNil,
 		},
 	}
 

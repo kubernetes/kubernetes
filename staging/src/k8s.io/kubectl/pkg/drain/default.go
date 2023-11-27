@@ -30,18 +30,18 @@ import (
 // example if you want different output behaviour.
 
 var (
-	nilHelperOutNilError    = errors.New("RunNodeDrain error: drain.Helper.Out can't be nil")
-	nilHelperErrOutNilError = errors.New("RunNodeDrain error: drain.Helper.ErrOut can't be nil")
+	errHelperOutNil    = errors.New("RunNodeDrain error: drain.Helper.Out can't be nil")
+	errHelperErrOutNil = errors.New("RunNodeDrain error: drain.Helper.ErrOut can't be nil")
 )
 
 // RunNodeDrain shows the canonical way to drain a node.
 // You should first cordon the node, e.g. using RunCordonOrUncordon
 func RunNodeDrain(drainer *Helper, nodeName string) error {
 	if drainer.Out == nil {
-		return nilHelperOutNilError
+		return errHelperOutNil
 	}
 	if drainer.ErrOut == nil {
-		return nilHelperErrOutNilError
+		return errHelperErrOutNil
 	}
 
 	// TODO(justinsb): Ensure we have adequate e2e coverage of this function in library consumers
