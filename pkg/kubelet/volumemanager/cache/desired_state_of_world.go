@@ -22,6 +22,7 @@ package cache
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -245,11 +246,8 @@ type podToMount struct {
 	// PVC volumes it is from the dereferenced PV object.
 	volumeSpec *volume.Spec
 
-	// outerVolumeSpecName is the volume.Spec.Name() of the volume as referenced
-	// directly in the pod. If the volume was referenced through a persistent
-	// volume claim, this contains the volume.Spec.Name() of the persistent
-	// volume claim
-	outerVolumeSpecName string
+	// outerVolumeSpecNames are the podSpec.Volume[x].Name of the volume.
+	outerVolumeSpecNames []string
 	// mountRequestTime stores time at which mount was requested
 	mountRequestTime time.Time
 }
@@ -359,8 +357,15 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 
 	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
 	mountRequestTime := time.Now()
-	if ok && !volumePlugin.RequiresRemount(volumeSpec) {
-		mountRequestTime = oldPodMount.mountRequestTime
+	var outerVolumeSpecNames []string
+	if ok {
+		if !volumePlugin.RequiresRemount(volumeSpec) {
+			mountRequestTime = oldPodMount.mountRequestTime
+		}
+		outerVolumeSpecNames = oldPodMount.outerVolumeSpecNames
+	}
+	if !slices.Contains(outerVolumeSpecNames, outerVolumeSpecName) {
+		outerVolumeSpecNames = append(outerVolumeSpecNames, outerVolumeSpecName)
 	}
 
 	if !ok {
@@ -388,11 +393,11 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	// updated values (this is required for volumes that require remounting on
 	// pod update, like Downward API volumes).
 	dsw.volumesToMount[volumeName].podsToMount[podName] = podToMount{
-		podName:             podName,
-		pod:                 pod,
-		volumeSpec:          volumeSpec,
-		outerVolumeSpecName: outerVolumeSpecName,
-		mountRequestTime:    mountRequestTime,
+		podName:              podName,
+		pod:                  pod,
+		volumeSpec:           volumeSpec,
+		outerVolumeSpecNames: outerVolumeSpecNames,
+		mountRequestTime:     mountRequestTime,
 	}
 	return volumeName, nil
 }
@@ -571,9 +576,8 @@ func (dsw *desiredStateOfWorld) GetVolumeNamesForPod(podName types.UniquePodName
 
 	volumeNames := make(map[string]v1.UniqueVolumeName)
 	for volumeName, volumeObj := range dsw.volumesToMount {
-		podObj, ok := volumeObj.podsToMount[podName]
-		if ok {
-			volumeNames[podObj.outerVolumeSpecName] = volumeName
+		for _, outerVolumeSpecName := range volumeObj.podsToMount[podName].outerVolumeSpecNames {
+			volumeNames[outerVolumeSpecName] = volumeName
 		}
 	}
 	return volumeNames
@@ -594,7 +598,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 					VolumeSpec:              podObj.volumeSpec,
 					PluginIsAttachable:      volumeObj.pluginIsAttachable,
 					PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
-					OuterVolumeSpecName:     podObj.outerVolumeSpecName,
+					OuterVolumeSpecNames:    podObj.outerVolumeSpecNames,
 					VolumeGIDValue:          volumeObj.volumeGIDValue,
 					ReportedInUse:           volumeObj.reportedInUse,
 					MountRequestTime:        podObj.mountRequestTime,

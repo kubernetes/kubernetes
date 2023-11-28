@@ -421,10 +421,8 @@ type VolumeToMount struct {
 	// InnerVolumeSpecName.
 	VolumeSpec *volume.Spec
 
-	// outerVolumeSpecName is the podSpec.Volume[x].Name of the volume. If the
-	// volume was referenced through a persistent volume claim, this contains
-	// the podSpec.Volume[x].Name of the persistent volume claim.
-	OuterVolumeSpecName string
+	// outerVolumeSpecNames are the podSpec.Volume[x].Name of the volume.
+	OuterVolumeSpecNames []string
 
 	// Pod to mount the volume to. Used to create NewMounter.
 	Pod *v1.Pod

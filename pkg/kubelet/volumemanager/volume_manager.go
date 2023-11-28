@@ -437,7 +437,7 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 
 		unattachedVolumes := []string{}
 		for _, volumeToMount := range unattachedVolumeMounts {
-			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
+			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecNames...)
 		}
 		slices.Sort(unattachedVolumes)
 
@@ -533,7 +533,7 @@ func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, e
 
 	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
 		if volumeToMount.PodName == uniquePodName {
-			volumesNotInDSW.Delete(volumeToMount.OuterVolumeSpecName)
+			volumesNotInDSW.Delete(volumeToMount.OuterVolumeSpecNames...)
 		}
 	}
 
