@@ -475,7 +475,7 @@ func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, e
 
 	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
 		if volumeToMount.PodName == uniquePodName {
-			volumesNotInDSW.Delete(volumeToMount.OuterVolumeSpecName)
+			volumesNotInDSW.Delete(volumeToMount.OuterVolumeSpecNames...)
 		}
 	}
 
@@ -490,7 +490,7 @@ func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName)
 		if volumeToMount.PodName == uniquePodName &&
 			volumeToMount.PluginIsAttachable &&
 			!vm.actualStateOfWorld.VolumeExists(volumeToMount.VolumeName) {
-			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
+			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecNames...)
 		}
 	}
 	sort.Strings(unattachedVolumes)
@@ -523,16 +523,18 @@ func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName)
 // getMountedVolumes returns volumes that are desired and actually mounted,
 // indexed by the outer volume spec name.
 func (vm *volumeManager) getMountedVolumes(podName types.UniquePodName) map[string]*cache.MountedVolume {
-	outerNames := map[v1.UniqueVolumeName]string{}
+	outerNames := map[v1.UniqueVolumeName][]string{}
 	for _, toMountVolumes := range vm.desiredStateOfWorld.GetVolumesToMount() {
 		if toMountVolumes.PodName == podName {
-			outerNames[toMountVolumes.VolumeName] = toMountVolumes.OuterVolumeSpecName
+			outerNames[toMountVolumes.VolumeName] = toMountVolumes.OuterVolumeSpecNames
 		}
 	}
 	volumes := vm.actualStateOfWorld.GetMountedVolumesForPod(podName)
 	volumesByOuterName := make(map[string]*cache.MountedVolume)
 	for i, mountedVolume := range volumes {
-		volumesByOuterName[outerNames[mountedVolume.VolumeName]] = &volumes[i]
+		for _, name := range outerNames[mountedVolume.VolumeName] {
+			volumesByOuterName[name] = &volumes[i]
+		}
 	}
 	return volumesByOuterName
 }
