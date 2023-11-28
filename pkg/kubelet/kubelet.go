@@ -1960,9 +1960,11 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Currently, using that context causes test failures. To remove this todoCtx, any wait.Interrupted
 	// errors need to be filtered from result and bypass the reasonCache - cancelling the context for
 	// SyncPod is a known and deliberate error, not a generic error.
-	todoCtx := context.TODO()
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(todoCtx, pod, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(ctx, pod, podStatus, pullSecrets, kl.backOff)
+	if wait.Interrupted(result.Error()) {
+		return false, err
+	}
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
