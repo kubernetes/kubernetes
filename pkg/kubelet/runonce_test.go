@@ -121,7 +121,6 @@ func TestRunOnce(t *testing.T) {
 		kb.hostutil,
 		kb.getPodsDir(),
 		kb.recorder,
-		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
 	// TODO: Factor out "stats.Provider" from Kubelet so we don't have a cyclic dependency
