@@ -302,8 +302,6 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			// explicitly reset exec arguments
 			modifiedAuthInfo.Exec.Args = nil
 		}
-
-		modifiedAuthInfo.Exec.ProvideClusterInfo = o.execProvideClusterInfo
 	}
 
 	// modify next values only if Exec exists, ignore these changes otherwise
@@ -320,6 +318,8 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 		if o.execInteractiveMode.Provided() {
 			modifiedAuthInfo.Exec.InteractiveMode = clientcmdapi.ExecInteractiveMode(o.execInteractiveMode.Value())
 		}
+
+		modifiedAuthInfo.Exec.ProvideClusterInfo = o.execProvideClusterInfo
 
 		// iterate over the existing exec env values and remove the specified
 		if o.execEnvToRemove != nil {
