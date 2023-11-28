@@ -18,12 +18,13 @@ package ipamperf
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -56,7 +57,8 @@ type Observer struct {
 	numAllocated int                  // number of nodes observed allocated podCIDR
 	timing       map[string]*nodeTime // per node timing
 	numNodes     int                  // the number of nodes to expect
-	stopChan     chan struct{}        // for the shared informer
+	cancelCtx    context.Context
+	cancel       func()
 	wg           sync.WaitGroup
 	clientSet    *clientset.Clientset
 }
@@ -82,13 +84,13 @@ type Results struct {
 }
 
 // NewObserver creates a new observer given a handle to the Clientset
-func NewObserver(clientSet *clientset.Clientset, numNodes int) *Observer {
+func NewObserver(ctx context.Context, clientSet *clientset.Clientset, numNodes int) *Observer {
 	o := &Observer{
 		timing:    map[string]*nodeTime{},
 		numNodes:  numNodes,
 		clientSet: clientSet,
-		stopChan:  make(chan struct{}),
 	}
+	o.cancelCtx, o.cancel = context.WithCancel(ctx)
 	return o
 }
 
@@ -108,7 +110,7 @@ func (o *Observer) Results(name string, config *Config) *Results {
 		lastAssignment time.Time // latest time any node was assigned CIDR (last node assignment)
 	)
 	o.wg.Wait()
-	close(o.stopChan) // shutdown the shared informer
+	o.cancel() // shutdown the shared informer
 
 	results := &Results{
 		Name:          name,
@@ -186,7 +188,7 @@ func (o *Observer) monitor() {
 			return
 		}),
 	})
-	sharedInformer.Start(o.stopChan)
+	sharedInformer.Start(o.cancelCtx.Done())
 }
 
 // String implements the Stringer interface and returns a multi-line representation
