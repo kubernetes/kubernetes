@@ -1961,7 +1961,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// errors need to be filtered from result and bypass the reasonCache - cancelling the context for
 	// SyncPod is a known and deliberate error, not a generic error.
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(ctx, pod, podStatus, pullSecrets, kl.backOff)
+	sctx := context.WithoutCancel(ctx)
+	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.backOff)
 	if wait.Interrupted(result.Error()) {
 		return false, err
 	}
