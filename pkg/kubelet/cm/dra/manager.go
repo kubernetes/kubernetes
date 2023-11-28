@@ -124,6 +124,13 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 		// in the cache.
 		claimInfo.addPodReference(pod.UID)
 
+		// Sync to Checkpoint in advance to prevent the loss of claim requests.
+		m.cache.add(claimInfo)
+		err = m.cache.syncToCheckpoint()
+		if err != nil {
+			return fmt.Errorf("failed to checkpoint claimInfo state, err: %+v", err)
+		}
+
 		if claimInfo.prepared {
 			// Already prepared this claim, no need to prepare it again
 			continue
@@ -276,6 +283,14 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 			claimInfo := m.cache.get(*claimName, pod.Namespace)
 			if claimInfo == nil {
 				return nil, fmt.Errorf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, *claimName)
+			}
+			// If claimInfo hasn't been prepared, run NodePrepareResources again.
+			// This will run only if DRA manager lost checkpoint information.
+			if !claimInfo.prepared {
+				err = m.PrepareResources(pod)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			claimInfo.RLock()
