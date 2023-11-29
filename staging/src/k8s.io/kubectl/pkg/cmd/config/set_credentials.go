@@ -51,7 +51,7 @@ type setCredentialsOptions struct {
 	execCommand            cliflag.StringFlag
 	execAPIVersion         cliflag.StringFlag
 	execInteractiveMode    cliflag.StringFlag
-	execProvideClusterInfo bool
+	execProvideClusterInfo cliflag.Tristate
 	execArgs               []string
 	execEnv                map[string]string
 	execEnvToRemove        []string
@@ -187,7 +187,8 @@ func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *
 	cmd.Flags().Var(&options.execCommand, flagExecCommand, "Command for the exec credential plugin for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.execAPIVersion, flagExecAPIVersion, "API version of the exec credential plugin for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.execInteractiveMode, flagExecInteractiveMode, "InteractiveMode of the exec credentials plugin for the user entry in kubeconfig")
-	cmd.Flags().BoolVar(&options.execProvideClusterInfo, flagExecProvideClusterInfo, options.execProvideClusterInfo, "ProvideClusterInfo of the exec credentials plugin for the user entry in kubeconfig")
+	flagClusterInfo := cmd.Flags().VarPF(&options.execProvideClusterInfo, flagExecProvideClusterInfo, "", "ProvideClusterInfo of the exec credentials plugin for the user entry in kubeconfig")
+	flagClusterInfo.NoOptDefVal = "true"
 	cmd.Flags().StringSlice(flagExecArg, nil, "New arguments for the exec credential plugin command for the user entry in kubeconfig")
 	cmd.Flags().StringArray(flagExecEnv, nil, "'key=value' environment values for the exec credential plugin")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "Embed client cert/key for the user entry in kubeconfig")
@@ -319,7 +320,9 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			modifiedAuthInfo.Exec.InteractiveMode = clientcmdapi.ExecInteractiveMode(o.execInteractiveMode.Value())
 		}
 
-		modifiedAuthInfo.Exec.ProvideClusterInfo = o.execProvideClusterInfo
+		if o.execProvideClusterInfo.Provided() {
+			modifiedAuthInfo.Exec.ProvideClusterInfo = o.execProvideClusterInfo.Value()
+		}
 
 		// iterate over the existing exec env values and remove the specified
 		if o.execEnvToRemove != nil {
