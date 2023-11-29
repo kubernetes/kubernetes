@@ -24,8 +24,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,13 +34,14 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
-
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
+
+	"github.com/pkg/errors"
 )
 
 const (

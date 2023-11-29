@@ -24,22 +24,21 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/klog/v2"
-
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 type planFlags struct {

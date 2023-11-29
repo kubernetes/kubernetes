@@ -19,8 +19,6 @@ package upgrade
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
@@ -28,8 +26,9 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/version"
-
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	"github.com/pkg/errors"
 )
 
 // VersionGetter defines an interface for fetching different versions.

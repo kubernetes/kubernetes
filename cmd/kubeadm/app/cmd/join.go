@@ -24,17 +24,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -47,6 +41,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -177,7 +176,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 
 			data := c.(*joinData)
 
-			if err := joinRunner.Run(args); err != nil {
+			if err = joinRunner.Run(args); err != nil {
 				return err
 			}
 
@@ -193,7 +192,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 					"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
 					"etcdMessage":    etcdMessage,
 				}
-				if err := joinControPlaneDoneTemp.Execute(data.outputWriter, ctx); err != nil {
+				if err = joinControPlaneDoneTemp.Execute(data.outputWriter, ctx); err != nil {
 					return err
 				}
 

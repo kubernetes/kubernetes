@@ -17,15 +17,15 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"github.com/pkg/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
-	netutils "k8s.io/utils/net"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	netutils "k8s.io/utils/net"
+
+	"github.com/pkg/errors"
 )
 
 const (

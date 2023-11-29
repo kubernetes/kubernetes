@@ -22,15 +22,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
-
-	"k8s.io/klog/v2"
-
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	"github.com/pkg/errors"
 )
 
 type kubeletFlagsOpts struct {

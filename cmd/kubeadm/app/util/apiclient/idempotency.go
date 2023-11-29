@@ -20,8 +20,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/pkg/errors"
-
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -32,8 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetretry "k8s.io/client-go/util/retry"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	"github.com/pkg/errors"
 )
 
 // ConfigMapMutator is a function that mutates the given ConfigMap and optionally returns an error
@@ -48,7 +47,7 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 			return errors.Wrap(err, "unable to create ConfigMap")
 		}
 
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
+		if _, err = client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update ConfigMap")
 		}
 	}
@@ -109,7 +108,7 @@ func CreateOrRetainConfigMap(client clientset.Interface, cm *v1.ConfigMap, confi
 		if !apierrors.IsNotFound(err) {
 			return nil
 		}
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
+		if _, err = client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return errors.Wrap(err, "unable to create ConfigMap")
 			}
@@ -125,7 +124,7 @@ func CreateOrUpdateSecret(client clientset.Interface, secret *v1.Secret) error {
 			return errors.Wrap(err, "unable to create secret")
 		}
 
-		if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+		if _, err = client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update secret")
 		}
 	}
@@ -151,7 +150,7 @@ func CreateOrUpdateDeployment(client clientset.Interface, deploy *apps.Deploymen
 			return errors.Wrap(err, "unable to create deployment")
 		}
 
-		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Update(context.TODO(), deploy, metav1.UpdateOptions{}); err != nil {
+		if _, err = client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Update(context.TODO(), deploy, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update deployment")
 		}
 	}
@@ -164,7 +163,7 @@ func CreateOrRetainDeployment(client clientset.Interface, deploy *apps.Deploymen
 		if !apierrors.IsNotFound(err) {
 			return nil
 		}
-		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{}); err != nil {
+		if _, err = client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{}); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return errors.Wrap(err, "unable to create deployment")
 			}
@@ -180,7 +179,7 @@ func CreateOrUpdateDaemonSet(client clientset.Interface, ds *apps.DaemonSet) err
 			return errors.Wrap(err, "unable to create daemonset")
 		}
 
-		if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Update(context.TODO(), ds, metav1.UpdateOptions{}); err != nil {
+		if _, err = client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Update(context.TODO(), ds, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update daemonset")
 		}
 	}
@@ -197,7 +196,7 @@ func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 				return false, nil
 			}
 
-			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
+			if _, err = client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
 				lastError = errors.Wrap(err, "unable to update RBAC role")
 				return false, nil
 			}
@@ -220,7 +219,7 @@ func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.Rol
 				return false, nil
 			}
 
-			if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(context.TODO(), roleBinding, metav1.UpdateOptions{}); err != nil {
+			if _, err = client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(context.TODO(), roleBinding, metav1.UpdateOptions{}); err != nil {
 				lastError = errors.Wrap(err, "unable to update RBAC rolebinding")
 				return false, nil
 			}
@@ -240,7 +239,7 @@ func CreateOrUpdateClusterRole(client clientset.Interface, clusterRole *rbac.Clu
 			return errors.Wrap(err, "unable to create RBAC clusterrole")
 		}
 
-		if _, err := client.RbacV1().ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{}); err != nil {
+		if _, err = client.RbacV1().ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update RBAC clusterrole")
 		}
 	}
@@ -254,7 +253,7 @@ func CreateOrUpdateClusterRoleBinding(client clientset.Interface, clusterRoleBin
 			return errors.Wrap(err, "unable to create RBAC clusterrolebinding")
 		}
 
-		if _, err := client.RbacV1().ClusterRoleBindings().Update(context.TODO(), clusterRoleBinding, metav1.UpdateOptions{}); err != nil {
+		if _, err = client.RbacV1().ClusterRoleBindings().Update(context.TODO(), clusterRoleBinding, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update RBAC clusterrolebinding")
 		}
 	}
@@ -301,7 +300,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 			return false, *lastError
 		}
 
-		if _, err := client.CoreV1().Nodes().Patch(context.TODO(), n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		if _, err = client.CoreV1().Nodes().Patch(context.TODO(), n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			*lastError = errors.Wrapf(err, "error patching node %q through apiserver", n.Name)
 			if apierrors.IsTimeout(err) || apierrors.IsConflict(err) || apierrors.IsServerTimeout(err) || apierrors.IsServiceUnavailable(err) {
 				return false, nil

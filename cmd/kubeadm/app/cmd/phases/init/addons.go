@@ -19,17 +19,16 @@ package phases
 import (
 	"io"
 
-	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
-
 	clientset "k8s.io/client-go/kubernetes"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 )
 
 var (

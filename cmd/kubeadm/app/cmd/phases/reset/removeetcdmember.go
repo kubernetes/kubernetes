@@ -21,10 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -33,6 +30,8 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	utilstaticpod "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+
+	"github.com/pkg/errors"
 )
 
 // NewRemoveETCDMemberPhase creates a kubeadm workflow phase for remove-etcd-member

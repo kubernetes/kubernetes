@@ -33,8 +33,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,15 +40,16 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	system "k8s.io/system-validators/validators"
-	utilsexec "k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+	system "k8s.io/system-validators/validators"
+	utilsexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
+
+	"github.com/pkg/errors"
 )
 
 const (

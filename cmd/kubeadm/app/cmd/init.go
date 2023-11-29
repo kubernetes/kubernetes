@@ -22,13 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -44,6 +39,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
 // initOptions defines all the init options exposed via flags by kubeadm init.
@@ -335,10 +334,10 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		cfg.NodeRegistration.Name = initOptions.externalInitCfg.NodeRegistration.Name
 	}
 
-	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+	if err = configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 		return nil, err
 	}
-	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
+	if err = features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
 		return nil, err
 	}
 
@@ -365,7 +364,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		// Validate that also the required kubeconfig files exists and are invalid, because
 		// kubeadm can't regenerate them without the CA Key
 		kubeconfigDir := initOptions.kubeconfigDir
-		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
+		if err = kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
 			return nil, err
 		}
 	}

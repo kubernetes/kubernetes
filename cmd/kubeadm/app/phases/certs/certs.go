@@ -24,15 +24,14 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -96,7 +95,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string, keyType kubeadmap
 	// Write .key and .pub files to disk
 	fmt.Printf("[certs] Generating %q key and public key\n", kubeadmconstants.ServiceAccountKeyBaseName)
 
-	if err := pkiutil.WriteKey(certsDir, kubeadmconstants.ServiceAccountKeyBaseName, key); err != nil {
+	if err = pkiutil.WriteKey(certsDir, kubeadmconstants.ServiceAccountKeyBaseName, key); err != nil {
 		return err
 	}
 
@@ -246,12 +245,12 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 		CheckCertificatePeriodValidity(baseName, signedCert)
 
 		// Check if the existing cert is signed by the given CA
-		if err := pkiutil.VerifyCertChain(signedCert, intermediates, signingCert); err != nil {
+		if err = pkiutil.VerifyCertChain(signedCert, intermediates, signingCert); err != nil {
 			return errors.Errorf("certificate %s is not signed by corresponding CA", baseName)
 		}
 
 		// Check if the certificate has the correct attributes
-		if err := validateCertificateWithConfig(signedCert, baseName, cfg); err != nil {
+		if err = validateCertificateWithConfig(signedCert, baseName, cfg); err != nil {
 			return err
 		}
 
@@ -476,7 +475,7 @@ func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error
 	CheckCertificatePeriodValidity(l.uxName, signedCert)
 
 	// Check if the cert is signed by the CA
-	if err := pkiutil.VerifyCertChain(signedCert, intermediates, caCert); err != nil {
+	if err = pkiutil.VerifyCertChain(signedCert, intermediates, caCert); err != nil {
 		return errors.Wrapf(err, "certificate %s is not signed by corresponding CA", l.uxName)
 	}
 	return nil

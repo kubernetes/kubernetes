@@ -22,20 +22,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	"sigs.k8s.io/yaml"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
+	"sigs.k8s.io/yaml"
+
+	"github.com/pkg/errors"
 )
 
 // WriteConfigToDisk writes the kubelet config object down to a file

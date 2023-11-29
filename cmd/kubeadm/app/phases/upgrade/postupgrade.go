@@ -23,8 +23,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -46,6 +43,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+
+	"github.com/pkg/errors"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
