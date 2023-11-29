@@ -452,7 +452,13 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Subdomain); len(msgs) != 0 {
 			return "", "", fmt.Errorf("pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
-		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
+		// If the cluster domain is empty string then do not include it in the hostDomain
+		// else add it in the hostDomain
+		if clusterDomain == "" {
+			hostDomain = fmt.Sprintf("%s.%s", pod.Spec.Subdomain, pod.Namespace)
+		} else {
+			hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
+		}
 	}
 
 	return hostname, hostDomain, nil
