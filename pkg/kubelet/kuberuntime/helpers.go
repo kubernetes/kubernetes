@@ -267,3 +267,11 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
 	}, nil
 }
+
+func removeSensitiveContainerInformation(pod *v1.Pod) *v1.Pod {
+	p := pod.DeepCopy()
+	for i := 0; i < len(p.Spec.Containers); i++ {
+		p.Spec.Containers[i].Env = nil
+	}
+	return p
+}

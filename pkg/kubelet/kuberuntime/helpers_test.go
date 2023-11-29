@@ -359,3 +359,98 @@ func TestToKubeContainerState(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoveSensitiveContainerInformation(t *testing.T) {
+	for _, test := range []struct {
+		description string
+		pod         *v1.Pod
+	}{
+		{
+			description: "no env var",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test_pod",
+					Namespace: "test_pod_namespace",
+					UID:       "test_pod_uid",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "test_container",
+							Image: "foo/image:v1",
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "one container with env var",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test_pod",
+					Namespace: "test_pod_namespace",
+					UID:       "test_pod_uid",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "test_container",
+							Image: "foo/image:v1",
+							Env: []v1.EnvVar{
+								{
+									Name:  "foo",
+									Value: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "multiple containers with env var",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test_pod",
+					Namespace: "test_pod_namespace",
+					UID:       "test_pod_uid",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "test_container",
+							Image: "foo/image:v1",
+							Env: []v1.EnvVar{
+								{
+									Name:  "foo",
+									Value: "bar",
+								},
+							},
+						},
+						{
+							Name:  "test_container_2",
+							Image: "foo/image:v2",
+							Env: []v1.EnvVar{
+								{
+									Name:  "baz",
+									Value: "qux",
+								},
+								{
+									Name:  "another",
+									Value: "value",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			pod := removeSensitiveContainerInformation(test.pod)
+			for _, container := range pod.Spec.Containers {
+				assert.Nil(t, container.Env)
+			}
+		})
+	}
+}
