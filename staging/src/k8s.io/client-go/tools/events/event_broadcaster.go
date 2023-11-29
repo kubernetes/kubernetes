@@ -314,6 +314,8 @@ func getKey(event *eventsv1.Event) eventKey {
 // TODO: this function should also return an error.
 //
 // Deprecated: use StartLogging instead.
+//
+//logcheck:context
 func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) func() {
 	logger := klog.Background().V(int(verbosity))
 	stopWatcher, err := e.StartLogging(logger)
@@ -393,6 +395,8 @@ func (e *eventBroadcasterImpl) startRecordingEvents(ctx context.Context) error {
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 // Deprecated: use StartRecordingToSinkWithContext instead.
+//
+//logcheck:context
 func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 	err := e.StartRecordingToSinkWithContext(wait.ContextForChannel(stopCh))
 	if err != nil {

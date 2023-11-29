@@ -139,6 +139,7 @@ type EventBroadcaster interface {
 
 	// StartLogging starts sending events received from this EventBroadcaster to the given logging
 	// function. The return value can be ignored or used to stop recording, if desired.
+	//logcheck:context
 	StartLogging(logf func(format string, args ...interface{})) watch.Interface
 
 	// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured
@@ -183,6 +184,8 @@ func (a *EventRecorderAdapter) WithLogger(logger klog.Logger) internalevents.Eve
 }
 
 // Creates a new event broadcaster.
+//
+//logcheck:context
 func NewBroadcaster(opts ...BroadcasterOption) EventBroadcaster {
 	c := config{
 		sleepDuration: defaultSleepDuration,
