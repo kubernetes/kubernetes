@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	storageV1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-helpers/scheduling/corev1"
 )
@@ -67,4 +68,15 @@ func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) er
 	}
 
 	return nil
+}
+
+func CheckCSINodeAffinity(csiNode *storageV1.CSINode, pv *v1.PersistentVolume) error {
+	if len(csiNode.Spec.Drivers) != 0 {
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name == pv.Spec.CSI.Driver {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("no matching CSI driver")
 }
