@@ -1963,9 +1963,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Call the container runtime's SyncPod callback
 	sctx := context.WithoutCancel(ctx)
 	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.backOff)
-	if wait.Interrupted(result.Error()) {
-		return false, err
-	}
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
