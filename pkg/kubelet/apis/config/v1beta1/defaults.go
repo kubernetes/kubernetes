@@ -113,9 +113,6 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.OOMScoreAdj == nil {
 		obj.OOMScoreAdj = utilpointer.Int32(int32(qos.KubeletOOMScoreAdj))
 	}
-	if obj.StreamingConnectionIdleTimeout == zeroDuration {
-		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
-	}
 	if obj.NodeStatusReportFrequency == zeroDuration {
 		// For backward compatibility, NodeStatusReportFrequency's default value is
 		// set to NodeStatusUpdateFrequency if NodeStatusUpdateFrequency is set

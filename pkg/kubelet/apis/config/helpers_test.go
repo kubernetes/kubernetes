@@ -272,7 +272,6 @@ var (
 		"ShowHiddenMetricsForVersion",
 		"ShutdownGracePeriodByPodPriority[*].Priority",
 		"ShutdownGracePeriodByPodPriority[*].ShutdownGracePeriodSeconds",
-		"StreamingConnectionIdleTimeout.Duration",
 		"SyncFrequency.Duration",
 		"SystemCgroups",
 		"SystemReservedCgroup",
