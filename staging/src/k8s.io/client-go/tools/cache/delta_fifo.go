@@ -457,6 +457,14 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 		if err != nil {
 			return err
 		}
+		// If the returned object is nil, storing a nil value can cause panics
+		// if consumers assume the object will be always not nil:
+		// > panic: interface conversion: interface {} is nil, not ...
+		// Users can use the tranformer to not store objects in memory
+		// by returning nil for those objects they want to filter.
+		if obj == nil {
+			return nil
+		}
 	}
 
 	oldDeltas := f.items[id]

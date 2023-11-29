@@ -409,6 +409,42 @@ func TestDeltaFIFO_transformer(t *testing.T) {
 	}
 }
 
+func TestDeltaFIFO_transformer_filter(t *testing.T) {
+	xfrm := TransformFunc(func(obj interface{}) (interface{}, error) {
+		if v, ok := obj.(testFifoObject); ok {
+			// filter odd values
+			if v.val.(int)%2 == 1 {
+				return nil, nil
+			}
+		}
+		return obj, nil
+	})
+
+	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: testFifoObjectKeyFunc,
+		Transformer: xfrm,
+	})
+	f.Add(mkFifoObj("one", 1))
+	f.Update(mkFifoObj("two", 2))
+	f.Add(mkFifoObj("three", 3))
+	f.Add(mkFifoObj("four", 4))
+	f.Delete(mkFifoObj("five", 5))
+	f.Delete(mkFifoObj("six", 6))
+	f.Update(mkFifoObj("four", 4))
+	f.Update(mkFifoObj("seven", 7))
+	f.Update(mkFifoObj("eight", 8))
+
+	expectList := []int{2, 4, 8}
+	for _, expect := range expectList {
+		if e, a := expect, testPop(f).val; e != a {
+			t.Errorf("Didn't get updated value (%v), got %v", e, a)
+		}
+	}
+	if e, a := 0, len(f.items); e != a {
+		t.Errorf("queue unexpectedly not empty: %v != %v\n%#v", e, a, f.items)
+	}
+}
+
 func TestDeltaFIFO_enqueueingNoLister(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
 	f.Add(mkFifoObj("foo", 10))
