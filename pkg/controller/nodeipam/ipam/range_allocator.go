@@ -163,7 +163,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 }
 
 func (r *rangeAllocator) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	r.broadcaster.StartStructuredLogging(3)

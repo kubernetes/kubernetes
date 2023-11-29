@@ -253,6 +253,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 }
 
 func TestRetryOnConflictError(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	mockClient := &fake.Clientset{}
 	numTries := 0
 	retryOnce := func(ctx context.Context, namespace *v1.Namespace) (*v1.Namespace, error) {
@@ -266,7 +267,7 @@ func TestRetryOnConflictError(t *testing.T) {
 	d := namespacedResourcesDeleter{
 		nsClient: mockClient.CoreV1().Namespaces(),
 	}
-	_, err := d.retryOnConflictError(context.Background(), namespace, retryOnce)
+	_, err := d.retryOnConflictError(ctx, namespace, retryOnce)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}

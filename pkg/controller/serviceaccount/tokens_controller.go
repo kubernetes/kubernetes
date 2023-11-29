@@ -113,7 +113,7 @@ func NewTokensController(ctx context.Context, serviceAccounts informers.ServiceA
 				case *v1.Secret:
 					return t.Type == v1.SecretTypeServiceAccountToken
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 					return false
 				}
 			},
@@ -164,7 +164,7 @@ type TokensController struct {
 // Run runs controller blocks until stopCh is closed
 func (e *TokensController) Run(ctx context.Context, workers int) {
 	// Shut down queues
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer e.syncServiceAccountQueue.ShutDown()
 	defer e.syncSecretQueue.ShutDown()
 

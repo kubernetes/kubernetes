@@ -480,6 +480,7 @@ func BenchmarkGetReplicaSetsWithSameController(b *testing.B) {
 }
 
 func TestPodControllerLookup(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(t, clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}), stopCh, BurstReplicas)
@@ -530,7 +531,7 @@ func TestPodControllerLookup(t *testing.T) {
 		for _, r := range c.inRSs {
 			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(r)
 		}
-		if rss := manager.getPodReplicaSets(c.pod); rss != nil {
+		if rss := manager.getPodReplicaSets(logger, c.pod); rss != nil {
 			if len(rss) != 1 {
 				t.Errorf("len(rss) = %v, want %v", len(rss), 1)
 				continue

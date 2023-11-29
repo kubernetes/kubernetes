@@ -302,7 +302,7 @@ func (qm *QuotaMonitor) IsSynced(ctx context.Context) bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 
@@ -322,7 +322,7 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	// The following workers are hanging forever until the queue is
 	// shutted down, so we need to shut it down in a separate goroutine.
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		defer qm.resourceChanges.ShutDown()
 
 		<-ctx.Done()
@@ -359,7 +359,7 @@ func (qm *QuotaMonitor) processResourceChanges(ctx context.Context) bool {
 	obj := event.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Cannot access obj")
 		return true
 	}
 	klog.FromContext(ctx).V(4).Info("QuotaMonitor process object",

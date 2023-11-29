@@ -93,7 +93,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 				case *v1.Secret:
 					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.tokenSecretNamespace
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 					return false
 				}
 			},
@@ -110,7 +110,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 
 // Run runs controller loops and returns when they are done
 func (tc *TokenCleaner) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer tc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
@@ -129,7 +129,7 @@ func (tc *TokenCleaner) Run(ctx context.Context) {
 func (tc *TokenCleaner) enqueueSecrets(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 	tc.queue.Add(key)
@@ -151,7 +151,7 @@ func (tc *TokenCleaner) processNextWorkItem(ctx context.Context) bool {
 
 	if err := tc.syncFunc(ctx, key); err != nil {
 		tc.queue.AddRateLimited(key)
-		utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, nil, "Sync failed", "key", key)
 		return true
 	}
 
@@ -206,7 +206,7 @@ func (tc *TokenCleaner) evalSecret(ctx context.Context, o interface{}) {
 	} else if ttl > 0 {
 		key, err := controller.KeyFunc(o)
 		if err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Generating key failed")
 			return
 		}
 		tc.queue.AddAfter(key, ttl)

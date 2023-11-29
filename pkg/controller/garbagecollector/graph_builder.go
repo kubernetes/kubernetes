@@ -575,7 +575,7 @@ func deletionStartsWithFinalizer(oldObj interface{}, newAccessor metav1.Object, 
 	}
 	oldAccessor, err := meta.Accessor(oldObj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
+		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return false
 	}
 	return !beingDeleted(oldAccessor) || !hasFinalizer(oldAccessor, matchingFinalizer)
@@ -687,7 +687,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 	obj := item.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Cannot access obj")
 		return true
 	}
 

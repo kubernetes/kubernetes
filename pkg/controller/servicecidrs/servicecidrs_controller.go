@@ -130,7 +130,7 @@ type Controller struct {
 
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	c.eventBroadcaster.StartStructuredLogging(3)
@@ -283,9 +283,8 @@ func (c *Controller) processNext(ctx context.Context) bool {
 		logger.V(2).Info("Error syncing ServiceCIDR, retrying", "ServiceCIDR", key, "err", err)
 		c.queue.AddRateLimited(key)
 	} else {
-		logger.Info("Dropping ServiceCIDR out of the queue", "ServiceCIDR", key, "err", err)
 		c.queue.Forget(key)
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed too often, dropping ServiceCIDR out of the queue", "key", key)
 	}
 	return true
 }
