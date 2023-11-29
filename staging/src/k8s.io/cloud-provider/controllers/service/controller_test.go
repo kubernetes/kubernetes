@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1442,6 +1443,15 @@ func TestSlowNodeSync(t *testing.T) {
 	key := <-syncService
 	if _, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node3, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("error creating node3, err: %v", err)
+	}
+
+	// Allow a bit of time for the informer cache to get populated with the new
+	// node
+	if err := wait.PollUntilContextCancel(wait.ContextForChannel(stopCh), 10*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+		n3, _ := controller.nodeLister.Get("node3")
+		return n3 != nil, nil
+	}); err != nil {
+		t.Fatalf("informer cache was never populated with node3")
 	}
 
 	// Sync the service
