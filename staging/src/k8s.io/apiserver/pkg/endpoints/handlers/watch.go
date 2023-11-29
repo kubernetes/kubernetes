@@ -160,7 +160,12 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		metricsScope: metricsScope,
 	}
 
-	server.ServeHTTP(w, req)
+	if wsstream.IsWebSocketRequest(req) {
+		w.Header().Set("Content-Type", server.MediaType)
+		websocket.Handler(server.HandleWS).ServeHTTP(w, req)
+		return
+	}
+	server.HandleHTTP(w, req)
 }
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
@@ -185,15 +190,9 @@ type WatchServer struct {
 	metricsScope string
 }
 
-// ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
+// HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
 // or over a websocket connection.
-func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if wsstream.IsWebSocketRequest(req) {
-		w.Header().Set("Content-Type", s.MediaType)
-		websocket.Handler(s.HandleWS).ServeHTTP(w, req)
-		return
-	}
-
+func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
@@ -265,7 +264,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// HandleWS implements a websocket handler.
+// HandleWS serves a series of encoded events over a websocket connection.
 func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	defer ws.Close()
 	done := make(chan struct{})
