@@ -75,7 +75,6 @@ var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, func() {
 			memoryLimit := memoryCapacity.Value()
 
 			matchResourceMetrics := gomega.And(gstruct.MatchKeys(gstruct.IgnoreMissing, gstruct.Keys{
-				"scrape_error":          gstruct.Ignore(),
 				"resource_scrape_error": gstruct.Ignore(),
 				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": boundedSample(1, 1e6),
@@ -114,7 +113,7 @@ var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, func() {
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
 			}),
-				haveKeys("scrape_error", "resource_scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes", "container_cpu_usage_seconds_total",
+				haveKeys("resource_scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes", "container_cpu_usage_seconds_total",
 					"container_memory_working_set_bytes", "container_start_time_seconds", "pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes"),
 			)
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
