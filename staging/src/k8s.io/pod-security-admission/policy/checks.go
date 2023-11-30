@@ -134,7 +134,7 @@ func AggregateCheckResults(results []CheckResult) AggregateCheckResult {
 	var (
 		reasons  []string
 		details  []string
-		errLists map[string]field.ErrorList
+		errLists = make(map[string]field.ErrorList)
 	)
 	for _, result := range results {
 		if !result.Allowed {
