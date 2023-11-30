@@ -359,3 +359,39 @@ func TestToKubeContainerState(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoveSensitiveContainerInformation(t *testing.T) {
+	for _, test := range []struct {
+		description string
+		container   *v1.Container
+	}{
+		{
+			description: "no env var",
+			container: &v1.Container{
+				Name:  "test_container",
+				Image: "foo/image:v1",
+			},
+		},
+		{
+			description: "with env var",
+			container: &v1.Container{
+				Name:  "test_container_2",
+				Image: "foo/image:v2",
+				Env: []v1.EnvVar{
+					{
+						Name:  "baz",
+						Value: "qux",
+					},
+					{
+						Name:  "another",
+						Value: "value",
+					},
+				},
+			},
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			assert.Nil(t, removeContainerSensitiveInformation(test.container).Env)
+		})
+	}
+}

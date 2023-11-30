@@ -1235,7 +1235,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		isInBackOff, msg, err := m.doBackOff(pod, spec.container, podStatus, backOff)
 		if isInBackOff {
 			startContainerResult.Fail(err, msg)
-			klog.V(4).InfoS("Backing Off restarting container in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod))
+			klog.V(4).InfoS("Backing Off restarting container in pod", "containerType", typeName, "container", removeContainerSensitiveInformation(spec.container), "pod", klog.KObj(pod))
 			return err
 		}
 
@@ -1243,7 +1243,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		if sc.HasWindowsHostProcessRequest(pod, spec.container) {
 			metrics.StartedHostProcessContainersTotal.WithLabelValues(metricLabel).Inc()
 		}
-		klog.V(4).InfoS("Creating container in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod))
+		klog.V(4).InfoS("Creating container in pod", "containerType", typeName, "container", removeContainerSensitiveInformation(spec.container), "pod", klog.KObj(pod))
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
 		if msg, err := m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
@@ -1257,9 +1257,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			// repetitive log spam
 			switch {
 			case err == images.ErrImagePullBackOff:
-				klog.V(3).InfoS("Container start failed in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
+				klog.V(3).InfoS("Container start failed in pod", "containerType", typeName, "container", removeContainerSensitiveInformation(spec.container), "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
 			default:
-				utilruntime.HandleError(fmt.Errorf("%v %+v start failed in pod %v: %v: %s", typeName, spec.container, format.Pod(pod), err, msg))
+				utilruntime.HandleError(fmt.Errorf("%v %+v start failed in pod %v: %v: %s", typeName, removeContainerSensitiveInformation(spec.container), format.Pod(pod), err, msg))
 			}
 			return err
 		}
