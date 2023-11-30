@@ -148,7 +148,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericiooptions.IOS
 	cmd := &cobra.Command{
 		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a secret from a local file, directory, or literal value. Using generic subcommand indicate an Opaque secret. When used with empty --type flag, the command creates an empty secret of type Opaque."),
+		Short:                 i18n.T("Create a secret from a local file, directory, or literal value. The default type for a secret is Opaque unless otherwise specified by the --type flag."),
 		Long:                  secretForGenericLong,
 		Example:               secretForGenericExample,
 		Run: func(cmd *cobra.Command, args []string) {
