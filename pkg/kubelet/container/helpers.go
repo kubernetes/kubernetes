@@ -70,7 +70,7 @@ type RuntimeHelper interface {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
+func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus, considerEventedPLEG bool) bool {
 	// Once a pod has been marked deleted, it should not be restarted
 	if pod.DeletionTimestamp != nil {
 		return false
@@ -86,9 +86,18 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	if status.State == ContainerStateRunning {
 		return false
 	}
-	// Always restart container in the unknown, or in the created state.
-	if status.State == ContainerStateUnknown || status.State == ContainerStateCreated {
-		return true
+	if considerEventedPLEG {
+		// If EventedPLEG is enabled, we don't retart the container directly as the CREATED event will always be triggered
+		if status.State == ContainerStateUnknown {
+			return true
+		} else if status.State == ContainerStateCreated {
+			return false
+		}
+	} else {
+		// Always restart container in the unknown, or in the created state.
+		if status.State == ContainerStateUnknown || status.State == ContainerStateCreated {
+			return true
+		}
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
