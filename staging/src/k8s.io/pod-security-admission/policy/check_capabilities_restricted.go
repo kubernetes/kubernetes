@@ -18,12 +18,12 @@ package policy
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -82,9 +82,9 @@ func capabilitiesRestrictedV1Dot22(podMetadata *metav1.ObjectMeta, podSpec *core
 	containersMissingDropAll := NewViolations(opts.withFieldErrors)
 	containersAddingForbidden := NewViolations(opts.withFieldErrors)
 
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext == nil || container.SecurityContext.Capabilities == nil {
-			containersMissingDropAll.Add(container.Name, required(pathFn.child("securityContext", "capabilities", "drop")))
+			containersMissingDropAll.Add(container.Name, required(path.Child("securityContext", "capabilities", "drop")))
 			return
 		}
 
@@ -104,9 +104,9 @@ func capabilitiesRestrictedV1Dot22(podMetadata *metav1.ObjectMeta, podSpec *core
 						strSlice[i] = string(v)
 					}
 					forbiddenValues := sets.NewString(strSlice...)
-					containersMissingDropAll.Add(container.Name, forbidden(pathFn.child("securityContext", "capabilities", "drop")).withBadValue(forbiddenValues.List()))
+					containersMissingDropAll.Add(container.Name, withBadValue(forbidden(path.Child("securityContext", "capabilities", "drop")), forbiddenValues.List()))
 				} else if length == 0 {
-					containersMissingDropAll.Add(container.Name, required(pathFn.child("securityContext", "capabilities", "drop")))
+					containersMissingDropAll.Add(container.Name, required(path.Child("securityContext", "capabilities", "drop")))
 				}
 			} else {
 				containersMissingDropAll.Add(container.Name)
@@ -124,7 +124,7 @@ func capabilitiesRestrictedV1Dot22(podMetadata *metav1.ObjectMeta, podSpec *core
 				}
 			}
 			if addedForbidden {
-				containersAddingForbidden.Add(container.Name, forbidden(pathFn.child("securityContext", "capabilities", "add")).withBadValue(forbiddenValues.List()))
+				containersAddingForbidden.Add(container.Name, withBadValue(forbidden(path.Child("securityContext", "capabilities", "add")), forbiddenValues.List()))
 			}
 		} else {
 			for _, c := range container.SecurityContext.Capabilities.Add {

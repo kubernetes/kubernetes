@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -58,15 +59,15 @@ func CheckWindowsHostProcess() Check {
 
 func windowsHostProcessV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	var badContainers []string
-	var errFns []ErrFn
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	var errs field.ErrorList
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil &&
 			container.SecurityContext.WindowsOptions != nil &&
 			container.SecurityContext.WindowsOptions.HostProcess != nil &&
 			*container.SecurityContext.WindowsOptions.HostProcess {
 			badContainers = append(badContainers, container.Name)
 			if opts.withFieldErrors {
-				errFns = append(errFns, forbidden(pathFn.child("securityContext", "windowsOptions", "hostProcess")).withBadValue(true))
+				errs = append(errs, withBadValue(forbidden(path.Child("securityContext", "windowsOptions", "hostProcess")), true))
 			}
 		}
 	})
@@ -83,7 +84,7 @@ func windowsHostProcessV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.Po
 	forbiddenSetters := NewViolations(opts.withFieldErrors)
 	if podSpecForbidden {
 		if opts.withFieldErrors {
-			forbiddenSetters.Add("pod", forbidden(hostProcessPath).withBadValue(true))
+			forbiddenSetters.Add("pod", withBadValue(forbidden(hostProcessPath), true))
 		} else {
 			forbiddenSetters.Add("pod")
 		}
@@ -96,7 +97,7 @@ func windowsHostProcessV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.Po
 				pluralize("container", "containers", len(badContainers)),
 				joinQuote(badContainers),
 			),
-			errFns...,
+			errs...,
 		)
 	}
 	if !forbiddenSetters.Empty() {

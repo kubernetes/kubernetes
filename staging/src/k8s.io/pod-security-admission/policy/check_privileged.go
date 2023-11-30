@@ -18,8 +18,10 @@ package policy
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -55,10 +57,10 @@ func CheckPrivileged() Check {
 func privilegedV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	badContainers := NewViolations(opts.withFieldErrors)
 
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil && container.SecurityContext.Privileged != nil && *container.SecurityContext.Privileged {
 			if opts.withFieldErrors {
-				badContainers.Add(container.Name, forbidden(pathFn.child("securityContext", "privileged")).withBadValue(true))
+				badContainers.Add(container.Name, withBadValue(forbidden(path.Child("securityContext", "privileged")), true))
 			} else {
 				badContainers.Add(container.Name)
 			}

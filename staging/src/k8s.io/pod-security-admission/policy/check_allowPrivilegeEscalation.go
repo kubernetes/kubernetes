@@ -18,8 +18,10 @@ package policy
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -63,15 +65,15 @@ func CheckAllowPrivilegeEscalation() Check {
 func allowPrivilegeEscalationV1Dot8(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	badContainers := NewViolations(opts.withFieldErrors)
 
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		if opts.withFieldErrors {
-			pathFn = pathFn.child("securityContext", "allowPrivilegeEscalation")
+			path = path.Child("securityContext", "allowPrivilegeEscalation")
 			if container.SecurityContext == nil {
-				badContainers.Add(container.Name, required(pathFn))
+				badContainers.Add(container.Name, required(path))
 			} else if container.SecurityContext.AllowPrivilegeEscalation == nil {
-				badContainers.Add(container.Name, forbidden(pathFn).withBadValue("nil"))
+				badContainers.Add(container.Name, withBadValue(forbidden(path), "nil"))
 			} else if *container.SecurityContext.AllowPrivilegeEscalation {
-				badContainers.Add(container.Name, forbidden(pathFn).withBadValue(true))
+				badContainers.Add(container.Name, withBadValue(forbidden(path), true))
 			}
 		} else if container.SecurityContext == nil || container.SecurityContext.AllowPrivilegeEscalation == nil || *container.SecurityContext.AllowPrivilegeEscalation {
 			badContainers.Add(container.Name)

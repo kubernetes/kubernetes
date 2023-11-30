@@ -38,14 +38,12 @@ func NewViolations(withFieldErrors bool) Violations {
 	return violations
 }
 
-func (v *Violations) Add(data string, errFns ...ErrFn) {
+func (v *Violations) Add(data string, errs ...*field.Error) {
 	v.data = append(v.data, data)
 	if v.withFieldErrors {
-		for _, errFn := range errFns {
-			if errFn != nil {
-				if err := errFn(); err != nil {
-					*v.errs = append(*v.errs, err)
-				}
+		for _, err := range errs {
+			if err != nil {
+				*v.errs = append(*v.errs, err)
 			}
 		}
 	}
@@ -67,42 +65,24 @@ func (v *Violations) Errs() *field.ErrorList {
 	return v.errs
 }
 
-func (f ErrFn) withBadValue(badValue interface{}) ErrFn {
-	if f == nil {
+func withBadValue(err *field.Error, badValue interface{}) *field.Error {
+	if err == nil {
 		return nil
 	}
-	return func() *field.Error {
-		err := f()
-		if err == nil {
-			return nil
-		}
-		err.BadValue = badValue
-		return err
-	}
+	err.BadValue = badValue
+	return err
 }
 
-func forbidden(pathFn func() *field.Path) ErrFn {
-	if pathFn == nil {
+func forbidden(path *field.Path) *field.Error {
+	if path == nil {
 		return nil
 	}
-	return func() *field.Error {
-		path := pathFn()
-		if path == nil {
-			return nil
-		}
-		return field.Forbidden(path, "")
-	}
+	return field.Forbidden(path, "")
 }
 
-func required(pathFn func() *field.Path) ErrFn {
-	if pathFn == nil {
+func required(path *field.Path) *field.Error {
+	if path == nil {
 		return nil
 	}
-	return func() *field.Error {
-		path := pathFn()
-		if path == nil {
-			return nil
-		}
-		return field.Required(path, "")
-	}
+	return field.Required(path, "")
 }

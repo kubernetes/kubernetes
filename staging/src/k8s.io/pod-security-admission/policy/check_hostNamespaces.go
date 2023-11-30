@@ -60,7 +60,7 @@ func hostNamespacesV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpe
 
 	if podSpec.HostNetwork {
 		if opts.withFieldErrors {
-			hostNamespaces.Add("hostNetwork=true", forbidden(hostNetworkPath).withBadValue(true))
+			hostNamespaces.Add("hostNetwork=true", withBadValue(forbidden(hostNetworkPath), true))
 		} else {
 			hostNamespaces.Add("hostNetwork=true")
 		}
@@ -69,7 +69,7 @@ func hostNamespacesV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpe
 
 	if podSpec.HostPID {
 		if opts.withFieldErrors {
-			hostNamespaces.Add("hostPID=true", forbidden(hostPIDPath).withBadValue(true))
+			hostNamespaces.Add("hostPID=true", withBadValue(forbidden(hostPIDPath), true))
 		} else {
 			hostNamespaces.Add("hostPID=true")
 		}
@@ -77,7 +77,7 @@ func hostNamespacesV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpe
 
 	if podSpec.HostIPC {
 		if opts.withFieldErrors {
-			hostNamespaces.Add("hostIPC=true", forbidden(hostIPCPath).withBadValue(true))
+			hostNamespaces.Add("hostIPC=true", withBadValue(forbidden(hostIPCPath), true))
 		} else {
 			hostNamespaces.Add("hostIPC=true")
 		}

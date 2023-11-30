@@ -19,72 +19,22 @@ package policy
 import "k8s.io/apimachinery/pkg/util/validation/field"
 
 var (
-	annotationsPath            = withPath(field.NewPath("metadata", "annotations"))
-	specPath                   = withPath(field.NewPath("spec"))
-	initContainersFldPath      = specPath.child("initContainers")
-	containersFldPath          = specPath.child("containers")
-	ephemeralContainersFldPath = specPath.child("ephemeralContainers")
-	securityContextPath        = specPath.child("securityContext")
-	hostNetworkPath            = specPath.child("hostNetwork")
-	hostPIDPath                = specPath.child("hostPID")
-	hostIPCPath                = specPath.child("hostIPC")
-	volumesPath                = specPath.child("volumes")
-	runAsNonRootPath           = securityContextPath.child("runAsNonRoot")
-	runAsUserPath              = securityContextPath.child("runAsUser")
-	seccompProfileTypePath     = securityContextPath.child("seccompProfile", "type")
-	seLinuxOptionsTypePath     = securityContextPath.child("seLinuxOptions", "type")
-	seLinuxOptionsUserPath     = securityContextPath.child("seLinuxOptions", "user")
-	seLinuxOptionsRolePath     = securityContextPath.child("seLinuxOptions", "role")
-	sysctlsPath                = securityContextPath.child("sysctls")
-	hostProcessPath            = securityContextPath.child("windowsOptions", "hostProcess")
+	annotationsPath            = field.NewPath("metadata", "annotations")
+	specPath                   = field.NewPath("spec")
+	initContainersFldPath      = specPath.Child("initContainers")
+	containersFldPath          = specPath.Child("containers")
+	ephemeralContainersFldPath = specPath.Child("ephemeralContainers")
+	securityContextPath        = specPath.Child("securityContext")
+	hostNetworkPath            = specPath.Child("hostNetwork")
+	hostPIDPath                = specPath.Child("hostPID")
+	hostIPCPath                = specPath.Child("hostIPC")
+	volumesPath                = specPath.Child("volumes")
+	runAsNonRootPath           = securityContextPath.Child("runAsNonRoot")
+	runAsUserPath              = securityContextPath.Child("runAsUser")
+	seccompProfileTypePath     = securityContextPath.Child("seccompProfile", "type")
+	seLinuxOptionsTypePath     = securityContextPath.Child("seLinuxOptions", "type")
+	seLinuxOptionsUserPath     = securityContextPath.Child("seLinuxOptions", "user")
+	seLinuxOptionsRolePath     = securityContextPath.Child("seLinuxOptions", "role")
+	sysctlsPath                = securityContextPath.Child("sysctls")
+	hostProcessPath            = securityContextPath.Child("windowsOptions", "hostProcess")
 )
-
-type PathFn func() *field.Path
-
-func withPath(path *field.Path) PathFn {
-	if path == nil {
-		return nil
-	}
-	return func() *field.Path {
-		return path
-	}
-}
-
-func (parent PathFn) index(i int) PathFn {
-	if parent == nil {
-		return nil
-	}
-	return func() *field.Path {
-		p := parent()
-		if p == nil {
-			return nil
-		}
-		return p.Index(i)
-	}
-}
-
-func (parent PathFn) child(name string, moreNames ...string) PathFn {
-	if parent == nil {
-		return nil
-	}
-	return func() *field.Path {
-		p := parent()
-		if p == nil {
-			return nil
-		}
-		return p.Child(name, moreNames...)
-	}
-}
-
-func (parent PathFn) key(key string) PathFn {
-	if parent == nil {
-		return nil
-	}
-	return func() *field.Path {
-		p := parent()
-		if p == nil {
-			return nil
-		}
-		return p.Key(key)
-	}
-}

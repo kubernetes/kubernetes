@@ -18,9 +18,11 @@ package policy
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -59,7 +61,7 @@ func CheckProcMount() Check {
 func procMountV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	badContainers := NewViolations(opts.withFieldErrors)
 	forbiddenProcMountTypes := sets.NewString()
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		// allow if the security context is nil.
 		if container.SecurityContext == nil {
 			return
@@ -71,7 +73,7 @@ func procMountV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, op
 		// check if the value of the proc mount type is valid.
 		if *container.SecurityContext.ProcMount != corev1.DefaultProcMount {
 			if opts.withFieldErrors {
-				badContainers.Add(container.Name, forbidden(pathFn.child("securityContext", "procMount")).withBadValue(string(*container.SecurityContext.ProcMount)))
+				badContainers.Add(container.Name, withBadValue(forbidden(path.Child("securityContext", "procMount")), string(*container.SecurityContext.ProcMount)))
 			} else {
 				badContainers.Add(container.Name)
 			}

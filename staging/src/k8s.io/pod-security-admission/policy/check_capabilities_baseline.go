@@ -18,9 +18,11 @@ package policy
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -78,7 +80,7 @@ var (
 func capabilitiesBaselineV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	badContainers := NewViolations(opts.withFieldErrors)
 	nonDefaultCapabilities := sets.NewString()
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil && container.SecurityContext.Capabilities != nil {
 			valid := true
 			if opts.withFieldErrors {
@@ -91,7 +93,7 @@ func capabilitiesBaselineV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.
 					}
 				}
 				if !valid {
-					badContainers.Add(container.Name, forbidden(pathFn.child("securityContext", "capabilities", "add")).withBadValue(forbiddenValue.List()))
+					badContainers.Add(container.Name, withBadValue(forbidden(path.Child("securityContext", "capabilities", "add")), forbiddenValue.List()))
 				}
 			} else {
 				for _, c := range container.SecurityContext.Capabilities.Add {

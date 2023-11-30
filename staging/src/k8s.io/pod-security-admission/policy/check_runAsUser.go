@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -70,7 +71,7 @@ func runAsUserV1Dot23(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, o
 
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.RunAsUser != nil && *podSpec.SecurityContext.RunAsUser == 0 {
 		if opts.withFieldErrors {
-			badSetters.Add("pod", forbidden(runAsUserPath).withBadValue(0))
+			badSetters.Add("pod", withBadValue(forbidden(runAsUserPath), 0))
 		} else {
 			badSetters.Add("pod")
 		}
@@ -78,13 +79,13 @@ func runAsUserV1Dot23(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, o
 
 	// containers that explicitly set runAsUser=0
 	explicitlyBadContainers := NewViolations(opts.withFieldErrors)
-	var explicitlyErrFns []ErrFn
+	var explicitlyErrs field.ErrorList
 
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil && *container.SecurityContext.RunAsUser == 0 {
 			explicitlyBadContainers.Add(container.Name)
 			if opts.withFieldErrors {
-				explicitlyErrFns = append(explicitlyErrFns, forbidden(pathFn.child("securityContext", "runAsUser")).withBadValue(0))
+				explicitlyErrs = append(explicitlyErrs, withBadValue(forbidden(path.Child("securityContext", "runAsUser")), 0))
 			}
 		}
 	})
@@ -96,7 +97,7 @@ func runAsUserV1Dot23(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, o
 				pluralize("container", "containers", explicitlyBadContainers.Len()),
 				joinQuote(explicitlyBadContainers.Data()),
 			),
-			explicitlyErrFns...,
+			explicitlyErrs...,
 		)
 	}
 	// pod or containers explicitly set runAsUser=0

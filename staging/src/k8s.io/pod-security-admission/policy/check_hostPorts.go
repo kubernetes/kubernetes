@@ -18,12 +18,13 @@ package policy
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -60,21 +61,21 @@ func CheckHostPorts() Check {
 func hostPortsV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	badContainers := NewViolations(opts.withFieldErrors)
 	forbiddenHostPorts := sets.NewString()
-	visitContainers(podSpec, opts, func(container *corev1.Container, pathFn PathFn) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		valid := true
-		var errFns []ErrFn
+		var errs field.ErrorList
 		for i, c := range container.Ports {
 			if c.HostPort != 0 {
 				valid = false
 				forbiddenHostPorts.Insert(strconv.Itoa(int(c.HostPort)))
 				if opts.withFieldErrors {
-					errFns = append(errFns, forbidden(pathFn.child("ports").index(i).child("hostPort")).withBadValue(int(c.HostPort)))
+					errs = append(errs, withBadValue(forbidden(path.Child("ports").Index(i).Child("hostPort")), int(c.HostPort)))
 				}
 			}
 		}
 		if !valid {
 			if opts.withFieldErrors {
-				badContainers.Add(container.Name, errFns...)
+				badContainers.Add(container.Name, errs...)
 			} else {
 				badContainers.Add(container.Name)
 			}

@@ -125,7 +125,7 @@ func sysctls(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, sysctlsAll
 		for i, sysctl := range podSpec.SecurityContext.Sysctls {
 			if !sysctlsAllowedSet.Has(sysctl.Name) {
 				if opts.withFieldErrors {
-					forbiddenSysctls.Add(sysctl.Name, forbidden(sysctlsPath.index(i).child("name")).withBadValue(sysctl.Name))
+					forbiddenSysctls.Add(sysctl.Name, withBadValue(forbidden(sysctlsPath.Index(i).Child("name")), sysctl.Name))
 				} else {
 					forbiddenSysctls.Add(sysctl.Name)
 				}

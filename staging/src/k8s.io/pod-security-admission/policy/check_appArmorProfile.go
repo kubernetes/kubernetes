@@ -67,7 +67,7 @@ func appArmorProfileV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 	for k, v := range podMetadata.Annotations {
 		if strings.HasPrefix(k, corev1.AppArmorBetaContainerAnnotationKeyPrefix) && !allowedProfile(v) {
 			if opts.withFieldErrors {
-				forbiddenAppArmorProfile.Add(fmt.Sprintf("%s=%q", k, v), forbidden(annotationsPath.key(k)).withBadValue(v))
+				forbiddenAppArmorProfile.Add(fmt.Sprintf("%s=%q", k, v), withBadValue(forbidden(annotationsPath.Key(k)), v))
 			} else {
 				forbiddenAppArmorProfile.Add(fmt.Sprintf("%s=%q", k, v))
 			}

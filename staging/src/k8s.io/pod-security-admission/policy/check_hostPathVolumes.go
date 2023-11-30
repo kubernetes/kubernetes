@@ -18,6 +18,7 @@ package policy
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/pod-security-admission/api"
@@ -60,7 +61,7 @@ func hostPathVolumesV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 	for i, volume := range podSpec.Volumes {
 		if volume.HostPath != nil {
 			if opts.withFieldErrors {
-				hostVolumes.Add(volume.Name, forbidden(specPath.child("volumes").index(i).child("hostPath")))
+				hostVolumes.Add(volume.Name, forbidden(specPath.Child("volumes").Index(i).Child("hostPath")))
 			} else {
 				hostVolumes.Add(volume.Name)
 			}

@@ -19,10 +19,9 @@ package policy
 import (
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -98,10 +97,10 @@ type AggregateCheckResult struct {
 	// ForbiddenReasons and ForbiddenDetails must have the same number of elements, and the indexes are for the same check.
 	ForbiddenDetails []string
 	// ErrLists is a slice of the field errors from all the forbidden checks.
-	ErrLists []field.ErrorList
+	ErrLists map[string]field.ErrorList
 }
 
-// ForbiddenReason returns a comma-separated string of of the forbidden reasons.
+// ForbiddenReason returns a comma-separated string of the forbidden reasons.
 // Example: host ports, privileged containers, non-default capabilities
 func (a *AggregateCheckResult) ForbiddenReason() string {
 	return strings.Join(a.ForbiddenReasons, ", ")
@@ -129,25 +128,28 @@ func (a *AggregateCheckResult) ForbiddenDetail() string {
 // UnknownForbiddenReason is used as the placeholder forbidden reason for checks that incorrectly disallow without providing a reason.
 const UnknownForbiddenReason = "unknown forbidden reason"
 
-// AggregateCheckPod runs all the checks and aggregates the forbidden results into a single CheckResult.
+// AggregateCheckResults runs all the checks and aggregates the forbidden results into a single CheckResult.
 // The aggregated reason is a comma-separated
 func AggregateCheckResults(results []CheckResult) AggregateCheckResult {
 	var (
 		reasons  []string
 		details  []string
-		errLists []field.ErrorList
+		errLists map[string]field.ErrorList
 	)
 	for _, result := range results {
 		if !result.Allowed {
 			if len(result.ForbiddenReason) == 0 {
 				reasons = append(reasons, UnknownForbiddenReason)
+				if result.ErrList != nil {
+					errLists[UnknownForbiddenReason] = *result.ErrList
+				}
 			} else {
 				reasons = append(reasons, result.ForbiddenReason)
+				if result.ErrList != nil {
+					errLists[result.ForbiddenReason] = *result.ErrList
+				}
 			}
 			details = append(details, result.ForbiddenDetail)
-			if result.ErrList != nil {
-				errLists = append(errLists, *result.ErrList)
-			}
 		}
 	}
 	return AggregateCheckResult{
