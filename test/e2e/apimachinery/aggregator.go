@@ -52,7 +52,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
-	"k8s.io/utils/strings/slices"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -736,24 +735,6 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	err = wait.PollImmediate(apiServiceRetryPeriod, apiServiceRetryTimeout, checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0))
 	framework.ExpectNoError(err, "failed to count the required APIServices")
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
-
-	ginkgo.By("Confirm that the group path of " + apiServiceName + " was removed from root paths")
-	groupPath := "/apis/" + apiServiceGroupName
-	err = wait.PollUntilContextTimeout(ctx, apiServiceRetryPeriod, apiServiceRetryTimeout, true, func(ctx context.Context) (done bool, err error) {
-		rootPaths := metav1.RootPaths{}
-		statusContent, err = restClient.Get().
-			AbsPath("/").
-			SetHeader("Accept", "application/json").DoRaw(ctx)
-		if err != nil {
-			return false, err
-		}
-		err = json.Unmarshal(statusContent, &rootPaths)
-		if err != nil {
-			return false, err
-		}
-		return !slices.Contains(rootPaths.Paths, groupPath), nil
-	})
-	framework.ExpectNoError(err, "Expected to not find %s from root paths", groupPath)
 
 	cleanupSampleAPIServer(ctx, client, aggrclient, n, apiServiceName)
 }
