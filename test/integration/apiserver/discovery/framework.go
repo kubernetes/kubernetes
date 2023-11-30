@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"testing"
 	"time"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -571,6 +573,29 @@ func WaitForGroupsAbsent(ctx context.Context, client testClient, groups ...strin
 		return true
 	})
 
+}
+
+func WaitForRootPaths(t *testing.T, ctx context.Context, client testClient, requirePaths, forbidPaths sets.Set[string]) error {
+	return wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, maxTimeout, true, func(ctx context.Context) (done bool, err error) {
+		statusContent, err := client.Discovery().RESTClient().Get().AbsPath("/").SetHeader("Accept", "application/json").DoRaw(ctx)
+		if err != nil {
+			return false, err
+		}
+		rootPaths := metav1.RootPaths{}
+		if err := json.Unmarshal(statusContent, &rootPaths); err != nil {
+			return false, err
+		}
+		paths := sets.New(rootPaths.Paths...)
+		if missing := requirePaths.Difference(paths); len(missing) > 0 {
+			t.Logf("missing required root paths %v", sets.List(missing))
+			return false, nil
+		}
+		if present := forbidPaths.Intersection(paths); len(present) > 0 {
+			t.Logf("present forbidden root paths %v", sets.List(present))
+			return false, nil
+		}
+		return true, nil
+	})
 }
 
 func WaitForGroups(ctx context.Context, client testClient, groups ...apidiscoveryv2beta1.APIGroupDiscovery) error {
