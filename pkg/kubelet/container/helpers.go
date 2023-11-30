@@ -70,7 +70,7 @@ type RuntimeHelper interface {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
+func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus, restartOnCreatedState bool) bool {
 	// Once a pod has been marked deleted, it should not be restarted
 	if pod.DeletionTimestamp != nil {
 		return false
@@ -86,10 +86,16 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	if status.State == ContainerStateRunning {
 		return false
 	}
-	// Always restart container in the unknown, or in the created state.
-	if status.State == ContainerStateUnknown || status.State == ContainerStateCreated {
+	// Always restart container in the unknown state
+	if status.State == ContainerStateUnknown {
 		return true
 	}
+	if status.State == ContainerStateCreated {
+		// we don't retart the container directly as the CREATED event will always be triggered
+		// but for next syncpod, we should handle the containers failed to be started which is in CREATED state.
+		return restartOnCreatedState
+	}
+
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
 		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
