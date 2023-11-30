@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main // import "k8s.io/code-generator"
+package client
+
+// Args are the arguments for the client generator.
+type Args struct {
+	InputDir string `doc:"The root package under which to search for Go files which request clients to be generated. This must be a local path, not a Go package."`
+
+	// TODO: mirror other arguments from kube::codegen::gen_client function
+}

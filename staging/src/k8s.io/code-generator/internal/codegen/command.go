@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main // import "k8s.io/code-generator"
+package codegen
+
+import (
+	"k8s.io/code-generator/internal/codegen/command"
+	"k8s.io/code-generator/internal/codegen/execution"
+)
+
+// Command is a command that can be run by code-gen.
+type Command interface {
+	// Matches returns true if the command matches the execution context.
+	Matches(ex *execution.Vars) bool
+	// Run runs the command.
+	Run(ex *execution.Vars)
+	command.Usage
+}
