@@ -753,13 +753,15 @@ func getUUIDFromProviderID(providerID string) string {
 
 // GetReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos(ctx context.Context, c clientset.Interface) []*NodeInfo {
-	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
-	framework.ExpectNoError(err)
 	var nodesInfo []*NodeInfo
-	for _, node := range nodeList.Items {
-		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node.Name)
-		if nodeInfo != nil {
-			nodesInfo = append(nodesInfo, nodeInfo)
+	if TestContext.NodeMapper != nil {
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		for _, node := range nodeList.Items {
+			nodeInfo := TestContext.NodeMapper.GetNodeInfo(node.Name)
+			if nodeInfo != nil {
+				nodesInfo = append(nodesInfo, nodeInfo)
+			}
 		}
 	}
 	return nodesInfo

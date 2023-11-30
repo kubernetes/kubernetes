@@ -735,9 +735,11 @@ func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.N
 	}
 	newNodes = filterWithPredicates(newNodes, getNodePredicatesForService(svc)...)
 	oldNodes = filterWithPredicates(oldNodes, getNodePredicatesForService(svc)...)
-	if nodeNames(newNodes).Equal(nodeNames(oldNodes)) {
+
+	if nodesSufficientlyEqual(oldNodes, newNodes) {
 		return retSuccess
 	}
+
 	klog.V(4).Infof("nodeSyncService started for service %s/%s", svc.Namespace, svc.Name)
 	if err := c.lockedUpdateLoadBalancerHosts(svc, newNodes); err != nil {
 		runtime.HandleError(fmt.Errorf("failed to update load balancer hosts for service %s/%s: %v", svc.Namespace, svc.Name, err))
@@ -746,6 +748,34 @@ func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.N
 	}
 	klog.V(4).Infof("nodeSyncService finished successfully for service %s/%s", svc.Namespace, svc.Name)
 	return retSuccess
+}
+
+func nodesSufficientlyEqual(oldNodes, newNodes []*v1.Node) bool {
+	if len(oldNodes) != len(newNodes) {
+		return false
+	}
+
+	// This holds the Node fields which trigger a sync when changed.
+	type protoNode struct {
+		providerID string
+	}
+	distill := func(n *v1.Node) protoNode {
+		return protoNode{
+			providerID: n.Spec.ProviderID,
+		}
+	}
+
+	mOld := map[string]protoNode{}
+	for _, n := range oldNodes {
+		mOld[n.Name] = distill(n)
+	}
+
+	mNew := map[string]protoNode{}
+	for _, n := range newNodes {
+		mNew[n.Name] = distill(n)
+	}
+
+	return reflect.DeepEqual(mOld, mNew)
 }
 
 // updateLoadBalancerHosts updates all existing load balancers so that
@@ -962,6 +992,7 @@ var (
 	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
+		nodeReadyPredicate,
 	}
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeNotDeletedPredicate,

@@ -19,11 +19,15 @@
 package grpc
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/internal/envconfig"
+	"google.golang.org/grpc/internal/grpcrand"
+	"google.golang.org/grpc/serviceconfig"
 )
 
 // PickFirstBalancerName is the name of the pick_first balancer.
@@ -43,10 +47,28 @@ func (*pickfirstBuilder) Name() string {
 	return PickFirstBalancerName
 }
 
+type pfConfig struct {
+	serviceconfig.LoadBalancingConfig `json:"-"`
+
+	// If set to true, instructs the LB policy to shuffle the order of the list
+	// of addresses received from the name resolver before attempting to
+	// connect to them.
+	ShuffleAddressList bool `json:"shuffleAddressList"`
+}
+
+func (*pickfirstBuilder) ParseConfig(js json.RawMessage) (serviceconfig.LoadBalancingConfig, error) {
+	cfg := &pfConfig{}
+	if err := json.Unmarshal(js, cfg); err != nil {
+		return nil, fmt.Errorf("pickfirst: unable to unmarshal LB policy config: %s, error: %v", string(js), err)
+	}
+	return cfg, nil
+}
+
 type pickfirstBalancer struct {
 	state   connectivity.State
 	cc      balancer.ClientConn
 	subConn balancer.SubConn
+	cfg     *pfConfig
 }
 
 func (b *pickfirstBalancer) ResolverError(err error) {
@@ -69,7 +91,8 @@ func (b *pickfirstBalancer) ResolverError(err error) {
 }
 
 func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState) error {
-	if len(state.ResolverState.Addresses) == 0 {
+	addrs := state.ResolverState.Addresses
+	if len(addrs) == 0 {
 		// The resolver reported an empty address list. Treat it like an error by
 		// calling b.ResolverError.
 		if b.subConn != nil {
@@ -82,12 +105,23 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 		return balancer.ErrBadResolverState
 	}
 
+	if state.BalancerConfig != nil {
+		cfg, ok := state.BalancerConfig.(*pfConfig)
+		if !ok {
+			return fmt.Errorf("pickfirstBalancer: received nil or illegal BalancerConfig (type %T): %v", state.BalancerConfig, state.BalancerConfig)
+		}
+		b.cfg = cfg
+	}
+
+	if envconfig.PickFirstLBConfig && b.cfg != nil && b.cfg.ShuffleAddressList {
+		grpcrand.Shuffle(len(addrs), func(i, j int) { addrs[i], addrs[j] = addrs[j], addrs[i] })
+	}
 	if b.subConn != nil {
-		b.cc.UpdateAddresses(b.subConn, state.ResolverState.Addresses)
+		b.cc.UpdateAddresses(b.subConn, addrs)
 		return nil
 	}
 
-	subConn, err := b.cc.NewSubConn(state.ResolverState.Addresses, balancer.NewSubConnOptions{})
+	subConn, err := b.cc.NewSubConn(addrs, balancer.NewSubConnOptions{})
 	if err != nil {
 		if logger.V(2) {
 			logger.Errorf("pickfirstBalancer: failed to NewSubConn: %v", err)
@@ -119,7 +153,6 @@ func (b *pickfirstBalancer) UpdateSubConnState(subConn balancer.SubConn, state b
 		}
 		return
 	}
-	b.state = state.ConnectivityState
 	if state.ConnectivityState == connectivity.Shutdown {
 		b.subConn = nil
 		return
@@ -132,11 +165,21 @@ func (b *pickfirstBalancer) UpdateSubConnState(subConn balancer.SubConn, state b
 			Picker:            &picker{result: balancer.PickResult{SubConn: subConn}},
 		})
 	case connectivity.Connecting:
+		if b.state == connectivity.TransientFailure {
+			// We stay in TransientFailure until we are Ready. See A62.
+			return
+		}
 		b.cc.UpdateState(balancer.State{
 			ConnectivityState: state.ConnectivityState,
 			Picker:            &picker{err: balancer.ErrNoSubConnAvailable},
 		})
 	case connectivity.Idle:
+		if b.state == connectivity.TransientFailure {
+			// We stay in TransientFailure until we are Ready. Also kick the
+			// subConn out of Idle into Connecting. See A62.
+			b.subConn.Connect()
+			return
+		}
 		b.cc.UpdateState(balancer.State{
 			ConnectivityState: state.ConnectivityState,
 			Picker:            &idlePicker{subConn: subConn},
@@ -147,6 +190,7 @@ func (b *pickfirstBalancer) UpdateSubConnState(subConn balancer.SubConn, state b
 			Picker:            &picker{err: state.ConnectionError},
 		})
 	}
+	b.state = state.ConnectivityState
 }
 
 func (b *pickfirstBalancer) Close() {

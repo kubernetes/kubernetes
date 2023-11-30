@@ -36,6 +36,10 @@ var (
 	// "GRPC_RING_HASH_CAP".  This does not override the default bounds
 	// checking which NACKs configs specifying ring sizes > 8*1024*1024 (~8M).
 	RingHashCap = uint64FromEnv("GRPC_RING_HASH_CAP", 4096, 1, 8*1024*1024)
+	// PickFirstLBConfig is set if we should support configuration of the
+	// pick_first LB policy, which can be enabled by setting the environment
+	// variable "GRPC_EXPERIMENTAL_PICKFIRST_LB_CONFIG" to "true".
+	PickFirstLBConfig = boolFromEnv("GRPC_EXPERIMENTAL_PICKFIRST_LB_CONFIG", false)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

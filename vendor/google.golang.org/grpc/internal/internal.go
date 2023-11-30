@@ -60,6 +60,9 @@ var (
 	GetServerCredentials interface{} // func (*grpc.Server) credentials.TransportCredentials
 	// CanonicalString returns the canonical string of the code defined here:
 	// https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	CanonicalString interface{} // func (codes.Code) string
 	// DrainServerTransports initiates a graceful close of existing connections
 	// on a gRPC server accepted on the provided listener address. An
@@ -69,20 +72,35 @@ var (
 	// AddGlobalServerOptions adds an array of ServerOption that will be
 	// effective globally for newly created servers. The priority will be: 1.
 	// user-provided; 2. this method; 3. default values.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	AddGlobalServerOptions interface{} // func(opt ...ServerOption)
 	// ClearGlobalServerOptions clears the array of extra ServerOption. This
 	// method is useful in testing and benchmarking.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	ClearGlobalServerOptions func()
 	// AddGlobalDialOptions adds an array of DialOption that will be effective
 	// globally for newly created client channels. The priority will be: 1.
 	// user-provided; 2. this method; 3. default values.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	AddGlobalDialOptions interface{} // func(opt ...DialOption)
 	// DisableGlobalDialOptions returns a DialOption that prevents the
 	// ClientConn from applying the global DialOptions (set via
 	// AddGlobalDialOptions).
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	DisableGlobalDialOptions interface{} // func() grpc.DialOption
 	// ClearGlobalDialOptions clears the array of extra DialOption. This
 	// method is useful in testing and benchmarking.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	ClearGlobalDialOptions func()
 	// JoinDialOptions combines the dial options passed as arguments into a
 	// single dial option.
@@ -93,9 +111,15 @@ var (
 
 	// WithBinaryLogger returns a DialOption that specifies the binary logger
 	// for a ClientConn.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	WithBinaryLogger interface{} // func(binarylog.Logger) grpc.DialOption
 	// BinaryLogger returns a ServerOption that can set the binary logger for a
 	// server.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	BinaryLogger interface{} // func(binarylog.Logger) grpc.ServerOption
 
 	// NewXDSResolverWithConfigForTesting creates a new xds resolver builder using

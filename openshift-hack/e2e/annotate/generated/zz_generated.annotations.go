@@ -489,6 +489,10 @@ var Annotations = map[string]string{
 
 	"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0 with failing container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0 without failing container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
