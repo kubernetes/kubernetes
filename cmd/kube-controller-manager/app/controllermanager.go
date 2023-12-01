@@ -31,6 +31,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	v1 "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -42,6 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
+	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
@@ -71,6 +74,10 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
+
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -283,9 +290,18 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 	}
 
-	// TODO: Add component identity registration here..
-	// kubeapiserver and kubelet use k8s.io.component-helpers.apimachinery.lease.NewController
-	c.Client.CoordinationV1().Leases("kube-system").Create
+	// Start component identity lease management
+	identityLease := &identityLease{
+		leaseClient:          c.Client.CoordinationV1().Leases("kube-system"),
+		holderIdentity:       "kube-controller-manager",
+		leaseName:            "kube-controller-manager-a", // TODO: safely append uids
+		leaseNamespace:       "kube-system",               // TODO: put this in kube-system once RBAC is set up for that
+		leaseDurationSeconds: 10,
+		clock:                clock.RealClock{},
+		controllerLeaseName:  c.ComponentConfig.Generic.LeaderMigration.LeaderName,
+		renewInterval:        5,
+	}
+	go identityLease.backoffEnsureLease(ctx)
 
 	// Start the main lock
 	go leaderElectAndRun(ctx, c, id, electionChecker,
@@ -339,6 +355,124 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	<-stopCh
 	return nil
+}
+
+type identityLease struct {
+	leaseClient    coordinationv1client.LeaseInterface
+	holderIdentity string
+
+	// identity lease
+	leaseName      string
+	leaseNamespace string
+
+	// controller lease
+	controllerLeaseName string
+
+	leaseDurationSeconds int32
+	renewInterval        time.Duration
+	clock                clock.Clock
+}
+
+// backoffEnsureLease attempts to create the lease if it does not exist,
+// and uses exponentially increasing waits to prevent overloading the API server
+// with retries. Returns the lease, and true if this call created the lease,
+// false otherwise.
+func (c *identityLease) backoffEnsureLease(ctx context.Context) (*v1.Lease, bool) {
+	klog.Infof("Starting identity lease management")
+	var (
+		lease   *v1.Lease
+		created bool
+		err     error
+	)
+	sleep := 100 * time.Millisecond
+	for {
+		lease, created, err = c.ensureLease(ctx)
+		if err == nil {
+			break
+		}
+		sleep = minDuration(2*sleep, maxBackoff)
+		klog.FromContext(ctx).Error(err, "Failed to ensure identity lease exists, will retry", "interval", sleep)
+		// backoff wait with early return if the context gets canceled
+		select {
+		case <-ctx.Done():
+			return nil, false
+		case <-time.After(sleep):
+		}
+	}
+	klog.Infof("Shutting down identity lease management")
+	return lease, created
+}
+
+const maxBackoff = 7 * time.Second
+
+func minDuration(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// ensureLease creates the lease if it does not exist. Returns the lease and
+// a bool (true if this call created the lease), or any error that occurs.
+func (c *identityLease) ensureLease(ctx context.Context) (*v1.Lease, bool, error) {
+	lease, err := c.leaseClient.Get(ctx, c.leaseName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		klog.Infof("Creating identity lease")
+		// lease does not exist, create it.
+		leaseToCreate, err := c.newLease(nil)
+		// An error occurred during allocating the new lease (likely from newLeasePostProcessFunc).
+		// Given that we weren't able to set the lease correctly, we simply
+		// not create it this time - we will retry in the next iteration.
+		if err != nil {
+			return nil, false, nil
+		}
+		lease, err := c.leaseClient.Create(ctx, leaseToCreate, metav1.CreateOptions{})
+		if err != nil {
+			return nil, false, err
+		}
+		return lease, true, nil
+	} else if err != nil {
+		// unexpected error getting lease
+		return nil, false, err
+	}
+	klog.Infof("identity lease exists.. doing nothing")
+	// lease already existed
+	return lease, false, nil
+}
+
+// newLease constructs a new lease if base is nil, or returns a copy of base
+// with desired state asserted on the copy.
+// Note that an error will block lease CREATE, causing the CREATE to be retried in
+// the next iteration; but the error won't block lease refresh (UPDATE).
+func (c *identityLease) newLease(base *v1.Lease) (*v1.Lease, error) {
+	// Use the bare minimum set of fields; other fields exist for debugging/legacy,
+	// but we don't need to make component heartbeats more complicated by using them.
+	var lease *v1.Lease
+	if base == nil {
+		lease = &v1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      c.leaseName,
+				Namespace: c.leaseNamespace,
+				Labels: map[string]string{
+					"coordination.kubernetes.io/leader-leases": c.controllerLeaseName,
+				},
+			},
+			Spec: v1.LeaseSpec{
+				HolderIdentity:       ptr.To(c.holderIdentity),
+				LeaseDurationSeconds: ptr.To(c.leaseDurationSeconds),
+			},
+		}
+	} else {
+		lease = base.DeepCopy()
+	}
+	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
+
+	//if c.newLeasePostProcessFunc != nil {
+	//	err := c.newLeasePostProcessFunc(lease)
+	//	return lease, err
+	//}
+
+	return lease, nil
 }
 
 // ControllerContext defines the context object for controller

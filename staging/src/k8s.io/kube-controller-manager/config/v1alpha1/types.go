@@ -168,6 +168,9 @@ type KubeControllerManagerConfiguration struct {
 	// ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for
 	// ValidatingAdmissionPolicyStatusController related features.
 	ValidatingAdmissionPolicyStatusController ValidatingAdmissionPolicyStatusControllerConfiguration
+	//LeaderElectionControllerConfiguration holds configuration for
+	// LeaderElectionController related features.
+	LeaderElectionController LeaderElectionControllerConfiguration
 }
 
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.

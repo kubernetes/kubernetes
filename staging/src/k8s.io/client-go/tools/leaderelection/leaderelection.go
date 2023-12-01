@@ -255,8 +255,8 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 			klog.V(4).Infof("failed to acquire lease %v", desc)
 			return
 		}
-		le.config.Lock.RecordEvent("became leader")
-		le.metrics.leaderOn(le.config.Name)
+		//le.config.Lock.RecordEvent("became leader")
+		//le.metrics.leaderOn(le.config.Name)
 		klog.Infof("successfully acquired lease %v", desc)
 		cancel()
 	}, le.config.RetryPeriod, JitterFactor, true, ctx.Done())
