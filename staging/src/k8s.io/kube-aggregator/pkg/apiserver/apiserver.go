@@ -115,7 +115,7 @@ type CompletedConfig struct {
 }
 
 type runnable interface {
-	Run(stopCh <-chan struct{}) error
+	RunWithContext(ctx context.Context) error
 }
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
@@ -479,8 +479,8 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
 }
 
-func (s preparedAPIAggregator) Run(stopCh <-chan struct{}) error {
-	return s.runnable.Run(stopCh)
+func (s preparedAPIAggregator) Run(ctx context.Context) error {
+	return s.runnable.RunWithContext(ctx)
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.

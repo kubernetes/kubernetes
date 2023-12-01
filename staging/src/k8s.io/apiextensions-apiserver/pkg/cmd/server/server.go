@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -25,7 +26,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
-func NewServerCommand(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
+func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command {
 	o := options.NewCustomResourceDefinitionsServerOptions(out, errOut)
 
 	cmd := &cobra.Command{
@@ -38,19 +39,20 @@ func NewServerCommand(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Comm
 			if err := o.Validate(); err != nil {
 				return err
 			}
-			if err := Run(o, stopCh); err != nil {
+			if err := Run(c.Context(), o); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
+	cmd.SetContext(ctx)
 
 	fs := cmd.Flags()
 	o.AddFlags(fs)
 	return cmd
 }
 
-func Run(o *options.CustomResourceDefinitionsServerOptions, stopCh <-chan struct{}) error {
+func Run(ctx context.Context, o *options.CustomResourceDefinitionsServerOptions) error {
 	config, err := o.Config()
 	if err != nil {
 		return err
@@ -60,5 +62,5 @@ func Run(o *options.CustomResourceDefinitionsServerOptions, stopCh <-chan struct
 	if err != nil {
 		return err
 	}
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+	return server.GenericAPIServer.PrepareRun().RunWithContext(ctx)
 }

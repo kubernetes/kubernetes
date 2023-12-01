@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -71,7 +72,7 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 
 // NewCommandStartWardleServer provides a CLI handler for 'start master' command
 // with a default WardleServerOptions.
-func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan struct{}) *cobra.Command {
+func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOptions) *cobra.Command {
 	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a wardle API server",
@@ -83,12 +84,13 @@ func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan st
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunWardleServer(stopCh); err != nil {
+			if err := o.RunWardleServer(c.Context()); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
+	cmd.SetContext(ctx)
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
@@ -154,7 +156,7 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 }
 
 // RunWardleServer starts a new WardleServer given WardleServerOptions
-func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
+func (o WardleServerOptions) RunWardleServer(ctx context.Context) error {
 	config, err := o.Config()
 	if err != nil {
 		return err
@@ -171,5 +173,5 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 		return nil
 	})
 
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+	return server.GenericAPIServer.PrepareRun().RunWithContext(ctx)
 }

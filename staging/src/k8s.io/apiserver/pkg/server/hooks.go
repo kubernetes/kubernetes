@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -48,8 +49,13 @@ type PreShutdownHookFunc func() error
 type PostStartHookContext struct {
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
-	// StopCh is the channel that will be closed when the server stops
+	// StopCh is the channel that will be closed when the server stops.
+	//
+	// Deprecated: use the PostStartHookContext itself instead, it contains a context that
+	// gets cancelled when the server stops. StopCh keeps getting provided for existing code.
 	StopCh <-chan struct{}
+	// Context gets cancelled when the server stops.
+	context.Context
 }
 
 // PostStartHookProvider is an interface in addition to provide a post start hook for the api server
@@ -151,15 +157,16 @@ func (s *GenericAPIServer) AddPreShutdownHookOrDie(name string, hook PreShutdown
 	}
 }
 
-// RunPostStartHooks runs the PostStartHooks for the server
-func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
+// RunPostStartHooks runs the PostStartHooks for the server.
+func (s *GenericAPIServer) RunPostStartHooks(ctx context.Context) {
 	s.postStartHookLock.Lock()
 	defer s.postStartHookLock.Unlock()
 	s.postStartHooksCalled = true
 
 	context := PostStartHookContext{
 		LoopbackClientConfig: s.LoopbackClientConfig,
-		StopCh:               stopCh,
+		StopCh:               ctx.Done(),
+		Context:              ctx,
 	}
 
 	for hookName, hookEntry := range s.postStartHooks {
