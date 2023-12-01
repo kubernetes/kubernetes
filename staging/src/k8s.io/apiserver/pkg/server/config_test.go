@@ -17,6 +17,8 @@ limitations under the License.
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -42,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/tracing"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -79,6 +82,9 @@ func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
 }
 
 func TestNewWithDelegate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test is done"))
 	delegateConfig := NewConfig(codecs)
 	delegateConfig.ExternalAddress = "192.168.10.4:443"
 	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
@@ -136,10 +142,8 @@ func TestNewWithDelegate(t *testing.T) {
 		return nil
 	})
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	wrappingServer.PrepareRun()
-	wrappingServer.RunPostStartHooks(stopCh)
+	wrappingServer.RunPostStartHooks(ctx)
 
 	server := httptest.NewServer(wrappingServer.Handler)
 	defer server.Close()
