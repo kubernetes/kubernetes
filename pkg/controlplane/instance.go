@@ -524,7 +524,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			)
 			// The default serviceCIDR must exist before the apiserver is healthy
 			// otherwise the allocators for Services will not work.
-			controller.Start(hookContext.StopCh)
+			controller.Start(hookContext)
 			return nil
 		})
 	}

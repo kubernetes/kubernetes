@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -41,6 +42,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/http2"
@@ -172,6 +174,9 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	             |
 //	         return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test has completed"))
 	fakeAudit := &fakeAudit{}
 	s := newGenericAPIServer(t, fakeAudit, false)
 	connReusingClient := newClient(false)
@@ -200,10 +205,12 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}, nil)
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	runCompletedCh := make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		if err := s.PrepareRun().Run(ctx); err != nil {
+			t.Errorf("HTTP server failed: %v", err)
+		}
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -222,7 +229,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 
 	// signal termination event: initiate a shutdown
-	close(stopCh)
+	cancel(errors.New("shutting down"))
 	waitForeverUntilSignaled(t, signals.ShutdownInitiated)
 
 	// /readyz must return an error, but we need to give it some time
@@ -395,6 +402,10 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //     |
 //     return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test has completed"))
+
 	fakeAudit := &fakeAudit{}
 	s := newGenericAPIServer(t, fakeAudit, true)
 	connReusingClient := newClient(false)
@@ -423,10 +434,12 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}, nil)
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	runCompletedCh := make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		if err := s.PrepareRun().Run(ctx); err != nil {
+			t.Errorf("HTTP server failed: %v", err)
+		}
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -445,7 +458,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}
 
 	// signal termination event: initiate a shutdown
-	close(stopCh)
+	cancel(errors.New("shutting down"))
 	waitForeverUntilSignaled(t, signals.ShutdownInitiated)
 
 	// /readyz must return an error, but we need to give it some time
@@ -551,6 +564,9 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 
 func TestMuxAndDiscoveryComplete(t *testing.T) {
 	// setup
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test has completed"))
 	testSignal1 := make(chan struct{})
 	testSignal2 := make(chan struct{})
 	s := newGenericAPIServer(t, &fakeAudit{}, true)
@@ -568,10 +584,12 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 	}
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	runCompletedCh := make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		if err := s.PrepareRun().Run(ctx); err != nil {
+			t.Errorf("HTTP server failed: %v", err)
+		}
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -612,6 +630,9 @@ func TestPreShutdownHooks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancelCause(ctx)
+			defer cancel(errors.New("test has completed"))
 			s := test.server()
 			doer := setupDoer(t, s.SecureServingInfo)
 
@@ -643,14 +664,16 @@ func TestPreShutdownHooks(t *testing.T) {
 			}
 
 			// start the API server
-			stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+			runCompletedCh := make(chan struct{})
 			go func() {
 				defer close(runCompletedCh)
-				s.PrepareRun().Run(stopCh)
+				if err := s.PrepareRun().Run(ctx); err != nil {
+					t.Errorf("HTTP server failed: %v", err)
+				}
 			}()
 			waitForAPIServerStarted(t, doer)
 
-			close(stopCh)
+			cancel(errors.New("shutting down"))
 
 			waitForeverUntil(t, runCompletedCh, "the apiserver Run method did not return")
 

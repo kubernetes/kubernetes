@@ -101,25 +101,19 @@ type Controller struct {
 
 // New returns a new service controller to keep cloud provider service resources
 // (like load balancers) in sync with the registry.
-func New(
-	cloud cloudprovider.Interface,
+func New(cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	nodeInformer coreinformers.NodeInformer,
 	clusterName string,
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
-	broadcaster := record.NewBroadcaster()
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
-
 	registerMetrics()
 	s := &Controller{
 		cloud:            cloud,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
-		eventBroadcaster: broadcaster,
-		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
@@ -224,6 +218,8 @@ func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetr
 	defer c.nodeQueue.ShutDown()
 
 	// Start event processing pipeline.
+	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 	c.eventBroadcaster.StartStructuredLogging(0)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
