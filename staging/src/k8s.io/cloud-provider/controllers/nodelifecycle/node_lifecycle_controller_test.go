@@ -19,10 +19,11 @@ package cloud
 import (
 	"context"
 	"errors"
-	"github.com/google/go-cmp/cmp"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func Test_NodesDeleted(t *testing.T) {
@@ -510,17 +512,18 @@ func Test_NodesDeleted(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			clientset := fake.NewSimpleClientset(testcase.existingNode)
 			informer := informers.NewSharedInformerFactory(clientset, time.Second)
 			nodeInformer := informer.Core().V1().Nodes()
 
-			if err := syncNodeStore(nodeInformer, clientset); err != nil {
+			if err := syncNodeStore(ctx, nodeInformer, clientset); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			eventBroadcaster := record.NewBroadcaster()
+			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				nodeLister:        nodeInformer.Lister(),
 				kubeClient:        clientset,
@@ -885,15 +888,19 @@ func Test_NodesShutdown(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			clientset := fake.NewSimpleClientset(testcase.existingNode)
 			informer := informers.NewSharedInformerFactory(clientset, time.Second)
 			nodeInformer := informer.Core().V1().Nodes()
 
-			if err := syncNodeStore(nodeInformer, clientset); err != nil {
+			if err := syncNodeStore(ctx, nodeInformer, clientset); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			eventBroadcaster := record.NewBroadcaster()
+			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				nodeLister:        nodeInformer.Lister(),
 				kubeClient:        clientset,
@@ -902,11 +909,11 @@ func Test_NodesShutdown(t *testing.T) {
 				nodeMonitorPeriod: 1 * time.Second,
 			}
 
-			w := eventBroadcaster.StartLogging(klog.Infof)
+			w := eventBroadcaster.StartStructuredLogging(0)
 			defer w.Stop()
-			cloudNodeLifecycleController.MonitorNodes(context.TODO())
+			cloudNodeLifecycleController.MonitorNodes(ctx)
 
-			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), testcase.existingNode.Name, metav1.GetOptions{})
+			updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, testcase.existingNode.Name, metav1.GetOptions{})
 			if testcase.expectedDeleted != apierrors.IsNotFound(err) {
 				t.Fatalf("unexpected error happens when getting the node: %v", err)
 			}
@@ -1047,11 +1054,13 @@ func Test_GetProviderID(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				cloud: testcase.fakeCloud,
 			}
 
-			providerID, err := cloudNodeLifecycleController.getProviderID(context.TODO(), testcase.existingNode)
+			providerID, err := cloudNodeLifecycleController.getProviderID(ctx, testcase.existingNode)
 
 			if err != nil && testcase.expectedErr == nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -1070,8 +1079,8 @@ func Test_GetProviderID(t *testing.T) {
 	}
 }
 
-func syncNodeStore(nodeinformer coreinformers.NodeInformer, f *fake.Clientset) error {
-	nodes, err := f.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+func syncNodeStore(ctx context.Context, nodeinformer coreinformers.NodeInformer, f *fake.Clientset) error {
+	nodes, err := f.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
