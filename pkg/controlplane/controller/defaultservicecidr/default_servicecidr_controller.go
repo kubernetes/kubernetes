@@ -55,9 +55,6 @@ func NewController(
 	secondaryRange net.IPNet,
 	client clientset.Interface,
 ) *Controller {
-	broadcaster := record.NewBroadcaster()
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
-
 	c := &Controller{
 		client:   client,
 		interval: 10 * time.Second, // same as DefaultEndpointReconcilerInterval
@@ -79,9 +76,6 @@ func NewController(
 	c.serviceCIDRLister = networkingv1alpha1listers.NewServiceCIDRLister(c.serviceCIDRInformer.GetIndexer())
 	c.serviceCIDRsSynced = c.serviceCIDRInformer.HasSynced
 
-	c.eventBroadcaster = broadcaster
-	c.eventRecorder = recorder
-
 	return c
 }
 
@@ -101,9 +95,12 @@ type Controller struct {
 }
 
 // Start will not return until the default ServiceCIDR exists or stopCh is closed.
-func (c *Controller) Start(stopCh <-chan struct{}) {
+func (c *Controller) Start(ctx context.Context) {
 	defer utilruntime.HandleCrash()
+	stopCh := ctx.Done()
 
+	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	c.eventBroadcaster.StartStructuredLogging(0)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
@@ -116,8 +113,6 @@ func (c *Controller) Start(stopCh <-chan struct{}) {
 		return
 	}
 
-	// derive a context from the stopCh so we can cancel the poll loop
-	ctx := wait.ContextForChannel(stopCh)
 	// wait until first successfully sync
 	// this blocks apiserver startup so poll with a short interval
 	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {

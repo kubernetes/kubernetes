@@ -94,7 +94,7 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create test secret, error: %v", err)
 		}
-		test.runResource(test.logger, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
+		test.runResource(test.TContext, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
 		test.cleanUp()
 	}
 }

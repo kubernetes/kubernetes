@@ -62,9 +62,6 @@ func TestAPIServiceWaitOnStart(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	etcdConfig := framework.SharedEtcd()
 
 	etcd3Client, _, err := integration.GetEtcdClients(etcdConfig.Transport)
@@ -235,9 +232,6 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// makes the kube-apiserver very responsive.  it's normally a minute
 	dynamiccertificates.FileRefreshDuration = 1 * time.Second
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	// we need the wardle port information first to set up the service resolver
 	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
@@ -291,7 +285,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		}
 		o.RecommendedOptions.SecureServing.Listener = listener
 		o.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
-		wardleCmd := sampleserver.NewCommandStartWardleServer(o, stopCh)
+		wardleCmd := sampleserver.NewCommandStartWardleServer(ctx, o)
 		wardleCmd.SetArgs([]string{
 			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
 			"--authorization-kubeconfig", wardleToKASKubeConfigFile,

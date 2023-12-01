@@ -32,9 +32,9 @@ import (
 )
 
 func main() {
-	stopCh := genericapiserver.SetupSignalHandler()
+	ctx := genericapiserver.SetupSignalContext()
 	options := server.NewDefaultOptions(os.Stdout, os.Stderr)
-	cmd := server.NewCommandStartAggregator(options, stopCh)
+	cmd := server.NewCommandStartAggregator(ctx, options)
 	code := cli.Run(cmd)
 	os.Exit(code)
 }
