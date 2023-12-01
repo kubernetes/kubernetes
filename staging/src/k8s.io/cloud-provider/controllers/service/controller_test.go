@@ -51,6 +51,7 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	_ "k8s.io/controller-manager/pkg/features/register"
+	"k8s.io/klog/v2/ktesting"
 
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -150,7 +151,8 @@ func defaultExternalService() *v1.Service {
 // node/service informers and reacting to resource events. Callers can also
 // specify `objects` which represent the initial state of objects, used to
 // populate the client set / informer cache at start-up.
-func newController(stopCh <-chan struct{}, objects ...runtime.Object) (*Controller, *fakecloud.Cloud, *fake.Clientset) {
+func newController(ctx context.Context, objects ...runtime.Object) (*Controller, *fakecloud.Cloud, *fake.Clientset) {
+	stopCh := ctx.Done()
 	cloud := &fakecloud.Cloud{}
 	cloud.Region = region
 
@@ -158,7 +160,7 @@ func newController(stopCh <-chan struct{}, objects ...runtime.Object) (*Controll
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	broadcaster := record.NewBroadcaster()
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
@@ -275,9 +277,10 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			controller, cloud, client := newController(nil)
+			controller, cloud, client := newController(ctx)
 			cloud.Exists = tc.lbExists
 			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
 			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(ctx, tc.service, metav1.CreateOptions{}); err != nil {
@@ -321,7 +324,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				}
 
 				for _, balancer := range cloud.Balancers {
-					if balancer.Name != controller.balancer.GetLoadBalancerName(context.Background(), "", tc.service) ||
+					if balancer.Name != controller.balancer.GetLoadBalancerName(ctx, "", tc.service) ||
 						balancer.Region != region ||
 						balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
 						t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
@@ -449,9 +452,10 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}}
 	for _, item := range table {
 		t.Run(item.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			controller, cloud, _ := newController(nil)
+			controller, cloud, _ := newController(ctx)
 			controller.nodeLister = newFakeNodeLister(nil, nodes...)
 			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); len(servicesToRetry) != 0 {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
@@ -607,10 +611,11 @@ func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
 		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
 	}} {
 		t.Run(tc.desc, func(t *testing.T) {
-			controller, cloud, _ := newController(nil)
-
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+
+			controller, cloud, _ := newController(ctx)
 
 			for _, svc := range services {
 				key, _ := cache.MetaNamespaceKeyFunc(svc)
@@ -638,6 +643,10 @@ func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
 }
 
 func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	node1 := makeNode(tweakName("node1"))
 	node2 := makeNode(tweakName("node2"))
 	node3 := makeNode(tweakName("node3"))
@@ -655,7 +664,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		serviceNames.Insert(fmt.Sprintf("%s/%s", svc.GetObjectMeta().GetNamespace(), svc.GetObjectMeta().GetName()))
 	}
 
-	controller, cloud, _ := newController(nil)
+	controller, cloud, _ := newController(ctx)
 	for _, tc := range []struct {
 		desc                  string
 		nodes                 []*v1.Node
@@ -715,7 +724,8 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		expectedRetryServices: serviceNames,
 	}} {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			controller.nodeLister = newFakeNodeLister(tc.nodeListerErr, tc.nodes...)
 			servicesToRetry := controller.updateLoadBalancerHosts(ctx, services, tc.worker)
@@ -771,7 +781,11 @@ func compareHostSets(t *testing.T, left, right []*v1.Node) bool {
 }
 
 func TestNodesNotEqual(t *testing.T) {
-	controller, cloud, _ := newController(nil)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	controller, cloud, _ := newController(ctx)
 
 	services := []*v1.Service{
 		newService("s0", v1.ServiceTypeLoadBalancer),
@@ -818,7 +832,8 @@ func TestNodesNotEqual(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			controller.nodeLister = newFakeNodeLister(nil, tc.newNodes...)
 
@@ -835,7 +850,11 @@ func TestNodesNotEqual(t *testing.T) {
 }
 
 func TestProcessServiceCreateOrUpdate(t *testing.T) {
-	controller, _, client := newController(nil)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	controller, _, client := newController(ctx)
 
 	//A pair of old and new loadbalancer IP address
 	oldLBIP := "192.168.1.1"
@@ -908,7 +927,8 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 	}}
 
 	for _, tc := range testCases {
-		ctx, cancel := context.WithCancel(context.Background())
+		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		newSvc := tc.updateFn(tc.svc)
 		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
@@ -945,12 +965,13 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			svc := newService(svcName, v1.ServiceTypeLoadBalancer)
 			// Preset finalizer so k8s error only happens when patching status.
 			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
-			controller, _, client := newController(nil)
+			controller, _, client := newController(ctx)
 			client.PrependReactor("patch", "services", func(action core.Action) (bool, runtime.Object, error) {
 				return true, nil, tc.k8sErr
 			})
@@ -987,14 +1008,14 @@ func TestSyncService(t *testing.T) {
 	testCases := []struct {
 		testName   string
 		key        string
-		updateFn   func()            //Function to manipulate the controller element to simulate error
-		expectedFn func(error) error //Expected function if returns nil then test passed, failed otherwise
+		updateFn   func(context.Context) // Function to manipulate the controller element to simulate error
+		expectedFn func(error) error     // Expected function if returns nil then test passed, failed otherwise
 	}{
 		{
 			testName: "if an invalid service name is synced",
 			key:      "invalid/key/string",
-			updateFn: func() {
-				controller, _, _ = newController(nil)
+			updateFn: func(ctx context.Context) {
+				controller, _, _ = newController(ctx)
 			},
 			expectedFn: func(e error) error {
 				//TODO: should find a way to test for dependent package errors in such a way that it won't break
@@ -1024,9 +1045,9 @@ func TestSyncService(t *testing.T) {
 		{
 			testName: "if valid service",
 			key:      "external-balancer",
-			updateFn: func() {
+			updateFn: func(ctx context.Context) {
 				testSvc := defaultExternalService()
-				controller, _, _ = newController(nil)
+				controller, _, _ = newController(ctx)
 				controller.enqueueService(testSvc)
 				svc := controller.cache.getOrCreate("external-balancer")
 				svc.state = testSvc
@@ -1043,10 +1064,11 @@ func TestSyncService(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			tc.updateFn()
+			tc.updateFn(ctx)
 			obtainedErr := controller.syncService(ctx, tc.key)
 
 			//expected matches obtained ??.
@@ -1128,11 +1150,12 @@ func TestProcessServiceDeletion(t *testing.T) {
 	}}
 
 	for _, tc := range testCases {
-		ctx, cancel := context.WithCancel(context.Background())
+		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		//Create a new controller.
-		controller, cloud, _ = newController(nil)
+		controller, cloud, _ = newController(ctx)
 		tc.updateFn(controller)
 		obtainedErr := controller.processServiceDeletion(ctx, svcKey)
 		if err := tc.expectedFn(obtainedErr); err != nil {
@@ -1213,8 +1236,10 @@ func TestNeedsCleanup(t *testing.T) {
 // make sure that the slow node sync never removes the Node from LB set because it
 // has stale data.
 func TestSlowNodeSync(t *testing.T) {
-	stopCh, syncServiceDone, syncService := make(chan struct{}), make(chan string), make(chan string)
-	defer close(stopCh)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	syncServiceDone, syncService := make(chan string), make(chan string)
 	defer close(syncService)
 
 	node1 := makeNode(tweakName("node1"))
@@ -1227,7 +1252,7 @@ func TestSlowNodeSync(t *testing.T) {
 	sKey2, _ := cache.MetaNamespaceKeyFunc(service2)
 	serviceKeys := sets.New(sKey1, sKey2)
 
-	controller, cloudProvider, kubeClient := newController(stopCh, node1, node2, service1, service2)
+	controller, cloudProvider, kubeClient := newController(ctx, node1, node2, service1, service2)
 	cloudProvider.UpdateCallCb = func(update fakecloud.UpdateBalancerCall) {
 		key, _ := cache.MetaNamespaceKeyFunc(update.Service)
 		impactedService := serviceKeys.Difference(sets.New(key)).UnsortedList()[0]
@@ -1263,17 +1288,17 @@ func TestSlowNodeSync(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		controller.syncNodes(context.TODO(), 1)
+		controller.syncNodes(ctx, 1)
 	}()
 
 	key := <-syncService
-	if _, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node3, metav1.CreateOptions{}); err != nil {
+	if _, err := kubeClient.CoreV1().Nodes().Create(ctx, node3, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("error creating node3, err: %v", err)
 	}
 
 	// Allow a bit of time for the informer cache to get populated with the new
 	// node
-	if err := wait.PollUntilContextCancel(wait.ContextForChannel(stopCh), 10*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+	if err := wait.PollUntilContextCancel(ctx, 10*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		n3, _ := controller.nodeLister.Get("node3")
 		return n3 != nil, nil
 	}); err != nil {
@@ -1281,7 +1306,7 @@ func TestSlowNodeSync(t *testing.T) {
 	}
 
 	// Sync the service
-	if err := controller.syncService(context.TODO(), key); err != nil {
+	if err := controller.syncService(ctx, key); err != nil {
 		t.Fatalf("unexpected service sync error, err: %v", err)
 	}
 
@@ -1465,13 +1490,18 @@ func TestNeedsUpdate(t *testing.T) {
 		expectedNeedsUpdate: true,
 	}}
 
-	controller, _, _ := newController(nil)
 	for _, tc := range testCases {
-		oldSvc, newSvc := tc.updateFn()
-		obtainedResult := controller.needsUpdate(oldSvc, newSvc)
-		if obtainedResult != tc.expectedNeedsUpdate {
-			t.Errorf("%v needsUpdate() should have returned %v but returned %v", tc.testName, tc.expectedNeedsUpdate, obtainedResult)
-		}
+		t.Run(tc.testName, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			controller, _, _ := newController(ctx)
+			oldSvc, newSvc := tc.updateFn()
+			obtainedResult := controller.needsUpdate(oldSvc, newSvc)
+			if obtainedResult != tc.expectedNeedsUpdate {
+				t.Errorf("%v needsUpdate() should have returned %v but returned %v", tc.testName, tc.expectedNeedsUpdate, obtainedResult)
+			}
+		})
 	}
 }
 
@@ -1606,7 +1636,8 @@ func TestAddFinalizer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
@@ -1659,7 +1690,8 @@ func TestRemoveFinalizer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
@@ -1756,7 +1788,8 @@ func TestPatchStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
@@ -2277,7 +2310,10 @@ func TestServiceQueueDelay(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			controller, cloud, client := newController(nil)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			controller, cloud, client := newController(ctx)
 			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
 			controller.serviceQueue = queue
 			cloud.Err = tc.lbCloudErr
@@ -2290,7 +2326,6 @@ func TestServiceQueueDelay(t *testing.T) {
 				t.Fatalf("adding service %s to cache: %s", svc.Name, err)
 			}
 
-			ctx := context.Background()
 			_, err := client.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)

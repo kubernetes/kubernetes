@@ -69,12 +69,17 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
+//logcheck:context // NewWithContext should be used instead of New in code which supports contextual logging
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
+	return NewWithContext(context.Background(), routes, kubeClient, nodeInformer, clusterName, clusterCIDRs)
+}
+
+func NewWithContext(ctx context.Context, routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
 	if len(clusterCIDRs) == 0 {
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
