@@ -33,7 +33,6 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	"go.opentelemetry.io/otel/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/golang/mock/gomock"
@@ -3104,7 +3103,7 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 	return fakeRuntime, endpoint
 }
 
-func createRemoteRuntimeService(endpoint string, t *testing.T, tp trace.TracerProvider) internalapi.RuntimeService {
+func createRemoteRuntimeService(endpoint string, t *testing.T, tp oteltrace.TracerProvider) internalapi.RuntimeService {
 	runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, tp)
 	require.NoError(t, err)
 	return runtimeService
@@ -3264,6 +3263,7 @@ func TestSyncPodSpans(t *testing.T) {
 	fakeRuntime.ImageService.SetFakeImageSize(100)
 	fakeRuntime.ImageService.SetFakeImages([]string{"test:latest"})
 	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp)
+	assert.NoError(t, err)
 
 	kubelet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 		kubelet.recorder,
@@ -3297,6 +3297,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeletutil.NewPodStartupLatencyTracker(),
 		tp,
 	)
+	assert.NoError(t, err)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
