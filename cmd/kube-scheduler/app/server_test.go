@@ -260,6 +260,7 @@ leaderElection:
 						{Name: "NodePorts"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "VolumeBinding"},
 						{Name: "NodeResourcesFit"},
 						{Name: "InterPodAffinity"},
 						{Name: "TaintToleration"},
