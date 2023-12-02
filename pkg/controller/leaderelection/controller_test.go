@@ -204,7 +204,7 @@ func TestPickLeader(t *testing.T) {
 					},
 				},
 			},
-			expectedLeaderName: "component-identity-1",
+			expectedLeaderName: "component-identity-2",
 		},
 		{
 			name: "same binary version, newer compatibility version",
@@ -228,7 +228,7 @@ func TestPickLeader(t *testing.T) {
 					},
 				},
 			},
-			expectedLeaderName: "component-identity-2",
+			expectedLeaderName: "component-identity-1",
 		},
 		{
 			name: "one candidate",
@@ -388,9 +388,7 @@ func TestController(t *testing.T) {
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.19",
 							BinaryVersionAnnotationName:        "1.19",
-						},
-						Labels: map[string]string{
-							CanLeadLeasesLabelName: "kube-system/component-A",
+							CanLeadLeasesAnnotationName:        "kube-system/component-A",
 						},
 					},
 					Spec: v1.LeaseSpec{
@@ -424,9 +422,7 @@ func TestController(t *testing.T) {
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.19",
 							BinaryVersionAnnotationName:        "1.19",
-						},
-						Labels: map[string]string{
-							CanLeadLeasesLabelName: "kube-system/component-A",
+							CanLeadLeasesAnnotationName:        "kube-system/component-A",
 						},
 					},
 					Spec: v1.LeaseSpec{
@@ -440,9 +436,7 @@ func TestController(t *testing.T) {
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.19",
 							BinaryVersionAnnotationName:        "1.20",
-						},
-						Labels: map[string]string{
-							CanLeadLeasesLabelName: "kube-system/component-A",
+							CanLeadLeasesAnnotationName:        "kube-system/component-A",
 						},
 					},
 					Spec: v1.LeaseSpec{
@@ -456,9 +450,7 @@ func TestController(t *testing.T) {
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.20",
 							BinaryVersionAnnotationName:        "1.20",
-						},
-						Labels: map[string]string{
-							CanLeadLeasesLabelName: "kube-system/component-A",
+							CanLeadLeasesAnnotationName:        "kube-system/component-A",
 						},
 					},
 					Spec: v1.LeaseSpec{
@@ -505,9 +497,7 @@ func TestController(t *testing.T) {
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.19",
 							BinaryVersionAnnotationName:        "1.19",
-						},
-						Labels: map[string]string{
-							CanLeadLeasesLabelName: "kube-system/component-A",
+							CanLeadLeasesAnnotationName:        "kube-system/component-A",
 						},
 					},
 					Spec: v1.LeaseSpec{
@@ -557,9 +547,7 @@ func TestController(t *testing.T) {
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.19",
 							BinaryVersionAnnotationName:        "1.19",
-						},
-						Labels: map[string]string{
-							CanLeadLeasesLabelName: "kube-system/component-A",
+							CanLeadLeasesAnnotationName:        "kube-system/component-A",
 						},
 					},
 					Spec: v1.LeaseSpec{
@@ -573,9 +561,7 @@ func TestController(t *testing.T) {
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.20",
 							BinaryVersionAnnotationName:        "1.20",
-						},
-						Labels: map[string]string{
-							CanLeadLeasesLabelName: "kube-system/component-A",
+							CanLeadLeasesAnnotationName:        "kube-system/component-A",
 						},
 					},
 					Spec: v1.LeaseSpec{

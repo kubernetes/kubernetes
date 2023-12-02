@@ -166,13 +166,26 @@ type Interface interface {
 
 // Manufacture will create a lock of a given type according to the input parameters
 func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
-	leaseLock := &LeaseLock{
-		LeaseMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		},
-		Client:     coordinationClient,
-		LockConfig: rlc,
+	var leaseLock Interface
+	if lockType == "coordinatedLeases" {
+		leaseLock = &CoordinatedLeaseLock{
+			LeaseMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Client:     coordinationClient,
+			LockConfig: rlc,
+		}
+		return leaseLock, nil
+	} else {
+		leaseLock = &LeaseLock{
+			LeaseMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Client:     coordinationClient,
+			LockConfig: rlc,
+		}
 	}
 	switch lockType {
 	case endpointsResourceLock:
