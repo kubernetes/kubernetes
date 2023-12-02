@@ -298,9 +298,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		leaseNamespace:       "kube-system",               // TODO: put this in kube-system once RBAC is set up for that
 		leaseDurationSeconds: 10,
 		clock:                clock.RealClock{},
-		controllerLeaseName:  c.ComponentConfig.Generic.LeaderMigration.LeaderName,
+		controllerLeaseName:  "kube-controller-manager", // TODO: wire this in
 		renewInterval:        5,
 	}
+	// TODO: Wrap this in a Run/sync() loop like lease.controller.Run()/sync()
 	go identityLease.backoffEnsureLease(ctx)
 
 	// Start the main lock

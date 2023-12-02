@@ -34,6 +34,7 @@ import (
 	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -86,21 +87,29 @@ func (l leaderLeaseId) String() string {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
+	klog.Infof("Running")
 	defer utilruntime.HandleCrash()
 
+	klog.Infof("Start WaitForNamedCacheSync")
 	if !cache.WaitForNamedCacheSync(controllerName, ctx.Done(), c.leaseSynced) {
+		klog.Infof("Failed WaitForNamedCacheSync")
 		return
 	}
+	klog.Infof("Done WaitForNamedCacheSync")
 
 	defer c.leaseQueue.ShutDown()
+	klog.Infof("Workers: %d", workers)
 	for i := 0; i < workers; i++ {
+		klog.Infof("Starting worker")
 		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
 	<-ctx.Done()
+	klog.Infof("Done Running")
 }
 
 func NewController(leaseInformer coordinationv1.LeaseInformer, leaseClient coordinationv1client.CoordinationV1Interface) (*Controller, error) {
+	klog.Infof("NewController")
 	c := &Controller{
 		leaseInformer: leaseInformer,
 		leaseQueue:    workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: controllerName}),
@@ -112,12 +121,15 @@ func NewController(leaseInformer coordinationv1.LeaseInformer, leaseClient coord
 	}
 	reg, err := leaseInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
+			klog.Infof("AddFunc")
 			c.enqueueLease(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
+			klog.Infof("UpdateFunc")
 			c.enqueueLease(newObj)
 		},
 		DeleteFunc: func(oldObj interface{}) {
+			klog.Infof("DeleteFunc")
 			c.leaseDeleted(oldObj)
 		},
 	})
@@ -129,17 +141,20 @@ func NewController(leaseInformer coordinationv1.LeaseInformer, leaseClient coord
 }
 
 func (c *Controller) enqueueLease(obj any) {
+	klog.Infof("enqueueLease")
 	if lease, ok := obj.(*v1.Lease); ok {
 		// TODO: handle namespaces
 		key, err := controller.KeyFunc(lease)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v: %w", lease, err))
 		}
+		klog.Infof("enqueueLease, Add: %q", key)
 		c.leaseQueue.Add(key)
 	}
 }
 
 func (c *Controller) leaseDeleted(oldObj any) {
+	klog.Infof("leaseDeleted")
 	if lease, ok := oldObj.(*v1.Lease); ok {
 		// TODO: Check if this is a lease that needs a leader election? We may need to maintain
 		// a set of leader election leases?  For prototype purposes can we just scan the leases?
@@ -152,12 +167,14 @@ func (c *Controller) leaseDeleted(oldObj any) {
 }
 
 func (c *Controller) runWorker(ctx context.Context) {
+	klog.Infof("runWorker")
 	go c.runElectionLoop(ctx.Done())
 	for c.processNextWorkItem(ctx) {
 	}
 }
 
 func (c *Controller) processNextWorkItem(ctx context.Context) bool {
+	klog.Infof("processNextWorkItem")
 	key, shutdown := c.leaseQueue.Get()
 	if shutdown {
 		return false
@@ -196,6 +213,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 }
 
 func (c *Controller) runElectionLoop(stopCh <-chan struct{}) {
+	klog.Infof("runElectionLoop")
 	ctx := context.Background()
 	for {
 		select {
@@ -214,6 +232,7 @@ func (c *Controller) runElectionLoop(stopCh <-chan struct{}) {
 }
 
 func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
+	klog.Infof("reconcile for lease namespace=%q, name=%q", lease.Namespace, lease.Name)
 	if lease == nil {
 		return nil
 	}
@@ -231,6 +250,7 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 				return err
 			}
 			if ok {
+				klog.Infof("finding candidates for lease namespace=%q, name=%q", lease.Namespace, lease.Name)
 				candidates, err := c.listCandidates(leaderLeaseId)
 				if err != nil {
 					return err
@@ -250,6 +270,7 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 }
 
 func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLeaseId) (*v1.Lease, bool, error) {
+	klog.Infof("activeLeader checking for lease namespace=%q, name=%q", leaderLeaseId.namespace, leaderLeaseId.name)
 	leaderLease, err := c.leaseInformer.Lister().Leases(leaderLeaseId.namespace).Get(leaderLeaseId.name)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
@@ -269,6 +290,7 @@ func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLease
 }
 
 func (c *Controller) scheduleElection(leaderLeaseId leaderLeaseId) error {
+	klog.Infof("scheduleElection")
 	// TODO: add a set to track ongoing elections and avoid requesting an election if one has already been kicked off?
 	// This might not be needed..
 	c.electionCh <- election{
@@ -279,6 +301,7 @@ func (c *Controller) scheduleElection(leaderLeaseId leaderLeaseId) error {
 }
 
 func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseId) error {
+	klog.Infof("runElection")
 	candidates, err := c.listCandidates(leaderLeaseId)
 	if err != nil {
 		return err
@@ -338,6 +361,7 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseI
 }
 
 func pickLeader(candidates []*v1.Lease) *v1.Lease {
+	klog.Infof("pickLeader")
 	var electee *v1.Lease
 	for _, c := range candidates {
 		if electee == nil || compare(electee, c) < 0 {
@@ -348,6 +372,7 @@ func pickLeader(candidates []*v1.Lease) *v1.Lease {
 }
 
 func shouldReelect(candidates []*v1.Lease, currentLeader *v1.Lease) bool {
+	klog.Infof("shouldReelect for candidates: %+v", candidates)
 	pickedLeader := pickLeader(candidates)
 	if pickedLeader == nil {
 		return false

@@ -110,6 +110,7 @@ func init() {
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-controller-manager").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "watch", "list", "create", "update").Groups("coordination.k8s.io").Resources("leases").RuleOrDie(),
 		},
 	})
 	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{
