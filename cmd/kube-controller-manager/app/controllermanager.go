@@ -291,18 +291,18 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	// Start component identity lease management
-	identityLease := &identityLease{
-		leaseClient:          c.Client.CoordinationV1().Leases("kube-system"),
-		holderIdentity:       "kube-controller-manager",
-		leaseName:            "kube-controller-manager-a", // TODO: safely append uids
-		leaseNamespace:       "kube-system",               // TODO: put this in kube-system once RBAC is set up for that
-		leaseDurationSeconds: 10,
-		clock:                clock.RealClock{},
-		canLeadLeases:        "kube-system/kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
-		renewInterval:        5,
-	}
-	// TODO: Wrap this in a Run/sync() loop like lease.controller.Run()/sync()
-	go identityLease.backoffEnsureLease(ctx)
+	//identityLease := &identityLease{
+	//	leaseClient:          c.Client.CoordinationV1().Leases("kube-system"),
+	//	holderIdentity:       "kube-controller-manager-a",
+	//	leaseName:            "kube-controller-manager-a", // TODO: safely append uids
+	//	leaseNamespace:       "kube-system",               // TODO: put this in kube-system once RBAC is set up for that
+	//	leaseDurationSeconds: 10,
+	//	clock:                clock.RealClock{},
+	//	canLeadLeases:        "kube-system/kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
+	//	renewInterval:        5,
+	//}
+	//// TODO: Wrap this in a Run/sync() loop like lease.controller.Run()/sync()
+	//go identityLease.backoffEnsureLease(ctx)
 
 	// Start the main lock
 	go leaderElectAndRun(ctx, c, id, electionChecker,
@@ -455,8 +455,10 @@ func (c *identityLease) newLease(base *v1.Lease) (*v1.Lease, error) {
 				Name:      c.leaseName,
 				Namespace: c.leaseNamespace,
 				Annotations: map[string]string{
-					// TODO: use CanLeadLeasesLabelName const
-					"coordination.k8s.io/can-lead-leases": c.canLeadLeases,
+					// TODO: use constants
+					"coordination.k8s.io/can-lead-leases":       c.canLeadLeases,
+					"coordination.k8s.io/binary-version":        version.Get().Major + "." + version.Get().Minor, // TODO: wire this in
+					"coordination.k8s.io/compatibility-version": version.Get().Major + "." + version.Get().Minor, // TODO: wire this in
 				},
 			},
 			Spec: v1.LeaseSpec{
