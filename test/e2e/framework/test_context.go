@@ -509,19 +509,21 @@ func AfterReadingAllFlags(t *TestContextType) {
 	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
 	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
 
-	// ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
-	report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")
-	validateSpecs(report.SpecReports)
-	if err := FormatBugs(); CheckForBugs && err != nil {
-		// Refuse to do anything if the E2E suite is buggy.
-		fmt.Fprint(Output, "ERROR: E2E suite initialization was faulty, these errors must be fixed:")
-		fmt.Fprint(Output, "\n"+err.Error())
-		Exit(1)
-	}
-	if t.listLabels || t.listTests {
-		listTestInformation(report)
-		Exit(0)
-	}
+	// TODO(soltysh): we need to figure out how we want to handle labels
+	// https://issues.redhat.com/browse/OCPBUGS-25641
+	// // ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
+	// report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")
+	// validateSpecs(report.SpecReports)
+	// if err := FormatBugs(); CheckForBugs && err != nil {
+	// 	// Refuse to do anything if the E2E suite is buggy.
+	// 	fmt.Fprint(Output, "ERROR: E2E suite initialization was faulty, these errors must be fixed:")
+	// 	fmt.Fprint(Output, "\n"+err.Error())
+	// 	Exit(1)
+	// }
+	// if t.listLabels || t.listTests {
+	// 	listTestInformation(report)
+	// 	Exit(0)
+	// }
 
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
