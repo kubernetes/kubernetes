@@ -890,7 +890,10 @@ func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, 
 				tb.Fatalf("op %d: %v", opIndex, err)
 			}
 			if err := nsPreparer.prepare(ctx); err != nil {
-				nsPreparer.cleanup(ctx)
+				err2 := nsPreparer.cleanup(ctx)
+				if err2 != nil {
+					err = fmt.Errorf("prepare: %v; cleanup: %v", err, err2)
+				}
 				tb.Fatalf("op %d: %v", opIndex, err)
 			}
 			for _, n := range nsPreparer.namespaces() {
@@ -944,11 +947,7 @@ func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, 
 			if concreteOp.SkipWaitToCompletion {
 				// Only record those namespaces that may potentially require barriers
 				// in the future.
-				if _, ok := numPodsScheduledPerNamespace[namespace]; ok {
-					numPodsScheduledPerNamespace[namespace] += concreteOp.Count
-				} else {
-					numPodsScheduledPerNamespace[namespace] = concreteOp.Count
-				}
+				numPodsScheduledPerNamespace[namespace] += concreteOp.Count
 			} else {
 				if err := waitUntilPodsScheduledInNamespace(ctx, tb, podInformer, namespace, concreteOp.Count); err != nil {
 					tb.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
@@ -1011,7 +1010,9 @@ func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, 
 
 				churnFns = append(churnFns, func(name string) string {
 					if name != "" {
-						dynRes.Delete(ctx, name, metav1.DeleteOptions{})
+						if err := dynRes.Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+							tb.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
+						}
 						return ""
 					}
 
