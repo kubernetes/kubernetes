@@ -5835,35 +5835,41 @@ func TestValidatePorts(t *testing.T) {
 		{Name: "do-re-me", ContainerPort: 84, Protocol: "SCTP"},
 		{ContainerPort: 85, Protocol: "TCP"},
 	}
-	if errs := validateContainerPorts(successCase, field.NewPath("field")); len(errs) != 0 {
+
+	podPortNames := sets.Set[string]{}
+	if errs := validateContainerPorts(successCase, podPortNames, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	nonCanonicalCase := []core.ContainerPort{
 		{ContainerPort: 80, Protocol: "TCP"},
 	}
-	if errs := validateContainerPorts(nonCanonicalCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainerPorts(nonCanonicalCase, podPortNames, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string]struct {
-		P []core.ContainerPort
-		T field.ErrorType
-		F string
-		D string
+		ContainerPort      []core.ContainerPort
+		OtherContainerPort []core.ContainerPort
+		Type               field.ErrorType
+		Field              string
+		Detail             string
 	}{
 		"name > 15 characters": {
 			[]core.ContainerPort{{Name: strings.Repeat("a", 16), ContainerPort: 80, Protocol: "TCP"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeInvalid,
 			"name", "15",
 		},
 		"name contains invalid characters": {
 			[]core.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeInvalid,
 			"name", "alpha-numeric",
 		},
 		"name is a number": {
 			[]core.ContainerPort{{Name: "80", ContainerPort: 80, Protocol: "TCP"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeInvalid,
 			"name", "at least one letter",
 		},
@@ -5872,54 +5878,79 @@ func TestValidatePorts(t *testing.T) {
 				{Name: "abc", ContainerPort: 80, Protocol: "TCP"},
 				{Name: "abc", ContainerPort: 81, Protocol: "TCP"},
 			},
+			[]core.ContainerPort{},
 			field.ErrorTypeDuplicate,
 			"[1].name", "",
 		},
 		"zero container port": {
 			[]core.ContainerPort{{ContainerPort: 0, Protocol: "TCP"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeRequired,
 			"containerPort", "",
 		},
 		"invalid container port": {
 			[]core.ContainerPort{{ContainerPort: 65536, Protocol: "TCP"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeInvalid,
 			"containerPort", "between",
 		},
 		"invalid host port": {
 			[]core.ContainerPort{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeInvalid,
 			"hostPort", "between",
 		},
 		"invalid protocol case": {
 			[]core.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeNotSupported,
 			"protocol", `supported values: "SCTP", "TCP", "UDP"`,
 		},
 		"invalid protocol": {
 			[]core.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}},
+			[]core.ContainerPort{},
 			field.ErrorTypeNotSupported,
 			"protocol", `supported values: "SCTP", "TCP", "UDP"`,
 		},
 		"protocol required": {
 			[]core.ContainerPort{{Name: "abc", ContainerPort: 80}},
+			[]core.ContainerPort{},
 			field.ErrorTypeRequired,
 			"protocol", "",
 		},
+		"duplicate port name": {
+			[]core.ContainerPort{{Name: "abc", ContainerPort: 80, Protocol: "TCP"}},
+			[]core.ContainerPort{{Name: "abc", ContainerPort: 8080, Protocol: "TCP"}},
+			field.ErrorTypeDuplicate,
+			"name", "",
+		},
+		"duplicate port name within the container": {
+			[]core.ContainerPort{
+				{Name: "abc", ContainerPort: 80, Protocol: "TCP"},
+				{Name: "abc", ContainerPort: 8080, Protocol: "TCP"},
+			},
+			[]core.ContainerPort{},
+			field.ErrorTypeDuplicate,
+			"name", "",
+		},
 	}
 	for k, v := range errorCases {
-		errs := validateContainerPorts(v.P, field.NewPath("field"))
+		errorPodPortNames := sets.Set[string]{}
+		validateContainerPorts(v.OtherContainerPort, errorPodPortNames, field.NewPath("field"))
+
+		errs := validateContainerPorts(v.ContainerPort, errorPodPortNames, field.NewPath("field"))
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			if errs[i].Type != v.T {
-				t.Errorf("%s: expected error to have type %q: %q", k, v.T, errs[i].Type)
+			if errs[i].Type != v.Type {
+				t.Errorf("%s: expected error to have type %q: %q", k, v.Type, errs[i].Type)
 			}
-			if !strings.Contains(errs[i].Field, v.F) {
-				t.Errorf("%s: expected error field %q: %q", k, v.F, errs[i].Field)
+			if !strings.Contains(errs[i].Field, v.Field) {
+				t.Errorf("%s: expected error field %q: %q", k, v.Field, errs[i].Field)
 			}
-			if !strings.Contains(errs[i].Detail, v.D) {
-				t.Errorf("%s: expected error detail %q, got %q", k, v.D, errs[i].Detail)
+			if !strings.Contains(errs[i].Detail, v.Detail) {
+				t.Errorf("%s: expected error detail %q, got %q", k, v.Detail, errs[i].Detail)
 			}
 		}
 	}

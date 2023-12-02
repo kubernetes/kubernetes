@@ -2508,10 +2508,9 @@ var supportedPortProtocols = sets.New(
 	core.ProtocolUDP,
 	core.ProtocolSCTP)
 
-func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) field.ErrorList {
+func validateContainerPorts(ports []core.ContainerPort, podPortNames sets.Set[string], fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allNames := sets.Set[string]{}
 	for i, port := range ports {
 		idxPath := fldPath.Index(i)
 		if len(port.Name) > 0 {
@@ -2519,10 +2518,10 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 				for i = range msgs {
 					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), port.Name, msgs[i]))
 				}
-			} else if allNames.Has(port.Name) {
+			} else if podPortNames.Has(port.Name) {
 				allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), port.Name))
 			} else {
-				allNames.Insert(port.Name)
+				podPortNames.Insert(port.Name)
 			}
 		}
 		if port.ContainerPort == 0 {
@@ -3365,11 +3364,12 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		allNames.Insert(c.Name)
 	}
 
+	allContainersPortNames := sets.Set[string]{}
 	for i, ec := range ephemeralContainers {
 		idxPath := fldPath.Index(i)
 
 		c := (*core.Container)(&ec.EphemeralContainerCommon)
-		allErrs = append(allErrs, validateContainerCommon(c, volumes, podClaimNames, idxPath, opts, podRestartPolicy)...)
+		allErrs = append(allErrs, validateContainerCommon(c, volumes, podClaimNames, allContainersPortNames, idxPath, opts, podRestartPolicy)...)
 		// Ephemeral containers don't need looser constraints for pod templates, so it's convenient to apply both validations
 		// here where we've already converted EphemeralContainerCommon to Container.
 		allErrs = append(allErrs, validateContainerOnlyForPod(c, idxPath)...)
@@ -3438,11 +3438,13 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 	for _, ctr := range regularContainers {
 		allNames.Insert(ctr.Name)
 	}
+
+	allContainersPortNames := sets.Set[string]{}
 	for i, ctr := range containers {
 		idxPath := fldPath.Index(i)
 
 		// Apply the validation common to all container types
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, allContainersPortNames, idxPath, opts, podRestartPolicy)...)
 
 		restartAlways := false
 		// Apply the validation specific to init containers
@@ -3497,7 +3499,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 
 // validateContainerCommon applies validation common to all container types. It's called by regular, init, and ephemeral
 // container list validation to require a properly formatted name, image, etc.
-func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], path *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy) field.ErrorList {
+func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames, podPortNames sets.Set[string], path *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy) field.ErrorList {
 	var allErrs field.ErrorList
 
 	namePath := path.Child("name")
@@ -3528,7 +3530,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 
 	volMounts := GetVolumeMountMap(ctr.VolumeMounts)
 	volDevices := GetVolumeDeviceMap(ctr.VolumeDevices)
-	allErrs = append(allErrs, validateContainerPorts(ctr.Ports, path.Child("ports"))...)
+	allErrs = append(allErrs, validateContainerPorts(ctr.Ports, podPortNames, path.Child("ports"))...)
 	allErrs = append(allErrs, ValidateEnv(ctr.Env, path.Child("env"), opts)...)
 	allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"))...)
 	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"))...)
@@ -3577,11 +3579,12 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 	}
 
 	allNames := sets.Set[string]{}
+	allContainersPortNames := sets.Set[string]{}
 	for i, ctr := range containers {
 		path := fldPath.Index(i)
 
 		// Apply validation common to all containers
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, path, opts, podRestartPolicy)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, allContainersPortNames, path, opts, podRestartPolicy)...)
 
 		// Container names must be unique within the list of regular containers.
 		// Collisions with init or ephemeral container names will be detected by the init or ephemeral
