@@ -126,8 +126,9 @@ func init() {
 	delegatedAuthBinding.Name = "system::extension-apiserver-authentication-reader"
 	addNamespaceRoleBinding(metav1.NamespaceSystem, delegatedAuthBinding)
 
+	// E1201 20:39:34.550004 1182102 controller.go:231] leases.coordination.k8s.io is forbidden: User "system:serviceaccount:kube-system:leader-election-controller" cannot create resource "leases" in API group "coordination.k8s.io" in the namespace "kube-system"
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-controller-manager", metav1.NamespaceSystem).Users(user.KubeControllerManager).SAs(metav1.NamespaceSystem, "kube-controller-manager").BindingOrDie())
+		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-controller-manager", metav1.NamespaceSystem).Users(user.KubeControllerManager).SAs(metav1.NamespaceSystem, "kube-controller-manager", "leader-election-controller").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-scheduler", metav1.NamespaceSystem).Users(user.KubeScheduler).SAs(metav1.NamespaceSystem, "kube-scheduler").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,

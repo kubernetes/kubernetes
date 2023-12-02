@@ -42,7 +42,7 @@ const controllerName = "leader-election-controller" // TODO: make exported?
 
 // TODO: multi-valued labels are problematic.. label matching gets broken.. should we use a label
 // per leader lease? Do we need to add a spec field?
-const CanLeadLeasesLabelName = "coordination.k8s.io/can-lead-leases"
+const CanLeadLeasesAnnotationName = "coordination.k8s.io/can-lead-leases"
 
 const CompatibilityVersionAnnotationName = "coordination.k8s.io/compatibility-version"
 const BinaryVersionAnnotationName = "coordination.k8s.io/binary-version"
@@ -190,14 +190,17 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		if err != nil {
 			return err
 		}
+		klog.Infof("processNextWorkItem looking up lease namespace=%q, name=%q", namespace, name)
 		lease, err := c.leaseInformer.Lister().Leases(namespace).Get(name)
 		if err != nil {
 			if kerrors.IsNotFound(err) {
+				klog.Infof("processNextWorkItem lease not found")
 				// If not found, the lease is being deleted, do nothing.
 				return nil
 			}
 			return err
 		}
+		klog.Infof("processNextWorkItem reconciling")
 		return c.reconcile(ctx, lease)
 	}()
 
@@ -237,7 +240,8 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 		return nil
 	}
 
-	if canLead, ok := lease.Labels[CanLeadLeasesLabelName]; ok {
+	if canLead, ok := lease.Annotations[CanLeadLeasesAnnotationName]; ok {
+		klog.Infof("reconcile found canLead label namespace=%q, name=%q: %q", lease.Namespace, lease.Name, canLead)
 		for _, leadeLeaseId := range strings.Split(canLead, ",") {
 			leaderLeaseId, err := parseLeaderLeaseId(leadeLeaseId)
 			if err != nil {
@@ -274,6 +278,7 @@ func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLease
 	leaderLease, err := c.leaseInformer.Lister().Leases(leaderLeaseId.namespace).Get(leaderLeaseId.name)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
+			klog.Infof("activeLeader not found for lease namespace=%q, name=%q", leaderLeaseId.namespace, leaderLeaseId.name)
 			return nil, false, nil
 		} else {
 			return nil, false, err
@@ -285,6 +290,14 @@ func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLease
 	}
 	// TODO: What namespace to use?
 	holderIdentityLease, err := c.leaseInformer.Lister().Leases(leaderLeaseId.namespace).Get(*holder)
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			klog.Infof("activeLeader holder identity not found for lease namespace=%q, name=%q", leaderLeaseId.namespace, leaderLeaseId.name)
+			return nil, false, nil
+		} else {
+			return nil, false, err
+		}
+	}
 
 	return holderIdentityLease, !isLeaseExpired(leaderLease), nil
 }
@@ -441,7 +454,7 @@ func listCanLead(lease *v1.Lease) []string {
 	if lease == nil {
 		return nil
 	}
-	if canLead, ok := lease.Labels[CanLeadLeasesLabelName]; ok {
+	if canLead, ok := lease.Annotations[CanLeadLeasesAnnotationName]; ok {
 		return strings.Split(canLead, ",")
 	}
 	return nil
