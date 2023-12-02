@@ -88,6 +88,7 @@ type KubeControllerManagerOptions struct {
 	SAController                              *SAControllerOptions
 	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
 	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
+	LeaderElectionController                  *LeaderElectionControllerOptions
 
 	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
@@ -190,6 +191,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
 			&componentConfig.ValidatingAdmissionPolicyStatusController,
 		},
+		LeaderElectionController: &LeaderElectionControllerOptions{
+			&componentConfig.LeaderElectionController,
+		},
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
@@ -266,6 +270,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.SAController.AddFlags(fss.FlagSet(names.ServiceAccountController))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet(names.TTLAfterFinishedController))
 	s.ValidatingAdmissionPolicyStatusController.AddFlags(fss.FlagSet(names.ValidatingAdmissionPolicyStatusController))
+	s.LeaderElectionController.AddFlags(fss.FlagSet(names.LeaderElectionController))
 
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	logsapi.AddFlags(s.Logs, fss.FlagSet("logs"))
@@ -367,6 +372,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.ValidatingAdmissionPolicyStatusController.ApplyTo(&c.ComponentConfig.ValidatingAdmissionPolicyStatusController); err != nil {
 		return err
 	}
+	if err := s.LeaderElectionController.ApplyTo(&c.ComponentConfig.LeaderElectionController); err != nil {
+		return err
+	}
 	if err := s.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
@@ -417,6 +425,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)
+	errs = append(errs, s.LeaderElectionController.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig
 
