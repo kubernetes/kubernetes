@@ -321,7 +321,9 @@ func validateText(location types.CodeLocation, text string, labels []string) {
 }
 
 func recordTextBug(location types.CodeLocation, message string) {
-	RecordBug(Bug{FileName: location.FileName, LineNumber: location.LineNumber, Message: message})
+	// TODO(soltysh): we need to figure out how we want to handle labels
+	// https://issues.redhat.com/browse/OCPBUGS-25641
+	// RecordBug(Bug{FileName: location.FileName, LineNumber: location.LineNumber, Message: message})
 }
 
 // WithEnvironment specifies that a certain test or group of tests only works
