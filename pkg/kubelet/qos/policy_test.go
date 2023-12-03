@@ -234,12 +234,12 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		{
 			pod:            &nodeCritical,
 			memoryCapacity: 0,
-			expectedErr:    "memory capacity for the host should not less than or equal to zero",
+			expectedErr:    "memory capacity 0 for the host should not less than or equal to zero",
 		},
 		{
 			pod:            &nodeCritical,
 			memoryCapacity: -1,
-			expectedErr:    "memory capacity for the host should not less than or equal to zero",
+			expectedErr:    "memory capacity -1 for the host should not less than or equal to zero",
 		},
 	}
 	for _, test := range oomTests {

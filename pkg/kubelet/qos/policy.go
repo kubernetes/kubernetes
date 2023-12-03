@@ -17,7 +17,7 @@ limitations under the License.
 package qos
 
 import (
-	"errors"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -44,7 +44,7 @@ const (
 // See https://lwn.net/Articles/391222/ for more information.
 func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) (int, error) {
 	if memoryCapacity <= 0 {
-		return 0, errors.New("memory capacity for the host should not less than or equal to zero")
+		return 0, fmt.Errorf("memory capacity %d for the host should not less than or equal to zero", memoryCapacity)
 	}
 
 	if types.IsNodeCriticalPod(pod) {
