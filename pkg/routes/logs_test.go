@@ -17,17 +17,18 @@ limitations under the License.
 package routes
 
 import (
-	"fmt"
-	"github.com/emicklei/go-restful/v3"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/emicklei/go-restful/v3"
 )
 
 func TestLogFileHandler(t *testing.T) {
-	oversizeFileName := fmt.Sprintf("%032768s", "a")
+	oversizeFileName := strings.Repeat("a", 32768)
 	tests := []struct {
 		logpath      string
 		expectedCode int
@@ -77,8 +78,8 @@ func TestLogFileHandler(t *testing.T) {
 
 func TestPreCheckLogFileNameLength(t *testing.T) {
 	// In windows, with long file name support enabled, file names can have up to 32,767 characters.
-	oversizeFileName := fmt.Sprintf("%032768s", "a")
-	normalFileName := fmt.Sprintf("%0255s", "a")
+	oversizeFileName := strings.Repeat("a", 32768)
+	normalFileName := strings.Repeat("a", 255)
 
 	// check file with oversize name.
 	if !logFileNameIsTooLong(oversizeFileName) {
