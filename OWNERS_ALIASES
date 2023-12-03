@@ -492,8 +492,7 @@ aliases:
   feature-approvers:
     - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
-    - caseydavenport # Network
-    - dcbw # Network
+    - danwinship # Network
     - dchen1107 # Node
     - deads2k # API Machinery
     - derekwaynecarr # Node
@@ -510,6 +509,7 @@ aliases:
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
     - marosset # Windows
+    - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
     - mwielgus # Autoscaling
@@ -517,6 +517,7 @@ aliases:
     - saad-ali # Storage
     - seans3 # CLI
     - sergeykanzhelev # Node
+    - shaneutt # Network
     - soltysh # Apps, CLI
     - tallclair # Auth
     - thockin # Network
