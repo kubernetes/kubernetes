@@ -70,7 +70,7 @@ var (
 	secretForGenericLong = templates.LongDesc(i18n.T(`
 		Create a secret based on a file, directory, or specified literal value.
 	
-		Using generic subcommand indicate an Opaque secret. When used with empty --type flag, the command creates an empty secret of type Opaque.
+		The default type for a secret is Opaque unless otherwise specified by the --type flag.
 
 		A single secret may package one or more key/value pairs.
 
