@@ -393,7 +393,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 
 func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
 	containerResources, err := m.generateContainerResources(pod, container)
-	if containerResources == nil {
+	if err != nil {
 		return fmt.Errorf("container %q updateContainerResources failed: %w", containerID.String(), err)
 	}
 	ctx := context.Background()
