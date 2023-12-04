@@ -167,6 +167,7 @@ func Register() {
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.CustomMustRegister(storageMonitor)
+		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(listStorageCount)
