@@ -18,13 +18,13 @@ package environment
 
 import (
 	"fmt"
+	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/interpreter"
 	"strconv"
 	"sync"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/ext"
-	"github.com/google/cel-go/interpreter"
 	"golang.org/x/sync/singleflight"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -62,10 +62,16 @@ var baseOpts = []VersionedOptions{
 			library.URLs(),
 			library.Regex(),
 			library.Lists(),
+
+			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
+			cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
 		},
 		ProgramOptions: []cel.ProgramOption{
 			cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
 			cel.CostLimit(celconfig.PerCallLimit),
+
+			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
+			cel.CostTrackerOptions(interpreter.PresenceTestHasCost(false)),
 		},
 	},
 	{
@@ -113,14 +119,6 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 29),
 		EnvOptions: []cel.EnvOption{
 			ext.Sets(),
-			// cel-go v0.17.7 introduced CostEstimatorOptions.
-			// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
-			cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
-		},
-		ProgramOptions: []cel.ProgramOption{
-			// cel-go v0.17.7 introduced CostTrackerOptions.
-			// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
-			cel.CostTrackerOptions(interpreter.PresenceTestHasCost(false)),
 		},
 	},
 }
