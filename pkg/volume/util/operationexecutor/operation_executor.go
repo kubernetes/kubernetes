@@ -39,6 +39,11 @@ import (
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
+const (
+	// EmptyUniquePodName is a UniquePodName for empty string.
+	EmptyUniquePodName volumetypes.UniquePodName = volumetypes.UniquePodName("")
+)
+
 // OperationExecutor defines a set of operations for attaching, detaching,
 // mounting, or unmounting a volume that are executed with a NewNestedPendingOperations which
 // prevents more than one operation from being triggered on the same volume.
