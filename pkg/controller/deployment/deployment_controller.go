@@ -105,7 +105,9 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		client:           client,
 		eventBroadcaster: eventBroadcaster,
 		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{
+			Name: "deployment",
+		}),
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
