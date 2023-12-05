@@ -1952,6 +1952,23 @@ func TestValidationExpressions(t *testing.T) {
 				"self.absentObj.?absentStr == optional.none()": "no such key: absentObj", // missing ?. operator on first deref is an error
 			},
 		},
+		{name: "quantity",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"isQuantity(self.val1)",
+				"isQuantity(self.val2)",
+				`isQuantity("20Mi")`,
+				`quantity(self.val2) == quantity("0.2G") && quantity("0.2G") == quantity("200M")`,
+				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`,
+				`quantity(self.val1).isLessThan(quantity("100M"))`,
+				`quantity(self.val2).isGreaterThan(quantity("50M"))`,
+				`quantity(self.val2).compareTo(quantity("0.2G")) == 0`,
+				`quantity("50k").add(quantity(self.val1)) == quantity("50.02k")`,
+				`quantity("50k").sub(quantity(self.val1)) == quantity("49980")`,
+				`quantity(self.val1).isInteger()`,
+			},
+		},
 	}
 
 	for i := range tests {

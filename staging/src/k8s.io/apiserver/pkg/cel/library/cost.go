@@ -147,6 +147,14 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 
 			return &cost
 		}
+	case "quantity", "isQuantity":
+		if len(args) >= 1 {
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
+			return &cost
+		}
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
+		cost := uint64(1)
+		return &cost
 	}
 	return nil
 }
@@ -360,6 +368,13 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 
 			return &checker.CallEstimate{CostEstimate: ipCompCost}
 		}
+	case "quantity", "isQuantity":
+		if target != nil {
+			sz := l.sizeEstimate(args[0])
+			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+		}
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
+		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	}
 	return nil
 }
