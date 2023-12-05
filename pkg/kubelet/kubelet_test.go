@@ -3249,7 +3249,7 @@ func TestSyncPodSpans(t *testing.T) {
 
 	exp := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
+		sdktrace.WithSyncer(exp),
 	)
 	kubelet.tracer = tp.Tracer(instrumentationScope)
 
@@ -3313,7 +3313,6 @@ func TestSyncPodSpans(t *testing.T) {
 	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
 	require.NoError(t, err)
 
-	err = tp.ForceFlush(context.Background())
 	require.NoError(t, err)
 	assert.NotEmpty(t, exp.GetSpans())
 
@@ -3331,7 +3330,7 @@ func TestSyncPodSpans(t *testing.T) {
 	imageServiceSpans := make([]tracetest.SpanStub, 0)
 	runtimeServiceSpans := make([]tracetest.SpanStub, 0)
 	for _, span := range exp.GetSpans() {
-		if span.SpanContext.TraceID() == rootSpan.SpanContext.TraceID() && span.Parent.SpanID() == rootSpan.SpanContext.SpanID() {
+		if span.SpanContext.TraceID() == rootSpan.SpanContext.TraceID() {
 			switch {
 			case strings.HasPrefix(span.Name, "runtime.v1.ImageService"):
 				imageServiceSpans = append(imageServiceSpans, span)
@@ -3340,6 +3339,14 @@ func TestSyncPodSpans(t *testing.T) {
 			}
 		}
 	}
-	assert.NotEmpty(t, imageServiceSpans)
-	assert.NotEmpty(t, runtimeServiceSpans)
+	assert.NotEmpty(t, imageServiceSpans, "syncPod trace should have image service spans")
+	assert.NotEmpty(t, runtimeServiceSpans, "syncPod trace should have runtime service spans")
+
+	for _, span := range imageServiceSpans {
+		assert.Equal(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), fmt.Sprintf("image service span %s %s should be child of root span", span.Name, span.Parent.SpanID()))
+	}
+
+	for _, span := range runtimeServiceSpans {
+		assert.Equal(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), fmt.Sprintf("runtime service span %s %s should be child of root span", span.Name, span.Parent.SpanID()))
+	}
 }
