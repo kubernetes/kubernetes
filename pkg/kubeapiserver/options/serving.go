@@ -33,6 +33,7 @@ func NewSecureServingOptions() *genericoptions.SecureServingOptionsWithLoopback 
 			PairName:      "apiserver",
 			CertDirectory: "/var/run/kubernetes",
 		},
+		CertificateRevocationList: "",
 	}
 	return o.WithLoopback()
 }

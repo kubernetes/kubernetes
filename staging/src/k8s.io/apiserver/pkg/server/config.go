@@ -348,6 +348,9 @@ type SecureServingInfo struct {
 
 	// DisableHTTP2 indicates that http2 should not be enabled.
 	DisableHTTP2 bool
+
+	// Certificate revocation list filename
+	CertificateRevocationList string
 }
 
 type AuthenticationInfo struct {
