@@ -117,13 +117,13 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 		return false, 0
 
 	case io.ErrUnexpectedEOF:
-		klog.V(1).InfoS("Watch closed with unexpected EOF", "err", err)
+		klog.V(1).InfoS("Watch closed with unexpected EOF", "err", err, "resourceVersion", rw.lastResourceVersion)
 		return false, 0
 
 	default:
 		msg := "Watch failed"
 		if net.IsProbableEOF(err) || net.IsTimeout(err) {
-			klog.V(5).InfoS(msg, "err", err)
+			klog.V(5).InfoS(msg, "err", err, "resourceVersion", rw.lastResourceVersion)
 			// Retry
 			return false, 0
 		}
@@ -163,7 +163,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 	}
 
 	if watcher == nil {
-		klog.ErrorS(nil, "Watch returned nil watcher")
+		klog.ErrorS(nil, "Watch returned nil watcher", "resourceVersion", rw.lastResourceVersion)
 		// Retry
 		return false, 0
 	}
@@ -174,7 +174,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 	for {
 		select {
 		case <-rw.stopChan:
-			klog.V(4).InfoS("Stopping RetryWatcher.")
+			klog.V(4).InfoS("Stopping RetryWatcher.", "resourceVersion", rw.lastResourceVersion)
 			return true, 0
 		case event, ok := <-ch:
 			if !ok {
