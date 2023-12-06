@@ -353,13 +353,6 @@ type UpdateServiceMapResult struct {
 	DeletedUDPClusterIPs sets.Set[string]
 }
 
-// Update updates ServicePortMap base on the given changes.
-func (sm ServicePortMap) Update(changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
-	result.DeletedUDPClusterIPs = sets.New[string]()
-	sm.apply(changes, result.DeletedUDPClusterIPs)
-	return result
-}
-
 // HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
 // for all Services in sm with non-zero HealthCheckNodePort.
 func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 {
@@ -409,24 +402,32 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	return svcPortMap
 }
 
-// apply the changes to ServicePortMap and update the deleted UDP cluster IP set.
-// apply triggers processServiceMapChange on every change.
-func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, deletedUDPClusterIPs sets.Set[string]) {
-	changes.lock.Lock()
-	defer changes.lock.Unlock()
-	for _, change := range changes.items {
-		if changes.processServiceMapChange != nil {
-			changes.processServiceMapChange(change.previous, change.current)
+// Update updates ServicePortMap base on the given changes, returns information about the
+// diff since the last Update, triggers processServiceMapChange on every change, and
+// clears the changes map.
+func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResult {
+	sct.lock.Lock()
+	defer sct.lock.Unlock()
+
+	result := UpdateServiceMapResult{
+		DeletedUDPClusterIPs: sets.New[string](),
+	}
+
+	for _, change := range sct.items {
+		if sct.processServiceMapChange != nil {
+			sct.processServiceMapChange(change.previous, change.current)
 		}
 		sm.merge(change.current)
-		// filter out the Update event of current changes from previous changes before calling unmerge() so that can
-		// skip deleting the Update events.
+		// filter out the Update event of current changes from previous changes
+		// before calling unmerge() so that can skip deleting the Update events.
 		change.previous.filter(change.current)
-		sm.unmerge(change.previous, deletedUDPClusterIPs)
+		sm.unmerge(change.previous, result.DeletedUDPClusterIPs)
 	}
 	// clear changes after applying them to ServicePortMap.
-	changes.items = make(map[types.NamespacedName]*serviceChange)
+	sct.items = make(map[types.NamespacedName]*serviceChange)
 	metrics.ServiceChangesPending.Set(0)
+
+	return result
 }
 
 // merge adds other ServicePortMap's elements to current ServicePortMap.
