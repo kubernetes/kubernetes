@@ -211,6 +211,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
+					"/",
 				).RuleOrDie(),
 			},
 		},
@@ -218,7 +219,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			// a role which provides minimal read access to the monitoring endpoints
 			// (i.e. /metrics, /livez/*, /readyz/*, /healthz/*, /livez, /readyz, /healthz)
 			// The splatted health check endpoints allow read access to individual health check
-			// endpoints which may contain more sensitive cluster information information
+			// endpoints which may contain more sensitive cluster information
 			ObjectMeta: metav1.ObjectMeta{Name: "system:monitoring"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(

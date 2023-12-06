@@ -541,6 +541,7 @@ items:
     name: system:discovery
   rules:
   - nonResourceURLs:
+    - /
     - /api
     - /api/*
     - /apis
