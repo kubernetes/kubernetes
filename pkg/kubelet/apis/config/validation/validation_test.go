@@ -295,14 +295,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 	}, {
-		name: "specify ServerTLSBootstrap without enabling RotateKubeletServerCertificate",
-		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"RotateKubeletServerCertificate": false}
-			conf.ServerTLSBootstrap = true
-			return conf
-		},
-		errMsg: "invalid configuration: serverTLSBootstrap true requires feature gate RotateKubeletServerCertificate",
-	}, {
 		name: "invalid TopologyManagerPolicy",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.TopologyManagerPolicy = "invalid-policy"

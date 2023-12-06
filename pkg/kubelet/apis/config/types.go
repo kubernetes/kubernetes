@@ -136,8 +136,7 @@ type KubeletConfiguration struct {
 	// serverTLSBootstrap enables server certificate bootstrap. Instead of self
 	// signing a serving certificate, the Kubelet will request a certificate from
 	// the certificates.k8s.io API. This requires an approver to approve the
-	// certificate signing requests. The RotateKubeletServerCertificate feature
-	// must be enabled.
+	// certificate signing requests.
 	ServerTLSBootstrap bool
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
