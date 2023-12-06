@@ -331,22 +331,12 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	return len(sct.items) > 0
 }
 
-// PendingChanges returns a set whose keys are the names of the services that have changed
-// since the last time sct was used to update a ServiceMap. (You must call this _before_
-// calling sm.Update(sct).)
-func (sct *ServiceChangeTracker) PendingChanges() sets.Set[string] {
-	sct.lock.Lock()
-	defer sct.lock.Unlock()
-
-	changes := sets.New[string]()
-	for name := range sct.items {
-		changes.Insert(name.String())
-	}
-	return changes
-}
-
 // UpdateServiceMapResult is the updated results after applying service changes.
 type UpdateServiceMapResult struct {
+	// UpdatedServices lists the names of all services added/updated/deleted since the
+	// last Update.
+	UpdatedServices sets.Set[types.NamespacedName]
+
 	// DeletedUDPClusterIPs holds stale (no longer assigned to a Service) Service IPs
 	// that had UDP ports. Callers can use this to abort timeout-waits or clear
 	// connection-tracking information.
@@ -410,13 +400,16 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 	defer sct.lock.Unlock()
 
 	result := UpdateServiceMapResult{
+		UpdatedServices:      sets.New[types.NamespacedName](),
 		DeletedUDPClusterIPs: sets.New[string](),
 	}
 
-	for _, change := range sct.items {
+	for nn, change := range sct.items {
 		if sct.processServiceMapChange != nil {
 			sct.processServiceMapChange(change.previous, change.current)
 		}
+		result.UpdatedServices.Insert(nn)
+
 		sm.merge(change.current)
 		// filter out the Update event of current changes from previous changes
 		// before calling unmerge() so that can skip deleting the Update events.
