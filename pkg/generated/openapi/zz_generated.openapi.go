@@ -15580,7 +15580,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"podReplacementPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use. This is an alpha field. Enable JobPodReplacementPolicy to be able to use this field.\n\nPossible enum values:\n - `\"Failed\"` means to wait until a previously created Pod is fully terminated (has phase Failed or Succeeded) before creating a replacement Pod.\n - `\"TerminatingOrFailed\"` means that we recreate pods when they are terminating (has a metadata.deletionTimestamp) or failed.",
+							Description: "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use. This is an beta field. To use this, enable the JobPodReplacementPolicy feature toggle. This is on by default.\n\nPossible enum values:\n - `\"Failed\"` means to wait until a previously created Pod is fully terminated (has phase Failed or Succeeded) before creating a replacement Pod.\n - `\"TerminatingOrFailed\"` means that we recreate pods when they are terminating (has a metadata.deletionTimestamp) or failed.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Failed", "TerminatingOrFailed"},
@@ -15658,7 +15658,7 @@ func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.Op
 					},
 					"terminating": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).\n\nThis field is alpha-level. The job controller populates the field when the feature gate JobPodReplacementPolicy is enabled (disabled by default).",
+							Description: "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).\n\nThis field is beta-level. The job controller populates the field when the feature gate JobPodReplacementPolicy is enabled (enabled by default).",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
