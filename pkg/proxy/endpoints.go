@@ -286,28 +286,20 @@ type UpdateEndpointsMapResult struct {
 	LastChangeTriggerTimes map[types.NamespacedName][]time.Time
 }
 
-// Update updates endpointsMap base on the given changes.
-func (em EndpointsMap) Update(changes *EndpointsChangeTracker) (result UpdateEndpointsMapResult) {
-	result.DeletedUDPEndpoints = make([]ServiceEndpoint, 0)
-	result.NewlyActiveUDPServices = make([]ServicePortName, 0)
-	result.LastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
-
-	em.apply(changes, &result.DeletedUDPEndpoints, &result.NewlyActiveUDPServices, &result.LastChangeTriggerTimes)
-
-	return result
-}
-
 // EndpointsMap maps a service name to a list of all its Endpoints.
 type EndpointsMap map[ServicePortName][]Endpoint
 
-// apply the changes to EndpointsMap, update the passed-in stale-conntrack-entry arrays,
-// and clear the changes map. In addition it returns (via argument) and resets the
-// lastChangeTriggerTimes for all endpoints that were changed and will result in syncing
-// the proxy rules. apply triggers processEndpointsMapChange on every change.
-func (em EndpointsMap) apply(ect *EndpointsChangeTracker, deletedUDPEndpoints *[]ServiceEndpoint,
-	newlyActiveUDPServices *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+// Update updates em based on the changes in ect, returns information about the diff since
+// the last Update, triggers processEndpointsMapChange on every change, and clears the
+// changes map.
+func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapResult {
+	result := UpdateEndpointsMapResult{
+		DeletedUDPEndpoints:    make([]ServiceEndpoint, 0),
+		NewlyActiveUDPServices: make([]ServicePortName, 0),
+		LastChangeTriggerTimes: make(map[types.NamespacedName][]time.Time),
+	}
 	if ect == nil {
-		return
+		return result
 	}
 
 	changes := ect.checkoutChanges()
@@ -317,9 +309,11 @@ func (em EndpointsMap) apply(ect *EndpointsChangeTracker, deletedUDPEndpoints *[
 		}
 		em.unmerge(change.previous)
 		em.merge(change.current)
-		detectStaleConntrackEntries(change.previous, change.current, deletedUDPEndpoints, newlyActiveUDPServices)
+		detectStaleConntrackEntries(change.previous, change.current, &result.DeletedUDPEndpoints, &result.NewlyActiveUDPServices)
 	}
-	ect.checkoutTriggerTimes(lastChangeTriggerTimes)
+	ect.checkoutTriggerTimes(&result.LastChangeTriggerTimes)
+
+	return result
 }
 
 // Merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.
