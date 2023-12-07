@@ -378,7 +378,7 @@ func updateContainersResources(containers []coreapi.Container, podAnnotations ma
 	}
 }
 
-func isGuaranteed(containers []coreapi.Container) bool {
+func IsGuaranteed(containers []coreapi.Container) bool {
 	for _, c := range containers {
 		// only memory and CPU resources are relevant to decide pod QoS class
 		for _, r := range []coreapi.ResourceName{coreapi.ResourceMemory, coreapi.ResourceCPU} {
@@ -425,7 +425,7 @@ func isBestEffort(containers []coreapi.Container) bool {
 }
 
 func getPodQoSClass(containers []coreapi.Container) coreapi.PodQOSClass {
-	if isGuaranteed(containers) {
+	if IsGuaranteed(containers) {
 		return coreapi.PodQOSGuaranteed
 	}
 
