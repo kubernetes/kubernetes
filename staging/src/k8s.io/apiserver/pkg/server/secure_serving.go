@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -95,7 +94,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			}
 
 			// Load CRL
-			crlBytes, err := ioutil.ReadFile(s.CertificateRevocationList)
+			crlBytes, err := os.ReadFile(s.CertificateRevocationList)
 			if err != nil {
 				return err
 			}
