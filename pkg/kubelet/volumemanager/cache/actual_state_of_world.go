@@ -731,6 +731,11 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	podObj.remountRequired = false
 	podObj.volumeMountStateForPod = markVolumeOpts.VolumeMountState
 
+	// Need to reset the outerVolumeSpecName
+	// if reconciler reconstructed the volume, it will be read from PVC
+	// Otherwise it will be read from podSpec
+	podObj.outerVolumeSpecName = markVolumeOpts.OuterVolumeSpecName
+
 	// if volume is mounted successfully, then it should be removed from foundDuringReconstruction map
 	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted {
 		delete(asw.foundDuringReconstruction[volumeName], podName)
