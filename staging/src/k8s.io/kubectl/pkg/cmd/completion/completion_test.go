@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 func TestBashCompletions(t *testing.T) {
@@ -69,7 +69,7 @@ See 'kubectl completion -h' for help and examples`,
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
-			_, _, out, _ := genericclioptions.NewTestIOStreams()
+			_, _, out, _ := genericiooptions.NewTestIOStreams()
 			parentCmd := &cobra.Command{
 				Use: "kubectl",
 			}

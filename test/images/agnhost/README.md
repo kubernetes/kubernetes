@@ -621,6 +621,29 @@ Usage:
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
 ```
 
+### tcp-reset
+
+Starts a simple TCP servers that reads only one byte of the connection and then closes it,
+having the effect of sending a TCP RST to the client.
+
+The subcommand can accept the following flags:
+
+- `port` (default: `8080`): The port number to listen to.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost tcp-reset [--port <port>]
+```
+
+Important: This behavior only works if the client send more than 1 byte and is OS
+dependant, it is guaranteed to work on Linux.
+
+```console
+echo -n 1 | nc 192.168.1.4:8080  # FIN
+echo -n 12 | nc 192.168.1.4:8080 # RST
+```
+
 ### test-webserver
 
 Starts a simple HTTP fileserver which serves any file specified in the URL path, if it exists.

@@ -183,6 +183,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
     # Fail it if it already took more than 30 minutes.
     if [ $((now - start)) -gt 1800 ]; then
       echo ""
+      "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" describe node
       # shellcheck disable=SC2154 # Color defined in sourced script
       echo -e "${color_red} Timeout waiting for all hollow-nodes to become Running. ${color_norm}"
       # Try listing nodes again - if it fails it means that API server is not responding
@@ -230,7 +231,7 @@ function resize-node-objects {
   echo "Annotating node objects with ${annotation_size_bytes} byte label"
   label=$( (< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w "$annotation_size_bytes"; true) | head -n 1)
   "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get nodes -o name \
-    | xargs -n10 -P100 -r -I% "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" annotate --overwrite % label="$label" > /dev/null
+    | xargs -P50 -r -I% "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" annotate --overwrite % label="$label"
   echo "Annotating node objects completed"
 }
 

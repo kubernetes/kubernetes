@@ -33,8 +33,10 @@ source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
-  "verify-govet-levee.sh"        # Do not run levee analysis by default while KEP-1933 implementation is in alpha.
+  "verify-golangci-lint-pr.sh"       # Runs in a separate job for PRs.
+  "verify-golangci-lint-pr-hints.sh" # Runs in a separate job for PRs.
   "verify-licenses.sh"           # runs in a separate job to monitor availability of the dependencies periodically
+  "verify-openapi-docs-urls.sh"  # Spams docs URLs, don't run in CI.
   )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
@@ -126,10 +128,10 @@ function run-cmd {
   local tr
 
   if ${SILENT}; then
-    juLog -output="${output}" -class="verify" -name="${testname}" "$@" &> /dev/null
+    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@" &> /dev/null
     tr=$?
   else
-    juLog -output="${output}" -class="verify" -name="${testname}" "$@"
+    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@"
     tr=$?
   fi
   return ${tr}

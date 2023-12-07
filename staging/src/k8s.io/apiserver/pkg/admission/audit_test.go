@@ -142,10 +142,10 @@ func TestWithAudit(t *testing.T) {
 	}
 	for tcName, tc := range testCases {
 		var handler Interface = fakeHandler{tc.admit, tc.admitAnnotations, tc.validate, tc.validateAnnotations, tc.handles}
-		ae := &auditinternal.Event{Level: auditinternal.LevelMetadata}
 		ctx := audit.WithAuditContext(context.Background())
 		ac := audit.AuditContextFrom(ctx)
-		ac.Event = ae
+		ae := &ac.Event
+		ae.Level = auditinternal.LevelMetadata
 		auditHandler := WithAudit(handler)
 		a := attributes()
 
@@ -188,7 +188,7 @@ func TestWithAuditConcurrency(t *testing.T) {
 	var handler Interface = fakeHandler{admitAnnotations: admitAnnotations, handles: true}
 	ctx := audit.WithAuditContext(context.Background())
 	ac := audit.AuditContextFrom(ctx)
-	ac.Event = &auditinternal.Event{Level: auditinternal.LevelMetadata}
+	ac.Event.Level = auditinternal.LevelMetadata
 	auditHandler := WithAudit(handler)
 	a := attributes()
 

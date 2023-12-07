@@ -54,7 +54,7 @@ func getAvailablePorts(count int) ([]int, error) {
 //   - uses free ports for client and peer listeners
 //   - cleans up the data directory on test termination
 //   - silences server logs other than errors
-func NewTestConfig(t *testing.T) *embed.Config {
+func NewTestConfig(t testing.TB) *embed.Config {
 	cfg := embed.NewConfig()
 
 	cfg.UnsafeNoFsync = true
@@ -66,10 +66,10 @@ func NewTestConfig(t *testing.T) *embed.Config {
 	clientURL := url.URL{Scheme: "http", Host: net.JoinHostPort("localhost", strconv.Itoa(ports[0]))}
 	peerURL := url.URL{Scheme: "http", Host: net.JoinHostPort("localhost", strconv.Itoa(ports[1]))}
 
-	cfg.LPUrls = []url.URL{peerURL}
-	cfg.APUrls = []url.URL{peerURL}
-	cfg.LCUrls = []url.URL{clientURL}
-	cfg.ACUrls = []url.URL{clientURL}
+	cfg.ListenPeerUrls = []url.URL{peerURL}
+	cfg.AdvertisePeerUrls = []url.URL{peerURL}
+	cfg.ListenClientUrls = []url.URL{clientURL}
+	cfg.AdvertiseClientUrls = []url.URL{clientURL}
 	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
 
 	cfg.ZapLoggerBuilder = embed.NewZapLoggerBuilder(zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel)).Named("etcd-server"))
@@ -81,7 +81,7 @@ func NewTestConfig(t *testing.T) *embed.Config {
 // RunEtcd starts an embedded etcd server with the provided config
 // (or NewTestConfig(t) if nil), and returns a client connected to the server.
 // The server is terminated when the test ends.
-func RunEtcd(t *testing.T, cfg *embed.Config) *clientv3.Client {
+func RunEtcd(t testing.TB, cfg *embed.Config) *clientv3.Client {
 	t.Helper()
 
 	if cfg == nil {

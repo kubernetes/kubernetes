@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -99,13 +100,13 @@ func testPropagateStore(ctx context.Context, t *testing.T, store storage.Interfa
 	return key, setOutput
 }
 
-func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
+func expectNoDiff(t *testing.T, msg string, expected, actual interface{}) {
 	t.Helper()
-	if !reflect.DeepEqual(expected, got) {
-		if diff := cmp.Diff(expected, got); diff != "" {
+	if !reflect.DeepEqual(expected, actual) {
+		if diff := cmp.Diff(expected, actual); diff != "" {
 			t.Errorf("%s: %s", msg, diff)
 		} else {
-			t.Errorf("%s:\nexpected: %#v\ngot: %#v", msg, expected, got)
+			t.Errorf("%s:\nexpected: %#v\ngot: %#v", msg, expected, actual)
 		}
 	}
 }
@@ -138,7 +139,7 @@ func encodeContinueOrDie(key string, resourceVersion int64) string {
 	return token
 }
 
-func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
+func testCheckEventType(t *testing.T, w watch.Interface, expectEventType watch.EventType) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
@@ -149,23 +150,20 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
-	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
-		ExpectNoDiff(t, "incorrect object", expectObj, object)
-		return nil
+func testCheckResult(t *testing.T, w watch.Interface, expectEvent watch.Event) {
+	testCheckResultFunc(t, w, func(actualEvent watch.Event) {
+		expectNoDiff(t, "incorrect event", expectEvent, actualEvent)
 	})
 }
 
-func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
+func testCheckResultFunc(t *testing.T, w watch.Interface, check func(actualEvent watch.Event)) {
 	select {
 	case res := <-w.ResultChan():
-		if res.Type != expectEventType {
-			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
-			return
+		obj := res.Object
+		if co, ok := obj.(runtime.CacheableObject); ok {
+			res.Object = co.GetObject()
 		}
-		if err := check(res.Object); err != nil {
-			t.Error(err)
-		}
+		check(res)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
 	}
@@ -189,6 +187,37 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 	}
 }
 
+func testCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
+	for _, expectedEvent := range expectedEvents {
+		testCheckResult(t, w, expectedEvent)
+	}
+}
+
+func testCheckResultsInRandomOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
+	for range expectedEvents {
+		testCheckResultFunc(t, w, func(actualEvent watch.Event) {
+			ExpectContains(t, "unexpected event", toInterfaceSlice(expectedEvents), actualEvent)
+		})
+	}
+}
+
+func testCheckNoMoreResults(t *testing.T, w watch.Interface) {
+	select {
+	case e := <-w.ResultChan():
+		t.Errorf("Unexpected: %#v event received, expected no events", e)
+	case <-time.After(time.Second):
+		return
+	}
+}
+
+func toInterfaceSlice[T any](s []T) []interface{} {
+	result := make([]interface{}, len(s))
+	for i, v := range s {
+		result[i] = v
+	}
+	return result
+}
+
 // resourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
 // referring to points in logical time before the sentinel generate an error. All logical times as
 // new as the sentinel or newer generate no error.
@@ -208,6 +237,36 @@ func resourceVersionNotOlderThan(sentinel string) func(string) error {
 		}
 		return nil
 	}
+}
+
+// StorageInjectingListErrors injects a dummy error for first N GetList calls.
+type StorageInjectingListErrors struct {
+	storage.Interface
+
+	lock   sync.Mutex
+	Errors int
+}
+
+func (s *StorageInjectingListErrors) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	err := func() error {
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		if s.Errors > 0 {
+			s.Errors--
+			return fmt.Errorf("injected error")
+		}
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
+	return s.Interface.GetList(ctx, key, opts, listObj)
+}
+
+func (s *StorageInjectingListErrors) ErrorsConsumed() (bool, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.Errors == 0, nil
 }
 
 // PrefixTransformer adds and verifies that all data has the correct prefix on its way in and out.

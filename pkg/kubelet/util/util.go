@@ -19,7 +19,9 @@ package util
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 // FromApiserverCache modifies <opts> so that the GET request will
@@ -27,6 +29,8 @@ import (
 func FromApiserverCache(opts *metav1.GetOptions) {
 	opts.ResourceVersion = "0"
 }
+
+var IsUnixDomainSocket = filesystem.IsUnixDomainSocket
 
 // GetNodenameForKernel gets hostname value to set in the hostname field (the nodename field of struct utsname) of the pod.
 func GetNodenameForKernel(hostname string, hostDomainName string, setHostnameAsFQDN *bool) (string, error) {
@@ -42,4 +46,17 @@ func GetNodenameForKernel(hostname string, hostDomainName string, setHostnameAsF
 		kernelHostname = fqdn
 	}
 	return kernelHostname, nil
+}
+
+// GetContainerByIndex validates and extracts the container at index "idx" from
+// "containers" with respect to "statuses".
+// It returns true if the container is valid, else returns false.
+func GetContainerByIndex(containers []v1.Container, statuses []v1.ContainerStatus, idx int) (v1.Container, bool) {
+	if idx < 0 || idx >= len(containers) || idx >= len(statuses) {
+		return v1.Container{}, false
+	}
+	if statuses[idx].Name != containers[idx].Name {
+		return v1.Container{}, false
+	}
+	return containers[idx], true
 }

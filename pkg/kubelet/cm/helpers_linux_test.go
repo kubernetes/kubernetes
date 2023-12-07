@@ -642,10 +642,26 @@ func TestHugePageLimits(t *testing.T) {
 			resultValue := HugePageLimits(resourceList)
 
 			if !reflect.DeepEqual(testcase.expected, resultValue) {
-				t.Errorf("unexpected result, expected: %v, actual: %v", testcase.expected, resultValue)
+				t.Errorf("unexpected result for HugePageLimits(), expected: %v, actual: %v", testcase.expected, resultValue)
+			}
+
+			// ensure ResourceConfigForPod uses HugePageLimits correctly internally
+			p := v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: resourceList,
+							},
+						},
+					},
+				},
+			}
+			resultValuePod := ResourceConfigForPod(&p, false, 0, false)
+			if !reflect.DeepEqual(testcase.expected, resultValuePod.HugePageLimit) {
+				t.Errorf("unexpected result for ResourceConfigForPod(), expected: %v, actual: %v", testcase.expected, resultValuePod)
 			}
 		})
-
 	}
 }
 

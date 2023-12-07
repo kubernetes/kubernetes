@@ -16,6 +16,8 @@ limitations under the License.
 
 package workqueue
 
+import "k8s.io/utils/clock"
+
 // RateLimitingInterface is an interface that rate limits items being added to the queue.
 type RateLimitingInterface interface {
 	DelayingInterface
@@ -32,29 +34,68 @@ type RateLimitingInterface interface {
 	NumRequeues(item interface{}) int
 }
 
+// RateLimitingQueueConfig specifies optional configurations to customize a RateLimitingInterface.
+
+type RateLimitingQueueConfig struct {
+	// Name for the queue. If unnamed, the metrics will not be registered.
+	Name string
+
+	// MetricsProvider optionally allows specifying a metrics provider to use for the queue
+	// instead of the global provider.
+	MetricsProvider MetricsProvider
+
+	// Clock optionally allows injecting a real or fake clock for testing purposes.
+	Clock clock.WithTicker
+
+	// DelayingQueue optionally allows injecting custom delaying queue DelayingInterface instead of the default one.
+	DelayingQueue DelayingInterface
+}
+
 // NewRateLimitingQueue constructs a new workqueue with rateLimited queuing ability
 // Remember to call Forget!  If you don't, you may end up tracking failures forever.
 // NewRateLimitingQueue does not emit metrics. For use with a MetricsProvider, please use
-// NewNamedRateLimitingQueue instead.
+// NewRateLimitingQueueWithConfig instead and specify a name.
 func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
+	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{})
+}
+
+// NewRateLimitingQueueWithConfig constructs a new workqueue with rateLimited queuing ability
+// with options to customize different properties.
+// Remember to call Forget!  If you don't, you may end up tracking failures forever.
+func NewRateLimitingQueueWithConfig(rateLimiter RateLimiter, config RateLimitingQueueConfig) RateLimitingInterface {
+	if config.Clock == nil {
+		config.Clock = clock.RealClock{}
+	}
+
+	if config.DelayingQueue == nil {
+		config.DelayingQueue = NewDelayingQueueWithConfig(DelayingQueueConfig{
+			Name:            config.Name,
+			MetricsProvider: config.MetricsProvider,
+			Clock:           config.Clock,
+		})
+	}
+
 	return &rateLimitingType{
-		DelayingInterface: NewDelayingQueue(),
+		DelayingInterface: config.DelayingQueue,
 		rateLimiter:       rateLimiter,
 	}
 }
 
+// NewNamedRateLimitingQueue constructs a new named workqueue with rateLimited queuing ability.
+// Deprecated: Use NewRateLimitingQueueWithConfig instead.
 func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
-	return &rateLimitingType{
-		DelayingInterface: NewNamedDelayingQueue(name),
-		rateLimiter:       rateLimiter,
-	}
+	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
+		Name: name,
+	})
 }
 
+// NewRateLimitingQueueWithDelayingInterface constructs a new named workqueue with rateLimited queuing ability
+// with the option to inject a custom delaying queue instead of the default one.
+// Deprecated: Use NewRateLimitingQueueWithConfig instead.
 func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter RateLimiter) RateLimitingInterface {
-	return &rateLimitingType{
-		DelayingInterface: di,
-		rateLimiter:       rateLimiter,
-	}
+	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
+		DelayingQueue: di,
+	})
 }
 
 // rateLimitingType wraps an Interface and provides rateLimited re-enquing

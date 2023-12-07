@@ -88,11 +88,12 @@ batch/v1 \
 batch/v1beta1 \
 certificates.k8s.io/v1 \
 certificates.k8s.io/v1beta1 \
+certificates.k8s.io/v1alpha1 \
 coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
 discovery.k8s.io/v1 \
 discovery.k8s.io/v1beta1 \
-resource.k8s.io/v1alpha1 \
+resource.k8s.io/v1alpha2 \
 extensions/v1beta1 \
 events.k8s.io/v1 \
 events.k8s.io/v1beta1 \
@@ -114,7 +115,7 @@ scheduling.k8s.io/v1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
-flowcontrol.apiserver.k8s.io/v1alpha1 \
+flowcontrol.apiserver.k8s.io/v1 \
 flowcontrol.apiserver.k8s.io/v1beta1 \
 flowcontrol.apiserver.k8s.io/v1beta2 \
 flowcontrol.apiserver.k8s.io/v1beta3 \

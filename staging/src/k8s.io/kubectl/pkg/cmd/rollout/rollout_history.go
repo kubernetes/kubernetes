@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -62,11 +63,11 @@ type RolloutHistoryOptions struct {
 	RESTClientGetter genericclioptions.RESTClientGetter
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewRolloutHistoryOptions returns an initialized RolloutHistoryOptions instance
-func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHistoryOptions {
+func NewRolloutHistoryOptions(streams genericiooptions.IOStreams) *RolloutHistoryOptions {
 	return &RolloutHistoryOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -74,7 +75,7 @@ func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHisto
 }
 
 // NewCmdRolloutHistory returns a Command instance for RolloutHistory sub command
-func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutHistory(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutHistoryOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}

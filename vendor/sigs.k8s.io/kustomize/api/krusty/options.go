@@ -8,6 +8,14 @@ import (
 	"sigs.k8s.io/kustomize/api/types"
 )
 
+type ReorderOption string
+
+const (
+	ReorderOptionLegacy      ReorderOption = "legacy"
+	ReorderOptionNone        ReorderOption = "none"
+	ReorderOptionUnspecified ReorderOption = "unspecified"
+)
+
 // Options holds high-level kustomize configuration options,
 // e.g. are plugins enabled, should the loader be restricted
 // to the kustomization root, etc.
@@ -16,7 +24,15 @@ type Options struct {
 	// per a particular sort order.  When false, don't do the
 	// sort, and instead respect the depth-first resource input
 	// order as specified by the kustomization file(s).
-	DoLegacyResourceSort bool
+
+	// Sort the resources before emitting them. Possible values:
+	// - "legacy": Use a fixed order that kustomize provides for backwards
+	//   compatibility.
+	// - "none": Respect the depth-first resource input order as specified by the
+	//   kustomization file.
+	// - "unspecified": The user didn't specify any preference. Kustomize will
+	//   select the appropriate default.
+	Reorder ReorderOption
 
 	// When true, a label
 	//     app.kubernetes.io/managed-by: kustomize-<version>
@@ -27,9 +43,6 @@ type Options struct {
 	// See type definition.
 	LoadRestrictions types.LoadRestrictions
 
-	// Create an inventory object for pruning.
-	DoPrune bool
-
 	// Options related to kustomize plugins.
 	PluginConfig *types.PluginConfig
 }
@@ -37,11 +50,10 @@ type Options struct {
 // MakeDefaultOptions returns a default instance of Options.
 func MakeDefaultOptions() *Options {
 	return &Options{
-		DoLegacyResourceSort: false,
-		AddManagedbyLabel:    false,
-		LoadRestrictions:     types.LoadRestrictionsRootOnly,
-		DoPrune:              false,
-		PluginConfig:         types.DisabledPluginConfig(),
+		Reorder:           ReorderOptionNone,
+		AddManagedbyLabel: false,
+		LoadRestrictions:  types.LoadRestrictionsRootOnly,
+		PluginConfig:      types.DisabledPluginConfig(),
 	}
 }
 

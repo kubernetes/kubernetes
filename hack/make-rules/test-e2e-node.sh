@@ -18,6 +18,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+kube::golang::setup_gomaxprocs
 
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
@@ -66,8 +67,8 @@ if [[ ${skip} != "" ]]; then
   ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
 fi
 
-if [[ ${run_until_failure} != "" ]]; then
-  ginkgoflags="${ginkgoflags} -untilItFails=${run_until_failure} "
+if [[ ${run_until_failure} == "true" ]]; then
+  ginkgoflags="${ginkgoflags} --until-it-fails=true "
 fi
 
 # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
@@ -84,6 +85,9 @@ if [[ -n ${image_service_endpoint} ]] ; then
   test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
 fi
 
+if [[ "${test_args}" != *"prepull-images"* ]]; then
+  test_args="--prepull-images=${PREPULL_IMAGES:-false}  ${test_args}"
+fi
 
 if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   # The following options are only valid in remote GCE run.
@@ -92,8 +96,12 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   image_project=${IMAGE_PROJECT:-"cos-cloud"}
   metadata=${INSTANCE_METADATA:-""}
   gubernator=${GUBERNATOR:-"false"}
+  instance_type=${INSTANCE_TYPE:-""}
+  node_env="${NODE_ENV:-""}"
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   image_config_dir=${IMAGE_CONFIG_DIR:-""}
+  use_dockerized_build=${USE_DOCKERIZED_BUILD:-"false"}
+  target_build_arch=${TARGET_BUILD_ARCH:-""}
   runtime_config=${RUNTIME_CONFIG:-""}
   if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
     gci_image=$(gcloud compute images list --project "${image_project}" \
@@ -154,11 +162,26 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   echo "Project: ${project}"
   echo "Image Project: ${image_project}"
   echo "Compute/Zone: ${zone}"
-  echo "Images: ${images}"
-  echo "Hosts: ${hosts}"
+  if [[ -n ${images} ]]; then
+    echo "Images: ${images}"
+  fi
+  if [[ -n ${hosts} ]]; then
+    echo "Hosts: ${hosts}"
+  fi
+  echo "Test Args: ${test_args}"
   echo "Ginkgo Flags: ${ginkgoflags}"
-  echo "Instance Metadata: ${metadata}"
-  echo "Image Config File: ${image_config_file}"
+  if [[ -n ${metadata} ]]; then
+    echo "Instance Metadata: ${metadata}"
+  fi
+  if [[ -n ${node_env} ]]; then
+    echo "Node-env: \"${node_env}\""
+  fi
+  if [[ -n ${image_config_file} ]]; then
+    echo "Image Config File: ${image_config_dir}/${image_config_file}"
+  fi
+  if [[ -n ${instance_type} ]]; then
+    echo "Instance Type: ${instance_type}"
+  fi
   echo "Kubelet Config File: ${kubelet_config_file}"
 
   # Invoke the runner
@@ -171,7 +194,9 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
     --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" --ssh-options="${ssh_options}" \
-    --image-config-dir="${image_config_dir}" \
+    --image-config-dir="${image_config_dir}" --node-env="${node_env}" \
+    --use-dockerized-build="${use_dockerized_build}" --instance-type="${instance_type}" \
+    --target-build-arch="${target_build_arch}" \
     --extra-envs="${extra_envs}" --kubelet-config-file="${kubelet_config_file}"  --test-suite="${test_suite}" \
     "${timeout_arg}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
@@ -203,6 +228,8 @@ else
   # Refresh sudo credentials if needed
   if ping -c 1 -q metadata.google.internal &> /dev/null; then
     echo 'Running on GCE, not asking for sudo credentials'
+  elif ping -c 1 -q 169.254.169.254 &> /dev/null; then
+    echo 'Running on AWS, not asking for sudo credentials'
   elif sudo --non-interactive "$(which bash)" -c true 2> /dev/null; then
     # if we can run bash without a password, it's a pretty safe bet that either
     # we can run any command without a password, or that sudo credentials

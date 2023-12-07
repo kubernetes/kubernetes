@@ -101,6 +101,36 @@ func TestExpiration(t *testing.T) {
 	if _, ok := c.Get("a"); !ok {
 		t.Fatalf("we should have found a key")
 	}
+
+	// Check getting an expired key with and without AllowExpiredGet
+	c.Set("b", "b", time.Second)
+	fc.Step(2 * time.Second)
+	if _, ok := c.Get("b"); ok {
+		t.Fatalf("we should not have found b key")
+	}
+	if count := c.Len(); count != 2 { // b is still in the cache
+		t.Errorf("expected two items got: %d", count)
+	}
+	c.AllowExpiredGet = true
+	if _, ok := c.Get("b"); !ok {
+		t.Fatalf("we should have found b key")
+	}
+	if count := c.Len(); count != 2 { // b is still in the cache
+		t.Errorf("expected two items got: %d", count)
+	}
+	c.Set("c", "c", time.Second)      // set some unrelated key to run gc
+	if count := c.Len(); count != 2 { // only a and c in the cache now
+		t.Errorf("expected two items got: %d", count)
+	}
+	if _, ok := c.Get("b"); ok {
+		t.Fatalf("we should not have found b key")
+	}
+	if _, ok := c.Get("a"); !ok {
+		t.Fatalf("we should have found a key")
+	}
+	if _, ok := c.Get("c"); !ok {
+		t.Fatalf("we should have found c key")
+	}
 }
 
 func TestGarbageCollection(t *testing.T) {

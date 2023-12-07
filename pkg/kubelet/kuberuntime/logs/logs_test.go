@@ -22,13 +22,16 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	v1 "k8s.io/api/core/v1"
 	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
@@ -80,7 +83,7 @@ func TestReadLogs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
-	defer os.Remove(file.Name())
+	defer utiltesting.CloseAndRemove(t, file)
 	file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n")
@@ -98,42 +101,42 @@ func TestReadLogs(t *testing.T) {
 		{
 			name: "using TailLines 2 should output last 2 lines",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64Ptr(2),
+				TailLines: pointer.Int64(2),
 			},
 			expected: "line2\nline3\n",
 		},
 		{
 			name: "using TailLines 4 should output all lines when the log has less than 4 lines",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64Ptr(4),
+				TailLines: pointer.Int64(4),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using TailLines 0 should output nothing",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64Ptr(0),
+				TailLines: pointer.Int64(0),
 			},
 			expected: "",
 		},
 		{
 			name: "using LimitBytes 9 should output first 9 bytes",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64Ptr(9),
+				LimitBytes: pointer.Int64(9),
 			},
 			expected: "line1\nlin",
 		},
 		{
 			name: "using LimitBytes 100 should output all bytes when the log has less than 100 bytes",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64Ptr(100),
+				LimitBytes: pointer.Int64(100),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using LimitBytes 0 should output nothing",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64Ptr(0),
+				LimitBytes: pointer.Int64(0),
 			},
 			expected: "",
 		},
@@ -162,7 +165,7 @@ func TestReadLogs(t *testing.T) {
 			name: "using follow combined with TailLines 2 should output the last 2 lines",
 			podLogOptions: v1.PodLogOptions{
 				Follow:    true,
-				TailLines: pointer.Int64Ptr(2),
+				TailLines: pointer.Int64(2),
 			},
 			expected: "line2\nline3\n",
 		},
@@ -208,6 +211,88 @@ func TestReadLogs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReadRotatedLog(t *testing.T) {
+	tmpDir := t.TempDir()
+	file, err := os.CreateTemp(tmpDir, "logfile")
+	if err != nil {
+		assert.NoErrorf(t, err, "unable to create temp file")
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+	containerID := "fake-container-id"
+	fakeRuntimeService := &apitesting.FakeRuntimeService{
+		Containers: map[string]*apitesting.FakeContainer{
+			containerID: {
+				ContainerStatus: runtimeapi.ContainerStatus{
+					State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+				},
+			},
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// Start to follow the container's log.
+	go func(ctx context.Context) {
+		podLogOptions := v1.PodLogOptions{
+			Follow: true,
+		}
+		opts := NewLogOptions(&podLogOptions, time.Now())
+		ReadLogs(ctx, file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+	}(ctx)
+
+	// log in stdout
+	expectedStdout := "line0\nline2\nline4\nline6\nline8\n"
+	// log in stderr
+	expectedStderr := "line1\nline3\nline5\nline7\nline9\n"
+
+	dir := filepath.Dir(file.Name())
+	baseName := filepath.Base(file.Name())
+
+	// Write 10 lines to log file.
+	// Let ReadLogs start.
+	time.Sleep(50 * time.Millisecond)
+	for line := 0; line < 10; line++ {
+		// Write the first three lines to log file
+		now := time.Now().Format(types.RFC3339NanoLenient)
+		if line%2 == 0 {
+			file.WriteString(fmt.Sprintf(
+				`{"log":"line%d\n","stream":"stdout","time":"%s"}`+"\n", line, now))
+		} else {
+			file.WriteString(fmt.Sprintf(
+				`{"log":"line%d\n","stream":"stderr","time":"%s"}`+"\n", line, now))
+		}
+		time.Sleep(1 * time.Millisecond)
+
+		if line == 5 {
+			file.Close()
+			// Pretend to rotate the log.
+			rotatedName := fmt.Sprintf("%s.%s", baseName, time.Now().Format("220060102-150405"))
+			rotatedName = filepath.Join(dir, rotatedName)
+			if err := os.Rename(filepath.Join(dir, baseName), rotatedName); err != nil {
+				assert.NoErrorf(t, err, "failed to rotate log %q to %q", file.Name(), rotatedName)
+				return
+			}
+
+			newF := filepath.Join(dir, baseName)
+			if file, err = os.Create(newF); err != nil {
+				assert.NoError(t, err, "unable to create new log file")
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	time.Sleep(20 * time.Millisecond)
+	// Make the function ReadLogs end.
+	fakeRuntimeService.Lock()
+	fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED
+	fakeRuntimeService.Unlock()
+
+	assert.Equal(t, expectedStdout, stdoutBuf.String())
+	assert.Equal(t, expectedStderr, stderrBuf.String())
 }
 
 func TestParseLog(t *testing.T) {
@@ -407,7 +492,7 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 	logLineFmt := "2022-10-29T16:10:22.592603036-05:00 stdout P %v\n"
 	logLineNewLine := "2022-10-29T16:10:22.592603036-05:00 stdout F \n"
 
-	tmpfile, err := ioutil.TempFile("", "log.*.txt")
+	tmpfile, err := os.CreateTemp("", "log.*.txt")
 	assert.NoError(t, err)
 
 	count := 10000

@@ -63,7 +63,7 @@ type Method interface {
 // any other decoding scheme.
 type ArgumentDecoder interface {
 	// To decode the arguments of a method the sender and message are
-	// provided incase the semantics of the implementer provides access
+	// provided in case the semantics of the implementer provides access
 	// to these as part of the method invocation.
 	DecodeArguments(conn *Conn, sender string, msg *Message, args []interface{}) ([]interface{}, error)
 }

@@ -185,6 +185,10 @@ const (
 	// capacity information for it.
 	CapCapacity Capability = "capacity"
 
+	// Anti-capability for drivers that do not support filesystem resizing of PVCs
+	// that are cloned or restored from a snapshot.
+	CapFSResizeFromSourceNotSupported Capability = "FSResizeFromSourceNotSupported"
+
 	// To support ReadWriteOncePod, the following CSI sidecars must be
 	// updated to these versions or greater:
 	// - csi-provisioner:v3.0.0+
@@ -201,6 +205,9 @@ const (
 	// talk to Kubernetes API server in any way should keep this capability enabled, because
 	// they will see the same NodeStage / NodePublish requests as if only one PV existed.
 	CapMultiplePVsSameID Capability = "multiplePVsSameID"
+
+	// The driver supports ReadOnlyMany (ROX) access mode
+	CapReadOnlyMany Capability = "capReadOnlyMany"
 )
 
 // DriverInfo represents static information about a TestDriver.
@@ -212,7 +219,7 @@ type DriverInfo struct {
 	// plugin if it exists and is empty if this DriverInfo represents a CSI
 	// Driver
 	InTreePluginName string
-	FeatureTag       string // FeatureTag for the driver
+	TestTags         []interface{} // tags for the driver (e.g. framework.WithSlow())
 
 	// Maximum single file size supported by this driver
 	MaxFileSize int64

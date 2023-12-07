@@ -19,7 +19,6 @@ package discovery
 import (
 	"encoding/json"
 	"fmt"
-	"mime"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -27,8 +26,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
-	openapi_v3 "github.com/google/gnostic/openapiv3"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/openapi"
@@ -110,7 +108,6 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.ServerGroups()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -121,32 +118,49 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}
 }
 
-func TestGetServerGroupsWithBrokenServer(t *testing.T) {
-	for _, statusCode := range []int{http.StatusNotFound, http.StatusForbidden} {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			w.WriteHeader(statusCode)
-		}))
-		defer server.Close()
-		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		// ServerGroups should not return an error even if server returns Not Found or Forbidden error at all end points
-		apiGroupList, err := client.ServerGroups()
+func TestDiscoveryToleratesMissingCoreGroup(t *testing.T) {
+	// Discovery tolerates 404 from /api. Aggregated api servers can do this.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var obj interface{}
+		switch req.URL.Path {
+		case "/api":
+			w.WriteHeader(http.StatusNotFound)
+		case "/apis":
+			obj = &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
+					{
+						Name: "extensions",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{GroupVersion: "extensions/v1beta1"},
+						},
+					},
+				},
+			}
+		}
+		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
+			return
 		}
-		groupVersions := metav1.ExtractGroupVersions(apiGroupList)
-		if len(groupVersions) != 0 {
-			t.Errorf("expected empty list, got: %q", groupVersions)
-		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	defer server.Close()
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	// ServerGroups should not return an error even if server returns 404 at /api.
+	apiGroupList, err := client.ServerGroups()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	groupVersions := metav1.ExtractGroupVersions(apiGroupList)
+	if !reflect.DeepEqual(groupVersions, []string{"extensions/v1beta1"}) {
+		t.Errorf("expected: %q, got: %q", []string{"extensions/v1beta1"}, groupVersions)
 	}
 }
 
-func TestTimeoutIsSet(t *testing.T) {
-	cfg := &restclient.Config{}
-	setDiscoveryDefaults(cfg)
-	assert.Equal(t, defaultTimeout, cfg.Timeout)
-}
-
-func TestGetServerResourcesWithV1Server(t *testing.T) {
+func TestDiscoveryFailsWhenNonCoreGroupsMissing(t *testing.T) {
+	// Discovery fails when /apis returns 404.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var obj interface{}
 		switch req.URL.Path {
@@ -156,13 +170,12 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 					"v1",
 				},
 			}
-		default:
+		case "/apis":
 			w.WriteHeader(http.StatusNotFound)
-			return
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Errorf("unexpected encoding error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -171,15 +184,32 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	// ServerResources should not return an error even if server returns error at /api/v1.
-	_, serverResources, err := client.ServerGroupsAndResources()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	_, err := client.ServerGroups()
+	if err == nil {
+		t.Fatal("expected error, received none")
 	}
-	gvs := groupVersions(serverResources)
-	if !sets.NewString(gvs...).Has("v1") {
-		t.Errorf("missing v1 in resource list: %v", serverResources)
+}
+
+func TestGetServerGroupsWithBrokenServer(t *testing.T) {
+	// 404 Not Found errors because discovery at /apis returns an error.
+	// 403 Forbidden errors because discovery at both /api and /apis returns error.
+	for _, statusCode := range []int{http.StatusNotFound, http.StatusForbidden} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.WriteHeader(statusCode)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		_, err := client.ServerGroups()
+		if err == nil {
+			t.Fatal("expected error, received none")
+		}
 	}
+}
+
+func TestTimeoutIsSet(t *testing.T) {
+	cfg := &restclient.Config{}
+	setDiscoveryDefaults(cfg)
+	assert.Equal(t, defaultTimeout, cfg.Timeout)
 }
 
 func TestGetServerResourcesForGroupVersion(t *testing.T) {
@@ -406,7 +436,7 @@ func TestGetServerResourcesForGroupVersion(t *testing.T) {
 		"extensions/v1beta10",
 	}
 	if !reflect.DeepEqual(expectedGroupVersions, serverGroupVersions) {
-		t.Errorf("unexpected group versions: %v", diff.ObjectReflectDiff(expectedGroupVersions, serverGroupVersions))
+		t.Errorf("unexpected group versions: %v", cmp.Diff(expectedGroupVersions, serverGroupVersions))
 	}
 }
 
@@ -462,45 +492,6 @@ func returnedOpenAPI() *openapi_v2.Document {
 	}
 }
 
-func openapiSchemaDeprecatedFakeServer(status int, t *testing.T) (*httptest.Server, error) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/openapi/v2" {
-			// write the error status for the new endpoint request
-			w.WriteHeader(status)
-			return
-		}
-		if req.URL.Path != "/swagger-2.0.0.pb-v1" {
-			errMsg := fmt.Sprintf("Unexpected url %v", req.URL)
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(errMsg))
-			t.Errorf("testing should fail as %s", errMsg)
-			return
-		}
-		if req.Method != "GET" {
-			errMsg := fmt.Sprintf("Unexpected method %v", req.Method)
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			w.Write([]byte(errMsg))
-			t.Errorf("testing should fail as %s", errMsg)
-			return
-		}
-
-		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
-
-		output, err := proto.Marshal(returnedOpenAPI())
-		if err != nil {
-			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(errMsg))
-			t.Errorf("testing should fail as %s", errMsg)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write(output)
-	}))
-
-	return server, nil
-}
-
 func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path != "/openapi/v2" {
@@ -525,8 +516,6 @@ func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 			t.Errorf("testing should fail as %s", errMsg)
 			return
 		}
-
-		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
 		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
@@ -644,57 +633,6 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 			}
 
 		})
-	}
-}
-
-func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusForbidden, t)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotFound, t)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotAcceptable, t)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
 	}
 }
 
@@ -964,17 +902,33 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 		expected map[schema.GroupVersionResource]struct{}
 	}{
 		{
+			// Combines discovery for /api and /apis.
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
 				switch req.URL.Path {
-				case "/api/v1":
-					list = &stable
 				case "/api":
 					list = &metav1.APIVersions{
 						Versions: []string{
 							"v1",
 						},
 					}
+				case "/api/v1":
+					list = &stable
+				case "/apis":
+					list = &metav1.APIGroupList{
+						Groups: []metav1.APIGroup{
+							{
+								Name: "batch",
+								Versions: []metav1.GroupVersionForDiscovery{
+									{GroupVersion: "batch/v1", Version: "v1"},
+								},
+								PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "batch/v1", Version: "v1"},
+							},
+						},
+					}
+				case "/apis/batch/v1":
+					list = &batchv1
+
 				default:
 					t.Logf("unexpected request: %s", req.URL.Path)
 					w.WriteHeader(http.StatusNotFound)
@@ -990,11 +944,14 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{
-				{Group: "", Version: "v1", Resource: "pods"}:     {},
-				{Group: "", Version: "v1", Resource: "services"}: {},
+				{Group: "", Version: "v1", Resource: "pods"}:      {},
+				{Group: "", Version: "v1", Resource: "services"}:  {},
+				{Group: "batch", Version: "v1", Resource: "jobs"}: {},
 			},
 		},
 		{
+			// Only return /apis (not legacy /api); does not error. 404 for legacy
+			// core/v1 at /api is tolerated.
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
 				switch req.URL.Path {
@@ -1349,8 +1306,9 @@ func TestAggregatedServerGroups(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			require.NoError(t, err)
-			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", AcceptV2Beta1)
+			// Content-Type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))
@@ -1384,6 +1342,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 		expectedGroupNames    []string
 		expectedGroupVersions []string
 		expectedGVKs          []string
+		expectedFailedGVs     []string
 	}{
 		{
 			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/1 resources at /apis",
@@ -1513,6 +1472,78 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 			},
 		},
 		{
+			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/2 versions/1 resources at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:    []string{"", "apps"},
+			expectedGroupVersions: []string{"v1", "apps/v1"},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v1/Deployment",
+			},
+			expectedFailedGVs: []string{"apps/v2"},
+		},
+		{
 			name: "Aggregated discovery: 1 group/2 resources at /api, 1 group/2 resources at /apis",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
@@ -1552,6 +1583,31 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 							Name: "apps",
 						},
 						Versions: []apidiscovery.APIVersionDiscovery{
+							// Stale "v2" version not included.
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 							{
 								Version: "v1",
 								Resources: []apidiscovery.APIResourceDiscovery{
@@ -1587,9 +1643,10 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 				"apps/v1/Deployment",
 				"apps/v1/StatefulSet",
 			},
+			expectedFailedGVs: []string{"apps/v2"},
 		},
 		{
-			name: "Aggregated discovery: 1 group/2 resources at /api, 2 group/2 resources at /apis",
+			name: "Aggregated discovery: 1 group/2 resources at /api, 2 group/2 resources/1 stale GV at /apis",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
 					{
@@ -1658,6 +1715,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 							Name: "batch",
 						},
 						Versions: []apidiscovery.APIVersionDiscovery{
+							// Stale Group/Version is not included
 							{
 								Version: "v1",
 								Resources: []apidiscovery.APIResourceDiscovery{
@@ -1680,21 +1738,46 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 										Scope: apidiscovery.ScopeNamespace,
 									},
 								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
 							},
 						},
 					},
 				},
 			},
 			expectedGroupNames:    []string{"", "apps", "batch"},
-			expectedGroupVersions: []string{"v1", "apps/v1", "batch/v1"},
+			expectedGroupVersions: []string{"v1", "apps/v1", "batch/v1beta1"},
 			expectedGVKs: []string{
 				"/v1/Pod",
 				"/v1/Service",
 				"apps/v1/Deployment",
 				"apps/v1/StatefulSet",
-				"batch/v1/Job",
-				"batch/v1/CronJob",
+				"batch/v1beta1/Job",
+				"batch/v1beta1/CronJob",
 			},
+			expectedFailedGVs: []string{"batch/v1"},
 		},
 		{
 			name:   "Aggregated discovery: /api returns nothing, 2 groups/2 resources at /apis",
@@ -1759,6 +1842,31 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 									},
 								},
 							},
+							{
+								// Stale "v1beta1" not included.
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 						},
 					},
 				},
@@ -1771,6 +1879,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 				"batch/v1/Job",
 				"batch/v1/CronJob",
 			},
+			expectedFailedGVs: []string{"batch/v1beta1"},
 		},
 	}
 
@@ -1788,15 +1897,24 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			require.NoError(t, err)
-			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", AcceptV2Beta1)
+			// Content-type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		apiGroups, resources, err := client.ServerGroupsAndResources()
-		require.NoError(t, err)
+		if len(test.expectedFailedGVs) > 0 {
+			require.Error(t, err)
+			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+			actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
+			assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
+				"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
+		} else {
+			require.NoError(t, err)
+		}
 		// Test the expected groups are returned for the aggregated format.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNames(apiGroups)...)
@@ -1823,12 +1941,139 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 	}
 }
 
+func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
+	tests := []struct {
+		name              string
+		corev1            *apidiscovery.APIGroupDiscoveryList
+		coreHttpStatus    int
+		apis              *apidiscovery.APIGroupDiscoveryList
+		apisHttpStatus    int
+		expectedGroups    []string
+		expectedResources []string
+		expectedErr       bool
+	}{
+		{
+			name:           "Aggregated Discovery: 404 for core/v1 is tolerated",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusNotFound,
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "daemonsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "DaemonSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apisHttpStatus:    http.StatusOK,
+			expectedGroups:    []string{"apps"},
+			expectedResources: []string{"apps/v1/Deployment", "apps/v1/DaemonSet"},
+			expectedErr:       false,
+		},
+		{
+			name:           "Aggregated Discovery: 403 for core/v1 causes error",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusForbidden,
+			apis:           &apidiscovery.APIGroupDiscoveryList{},
+			apisHttpStatus: http.StatusOK,
+			expectedErr:    true,
+		},
+		{
+			name:           "Aggregated Discovery: 404 for /apis causes error",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusOK,
+			apis:           &apidiscovery.APIGroupDiscoveryList{},
+			apisHttpStatus: http.StatusNotFound,
+			expectedErr:    true,
+		},
+		{
+			name:           "Aggregated Discovery: 403 for /apis causes error",
+			corev1:         &apidiscovery.APIGroupDiscoveryList{},
+			coreHttpStatus: http.StatusOK,
+			apis:           &apidiscovery.APIGroupDiscoveryList{},
+			apisHttpStatus: http.StatusForbidden,
+			expectedErr:    true,
+		},
+	}
+
+	for _, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var agg *apidiscovery.APIGroupDiscoveryList
+			var status int
+			switch req.URL.Path {
+			case "/api":
+				agg = test.corev1
+				status = test.coreHttpStatus
+			case "/apis":
+				agg = test.apis
+				status = test.apisHttpStatus
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(agg)
+			require.NoError(t, err)
+			// Content-type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
+			w.WriteHeader(status)
+			w.Write(output)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		apiGroups, resources, err := client.ServerGroupsAndResources()
+		if test.expectedErr {
+			require.Error(t, err)
+			require.Nil(t, apiGroups)
+			require.Nil(t, resources)
+			continue
+		}
+		require.NoError(t, err)
+		// First check the returned groups
+		expectedGroups := sets.NewString(test.expectedGroups...)
+		actualGroups := sets.NewString(groupNames(apiGroups)...)
+		assert.True(t, expectedGroups.Equal(actualGroups),
+			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroups.List(), actualGroups.List())
+		// Next check the returned resources
+		expectedGVKs := sets.NewString(test.expectedResources...)
+		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
+		assert.True(t, expectedGVKs.Equal(actualGVKs),
+			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+	}
+}
+
 func TestAggregatedServerPreferredResources(t *testing.T) {
 	tests := []struct {
-		name         string
-		corev1       *apidiscovery.APIGroupDiscoveryList
-		apis         *apidiscovery.APIGroupDiscoveryList
-		expectedGVKs []string
+		name              string
+		corev1            *apidiscovery.APIGroupDiscoveryList
+		apis              *apidiscovery.APIGroupDiscoveryList
+		expectedGVKs      []string
+		expectedFailedGVs []string
 	}{
 		{
 			name: "Aggregated discovery: basic corev1 and apps/v1 preferred resources returned",
@@ -1955,6 +2200,78 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 			},
 		},
 		{
+			name: "Aggregated discovery: stale Group/Version can not produce preferred version",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							// v2 is "stale", so it can not be "preferred".
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			// Only v1 resources from apps group; v2 would be preferred but it is "stale".
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v1/Deployment",
+			},
+			expectedFailedGVs: []string{"apps/v2"},
+		},
+		{
 			name: "Aggregated discovery: preferred multiple resources from multiple group/versions",
 			corev1: &apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{
@@ -2017,6 +2334,30 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 									},
 								},
 							},
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+								Freshness: apidiscovery.DiscoveryFreshnessStale,
+							},
 						},
 					},
 				},
@@ -2027,6 +2368,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 				"apps/v1/Deployment",
 				"apps/v1/StatefulSet",
 			},
+			expectedFailedGVs: []string{"apps/v1beta1"},
 		},
 		{
 			name: "Aggregated discovery: resources from multiple preferred group versions at /apis",
@@ -2085,6 +2427,30 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 										ResponseKind: &metav1.GroupVersionKind{
 											Group:   "apps",
 											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								// Not included because "v1" is preferred.
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1beta1",
 											Kind:    "StatefulSet",
 										},
 										Scope: apidiscovery.ScopeNamespace,
@@ -2228,6 +2594,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 								},
 							},
 							{
+								// Not included, since "v1" is preferred.
 								Version: "v1beta1",
 								Resources: []apidiscovery.APIResourceDiscovery{
 									{
@@ -2280,20 +2647,103 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			require.NoError(t, err)
-			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", AcceptV2Beta1)
+			// Content-type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		resources, err := client.ServerPreferredResources()
-		require.NoError(t, err)
+		if len(test.expectedFailedGVs) > 0 {
+			require.Error(t, err)
+			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+			actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
+			assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
+				"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
+		} else {
+			require.NoError(t, err)
+		}
 		// Test the expected preferred GVKs are returned from the aggregated discovery.
 		expectedGVKs := sets.NewString(test.expectedGVKs...)
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
 		assert.True(t, expectedGVKs.Equal(actualGVKs),
 			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+	}
+}
+
+func TestDiscoveryContentTypeVersion(t *testing.T) {
+	v2beta1 := schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2beta1", Kind: "APIGroupDiscoveryList"}
+	tests := []struct {
+		contentType string
+		gvk         schema.GroupVersionKind
+		match       bool
+		expectErr   bool
+	}{
+		{
+			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList",
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
+		},
+		{
+			// content-type parameters are not in correct order, but comparison ignores order.
+			contentType: "application/json; v=v2beta1;as=APIGroupDiscoveryList;g=apidiscovery.k8s.io",
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
+		},
+		{
+			// content-type parameters are not in correct order, but comparison ignores order.
+			contentType: "application/json; as=APIGroupDiscoveryList;g=apidiscovery.k8s.io;v=v2beta1",
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
+		},
+		{
+			// Ignores extra parameter "charset=utf-8"
+			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList;charset=utf-8",
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
+		},
+		{
+			contentType: "application/json",
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
+		},
+		{
+			contentType: "application/json; charset=UTF-8",
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
+		},
+		{
+			contentType: "text/json",
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
+		},
+		{
+			contentType: "text/html",
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
+		},
+		{
+			contentType: "",
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   true,
+		},
+	}
+
+	for _, test := range tests {
+		match, err := ContentTypeIsGVK(test.contentType, test.gvk)
+		assert.Equal(t, test.expectErr, err != nil)
+		assert.Equal(t, test.match, match)
 	}
 }
 
@@ -2367,6 +2817,18 @@ func groupVersionKinds(resources []*metav1.APIResourceList) []string {
 			gvk := fmt.Sprintf("%s/%s/%s", resource.Group, resource.Version, resource.Kind)
 			result = append(result, gvk)
 		}
+	}
+	return result
+}
+
+func failedGroupVersions(err error) []string {
+	result := []string{}
+	ferr, ok := err.(*ErrGroupDiscoveryFailed)
+	if !ok {
+		return result
+	}
+	for gv := range ferr.Groups {
+		result = append(result, gv.String())
 	}
 	return result
 }

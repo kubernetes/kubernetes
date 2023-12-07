@@ -15,7 +15,7 @@ import (
     ...
 )
 
-Describe("Checking books out of the library", Label("library"), func() {
+var _ = Describe("Checking books out of the library", Label("library"), func() {
     var library *libraries.Library
     var book *books.Book
     var valjean *users.User
@@ -50,7 +50,7 @@ Describe("Checking books out of the library", Label("library"), func() {
 
             It("tells the user", func(ctx SpecContext) {
                 err := valjean.Checkout(ctx, library, "Les Miserables")
-                Expect(error).To(MatchError("Les Miserables is currently checked out"))
+                Expect(err).To(MatchError("Les Miserables is currently checked out"))
             }, SpecTimeout(time.Second * 5))
 
             It("lets the user place a hold and get notified later", func(ctx SpecContext) {
@@ -74,7 +74,7 @@ Describe("Checking books out of the library", Label("library"), func() {
     When("the library does not have the book in question", func() {
         It("tells the reader the book is unavailable", func(ctx SpecContext) {
             err := valjean.Checkout(ctx, library, "Les Miserables")
-            Expect(error).To(MatchError("Les Miserables is not in the library catalog"))
+            Expect(err).To(MatchError("Les Miserables is not in the library catalog"))
         }, SpecTimeout(time.Second * 5))
     })
 })

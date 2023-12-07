@@ -93,7 +93,7 @@ func (t *CassandraUpgradeTest) Setup(ctx context.Context, f *framework.Framework
 	cassandraKubectlCreate(ns, "tester.yaml")
 
 	ginkgo.By("Getting the ingress IPs from the services")
-	err := wait.PollImmediateWithContext(ctx, statefulsetPoll, statefulsetTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, statefulsetPoll, statefulsetTimeout, true, func(ctx context.Context) (bool, error) {
 		if t.ip = t.getServiceIP(ctx, f, ns, "test-server"); t.ip == "" {
 			return false, nil
 		}
@@ -116,7 +116,7 @@ func (t *CassandraUpgradeTest) Setup(ctx context.Context, f *framework.Framework
 	ginkgo.By("Verifying that the users exist")
 	users, err := t.listUsers()
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(users), 2)
+	gomega.Expect(users).To(gomega.HaveLen(2))
 }
 
 // listUsers gets a list of users from the db via the tester service.

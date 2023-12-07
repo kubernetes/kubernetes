@@ -21,10 +21,13 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -45,9 +48,9 @@ const (
 	3. Verify the provisioned PV size is correct.
 */
 
-var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Disk Size", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-disksize")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client       clientset.Interface
 		namespace    string
@@ -95,6 +98,6 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		ginkgo.By("Verifying if provisioned PV has the correct size")
 		expectedCapacity := resource.MustParse(expectedDiskSize)
 		pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-		framework.ExpectEqual(pvCapacity.Value(), expectedCapacity.Value())
+		gomega.Expect(pvCapacity.Value()).To(gomega.Equal(expectedCapacity.Value()))
 	})
 })

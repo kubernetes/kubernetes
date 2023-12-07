@@ -21,18 +21,24 @@ import (
 	"fmt"
 	"io"
 
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/klog/v2"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/rules"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/environment"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -49,6 +55,8 @@ type Webhook struct {
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
+	filterCompiler   cel.FilterCompiler
+	authorizer       authorizer.Authorizer
 }
 
 var (
@@ -92,6 +100,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		namespaceMatcher: &namespace.Matcher{},
 		objectMatcher:    &object.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
+		filterCompiler:   cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
 	}, nil
 }
 
@@ -124,6 +133,10 @@ func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFacto
 	})
 }
 
+func (a *Webhook) SetAuthorizer(authorizer authorizer.Authorizer) {
+	a.authorizer = authorizer
+}
+
 // ValidateInitialization implements the InitializationValidator interface.
 func (a *Webhook) ValidateInitialization() error {
 	if a.hookSource == nil {
@@ -140,7 +153,7 @@ func (a *Webhook) ValidateInitialization() error {
 
 // ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
 // or an error if an error was encountered during evaluation.
-func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
+func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces, v VersionedAttributeAccessor) (*WebhookInvocation, *apierrors.StatusError) {
 	matches, matchNsErr := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
 	// Should not return an error here for webhooks which do not apply to the request, even if err is an unexpected scenario.
 	if !matches && matchNsErr == nil {
@@ -205,6 +218,25 @@ func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attri
 	}
 	if matchObjErr != nil {
 		return nil, matchObjErr
+	}
+	matchConditions := h.GetMatchConditions()
+	if len(matchConditions) > 0 {
+		versionedAttr, err := v.VersionedAttribute(invocation.Kind)
+		if err != nil {
+			return nil, apierrors.NewInternalError(err)
+		}
+
+		matcher := h.GetCompiledMatcher(a.filterCompiler)
+		matchResult := matcher.Match(ctx, versionedAttr, nil, a.authorizer)
+
+		if matchResult.Error != nil {
+			klog.Warningf("Failed evaluating match conditions, failing closed %v: %v", h.GetName(), matchResult.Error)
+			return nil, apierrors.NewForbidden(attr.GetResource().GroupResource(), attr.GetName(), matchResult.Error)
+		} else if !matchResult.Matches {
+			admissionmetrics.Metrics.ObserveMatchConditionExclusion(ctx, h.GetName(), "webhook", h.GetType(), string(attr.GetOperation()))
+			// if no match, always skip webhook
+			return nil, nil
+		}
 	}
 
 	return invocation, nil

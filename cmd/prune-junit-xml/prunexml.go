@@ -22,40 +22,43 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 
 	"k8s.io/kubernetes/third_party/forked/gotestsum/junitxml"
 )
 
 func main() {
 	maxTextSize := flag.Int("max-text-size", 1, "maximum size of attribute or text (in MB)")
+	pruneTests := flag.Bool("prune-tests", true,
+		"prune's xml files to display only top level tests and failed sub-tests")
 	flag.Parse()
-
-	if flag.NArg() > 0 {
-		for _, path := range flag.Args() {
-			fmt.Printf("processing junit xml file : %s\n", path)
-			xmlReader, err := os.Open(path)
-			if err != nil {
-				panic(err)
-			}
-			defer xmlReader.Close()
-			suites, err := fetchXML(xmlReader) // convert MB into bytes (roughly!)
-			if err != nil {
-				panic(err)
-			}
-
-			pruneXML(suites, *maxTextSize*1e6) // convert MB into bytes (roughly!)
-
-			xmlWriter, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-			if err != nil {
-				panic(err)
-			}
-			defer xmlWriter.Close()
-			err = streamXML(xmlWriter, suites)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Println("done.")
+	for _, path := range flag.Args() {
+		fmt.Printf("processing junit xml file : %s\n", path)
+		xmlReader, err := os.Open(path)
+		if err != nil {
+			panic(err)
 		}
+		defer xmlReader.Close()
+		suites, err := fetchXML(xmlReader) // convert MB into bytes (roughly!)
+		if err != nil {
+			panic(err)
+		}
+
+		pruneXML(suites, *maxTextSize*1e6) // convert MB into bytes (roughly!)
+		if *pruneTests {
+			pruneTESTS(suites)
+		}
+
+		xmlWriter, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			panic(err)
+		}
+		defer xmlWriter.Close()
+		err = streamXML(xmlWriter, suites)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("done.")
 	}
 }
 
@@ -80,6 +83,40 @@ func pruneXML(suites *junitxml.JUnitTestSuites, maxBytes int) {
 			}
 		}
 	}
+}
+
+// This function condenses the junit xml to have package name as top level identifier
+// and nesting under that.
+func pruneTESTS(suites *junitxml.JUnitTestSuites) {
+	var updatedTestsuites []junitxml.JUnitTestSuite
+
+	for _, suite := range suites.Suites {
+		var updatedTestcases []junitxml.JUnitTestCase
+		var updatedTestcase junitxml.JUnitTestCase
+		var updatedTestcaseFailure junitxml.JUnitFailure
+		failflag := false
+		name := suite.Name
+		regex := regexp.MustCompile(`^(.*?)/([^/]+)/?$`)
+		match := regex.FindStringSubmatch(name)
+		updatedTestcase.Classname = match[1]
+		updatedTestcase.Name = match[2]
+		updatedTestcase.Time = suite.Time
+		for _, testcase := range suite.TestCases {
+			// The top level testcase element in a JUnit xml file does not have the / character.
+			if testcase.Failure != nil {
+				failflag = true
+				updatedTestcaseFailure.Message = updatedTestcaseFailure.Message + testcase.Failure.Message + ";"
+				updatedTestcaseFailure.Contents = updatedTestcaseFailure.Contents + testcase.Failure.Contents + ";"
+				updatedTestcaseFailure.Type = updatedTestcaseFailure.Type + testcase.Failure.Type
+			}
+		}
+		if failflag {
+			updatedTestcase.Failure = &updatedTestcaseFailure
+		}
+		suite.TestCases = append(updatedTestcases, updatedTestcase)
+		updatedTestsuites = append(updatedTestsuites, suite)
+	}
+	suites.Suites = updatedTestsuites
 }
 
 func fetchXML(xmlReader io.Reader) (*junitxml.JUnitTestSuites, error) {

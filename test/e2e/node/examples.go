@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -45,9 +46,9 @@ const (
 	serverStartTimeout = framework.PodStartTimeout + 3*time.Minute
 )
 
-var _ = SIGDescribe("[Feature:Example]", func() {
+var _ = SIGDescribe(feature.Example, func() {
 	f := framework.NewDefaultFramework("examples")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var c clientset.Interface
 	var ns string

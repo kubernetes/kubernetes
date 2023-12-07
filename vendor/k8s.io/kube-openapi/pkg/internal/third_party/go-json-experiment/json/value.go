@@ -263,7 +263,7 @@ func reorderObjects(d *Decoder, scratch *[]byte) {
 			afterValue := d.InputOffset()
 
 			if isSorted && len(*members) > 0 {
-				isSorted = lessUTF16(prevName, name)
+				isSorted = lessUTF16(prevName, []byte(name))
 			}
 			*members = append(*members, memberName{name, beforeName, afterValue})
 			prevName = name
@@ -317,7 +317,7 @@ func reorderObjects(d *Decoder, scratch *[]byte) {
 // to the UTF-16 codepoints of the UTF-8 encoded input strings.
 // This implements the ordering specified in RFC 8785, section 3.2.3.
 // The inputs must be valid UTF-8, otherwise this may panic.
-func lessUTF16(x, y []byte) bool {
+func lessUTF16[Bytes []byte | string](x, y Bytes) bool {
 	// NOTE: This is an optimized, allocation-free implementation
 	// of lessUTF16Simple in fuzz_test.go. FuzzLessUTF16 verifies that the
 	// two implementations agree on the result of comparing any two strings.
@@ -326,8 +326,13 @@ func lessUTF16(x, y []byte) bool {
 		return ('\u0000' <= r && r <= '\uD7FF') || ('\uE000' <= r && r <= '\uFFFF')
 	}
 
+	var invalidUTF8 bool
+	x0, y0 := x, y
 	for {
 		if len(x) == 0 || len(y) == 0 {
+			if len(x) == len(y) && invalidUTF8 {
+				return string(x0) < string(y0)
+			}
 			return len(x) < len(y)
 		}
 
@@ -341,35 +346,36 @@ func lessUTF16(x, y []byte) bool {
 		}
 
 		// Decode next pair of runes as UTF-8.
-		rx, nx := utf8.DecodeRune(x)
-		ry, ny := utf8.DecodeRune(y)
+		// TODO(https://go.dev/issue/56948): Use a generic implementation
+		// of utf8.DecodeRune, or rely on a compiler optimization to statically
+		// hide the cost of a type switch (https://go.dev/issue/57072).
+		var rx, ry rune
+		var nx, ny int
+		switch any(x).(type) {
+		case string:
+			rx, nx = utf8.DecodeRuneInString(string(x))
+			ry, ny = utf8.DecodeRuneInString(string(y))
+		case []byte:
+			rx, nx = utf8.DecodeRune([]byte(x))
+			ry, ny = utf8.DecodeRune([]byte(y))
+		}
+
+		selfx := isUTF16Self(rx)
+		selfy := isUTF16Self(ry)
 		switch {
-
-		// Both runes encode as either a single or surrogate pair
-		// of UTF-16 codepoints.
-		case isUTF16Self(rx) == isUTF16Self(ry):
-			if rx != ry {
-				return rx < ry
-			}
-
 		// The x rune is a single UTF-16 codepoint, while
 		// the y rune is a surrogate pair of UTF-16 codepoints.
-		case isUTF16Self(rx):
-			ry, _ := utf16.EncodeRune(ry)
-			if rx != ry {
-				return rx < ry
-			}
-			panic("BUG: invalid UTF-8") // implies rx is an unpaired surrogate half
-
+		case selfx && !selfy:
+			ry, _ = utf16.EncodeRune(ry)
 		// The y rune is a single UTF-16 codepoint, while
 		// the x rune is a surrogate pair of UTF-16 codepoints.
-		case isUTF16Self(ry):
-			rx, _ := utf16.EncodeRune(rx)
-			if rx != ry {
-				return rx < ry
-			}
-			panic("BUG: invalid UTF-8") // implies ry is an unpaired surrogate half
+		case selfy && !selfx:
+			rx, _ = utf16.EncodeRune(rx)
 		}
+		if rx != ry {
+			return rx < ry
+		}
+		invalidUTF8 = invalidUTF8 || (rx == utf8.RuneError && nx == 1) || (ry == utf8.RuneError && ny == 1)
 		x, y = x[nx:], y[ny:]
 	}
 }

@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/porter"
 	resconsumerctrl "k8s.io/kubernetes/test/images/agnhost/resource-consumer-controller"
 	servehostname "k8s.io/kubernetes/test/images/agnhost/serve-hostname"
+	tcpreset "k8s.io/kubernetes/test/images/agnhost/tcp-reset"
 	testwebserver "k8s.io/kubernetes/test/images/agnhost/test-webserver"
 	"k8s.io/kubernetes/test/images/agnhost/webhook"
 )
@@ -81,6 +82,7 @@ func main() {
 	rootCmd.AddCommand(resconsumerctrl.CmdResourceConsumerController)
 	rootCmd.AddCommand(servehostname.CmdServeHostname)
 	rootCmd.AddCommand(testwebserver.CmdTestWebserver)
+	rootCmd.AddCommand(tcpreset.CmdTCPReset)
 	rootCmd.AddCommand(webhook.CmdWebhook)
 	rootCmd.AddCommand(openidmetadata.CmdTestServiceAccountIssuerDiscovery)
 	rootCmd.AddCommand(grpchealthchecking.CmdGrpcHealthChecking)

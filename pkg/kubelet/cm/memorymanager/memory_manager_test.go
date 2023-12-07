@@ -312,7 +312,7 @@ func TestValidateReservedMemory(t *testing.T) {
 			err := validateReservedMemory(tc.machineInfo, tc.nodeAllocatableReservation, tc.systemReservedMemory)
 			if strings.TrimSpace(tc.expectedError) != "" {
 				assert.Error(t, err)
-				assert.Equal(t, err.Error(), tc.expectedError)
+				assert.Equal(t, tc.expectedError, err.Error())
 			}
 		})
 	}

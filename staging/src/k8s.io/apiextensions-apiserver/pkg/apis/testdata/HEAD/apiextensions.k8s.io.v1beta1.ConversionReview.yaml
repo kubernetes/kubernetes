@@ -1,0 +1,41 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: ConversionReview
+request:
+  desiredAPIVersion: desiredAPIVersionValue
+  objects:
+  - apiVersion: example.com/v1
+    kind: CustomType
+    spec:
+      replicas: 1
+    status:
+      available: 1
+  uid: uidValue
+response:
+  convertedObjects:
+  - apiVersion: example.com/v1
+    kind: CustomType
+    spec:
+      replicas: 1
+    status:
+      available: 1
+  result:
+    code: 6
+    details:
+      causes:
+      - field: fieldValue
+        message: messageValue
+        reason: reasonValue
+      group: groupValue
+      kind: kindValue
+      name: nameValue
+      retryAfterSeconds: 5
+      uid: uidValue
+    message: messageValue
+    metadata:
+      continue: continueValue
+      remainingItemCount: 4
+      resourceVersion: resourceVersionValue
+      selfLink: selfLinkValue
+    reason: reasonValue
+    status: statusValue
+  uid: uidValue

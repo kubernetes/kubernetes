@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -346,6 +347,8 @@ func TestRestrictedProfile(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
@@ -385,6 +388,8 @@ func TestRestrictedProfile(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
@@ -396,7 +401,17 @@ func TestRestrictedProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: "dbg", Image: "dbgimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"ALL"},
+								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
+							},
+						},
 					},
 				},
 			},
@@ -409,6 +424,14 @@ func TestRestrictedProfile(t *testing.T) {
 						{
 							Name:  "dbg",
 							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot: pointer.Bool(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
+							},
 						},
 					},
 				},
@@ -472,7 +495,7 @@ func TestNetAdminProfile(t *testing.T) {
 							Name: "dbg", Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
-									Add: []corev1.Capability{"NET_ADMIN"},
+									Add: []corev1.Capability{"NET_ADMIN", "NET_RAW"},
 								},
 							},
 						},
@@ -503,6 +526,7 @@ func TestNetAdminProfile(t *testing.T) {
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
+					ShareProcessNamespace: pointer.Bool(true),
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -510,7 +534,54 @@ func TestNetAdminProfile(t *testing.T) {
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
-									Add: []corev1.Capability{"NET_ADMIN"},
+									Add: []corev1.Capability{"NET_ADMIN", "NET_RAW"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "debug by pod copy preserve existing capability",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+					},
+				},
+			},
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					ShareProcessNamespace: pointer.Bool(true),
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE", "NET_ADMIN", "NET_RAW"},
 								},
 							},
 						},
@@ -541,9 +612,48 @@ func TestNetAdminProfile(t *testing.T) {
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.BoolPtr(true),
 								Capabilities: &corev1.Capabilities{
-									Add: []corev1.Capability{"NET_ADMIN"},
+									Add: []corev1.Capability{"NET_ADMIN", "NET_RAW"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "debug by node preserve existing capability",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        testNode,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					HostPID:     true,
+					HostIPC:     true,
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE", "NET_ADMIN", "NET_RAW"},
 								},
 							},
 						},

@@ -43,7 +43,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 }
 
 func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
-	minAvailable := intstr.FromInt(7)
+	minAvailable := intstr.FromInt32(7)
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -91,7 +91,7 @@ func TestStatusUpdate(t *testing.T) {
 	}
 	obtainedPdb := obj.(*policy.PodDisruptionBudget)
 
-	minAvailable := intstr.FromInt(8)
+	minAvailable := intstr.FromInt32(8)
 	update := policy.PodDisruptionBudget{
 		ObjectMeta: obtainedPdb.ObjectMeta,
 		Spec: policy.PodDisruptionBudgetSpec{

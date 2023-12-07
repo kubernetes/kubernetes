@@ -18,10 +18,13 @@ package rollout
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/set"
@@ -48,7 +51,7 @@ type RestartOptions struct {
 	LabelSelector    string
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	fieldManager string
 }
@@ -60,6 +63,9 @@ var (
 	        Resource rollout will be restarted.`))
 
 	restartExample = templates.Examples(`
+		# Restart all deployments in test-namespace namespace
+		kubectl rollout restart deployment -n test-namespace
+
 		# Restart a deployment
 		kubectl rollout restart deployment/nginx
 
@@ -71,7 +77,7 @@ var (
 )
 
 // NewRolloutRestartOptions returns an initialized RestartOptions instance
-func NewRolloutRestartOptions(streams genericclioptions.IOStreams) *RestartOptions {
+func NewRolloutRestartOptions(streams genericiooptions.IOStreams) *RestartOptions {
 	return &RestartOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("restarted").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -79,7 +85,7 @@ func NewRolloutRestartOptions(streams genericclioptions.IOStreams) *RestartOptio
 }
 
 // NewCmdRolloutRestart returns a Command instance for 'rollout restart' sub command
-func NewCmdRolloutRestart(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutRestart(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutRestartOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}

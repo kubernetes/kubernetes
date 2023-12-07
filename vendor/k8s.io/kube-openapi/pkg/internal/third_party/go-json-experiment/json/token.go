@@ -112,7 +112,7 @@ func Bool(b bool) Token {
 	return False
 }
 
-// String construct a Token representing a JSON string.
+// String constructs a Token representing a JSON string.
 // The provided string should contain valid UTF-8, otherwise invalid characters
 // may be mangled as the Unicode replacement character.
 func String(s string) Token {
@@ -225,7 +225,7 @@ func (t Token) appendString(dst []byte, validateUTF8, preserveRaw bool, escapeRu
 }
 
 // String returns the unescaped string value for a JSON string.
-// For other JSON kinds, this returns the raw JSON represention.
+// For other JSON kinds, this returns the raw JSON representation.
 func (t Token) String() string {
 	// This is inlinable to take advantage of "function outlining".
 	// This avoids an allocation for the string(b) conversion
@@ -373,10 +373,10 @@ func (t Token) Int() int64 {
 		case 'i':
 			return int64(t.num)
 		case 'u':
-			if uint64(t.num) > maxInt64 {
+			if t.num > maxInt64 {
 				return maxInt64
 			}
-			return int64(uint64(t.num))
+			return int64(t.num)
 		}
 	}
 
@@ -425,7 +425,7 @@ func (t Token) Uint() uint64 {
 		// Handle exact integer value.
 		switch t.str[0] {
 		case 'u':
-			return uint64(t.num)
+			return t.num
 		case 'i':
 			if int64(t.num) < minUint64 {
 				return minUint64

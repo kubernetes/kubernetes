@@ -225,6 +225,7 @@ spec:
       uid: uidValue
     volumeName: volumeNameValue
     volumeNamespace: volumeNamespaceValue
+  volumeAttributesClassName: volumeAttributesClassNameValue
   volumeMode: volumeModeValue
   vsphereVolume:
     fsType: fsTypeValue
@@ -232,6 +233,7 @@ spec:
     storagePolicyName: storagePolicyNameValue
     volumePath: volumePathValue
 status:
+  lastPhaseTransitionTime: "2004-01-01T01:01:01Z"
   message: messageValue
   phase: phaseValue
   reason: reasonValue

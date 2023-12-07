@@ -49,6 +49,6 @@ func (sr StatelessPreBindExample) PreBind(ctx context.Context, state *framework.
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
 	return &StatelessPreBindExample{}, nil
 }

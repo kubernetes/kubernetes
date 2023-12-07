@@ -19,14 +19,12 @@ package instrumentation
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
@@ -34,7 +32,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -76,7 +76,7 @@ func eventExistsInList(ctx context.Context, client typedeventsv1.EventInterface,
 
 var _ = common.SIGDescribe("Events API", func() {
 	f := framework.NewDefaultFramework("events")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var coreClient corev1.EventInterface
 	var client typedeventsv1.EventInterface
 	var clientAllNamespaces typedeventsv1.EventInterface
@@ -160,7 +160,7 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		testEvent.Series = eventSeries
 		if !apiequality.Semantic.DeepEqual(testEvent, event) {
-			framework.Failf("test event wasn't properly patched: %v", diff.ObjectReflectDiff(testEvent, event))
+			framework.Failf("test event wasn't properly patched: %v", cmp.Diff(testEvent, event))
 		}
 
 		ginkgo.By("updating the test event")
@@ -178,7 +178,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		event.ObjectMeta.ResourceVersion = ""
 		event.ObjectMeta.ManagedFields = nil
 		if !apiequality.Semantic.DeepEqual(testEvent, event) {
-			framework.Failf("test event wasn't properly updated: %v", diff.ObjectReflectDiff(testEvent, event))
+			framework.Failf("test event wasn't properly updated: %v", cmp.Diff(testEvent, event))
 		}
 
 		ginkgo.By("deleting the test event")
@@ -218,7 +218,7 @@ var _ = common.SIGDescribe("Events API", func() {
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
-		framework.ExpectEqual(len(eventList.Items), len(eventNames), fmt.Sprintf("unexpected event list: %#v", eventList))
+		gomega.Expect(eventList.Items).To(gomega.HaveLen(len(eventNames)), "unexpected event list: %#v", eventList)
 
 		ginkgo.By("delete a list of events")
 		framework.Logf("requesting DeleteCollection of events")
@@ -232,6 +232,6 @@ var _ = common.SIGDescribe("Events API", func() {
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
-		framework.ExpectEqual(len(eventList.Items), 0, fmt.Sprintf("unexpected event list: %#v", eventList))
+		gomega.Expect(eventList.Items).To(gomega.BeEmpty(), "unexpected event list: %#v", eventList)
 	})
 })

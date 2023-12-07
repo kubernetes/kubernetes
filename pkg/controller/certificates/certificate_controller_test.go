@@ -26,13 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 // TODO flesh this out to cover things like not being able to find the csr in the cache, not
 // auto-approving, etc.
 func TestCertificateController(t *testing.T) {
-
+	_, ctx := ktesting.NewTestContext(t)
 	csr := &certificates.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-csr",
@@ -55,6 +56,7 @@ func TestCertificateController(t *testing.T) {
 	}
 
 	controller := NewCertificateController(
+		ctx,
 		"test",
 		client,
 		informerFactory.Certificates().V1().CertificateSigningRequests(),
@@ -69,7 +71,6 @@ func TestCertificateController(t *testing.T) {
 	wait.PollUntil(10*time.Millisecond, func() (bool, error) {
 		return controller.queue.Len() >= 1, nil
 	}, stopCh)
-	ctx := context.TODO()
 	controller.processNextWorkItem(ctx)
 
 	actions := client.Actions()

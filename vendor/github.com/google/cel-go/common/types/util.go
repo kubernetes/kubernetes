@@ -21,7 +21,7 @@ import (
 // IsUnknownOrError returns whether the input element ref.Val is an ErrType or UnknownType.
 func IsUnknownOrError(val ref.Val) bool {
 	switch val.(type) {
-	case Unknown, *Err:
+	case *Unknown, *Err:
 		return true
 	}
 	return false

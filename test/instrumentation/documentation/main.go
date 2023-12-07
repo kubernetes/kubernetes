@@ -58,60 +58,66 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 
 ### List of Stable Kubernetes Metrics
 
-<table class="table metrics" caption="This is the list of STABLE metrics emitted from core Kubernetes components">
-<thead>
-	<tr>
-		<th class="metric_name">Name</th>
-		<th class="metric_stability_level">Stability Level</th>
-		<th class="metric_type">Type</th>
-		<th class="metric_help">Help</th>
-		<th class="metric_labels">Labels</th>
-		<th class="metric_const_labels">Const Labels</th>
-		<th class="metric_deprecated_version">Deprecated Version</th>
-	</tr>
-</thead>
-<tbody>
-{{range $index, $metric := .StableMetrics}}
-<tr class="metric"><td class="metric_name">{{with $metric}}{{.BuildFQName}}{{end}}</td>
-<td class="metric_stability_level" data-stability="{{$metric.StabilityLevel | ToLower}}">{{$metric.StabilityLevel}}</td>
-<td class="metric_type" data-type="{{$metric.Type | ToLower}}">{{$metric.Type}}</td>
-<td class="metric_description">{{$metric.Help}}</td>
-{{if not $metric.Labels }}<td class="metric_labels_varying"></td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
-{{if not $metric.ConstLabels }}<td class="metric_labels_constant"></td>{{else }}<td class="metric_labels_constant">{{range $key, $value := $metric.ConstLabels}}<div class="metric_label">{{$key}}:{{$value}}</div>{{end}}</td>{{end}}
-{{if not $metric.DeprecatedVersion }}<td class="metric_deprecated_version"></td>{{else }}<td class="metric_deprecated_version">{{$metric.DeprecatedVersion}}</td>{{end}}</tr>{{end}}
-</tbody>
-</table>
+Stable metrics observe strict API contracts and no labels can be added or removed from stable metrics during their lifetime.
+
+<div class="metrics">
+{{- range $index, $metric := .StableMetrics -}}
+	<div class="metric" data-stability="{{$metric.StabilityLevel | ToLower}}">
+	<div class="metric_name">{{with $metric}}{{.BuildFQName}}{{- end -}}</div>
+	<div class="metric_help">{{- $metric.Help -}}</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">{{- $metric.StabilityLevel -}}</span></li>
+	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
+	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
+	</ul>
+	</div>{{end}}
+</div>
+
+### List of Beta Kubernetes Metrics
+
+Beta metrics observe a looser API contract than its stable counterparts. No labels can be removed from beta metrics during their lifetime, however, labels can be added while the metric is in the beta stage. This offers the assurance that beta metrics will honor existing dashboards and alerts, while allowing for amendments in the future. 
+
+<div class="metrics">
+{{- range $index, $metric := .BetaMetrics -}}
+	<div class="metric" data-stability="{{$metric.StabilityLevel | ToLower}}">
+	<div class="metric_name">{{with $metric}}{{.BuildFQName}}{{- end -}}</div>
+	<div class="metric_help">{{- $metric.Help -}}</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">{{- $metric.StabilityLevel -}}</span></li>
+	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
+	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
+	</ul>
+	</div>{{end}}
+</div>
 
 ### List of Alpha Kubernetes Metrics
 
-<table class="table metrics" caption="This is the list of ALPHA metrics emitted from core Kubernetes components">
-<thead>
-	<tr>
-		<th class="metric_name">Name</th>
-		<th class="metric_stability_level">Stability Level</th>
-		<th class="metric_type">Type</th>
-		<th class="metric_help">Help</th>
-		<th class="metric_labels">Labels</th>
-		<th class="metric_const_labels">Const Labels</th>
-		<th class="metric_deprecated_version">Deprecated Version</th>
-	</tr>
-</thead>
-<tbody>
-{{range $index, $metric := .AlphaMetrics}}
-<tr class="metric"><td class="metric_name">{{with $metric}}{{.BuildFQName}}{{end}}</td>
-<td class="metric_stability_level" data-stability="{{$metric.StabilityLevel | ToLower}}">{{$metric.StabilityLevel}}</td>
-<td class="metric_type" data-type="{{$metric.Type | ToLower}}">{{$metric.Type}}</td>
-<td class="metric_description">{{$metric.Help}}</td>
-{{if not $metric.Labels }}<td class="metric_labels_varying"></td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
-{{if not $metric.ConstLabels }}<td class="metric_labels_constant"></td>{{else }}<td class="metric_labels_constant">{{range $key, $value := $metric.ConstLabels}}<div class="metric_label">{{$key}}:{{$value}}</div>{{end}}</td>{{end}}
-{{if not $metric.DeprecatedVersion }}<td class="metric_deprecated_version"></td>{{else }}<td class="metric_deprecated_version">{{$metric.DeprecatedVersion}}</td>{{end}}</tr>{{end}}
-</tbody>
-</table>
+Alpha metrics do not have any API guarantees. These metrics must be used at your own risk, subsequent versions of Kubernetes may remove these metrics altogether, or mutate the API in such a way that breaks existing dashboards and alerts. 
+
+<div class="metrics">
+{{- range $index, $metric := .AlphaMetrics -}}
+	<div class="metric" data-stability="{{$metric.StabilityLevel | ToLower}}">
+	<div class="metric_name">{{with $metric}}{{.BuildFQName}}{{- end -}}</div>
+	<div class="metric_help">{{- $metric.Help -}}</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">{{- $metric.StabilityLevel -}}</span></li>
+	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
+	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
+	</ul>
+	</div>{{end}}
+</div>
 `
 )
 
 type templateData struct {
 	AlphaMetrics     []metric
+	BetaMetrics      []metric
 	StableMetrics    []metric
 	GeneratedDate    time.Time
 	GeneratedVersion string
@@ -122,8 +128,8 @@ func main() {
 	var minor string
 	flag.StringVar(&major, "major", "", "k8s major version")
 	flag.StringVar(&minor, "minor", "", "k8s minor version")
-	println(major, minor)
 	flag.Parse()
+	println(major, minor)
 	dat, err := os.ReadFile("test/instrumentation/documentation/documentation-list.yaml")
 	if err == nil {
 		var parsedMetrics []metric
@@ -146,6 +152,7 @@ func main() {
 		sortedMetrics := byStabilityLevel(parsedMetrics)
 		data := templateData{
 			AlphaMetrics:     sortedMetrics["ALPHA"],
+			BetaMetrics:      sortedMetrics["BETA"],
 			StableMetrics:    sortedMetrics["STABLE"],
 			GeneratedDate:    time.Now(),
 			GeneratedVersion: fmt.Sprintf("%v.%v", major, parseMinor(minor)),

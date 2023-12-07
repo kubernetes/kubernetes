@@ -31,11 +31,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	kexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -405,7 +405,7 @@ func TestTarUntar(t *testing.T) {
 		}
 	}
 
-	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+	opts := NewCopyOptions(genericiooptions.NewTestIOStreamsDiscard())
 
 	writer := &bytes.Buffer{}
 	if err := makeTar(newLocalPath(dir), newRemotePath(dir), writer); err != nil {
@@ -467,7 +467,7 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 	}
 	createTmpFile(t, completePath, "sample data")
 
-	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+	opts := NewCopyOptions(genericiooptions.NewTestIOStreamsDiscard())
 
 	writer := &bytes.Buffer{}
 	if err := makeTar(newLocalPath(dir), newRemotePath(dir), writer); err != nil {
@@ -589,7 +589,7 @@ func TestBadTar(t *testing.T) {
 		t.FailNow()
 	}
 
-	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+	opts := NewCopyOptions(genericiooptions.NewTestIOStreamsDiscard())
 	if err := opts.untarAll("", "", "/prefix", remotePath{}, newLocalPath(dir), &buf); err != nil {
 		t.Errorf("unexpected error: %v ", err)
 		t.FailNow()
@@ -618,7 +618,7 @@ func TestCopyToPod(t *testing.T) {
 	}
 
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdCp(tf, ioStreams)
 
@@ -689,7 +689,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 	}
 
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdCp(tf, ioStreams)
 
@@ -753,7 +753,7 @@ func TestValidate(t *testing.T) {
 			expectedErr: true,
 		},
 	}
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	opts := NewCopyOptions(ioStreams)
 
 	for _, test := range tests {
@@ -908,7 +908,7 @@ func TestUntar(t *testing.T) {
 
 	// Capture warnings to stderr for debugging.
 	output := (*testWriter)(t)
-	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
+	opts := NewCopyOptions(genericiooptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
 
 	require.NoError(t, opts.untarAll("", "", "", remotePath{}, newLocalPath(basedir), buf))
 
@@ -959,7 +959,7 @@ func TestUntar_SingleFile(t *testing.T) {
 
 	// Capture warnings to stderr for debugging.
 	output := (*testWriter)(t)
-	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
+	opts := NewCopyOptions(genericiooptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
 
 	require.NoError(t, opts.untarAll("", "", srcName, remotePath{}, newLocalPath(dest), buf))
 	cmpFileData(t, dest, content)

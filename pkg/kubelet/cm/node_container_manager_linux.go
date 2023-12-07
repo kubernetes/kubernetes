@@ -147,7 +147,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 			if rp.Unified == nil {
 				rp.Unified = make(map[string]string)
 			}
-			rp.Unified[MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
+			rp.Unified[Cgroup2MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
 		}
 	}
 

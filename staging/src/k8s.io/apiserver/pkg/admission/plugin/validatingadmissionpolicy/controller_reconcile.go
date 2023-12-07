@@ -22,19 +22,24 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -42,27 +47,30 @@ type policyController struct {
 	once                        sync.Once
 	context                     context.Context
 	dynamicClient               dynamic.Interface
+	informerFactory             informers.SharedInformerFactory
 	restMapper                  meta.RESTMapper
-	policyDefinitionsController generic.Controller[*v1alpha1.ValidatingAdmissionPolicy]
-	policyBindingController     generic.Controller[*v1alpha1.ValidatingAdmissionPolicyBinding]
+	policyDefinitionsController generic.Controller[*v1beta1.ValidatingAdmissionPolicy]
+	policyBindingController     generic.Controller[*v1beta1.ValidatingAdmissionPolicyBinding]
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
-	ValidatorCompiler
+	// pass nil to create filter compiler in demand
+	filterCompiler cel.FilterCompiler
 
-	// Lock which protects:
-	//  - cachedPolicies
-	//  - paramCRDControllers
-	//  - definitionInfo
-	//  - bindingInfos
-	//  - definitionsToBindings
-	// All other fields should be assumed constant
+	matcher Matcher
+
+	newValidator
+
+	client kubernetes.Interface
+	// Lock which protects
+	// All Below fields
+	// All above fields should be assumed constant
 	mutex sync.RWMutex
 
 	cachedPolicies []policyData
 
 	// controller and metadata
-	paramsCRDControllers map[v1alpha1.ParamKind]*paramInfo
+	paramsCRDControllers map[v1beta1.ParamKind]*paramInfo
 
 	// Index for each definition namespace/name, contains all binding
 	// namespace/names known to exist for that definition
@@ -77,25 +85,29 @@ type policyController struct {
 	// All keys must have at least one dependent binding
 	// All binding names MUST exist as a key bindingInfos
 	definitionsToBindings map[namespacedName]sets.Set[namespacedName]
-
-	client kubernetes.Interface
 }
+
+type newValidator func(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failurePolicy *v1.FailurePolicyType) Validator
 
 func newPolicyController(
 	restMapper meta.RESTMapper,
 	client kubernetes.Interface,
 	dynamicClient dynamic.Interface,
-	validatorCompiler ValidatorCompiler,
-	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
-	bindingsInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicyBinding],
+	informerFactory informers.SharedInformerFactory,
+	filterCompiler cel.FilterCompiler,
+	matcher Matcher,
+	policiesInformer generic.Informer[*v1beta1.ValidatingAdmissionPolicy],
+	bindingsInformer generic.Informer[*v1beta1.ValidatingAdmissionPolicyBinding],
 ) *policyController {
 	res := &policyController{}
 	*res = policyController{
-		ValidatorCompiler:     validatorCompiler,
+		filterCompiler:        filterCompiler,
 		definitionInfo:        make(map[namespacedName]*definitionInfo),
 		bindingInfos:          make(map[namespacedName]*bindingInfo),
-		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
+		paramsCRDControllers:  make(map[v1beta1.ParamKind]*paramInfo),
 		definitionsToBindings: make(map[namespacedName]sets.Set[namespacedName]),
+		matcher:               matcher,
+		newValidator:          NewValidator,
 		policyDefinitionsController: generic.NewController(
 			policiesInformer,
 			res.reconcilePolicyDefinition,
@@ -112,9 +124,10 @@ func newPolicyController(
 				Name:    "cel-policy-bindings",
 			},
 		),
-		restMapper:    restMapper,
-		dynamicClient: dynamicClient,
-		client:        client,
+		restMapper:      restMapper,
+		dynamicClient:   dynamicClient,
+		informerFactory: informerFactory,
+		client:          client,
 	}
 	return res
 }
@@ -147,10 +160,14 @@ func (c *policyController) HasSynced() bool {
 	return c.policyDefinitionsController.HasSynced() && c.policyBindingController.HasSynced()
 }
 
-func (c *policyController) reconcilePolicyDefinition(namespace, name string, definition *v1alpha1.ValidatingAdmissionPolicy) error {
+func (c *policyController) reconcilePolicyDefinition(namespace, name string, definition *v1beta1.ValidatingAdmissionPolicy) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	err := c.reconcilePolicyDefinitionSpec(namespace, name, definition)
+	return err
+}
 
+func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string, definition *v1beta1.ValidatingAdmissionPolicy) error {
 	c.cachedPolicies = nil // invalidate cachedPolicies
 
 	// Namespace for policydefinition is empty.
@@ -163,7 +180,13 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 		celmetrics.Metrics.ObserveDefinition(context.TODO(), "active", "deny")
 	}
 
-	var paramSource *v1alpha1.ParamKind
+	// Skip reconcile if the spec of the definition is unchanged
+	if info.lastReconciledValue != nil && definition != nil &&
+		apiequality.Semantic.DeepEqual(info.lastReconciledValue.Spec, definition.Spec) {
+		return nil
+	}
+
+	var paramSource *v1beta1.ParamKind
 	if definition != nil {
 		paramSource = definition.Spec.ParamKind
 	}
@@ -209,7 +232,6 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 		// Skip setting up controller for empty param type
 		return nil
 	}
-
 	// find GVR for params
 	// Parse param source into a GVK
 
@@ -236,104 +258,78 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 		return info.configurationError
 	}
 
-	if info, ok := c.paramsCRDControllers[*paramSource]; ok {
-		// If a param controller is already active for this paramsource, make
-		// sure it is tracking this policy's dependency upon it
-		info.dependentDefinitions.Insert(nn)
-
-	} else {
-		instanceContext, instanceCancel := context.WithCancel(c.context)
-
-		var informer cache.SharedIndexInformer
-
-		// Informer Factory is optional
-		if c.client != nil {
-			// Create temporary informer factory
-			// Cannot use the k8s shared informer factory for dynamic params informer.
-			// Would leak unnecessary informers when we are done since we would have to
-			// call informerFactory.Start() with a longer-lived stopCh than necessary.
-			// SharedInformerFactory does not support temporary usage.
-			dynamicFactory := informers.NewSharedInformerFactory(c.client, 10*time.Minute)
-
-			// Look for a typed informer. If it does not exist
-			genericInformer, err := dynamicFactory.ForResource(paramsGVR.Resource)
-
-			// Ignore error. We fallback to dynamic informer if there is no
-			// typed informer
-			if err != nil {
-				informer = nil
-			} else {
-				informer = genericInformer.Informer()
-
-				// Set transformer on the informer to workaround inconsistency
-				// where typed objects have TypeMeta wiped out but dynamic
-				// objects keep kind/apiVersion fields
-				informer.SetTransform(func(i interface{}) (interface{}, error) {
-					// Ensure param is populated with its GVK for consistency
-					// (CRD dynamic informer always returns objects with kind/apiversion,
-					// but native types do not include populated TypeMeta.
-					if param := i.(runtime.Object); param != nil {
-						if param.GetObjectKind().GroupVersionKind().Empty() {
-							// https://github.com/kubernetes/client-go/issues/413#issue-324586398
-							gvks, _, _ := k8sscheme.Scheme.ObjectKinds(param)
-							for _, gvk := range gvks {
-								if len(gvk.Kind) == 0 {
-									continue
-								}
-								if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
-									continue
-								}
-								param.GetObjectKind().SetGroupVersionKind(gvk)
-								break
-							}
-						}
-					}
-
-					return i, nil
-				})
-			}
-		}
-
-		if informer == nil {
-			// Dynamic JSON informer fallback.
-			// Cannot use shared dynamic informer since it would be impossible
-			// to clean CRD informers properly with multiple dependents
-			// (cannot start ahead of time, and cannot track dependencies via stopCh)
-			informer = dynamicinformer.NewFilteredDynamicInformer(
-				c.dynamicClient,
-				paramsGVR.Resource,
-				corev1.NamespaceAll,
-				// Use same interval as is used for k8s typed sharedInformerFactory
-				// https://github.com/kubernetes/kubernetes/blob/7e0923899fed622efbc8679cca6b000d43633e38/cmd/kube-apiserver/app/server.go#L430
-				10*time.Minute,
-				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-				nil,
-			).Informer()
-		}
-
-		controller := generic.NewController(
-			generic.NewInformer[runtime.Object](informer),
-			c.reconcileParams,
-			generic.ControllerOptions{
-				Workers: 1,
-				Name:    paramSource.String() + "-controller",
-			},
-		)
-
-		c.paramsCRDControllers[*paramSource] = &paramInfo{
-			controller:           controller,
-			stop:                 instanceCancel,
-			dependentDefinitions: sets.New(nn),
-		}
-
-		go controller.Run(instanceContext)
-		go informer.Run(instanceContext.Done())
-	}
+	paramInfo := c.ensureParamInfo(paramSource, paramsGVR)
+	paramInfo.dependentDefinitions.Insert(nn)
 
 	return nil
 }
 
-func (c *policyController) reconcilePolicyBinding(namespace, name string, binding *v1alpha1.ValidatingAdmissionPolicyBinding) error {
+// Ensures that there is an informer started for the given GVK to be used as a
+// param
+func (c *policyController) ensureParamInfo(paramSource *v1beta1.ParamKind, mapping *meta.RESTMapping) *paramInfo {
+	if info, ok := c.paramsCRDControllers[*paramSource]; ok {
+		return info
+	}
+
+	// We are not watching this param. Start an informer for it.
+	instanceContext, instanceCancel := context.WithCancel(c.context)
+
+	var informer cache.SharedIndexInformer
+
+	// Try to see if our provided informer factory has an informer for this type.
+	// We assume the informer is already started, and starts all types associated
+	// with it.
+	if genericInformer, err := c.informerFactory.ForResource(mapping.Resource); err == nil {
+		informer = genericInformer.Informer()
+
+		// Ensure the informer is started
+		// Use policyController's context rather than the instance context.
+		// PolicyController context is expected to last until app shutdown
+		// This is due to behavior of informerFactory which would cause the
+		// informer to stop running once the context is cancelled, and
+		// never started again.
+		c.informerFactory.Start(c.context.Done())
+	} else {
+		// Dynamic JSON informer fallback.
+		// Cannot use shared dynamic informer since it would be impossible
+		// to clean CRD informers properly with multiple dependents
+		// (cannot start ahead of time, and cannot track dependencies via stopCh)
+		informer = dynamicinformer.NewFilteredDynamicInformer(
+			c.dynamicClient,
+			mapping.Resource,
+			corev1.NamespaceAll,
+			// Use same interval as is used for k8s typed sharedInformerFactory
+			// https://github.com/kubernetes/kubernetes/blob/7e0923899fed622efbc8679cca6b000d43633e38/cmd/kube-apiserver/app/server.go#L430
+			10*time.Minute,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+			nil,
+		).Informer()
+		go informer.Run(instanceContext.Done())
+	}
+
+	controller := generic.NewController(
+		generic.NewInformer[runtime.Object](informer),
+		c.reconcileParams,
+		generic.ControllerOptions{
+			Workers: 1,
+			Name:    paramSource.String() + "-controller",
+		},
+	)
+
+	ret := &paramInfo{
+		controller:           controller,
+		stop:                 instanceCancel,
+		scope:                mapping.Scope,
+		dependentDefinitions: sets.New[namespacedName](),
+	}
+	c.paramsCRDControllers[*paramSource] = ret
+
+	go controller.Run(instanceContext)
+	return ret
+
+}
+
+func (c *policyController) reconcilePolicyBinding(namespace, name string, binding *v1beta1.ValidatingAdmissionPolicyBinding) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -347,6 +343,12 @@ func (c *policyController) reconcilePolicyBinding(namespace, name string, bindin
 	if !ok {
 		info = &bindingInfo{}
 		c.bindingInfos[nn] = info
+	}
+
+	// Skip if the spec of the binding is unchanged.
+	if info.lastReconciledValue != nil && binding != nil &&
+		apiequality.Semantic.DeepEqual(info.lastReconciledValue.Spec, binding.Spec) {
+		return nil
 	}
 
 	var oldNamespacedDefinitionName namespacedName
@@ -424,27 +426,120 @@ func (c *policyController) latestPolicyData() []policyData {
 		for bindingNN := range c.definitionsToBindings[definitionNN] {
 			bindingInfo := c.bindingInfos[bindingNN]
 			if bindingInfo.validator == nil && definitionInfo.configurationError == nil {
-				bindingInfo.validator = c.ValidatorCompiler.Compile(definitionInfo.lastReconciledValue)
+				hasParam := false
+				if definitionInfo.lastReconciledValue.Spec.ParamKind != nil {
+					hasParam = true
+				}
+				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
+				expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
+				failurePolicy := convertv1beta1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy)
+				var matcher matchconditions.Matcher = nil
+				matchConditions := definitionInfo.lastReconciledValue.Spec.MatchConditions
+
+				filterCompiler := c.filterCompiler
+				if filterCompiler == nil {
+					compositedCompiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+					if err == nil {
+						filterCompiler = compositedCompiler
+						compositedCompiler.CompileAndStoreVariables(convertv1beta1Variables(definitionInfo.lastReconciledValue.Spec.Variables), optionalVars, environment.StoredExpressions)
+					} else {
+						utilruntime.HandleError(err)
+					}
+				}
+				if len(matchConditions) > 0 {
+					matchExpressionAccessors := make([]cel.ExpressionAccessor, len(matchConditions))
+					for i := range matchConditions {
+						matchExpressionAccessors[i] = (*matchconditions.MatchCondition)(&matchConditions[i])
+					}
+					matcher = matchconditions.NewMatcher(filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "policy", "validate", definitionInfo.lastReconciledValue.Name)
+				}
+				bindingInfo.validator = c.newValidator(
+					filterCompiler.Compile(convertv1beta1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
+					matcher,
+					filterCompiler.Compile(convertv1beta1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertv1beta1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
+					failurePolicy,
+				)
 			}
 			bindingInfos = append(bindingInfos, *bindingInfo)
 		}
 
-		var paramController generic.Controller[runtime.Object]
+		var pInfo paramInfo
 		if paramKind := definitionInfo.lastReconciledValue.Spec.ParamKind; paramKind != nil {
 			if info, ok := c.paramsCRDControllers[*paramKind]; ok {
-				paramController = info.controller
+				pInfo = *info
 			}
 		}
 
 		res = append(res, policyData{
-			definitionInfo:  *definitionInfo,
-			paramController: paramController,
-			bindings:        bindingInfos,
+			definitionInfo: *definitionInfo,
+			paramInfo:      pInfo,
+			bindings:       bindingInfos,
 		})
 	}
 
 	c.cachedPolicies = res
 	return res
+}
+
+func convertv1beta1FailurePolicyTypeTov1FailurePolicyType(policyType *v1beta1.FailurePolicyType) *v1.FailurePolicyType {
+	if policyType == nil {
+		return nil
+	}
+
+	var v1FailPolicy v1.FailurePolicyType
+	if *policyType == v1beta1.Fail {
+		v1FailPolicy = v1.Fail
+	} else if *policyType == v1beta1.Ignore {
+		v1FailPolicy = v1.Ignore
+	}
+	return &v1FailPolicy
+}
+
+func convertv1beta1Validations(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		validation := ValidationCondition{
+			Expression: validation.Expression,
+			Message:    validation.Message,
+			Reason:     validation.Reason,
+		}
+		celExpressionAccessor[i] = &validation
+	}
+	return celExpressionAccessor
+}
+
+func convertv1beta1MessageExpressions(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		if validation.MessageExpression != "" {
+			condition := MessageExpressionCondition{
+				MessageExpression: validation.MessageExpression,
+			}
+			celExpressionAccessor[i] = &condition
+		}
+	}
+	return celExpressionAccessor
+}
+
+func convertv1beta1AuditAnnotations(inputValidations []v1beta1.AuditAnnotation) []cel.ExpressionAccessor {
+	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
+	for i, validation := range inputValidations {
+		validation := AuditAnnotationCondition{
+			Key:             validation.Key,
+			ValueExpression: validation.ValueExpression,
+		}
+		celExpressionAccessor[i] = &validation
+	}
+	return celExpressionAccessor
+}
+
+func convertv1beta1Variables(variables []v1beta1.Variable) []cel.NamedExpressionAccessor {
+	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
+	for i, variable := range variables {
+		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}
+	}
+	return namedExpressions
 }
 
 func getNamespaceName(namespace, name string) namespacedName {

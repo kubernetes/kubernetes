@@ -39,7 +39,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v3.3.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.4.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"

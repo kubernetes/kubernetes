@@ -65,9 +65,95 @@ func init() {
 			}
 		},
 	}
-
 	registerFixtureGenerator(
 		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "sysctls"},
 		fixtureData_1_0,
+	)
+
+	fixtureData_1_27 := fixtureGenerator{
+		expectErrorSubstring: "forbidden sysctl",
+		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+			if p.Spec.SecurityContext == nil {
+				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+			}
+			return []*corev1.Pod{
+				// security context with no sysctls
+				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.Sysctls = nil }),
+				// sysctls with name="kernel.shm_rmid_forced" ,"net.ipv4.ip_local_port_range"
+				// "net.ipv4.tcp_syncookies", "net.ipv4.ping_group_range",
+				// "net.ipv4.ip_unprivileged_port_start", "net.ipv4.ip_local_reserved_ports"
+				tweak(p, func(p *corev1.Pod) {
+					p.Spec.SecurityContext.Sysctls = []corev1.Sysctl{
+						{Name: "kernel.shm_rmid_forced", Value: "0"},
+						{Name: "net.ipv4.ip_local_port_range", Value: "1024 65535"},
+						{Name: "net.ipv4.tcp_syncookies", Value: "0"},
+						{Name: "net.ipv4.ping_group_range", Value: "1 0"},
+						{Name: "net.ipv4.ip_unprivileged_port_start", Value: "1024"},
+						{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"},
+					}
+				}),
+			}
+		},
+		generateFail: func(p *corev1.Pod) []*corev1.Pod {
+			if p.Spec.SecurityContext == nil {
+				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+			}
+			return []*corev1.Pod{
+				// sysctls with out of allowed name
+				tweak(p, func(p *corev1.Pod) {
+					p.Spec.SecurityContext.Sysctls = []corev1.Sysctl{{Name: "othersysctl", Value: "other"}}
+				}),
+			}
+		},
+	}
+	registerFixtureGenerator(
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 27), check: "sysctls"},
+		fixtureData_1_27,
+	)
+
+	fixtureDataV1Dot29 := fixtureGenerator{
+		expectErrorSubstring: "forbidden sysctl",
+		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+			if p.Spec.SecurityContext == nil {
+				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+			}
+			return []*corev1.Pod{
+				// security context with no sysctls
+				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.Sysctls = nil }),
+				// sysctls with name="kernel.shm_rmid_forced" ,"net.ipv4.ip_local_port_range"
+				// "net.ipv4.tcp_syncookies", "net.ipv4.ping_group_range",
+				// "net.ipv4.ip_unprivileged_port_start", "net.ipv4.ip_local_reserved_ports",
+				// "net.ipv4.tcp_keepalive_time"
+				tweak(p, func(p *corev1.Pod) {
+					p.Spec.SecurityContext.Sysctls = []corev1.Sysctl{
+						{Name: "kernel.shm_rmid_forced", Value: "0"},
+						{Name: "net.ipv4.ip_local_port_range", Value: "1024 65535"},
+						{Name: "net.ipv4.tcp_syncookies", Value: "0"},
+						{Name: "net.ipv4.ping_group_range", Value: "1 0"},
+						{Name: "net.ipv4.ip_unprivileged_port_start", Value: "1024"},
+						{Name: "net.ipv4.ip_local_reserved_ports", Value: "1024-4999"},
+						{Name: "net.ipv4.tcp_keepalive_time", Value: "7200"},
+						{Name: "net.ipv4.tcp_fin_timeout", Value: "60"},
+						{Name: "net.ipv4.tcp_keepalive_intvl", Value: "75"},
+						{Name: "net.ipv4.tcp_keepalive_probes", Value: "9"},
+					}
+				}),
+			}
+		},
+		generateFail: func(p *corev1.Pod) []*corev1.Pod {
+			if p.Spec.SecurityContext == nil {
+				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+			}
+			return []*corev1.Pod{
+				// sysctls with out of allowed name
+				tweak(p, func(p *corev1.Pod) {
+					p.Spec.SecurityContext.Sysctls = []corev1.Sysctl{{Name: "othersysctl", Value: "other"}}
+				}),
+			}
+		},
+	}
+	registerFixtureGenerator(
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 29), check: "sysctls"},
+		fixtureDataV1Dot29,
 	)
 }

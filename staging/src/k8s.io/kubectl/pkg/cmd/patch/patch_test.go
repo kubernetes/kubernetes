@@ -23,7 +23,7 @@ import (
 
 	jsonpath "github.com/exponent-io/jsonpath"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -57,7 +57,7 @@ func TestPatchObject(t *testing.T) {
 			}
 		}),
 	}
-	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")
@@ -91,7 +91,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 			}
 		}),
 	}
-	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")
@@ -138,7 +138,7 @@ func TestPatchNoop(t *testing.T) {
 			patchObject.Annotations = map[string]string{}
 		}
 		patchObject.Annotations["foo"] = "bar"
-		stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+		stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 		cmd := NewCmdPatch(tf, stream)
 		cmd.Flags().Set("namespace", "test")
 		cmd.Flags().Set("patch", `{"metadata":{"annotations":{"foo":"bar"}}}`)
@@ -177,7 +177,7 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 			}
 		}),
 	}
-	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")
@@ -222,7 +222,7 @@ func TestPatchSubresource(t *testing.T) {
 			}
 		}),
 	}
-	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")

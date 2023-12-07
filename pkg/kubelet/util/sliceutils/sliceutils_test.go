@@ -18,36 +18,12 @@ package sliceutils
 
 import (
 	"testing"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"time"
 )
-
-func TestStringInSlice(t *testing.T) {
-	fooTests := []struct {
-		s    string
-		list []string
-		er   bool
-	}{
-		{"first", []string{"first", "second"}, true},
-		{"FIRST", []string{"first", "second"}, false},
-		{"third", []string{"first", "second"}, false},
-		{"first", nil, false},
-
-		{"", []string{"first", "second"}, false},
-		{"", []string{"first", "second", ""}, true},
-		{"", nil, false},
-	}
-
-	for _, fooTest := range fooTests {
-		r := StringInSlice(fooTest.s, fooTest.list)
-		if r != fooTest.er {
-			t.Errorf("returned %t but expected %t for s=%s & list=%s", r, fooTest.er, fooTest.s, fooTest.list)
-		}
-	}
-}
 
 func buildPodsByCreationTime() PodsByCreationTime {
 	return []*v1.Pod{

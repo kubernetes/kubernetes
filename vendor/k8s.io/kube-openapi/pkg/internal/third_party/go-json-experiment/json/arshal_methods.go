@@ -21,8 +21,8 @@ var (
 )
 
 // MarshalerV1 is implemented by types that can marshal themselves.
-// It is recommended that types implement MarshalerV2 unless
-// the implementation is trying to avoid a hard dependency on this package.
+// It is recommended that types implement MarshalerV2 unless the implementation
+// is trying to avoid a hard dependency on the "jsontext" package.
 //
 // It is recommended that implementations return a buffer that is safe
 // for the caller to retain and potentially mutate.

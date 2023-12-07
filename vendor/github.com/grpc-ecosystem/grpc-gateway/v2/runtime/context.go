@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -35,11 +36,15 @@ const metadataHeaderBinarySuffix = "-Bin"
 const xForwardedFor = "X-Forwarded-For"
 const xForwardedHost = "X-Forwarded-Host"
 
-var (
-	// DefaultContextTimeout is used for gRPC call context.WithTimeout whenever a Grpc-Timeout inbound
-	// header isn't present. If the value is 0 the sent `context` will not have a timeout.
-	DefaultContextTimeout = 0 * time.Second
-)
+// DefaultContextTimeout is used for gRPC call context.WithTimeout whenever a Grpc-Timeout inbound
+// header isn't present. If the value is 0 the sent `context` will not have a timeout.
+var DefaultContextTimeout = 0 * time.Second
+
+// malformedHTTPHeaders lists the headers that the gRPC server may reject outright as malformed.
+// See https://github.com/grpc/grpc-go/pull/4803#issuecomment-986093310 for more context.
+var malformedHTTPHeaders = map[string]struct{}{
+	"connection": {},
+}
 
 type (
 	rpcMethodKey       struct{}
@@ -95,12 +100,43 @@ func AnnotateIncomingContext(ctx context.Context, mux *ServeMux, req *http.Reque
 	return metadata.NewIncomingContext(ctx, md), nil
 }
 
+func isValidGRPCMetadataKey(key string) bool {
+	// Must be a valid gRPC "Header-Name" as defined here:
+	//   https://github.com/grpc/grpc/blob/4b05dc88b724214d0c725c8e7442cbc7a61b1374/doc/PROTOCOL-HTTP2.md
+	// This means 0-9 a-z _ - .
+	// Only lowercase letters are valid in the wire protocol, but the client library will normalize
+	// uppercase ASCII to lowercase, so uppercase ASCII is also acceptable.
+	bytes := []byte(key) // gRPC validates strings on the byte level, not Unicode.
+	for _, ch := range bytes {
+		validLowercaseLetter := ch >= 'a' && ch <= 'z'
+		validUppercaseLetter := ch >= 'A' && ch <= 'Z'
+		validDigit := ch >= '0' && ch <= '9'
+		validOther := ch == '.' || ch == '-' || ch == '_'
+		if !validLowercaseLetter && !validUppercaseLetter && !validDigit && !validOther {
+			return false
+		}
+	}
+	return true
+}
+
+func isValidGRPCMetadataTextValue(textValue string) bool {
+	// Must be a valid gRPC "ASCII-Value" as defined here:
+	//   https://github.com/grpc/grpc/blob/4b05dc88b724214d0c725c8e7442cbc7a61b1374/doc/PROTOCOL-HTTP2.md
+	// This means printable ASCII (including/plus spaces); 0x20 to 0x7E inclusive.
+	bytes := []byte(textValue) // gRPC validates strings on the byte level, not Unicode.
+	for _, ch := range bytes {
+		if ch < 0x20 || ch > 0x7E {
+			return false
+		}
+	}
+	return true
+}
+
 func annotateContext(ctx context.Context, mux *ServeMux, req *http.Request, rpcMethodName string, options ...AnnotateContextOption) (context.Context, metadata.MD, error) {
 	ctx = withRPCMethod(ctx, rpcMethodName)
 	for _, o := range options {
 		ctx = o(ctx)
 	}
-	var pairs []string
 	timeout := DefaultContextTimeout
 	if tm := req.Header.Get(metadataGrpcTimeout); tm != "" {
 		var err error
@@ -109,7 +145,7 @@ func annotateContext(ctx context.Context, mux *ServeMux, req *http.Request, rpcM
 			return nil, nil, status.Errorf(codes.InvalidArgument, "invalid grpc-timeout: %s", tm)
 		}
 	}
-
+	var pairs []string
 	for key, vals := range req.Header {
 		key = textproto.CanonicalMIMEHeaderKey(key)
 		for _, val := range vals {
@@ -118,6 +154,10 @@ func annotateContext(ctx context.Context, mux *ServeMux, req *http.Request, rpcM
 				pairs = append(pairs, "authorization", val)
 			}
 			if h, ok := mux.incomingHeaderMatcher(key); ok {
+				if !isValidGRPCMetadataKey(h) {
+					grpclog.Errorf("HTTP header name %q is not valid as gRPC metadata key; skipping", h)
+					continue
+				}
 				// Handles "-bin" metadata in grpc, since grpc will do another base64
 				// encode before sending to server, we need to decode it first.
 				if strings.HasSuffix(key, metadataHeaderBinarySuffix) {
@@ -127,6 +167,9 @@ func annotateContext(ctx context.Context, mux *ServeMux, req *http.Request, rpcM
 					}
 
 					val = string(b)
+				} else if !isValidGRPCMetadataTextValue(val) {
+					grpclog.Errorf("Value of HTTP header %q contains non-ASCII value (not valid as gRPC metadata): skipping", h)
+					continue
 				}
 				pairs = append(pairs, h, val)
 			}
@@ -172,11 +215,17 @@ type serverMetadataKey struct{}
 
 // NewServerMetadataContext creates a new context with ServerMetadata
 func NewServerMetadataContext(ctx context.Context, md ServerMetadata) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return context.WithValue(ctx, serverMetadataKey{}, md)
 }
 
 // ServerMetadataFromContext returns the ServerMetadata in ctx
 func ServerMetadataFromContext(ctx context.Context) (md ServerMetadata, ok bool) {
+	if ctx == nil {
+		return md, false
+	}
 	md, ok = ctx.Value(serverMetadataKey{}).(ServerMetadata)
 	return
 }
@@ -269,8 +318,8 @@ func timeoutUnitToDuration(u uint8) (d time.Duration, ok bool) {
 	case 'n':
 		return time.Nanosecond, true
 	default:
+		return
 	}
-	return
 }
 
 // isPermanentHTTPHeader checks whether hdr belongs to the list of
@@ -306,6 +355,13 @@ func isPermanentHTTPHeader(hdr string) bool {
 		return true
 	}
 	return false
+}
+
+// isMalformedHTTPHeader checks whether header belongs to the list of
+// "malformed headers" and would be rejected by the gRPC server.
+func isMalformedHTTPHeader(header string) bool {
+	_, isMalformed := malformedHTTPHeaders[strings.ToLower(header)]
+	return isMalformed
 }
 
 // RPCMethod returns the method string for the server context. The returned

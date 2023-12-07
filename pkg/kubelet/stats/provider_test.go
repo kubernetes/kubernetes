@@ -63,6 +63,7 @@ const (
 	offsetFsBaseUsageBytes
 	offsetFsInodeUsage
 	offsetAcceleratorDutyCycle
+	offsetMemSwapUsageBytes
 )
 
 var (
@@ -101,6 +102,7 @@ func TestGetCgroupStats(t *testing.T) {
 	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
 	checkMemoryStats(t, "", containerInfoSeed, containerInfo, cs.Memory)
 	checkNetworkStats(t, "", containerInfoSeed, ns)
+	checkSwapStats(t, "", containerInfoSeed, containerInfo, cs.Swap)
 
 	assert.Equal(cgroupName, cs.Name)
 	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
@@ -415,21 +417,34 @@ func TestHasDedicatedImageFs(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+	imageStatsExpected := &statsapi.FsStats{AvailableBytes: uint64Ptr(1)}
 
 	for desc, test := range map[string]struct {
-		rootfsDevice  string
-		imagefsDevice string
-		dedicated     bool
+		rootfsDevice     string
+		imagefsDevice    string
+		dedicated        bool
+		imageFsStats     *statsapi.FsStats
+		containerFsStats *statsapi.FsStats
 	}{
 		"dedicated device for image filesystem": {
 			rootfsDevice:  "root/device",
 			imagefsDevice: "image/device",
 			dedicated:     true,
+			imageFsStats:  imageStatsExpected,
 		},
 		"shared device for image filesystem": {
-			rootfsDevice:  "share/device",
-			imagefsDevice: "share/device",
-			dedicated:     false,
+			rootfsDevice:     "share/device",
+			imagefsDevice:    "share/device",
+			dedicated:        false,
+			imageFsStats:     imageStatsExpected,
+			containerFsStats: imageStatsExpected,
+		},
+		"split filesystem for images": {
+			rootfsDevice:     "root/device",
+			imagefsDevice:    "root/device",
+			dedicated:        true,
+			imageFsStats:     &statsapi.FsStats{AvailableBytes: uint64Ptr(1)},
+			containerFsStats: &statsapi.FsStats{AvailableBytes: uint64Ptr(2)},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
@@ -439,10 +454,12 @@ func TestHasDedicatedImageFs(t *testing.T) {
 			mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
 		)
 		mockCadvisor.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{Device: test.rootfsDevice}, nil)
-
 		provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{
-			device: test.imagefsDevice,
+			device:      test.imagefsDevice,
+			imageFs:     test.imageFsStats,
+			containerFs: test.containerFsStats,
 		})
+
 		dedicated, err := provider.HasDedicatedImageFs(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, test.dedicated, dedicated)
@@ -497,7 +514,8 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 		HasNetwork:   true,
 		Labels:       labels,
 		Memory: cadvisorapiv2.MemorySpec{
-			Limit: unlimitedMemory,
+			Limit:     unlimitedMemory,
+			SwapLimit: unlimitedMemory,
 		},
 		CustomMetrics: generateCustomMetricSpec(),
 	}
@@ -518,6 +536,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				Pgfault:    uint64(seed + offsetMemPageFaults),
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
 			},
+			Swap: uint64(seed + offsetMemSwapUsageBytes),
 		},
 		Network: &cadvisorapiv2.NetworkStats{
 			Interfaces: []cadvisorapiv1.InterfaceStats{{
@@ -696,6 +715,20 @@ func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.C
 	}
 }
 
+func checkSwapStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.SwapStats) {
+	label += ".Swap"
+
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Time")
+	assert.EqualValues(t, seed+offsetMemSwapUsageBytes, *stats.SwapUsageBytes, label+".SwapUsageBytes")
+
+	if !info.Spec.HasMemory || isMemoryUnlimited(info.Spec.Memory.SwapLimit) {
+		assert.Nil(t, stats.SwapAvailableBytes, label+".SwapAvailableBytes")
+	} else {
+		expected := info.Spec.Memory.Limit - *stats.SwapUsageBytes
+		assert.EqualValues(t, expected, *stats.SwapAvailableBytes, label+".AvailableBytes")
+	}
+}
+
 func checkFsStats(t *testing.T, label string, seed int, stats *statsapi.FsStats) {
 	assert.EqualValues(t, seed+offsetFsCapacity, *stats.CapacityBytes, label+".CapacityBytes")
 	assert.EqualValues(t, seed+offsetFsAvailable, *stats.AvailableBytes, label+".AvailableBytes")
@@ -742,7 +775,9 @@ func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.Pod
 }
 
 type fakeContainerStatsProvider struct {
-	device string
+	device      string
+	imageFs     *statsapi.FsStats
+	containerFs *statsapi.FsStats
 }
 
 func (p fakeContainerStatsProvider) ListPodStats(context.Context) ([]statsapi.PodStats, error) {
@@ -757,8 +792,8 @@ func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats(context.Context) ([
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (p fakeContainerStatsProvider) ImageFsStats(context.Context) (*statsapi.FsStats, error) {
-	return nil, fmt.Errorf("not implemented")
+func (p fakeContainerStatsProvider) ImageFsStats(context.Context) (*statsapi.FsStats, *statsapi.FsStats, error) {
+	return p.imageFs, p.containerFs, nil
 }
 
 func (p fakeContainerStatsProvider) ImageFsDevice(context.Context) (string, error) {

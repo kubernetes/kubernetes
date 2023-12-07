@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -52,9 +53,9 @@ For the number of schedulable nodes:
 9. Delete the Pod and wait for the Volume to be detached.
 10. Delete the Volume.
 */
-var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vsphere][Serial][Disruptive]", func() {
+var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart", feature.Vsphere, framework.WithSerial(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("restart-vpxd")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	type node struct {
 		name     string

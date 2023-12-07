@@ -1,0 +1,9 @@
+apiVersion: company.com/v1
+kind: ApplySet
+metadata:
+  name: my-set
+  annotations:
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0
+    applyset.kubernetes.io/contains-group-kinds: ""
+  labels:
+    applyset.kubernetes.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1

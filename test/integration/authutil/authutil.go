@@ -64,6 +64,14 @@ func WaitForNamedAuthorizationUpdate(t *testing.T, ctx context.Context, c author
 }
 
 func GrantUserAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, username string, rule rbacv1.PolicyRule) {
+	grantAuthorization(t, ctx, adminClient, username, "", rbacv1.UserKind, rule)
+}
+
+func GrantServiceAccountAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, serviceAccountName, serviceAccountNamespace string, rule rbacv1.PolicyRule) {
+	grantAuthorization(t, ctx, adminClient, serviceAccountName, serviceAccountNamespace, rbacv1.ServiceAccountKind, rule)
+}
+
+func grantAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, name, namespace, accountKind string, rule rbacv1.PolicyRule) {
 	t.Helper()
 
 	cr, err := adminClient.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
@@ -83,10 +91,10 @@ func GrantUserAuthorization(t *testing.T, ctx context.Context, adminClient clien
 		ObjectMeta: metav1.ObjectMeta{GenerateName: strings.Replace(t.Name(), "/", "--", -1)},
 		Subjects: []rbacv1.Subject{
 			{
-				Kind:      rbacv1.UserKind,
-				APIGroup:  rbacv1.GroupName,
-				Name:      username,
-				Namespace: "",
+				Kind: accountKind,
+				// APIGroup defaults to the appropriate value for both users and service accounts
+				Name:      name,
+				Namespace: namespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -107,12 +115,17 @@ func GrantUserAuthorization(t *testing.T, ctx context.Context, adminClient clien
 		resourceName = rule.ResourceNames[0]
 	}
 
+	subjectName := name
+	if accountKind == rbacv1.ServiceAccountKind {
+		subjectName = "system:serviceaccount:" + namespace + ":" + name
+	}
+
 	WaitForNamedAuthorizationUpdate(
 		t,
 		ctx,
 		adminClient.AuthorizationV1(),
-		username,
-		"",
+		subjectName,
+		namespace,
 		rule.Verbs[0],
 		resourceName,
 		schema.GroupResource{Group: rule.APIGroups[0], Resource: rule.Resources[0]},

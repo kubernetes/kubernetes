@@ -45,6 +45,9 @@ type CloudControllerManagerConfiguration struct {
 
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
+
+	// Webhook is the configuration for cloud-controller-manager hosted webhooks
+	Webhook WebhookConfiguration
 }
 
 // KubeCloudSharedConfiguration contains elements shared by both kube-controller manager
@@ -62,7 +65,7 @@ type KubeCloudSharedConfiguration struct {
 	AllowUntaggedCloud bool
 	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
 	RouteReconciliationPeriod metav1.Duration
-	// nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
+	// nodeMonitorPeriod is the period for syncing NodeStatus in CloudNodeLifecycleController.
 	NodeMonitorPeriod metav1.Duration
 	// clusterName is the instance prefix for the cluster.
 	ClusterName string
@@ -88,4 +91,13 @@ type CloudProviderConfiguration struct {
 	Name string
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	CloudConfigFile string
+}
+
+type WebhookConfiguration struct {
+	// Webhooks is the list of webhooks to enable or disable
+	// '*' means "all enabled by default webhooks"
+	// 'foo' means "enable 'foo'"
+	// '-foo' means "disable 'foo'"
+	// first item for a particular name wins
+	Webhooks []string
 }

@@ -69,6 +69,7 @@ generate: $(GEN_ATOMICINT) $(GEN_ATOMICWRAPPER)
 generatenodirty:
 	@[ -z "$$(git status --porcelain)" ] || ( \
 		echo "Working tree is dirty. Commit your changes first."; \
+		git status; \
 		exit 1 )
 	@make generate
 	@status=$$(git status --porcelain); \

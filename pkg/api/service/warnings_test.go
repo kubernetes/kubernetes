@@ -26,6 +26,51 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+func TestGetWarningsForService(t *testing.T) {
+	testCases := []struct {
+		name        string
+		tweakSvc    func(svc *api.Service) // Given a basic valid service, each test case can customize it.
+		numWarnings int
+	}{{
+		name: "new topology mode set",
+		tweakSvc: func(s *api.Service) {
+			s.Annotations = map[string]string{api.AnnotationTopologyMode: "foo"}
+		},
+		numWarnings: 0,
+	}, {
+		name: "deprecated hints annotation set",
+		tweakSvc: func(s *api.Service) {
+			s.Annotations = map[string]string{api.DeprecatedAnnotationTopologyAwareHints: "foo"}
+		},
+		numWarnings: 1,
+	}, {
+		name: "externalIPs set when type is ExternalName",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeExternalName
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+		},
+		numWarnings: 1,
+	}, {
+		name: "externalName set when type is not ExternalName",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ExternalName = "example.com"
+		},
+		numWarnings: 1,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &api.Service{}
+			tc.tweakSvc(svc)
+			warnings := GetWarningsForService(svc, svc)
+			if want, got := tc.numWarnings, len(warnings); got != want {
+				t.Errorf("Unexpected warning list: expected %d, got %d\n%q", want, got, warnings)
+			}
+		})
+	}
+}
+
 func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 	service := func(clusterIPs []string) *api.Service {
 		svc := api.Service{

@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"errors"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,6 +35,14 @@ import (
 
 const pluginNameNotAvailable = "N/A"
 
+const (
+	// Force detach reason is timeout
+	ForceDetachReasonTimeout = "timeout"
+	// Force detach reason is the node has an out-of-service taint
+	ForceDetachReasonOutOfService = "out-of-service"
+	attachDetachController        = "attach_detach_controller"
+)
+
 var (
 	inUseVolumeMetricDesc = metrics.NewDesc(
 		metrics.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
@@ -47,12 +56,15 @@ var (
 		[]string{"plugin_name", "state"}, nil,
 		metrics.ALPHA, "")
 
-	forcedDetachMetricCounter = metrics.NewCounter(
+	ForceDetachMetricCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:      attachDetachController,
 			Name:           "attachdetach_controller_forced_detaches",
 			Help:           "Number of times the A/D Controller performed a forced detach",
 			StabilityLevel: metrics.ALPHA,
-		})
+		},
+		[]string{"reason"},
+	)
 )
 var registerMetrics sync.Once
 
@@ -74,7 +86,7 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 			pluginMgr,
 			csiMigratedPluginManager,
 			intreeToCSITranslator))
-		legacyregistry.MustRegister(forcedDetachMetricCounter)
+		legacyregistry.MustRegister(ForceDetachMetricCounter)
 	})
 }
 
@@ -129,7 +141,7 @@ func (collector *attachDetachStateCollector) DescribeWithStability(ch chan<- *me
 }
 
 func (collector *attachDetachStateCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	nodeVolumeMap := collector.getVolumeInUseCount()
+	nodeVolumeMap := collector.getVolumeInUseCount(klog.TODO())
 	for nodeName, pluginCount := range nodeVolumeMap {
 		for pluginName, count := range pluginCount {
 			ch <- metrics.NewLazyConstMetric(inUseVolumeMetricDesc,
@@ -152,10 +164,10 @@ func (collector *attachDetachStateCollector) CollectWithStability(ch chan<- metr
 	}
 }
 
-func (collector *attachDetachStateCollector) getVolumeInUseCount() volumeCount {
+func (collector *attachDetachStateCollector) getVolumeInUseCount(logger klog.Logger) volumeCount {
 	pods, err := collector.podLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Error getting pod list")
+		logger.Error(errors.New("Error getting pod list"), "Get pod list failed")
 		return nil
 	}
 
@@ -169,7 +181,7 @@ func (collector *attachDetachStateCollector) getVolumeInUseCount() volumeCount {
 			continue
 		}
 		for _, podVolume := range pod.Spec.Volumes {
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, pod, types.NodeName(pod.Spec.NodeName), collector.volumePluginMgr, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, pod, types.NodeName(pod.Spec.NodeName), collector.volumePluginMgr, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
 			if err != nil {
 				continue
 			}
@@ -208,6 +220,6 @@ func (collector *attachDetachStateCollector) getTotalVolumesCount() volumeCount 
 }
 
 // RecordForcedDetachMetric register a forced detach metric.
-func RecordForcedDetachMetric() {
-	forcedDetachMetricCounter.Inc()
+func RecordForcedDetachMetric(forceDetachReason string) {
+	ForceDetachMetricCounter.WithLabelValues(forceDetachReason).Inc()
 }

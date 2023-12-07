@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -71,11 +72,11 @@ type CreateJobOptions struct {
 	FieldManager        string
 	CreateAnnotation    bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCreateJobOptions initializes and returns new CreateJobOptions instance
-func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOptions {
+func NewCreateJobOptions(ioStreams genericiooptions.IOStreams) *CreateJobOptions {
 	return &CreateJobOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -83,7 +84,7 @@ func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOption
 }
 
 // NewCmdCreateJob is a command to ease creating Jobs from CronJobs.
-func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateJobOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
@@ -260,17 +261,10 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batch
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        o.Name,
-			Annotations: annotations,
-			Labels:      cronJob.Spec.JobTemplate.Labels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: batchv1.SchemeGroupVersion.String(),
-					Kind:       "CronJob",
-					Name:       cronJob.GetName(),
-					UID:        cronJob.GetUID(),
-				},
-			},
+			Name:            o.Name,
+			Annotations:     annotations,
+			Labels:          cronJob.Spec.JobTemplate.Labels,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cronJob, batchv1.SchemeGroupVersion.WithKind("CronJob"))},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}

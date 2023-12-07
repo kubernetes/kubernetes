@@ -40,17 +40,18 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Serial]", func() {
+var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, framework.WithSerial(), func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
-		pollTimeout    = 1 * time.Minute
+		pollTimeout    = 5 * time.Minute
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string

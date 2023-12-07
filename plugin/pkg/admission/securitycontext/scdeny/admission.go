@@ -23,16 +23,25 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // PluginName indicates name of admission plugin.
 const PluginName = "SecurityContextDeny"
 
+const docLink = "https://k8s.io/docs/reference/access-authn-authz/admission-controllers/#securitycontextdeny"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewSecurityContextDeny(), nil
+		if utilfeature.DefaultFeatureGate.Enabled(features.SecurityContextDeny) {
+			return NewSecurityContextDeny(), nil
+		} else {
+			return nil, fmt.Errorf("%s admission controller is an alpha feature, planned to be removed, and requires the SecurityContextDeny feature gate to be enabled, see %s for more information", PluginName, docLink)
+		}
 	})
 }
 
@@ -45,6 +54,11 @@ var _ admission.ValidationInterface = &Plugin{}
 
 // NewSecurityContextDeny creates a new instance of the SecurityContextDeny admission controller
 func NewSecurityContextDeny() *Plugin {
+	// DEPRECATED: SecurityContextDeny will be removed in favor of PodSecurity admission.
+	klog.Warningf("%s admission controller is deprecated. "+
+		"Please remove this controller from your configuration files and scripts. "+
+		"See %s for more information.",
+		PluginName, docLink)
 	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}

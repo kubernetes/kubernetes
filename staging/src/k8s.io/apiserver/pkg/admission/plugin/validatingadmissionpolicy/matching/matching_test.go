@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,10 +38,10 @@ import (
 var _ MatchCriteria = &fakeCriteria{}
 
 type fakeCriteria struct {
-	matchResources v1alpha1.MatchResources
+	matchResources v1beta1.MatchResources
 }
 
-func (fc *fakeCriteria) GetMatchResources() v1alpha1.MatchResources {
+func (fc *fakeCriteria) GetMatchResources() v1beta1.MatchResources {
 	return fc.matchResources
 }
 
@@ -53,12 +53,20 @@ func (fc *fakeCriteria) GetParsedObjectSelector() (labels.Selector, error) {
 	return metav1.LabelSelectorAsSelector(fc.matchResources.ObjectSelector)
 }
 
+func gvr(group, version, resource string) schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
+}
+
+func gvk(group, version, kind string) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
+}
+
 func TestMatcher(t *testing.T) {
 	a := &Matcher{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
 
 	allScopes := v1.AllScopes
-	exactMatch := v1alpha1.Exact
-	equivalentMatch := v1alpha1.Equivalent
+	exactMatch := v1beta1.Exact
+	equivalentMatch := v1beta1.Equivalent
 
 	mapper := runtime.NewEquivalentResourceRegistryWithIdentity(func(resource schema.GroupResource) string {
 		if resource.Resource == "deployments" {
@@ -67,19 +75,19 @@ func TestMatcher(t *testing.T) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
 	// register invalid kinds to trigger an error
-	mapper.RegisterKindFor(schema.GroupVersionResource{"example.com", "v1", "widgets"}, "", schema.GroupVersionKind{"", "", ""})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"example.com", "v2", "widgets"}, "", schema.GroupVersionKind{"", "", ""})
+	mapper.RegisterKindFor(gvr("example.com", "v1", "widgets"), "", gvk("", "", ""))
+	mapper.RegisterKindFor(gvr("example.com", "v2", "widgets"), "", gvk("", "", ""))
 
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 
@@ -87,440 +95,446 @@ func TestMatcher(t *testing.T) {
 	testcases := []struct {
 		name string
 
-		criteria *v1alpha1.MatchResources
+		criteria *v1beta1.MatchResources
 		attrs    admission.Attributes
 
-		expectMatches   bool
-		expectMatchKind *schema.GroupVersionKind
-		expectErr       string
+		expectMatches       bool
+		expectMatchKind     schema.GroupVersionKind
+		expectMatchResource schema.GroupVersionResource
+		expectErr           string
 	}{
 		{
 			name:          "no rules (just write)",
-			criteria:      &v1alpha1.MatchResources{NamespaceSelector: &metav1.LabelSelector{}, ResourceRules: []v1alpha1.NamedRuleWithOperations{}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			criteria:      &v1beta1.MatchResources{NamespaceSelector: &metav1.LabelSelector{}, ResourceRules: []v1beta1.NamedRuleWithOperations{}},
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "wildcard rule, match as requested",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1", "Deployment"},
+			expectMatchKind: gvk("apps", "v1", "Deployment"),
 		},
 		{
 			name: "specific rules, prefer exact match",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1", "Deployment"},
+			expectMatchKind: gvk("apps", "v1", "Deployment"),
 		},
 		{
 			name: "specific rules, match miss",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "specific rules, exact match miss",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "specific rules, equivalent match, prefer extensions",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"},
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("extensions", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("extensions", "v1beta1", "Deployment"),
 		},
 		{
 			name: "specific rules, equivalent match, prefer apps",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1beta1", "Deployment"},
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("apps", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("apps", "v1beta1", "Deployment"),
 		},
 
 		{
 			name: "specific rules, subresource prefer exact match",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource match miss",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "specific rules, subresource exact match miss",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"extensions", "v1beta1", "Scale"},
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("extensions", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("extensions", "v1beta1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer apps",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1beta1", "Scale"},
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("apps", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("apps", "v1beta1", "Scale"),
 		},
 		{
 			name: "specific rules, prefer exact match and name match",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"name"},
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "specific rules, prefer exact match and name match miss",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"wrong-name"},
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions and name match",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"name"},
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("apps", "v1", "deployments"),
+			expectMatchKind:     gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions and name match miss",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"wrong-name"},
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "exclude resource match on miss",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
 				}},
-				ExcludeResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ExcludeResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}},
 			},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "exclude resource miss on match",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
 				}},
-				ExcludeResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ExcludeResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "treat empty ResourceRules as match",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ExcludeResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
+				ExcludeResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: true,
 		},
 		{
 			name: "treat non-empty ResourceRules as no match",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules:     []v1alpha1.NamedRuleWithOperations{{}},
+				ResourceRules:     []v1beta1.NamedRuleWithOperations{{}},
 			},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "erroring namespace selector on otherwise non-matching rule doesn't error",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key ", Operator: "In", Values: []string{"bad value"}}}},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
-						Rule:       v1alpha1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
-						Operations: []v1alpha1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "",
 		},
 		{
 			name: "erroring namespace selector on otherwise matching rule errors",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key", Operator: "In", Values: []string{"bad value"}}}},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
-						Rule:       v1alpha1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
-						Operations: []v1alpha1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "bad value",
 		},
 		{
 			name: "erroring object selector on otherwise non-matching rule doesn't error",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key", Operator: "In", Values: []string{"bad value"}}}},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
-						Rule:       v1alpha1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
-						Operations: []v1alpha1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "",
 		},
 		{
 			name: "erroring object selector on otherwise matching rule errors",
-			criteria: &v1alpha1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key", Operator: "In", Values: []string{"bad value"}}}},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
-						Rule:       v1alpha1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
-						Operations: []v1alpha1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "bad value",
 		},
@@ -528,7 +542,7 @@ func TestMatcher(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			matches, matchKind, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria})
+			matches, matchResource, matchKind, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria})
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
@@ -540,14 +554,31 @@ func TestMatcher(t *testing.T) {
 			} else if len(testcase.expectErr) > 0 {
 				t.Fatalf("expected error %q, got no error", testcase.expectErr)
 			}
-			if testcase.expectMatchKind != nil {
-				if *testcase.expectMatchKind != matchKind {
+			var emptyGVK schema.GroupVersionKind
+			if testcase.expectMatchKind != emptyGVK {
+				if testcase.expectMatchKind != matchKind {
 					t.Fatalf("expected matchKind %v, got %v", testcase.expectMatchKind, matchKind)
 				}
 			}
 
 			if matches != testcase.expectMatches {
 				t.Fatalf("expected matches = %v; got %v", testcase.expectMatches, matches)
+			}
+
+			expectResource := testcase.expectMatchResource
+			if !expectResource.Empty() && !matches {
+				t.Fatalf("expectResource is non-empty, but did not match")
+			} else if expectResource.Empty() {
+				// Test for exact match by default. Tests that expect an equivalent
+				// resource to match should explicitly state so by supplying
+				// expectMatchResource
+				expectResource = testcase.attrs.GetResource()
+			}
+
+			if matches {
+				if matchResource != expectResource {
+					t.Fatalf("expected matchResource %v, got %v", expectResource, matchResource)
+				}
 			}
 		})
 	}
@@ -570,7 +601,7 @@ func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
 
 func BenchmarkMatcher(b *testing.B) {
 	allScopes := v1.AllScopes
-	equivalentMatch := v1alpha1.Equivalent
+	equivalentMatch := v1beta1.Equivalent
 
 	namespace1Labels := map[string]string{"ns": "ns1"}
 	namespace1 := corev1.Namespace{
@@ -588,42 +619,42 @@ func BenchmarkMatcher(b *testing.B) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "", gvk("apps", "v1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "", gvk("apps", "v1beta1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta2", "statefulset"), "", gvk("apps", "v1beta2", "StatefulSet"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "scale", gvk("apps", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha2", "statefulset"), "scale", gvk("apps", "v1beta2", "Scale"))
 
 	nsSelector := make(map[string]string)
 	for i := 0; i < 100; i++ {
 		nsSelector[fmt.Sprintf("key-%d", i)] = fmt.Sprintf("val-%d", i)
 	}
 
-	mr := v1alpha1.MatchResources{
+	mr := v1beta1.MatchResources{
 		MatchPolicy:       &equivalentMatch,
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: nsSelector},
 		ObjectSelector:    &metav1.LabelSelector{},
-		ResourceRules: []v1alpha1.NamedRuleWithOperations{
+		ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1alpha1.RuleWithOperations{
+				RuleWithOperations: v1beta1.RuleWithOperations{
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				},
 			},
 			{
-				RuleWithOperations: v1alpha1.RuleWithOperations{
+				RuleWithOperations: v1beta1.RuleWithOperations{
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				},
@@ -632,7 +663,7 @@ func BenchmarkMatcher(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
@@ -643,7 +674,7 @@ func BenchmarkMatcher(b *testing.B) {
 
 func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 	allScopes := v1.AllScopes
-	equivalentMatch := v1alpha1.Equivalent
+	equivalentMatch := v1beta1.Equivalent
 
 	namespace1Labels := map[string]string{"ns": "ns1"}
 	namespace1 := corev1.Namespace{
@@ -661,34 +692,34 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "", gvk("apps", "v1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "", gvk("apps", "v1beta1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta2", "statefulset"), "", gvk("apps", "v1beta2", "StatefulSet"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "scale", gvk("apps", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha2", "statefulset"), "scale", gvk("apps", "v1beta2", "Scale"))
 
-	mr := v1alpha1.MatchResources{
+	mr := v1beta1.MatchResources{
 		MatchPolicy:       &equivalentMatch,
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 		ObjectSelector:    &metav1.LabelSelector{},
-		ResourceRules:     []v1alpha1.NamedRuleWithOperations{},
+		ResourceRules:     []v1beta1.NamedRuleWithOperations{},
 	}
 
 	for i := 0; i < 100; i++ {
-		rule := v1alpha1.NamedRuleWithOperations{
-			RuleWithOperations: v1alpha1.RuleWithOperations{
+		rule := v1beta1.NamedRuleWithOperations{
+			RuleWithOperations: v1beta1.RuleWithOperations{
 				Operations: []v1.OperationType{"*"},
 				Rule: v1.Rule{
 					APIGroups:   []string{fmt.Sprintf("app-%d", i)},
@@ -702,7 +733,7 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
@@ -713,7 +744,7 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 
 func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 	allScopes := v1.AllScopes
-	equivalentMatch := v1alpha1.Equivalent
+	equivalentMatch := v1beta1.Equivalent
 
 	namespace1Labels := map[string]string{"ns": "ns1"}
 	namespace1 := corev1.Namespace{
@@ -731,39 +762,39 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "", gvk("apps", "v1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "", gvk("apps", "v1beta1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta2", "statefulset"), "", gvk("apps", "v1beta2", "StatefulSet"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "scale", gvk("apps", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha2", "statefulset"), "scale", gvk("apps", "v1beta2", "Scale"))
 
 	nsSelector := make(map[string]string)
 	for i := 0; i < 100; i++ {
 		nsSelector[fmt.Sprintf("key-%d", i)] = fmt.Sprintf("val-%d", i)
 	}
 
-	mr := v1alpha1.MatchResources{
+	mr := v1beta1.MatchResources{
 		MatchPolicy:       &equivalentMatch,
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: nsSelector},
 		ObjectSelector:    &metav1.LabelSelector{},
-		ResourceRules:     []v1alpha1.NamedRuleWithOperations{},
+		ResourceRules:     []v1beta1.NamedRuleWithOperations{},
 	}
 
 	for i := 0; i < 100; i++ {
-		rule := v1alpha1.NamedRuleWithOperations{
-			RuleWithOperations: v1alpha1.RuleWithOperations{
+		rule := v1beta1.NamedRuleWithOperations{
+			RuleWithOperations: v1beta1.RuleWithOperations{
 				Operations: []v1.OperationType{"*"},
 				Rule: v1.Rule{
 					APIGroups:   []string{fmt.Sprintf("app-%d", i)},
@@ -777,7 +808,7 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 

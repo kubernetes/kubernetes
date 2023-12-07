@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -103,17 +102,6 @@ func AddCRISocketFlag(flagSet *pflag.FlagSet, criSocket *string) {
 	)
 }
 
-// DefaultInitConfiguration return default InitConfiguration. Avoid running the CRI auto-detection
-// code as we don't need it.
-func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
-	initCfg := &kubeadmapiv1.InitConfiguration{
-		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: kubeadmconstants.UnknownCRISocket, // avoid CRI detection
-		},
-	}
-	return initCfg
-}
-
 // InteractivelyConfirmAction asks the user whether they _really_ want to take the action.
 func InteractivelyConfirmAction(action, question string, r io.Reader) error {
 	fmt.Printf("[%s] %s [y/N]: ", action, question)
@@ -140,4 +128,13 @@ func GetClientSet(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
+}
+
+// ValueFromFlagsOrConfig checks if the "name" flag has been set. If yes, it returns the value of the flag, otherwise it returns the value from config.
+func ValueFromFlagsOrConfig(flagSet *pflag.FlagSet, name string, cfgValue interface{}, flagValue interface{}) interface{} {
+	if flagSet.Changed(name) {
+		return flagValue
+	}
+	// assume config has all the defaults set correctly.
+	return cfgValue
 }

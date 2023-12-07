@@ -416,14 +416,13 @@ kube::test::if_supports_resource() {
   return 1
 }
 
-
 kube::test::version::object_to_file() {
   name=$1
   flags=${2:-""}
   file=$3
   # shellcheck disable=SC2086
   # Disabling because "flags" needs to allow for expansion here
-  kubectl version ${flags} | grep "${name} Version:" | sed -e s/"${name} Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > "${file}"
+  kubectl version ${flags} | grep "${name} Version:" | sed -e s/"${name} Version: "/""/g > "${file}"
 }
 
 kube::test::version::json_object_to_file() {

@@ -32,6 +32,20 @@ import (
 func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
 	originalValue := gate.Enabled(f)
 
+	// Specially handle AllAlpha and AllBeta
+	var cleanups []func()
+	if f == "AllAlpha" || f == "AllBeta" {
+		// Iterate over individual gates so their individual values get restored
+		for k, v := range gate.(featuregate.MutableFeatureGate).GetAll() {
+			if k == "AllAlpha" || k == "AllBeta" {
+				continue
+			}
+			if (f == "AllAlpha" && v.PreRelease == featuregate.Alpha) || (f == "AllBeta" && v.PreRelease == featuregate.Beta) {
+				cleanups = append(cleanups, SetFeatureGateDuringTest(tb, gate, k, value))
+			}
+		}
+	}
+
 	if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, value)); err != nil {
 		tb.Errorf("error setting %s=%v: %v", f, value, err)
 	}
@@ -39,6 +53,9 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 	return func() {
 		if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
 			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
+		}
+		for _, cleanup := range cleanups {
+			cleanup()
 		}
 	}
 }

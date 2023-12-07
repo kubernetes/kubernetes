@@ -82,7 +82,7 @@ var (
 		## Write bash completion code to a file and source it from .bash_profile
 		    kubectl completion bash > ~/.kube/completion.bash.inc
 		    printf "
-		      # Kubectl shell completion
+		      # kubectl shell completion
 		      source '$HOME/.kube/completion.bash.inc'
 		      " >> $HOME/.bash_profile
 		    source $HOME/.bash_profile
@@ -95,7 +95,7 @@ var (
 
 		# Load the kubectl completion code for fish[2] into the current shell
 		    kubectl completion fish | source
-		# To load completions for each session, execute once: 
+		# To load completions for each session, execute once:
 		    kubectl completion fish > ~/.config/fish/completions/kubectl.fish
 
 		# Load the kubectl completion code for powershell into the current shell

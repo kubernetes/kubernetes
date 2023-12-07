@@ -116,6 +116,10 @@ spec:
                   - valuesValue
                 matchLabels:
                   matchLabelsKey: matchLabelsValue
+              matchLabelKeys:
+              - matchLabelKeysValue
+              mismatchLabelKeys:
+              - mismatchLabelKeysValue
               namespaceSelector:
                 matchExpressions:
                 - key: keyValue
@@ -137,6 +141,10 @@ spec:
                 - valuesValue
               matchLabels:
                 matchLabelsKey: matchLabelsValue
+            matchLabelKeys:
+            - matchLabelKeysValue
+            mismatchLabelKeys:
+            - mismatchLabelKeysValue
             namespaceSelector:
               matchExpressions:
               - key: keyValue
@@ -159,6 +167,10 @@ spec:
                   - valuesValue
                 matchLabels:
                   matchLabelsKey: matchLabelsValue
+              matchLabelKeys:
+              - matchLabelKeysValue
+              mismatchLabelKeys:
+              - mismatchLabelKeysValue
               namespaceSelector:
                 matchExpressions:
                 - key: keyValue
@@ -180,6 +192,10 @@ spec:
                 - valuesValue
               matchLabels:
                 matchLabelsKey: matchLabelsValue
+            matchLabelKeys:
+            - matchLabelKeysValue
+            mismatchLabelKeys:
+            - mismatchLabelKeysValue
             namespaceSelector:
               matchExpressions:
               - key: keyValue
@@ -239,6 +255,8 @@ spec:
               path: pathValue
               port: portValue
               scheme: schemeValue
+            sleep:
+              seconds: 1
             tcpSocket:
               host: hostValue
               port: portValue
@@ -254,6 +272,8 @@ spec:
               path: pathValue
               port: portValue
               scheme: schemeValue
+            sleep:
+              seconds: 1
             tcpSocket:
               host: hostValue
               port: portValue
@@ -312,6 +332,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -319,6 +342,7 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
+        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -442,6 +466,8 @@ spec:
               path: pathValue
               port: portValue
               scheme: schemeValue
+            sleep:
+              seconds: 1
             tcpSocket:
               host: hostValue
               port: portValue
@@ -457,6 +483,8 @@ spec:
               path: pathValue
               port: portValue
               scheme: schemeValue
+            sleep:
+              seconds: 1
             tcpSocket:
               host: hostValue
               port: portValue
@@ -515,6 +543,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -522,6 +553,7 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
+        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -647,6 +679,8 @@ spec:
               path: pathValue
               port: portValue
               scheme: schemeValue
+            sleep:
+              seconds: 1
             tcpSocket:
               host: hostValue
               port: portValue
@@ -662,6 +696,8 @@ spec:
               path: pathValue
               port: portValue
               scheme: schemeValue
+            sleep:
+              seconds: 1
             tcpSocket:
               host: hostValue
               port: portValue
@@ -720,6 +756,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -727,6 +766,7 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
+        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -978,8 +1018,6 @@ spec:
                 name: nameValue
                 namespace: namespaceValue
               resources:
-                claims:
-                - name: nameValue
                 limits:
                   limitsKey: "0"
                 requests:
@@ -993,6 +1031,7 @@ spec:
                 matchLabels:
                   matchLabelsKey: matchLabelsValue
               storageClassName: storageClassNameValue
+              volumeAttributesClassName: volumeAttributesClassNameValue
               volumeMode: volumeModeValue
               volumeName: volumeNameValue
         fc:
@@ -1062,7 +1101,20 @@ spec:
         projected:
           defaultMode: 2
           sources:
-          - configMap:
+          - clusterTrustBundle:
+              labelSelector:
+                matchExpressions:
+                - key: keyValue
+                  operator: operatorValue
+                  values:
+                  - valuesValue
+                matchLabels:
+                  matchLabelsKey: matchLabelsValue
+              name: nameValue
+              optional: true
+              path: pathValue
+              signerName: signerNameValue
+            configMap:
               items:
               - key: keyValue
                 mode: 3

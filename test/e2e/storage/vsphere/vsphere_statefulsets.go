@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -55,9 +56,9 @@ const (
 	storageclassname = "nginx-sc"
 )
 
-var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("vsphere statefulset", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("vsphere-statefulset")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		namespace string
 		client    clientset.Interface
@@ -88,7 +89,7 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		framework.ExpectNoError(e2estatefulset.CheckMount(ctx, client, statefulset, mountPath))
 		ssPodsBeforeScaleDown := e2estatefulset.GetPodList(ctx, client, statefulset)
 		gomega.Expect(ssPodsBeforeScaleDown.Items).NotTo(gomega.BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
-		framework.ExpectEqual(len(ssPodsBeforeScaleDown.Items), int(replicas), "Number of Pods in the statefulset should match with number of replicas")
+		gomega.Expect(ssPodsBeforeScaleDown.Items).To(gomega.HaveLen(int(replicas)), "Number of Pods in the statefulset should match with number of replicas")
 
 		// Get the list of Volumes attached to Pods before scale down
 		volumesBeforeScaleDown := make(map[string]string)
@@ -134,7 +135,7 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 
 		ssPodsAfterScaleUp := e2estatefulset.GetPodList(ctx, client, statefulset)
 		gomega.Expect(ssPodsAfterScaleUp.Items).NotTo(gomega.BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
-		framework.ExpectEqual(len(ssPodsAfterScaleUp.Items), int(replicas), "Number of Pods in the statefulset should match with number of replicas")
+		gomega.Expect(ssPodsAfterScaleUp.Items).To(gomega.HaveLen(int(replicas)), "Number of Pods in the statefulset should match with number of replicas")
 
 		// After scale up, verify all vsphere volumes are attached to node VMs.
 		ginkgo.By("Verify all volumes are attached to Nodes after Statefulsets is scaled up")

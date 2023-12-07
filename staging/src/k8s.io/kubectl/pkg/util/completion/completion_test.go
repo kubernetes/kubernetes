@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/clientcmd"
@@ -364,7 +364,7 @@ func prepareCompletionTest() (*cmdtesting.TestFactory, *cobra.Command) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
 	cmd := get.NewCmdGet("kubectl", tf, streams)
 	return tf, cmd
 }

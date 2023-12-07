@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -32,6 +33,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -59,6 +62,10 @@ func init() {
 
 func newPod() runtime.Object {
 	return &example.Pod{}
+}
+
+func newPodList() runtime.Object {
+	return &example.PodList{}
 }
 
 func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
@@ -134,9 +141,24 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, store)
 }
 
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, store)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, store)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, store)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -152,8 +174,10 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	originalTransformer := s.transformer.(*storagetesting.PrefixTransformer)
 	transformer := *originalTransformer
 	s.transformer = modifier(&transformer)
+	s.watcher.transformer = modifier(&transformer)
 	return func() {
 		s.transformer = originalTransformer
+		s.watcher.transformer = originalTransformer
 	}
 }
 
@@ -188,13 +212,8 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, false)
-}
-
-func TestListWithoutPaging(t *testing.T) {
-	ctx, store, _ := testSetup(t, withoutPaging())
-	storagetesting.RunTestListWithoutPaging(ctx, t, store)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestList(ctx, t, store, compactStorage(client), false)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -255,7 +274,7 @@ func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := etcdClient.KV.Compact(ctx, int64(rv), clientv3.WithCompactPhysical()); err != nil {
+		if _, _, err = compact(ctx, etcdClient, 0, int64(rv)); err != nil {
 			t.Fatalf("Unable to compact, %v", err)
 		}
 	}
@@ -463,14 +482,15 @@ func (r *clientRecorder) GetReadsAndReset() uint64 {
 }
 
 type setupOptions struct {
-	client        func(*testing.T) *clientv3.Client
-	codec         runtime.Codec
-	newFunc       func() runtime.Object
-	prefix        string
-	groupResource schema.GroupResource
-	transformer   value.Transformer
-	pagingEnabled bool
-	leaseConfig   LeaseManagerConfig
+	client         func(testing.TB) *clientv3.Client
+	codec          runtime.Codec
+	newFunc        func() runtime.Object
+	newListFunc    func() runtime.Object
+	prefix         string
+	resourcePrefix string
+	groupResource  schema.GroupResource
+	transformer    value.Transformer
+	leaseConfig    LeaseManagerConfig
 
 	recorderEnabled bool
 }
@@ -479,7 +499,7 @@ type setupOption func(*setupOptions)
 
 func withClientConfig(config *embed.Config) setupOption {
 	return func(options *setupOptions) {
-		options.client = func(t *testing.T) *clientv3.Client {
+		options.client = func(t testing.TB) *clientv3.Client {
 			return testserver.RunEtcd(t, config)
 		}
 	}
@@ -488,12 +508,6 @@ func withClientConfig(config *embed.Config) setupOption {
 func withPrefix(prefix string) setupOption {
 	return func(options *setupOptions) {
 		options.prefix = prefix
-	}
-}
-
-func withoutPaging() setupOption {
-	return func(options *setupOptions) {
-		options.pagingEnabled = false
 	}
 }
 
@@ -510,21 +524,22 @@ func withRecorder() setupOption {
 }
 
 func withDefaults(options *setupOptions) {
-	options.client = func(t *testing.T) *clientv3.Client {
+	options.client = func(t testing.TB) *clientv3.Client {
 		return testserver.RunEtcd(t, nil)
 	}
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
+	options.newListFunc = newPodList
 	options.prefix = ""
+	options.resourcePrefix = "/pods"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
 	options.transformer = newTestTransformer()
-	options.pagingEnabled = true
 	options.leaseConfig = newTestLeaseManagerConfig()
 }
 
 var _ setupOption = withDefaults
 
-func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *clientv3.Client) {
+func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *clientv3.Client) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -538,10 +553,11 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *cli
 		client,
 		setupOpts.codec,
 		setupOpts.newFunc,
+		setupOpts.newListFunc,
 		setupOpts.prefix,
+		setupOpts.resourcePrefix,
 		setupOpts.groupResource,
 		setupOpts.transformer,
-		setupOpts.pagingEnabled,
 		setupOpts.leaseConfig,
 	)
 	ctx := context.Background()
@@ -621,4 +637,133 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
 	_, countErr := store.Count(invalidKey)
 	expectInvalidKey("Count", countErr)
+}
+
+func BenchmarkStore_GetList(b *testing.B) {
+	generateBigPod := func(index int, total int, expect int) runtime.Object {
+		l := map[string]string{}
+		if index%(total/expect) == 0 {
+			l["foo"] = "bar"
+		}
+		terminationGracePeriodSeconds := int64(42)
+		activeDeadlineSeconds := int64(42)
+		pod := &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: l,
+			},
+			Spec: examplev1.PodSpec{
+				RestartPolicy:                 examplev1.RestartPolicy("Always"),
+				TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+				ActiveDeadlineSeconds:         &activeDeadlineSeconds,
+				NodeSelector:                  map[string]string{},
+				ServiceAccountName:            "demo-sa",
+			},
+		}
+		pod.Name = fmt.Sprintf("object-%d", index)
+		data := make([]byte, 1024*2, 1024*2) // 2k labels
+		rand.Read(data)
+		pod.Spec.NodeSelector["key"] = string(data)
+		return pod
+	}
+	testCases := []struct {
+		name              string
+		objectNum         int
+		expectNum         int
+		selector          labels.Selector
+		newObjectFunc     func(index int, total int, expect int) runtime.Object
+		newListObjectFunc func() runtime.Object
+	}{
+		{
+			name:              "pick 50 pods out of 5000 pod",
+			objectNum:         5000,
+			expectNum:         50,
+			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
+			newObjectFunc:     generateBigPod,
+			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
+		},
+		{
+			name:              "pick 500 pods out of 5000 pod",
+			objectNum:         5000,
+			expectNum:         500,
+			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
+			newObjectFunc:     generateBigPod,
+			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
+		},
+		{
+			name:              "pick 1000 pods out of 5000 pod",
+			objectNum:         5000,
+			expectNum:         1000,
+			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
+			newObjectFunc:     generateBigPod,
+			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
+		},
+		{
+			name:              "pick 2500 pods out of 5000 pod",
+			objectNum:         5000,
+			expectNum:         2500,
+			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
+			newObjectFunc:     generateBigPod,
+			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
+		},
+		{
+			name:              "pick 5000 pods out of 5000 pod",
+			objectNum:         5000,
+			expectNum:         5000,
+			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
+			newObjectFunc:     generateBigPod,
+			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
+		},
+	}
+	for _, tc := range testCases {
+		b.Run(tc.name, func(b *testing.B) {
+			// booting etcd instance
+			ctx, store, etcdClient := testSetup(b)
+			defer etcdClient.Close()
+
+			// make fake objects..
+			dir := "/testing"
+			originalRevision := ""
+			for i := 0; i < tc.objectNum; i++ {
+				obj := tc.newObjectFunc(i, tc.objectNum, tc.expectNum)
+				o := obj.(metav1.Object)
+				key := fmt.Sprintf("/testing/testkey/%s", o.GetName())
+				out := tc.newObjectFunc(i, tc.objectNum, tc.expectNum)
+				if err := store.Create(ctx, key, obj, out, 0); err != nil {
+					b.Fatalf("Set failed: %v", err)
+				}
+				originalRevision = out.(metav1.Object).GetResourceVersion()
+			}
+
+			// prepare result and pred
+			pred := storage.SelectionPredicate{
+				Label: tc.selector,
+				Field: fields.Everything(),
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod, ok := obj.(*examplev1.Pod)
+					if !ok {
+						return nil, nil, fmt.Errorf("not a pod")
+					}
+					return pod.ObjectMeta.Labels, fields.Set{
+						"metadata.name": pod.Name,
+					}, nil
+				},
+			}
+
+			// now we start benchmarking
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				list := tc.newListObjectFunc()
+				if err := store.GetList(ctx, dir, storage.ListOptions{Predicate: pred, Recursive: true}, list); err != nil {
+					b.Errorf("Unexpected List error: %v", err)
+				}
+				listObject := list.(*examplev1.PodList)
+				if originalRevision != listObject.GetResourceVersion() {
+					b.Fatalf("original revision (%s) did not match final revision after linearized reads (%s)", originalRevision, listObject.GetResourceVersion())
+				}
+				if len(listObject.Items) != tc.expectNum {
+					b.Fatalf("expect (%d) items but got (%d)", tc.expectNum, len(listObject.Items))
+				}
+			}
+		})
+	}
 }

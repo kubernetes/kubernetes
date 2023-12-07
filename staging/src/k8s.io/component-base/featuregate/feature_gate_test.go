@@ -433,7 +433,7 @@ func TestFeatureGateMetrics(t *testing.T) {
 	const testBetaDisabled Feature = "TestBetaDisabled"
 	testedMetrics := []string{"kubernetes_feature_enabled"}
 	expectedOutput := `
-		# HELP kubernetes_feature_enabled [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
+		# HELP kubernetes_feature_enabled [BETA] This metric records the data about the stage and enablement of a k8s feature.
         # TYPE kubernetes_feature_enabled gauge
         kubernetes_feature_enabled{name="TestAlpha",stage="ALPHA"} 0
         kubernetes_feature_enabled{name="TestBeta",stage="BETA"} 1

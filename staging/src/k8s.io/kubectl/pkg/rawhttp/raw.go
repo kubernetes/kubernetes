@@ -23,32 +23,32 @@ import (
 	"io"
 	"os"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest"
 )
 
 // RawPost uses the REST client to POST content
-func RawPost(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, filename string) error {
+func RawPost(restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, filename string) error {
 	return raw(restClient, streams, url, filename, "POST")
 }
 
 // RawPut uses the REST client to PUT content
-func RawPut(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, filename string) error {
+func RawPut(restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, filename string) error {
 	return raw(restClient, streams, url, filename, "PUT")
 }
 
 // RawGet uses the REST client to GET content
-func RawGet(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url string) error {
+func RawGet(restClient *rest.RESTClient, streams genericiooptions.IOStreams, url string) error {
 	return raw(restClient, streams, url, "", "GET")
 }
 
 // RawDelete uses the REST client to DELETE content
-func RawDelete(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, filename string) error {
+func RawDelete(restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, filename string) error {
 	return raw(restClient, streams, url, filename, "DELETE")
 }
 
 // raw makes a simple HTTP request to the provided path on the server using the default credentials.
-func raw(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, filename, requestType string) error {
+func raw(restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, filename, requestType string) error {
 	var data io.Reader
 	switch {
 	case len(filename) == 0:

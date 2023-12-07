@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -45,9 +46,9 @@ Test to verify volume status after node power off:
 1. Verify the pod got provisioned on a different node with volume attached to it
 2. Verify the volume is detached from the powered off node
 */
-var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
+var _ = utils.SIGDescribe("Node Poweroff", feature.Vsphere, framework.WithSlow(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("node-poweroff")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client    clientset.Interface
 		namespace string
@@ -101,7 +102,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
 		ginkgo.By("Creating a Deployment")
-		deployment, err := e2edeployment.CreateDeployment(ctx, client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
+		deployment, err := e2edeployment.CreateDeployment(ctx, client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, admissionapi.LevelRestricted, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AppsV1().Deployments(namespace).Delete), deployment.Name, metav1.DeleteOptions{})
 
@@ -172,7 +173,7 @@ func waitForPodToFailover(ctx context.Context, client clientset.Interface, deplo
 	})
 
 	if waitErr != nil {
-		if waitErr == wait.ErrWaitTimeout {
+		if wait.Interrupted(waitErr) {
 			return "", fmt.Errorf("pod has not failed over after %v: %v", timeout, waitErr)
 		}
 		return "", fmt.Errorf("pod did not fail over from %q: %v", oldNode, waitErr)

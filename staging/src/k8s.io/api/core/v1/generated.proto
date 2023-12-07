@@ -228,7 +228,6 @@ message CSIPersistentVolumeSource {
   // nodeExpandSecretRef is a reference to the secret object containing
   // sensitive information to pass to the CSI driver to complete the CSI
   // NodeExpandVolume call.
-  // This is an alpha field and requires enabling CSINodeExpandSecret feature gate.
   // This field is optional, may be omitted if no secret is required. If the
   // secret object contains more than one secret, all secrets are passed.
   // +optional
@@ -413,15 +412,9 @@ message ClaimSource {
   //
   // The template will be used to create a new ResourceClaim, which will
   // be bound to this pod. When this pod is deleted, the ResourceClaim
-  // will also be deleted. The name of the ResourceClaim will be <pod
-  // name>-<resource name>, where <resource name> is the
-  // PodResourceClaim.Name. Pod validation will reject the pod if the
-  // concatenated name is not valid for a ResourceClaim (e.g. too long).
-  //
-  // An existing ResourceClaim with that name that is not owned by the
-  // pod will not be used for the pod to avoid using an unrelated
-  // resource by mistake. Scheduling and pod startup are then blocked
-  // until the unrelated ResourceClaim is removed.
+  // will also be deleted. The pod name and resource name, along with a
+  // generated component, will be used to form a unique name for the
+  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
   //
   // This field is immutable and no changes will be made to the
   // corresponding ResourceClaim by the control plane after creating the
@@ -436,6 +429,40 @@ message ClientIPConfig {
   // Default value is 10800(for 3 hours).
   // +optional
   optional int32 timeoutSeconds = 1;
+}
+
+// ClusterTrustBundleProjection describes how to select a set of
+// ClusterTrustBundle objects and project their contents into the pod
+// filesystem.
+message ClusterTrustBundleProjection {
+  // Select a single ClusterTrustBundle by object name.  Mutually-exclusive
+  // with signerName and labelSelector.
+  // +optional
+  optional string name = 1;
+
+  // Select all ClusterTrustBundles that match this signer name.
+  // Mutually-exclusive with name.  The contents of all selected
+  // ClusterTrustBundles will be unified and deduplicated.
+  // +optional
+  optional string signerName = 2;
+
+  // Select all ClusterTrustBundles that match this label selector.  Only has
+  // effect if signerName is set.  Mutually-exclusive with name.  If unset,
+  // interpreted as "match nothing".  If set but empty, interpreted as "match
+  // everything".
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 3;
+
+  // If true, don't block pod startup if the referenced ClusterTrustBundle(s)
+  // aren't available.  If using name, then the named ClusterTrustBundle is
+  // allowed not to exist.  If using signerName, then the combination of
+  // signerName and labelSelector is allowed to match zero
+  // ClusterTrustBundles.
+  // +optional
+  optional bool optional = 5;
+
+  // Relative path from the volume root to write the bundle.
+  optional string path = 4;
 }
 
 // Information about the condition of a component.
@@ -722,6 +749,31 @@ message Container {
   // +optional
   optional ResourceRequirements resources = 8;
 
+  // Resources resize policy for the container.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  // +listType=atomic
+  repeated ContainerResizePolicy resizePolicy = 23;
+
+  // RestartPolicy defines the restart behavior of individual containers in a pod.
+  // This field may only be set for init containers, and the only allowed value is "Always".
+  // For non-init containers or when this field is not specified,
+  // the restart behavior is defined by the Pod's restart policy and the container type.
+  // Setting the RestartPolicy as "Always" for the init container will have the following effect:
+  // this init container will be continually restarted on
+  // exit until all regular containers have terminated. Once all regular
+  // containers have completed, all init containers with restartPolicy "Always"
+  // will be shut down. This lifecycle differs from normal init containers and
+  // is often referred to as a "sidecar" container. Although this init
+  // container still starts in the init container sequence, it does not wait
+  // for the container to complete before proceeding to the next init
+  // container. Instead, the next init container starts immediately after this
+  // init container is started, or after any startupProbe has successfully
+  // completed.
+  // +featureGate=SidecarContainers
+  // +optional
+  optional string restartPolicy = 24;
+
   // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
   // +optional
@@ -862,6 +914,17 @@ message ContainerPort {
   optional string hostIP = 5;
 }
 
+// ContainerResizePolicy represents resource resize policy for the container.
+message ContainerResizePolicy {
+  // Name of the resource to which this resource resize policy applies.
+  // Supported values: cpu, memory.
+  optional string resourceName = 1;
+
+  // Restart policy to apply when specified resource is resized.
+  // If not specified, it defaults to NotRequired.
+  optional string restartPolicy = 2;
+}
+
 // ContainerState holds a possible state of container.
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
@@ -929,41 +992,76 @@ message ContainerStateWaiting {
 
 // ContainerStatus contains details for the current status of this container.
 message ContainerStatus {
-  // This must be a DNS_LABEL. Each container in a pod must have a unique name.
+  // Name is a DNS_LABEL representing the unique name of the container.
+  // Each container in a pod must have a unique name across all container types.
   // Cannot be updated.
   optional string name = 1;
 
-  // Details about the container's current condition.
+  // State holds details about the container's current condition.
   // +optional
   optional ContainerState state = 2;
 
-  // Details about the container's last termination condition.
+  // LastTerminationState holds the last termination state of the container to
+  // help debug container crashes and restarts. This field is not
+  // populated if the container is still running and RestartCount is 0.
   // +optional
   optional ContainerState lastState = 3;
 
-  // Specifies whether the container has passed its readiness probe.
+  // Ready specifies whether the container is currently passing its readiness check.
+  // The value will change as readiness probes keep executing. If no readiness
+  // probes are specified, this field defaults to true once the container is
+  // fully started (see Started field).
+  //
+  // The value is typically used to determine whether a container is ready to
+  // accept traffic.
   optional bool ready = 4;
 
-  // The number of times the container has been restarted.
+  // RestartCount holds the number of times the container has been restarted.
+  // Kubelet makes an effort to always increment the value, but there
+  // are cases when the state may be lost due to node restarts and then the value
+  // may be reset to 0. The value is never negative.
   optional int32 restartCount = 5;
 
-  // The image the container is running.
+  // Image is the name of container image that the container is running.
+  // The container image may not match the image used in the PodSpec,
+  // as it may have been resolved by the runtime.
   // More info: https://kubernetes.io/docs/concepts/containers/images.
   optional string image = 6;
 
-  // ImageID of the container's image.
+  // ImageID is the image ID of the container's image. The image ID may not
+  // match the image ID of the image used in the PodSpec, as it may have been
+  // resolved by the runtime.
   optional string imageID = 7;
 
-  // Container's ID in the format '<type>://<container_id>'.
+  // ContainerID is the ID of the container in the format '<type>://<container_id>'.
+  // Where type is a container runtime identifier, returned from Version call of CRI API
+  // (for example "containerd").
   // +optional
   optional string containerID = 8;
 
-  // Specifies whether the container has passed its startup probe.
-  // Initialized as false, becomes true after startupProbe is considered successful.
-  // Resets to false when the container is restarted, or if kubelet loses state temporarily.
-  // Is always true when no startupProbe is defined.
+  // Started indicates whether the container has finished its postStart lifecycle hook
+  // and passed its startup probe.
+  // Initialized as false, becomes true after startupProbe is considered
+  // successful. Resets to false when the container is restarted, or if kubelet
+  // loses state temporarily. In both cases, startup probes will run again.
+  // Is always true when no startupProbe is defined and container is running and
+  // has passed the postStart lifecycle hook. The null value must be treated the
+  // same as false.
   // +optional
   optional bool started = 9;
+
+  // AllocatedResources represents the compute resources allocated for this container by the
+  // node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
+  // and after successfully admitting desired pod resize.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 10;
+
+  // Resources represents the compute resource requests and limits that have been successfully
+  // enacted on the running container after it has been started or has been successfully resized.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  optional ResourceRequirements resources = 11;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1039,7 +1137,7 @@ message EmptyDirVolumeSource {
   // The maximum usage on memory medium EmptyDir would be the minimum value between
   // the SizeLimit specified here and the sum of memory limits of all containers in a pod.
   // The default is nil which means that the limit is undefined.
-  // More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
   // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 2;
 }
@@ -1085,10 +1183,19 @@ message EndpointPort {
   optional string protocol = 3;
 
   // The application protocol for this port.
+  // This is used as a hint for implementations to offer richer behavior for protocols that they understand.
   // This field follows standard Kubernetes label syntax.
-  // Un-prefixed names are reserved for IANA standard service names (as per
+  // Valid values are either:
+  //
+  // * Un-prefixed protocol names - reserved for IANA standard service names (as per
   // RFC-6335 and https://www.iana.org/assignments/service-names).
-  // Non-standard protocols should use prefixed names such as
+  //
+  // * Kubernetes-defined prefixed names:
+  //   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+  //   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+  //   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+  //
+  // * Other protocols should use implementation-defined prefixed names such as
   // mycompany.com/my-custom-protocol.
   // +optional
   optional string appProtocol = 4;
@@ -1319,6 +1426,20 @@ message EphemeralContainerCommon {
   // already allocated to the pod.
   // +optional
   optional ResourceRequirements resources = 8;
+
+  // Resources resize policy for the container.
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  // +listType=atomic
+  repeated ContainerResizePolicy resizePolicy = 23;
+
+  // Restart policy for the container to manage the restart behavior of each
+  // container within a pod.
+  // This may only be set for init containers. You cannot set this field on
+  // ephemeral containers.
+  // +featureGate=SidecarContainers
+  // +optional
+  optional string restartPolicy = 24;
 
   // Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
   // Cannot be updated.
@@ -1787,7 +1908,8 @@ message HTTPGetAction {
 
 // HTTPHeader describes a custom header to be used in HTTP probes
 message HTTPHeader {
-  // The header field name
+  // The header field name.
+  // This will be canonicalized upon output, so case-variant names will be understood as the same header.
   optional string name = 1;
 
   // The header field value
@@ -1802,6 +1924,12 @@ message HostAlias {
 
   // Hostnames for the above IP address.
   repeated string hostnames = 2;
+}
+
+// HostIP represents a single IP address allocated to the host.
+message HostIP {
+  // IP is the IP address assigned to the host
+  optional string ip = 1;
 }
 
 // Represents a host path mapped into a pod.
@@ -1992,6 +2120,11 @@ message LifecycleHandler {
   // lifecycle hooks will fail in runtime when tcp handler is specified.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
+
+  // Sleep represents the duration that the container should sleep before being terminated.
+  // +featureGate=PodLifecycleSleepAction
+  // +optional
+  optional SleepAction sleep = 4;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -2075,6 +2208,15 @@ message LoadBalancerIngress {
   // +optional
   optional string hostname = 2;
 
+  // IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+  // Setting this to "VIP" indicates that traffic is delivered to the node with
+  // the destination set to the load-balancer's IP and port.
+  // Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+  // the destination set to the node's IP and node port or the pod's IP and port.
+  // Service implementations may use this information to adjust traffic routing.
+  // +optional
+  optional string ipMode = 3;
+
   // Ports is a list of records of service ports
   // If used, every port defined in the service should have an entry in it
   // +listType=atomic
@@ -2113,6 +2255,24 @@ message LocalVolumeSource {
   // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a filesystem if unspecified.
   // +optional
   optional string fsType = 2;
+}
+
+// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
+message ModifyVolumeStatus {
+  // targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+  optional string targetVolumeAttributesClassName = 1;
+
+  // status is the status of the ControllerModifyVolume operation. It can be in any of following states:
+  //  - Pending
+  //    Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+  //    the specified VolumeAttributesClass not existing.
+  //  - InProgress
+  //    InProgress indicates that the volume is being modified.
+  //  - Infeasible
+  //   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+  // 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
+  // Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+  optional string status = 2;
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -2665,7 +2825,7 @@ message PersistentVolumeClaim {
   optional PersistentVolumeClaimStatus status = 3;
 }
 
-// PersistentVolumeClaimCondition contails details about state of pvc
+// PersistentVolumeClaimCondition contains details about state of pvc
 message PersistentVolumeClaimCondition {
   optional string type = 1;
 
@@ -2720,7 +2880,7 @@ message PersistentVolumeClaimSpec {
   // status field of the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
   // +optional
-  optional ResourceRequirements resources = 2;
+  optional VolumeResourceRequirements resources = 2;
 
   // volumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
@@ -2772,6 +2932,22 @@ message PersistentVolumeClaimSpec {
   // (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
   // +optional
   optional TypedObjectReference dataSourceRef = 8;
+
+  // volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+  // If specified, the CSI driver will create or update the volume with the attributes defined
+  // in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
+  // it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
+  // will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
+  // If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
+  // will be set by the persistentvolume controller if it exists.
+  // If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
+  // set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
+  // exists.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+  // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string volumeAttributesClassName = 9;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2796,25 +2972,85 @@ message PersistentVolumeClaimStatus {
   // +patchStrategy=merge
   repeated PersistentVolumeClaimCondition conditions = 4;
 
-  // allocatedResources is the storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may
-  // be larger than the actual capacity when a volume expansion operation is requested.
+  // allocatedResources tracks the resources allocated to a PVC including its capacity.
+  // Key names follow standard Kubernetes label syntax. Valid values are either:
+  // 	* Un-prefixed keys:
+  // 		- storage - the capacity of the volume.
+  // 	* Custom resources must use implementation-defined prefixed names such as "example.com/my-custom-resource"
+  // Apart from above values - keys that are unprefixed or have kubernetes.io prefix are considered
+  // reserved and hence may not be used.
+  //
+  // Capacity reported here may be larger than the actual capacity when a volume expansion operation
+  // is requested.
   // For storage quota, the larger value from allocatedResources and PVC.spec.resources is used.
   // If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.
   // If a volume expansion capacity request is lowered, allocatedResources is only
   // lowered if there are no expansion operations in progress and if the actual volume capacity
   // is equal or lower than the requested capacity.
+  //
+  // A controller that receives PVC update with previously unknown resourceName
+  // should ignore the update for the purpose it was designed. For example - a controller that
+  // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
+  // resources associated with PVC.
+  //
   // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
   // +featureGate=RecoverVolumeExpansionFailure
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
 
-  // resizeStatus stores status of resize operation.
-  // ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty
-  // string by resize controller or kubelet.
+  // allocatedResourceStatuses stores status of resource being resized for the given PVC.
+  // Key names follow standard Kubernetes label syntax. Valid values are either:
+  // 	* Un-prefixed keys:
+  // 		- storage - the capacity of the volume.
+  // 	* Custom resources must use implementation-defined prefixed names such as "example.com/my-custom-resource"
+  // Apart from above values - keys that are unprefixed or have kubernetes.io prefix are considered
+  // reserved and hence may not be used.
+  //
+  // ClaimResourceStatus can be in any of following states:
+  // 	- ControllerResizeInProgress:
+  // 		State set when resize controller starts resizing the volume in control-plane.
+  // 	- ControllerResizeFailed:
+  // 		State set when resize has failed in resize controller with a terminal error.
+  // 	- NodeResizePending:
+  // 		State set when resize controller has finished resizing the volume but further resizing of
+  // 		volume is needed on the node.
+  // 	- NodeResizeInProgress:
+  // 		State set when kubelet starts resizing the volume.
+  // 	- NodeResizeFailed:
+  // 		State set when resizing has failed in kubelet with a terminal error. Transient errors don't set
+  // 		NodeResizeFailed.
+  // For example: if expanding a PVC for more capacity - this field can be one of the following states:
+  // 	- pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeInProgress"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeFailed"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizePending"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeInProgress"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeFailed"
+  // When this field is not set, it means that no resize operation is in progress for the given PVC.
+  //
+  // A controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus
+  // should ignore the update for the purpose it was designed. For example - a controller that
+  // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
+  // resources associated with PVC.
+  //
   // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
   // +featureGate=RecoverVolumeExpansionFailure
+  // +mapType=granular
   // +optional
-  optional string resizeStatus = 6;
+  map<string, string> allocatedResourceStatuses = 7;
+
+  // currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
+  // When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string currentVolumeAttributesClassName = 8;
+
+  // ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
+  // When this is unset, there is no ModifyVolume operation being attempted.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional ModifyVolumeStatus modifyVolumeStatus = 9;
 }
 
 // PersistentVolumeClaimTemplate is used to produce
@@ -3019,6 +3255,17 @@ message PersistentVolumeSpec {
   // This field influences the scheduling of pods that use this volume.
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
+
+  // Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+  // is not allowed. When this field is not set, it indicates that this volume does not belong to any
+  // VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
+  // after a volume has been updated successfully to a new class.
+  // For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
+  // PersistentVolumeClaims during the binding process.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string volumeAttributesClassName = 10;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -3036,6 +3283,13 @@ message PersistentVolumeStatus {
   // for machine parsing and tidy display in the CLI.
   // +optional
   optional string reason = 3;
+
+  // lastPhaseTransitionTime is the time the phase transitioned from one to another
+  // and automatically resets to current time everytime a volume phase transitions.
+  // This is an alpha field and requires enabling PersistentVolumeLastPhaseTransitionTime feature.
+  // +featureGate=PersistentVolumeLastPhaseTransitionTime
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastPhaseTransitionTime = 4;
 }
 
 // Represents a Photon Controller persistent disk resource.
@@ -3104,6 +3358,7 @@ message PodAffinity {
 // a pod of the set of pods is running
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
+  // If it's null, this PodAffinityTerm matches with no Pods.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
@@ -3128,6 +3383,32 @@ message PodAffinityTerm {
   // An empty selector ({}) matches all namespaces.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
+
+  // MatchLabelKeys is a set of pod label keys to select which pods will
+  // be taken into consideration. The keys are used to lookup values from the
+  // incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)`
+  // to select the group of existing pods which pods will be taken into consideration
+  // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+  // pod labels will be ignored. The default value is empty.
+  // The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+  // Also, MatchLabelKeys cannot be set when LabelSelector isn't set.
+  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // +listType=atomic
+  // +optional
+  repeated string matchLabelKeys = 5;
+
+  // MismatchLabelKeys is a set of pod label keys to select which pods will
+  // be taken into consideration. The keys are used to lookup values from the
+  // incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)`
+  // to select the group of existing pods which pods will be taken into consideration
+  // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+  // pod labels will be ignored. The default value is empty.
+  // The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector.
+  // Also, MismatchLabelKeys cannot be set when LabelSelector isn't set.
+  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // +listType=atomic
+  // +optional
+  repeated string mismatchLabelKeys = 6;
 }
 
 // Pod anti affinity is a group of inter pod anti affinity scheduling rules.
@@ -3280,12 +3561,9 @@ message PodExecOptions {
   repeated string command = 6;
 }
 
-// IP address information for entries in the (plural) PodIPs field.
-// Each entry includes:
-//
-// 	IP: An IP address allocated to the pod. Routable at least within the cluster.
+// PodIP represents a single IP address allocated to the pod.
 message PodIP {
-  // ip is an IP address (IPv4 or IPv6) assigned to the pod
+  // IP is the IP address assigned to the pod
   optional string ip = 1;
 }
 
@@ -3400,6 +3678,24 @@ message PodResourceClaim {
 
   // Source describes where to find the ResourceClaim.
   optional ClaimSource source = 2;
+}
+
+// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
+// which references a ResourceClaimTemplate. It stores the generated name for
+// the corresponding ResourceClaim.
+message PodResourceClaimStatus {
+  // Name uniquely identifies this resource claim inside the pod.
+  // This must match the name of an entry in pod.spec.resourceClaims,
+  // which implies that the string must be a DNS_LABEL.
+  optional string name = 1;
+
+  // ResourceClaimName is the name of the ResourceClaim that was
+  // generated for the Pod in the namespace of the Pod. It this is
+  // unset, then generating a ResourceClaim was not necessary. The
+  // pod.spec.resourceClaims entry can be ignored in this case.
+  //
+  // +optional
+  optional string resourceClaimName = 2;
 }
 
 // PodSchedulingGate is associated to a Pod to guard its scheduling.
@@ -3553,7 +3849,7 @@ message PodSpec {
   repeated EphemeralContainer ephemeralContainers = 34;
 
   // Restart policy for all containers within the pod.
-  // One of Always, OnFailure, Never.
+  // One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted.
   // Default to Always.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
   // +optional
@@ -3808,14 +4104,19 @@ message PodSpec {
   optional bool hostUsers = 37;
 
   // SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
-  // More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+  // If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
+  // scheduler will not attempt to schedule the pod.
   //
-  // This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
-  // +optional
+  // SchedulingGates can only be set at pod creation time, and be removed only afterwards.
+  //
+  // This is a beta feature enabled by the PodSchedulingReadiness feature gate.
+  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
+  // +featureGate=PodSchedulingReadiness
+  // +optional
   repeated PodSchedulingGate schedulingGates = 38;
 
   // ResourceClaims defines which ResourceClaims must be allocated
@@ -3888,11 +4189,23 @@ message PodStatus {
   // +optional
   optional string nominatedNodeName = 11;
 
-  // IP address of the host to which the pod is assigned. Empty if not yet scheduled.
+  // hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet.
+  // A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will
+  // not be updated even if there is a node is assigned to pod
   // +optional
   optional string hostIP = 5;
 
-  // IP address allocated to the pod. Routable at least within the cluster.
+  // hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must
+  // match the hostIP field. This list is empty if the pod has not started yet.
+  // A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will
+  // not be updated even if there is a node is assigned to this pod.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=ip
+  // +listType=atomic
+  repeated HostIP hostIPs = 16;
+
+  // podIP address allocated to the pod. Routable at least within the cluster.
   // Empty if not yet allocated.
   // +optional
   optional string podIP = 6;
@@ -3930,6 +4243,22 @@ message PodStatus {
   // Status for any ephemeral containers that have run in this pod.
   // +optional
   repeated ContainerStatus ephemeralContainerStatuses = 13;
+
+  // Status of resources resize desired for pod's containers.
+  // It is empty if no resources resize is pending.
+  // Any changes to container resources will automatically set this to "Proposed"
+  // +featureGate=InPlacePodVerticalScaling
+  // +optional
+  optional string resize = 14;
+
+  // Status of resource claims.
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +featureGate=DynamicResourceAllocation
+  // +optional
+  repeated PodResourceClaimStatus resourceClaimStatuses = 15;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -4122,8 +4451,6 @@ message ProbeHandler {
   optional TCPSocketAction tcpSocket = 3;
 
   // GRPC specifies an action involving a GRPC port.
-  // This is a beta field and requires enabling GRPCContainerProbe feature gate.
-  // +featureGate=GRPCContainerProbe
   // +optional
   optional GRPCAction grpc = 4;
 }
@@ -4373,6 +4700,7 @@ message ReplicationControllerSpec {
 
   // Template is the object that describes the pod that will be created if
   // insufficient replicas are detected. This takes precedence over a TemplateRef.
+  // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
   optional PodTemplateSpec template = 3;
@@ -4512,7 +4840,7 @@ message ResourceRequirements {
   // This is an alpha field and requires enabling the
   // DynamicResourceAllocation feature gate.
   //
-  // This field is immutable.
+  // This field is immutable. It can only be set for containers.
   //
   // +listType=map
   // +listMapKey=name
@@ -4675,7 +5003,7 @@ message SeccompProfile {
   // localhostProfile indicates a profile defined in a file on the node should be used.
   // The profile must be preconfigured on the node to work.
   // Must be a descending path, relative to the kubelet's configured seccomp profile location.
-  // Must only be set if type is "Localhost".
+  // Must be set if type is "Localhost". Must NOT be set for any other type.
   // +optional
   optional string localhostProfile = 2;
 }
@@ -5046,10 +5374,19 @@ message ServicePort {
   optional string protocol = 2;
 
   // The application protocol for this port.
+  // This is used as a hint for implementations to offer richer behavior for protocols that they understand.
   // This field follows standard Kubernetes label syntax.
-  // Un-prefixed names are reserved for IANA standard service names (as per
+  // Valid values are either:
+  //
+  // * Un-prefixed protocol names - reserved for IANA standard service names (as per
   // RFC-6335 and https://www.iana.org/assignments/service-names).
-  // Non-standard protocols should use prefixed names such as
+  //
+  // * Kubernetes-defined prefixed names:
+  //   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+  //   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+  //   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+  //
+  // * Other protocols should use implementation-defined prefixed names such as
   // mycompany.com/my-custom-protocol.
   // +optional
   optional string appProtocol = 6;
@@ -5197,10 +5534,9 @@ message ServiceSpec {
   // This feature depends on whether the underlying cloud-provider supports specifying
   // the loadBalancerIP when a load balancer is created.
   // This field will be ignored if the cloud-provider does not support the feature.
-  // Deprecated: This field was under-specified and its meaning varies across implementations,
-  // and it cannot support dual-stack.
-  // As of Kubernetes v1.24, users are encouraged to use implementation-specific annotations when available.
-  // This field may be removed in a future API version.
+  // Deprecated: This field was under-specified and its meaning varies across implementations.
+  // Using it is non-portable and it may not support dual-stack.
+  // Users are encouraged to use implementation-specific annotations when available.
   // +optional
   optional string loadBalancerIP = 8;
 
@@ -5347,6 +5683,12 @@ message SessionAffinityConfig {
   // clientIP contains the configurations of Client IP based session affinity.
   // +optional
   optional ClientIPConfig clientIP = 1;
+}
+
+// SleepAction describes a "sleep" action.
+message SleepAction {
+  // Seconds is the number of seconds to sleep.
+  optional int64 seconds = 1;
 }
 
 // Represents a StorageOS persistent volume resource.
@@ -5628,8 +5970,12 @@ message TopologySpreadConstraint {
   // spreading will be calculated. The keys are used to lookup values from the
   // incoming pod labels, those key-value labels are ANDed with labelSelector
   // to select the group of existing pods over which spreading will be calculated
-  // for the incoming pod. Keys that don't exist in the incoming pod labels will
+  // for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+  // MatchLabelKeys cannot be set when LabelSelector isn't set.
+  // Keys that don't exist in the incoming pod labels will
   // be ignored. A null or empty list means only match against labelSelector.
+  //
+  // This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
   // +listType=atomic
   // +optional
   repeated string matchLabelKeys = 8;
@@ -5752,6 +6098,39 @@ message VolumeProjection {
   // serviceAccountToken is information about the serviceAccountToken data to project
   // +optional
   optional ServiceAccountTokenProjection serviceAccountToken = 4;
+
+  // ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
+  // of ClusterTrustBundle objects in an auto-updating file.
+  //
+  // Alpha, gated by the ClusterTrustBundleProjection feature gate.
+  //
+  // ClusterTrustBundle objects can either be selected by name, or by the
+  // combination of signer name and a label selector.
+  //
+  // Kubelet performs aggressive normalization of the PEM contents written
+  // into the pod filesystem.  Esoteric PEM features such as inter-block
+  // comments and block headers are stripped.  Certificates are deduplicated.
+  // The ordering of certificates within the file is arbitrary, and Kubelet
+  // may change the order over time.
+  //
+  // +featureGate=ClusterTrustBundleProjection
+  // +optional
+  optional ClusterTrustBundleProjection clusterTrustBundle = 5;
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+message VolumeResourceRequirements {
+  // Limits describes the maximum amount of compute resources allowed.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
+
+  // Requests describes the minimum amount of compute resources required.
+  // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+  // otherwise to an implementation-defined value. Requests cannot exceed Limits.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 }
 
 // Represents the source of a volume to mount.
@@ -5971,12 +6350,9 @@ message WindowsSecurityContextOptions {
   optional string runAsUserName = 3;
 
   // HostProcess determines if a container should be run as a 'Host Process' container.
-  // This field is alpha-level and will only be honored by components that enable the
-  // WindowsHostProcessContainers feature flag. Setting this field without the feature
-  // flag will result in errors when validating the Pod. All of a Pod's containers must
-  // have the same effective HostProcess value (it is not allowed to have a mix of HostProcess
-  // containers and non-HostProcess containers).  In addition, if HostProcess is true
-  // then HostNetwork must also be set to true.
+  // All of a Pod's containers must have the same effective HostProcess value
+  // (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+  // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
 }

@@ -17,19 +17,34 @@ limitations under the License.
 package cel
 
 import (
+	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/utils/ptr"
 
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/cel/common"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -37,6 +52,7 @@ func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
 		name          string
 		schema        *schema.Structural
+		oldSchema     *schema.Structural
 		obj           interface{}
 		oldObj        interface{}
 		valid         []string
@@ -170,6 +186,60 @@ func TestValidationExpressions(t *testing.T) {
 				"double(self.val1) < 10.0",
 				"double(self.val2) == 10.0",
 				"double(self.val3) > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with all float types
+				"self.val1 < self.val4",
+				"self.val1 <= self.val4",
+				"self.val2 <= self.val4",
+				"self.val2 >= self.val4",
+				"self.val3 > self.val4",
+				"self.val3 >= self.val4",
+
+				"self.val1 < self.val4",
+				"self.val3 > self.val4",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				// Cross Type Numeric Comparisons: float types backed by integer values,
+				// which is how integer literals are parsed from JSON for custom resources.
+				"self.val1 < self.val7",
+				"self.val3 > self.val7",
+
+				"self.val1 < int(self.val7)",
+				"self.val3 > int(self.val7)",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				// Cross Type Numeric Comparisons: literal integers and floats
+				"5 < 10.0",
+				"15 > 10.0",
+
+				"5 < 10.0",
+				"15 > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with literal floats
+				"self.val1 < 10.0",
+				"self.val3 > 10.0",
 			},
 		},
 		{name: "unicode strings",
@@ -201,10 +271,15 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.substring(4, 10).trim() == 'takes'",
 				"self.val1.upperAscii() == 'ROOK TAKES 👑'",
 				"self.val1.lowerAscii() == 'rook takes 👑'",
+
+				"'%d %s %f %s %s'.format([1, 'abc', 1.0, duration('1m'), timestamp('2000-01-01T00:00:00.000Z')]) == '1 abc 1.000000 60s 2000-01-01T00:00:00Z'",
+				"'%e'.format([3.14]) == '3.140000 × 10⁰⁰'",
+				"'%o %o %o'.format([7, 8, 9]) == '7 10 11'",
+				"'%b %b %b'.format([7, 8, 9]) == '111 1000 1001'",
 			},
 			errors: map[string]string{
 				// Invalid regex with a string constant regex pattern is compile time error
-				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.val1.matches(')')": "compile error: compilation failed: ERROR: <input>:1:19: invalid matches argument",
 			},
 		},
 		{name: "escaped strings",
@@ -249,6 +324,11 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.getMilliseconds() == 3723004",
 				"type(self.val1) == google.protobuf.Duration",
 			},
+			errors: map[string]string{
+				"duration('1')":                      "invalid duration argument",
+				"duration('1d')":                     "invalid duration argument",
+				"duration('1us') < duration('1nns')": "invalid duration argument",
+			},
 		},
 		{name: "date format",
 			obj:    objs("1997-07-16", "1997-07-16"),
@@ -276,6 +356,11 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.getMilliseconds('01:00') == 10",
 				"self.val1.getHours('UTC') == 18", // TZ in string is 1hr off of UTC
 				"type(self.val1) == google.protobuf.Timestamp",
+			},
+			errors: map[string]string{
+				"timestamp('1000-00-00T00:00:00Z')":  "invalid timestamp",
+				"timestamp('1000-01-01T00:00:00ZZ')": "invalid timestamp",
+				"timestamp(-62135596801)":            "invalid timestamp",
 			},
 		},
 		{name: "enums",
@@ -335,6 +420,21 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 + self.val2 == [1, 2, 3, 1, 2, 3]",
 				"self.val1 + [4, 5] == [1, 2, 3, 4, 5]",
 			},
+			errors: map[string]string{
+				// Mixed type lists are not allowed since we have HomogeneousAggregateLiterals enabled
+				"[1, 'a', false].filter(x, string(x) == 'a')": "expected type 'int' but found 'string'",
+			},
+		},
+		{name: "string lists",
+			obj:    objs([]interface{}{"a", "b", "c"}),
+			schema: schemas(listType(&stringType)),
+			valid: []string{
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
+			},
 		},
 		{name: "listSets",
 			obj:    objs([]interface{}{"a", "b", "c"}, []interface{}{"a", "c", "b"}),
@@ -348,6 +448,12 @@ func TestValidationExpressions(t *testing.T) {
 				"!('x' in self.val1)",
 				"self.val1 + self.val2 == ['a', 'b', 'c']",
 				"self.val1 + ['c', 'd'] == ['a', 'b', 'c', 'd']",
+
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
 			},
 		},
 		{name: "listMaps",
@@ -399,6 +505,10 @@ func TestValidationExpressions(t *testing.T) {
 				"'k1' in self.val1",
 				"!('k3' in self.val1)",
 				"self.val1 == {'k1': 'a', 'k2': 'b'}",
+			},
+			errors: map[string]string{
+				// Mixed type maps are not allowed since we have HomogeneousAggregateLiterals enabled
+				"{'k1': 'a', 'k2': 1, 'k2': false}": "expected type 'string' but found 'int'",
 			},
 		},
 		{name: "objects",
@@ -1652,6 +1762,7 @@ func TestValidationExpressions(t *testing.T) {
 				"self.str.find(')') == ''":       "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
 				"self.str.findAll(')') == []":    "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
 				"self.str.findAll(')', 1) == []": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.matches('x++')":        "invalid matches argument",
 			},
 		},
 		{name: "URL parsing",
@@ -1751,6 +1862,96 @@ func TestValidationExpressions(t *testing.T) {
 				"oldSelf == self",
 			},
 		},
+		{name: "authorizer is not supported for CRD Validation Rules",
+			obj:    []interface{}{},
+			oldObj: []interface{}{},
+			schema: objectTypePtr(map[string]schema.Structural{}),
+			errors: map[string]string{
+				"authorizer.path('/healthz').check('get').allowed()": "undeclared reference to 'authorizer'",
+			},
+		},
+		{name: "optionals", // https://github.com/google/cel-spec/wiki/proposal-246
+			obj: map[string]interface{}{
+				"presentObj": map[string]interface{}{
+					"presentStr": "value",
+				},
+				"m": map[string]interface{}{"k": "v"},
+				"l": []interface{}{"a"},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"presentObj": objectType(map[string]schema.Structural{
+					"presentStr": stringType,
+				}),
+				"absentObj": objectType(map[string]schema.Structural{
+					"absentStr": stringType,
+				}),
+				"m": mapType(&stringType),
+				"l": listType(&stringType),
+			}),
+			valid: []string{
+				"self.?presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr.or(optional.of('nope')) == optional.of('value')",
+				"self.presentObj.?presentStr.orValue('') == 'value'",
+				"self.presentObj.?presentStr.hasValue() == true",
+				"self.presentObj.?presentStr.optMap(v, v == 'value').hasValue()",
+				"self.?absentObj.?absentStr == optional.none()",
+				"self.?absentObj.?absentStr.or(optional.of('nope')) == optional.of('nope')",
+				"self.?absentObj.?absentStr.orValue('nope') == 'nope'",
+				"self.?absentObj.?absentStr.hasValue() == false",
+				"self.?absentObj.?absentStr.optMap(v, v == 'value').hasValue() == false",
+
+				"self.m[?'k'] == optional.of('v')",
+				"self.m[?'k'].or(optional.of('nope')) == optional.of('v')",
+				"self.m[?'k'].orValue('') == 'v'",
+				"self.m[?'k'].hasValue() == true",
+				"self.m[?'k'].optMap(v, v == 'v').hasValue()",
+				"self.m[?'x'] == optional.none()",
+				"self.m[?'x'].or(optional.of('nope')) == optional.of('nope')",
+				"self.m[?'x'].orValue('nope') == 'nope'",
+				"self.m[?'x'].hasValue() == false",
+				"self.m[?'x'].hasValue() == false",
+
+				"self.l[?0] == optional.of('a')",
+				"self.l[?1] == optional.none()",
+				"self.l[?0].orValue('') == 'a'",
+				"self.l[?0].hasValue() == true",
+				"self.l[?0].optMap(v, v == 'a').hasValue()",
+				"self.l[?1] == optional.none()",
+				"self.l[?1].or(optional.of('nope')) == optional.of('nope')",
+				"self.l[?1].orValue('nope') == 'nope'",
+				"self.l[?1].hasValue() == false",
+				"self.l[?1].hasValue() == false",
+
+				"optional.ofNonZeroValue(1).hasValue()",
+				"optional.ofNonZeroValue(uint(1)).hasValue()",
+				"optional.ofNonZeroValue(1.1).hasValue()",
+				"optional.ofNonZeroValue('a').hasValue()",
+				"optional.ofNonZeroValue(true).hasValue()",
+				"optional.ofNonZeroValue(['a']).hasValue()",
+				"optional.ofNonZeroValue({'k': 'v'}).hasValue()",
+				"optional.ofNonZeroValue(timestamp('2011-08-18T00:00:00.000+01:00')).hasValue()",
+				"optional.ofNonZeroValue(duration('19h3m37s10ms')).hasValue()",
+				"optional.ofNonZeroValue(null) == optional.none()",
+				"optional.ofNonZeroValue(0) == optional.none()",
+				"optional.ofNonZeroValue(uint(0)) == optional.none()",
+				"optional.ofNonZeroValue(0.0) == optional.none()",
+				"optional.ofNonZeroValue('') == optional.none()",
+				"optional.ofNonZeroValue(false) == optional.none()",
+				"optional.ofNonZeroValue([]) == optional.none()",
+				"optional.ofNonZeroValue({}) == optional.none()",
+				"optional.ofNonZeroValue(timestamp('0001-01-01T00:00:00.000+00:00')) == optional.none()",
+				"optional.ofNonZeroValue(duration('0s')) == optional.none()",
+
+				"{?'k': optional.none(), 'k2': 'v2'} == {'k2': 'v2'}",
+				"{?'k': optional.of('v'), 'k2': 'v2'} == {'k': 'v', 'k2': 'v2'}",
+				"['a', ?optional.none(), 'c'] == ['a', 'c']",
+				"['a', ?optional.of('v'), 'c'] == ['a', 'v', 'c']",
+			},
+			errors: map[string]string{
+				"self.absentObj.?absentStr == optional.none()": "no such key: absentObj", // missing ?. operator on first deref is an error
+			},
+		},
 	}
 
 	for i := range tests {
@@ -1758,7 +1959,7 @@ func TestValidationExpressions(t *testing.T) {
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -1769,7 +1970,7 @@ func TestValidationExpressions(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1793,7 +1994,7 @@ func TestValidationExpressions(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2003,10 +2204,11 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.TODO()
-			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), PerCallLimit)
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -2073,7 +2275,7 @@ func TestCELValidationLimit(t *testing.T) {
 				t.Run(validRule, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), PerCallLimit)
+					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), celconfig.PerCallLimit)
 
 					// test with cost budget exceeded
 					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
@@ -2098,7 +2300,7 @@ func TestCELValidationLimit(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
@@ -2141,11 +2343,11 @@ func TestCELValidationContextCancellation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
-			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2154,7 +2356,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			found := false
 			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 			cancel()
-			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
 					found = true
@@ -2170,7 +2372,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 
 // This is the most recursive operations we expect to be able to include in an expression.
 // This number could get larger with more improvements in the grammar or ANTLR stack, but should *never* decrease or previously valid expressions could be treated as invalid.
-const maxValidDepth = 243
+const maxValidDepth = 250
 
 // TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
 func TestCELMaxRecursionDepth(t *testing.T) {
@@ -2199,7 +2401,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -2207,7 +2409,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2231,7 +2433,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2248,6 +2450,1587 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMessageExpression(t *testing.T) {
+	klog.LogToStderr(false)
+	klog.InitFlags(nil)
+	setDefaultVerbosity(2)
+	defer klog.LogToStderr(true)
+	tests := []struct {
+		name                    string
+		costBudget              int64
+		perCallLimit            uint64
+		message                 string
+		messageExpression       string
+		expectedLogErr          string
+		expectedValidationErr   string
+		expectedRemainingBudget int64
+	}{
+		{
+			name:                    "no cost error expected",
+			messageExpression:       `"static string"`,
+			expectedValidationErr:   "static string",
+			costBudget:              300,
+			expectedRemainingBudget: 300,
+		},
+		{
+			name:                  "messageExpression takes precedence over message",
+			message:               "invisible",
+			messageExpression:     `"this is messageExpression"`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedValidationErr: "this is messageExpression",
+		},
+		{
+			name:                    "default rule message used if messageExpression does not eval to string",
+			messageExpression:       `true`,
+			costBudget:              celconfig.RuntimeCELCostBudget,
+			expectedValidationErr:   "failed rule",
+			expectedRemainingBudget: celconfig.RuntimeCELCostBudget,
+		},
+		{
+			name:                    "limit exceeded",
+			messageExpression:       `"string 1" + "string 2" + "string 3"`,
+			costBudget:              1,
+			expectedValidationErr:   "messageExpression evaluation failed due to running out of cost budget",
+			expectedRemainingBudget: -1,
+		},
+		{
+			name:                    "messageExpression budget (str concat)",
+			messageExpression:       `"str1 " + self.str`,
+			costBudget:              50,
+			expectedValidationErr:   "str1 a string",
+			expectedRemainingBudget: 46,
+		},
+		{
+			name:                    "runtime cost preserved if messageExpression fails during evaluation",
+			message:                 "message not messageExpression",
+			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
+			costBudget:              50,
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
+			expectedValidationErr:   "message not messageExpression",
+			expectedRemainingBudget: 47,
+		},
+		{
+			name:                    "runtime cost preserved if messageExpression fails during evaluation (no message set)",
+			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
+			costBudget:              50,
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
+			expectedValidationErr:   "failed rule",
+			expectedRemainingBudget: 47,
+		},
+		{
+			name:                    "per-call limit exceeded during messageExpression execution",
+			messageExpression:       `"string 1" + "string 2" + "string 3"`,
+			costBudget:              celconfig.RuntimeCELCostBudget,
+			perCallLimit:            1,
+			expectedValidationErr:   "call cost exceeds limit for messageExpression",
+			expectedRemainingBudget: -1,
+		},
+		{
+			name:                  "messageExpression is not allowed to generate a string with newlines",
+			message:               "message not messageExpression",
+			messageExpression:     `"str with \na newline"`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should not contain line breaks",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate messages >5000 characters",
+			message:               "message not messageExpression",
+			messageExpression:     fmt.Sprintf(`"%s"`, genString(5121, 'a')),
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression beyond allowable length of 5120",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate an empty string",
+			message:               "message not messageExpression",
+			messageExpression:     `string("")`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate a string with only spaces",
+			message:               "message not messageExpression",
+			messageExpression:     `string("     ")`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
+			expectedValidationErr: "message not messageExpression",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outputBuffer := strings.Builder{}
+			klog.SetOutput(&outputBuffer)
+
+			ctx := context.TODO()
+			var s schema.Structural
+			if tt.message != "" {
+				s = withRuleMessageAndMessageExpression(objectType(map[string]schema.Structural{
+					"str": stringType}), "false", tt.message, tt.messageExpression)
+			} else {
+				s = withRuleAndMessageExpression(objectType(map[string]schema.Structural{
+					"str": stringType}), "false", tt.messageExpression)
+			}
+			obj := map[string]interface{}{
+				"str": "a string",
+			}
+
+			callLimit := uint64(celconfig.PerCallLimit)
+			if tt.perCallLimit != 0 {
+				callLimit = tt.perCallLimit
+			}
+			celValidator := NewValidator(&s, false, callLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, obj, nil, tt.costBudget)
+			klog.Flush()
+
+			if len(errs) != 1 {
+				t.Fatalf("expected 1 error, got %d", len(errs))
+			}
+
+			if tt.expectedLogErr != "" {
+				if !strings.Contains(outputBuffer.String(), tt.expectedLogErr) {
+					t.Fatalf("did not find expected log error message: %q\n%q", tt.expectedLogErr, outputBuffer.String())
+				}
+			} else if tt.expectedLogErr == "" && outputBuffer.String() != "" {
+				t.Fatalf("expected no log output, got: %q", outputBuffer.String())
+			}
+
+			if tt.expectedValidationErr != "" {
+				if !strings.Contains(errs[0].Error(), tt.expectedValidationErr) {
+					t.Fatalf("did not find expected validation error message: %q", tt.expectedValidationErr)
+				}
+			}
+
+			if tt.expectedRemainingBudget != 0 {
+				if tt.expectedRemainingBudget != remainingBudget {
+					t.Fatalf("expected %d cost left, got %d", tt.expectedRemainingBudget, remainingBudget)
+				}
+			}
+		})
+	}
+}
+
+func TestReasonAndFldPath(t *testing.T) {
+	forbiddenReason := func() *apiextensions.FieldValueErrorReason {
+		r := apiextensions.FieldValueForbidden
+		return &r
+	}()
+	tests := []struct {
+		name      string
+		schema    *schema.Structural
+		obj       interface{}
+		errors    []string
+		errorType field.ErrorType
+	}{
+		{name: "Return error based on input reason",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f: Forbidden"},
+		},
+		{name: "Return error default is invalid",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", nil),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeInvalid,
+			errors:    []string{"root.f: Invalid"},
+		},
+		{name: "Return error based on input fieldPath",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ".m", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f.m: Forbidden"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, nil, celconfig.RuntimeCELCostBudget)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != tt.errorType {
+					t.Errorf("expected error type %v, but got: %v", tt.errorType, err.Type)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func TestValidateFieldPath(t *testing.T) {
+	sts := schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"foo": {
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{
+						Structural: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "object",
+							},
+							Properties: map[string]schema.Structural{
+								"subAdd": {
+									Generic: schema.Generic{
+										Type: "number",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"white space": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
+			"'foo'bar": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
+			"a": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"foo's": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"test\a": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bb[b": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bbb": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"c": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+							"34": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+					"bbb.c": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"a-b.3'4": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+				},
+			},
+			"list": {
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "object",
+					},
+					Properties: map[string]schema.Structural{
+						"a": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+						"a-b.3'4": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	path := field.NewPath("")
+
+	tests := []struct {
+		name            string
+		fieldPath       string
+		pathOfFieldPath *field.Path
+		schema          *schema.Structural
+		errDetail       string
+		validFieldPath  *field.Path
+	}{
+		{
+			name:            "Valid .a",
+			fieldPath:       ".a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a"),
+		},
+		{
+			name:            "Valid 'foo'bar",
+			fieldPath:       "['\\'foo\\'bar']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("'foo'bar"),
+		},
+		{
+			name:            "Invalid 'foo'bar",
+			fieldPath:       ".\\'foo\\'bar",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Invalid with whitespace",
+			fieldPath:       ". a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       ".white space",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       "['white space']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "invalid dot annotation",
+			fieldPath:       ".a.bb[b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "valid with .",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a", "bbb.c"),
+		},
+		{
+			name:            "Unclosed ]",
+			fieldPath:       ".a['bbb.c'",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
+		},
+		{
+			name:            "Unexpected end of JSON path",
+			fieldPath:       ".",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
+		},
+		{
+			name:            "Valid map syntax .a.bbb",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("bbb.c"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo.subAdd",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo['subAdd']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Invalid",
+			fieldPath:       ".a.foo's",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['foo\\'s']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("foo's"),
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['test\\a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("test\a"),
+		},
+
+		{
+			name:            "Invalid map key",
+			fieldPath:       ".a.foo",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Malformed map key",
+			fieldPath:       ".a.bbb[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected single quoted string but got 0",
+		},
+		{
+			name:            "Valid refer for name has number",
+			fieldPath:       ".a.bbb.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Map syntax for special field names",
+			fieldPath:       ".a.bbb['34']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			//errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Valid .list",
+			fieldPath:       ".list",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("list"),
+		},
+		{
+			name:            "Invalid list index",
+			fieldPath:       ".list[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected single quoted string but got 0",
+		},
+		{
+			name:            "Invalid list reference",
+			fieldPath:       ".list. a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Invalid .list.a",
+			fieldPath:       ".list['a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Missing leading dot",
+			fieldPath:       "a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected [ or . but got: a",
+		},
+		{
+			name:            "Nonexistent field",
+			fieldPath:       ".c",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Duplicate dots",
+			fieldPath:       ".a..b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "object of array",
+			fieldPath:       ".list.a-b.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
+
+			if err == nil && tc.errDetail != "" {
+				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
+			}
+			if err != nil && tc.errDetail == "" {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tc.errDetail) {
+				t.Errorf("expected error to contain: %v, but get: %v", tc.errDetail, err)
+			}
+			if tc.validFieldPath != nil && tc.validFieldPath.String() != path.Child(validField.String()).String() {
+				t.Errorf("expected %v, got %v", tc.validFieldPath, path.Child(validField.String()))
+			}
+		})
+	}
+}
+
+// FixTabsOrDie counts the number of tab characters preceding the first
+// line in the given yaml object. It removes that many tabs from every
+// line. It panics (it's a test funvion) if some line has fewer tabs
+// than the first line.
+//
+// The purpose of this is to make it easier to read tests.
+func FixTabsOrDie(in string) string {
+	lines := bytes.Split([]byte(in), []byte{'\n'})
+	if len(lines[0]) == 0 && len(lines) > 1 {
+		lines = lines[1:]
+	}
+	// Create prefix made of tabs that we want to remove.
+	var prefix []byte
+	for _, c := range lines[0] {
+		if c != '\t' {
+			break
+		}
+		prefix = append(prefix, byte('\t'))
+	}
+	// Remove prefix from all tabs, fail otherwise.
+	for i := range lines {
+		line := lines[i]
+		// It's OK for the last line to be blank (trailing \n)
+		if i == len(lines)-1 && len(line) <= len(prefix) && bytes.TrimSpace(line) == nil {
+			lines[i] = []byte{}
+			break
+		}
+		if !bytes.HasPrefix(line, prefix) {
+			minRange := i - 5
+			maxRange := i + 5
+			if minRange < 0 {
+				minRange = 0
+			}
+			if maxRange > len(lines) {
+				maxRange = len(lines)
+			}
+			panic(fmt.Errorf("line %d doesn't start with expected number (%d) of tabs (%v-%v):\n%v", i, len(prefix), minRange, maxRange, string(bytes.Join(lines[minRange:maxRange], []byte{'\n'}))))
+		}
+		lines[i] = line[len(prefix):]
+	}
+
+	joined := string(bytes.Join(lines, []byte{'\n'}))
+
+	// Convert rest of tabs to spaces since yaml doesnt like yabs
+	// (assuming 2 space alignment)
+	return strings.ReplaceAll(joined, "\t", "  ")
+}
+
+// Creates a *spec.Schema Schema by decoding the given YAML. Panics on error
+func mustSchema(source string) *schema.Structural {
+	source = FixTabsOrDie(source)
+	d := yaml.NewYAMLOrJSONDecoder(strings.NewReader(source), 4096)
+	props := &apiextensions.JSONSchemaProps{}
+	if err := d.Decode(props); err != nil {
+		panic(err)
+	}
+	convertedProps := &apiextensionsinternal.JSONSchemaProps{}
+	if err := apiextensions.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(props, convertedProps, nil); err != nil {
+		panic(err)
+	}
+
+	res, err := schema.NewStructural(convertedProps)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+// Creates an *unstructured by decoding the given YAML. Panics on error
+func mustUnstructured(source string) interface{} {
+	source = FixTabsOrDie(source)
+	d := yaml.NewYAMLOrJSONDecoder(strings.NewReader(source), 4096)
+	var res interface{}
+	if err := d.Decode(&res); err != nil {
+		panic(err)
+	}
+	return res
+}
+
+type warningRecorder struct {
+	mu       sync.Mutex
+	warnings []string
+}
+
+// AddWarning adds a warning to recorder.
+func (r *warningRecorder) AddWarning(agent, text string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.warnings = append(r.warnings, text)
+}
+
+func (r *warningRecorder) Warnings() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	warnings := make([]string, len(r.warnings))
+	copy(warnings, r.warnings)
+	return warnings
+}
+
+func TestRatcheting(t *testing.T) {
+	cases := []struct {
+		name   string
+		schema *schema.Structural
+		oldObj interface{}
+		newObj interface{}
+
+		// Errors that should occur when evaluating this operation with
+		// ratcheting feature enabled
+		errors []string
+
+		// Errors that should occur when evaluating this operation with
+		// ratcheting feature disabled
+		// These errors should be raised as warnings when ratcheting is enabled
+		warnings []string
+
+		runtimeCostBudget int64
+	}{
+		{
+			name: "normal CEL expression",
+			schema: mustSchema(`
+				type: object
+				properties:
+					foo:
+						type: string
+						x-kubernetes-validations:
+						- rule: self == "bar"
+						  message: "gotta be baz"
+				`),
+			oldObj: mustUnstructured(`
+				foo: baz
+			`),
+			newObj: mustUnstructured(`
+				foo: baz
+			`),
+			warnings: []string{
+				`root.foo: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of an atomic array whose parent is totally unchanged",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: atomic
+				items:
+					type: object
+					properties:
+						bar:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+				`),
+			// CEL error comes from uncorrelatable portion of the schema,
+			// but it should be ratcheted anyway because it is the descendent
+			// of an unchanged correlatable node
+			oldObj: mustUnstructured(`
+				- bar: bar
+			`),
+			newObj: mustUnstructured(`
+				- bar: bar
+			`),
+			warnings: []string{
+				`root[0].bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of a set whose parent is totally unchanged",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: set
+				items:
+					type: number
+					x-kubernetes-validations:
+					- rule: int(self) % 2 == 1
+					  message: "gotta be odd"
+				`),
+			// CEL error comes from uncorrelatable portion of the schema,
+			// but it should be ratcheted anyway because it is the descendent
+			// of an unchanged correlatable node
+			oldObj: mustUnstructured(`
+				- 1
+				- 2
+			`),
+			newObj: mustUnstructured(`
+				- 1
+				- 2
+			`),
+			warnings: []string{
+				`root[1]: Invalid value: "number": gotta be odd`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of a set and one of its siblings has changed",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					setArray:
+						type: array
+						x-kubernetes-list-type: set
+						items:
+							type: number
+							x-kubernetes-validations:
+							- rule: int(self) % 2 == 1
+							  message: "gotta be odd"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				setArray:
+				- 1
+				- 3
+				- 2
+			`),
+			newObj: mustUnstructured(`
+				stringField: changed but ratcheted
+				setArray:
+				- 1
+				- 3
+				- 2
+			`),
+			warnings: []string{
+				`root.setArray[2]: Invalid value: "number": gotta be odd`,
+			},
+		},
+		{
+			name: "descendent of a map list whose parent is unchanged",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: map
+				x-kubernetes-list-map-keys: ["key"]
+				items:
+					type: object
+					properties:
+						key:
+							type: string
+						value:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+			`),
+			oldObj: mustUnstructured(`
+				- key: foo
+				  value: notbaz
+				- key: bar
+				  value: notbaz
+			`),
+			newObj: mustUnstructured(`
+				- key: foo
+				  value: notbaz
+				- key: bar
+				  value: notbaz
+				- key: baz
+				  value: baz
+			`),
+			warnings: []string{
+				`root[0].value: Invalid value: "string": gotta be baz`,
+				`root[1].value: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "descendent of a map list whose siblings have changed",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: map
+				x-kubernetes-list-map-keys: ["key"]
+				items:
+					type: object
+					properties:
+						key:
+							type: string
+						value:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+			`),
+			oldObj: mustUnstructured(`
+				- key: foo
+				  value: notbaz
+				- key: bar
+				  value: notbaz
+			`),
+			newObj: mustUnstructured(`
+				- key: foo
+				  value: baz
+				- key: bar
+				  value: notbaz
+			`),
+			warnings: []string{
+				`root[1].value: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "descendent of a map whose parent is totally unchanged",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					mapField:
+						type: object
+						properties:
+							foo:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "baz"
+								  message: "gotta be baz"
+							mapField:
+								type: object
+								properties:
+									bar:
+										type: string
+										x-kubernetes-validations:
+										- rule: self == "baz"
+										  message: "gotta be nested baz"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: notbaz
+					mapField:
+						bar: notbaz
+			`),
+			newObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: notbaz
+					mapField:
+						bar: notbaz
+			`),
+			warnings: []string{
+				`root.mapField.foo: Invalid value: "string": gotta be baz`,
+				`root.mapField.mapField.bar: Invalid value: "string": gotta be nested baz`,
+			},
+		},
+		{
+			name: "descendent of a map whose siblings have changed",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					mapField:
+						type: object
+						properties:
+							foo:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "baz"
+								  message: "gotta be baz"
+							mapField:
+								type: object
+								properties:
+									bar:
+										type: string
+										x-kubernetes-validations:
+										- rule: self == "baz"
+										  message: "gotta be baz"
+									otherBar:
+										type: string
+										x-kubernetes-validations:
+										- rule: self == "otherBaz"
+										  message: "gotta be otherBaz"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: baz
+					mapField:
+						bar: notbaz
+						otherBar: nototherBaz
+			`),
+			newObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: notbaz
+					mapField:
+						bar: notbaz
+						otherBar: otherBaz
+			`),
+			errors: []string{
+				// Didn't get ratcheted because we changed its value from baz to notbaz
+				`root.mapField.foo: Invalid value: "string": gotta be baz`,
+			},
+			warnings: []string{
+				// Ratcheted because its value remained the same, even though it is invalid
+				`root.mapField.mapField.bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of an atomic array whose siblings has changed",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					atomicArray:
+						type: array
+						x-kubernetes-list-type: atomic
+						items:
+							type: object
+							properties:
+								bar:
+									type: string
+									x-kubernetes-validations:
+									- rule: self == "baz"
+									  message: "gotta be baz"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				atomicArray:
+				- bar: bar
+			`),
+			newObj: mustUnstructured(`
+				stringField: changed but ratcheted
+				atomicArray:
+				- bar: bar
+			`),
+			warnings: []string{
+				`root.atomicArray[0].bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "we can't ratchet a normal CEL expression from an uncorrelatable part of the schema whose parent nodes has changed",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: atomic
+				items:
+					type: object
+					properties:
+						bar:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+			`),
+			// CEL error comes from uncorrelatable portion of the schema,
+			// but it should be ratcheted anyway because it is the descendent
+			// or an unchanged correlatable node
+			oldObj: mustUnstructured(`
+				- bar: bar
+			`),
+			newObj: mustUnstructured(`
+				- bar: bar
+				- bar: baz
+			`),
+			errors: []string{
+				`root[0].bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "transition rules never ratchet for correlatable schemas",
+			schema: mustSchema(`
+				type: object
+				properties:
+					foo:
+						type: string
+						x-kubernetes-validations:
+						- rule: oldSelf != "bar" && self == "baz"
+						  message: gotta be baz
+			`),
+			oldObj: mustUnstructured(`
+				foo: bar
+			`),
+			newObj: mustUnstructured(`
+				foo: bar
+			`),
+			errors: []string{
+				`root.foo: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "changing field path does not change ratcheting logic",
+			schema: mustSchema(`
+				type: object
+				x-kubernetes-validations:
+				- rule: self.foo == "baz"
+				  message: gotta be baz
+				  fieldPath: ".foo"
+				properties:
+					bar:
+						type: string
+					foo:
+						type: string
+			`),
+			oldObj: mustUnstructured(`
+				foo: bar
+			`),
+			// Fieldpath is on unchanged field `foo`, but since rule is on the
+			// changed parent object we still get an error
+			newObj: mustUnstructured(`
+				foo: bar
+				bar: invalid
+			`),
+			errors: []string{
+				`root.foo: Invalid value: "object": gotta be baz`,
+			},
+		},
+		{
+			name: "cost budget errors are not ratcheted",
+			schema: mustSchema(`
+				type: string
+				minLength: 5
+				x-kubernetes-validations:
+				- rule: self == "baz"
+				  message: gotta be baz
+			`),
+			oldObj:            "unchanged",
+			newObj:            "unchanged",
+			runtimeCostBudget: 1,
+			errors: []string{
+				`validation failed due to running out of cost budget, no further validation rules will be run`,
+			},
+		},
+		{
+			name: "compile errors are not ratcheted",
+			schema: mustSchema(`
+				type: string
+				x-kubernetes-validations:
+				- rule: asdausidyhASDNJm
+				  message: gotta be baz
+			`),
+			oldObj: "unchanged",
+			newObj: "unchanged",
+			errors: []string{
+				`rule compile error: compilation failed: ERROR: <input>:1:1: undeclared reference to 'asdausidyhASDNJm'`,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			validator := NewValidator(c.schema, false, celconfig.PerCallLimit)
+			require.NotNil(t, validator)
+			recorder := &warningRecorder{}
+			ctx := warning.WithWarningRecorder(context.TODO(), recorder)
+			budget := c.runtimeCostBudget
+			if budget == 0 {
+				budget = celconfig.RuntimeCELCostBudget
+			}
+			errs, _ := validator.Validate(
+				ctx,
+				field.NewPath("root"),
+				c.schema,
+				c.newObj,
+				c.oldObj,
+				budget,
+				WithRatcheting(common.NewCorrelatedObject(c.newObj, c.oldObj, &model.Structural{Structural: c.schema})),
+			)
+
+			require.Len(t, errs, len(c.errors), "must have expected number of errors")
+			require.Len(t, recorder.Warnings(), len(c.warnings), "must have expected number of warnings")
+
+			// Check that the expected errors were raised
+			for _, expectedErr := range c.errors {
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Error(), expectedErr) {
+						found = true
+						break
+					}
+				}
+
+				assert.True(t, found, "expected error %q not found", expectedErr)
+			}
+
+			// Check that the ratcheting disabled errors were raised as warnings
+			for _, expectedWarning := range c.warnings {
+				found := false
+				for _, warning := range recorder.Warnings() {
+					if warning == expectedWarning {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "expected warning %q not found", expectedWarning)
+			}
+
+		})
+	}
+}
+
+// Runs transition rule cases with OptionalOldSelf set to true on the schema
+func TestOptionalOldSelf(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		oldObj interface{}
+		errors []string // strings that error message must contain
+	}{
+		{
+			name: "allow new value if old value is null",
+			obj: map[string]interface{}{
+				"foo": "bar",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'not bar' || !oldSelf.hasValue()"),
+		},
+		{
+			name: "block new value if old value is not null",
+			obj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "bar",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || !oldSelf.hasValue()"),
+			errors: []string{"failed rule"},
+		},
+		{
+			name: "allow invalid new value if old value is also invalid",
+			obj: map[string]interface{}{
+				"foo": "invalid again",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || (oldSelf.hasValue() && oldSelf.value().foo != 'valid')"),
+		},
+		{
+			name: "allow invalid new value if old value is also invalid with chained optionals",
+			obj: map[string]interface{}{
+				"foo": "invalid again",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || oldSelf.foo.orValue('') != 'valid'"),
+		},
+		{
+			name: "block invalid new value if old value is valid",
+			obj: map[string]interface{}{
+				"foo": "invalid",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "valid",
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"foo": stringType,
+			}), "self.foo == 'valid' || (oldSelf.hasValue() && oldSelf.value().foo != 'valid')"),
+			errors: []string{"failed rule"},
+		},
+		{
+			name:   "create: new min or allow higher than oldValue",
+			obj:    10,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name: "block create: new min or allow higher than oldValue",
+			obj:  9,
+			// Can't use != null because type is integer and no overload
+			// workaround by comparing type, but kinda hacky
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+			errors: []string{"failed rule"},
+		},
+		{
+			name:   "update: new min or allow higher than oldValue",
+			obj:    10,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name:   "ratchet update: new min or allow higher than oldValue",
+			obj:    9,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name:   "ratchet noop update: new min or allow higher than oldValue",
+			obj:    5,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+		},
+		{
+			name:   "block update: new min or allow higher than oldValue",
+			obj:    4,
+			oldObj: 5,
+			schema: cloneWithRule(&integerType, "self >= 10 || (oldSelf.hasValue() && oldSelf.value() <= self)"),
+			errors: []string{"failed rule"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		tp := true
+		for i := range tt.schema.XValidations {
+			tt.schema.XValidations[i].OptionalOldSelf = &tp
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			// t.Parallel()
+
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, false), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, tt.oldObj, math.MaxInt)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeInvalid {
+					t.Errorf("expected only ErrorTypeInvalid errors, but got: %v", err)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+// Shows that type(oldSelf) == null_type works for all supported OpenAPI types
+// both when oldSelf is null and when it is not null
+func TestOptionalOldSelfCheckForNull(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+
+	tests := []struct {
+		name   string
+		schema schema.Structural
+		obj    interface{}
+		oldObj interface{}
+	}{
+		{
+			name: "object",
+			obj: map[string]interface{}{
+				"foo": "bar",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "baz",
+			},
+			schema: withRule(objectType(map[string]schema.Structural{
+				"foo": stringType,
+			}), `!oldSelf.hasValue() || self.foo == "bar"`),
+		},
+		{
+			name: "object - conditional field",
+			obj: map[string]interface{}{
+				"foo": "bar",
+			},
+			oldObj: map[string]interface{}{
+				"foo": "baz",
+			},
+			schema: withRule(objectType(map[string]schema.Structural{
+				"foo": stringType,
+			}), `self.foo != "bar" || oldSelf.?foo.orValue("baz") == "baz"`),
+		},
+		{
+			name:   "string",
+			obj:    "bar",
+			oldObj: "baz",
+			schema: withRule(stringType, `
+				!oldSelf.hasValue() || self == "bar"
+			`),
+		},
+		{
+			name:   "integer",
+			obj:    1,
+			oldObj: 2,
+			schema: withRule(integerType, `
+				!oldSelf.hasValue() || self == 1
+			`),
+		},
+		{
+			name:   "number",
+			obj:    1.1,
+			oldObj: 2.2,
+			schema: withRule(numberType, `
+				!oldSelf.hasValue() || self == 1.1
+			`),
+		},
+		{
+			name:   "boolean",
+			obj:    true,
+			oldObj: false,
+			schema: withRule(booleanType, `
+				!oldSelf.hasValue() || self == true
+			`),
+		},
+		{
+			name:   "array",
+			obj:    []interface{}{"bar"},
+			oldObj: []interface{}{"baz"},
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				!oldSelf.hasValue() || self[0] == "bar"
+			`),
+		},
+		{
+			name: "array - conditional index",
+			obj:  []interface{}{},
+			oldObj: []interface{}{
+				"baz",
+			},
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				self.size() > 0 || oldSelf[?0].orValue("baz") == "baz"
+			`),
+		},
+		{
+			name:   "set-array",
+			obj:    []interface{}{"bar"},
+			oldObj: []interface{}{"baz"},
+			schema: withRule(arrayType("set", nil, &stringSchema), `
+				!oldSelf.hasValue() || self[0] == "bar"
+			`),
+		},
+		{
+			name: "map-array",
+			obj: []interface{}{map[string]interface{}{
+				"key":   "foo",
+				"value": "bar",
+			}},
+			oldObj: []interface{}{map[string]interface{}{
+				"key":   "foo",
+				"value": "baz",
+			}},
+			schema: withRule(arrayType("map", []string{"key"}, objectTypePtr(map[string]schema.Structural{
+				"key":   stringType,
+				"value": stringType,
+			})), `
+				!oldSelf.hasValue() || self[0].value == "bar"
+			`),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		tp := true
+		for i := range tt.schema.XValidations {
+			tt.schema.XValidations[i].OptionalOldSelf = &tp
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			celValidator := validator(&tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+
+			t.Run("null old", func(t *testing.T) {
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &tt.schema, tt.obj, nil, math.MaxInt)
+				if len(errs) != 0 {
+					t.Errorf("expected no errors, but got: %v", errs)
+				}
+			})
+
+			t.Run("non-null old", func(t *testing.T) {
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &tt.schema, tt.obj, tt.oldObj, math.MaxInt)
+				if len(errs) != 0 {
+					t.Errorf("expected no errors, but got: %v", errs)
+				}
+			})
+		})
+	}
+}
+
+// Show that we cant just use oldSelf as if it was unwrapped
+func TestOptionalOldSelfIsOptionalType(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+
+	cases := []struct {
+		name   string
+		schema schema.Structural
+		obj    interface{}
+		errors []string
+	}{
+		{
+			name: "forbid direct usage of optional integer",
+			schema: withRule(integerType, `
+				oldSelf + self > 5
+			`),
+			obj:    5,
+			errors: []string{"no matching overload for '_+_' applied to '(optional(int), int)"},
+		},
+		{
+			name: "forbid direct usage of optional string",
+			schema: withRule(stringType, `
+				oldSelf == "foo"
+			`),
+			obj:    "bar",
+			errors: []string{"no matching overload for '_==_' applied to '(optional(string), string)"},
+		},
+		{
+			name: "forbid direct usage of optional array",
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				oldSelf.all(x, x == x)
+			`),
+			obj:    []interface{}{"bar"},
+			errors: []string{"expression of type 'optional(list(string))' cannot be range of a comprehension"},
+		},
+		{
+			name: "forbid direct usage of optional array element",
+			schema: withRule(arrayType("", nil, &stringSchema), `
+				oldSelf[0] == "foo"
+			`),
+			obj:    []interface{}{"bar"},
+			errors: []string{"found no matching overload for '_==_' applied to '(optional(string), string)"},
+		},
+		{
+			name: "forbid direct usage of optional struct",
+			schema: withRule(arrayType("map", []string{"key"}, objectTypePtr(map[string]schema.Structural{
+				"key":   stringType,
+				"value": stringType,
+			})), `oldSelf.key == "foo"`),
+			obj: []interface{}{map[string]interface{}{
+				"key":   "bar",
+				"value": "baz",
+			}},
+			errors: []string{"does not support field selection"},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+
+			for i := range tt.schema.XValidations {
+				tt.schema.XValidations[i].OptionalOldSelf = ptr.To(true)
+			}
+
+			celValidator := validator(&tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &tt.schema, tt.obj, tt.obj, math.MaxInt)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeInvalid {
+					t.Errorf("expected only ErrorTypeInvalid errors, but got: %v", err)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func genString(n int, c rune) string {
+	b := strings.Builder{}
+	for i := 0; i < n; i++ {
+		_, err := b.WriteRune(c)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return b.String()
+}
+
+func setDefaultVerbosity(v int) {
+	f := flag.CommandLine.Lookup("v")
+	_ = f.Value.Set(fmt.Sprintf("%d", v))
 }
 
 func BenchmarkCELValidationWithContext(b *testing.B) {
@@ -2276,12 +4059,12 @@ func BenchmarkCELValidationWithContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
-				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Fatalf("validation failed: %v", err)
 				}
@@ -2316,14 +4099,14 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
 				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 				cancel()
-				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				//found := false
 				//for _, err := range errs {
 				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
@@ -2370,7 +4153,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 					},
 				},
 			}
-			validator := NewValidator(s, true, PerCallLimit)
+			validator := NewValidator(s, true, celconfig.PerCallLimit)
 			if validator == nil {
 				b.Fatal("expected non nil validator")
 			}
@@ -2381,7 +4164,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				errs, _ := validator.Validate(ctx, root, s, obj, obj, RuntimeCELCostBudget)
+				errs, _ := validator.Validate(ctx, root, s, obj, obj, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Errorf("unexpected error: %v", err)
 				}
@@ -2519,6 +4302,38 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 	s.Extensions.XValidations = apiextensions.ValidationRules{
 		{
 			Rule: rule,
+		},
+	}
+	return s
+}
+
+func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, messageExpression string) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:              rule,
+			Message:           message,
+			MessageExpression: messageExpression,
+		},
+	}
+	return s
+}
+
+func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *apiextensions.FieldValueErrorReason) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:      rule,
+			FieldPath: jsonPath,
+			Reason:    reason,
+		},
+	}
+	return s
+}
+
+func withRuleAndMessageExpression(s schema.Structural, rule, messageExpression string) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:              rule,
+			MessageExpression: messageExpression,
 		},
 	}
 	return s

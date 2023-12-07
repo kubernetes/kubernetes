@@ -32,6 +32,7 @@ var map_ServerStorageVersion = map[string]string{
 	"apiServerID":       "The ID of the reporting API server.",
 	"encodingVersion":   "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
 	"decodableVersions": "The API server can decode objects encoded in these versions. The encodingVersion must be included in the decodableVersions.",
+	"servedVersions":    "The API server can serve these versions. DecodableVersions must include all ServedVersions.",
 }
 
 func (ServerStorageVersion) SwaggerDoc() map[string]string {

@@ -2,35 +2,62 @@ BRANCH=`git rev-parse --abbrev-ref HEAD`
 COMMIT=`git rev-parse --short HEAD`
 GOLDFLAGS="-X main.branch $(BRANCH) -X main.commit $(COMMIT)"
 
-race:
-	@TEST_FREELIST_TYPE=hashmap go test -v -race -test.run="TestSimulate_(100op|1000op)"
-	@echo "array freelist test"
-	@TEST_FREELIST_TYPE=array go test -v -race -test.run="TestSimulate_(100op|1000op)"
+TESTFLAGS_RACE=-race=false
+ifdef ENABLE_RACE
+	TESTFLAGS_RACE=-race=true
+endif
 
+TESTFLAGS_CPU=
+ifdef CPU
+	TESTFLAGS_CPU=-cpu=$(CPU)
+endif
+TESTFLAGS = $(TESTFLAGS_RACE) $(TESTFLAGS_CPU) $(EXTRA_TESTFLAGS)
+
+.PHONY: fmt
 fmt:
 	!(gofmt -l -s -d $(shell find . -name \*.go) | grep '[a-z]')
 
-# go get honnef.co/go/tools/simple
-gosimple:
-	gosimple ./...
+.PHONY: lint
+lint:
+	golangci-lint run ./...
 
-# go get honnef.co/go/tools/unused
-unused:
-	unused ./...
-
-# go get github.com/kisielk/errcheck
-errcheck:
-	@errcheck -ignorepkg=bytes -ignore=os:Remove go.etcd.io/bbolt
-
+.PHONY: test
 test:
-	TEST_FREELIST_TYPE=hashmap go test -timeout 20m -v -coverprofile cover.out -covermode atomic
-	# Note: gets "program not an importable package" in out of path builds
-	TEST_FREELIST_TYPE=hashmap go test -v ./cmd/bbolt
+	@echo "hashmap freelist test"
+	TEST_FREELIST_TYPE=hashmap go test -v ${TESTFLAGS} -timeout 30m
+	TEST_FREELIST_TYPE=hashmap go test -v ${TESTFLAGS} ./cmd/bbolt
 
 	@echo "array freelist test"
+	TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} -timeout 30m
+	TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} ./cmd/bbolt
 
-	@TEST_FREELIST_TYPE=array go test -timeout 20m -v -coverprofile cover.out -covermode atomic
-	# Note: gets "program not an importable package" in out of path builds
-	@TEST_FREELIST_TYPE=array go test -v ./cmd/bbolt
+.PHONY: coverage
+coverage:
+	@echo "hashmap freelist test"
+	TEST_FREELIST_TYPE=hashmap go test -v -timeout 30m \
+		-coverprofile cover-freelist-hashmap.out -covermode atomic
 
-.PHONY: race fmt errcheck test gosimple unused
+	@echo "array freelist test"
+	TEST_FREELIST_TYPE=array go test -v -timeout 30m \
+		-coverprofile cover-freelist-array.out -covermode atomic
+
+.PHONY: gofail-enable
+gofail-enable: install-gofail
+	gofail enable .
+
+.PHONY: gofail-disable
+gofail-disable:
+	gofail disable .
+
+.PHONY: install-gofail
+install-gofail:
+	go install go.etcd.io/gofail
+
+.PHONY: test-failpoint
+test-failpoint:
+	@echo "[failpoint] hashmap freelist test"
+	TEST_FREELIST_TYPE=hashmap go test -v ${TESTFLAGS} -timeout 30m ./tests/failpoint
+
+	@echo "[failpoint] array freelist test"
+	TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} -timeout 30m ./tests/failpoint
+

@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"reflect"
@@ -27,257 +28,67 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/diff"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 )
-
-// verifies the cacheWatcher.process goroutine is properly cleaned up even if
-// the writes to cacheWatcher.result channel is blocked.
-func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
-	var lock sync.RWMutex
-	var w *cacheWatcher
-	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
-	forget := func(drainWatcher bool) {
-		lock.Lock()
-		defer lock.Unlock()
-		count++
-		// forget() has to stop the watcher, as only stopping the watcher
-		// triggers stopping the process() goroutine which we are in the
-		// end waiting for in this test.
-		w.setDrainInputBufferLocked(drainWatcher)
-		w.stopLocked()
-	}
-	initEvents := []*watchCacheEvent{
-		{Object: &v1.Pod{}},
-		{Object: &v1.Pod{}},
-	}
-	// set the size of the buffer of w.result to 0, so that the writes to
-	// w.result is blocked.
-	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, "")
-	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 0)
-	w.Stop()
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
-		lock.RLock()
-		defer lock.RUnlock()
-		return count == 2, nil
-	}); err != nil {
-		t.Fatalf("expected forget() to be called twice, because sendWatchCacheEvent should not be blocked by the result channel: %v", err)
-	}
-}
-
-func TestCacheWatcherHandlesFiltering(t *testing.T) {
-	filter := func(_ string, _ labels.Set, field fields.Set) bool {
-		return field["spec.nodeName"] == "host"
-	}
-	forget := func(bool) {}
-
-	testCases := []struct {
-		events   []*watchCacheEvent
-		expected []watch.Event
-	}{
-		// properly handle starting with the filter, then being deleted, then re-added
-		{
-			events: []*watchCacheEvent{
-				{
-					Type:            watch.Added,
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					ObjFields:       fields.Set{"spec.nodeName": "host"},
-					ResourceVersion: 1,
-				},
-				{
-					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					ObjFields:       fields.Set{"spec.nodeName": ""},
-					ResourceVersion: 2,
-				},
-				{
-					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
-					ObjFields:       fields.Set{"spec.nodeName": "host"},
-					ResourceVersion: 3,
-				},
-			},
-			expected: []watch.Event{
-				{Type: watch.Added, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}},
-				{Type: watch.Deleted, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}},
-				{Type: watch.Added, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}}},
-			},
-		},
-		// properly handle ignoring changes prior to the filter, then getting added, then deleted
-		{
-			events: []*watchCacheEvent{
-				{
-					Type:            watch.Added,
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					ObjFields:       fields.Set{"spec.nodeName": ""},
-					ResourceVersion: 1,
-				},
-				{
-					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					ObjFields:       fields.Set{"spec.nodeName": ""},
-					ResourceVersion: 2,
-				},
-				{
-					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
-					ObjFields:       fields.Set{"spec.nodeName": "host"},
-					ResourceVersion: 3,
-				},
-				{
-					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
-					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
-					ObjFields:       fields.Set{"spec.nodeName": "host"},
-					ResourceVersion: 4,
-				},
-				{
-					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
-					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
-					ObjFields:       fields.Set{"spec.nodeName": ""},
-					ResourceVersion: 5,
-				},
-				{
-					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
-					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "6"}},
-					ObjFields:       fields.Set{"spec.nodeName": ""},
-					ResourceVersion: 6,
-				},
-			},
-			expected: []watch.Event{
-				{Type: watch.Added, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}}},
-				{Type: watch.Modified, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}}},
-				{Type: watch.Deleted, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}}},
-			},
-		},
-	}
-
-TestCase:
-	for i, testCase := range testCases {
-		// set the size of the buffer of w.result to 0, so that the writes to
-		// w.result is blocked.
-		for j := range testCase.events {
-			testCase.events[j].ResourceVersion = uint64(j) + 1
-		}
-
-		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, "")
-		go w.processInterval(context.Background(), intervalFromEvents(testCase.events), 0)
-
-		ch := w.ResultChan()
-		for j, event := range testCase.expected {
-			e := <-ch
-			if !reflect.DeepEqual(event, e) {
-				t.Errorf("%d: unexpected event %d: %s", i, j, diff.ObjectReflectDiff(event, e))
-				break TestCase
-			}
-		}
-		select {
-		case obj, ok := <-ch:
-			t.Errorf("%d: unexpected excess event: %#v %t", i, obj, ok)
-			break TestCase
-		default:
-		}
-		w.setDrainInputBufferLocked(false)
-		w.stopLocked()
-	}
-}
-
-type testVersioner struct{}
-
-func (testVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
-	return meta.NewAccessor().SetResourceVersion(obj, strconv.FormatUint(resourceVersion, 10))
-}
-func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count *int64) error {
-	listAccessor, err := meta.ListAccessor(obj)
-	if err != nil || listAccessor == nil {
-		return err
-	}
-	listAccessor.SetResourceVersion(strconv.FormatUint(resourceVersion, 10))
-	listAccessor.SetContinue(continueValue)
-	listAccessor.SetRemainingItemCount(count)
-	return nil
-}
-func (testVersioner) PrepareObjectForStorage(obj runtime.Object) error {
-	return fmt.Errorf("unimplemented")
-}
-func (testVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return 0, err
-	}
-	version := accessor.GetResourceVersion()
-	if len(version) == 0 {
-		return 0, nil
-	}
-	return strconv.ParseUint(version, 10, 64)
-}
-func (testVersioner) ParseResourceVersion(resourceVersion string) (uint64, error) {
-	return strconv.ParseUint(resourceVersion, 10, 64)
-}
-
-var (
-	scheme   = runtime.NewScheme()
-	codecs   = serializer.NewCodecFactory(scheme)
-	errDummy = fmt.Errorf("dummy error")
-)
-
-func init() {
-	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	utilruntime.Must(example.AddToScheme(scheme))
-	utilruntime.Must(examplev1.AddToScheme(scheme))
-}
 
 func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 	prefix := "pods"
 	config := Config{
 		Storage:        s,
-		Versioner:      testVersioner{},
+		Versioner:      storage.APIObjectVersioner{},
 		GroupResource:  schema.GroupResource{Resource: "pods"},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
-		GetAttrsFunc:   storage.DefaultNamespaceScopedAttr,
-		NewFunc:        func() runtime.Object { return &example.Pod{} },
-		NewListFunc:    func() runtime.Object { return &example.PodList{} },
-		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:          clock.RealClock{},
+		GetAttrsFunc: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			pod, ok := obj.(*example.Pod)
+			if !ok {
+				return storage.DefaultNamespaceScopedAttr(obj)
+			}
+			labelsSet, fieldsSet, err := storage.DefaultNamespaceScopedAttr(obj)
+			if err != nil {
+				return nil, nil, err
+			}
+			fieldsSet["spec.nodeName"] = pod.Spec.NodeName
+			return labelsSet, fieldsSet, nil
+		},
+		NewFunc:     func() runtime.Object { return &example.Pod{} },
+		NewListFunc: func() runtime.Object { return &example.PodList{} },
+		Codec:       codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:       clock.RealClock{},
 	}
 	cacher, err := NewCacherFromConfig(config)
-	return cacher, testVersioner{}, err
+	return cacher, storage.APIObjectVersioner{}, err
 }
 
 type dummyStorage struct {
-	err error
+	sync.RWMutex
+	err       error
+	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
+	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+}
+
+func (d *dummyStorage) RequestWatchProgress(ctx context.Context) error {
+	return nil
 }
 
 type dummyWatch struct {
@@ -305,13 +116,27 @@ func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, 
 func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
-	return newDummyWatch(), nil
+func (d *dummyStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if d.watchFn != nil {
+		return d.watchFn(ctx, key, opts)
+	}
+	d.RLock()
+	defer d.RUnlock()
+
+	return newDummyWatch(), d.err
 }
 func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
+	d.RLock()
+	defer d.RUnlock()
+
 	return d.err
 }
-func (d *dummyStorage) GetList(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
+	if d.getListFn != nil {
+		return d.getListFn(ctx, resPrefix, opts, listObj)
+	}
+	d.RLock()
+	defer d.RUnlock()
 	podList := listObj.(*example.PodList)
 	podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
 	return d.err
@@ -322,8 +147,57 @@ func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.O
 func (d *dummyStorage) Count(_ string) (int64, error) {
 	return 0, fmt.Errorf("unimplemented")
 }
+func (d *dummyStorage) injectError(err error) {
+	d.Lock()
+	defer d.Unlock()
+
+	d.err = err
+}
 
 func TestGetListCacheBypass(t *testing.T) {
+	type testCase struct {
+		opts         storage.ListOptions
+		expectBypass bool
+	}
+	commonTestCases := []testCase{
+		{opts: storage.ListOptions{ResourceVersion: "0"}, expectBypass: false},
+		{opts: storage.ListOptions{ResourceVersion: "1"}, expectBypass: false},
+
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
+
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: false},
+		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
+
+		{opts: storage.ListOptions{ResourceVersion: "", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
+	}
+
+	t.Run("ConsistentListFromStorage", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		testCases := append(commonTestCases,
+			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
+		)
+		for _, tc := range testCases {
+			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		}
+
+	})
+	t.Run("ConsistentListFromCache", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		testCases := append(commonTestCases,
+			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
+		)
+		for _, tc := range testCases {
+			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		}
+	})
+}
+
+func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -331,34 +205,37 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	pred := storage.SelectionPredicate{
-		Limit: 500,
-	}
 	result := &example.PodList{}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
-
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.err = errDummy
-	err = cacher.GetList(context.TODO(), "pods/ns", storage.ListOptions{
-		ResourceVersion: "0",
-		Predicate:       pred,
-		Recursive:       true,
-	}, result)
-	if err != nil {
-		t.Errorf("GetList with Limit and RV=0 should be served from cache: %v", err)
+	backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+		currentResourceVersion := "42"
+		switch {
+		// request made by getCurrentResourceVersionFromStorage by checking Limit
+		case key == cacher.resourcePrefix:
+			podList := listObj.(*example.PodList)
+			podList.ResourceVersion = currentResourceVersion
+			return nil
+		// request made by storage.GetList with revision from original request or
+		// returned by getCurrentResourceVersionFromStorage
+		case opts.ResourceVersion == options.ResourceVersion || opts.ResourceVersion == currentResourceVersion:
+			return errDummy
+		default:
+			t.Fatalf("Unexpected request %+v", opts)
+			return nil
+		}
 	}
-
-	err = cacher.GetList(context.TODO(), "pods/ns", storage.ListOptions{
-		ResourceVersion: "",
-		Predicate:       pred,
-		Recursive:       true,
-	}, result)
-	if err != errDummy {
-		t.Errorf("GetList with Limit without RV=0 should bypass cacher: %v", err)
+	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
+	if err != nil && err != errDummy {
+		t.Fatalf("Unexpected error for List request with options: %v, err: %v", options, err)
+	}
+	gotBypass := err == errDummy
+	if gotBypass != expectBypass {
+		t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", options, expectBypass, gotBypass)
 	}
 }
 
@@ -376,12 +253,12 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	result := &example.PodList{}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.err = errDummy
+	backingStorage.injectError(errDummy)
 	err = cacher.GetList(context.TODO(), "pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred,
@@ -410,12 +287,12 @@ func TestGetCacheBypass(t *testing.T) {
 	result := &example.Pod{}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.err = errDummy
+	backingStorage.injectError(errDummy)
 	err = cacher.Get(context.TODO(), "pods/ns/pod-0", storage.GetOptions{
 		IgnoreNotFound:  true,
 		ResourceVersion: "0",
@@ -433,7 +310,7 @@ func TestGetCacheBypass(t *testing.T) {
 	}
 }
 
-func TestWatcherNotGoingBackInTime(t *testing.T) {
+func TestWatchCacheBypass(t *testing.T) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -442,7 +319,151 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
+
+	// Inject error to underlying layer and check if cacher is not bypassed.
+	backingStorage.injectError(errDummy)
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+	})
+	if err != nil {
+		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
+	}
+
+	// With unset RV, check if cacher is bypassed.
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+	})
+	if err != errDummy {
+		t.Errorf("Watch with unset RV should bypass cacher: %v", err)
+	}
+}
+
+func TestEmptyWatchEventCache(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+
+	// add a few objects
+	v := storage.APIObjectVersioner{}
+	lastRV := uint64(0)
+	for i := 0; i < 5; i++ {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i), Namespace: "test-ns"}}
+		out := &example.Pod{}
+		key := computePodKey(pod)
+		if err := etcdStorage.Create(context.Background(), key, pod, out, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+		var err error
+		if lastRV, err = v.ParseResourceVersion(out.ResourceVersion); err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+	}
+
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Given that cacher is always initialized from the "current" version of etcd,
+	// we now have a cacher with an empty cache of watch events and a resourceVersion of rv.
+	// It should support establishing watches from rv and higher, but not older.
+
+	expectedResourceExpiredError := apierrors.NewResourceExpired("").ErrStatus
+	tests := []struct {
+		name            string
+		resourceVersion uint64
+		expectedEvent   *watch.Event
+	}{
+		{
+			name:            "RV-1",
+			resourceVersion: lastRV - 1,
+			expectedEvent:   &watch.Event{Type: watch.Error, Object: &expectedResourceExpiredError},
+		},
+		{
+			name:            "RV",
+			resourceVersion: lastRV,
+		},
+		{
+			name:            "RV+1",
+			resourceVersion: lastRV + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := storage.ListOptions{
+				ResourceVersion: strconv.Itoa(int(tt.resourceVersion)),
+				Predicate:       storage.Everything,
+			}
+			watcher, err := cacher.Watch(context.Background(), "/pods/test-ns", opts)
+			if err != nil {
+				t.Fatalf("Failed to create watch: %v", err)
+			}
+			defer watcher.Stop()
+			select {
+			case event := <-watcher.ResultChan():
+				if tt.expectedEvent == nil {
+					t.Errorf("Unexpected event: type=%#v, object=%#v", event.Type, event.Object)
+					break
+				}
+				if e, a := tt.expectedEvent.Type, event.Type; e != a {
+					t.Errorf("Expected: %s, got: %s", e, a)
+				}
+				if e, a := tt.expectedEvent.Object, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
+					t.Errorf("Expected: %#v, got: %#v", e, a)
+				}
+			case <-time.After(3 * time.Second):
+				if tt.expectedEvent != nil {
+					t.Errorf("Failed to get an event")
+				}
+				// watch remained established successfully
+			}
+		})
+	}
+}
+
+func TestWatchNotHangingOnStartupFailure(t *testing.T) {
+	// Configure cacher so that it can't initialize, because of
+	// constantly failing lists to the underlying storage.
+	dummyErr := fmt.Errorf("dummy")
+	backingStorage := &dummyStorage{err: dummyErr}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel the watch after some time to check if it will properly
+	// terminate instead of hanging forever.
+	go func() {
+		defer cancel()
+		cacher.clock.Sleep(5 * time.Second)
+	}()
+
+	// Watch hangs waiting on watchcache being initialized.
+	// Ensure that it terminates when its context is cancelled
+	// (e.g. the request is terminated for whatever reason).
+	_, err = cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0"})
+	if err == nil || err.Error() != apierrors.NewServiceUnavailable(context.Canceled.Error()).Error() {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+}
+
+func TestWatcherNotGoingBackInTime(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, v, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -505,7 +526,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 				shouldContinue = false
 				break
 			}
-			rv, err := testVersioner{}.ParseResourceVersion(event.Object.(metaRuntimeInterface).GetResourceVersion())
+			rv, err := v.ParseResourceVersion(event.Object.(metaRuntimeInterface).GetResourceVersion())
 			if err != nil {
 				t.Errorf("unexpected parsing error: %v", err)
 			} else {
@@ -520,90 +541,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	}
 }
 
-func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
-	var w *cacheWatcher
-	done := make(chan struct{})
-	filter := func(string, labels.Set, fields.Set) bool { return true }
-	forget := func(drainWatcher bool) {
-		w.setDrainInputBufferLocked(drainWatcher)
-		w.stopLocked()
-		done <- struct{}{}
-	}
-
-	maxRetriesToProduceTheRaceCondition := 1000
-	// Simulating the timer is fired and stopped concurrently by set time
-	// timeout to zero and run the Stop goroutine concurrently.
-	// May sure that the watch will not be blocked on Stop.
-	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, "")
-		go w.Stop()
-		select {
-		case <-done:
-		case <-time.After(time.Second):
-			t.Fatal("stop is blocked when the timer is fired concurrently")
-		}
-	}
-
-	deadline := time.Now().Add(time.Hour)
-	// After that, verifies the cacheWatcher.process goroutine works correctly.
-	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, schema.GroupResource{Resource: "pods"}, "")
-		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
-		ctx, cancel := context.WithDeadline(context.Background(), deadline)
-		defer cancel()
-		go w.processInterval(ctx, intervalFromEvents(nil), 0)
-		select {
-		case <-w.ResultChan():
-		case <-time.After(time.Second):
-			t.Fatal("expected received a event on ResultChan")
-		}
-		w.setDrainInputBufferLocked(false)
-		w.stopLocked()
-	}
-}
-
-func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
-		t.Fatalf("unexpected error waiting for the cache to be ready")
-	}
-
-	w, err := cacher.Watch(context.Background(), "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Failed to create watch: %v", err)
-	}
-
-	watchClosed := make(chan struct{})
-	go func() {
-		defer close(watchClosed)
-		for event := range w.ResultChan() {
-			switch event.Type {
-			case watch.Added, watch.Modified, watch.Deleted:
-				// ok
-			default:
-				t.Errorf("unexpected event %#v", event)
-			}
-		}
-	}()
-
-	cacher.Stop()
-
-	select {
-	case <-watchClosed:
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timed out waiting for watch to close")
-	}
-
-}
-
-func TestCacheDontAcceptRequestsStopped(t *testing.T) {
+func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -611,7 +549,7 @@ func TestCacheDontAcceptRequestsStopped(t *testing.T) {
 	}
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -665,45 +603,114 @@ func TestCacheDontAcceptRequestsStopped(t *testing.T) {
 	}
 }
 
-func TestTimeBucketWatchersBasic(t *testing.T) {
-	filter := func(_ string, _ labels.Set, _ fields.Set) bool {
-		return true
-	}
-	forget := func(bool) {}
-
-	newWatcher := func(deadline time.Time) *cacheWatcher {
-		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, "")
-	}
-
-	clock := testingclock.NewFakeClock(time.Now())
-	watchers := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
-	now := clock.Now()
-	watchers.addWatcher(newWatcher(now.Add(10 * time.Second)))
-	watchers.addWatcher(newWatcher(now.Add(20 * time.Second)))
-	watchers.addWatcher(newWatcher(now.Add(20 * time.Second)))
-
-	if len(watchers.watchersBuckets) != 2 {
-		t.Errorf("unexpected bucket size: %#v", watchers.watchersBuckets)
-	}
-	watchers0 := watchers.popExpiredWatchers()
-	if len(watchers0) != 0 {
-		t.Errorf("unexpected bucket size: %#v", watchers0)
+func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
+	makePod := func(i int) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", i),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", i),
+			},
+		}
 	}
 
-	clock.Step(10 * time.Second)
-	watchers1 := watchers.popExpiredWatchers()
-	if len(watchers1) != 1 || len(watchers1[0]) != 1 {
-		t.Errorf("unexpected bucket size: %v", watchers1)
+	listCalls, watchCalls := 0, 0
+	backingStorage := &dummyStorage{
+		getListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			podList := listObj.(*example.PodList)
+			var err error
+			switch listCalls {
+			case 0:
+				podList.ListMeta = metav1.ListMeta{ResourceVersion: "1"}
+			case 1:
+				podList.ListMeta = metav1.ListMeta{ResourceVersion: "10"}
+			default:
+				err = fmt.Errorf("unexpected list call")
+			}
+			listCalls++
+			return err
+		},
+		watchFn: func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
+			var w *watch.FakeWatcher
+			var err error
+			switch watchCalls {
+			case 0:
+				w = watch.NewFakeWithChanSize(10, false)
+				for i := 2; i < 8; i++ {
+					w.Add(makePod(i))
+				}
+				// Emit an error to force relisting.
+				w.Error(nil)
+				w.Stop()
+			case 1:
+				w = watch.NewFakeWithChanSize(10, false)
+				for i := 12; i < 18; i++ {
+					w.Add(makePod(i))
+				}
+				w.Stop()
+			default:
+				err = fmt.Errorf("unexpected watch call")
+			}
+			watchCalls++
+			return w, err
+		},
 	}
-	watchers1 = watchers.popExpiredWatchers()
-	if len(watchers1) != 0 {
-		t.Errorf("unexpected bucket size: %#v", watchers1)
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
 	}
+	defer cacher.Stop()
 
-	clock.Step(12 * time.Second)
-	watchers2 := watchers.popExpiredWatchers()
-	if len(watchers2) != 1 || len(watchers2[0]) != 2 {
-		t.Errorf("unexpected bucket size: %#v", watchers2)
+	concurrency := 1000
+	wg := sync.WaitGroup{}
+	wg.Add(concurrency)
+
+	// Ensure that test doesn't deadlock if cacher already processed everything
+	// and get back into Pending state before some watches get called.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			w, err := cacher.Watch(ctx, "pods", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything})
+			if err != nil {
+				// Watch failed to initialize (this most probably means that cacher
+				// already moved back to Pending state before watch initialized.
+				// Ignore this case.
+				return
+			}
+			defer w.Stop()
+
+			prevRV := -1
+			for event := range w.ResultChan() {
+				if event.Type == watch.Error {
+					break
+				}
+				object := event.Object
+				if co, ok := object.(runtime.CacheableObject); ok {
+					object = co.GetObject()
+				}
+				rv, err := strconv.Atoi(object.(*example.Pod).ResourceVersion)
+				if err != nil {
+					errCh <- fmt.Errorf("incorrect resource version: %v", err)
+					return
+				}
+				if prevRV != -1 && prevRV+1 != rv {
+					errCh <- fmt.Errorf("unexpected event received, prevRV=%d, rv=%d", prevRV, rv)
+					return
+				}
+				prevRV = rv
+			}
+
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Error(err)
 	}
 }
 
@@ -716,7 +723,7 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	pred := storage.Everything
@@ -757,7 +764,9 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 			case <-stopCh:
 				return
 			default:
-				cacher.bookmarkWatchers.popExpiredWatchers()
+				cacher.Lock()
+				cacher.bookmarkWatchers.popExpiredWatchersThreadUnsafe()
+				cacher.Unlock()
 			}
 		}
 	}()
@@ -771,9 +780,9 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 
 	// wait out the expiration period and pop expired watchers
 	time.Sleep(2 * time.Second)
-	cacher.bookmarkWatchers.popExpiredWatchers()
-	cacher.bookmarkWatchers.lock.Lock()
-	defer cacher.bookmarkWatchers.lock.Unlock()
+	cacher.Lock()
+	defer cacher.Unlock()
+	cacher.bookmarkWatchers.popExpiredWatchersThreadUnsafe()
 	if len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
 		numWatchers := 0
 		for bucketID, v := range cacher.bookmarkWatchers.watchersBuckets {
@@ -782,27 +791,6 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 		}
 		t.Errorf("unexpected bookmark watchers %v", numWatchers)
 	}
-}
-
-func TestWatchInitializationSignal(t *testing.T) {
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	initSignal := utilflowcontrol.NewInitializationSignal()
-	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
-
-	_, err = cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Failed to create watch: %v", err)
-	}
-
-	initSignal.Wait()
 }
 
 func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBookmarks bool) {
@@ -814,7 +802,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	pred := storage.Everything
@@ -914,7 +902,7 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	cacher.bookmarkWatchers.bookmarkFrequency = time.Second
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	pred := storage.Everything
@@ -984,7 +972,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1062,7 +1050,7 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	cacher.bookmarkWatchers = newTimeBucketWatchers(clock.RealClock{}, 2*time.Second)
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1140,7 +1128,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1220,7 +1208,7 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1298,26 +1286,57 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	}
 }
 
-func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event) {
+func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictOrder bool) {
 	_, _, line, _ := goruntime.Caller(1)
-	for _, expectedEvent := range events {
+	actualEvents := make([]watch.Event, len(events))
+	for idx := range events {
 		select {
 		case event := <-w.ResultChan():
-			if e, a := expectedEvent.Type, event.Type; e != a {
-				t.Logf("(called from line %d)", line)
-				t.Errorf("Expected: %s, got: %s", e, a)
-			}
-			object := event.Object
-			if co, ok := object.(runtime.CacheableObject); ok {
-				object = co.GetObject()
-			}
-			if e, a := expectedEvent.Object, object; !apiequality.Semantic.DeepEqual(e, a) {
-				t.Logf("(called from line %d)", line)
-				t.Errorf("Expected: %#v, got: %#v", e, a)
-			}
+			actualEvents[idx] = event
 		case <-time.After(wait.ForeverTestTimeout):
 			t.Logf("(called from line %d)", line)
 			t.Errorf("Timed out waiting for an event")
+		}
+	}
+	validateEvents := func(expected, actual watch.Event) (bool, []string) {
+		errors := []string{}
+		if e, a := expected.Type, actual.Type; e != a {
+			errors = append(errors, fmt.Sprintf("Expected: %s, got: %s", e, a))
+		}
+		actualObject := actual.Object
+		if co, ok := actualObject.(runtime.CacheableObject); ok {
+			actualObject = co.GetObject()
+		}
+		if e, a := expected.Object, actualObject; !apiequality.Semantic.DeepEqual(e, a) {
+			errors = append(errors, fmt.Sprintf("Expected: %#v, got: %#v", e, a))
+		}
+		return len(errors) == 0, errors
+	}
+
+	if len(events) != len(actualEvents) {
+		t.Fatalf("unexpected number of events: %d, expected: %d, acutalEvents: %#v, expectedEvents:%#v", len(actualEvents), len(events), actualEvents, events)
+	}
+
+	if strictOrder {
+		for idx, expectedEvent := range events {
+			valid, errors := validateEvents(expectedEvent, actualEvents[idx])
+			if !valid {
+				t.Logf("(called from line %d)", line)
+				for _, err := range errors {
+					t.Errorf(err)
+				}
+			}
+		}
+	}
+	for _, expectedEvent := range events {
+		validated := false
+		for _, actualEvent := range actualEvents {
+			if validated, _ = validateEvents(expectedEvent, actualEvent); validated {
+				break
+			}
+		}
+		if !validated {
+			t.Fatalf("Expected: %#v but didn't find", expectedEvent)
 		}
 	}
 }
@@ -1331,7 +1350,7 @@ func TestCachingDeleteEvents(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1399,9 +1418,9 @@ func TestCachingDeleteEvents(t *testing.T) {
 	cacher.watchCache.Update(pod3)
 	cacher.watchCache.Delete(pod4)
 
-	verifyEvents(t, allEventsWatcher, allEvents)
-	verifyEvents(t, fooEventsWatcher, fooEvents)
-	verifyEvents(t, barEventsWatcher, barEvents)
+	verifyEvents(t, allEventsWatcher, allEvents, true)
+	verifyEvents(t, fooEventsWatcher, fooEvents, true)
+	verifyEvents(t, barEventsWatcher, barEvents, true)
 }
 
 func testCachingObjects(t *testing.T, watchersCount int) {
@@ -1413,7 +1432,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
@@ -1509,7 +1528,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(); err != nil {
+	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	// Ensure there is enough budget for slow processing since
@@ -1584,89 +1603,264 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	}
 }
 
-func makeWatchCacheEvent(rv uint64) *watchCacheEvent {
-	return &watchCacheEvent{
-		Type: watch.Added,
-		Object: &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            fmt.Sprintf("pod-%d", rv),
-				ResourceVersion: fmt.Sprintf("%d", rv),
+func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	opts := storage.ListOptions{
+		Predicate:         storage.Everything,
+		SendInitialEvents: pointer.Bool(true),
+		ResourceVersion:   "105",
+	}
+	opts.Predicate.AllowWatchBookmarks = true
+
+	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
+	require.NoError(t, err, "failed to create watch: %v")
+	defer w.Stop()
+	verifyEvents(t, w, []watch.Event{
+		{
+			Type: watch.Error,
+			Object: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).Error(),
+				Details: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).(*apierrors.StatusError).Status().Details,
+				Reason:  metav1.StatusReasonTimeout,
+				Code:    504,
 			},
 		},
-		ResourceVersion: rv,
+	}, true)
+
+	go func() {
+		cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
+	}()
+	w, err = cacher.Watch(context.Background(), "pods/ns", opts)
+	require.NoError(t, err, "failed to create watch: %v")
+	defer w.Stop()
+	verifyEvents(t, w, []watch.Event{
+		{
+			Type:   watch.Added,
+			Object: makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}),
+		},
+	}, true)
+}
+
+type fakeStorage struct {
+	pods []example.Pod
+	storage.Interface
+}
+
+func newObjectStorage(fakePods []example.Pod) *fakeStorage {
+	return &fakeStorage{
+		pods: fakePods,
 	}
 }
 
-// TestCacheWatcherDraining verifies the cacheWatcher.process goroutine is properly cleaned up when draining was requested
-func TestCacheWatcherDraining(t *testing.T) {
-	var lock sync.RWMutex
-	var w *cacheWatcher
-	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
-	forget := func(drainWatcher bool) {
-		lock.Lock()
-		defer lock.Unlock()
-		count++
-		w.setDrainInputBufferLocked(drainWatcher)
-		w.stopLocked()
-	}
-	initEvents := []*watchCacheEvent{
-		makeWatchCacheEvent(5),
-		makeWatchCacheEvent(6),
-	}
-	w = newCacheWatcher(1, filter, forget, testVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
-	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 1)
-	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
-		t.Fatal("failed adding an even to the watcher")
-	}
-	forget(true) // drain the watcher
+func (m fakeStorage) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	podList := listObj.(*example.PodList)
+	podList.ListMeta = metav1.ListMeta{ResourceVersion: "12345"}
+	podList.Items = m.pods
+	return nil
+}
+func (m fakeStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
+	return newDummyWatch(), nil
+}
 
-	eventCount := 0
-	for range w.ResultChan() {
-		eventCount++
+func BenchmarkCacher_GetList(b *testing.B) {
+	testCases := []struct {
+		totalObjectNum  int
+		expectObjectNum int
+	}{
+		{
+			totalObjectNum:  5000,
+			expectObjectNum: 50,
+		},
+		{
+			totalObjectNum:  5000,
+			expectObjectNum: 500,
+		},
+		{
+			totalObjectNum:  5000,
+			expectObjectNum: 1000,
+		},
+		{
+			totalObjectNum:  5000,
+			expectObjectNum: 2500,
+		},
+		{
+			totalObjectNum:  5000,
+			expectObjectNum: 5000,
+		},
 	}
-	if eventCount != 3 {
-		t.Errorf("Unexpected number of objects received: %d, expected: 3", eventCount)
-	}
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
-		lock.RLock()
-		defer lock.RUnlock()
-		return count == 2, nil
-	}); err != nil {
-		t.Fatalf("expected forget() to be called twice, because processInterval should call Stop(): %v", err)
+	for _, tc := range testCases {
+		b.Run(
+			fmt.Sprintf("totalObjectNum=%d, expectObjectNum=%d", tc.totalObjectNum, tc.expectObjectNum),
+			func(b *testing.B) {
+				// create sample pods
+				fakePods := make([]example.Pod, tc.totalObjectNum, tc.totalObjectNum)
+				for i := range fakePods {
+					fakePods[i].Namespace = "default"
+					fakePods[i].Name = fmt.Sprintf("pod-%d", i)
+					fakePods[i].ResourceVersion = strconv.Itoa(i)
+					if i%(tc.totalObjectNum/tc.expectObjectNum) == 0 {
+						fakePods[i].Spec.NodeName = "node-0"
+					}
+					data := make([]byte, 1024*2, 1024*2) // 2k labels
+					rand.Read(data)
+					fakePods[i].Spec.NodeSelector = map[string]string{
+						"key": string(data),
+					}
+				}
+
+				// build test cacher
+				cacher, _, err := newTestCacher(newObjectStorage(fakePods))
+				if err != nil {
+					b.Fatalf("new cacher: %v", err)
+				}
+				defer cacher.Stop()
+
+				// prepare result and pred
+				parsedField, err := fields.ParseSelector("spec.nodeName=node-0")
+				if err != nil {
+					b.Fatalf("parse selector: %v", err)
+				}
+				pred := storage.SelectionPredicate{
+					Label: labels.Everything(),
+					Field: parsedField,
+				}
+
+				// now we start benchmarking
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					result := &example.PodList{}
+					err = cacher.GetList(context.TODO(), "pods", storage.ListOptions{
+						Predicate:       pred,
+						Recursive:       true,
+						ResourceVersion: "12345",
+					}, result)
+					if err != nil {
+						b.Fatalf("GetList cache: %v", err)
+					}
+					if len(result.Items) != tc.expectObjectNum {
+						b.Fatalf("expect %d but got %d", tc.expectObjectNum, len(result.Items))
+					}
+				}
+			})
 	}
 }
 
-// TestCacheWatcherDrainingRequestedButNotDrained verifies the cacheWatcher.process goroutine is properly cleaned up when draining was requested
-// but the client never actually get any data
-func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
-	var lock sync.RWMutex
-	var w *cacheWatcher
-	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
-	forget := func(drainWatcher bool) {
-		lock.Lock()
-		defer lock.Unlock()
-		count++
-		w.setDrainInputBufferLocked(drainWatcher)
-		w.stopLocked()
+// TestDoNotPopExpiredWatchersWhenNoEventsSeen makes sure that
+// a bookmark event will be delivered after the cacher has seen an event.
+// Previously the watchers have been removed from the "want bookmark" queue.
+func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
 	}
-	initEvents := []*watchCacheEvent{
-		makeWatchCacheEvent(5),
-		makeWatchCacheEvent(6),
+	defer cacher.Stop()
+
+	// wait until cacher is initialized.
+	if err := cacher.ready.wait(context.Background()); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
-	w = newCacheWatcher(1, filter, forget, testVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
-	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 1)
-	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
-		t.Fatal("failed adding an even to the watcher")
+
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+	opts := storage.ListOptions{
+		Predicate:         pred,
+		SendInitialEvents: pointer.Bool(true),
 	}
-	forget(true) // drain the watcher
-	w.Stop()     // client disconnected, timeout expired or ctx was actually closed
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
-		lock.RLock()
-		defer lock.RUnlock()
-		return count == 3, nil
-	}); err != nil {
-		t.Fatalf("expected forget() to be called three times, because processInterval should call Stop(): %v", err)
+	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
+	require.NoError(t, err, "failed to create watch: %v")
+	defer w.Stop()
+
+	// Ensure that popExpiredWatchers is called to ensure that our watch isn't removed from bookmarkWatchers.
+	// We do that every ~1s, so waiting 2 seconds seems enough.
+	time.Sleep(2 * time.Second)
+
+	// Send an event to ensure that lastProcessedResourceVersion in Cacher will change to non-zero value.
+	makePod := func(rv uint64) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", rv),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", rv),
+				Annotations:     map[string]string{},
+			},
+		}
 	}
+	err = cacher.watchCache.Add(makePod(102))
+	require.NoError(t, err)
+
+	verifyEvents(t, w, []watch.Event{
+		{Type: watch.Added, Object: makePod(102)},
+		{Type: watch.Bookmark, Object: &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "102",
+				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+			},
+		}},
+	}, true)
+}
+
+func TestForgetWatcher(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	require.NoError(t, err)
+	defer cacher.Stop()
+
+	// wait until cacher is initialized.
+	if err := cacher.ready.wait(context.Background()); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
+
+	assertCacherInternalState := func(expectedWatchersCounter, expectedValueWatchersCounter int) {
+		cacher.Lock()
+		defer cacher.Unlock()
+
+		require.Equal(t, expectedWatchersCounter, len(cacher.watchers.allWatchers))
+		require.Equal(t, expectedValueWatchersCounter, len(cacher.watchers.valueWatchers))
+	}
+	assertCacherInternalState(0, 0)
+
+	var forgetWatcherFn func(bool)
+	var forgetCounter int
+	forgetWatcherWrapped := func(drainWatcher bool) {
+		forgetCounter++
+		forgetWatcherFn(drainWatcher)
+	}
+	w := newCacheWatcher(
+		0,
+		func(_ string, _ labels.Set, _ fields.Set) bool { return true },
+		nil,
+		storage.APIObjectVersioner{},
+		testingclock.NewFakeClock(time.Now()).Now().Add(2*time.Minute),
+		true,
+		schema.GroupResource{Resource: "pods"},
+		"1",
+	)
+	forgetWatcherFn = forgetWatcher(cacher, w, 0, namespacedName{}, "", false)
+	addWatcher := func(w *cacheWatcher) {
+		cacher.Lock()
+		defer cacher.Unlock()
+
+		cacher.watchers.addWatcher(w, 0, namespacedName{}, "", false)
+	}
+
+	addWatcher(w)
+	assertCacherInternalState(1, 0)
+
+	forgetWatcherWrapped(false)
+	assertCacherInternalState(0, 0)
+	require.Equal(t, 1, forgetCounter)
+
+	forgetWatcherWrapped(false)
+	assertCacherInternalState(0, 0)
+	require.Equal(t, 2, forgetCounter)
 }

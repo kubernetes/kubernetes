@@ -53,11 +53,15 @@ func SetObjectDefaults_FlowSchemaList(in *v1beta3.FlowSchemaList) {
 }
 
 func SetObjectDefaults_PriorityLevelConfiguration(in *v1beta3.PriorityLevelConfiguration) {
+	SetDefaults_PriorityLevelConfiguration(in)
 	if in.Spec.Limited != nil {
 		SetDefaults_LimitedPriorityLevelConfiguration(in.Spec.Limited)
 		if in.Spec.Limited.LimitResponse.Queuing != nil {
 			SetDefaults_QueuingConfiguration(in.Spec.Limited.LimitResponse.Queuing)
 		}
+	}
+	if in.Spec.Exempt != nil {
+		SetDefaults_ExemptPriorityLevelConfiguration(in.Spec.Exempt)
 	}
 }
 

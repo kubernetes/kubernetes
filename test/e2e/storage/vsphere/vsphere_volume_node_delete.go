@@ -24,6 +24,7 @@ import (
 	"github.com/vmware/govmomi/object"
 
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -31,9 +32,9 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]", func() {
+var _ = utils.SIGDescribe("Node Unregister", feature.Vsphere, framework.WithSlow(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("node-unregister")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client     clientset.Interface
 		namespace  string
@@ -81,7 +82,9 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 		// Ready nodes should be 1 less
 		ginkgo.By("Verifying the ready node counts")
-		framework.ExpectEqual(verifyReadyNodeCount(ctx, f.ClientSet, totalNodesCount-1), true, "Unable to verify expected ready node count")
+		if !verifyReadyNodeCount(ctx, f.ClientSet, totalNodesCount-1) {
+			framework.Failf("Unable to verify expected ready node count. Total Nodes: %d, Expected Ready Nodes: %d", totalNodesCount, totalNodesCount-1)
+		}
 
 		nodeList, err = e2enode.GetReadySchedulableNodes(ctx, client)
 		framework.ExpectNoError(err)
@@ -98,7 +101,9 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 		// Ready nodes should be equal to earlier count
 		ginkgo.By("Verifying the ready node counts")
-		framework.ExpectEqual(verifyReadyNodeCount(ctx, f.ClientSet, totalNodesCount), true, "Unable to verify expected ready node count")
+		if !verifyReadyNodeCount(ctx, f.ClientSet, totalNodesCount) {
+			framework.Failf("Unable to verify expected ready node count. Total Nodes: %d, Expected Ready Nodes: %d", totalNodesCount, totalNodesCount)
+		}
 
 		nodeList, err = e2enode.GetReadySchedulableNodes(ctx, client)
 		framework.ExpectNoError(err)

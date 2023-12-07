@@ -24,6 +24,7 @@ import (
 	"sort"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,14 +39,16 @@ type containerGC struct {
 	client           internalapi.RuntimeService
 	manager          *kubeGenericRuntimeManager
 	podStateProvider podStateProvider
+	tracer           trace.Tracer
 }
 
 // NewContainerGC creates a new containerGC.
-func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager) *containerGC {
+func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager, tracer trace.Tracer) *containerGC {
 	return &containerGC{
 		client:           client,
 		manager:          manager,
 		podStateProvider: podStateProvider,
+		tracer:           tracer,
 	}
 }
 
@@ -138,7 +141,7 @@ func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containe
 				ID:   containers[i].id,
 			}
 			message := "Container is in unknown state, try killing it before removal"
-			if err := cgc.manager.killContainer(ctx, nil, id, containers[i].name, message, reasonUnknown, nil); err != nil {
+			if err := cgc.manager.killContainer(ctx, nil, id, containers[i].name, message, reasonUnknown, nil, nil); err != nil {
 				klog.ErrorS(err, "Failed to stop container", "containerID", containers[i].id)
 				continue
 			}
@@ -290,7 +293,7 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 		sandboxIDs.Insert(container.PodSandboxId)
 	}
 
-	sandboxesByPod := make(sandboxesByPodUID)
+	sandboxesByPod := make(sandboxesByPodUID, len(sandboxes))
 	for _, sandbox := range sandboxes {
 		podUID := types.UID(sandbox.Metadata.Uid)
 		sandboxInfo := sandboxGCInfo{
@@ -298,13 +301,8 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 			createTime: time.Unix(0, sandbox.CreatedAt),
 		}
 
-		// Set ready sandboxes to be active.
-		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			sandboxInfo.active = true
-		}
-
-		// Set sandboxes that still have containers to be active.
-		if sandboxIDs.Has(sandbox.Id) {
+		// Set ready sandboxes and sandboxes that still have containers to be active.
+		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY || sandboxIDs.Has(sandbox.Id) {
 			sandboxInfo.active = true
 		}
 
@@ -407,6 +405,8 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
 func (cgc *containerGC) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
+	ctx, otelSpan := cgc.tracer.Start(ctx, "Containers/GarbageCollect")
+	defer otelSpan.End()
 	errors := []error{}
 	// Remove evictable containers
 	if err := cgc.evictContainers(ctx, gcPolicy, allSourcesReady, evictNonDeletedPods); err != nil {

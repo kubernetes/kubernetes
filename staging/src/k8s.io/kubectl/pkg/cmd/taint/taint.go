@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -61,7 +62,7 @@ type TaintOptions struct {
 
 	ClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	Mapper meta.RESTMapper
 }
@@ -88,14 +89,14 @@ var (
 		# Remove from node 'foo' all the taints with key 'dedicated'
 		kubectl taint nodes foo dedicated-
 
-		# Add a taint with key 'dedicated' on nodes having label mylabel=X
+		# Add a taint with key 'dedicated' on nodes having label myLabel=X
 		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule
 
 		# Add to node 'foo' a taint with key 'bar' and no value
 		kubectl taint nodes foo bar:NoSchedule`))
 )
 
-func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdTaint(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	options := &TaintOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("tainted").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,

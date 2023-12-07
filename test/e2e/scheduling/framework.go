@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,15 +31,13 @@ import (
 var (
 	timeout  = 10 * time.Minute
 	waitTime = 2 * time.Second
+
+	// SIGDescribe annotates the test with the SIG label.
+	SIGDescribe = framework.SIGDescribe("scheduling")
 )
 
-// SIGDescribe annotates the test with the SIG label.
-func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-scheduling] "+text, body)
-}
-
 // WaitForStableCluster waits until all existing pods are scheduled and returns their amount.
-func WaitForStableCluster(c clientset.Interface, workerNodes sets.String) int {
+func WaitForStableCluster(c clientset.Interface, workerNodes sets.Set[string]) int {
 	startTime := time.Now()
 	// Wait for all pods to be scheduled.
 	allScheduledPods, allNotScheduledPods := getScheduledAndUnscheduledPods(c, workerNodes)
@@ -61,7 +57,7 @@ func WaitForStableCluster(c clientset.Interface, workerNodes sets.String) int {
 }
 
 // getScheduledAndUnscheduledPods lists scheduled and not scheduled pods in all namespaces, with succeeded and failed pods filtered out.
-func getScheduledAndUnscheduledPods(c clientset.Interface, workerNodes sets.String) (scheduledPods, notScheduledPods []v1.Pod) {
+func getScheduledAndUnscheduledPods(c clientset.Interface, workerNodes sets.Set[string]) (scheduledPods, notScheduledPods []v1.Pod) {
 	pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for stable cluster", metav1.NamespaceAll))
 

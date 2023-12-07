@@ -40,6 +40,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzNetworking,
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
+		fuzzResetConfiguration,
 	}
 }
 
@@ -63,6 +64,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Patches = nil
+	obj.DryRun = false
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -85,10 +87,17 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
 		Duration: constants.DefaultControlPlaneTimeout,
 	}
+	obj.ControllerManager.ExtraEnvs = []kubeadm.EnvVar{}
+	obj.APIServer.ExtraEnvs = []kubeadm.EnvVar{}
+	obj.Scheduler.ExtraEnvs = []kubeadm.EnvVar{}
+	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
+	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
+	obj.Proxy.Disabled = false
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
+	obj.Disabled = false
 }
 
 func fuzzComponentConfigMap(obj *kubeadm.ComponentConfigMap, c fuzz.Continue) {
@@ -124,8 +133,16 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Patches = nil
+	obj.DryRun = false
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
+}
+
+func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.CertificatesDir = "/tmp"
 }

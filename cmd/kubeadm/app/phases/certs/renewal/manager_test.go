@@ -30,6 +30,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -42,17 +43,9 @@ var (
 
 	testCACert, testCAKey, _ = pkiutil.NewCertificateAuthority(testCACertCfg)
 
-	testCertCfg = &pkiutil.CertConfig{
-		Config: certutil.Config{
-			CommonName:   "test-common-name",
-			Organization: []string{"sig-cluster-lifecycle"},
-			AltNames: certutil.AltNames{
-				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
-				DNSNames: []string{"test-domain.space"},
-			},
-			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		},
-	}
+	testCertOrganization = []string{"sig-cluster-lifecycle"}
+
+	testCertCfg = makeTestCertConfig(testCertOrganization)
 )
 
 func TestNewManager(t *testing.T) {
@@ -64,7 +57,7 @@ func TestNewManager(t *testing.T) {
 		{
 			name:                 "cluster with local etcd",
 			cfg:                  &kubeadmapi.ClusterConfiguration{},
-			expectedCertificates: 10, //[admin apiserver apiserver-etcd-client apiserver-kubelet-client controller-manager etcd/healthcheck-client etcd/peer etcd/server front-proxy-client scheduler]
+			expectedCertificates: 11, // [admin super-admin apiserver apiserver-etcd-client apiserver-kubelet-client controller-manager etcd/healthcheck-client etcd/peer etcd/server front-proxy-client scheduler]
 		},
 		{
 			name: "cluster with external etcd",
@@ -73,7 +66,7 @@ func TestNewManager(t *testing.T) {
 					External: &kubeadmapi.ExternalEtcd{},
 				},
 			},
-			expectedCertificates: 6, // [admin apiserver apiserver-kubelet-client controller-manager front-proxy-client scheduler]
+			expectedCertificates: 7, // [admin super-admin apiserver apiserver-kubelet-client controller-manager front-proxy-client scheduler]
 		},
 	}
 
@@ -99,6 +92,11 @@ func TestRenewUsingLocalCA(t *testing.T) {
 		t.Fatalf("couldn't write out CA certificate to %s", dir)
 	}
 
+	etcdDir := filepath.Join(dir, "etcd")
+	if err := pkiutil.WriteCertAndKey(etcdDir, "ca", testCACert, testCAKey); err != nil {
+		t.Fatalf("couldn't write out CA certificate to %s", etcdDir)
+	}
+
 	cfg := &kubeadmapi.ClusterConfiguration{
 		CertificatesDir: dir,
 	}
@@ -108,16 +106,18 @@ func TestRenewUsingLocalCA(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		certName       string
-		createCertFunc func() *x509.Certificate
+		name                 string
+		certName             string
+		createCertFunc       func() *x509.Certificate
+		expectedOrganization []string
 	}{
 		{
 			name:     "Certificate renewal for a PKI certificate",
 			certName: "apiserver",
 			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey)
+				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey, testCertOrganization)
 			},
+			expectedOrganization: testCertOrganization,
 		},
 		{
 			name:     "Certificate renewal for a certificate embedded in a kubeconfig file",
@@ -125,6 +125,23 @@ func TestRenewUsingLocalCA(t *testing.T) {
 			createCertFunc: func() *x509.Certificate {
 				return writeTestKubeconfig(t, dir, "admin.conf", testCACert, testCAKey)
 			},
+			expectedOrganization: testCertOrganization,
+		},
+		{
+			name:     "apiserver-etcd-client cert should not contain SystemPrivilegedGroup after renewal",
+			certName: "apiserver-etcd-client",
+			createCertFunc: func() *x509.Certificate {
+				return writeTestCertificate(t, dir, "apiserver-etcd-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
+			},
+			expectedOrganization: []string{},
+		},
+		{
+			name:     "apiserver-kubelet-client cert should replace SystemPrivilegedGroup with ClusterAdminsGroup after renewal",
+			certName: "apiserver-kubelet-client",
+			createCertFunc: func() *x509.Certificate {
+				return writeTestCertificate(t, dir, "apiserver-kubelet-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
+			},
+			expectedOrganization: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 		},
 	}
 
@@ -154,7 +171,7 @@ func TestRenewUsingLocalCA(t *testing.T) {
 
 			certtestutil.AssertCertificateIsSignedByCa(t, newCert, testCACert)
 			certtestutil.AssertCertificateHasClientAuthUsage(t, newCert)
-			certtestutil.AssertCertificateHasOrganizations(t, newCert, testCertCfg.Organization...)
+			certtestutil.AssertCertificateHasOrganizations(t, newCert, test.expectedOrganization...)
 			certtestutil.AssertCertificateHasCommonName(t, newCert, testCertCfg.CommonName)
 			certtestutil.AssertCertificateHasDNSNames(t, newCert, testCertCfg.AltNames.DNSNames...)
 			certtestutil.AssertCertificateHasIPAddresses(t, newCert, testCertCfg.AltNames.IPs...)
@@ -193,7 +210,7 @@ func TestCreateRenewCSR(t *testing.T) {
 			name:     "Creation of a CSR request for renewal of a PKI certificate",
 			certName: "apiserver",
 			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey)
+				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey, testCertOrganization)
 			},
 		},
 		{
@@ -233,7 +250,7 @@ func TestCreateRenewCSR(t *testing.T) {
 func TestCertToConfig(t *testing.T) {
 	expectedConfig := &certutil.Config{
 		CommonName:   "test-common-name",
-		Organization: []string{"sig-cluster-lifecycle"},
+		Organization: testCertOrganization,
 		AltNames: certutil.AltNames{
 			IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 			DNSNames: []string{"test-domain.space"},
@@ -244,7 +261,7 @@ func TestCertToConfig(t *testing.T) {
 	cert := &x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   "test-common-name",
-			Organization: []string{"sig-cluster-lifecycle"},
+			Organization: testCertOrganization,
 		},
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		DNSNames:    []string{"test-domain.space"},
@@ -272,5 +289,19 @@ func TestCertToConfig(t *testing.T) {
 
 	if len(cfg.AltNames.DNSNames) != 1 || cfg.AltNames.DNSNames[0] != expectedConfig.AltNames.DNSNames[0] {
 		t.Errorf("expected SAN DNSNames %v, got %v", expectedConfig.AltNames.DNSNames, cfg.AltNames.DNSNames)
+	}
+}
+
+func makeTestCertConfig(organization []string) *pkiutil.CertConfig {
+	return &pkiutil.CertConfig{
+		Config: certutil.Config{
+			CommonName:   "test-common-name",
+			Organization: organization,
+			AltNames: certutil.AltNames{
+				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
+				DNSNames: []string{"test-domain.space"},
+			},
+			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		},
 	}
 }

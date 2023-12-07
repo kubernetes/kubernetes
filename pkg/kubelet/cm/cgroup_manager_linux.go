@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
@@ -43,10 +45,12 @@ import (
 const (
 	// systemdSuffix is the cgroup name suffix for systemd
 	systemdSuffix string = ".slice"
-	// MemoryMin is memory.min for cgroup v2
-	MemoryMin string = "memory.min"
-	// MemoryHigh is memory.high for cgroup v2
-	MemoryHigh string = "memory.high"
+	// Cgroup2MemoryMin is memory.min for cgroup v2
+	Cgroup2MemoryMin string = "memory.min"
+	// Cgroup2MemoryHigh is memory.high for cgroup v2
+	Cgroup2MemoryHigh      string = "memory.high"
+	Cgroup2MaxCpuLimit     string = "max"
+	Cgroup2MaxSwapFilename string = "memory.swap.max"
 )
 
 var RootCgroupName = CgroupName([]string{})
@@ -242,7 +246,7 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 		}
 		difference := neededControllers.Difference(enabledControllers)
 		if difference.Len() > 0 {
-			return fmt.Errorf("cgroup %q has some missing controllers: %v", name, strings.Join(difference.List(), ", "))
+			return fmt.Errorf("cgroup %q has some missing controllers: %v", name, strings.Join(sets.List(difference), ", "))
 		}
 		return nil // valid V2 cgroup
 	}
@@ -256,7 +260,7 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 	// scoped to the set control groups it understands.  this is being discussed
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
-	allowlistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
+	allowlistControllers := sets.New[string]("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
 
 	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
 		allowlistControllers.Insert("hugetlb")
@@ -318,24 +322,24 @@ func getCPUWeight(cpuShares *uint64) uint64 {
 }
 
 // readUnifiedControllers reads the controllers available at the specified cgroup
-func readUnifiedControllers(path string) (sets.String, error) {
+func readUnifiedControllers(path string) (sets.Set[string], error) {
 	controllersFileContent, err := os.ReadFile(filepath.Join(path, "cgroup.controllers"))
 	if err != nil {
 		return nil, err
 	}
 	controllers := strings.Fields(string(controllersFileContent))
-	return sets.NewString(controllers...), nil
+	return sets.New(controllers...), nil
 }
 
 var (
 	availableRootControllersOnce sync.Once
-	availableRootControllers     sets.String
+	availableRootControllers     sets.Set[string]
 )
 
 // getSupportedUnifiedControllers returns a set of supported controllers when running on cgroup v2
-func getSupportedUnifiedControllers() sets.String {
+func getSupportedUnifiedControllers() sets.Set[string] {
 	// This is the set of controllers used by the Kubelet
-	supportedControllers := sets.NewString("cpu", "cpuset", "memory", "hugetlb", "pids")
+	supportedControllers := sets.New("cpu", "cpuset", "memory", "hugetlb", "pids")
 	// Memoize the set of controllers that are present in the root cgroup
 	availableRootControllersOnce.Do(func() {
 		var err error
@@ -403,7 +407,7 @@ func (m *cgroupManagerImpl) maybeSetHugetlb(resourceConfig *ResourceConfig, reso
 	}
 
 	// For each page size enumerated, set that value.
-	pageSizes := sets.NewString()
+	pageSizes := sets.New[string]()
 	for pageSize, limit := range resourceConfig.HugePageLimit {
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize)
 		if err != nil {
@@ -481,7 +485,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 	cgroupFsName := m.Name(name)
 
 	// Get a list of processes that we need to kill
-	pidsToKill := sets.NewInt()
+	pidsToKill := sets.New[int]()
 	var pids []int
 	for _, val := range m.subsystems.MountPoints {
 		dir := path.Join(val, cgroupFsName)
@@ -522,7 +526,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 			klog.V(4).InfoS("Cgroup manager encountered error scanning pids for directory", "path", dir, "err", err)
 		}
 	}
-	return pidsToKill.List()
+	return sets.List(pidsToKill)
 }
 
 // ReduceCPULimits reduces the cgroup's cpu shares to the lowest possible value
@@ -556,4 +560,190 @@ func (m *cgroupManagerImpl) MemoryUsage(name CgroupName) (int64, error) {
 	}
 	val, err := fscommon.GetCgroupParamUint(path, file)
 	return int64(val), err
+}
+
+// Convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
+func CpuSharesToCpuWeight(cpuShares uint64) uint64 {
+	return uint64((((cpuShares - 2) * 9999) / 262142) + 1)
+}
+
+// Convert cgroup v2 cpu.weight value to cgroup v1 cpu.shares
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
+func CpuWeightToCpuShares(cpuWeight uint64) uint64 {
+	return uint64((((cpuWeight - 1) * 262142) / 9999) + 2)
+}
+
+func getCgroupv1CpuConfig(cgroupPath string) (*ResourceConfig, error) {
+	cpuQuotaStr, errQ := fscommon.GetCgroupParamString(cgroupPath, "cpu.cfs_quota_us")
+	if errQ != nil {
+		return nil, fmt.Errorf("failed to read CPU quota for cgroup %v: %v", cgroupPath, errQ)
+	}
+	cpuQuota, errInt := strconv.ParseInt(cpuQuotaStr, 10, 64)
+	if errInt != nil {
+		return nil, fmt.Errorf("failed to convert CPU quota as integer for cgroup %v: %v", cgroupPath, errInt)
+	}
+	cpuPeriod, errP := fscommon.GetCgroupParamUint(cgroupPath, "cpu.cfs_period_us")
+	if errP != nil {
+		return nil, fmt.Errorf("failed to read CPU period for cgroup %v: %v", cgroupPath, errP)
+	}
+	cpuShares, errS := fscommon.GetCgroupParamUint(cgroupPath, "cpu.shares")
+	if errS != nil {
+		return nil, fmt.Errorf("failed to read CPU shares for cgroup %v: %v", cgroupPath, errS)
+	}
+	return &ResourceConfig{CPUShares: &cpuShares, CPUQuota: &cpuQuota, CPUPeriod: &cpuPeriod}, nil
+}
+
+func getCgroupv2CpuConfig(cgroupPath string) (*ResourceConfig, error) {
+	var cpuLimitStr, cpuPeriodStr string
+	cpuLimitAndPeriod, err := fscommon.GetCgroupParamString(cgroupPath, "cpu.max")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cpu.max file for cgroup %v: %v", cgroupPath, err)
+	}
+	numItems, errScan := fmt.Sscanf(cpuLimitAndPeriod, "%s %s", &cpuLimitStr, &cpuPeriodStr)
+	if errScan != nil || numItems != 2 {
+		return nil, fmt.Errorf("failed to correctly parse content of cpu.max file ('%s') for cgroup %v: %v",
+			cpuLimitAndPeriod, cgroupPath, errScan)
+	}
+	cpuLimit := int64(-1)
+	if cpuLimitStr != Cgroup2MaxCpuLimit {
+		cpuLimit, err = strconv.ParseInt(cpuLimitStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert CPU limit as integer for cgroup %v: %v", cgroupPath, err)
+		}
+	}
+	cpuPeriod, errPeriod := strconv.ParseUint(cpuPeriodStr, 10, 64)
+	if errPeriod != nil {
+		return nil, fmt.Errorf("failed to convert CPU period as integer for cgroup %v: %v", cgroupPath, errPeriod)
+	}
+	cpuWeight, errWeight := fscommon.GetCgroupParamUint(cgroupPath, "cpu.weight")
+	if errWeight != nil {
+		return nil, fmt.Errorf("failed to read CPU weight for cgroup %v: %v", cgroupPath, errWeight)
+	}
+	cpuShares := CpuWeightToCpuShares(cpuWeight)
+	return &ResourceConfig{CPUShares: &cpuShares, CPUQuota: &cpuLimit, CPUPeriod: &cpuPeriod}, nil
+}
+
+func getCgroupCpuConfig(cgroupPath string) (*ResourceConfig, error) {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		return getCgroupv2CpuConfig(cgroupPath)
+	} else {
+		return getCgroupv1CpuConfig(cgroupPath)
+	}
+}
+
+func getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {
+	memLimitFile := "memory.limit_in_bytes"
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		memLimitFile = "memory.max"
+	}
+	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, memLimitFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
+	}
+	mLim := int64(memLimit)
+	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
+	return &ResourceConfig{Memory: &mLim}, nil
+
+}
+
+// Get the resource config values applied to the cgroup for specified resource type
+func (m *cgroupManagerImpl) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
+	cgroupPaths := m.buildCgroupPaths(name)
+	cgroupResourcePath, found := cgroupPaths[string(resource)]
+	if !found {
+		return nil, fmt.Errorf("failed to build %v cgroup fs path for cgroup %v", resource, name)
+	}
+	switch resource {
+	case v1.ResourceCPU:
+		return getCgroupCpuConfig(cgroupResourcePath)
+	case v1.ResourceMemory:
+		return getCgroupMemoryConfig(cgroupResourcePath)
+	}
+	return nil, fmt.Errorf("unsupported resource %v for cgroup %v", resource, name)
+}
+
+func setCgroupv1CpuConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
+	var cpuQuotaStr, cpuPeriodStr, cpuSharesStr string
+	if resourceConfig.CPUQuota != nil {
+		cpuQuotaStr = strconv.FormatInt(*resourceConfig.CPUQuota, 10)
+		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.cfs_quota_us"), []byte(cpuQuotaStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuQuotaStr, cgroupPath, err)
+		}
+	}
+	if resourceConfig.CPUPeriod != nil {
+		cpuPeriodStr = strconv.FormatUint(*resourceConfig.CPUPeriod, 10)
+		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.cfs_period_us"), []byte(cpuPeriodStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuPeriodStr, cgroupPath, err)
+		}
+	}
+	if resourceConfig.CPUShares != nil {
+		cpuSharesStr = strconv.FormatUint(*resourceConfig.CPUShares, 10)
+		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.shares"), []byte(cpuSharesStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuSharesStr, cgroupPath, err)
+		}
+	}
+	return nil
+}
+
+func setCgroupv2CpuConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
+	if resourceConfig.CPUQuota != nil {
+		if resourceConfig.CPUPeriod == nil {
+			return fmt.Errorf("CpuPeriod must be specified in order to set CpuLimit")
+		}
+		cpuLimitStr := Cgroup2MaxCpuLimit
+		if *resourceConfig.CPUQuota > -1 {
+			cpuLimitStr = strconv.FormatInt(*resourceConfig.CPUQuota, 10)
+		}
+		cpuPeriodStr := strconv.FormatUint(*resourceConfig.CPUPeriod, 10)
+		cpuMaxStr := fmt.Sprintf("%s %s", cpuLimitStr, cpuPeriodStr)
+		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.max"), []byte(cpuMaxStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuMaxStr, cgroupPath, err)
+		}
+	}
+	if resourceConfig.CPUShares != nil {
+		cpuWeight := CpuSharesToCpuWeight(*resourceConfig.CPUShares)
+		cpuWeightStr := strconv.FormatUint(cpuWeight, 10)
+		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.weight"), []byte(cpuWeightStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuWeightStr, cgroupPath, err)
+		}
+	}
+	return nil
+}
+
+func setCgroupCpuConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		return setCgroupv2CpuConfig(cgroupPath, resourceConfig)
+	} else {
+		return setCgroupv1CpuConfig(cgroupPath, resourceConfig)
+	}
+}
+
+func setCgroupMemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
+	memLimitFile := "memory.limit_in_bytes"
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		memLimitFile = "memory.max"
+	}
+	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)
+	if err := os.WriteFile(filepath.Join(cgroupPath, memLimitFile), []byte(memLimit), 0700); err != nil {
+		return fmt.Errorf("failed to write %v to %v/%v: %v", memLimit, cgroupPath, memLimitFile, err)
+	}
+	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
+	return nil
+}
+
+// Set resource config for the specified resource type on the cgroup
+func (m *cgroupManagerImpl) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+	cgroupPaths := m.buildCgroupPaths(name)
+	cgroupResourcePath, found := cgroupPaths[string(resource)]
+	if !found {
+		return fmt.Errorf("failed to build %v cgroup fs path for cgroup %v", resource, name)
+	}
+	switch resource {
+	case v1.ResourceCPU:
+		return setCgroupCpuConfig(cgroupResourcePath, resourceConfig)
+	case v1.ResourceMemory:
+		return setCgroupMemoryConfig(cgroupResourcePath, resourceConfig)
+	}
+	return nil
 }

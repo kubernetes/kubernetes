@@ -30,6 +30,7 @@ func TestPortsForObject(t *testing.T) {
 	tests := []struct {
 		object    runtime.Object
 		expectErr bool
+		expected  []string
 	}{
 		{
 			object: &corev1.Pod{
@@ -45,6 +46,74 @@ func TestPortsForObject(t *testing.T) {
 					},
 				},
 			},
+			expected: []string{"101"},
+		},
+		{
+			object: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 101,
+								},
+								{
+									ContainerPort: 102,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []string{"101", "102"},
+		},
+		{
+			object: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 101,
+									Protocol:      corev1.ProtocolTCP,
+								},
+								{
+									ContainerPort: 101,
+									Protocol:      corev1.ProtocolUDP,
+								},
+								{
+									ContainerPort: 102,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []string{"101", "102"},
+		},
+		{
+			object: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 101,
+									Protocol:      corev1.ProtocolTCP,
+								},
+								{
+									ContainerPort: 102,
+								},
+								{
+									ContainerPort: 101,
+									Protocol:      corev1.ProtocolUDP,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []string{"101", "102"},
 		},
 		{
 			object: &corev1.Service{
@@ -56,6 +125,7 @@ func TestPortsForObject(t *testing.T) {
 					},
 				},
 			},
+			expected: []string{"101"},
 		},
 		{
 			object: &corev1.ReplicationController{
@@ -75,6 +145,7 @@ func TestPortsForObject(t *testing.T) {
 					},
 				},
 			},
+			expected: []string{"101"},
 		},
 		{
 			object: &extensionsv1beta1.Deployment{
@@ -94,6 +165,7 @@ func TestPortsForObject(t *testing.T) {
 					},
 				},
 			},
+			expected: []string{"101"},
 		},
 		{
 			object: &extensionsv1beta1.ReplicaSet{
@@ -113,13 +185,13 @@ func TestPortsForObject(t *testing.T) {
 					},
 				},
 			},
+			expected: []string{"101"},
 		},
 		{
 			object:    &corev1.Node{},
 			expectErr: true,
 		},
 	}
-	expectedPorts := []string{"101"}
 
 	for _, test := range tests {
 		actual, err := portsForObject(test.object)
@@ -133,8 +205,8 @@ func TestPortsForObject(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 			continue
 		}
-		if !reflect.DeepEqual(actual, expectedPorts) {
-			t.Errorf("expected ports %v, but got %v", expectedPorts, actual)
+		if !reflect.DeepEqual(actual, test.expected) {
+			t.Errorf("expected ports %v, but got %v", test.expected, actual)
 		}
 	}
 }

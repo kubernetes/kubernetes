@@ -31,7 +31,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 source "${KUBE_ROOT}/cluster/common.sh"
 
-declare -r KUBE_RELEASE_BUCKET_URL="https://storage.googleapis.com/kubernetes-release"
+declare -r KUBE_RELEASE_BUCKET_URL="https://dl.k8s.io/"
 declare -r KUBE_DEV_RELEASE_BUCKET_URL="https://storage.googleapis.com/k8s-release-dev"
 declare -r KUBE_TAR_NAME="kubernetes.tar.gz"
 
@@ -82,7 +82,7 @@ if [[ "${print_version}" == "true" ]]; then
 else
   echo "Using version at ${1}: ${KUBE_VERSION}" >&2
   if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
-    curl --fail -o "kubernetes-${KUBE_VERSION}.tar.gz" "${KUBE_RELEASE_BUCKET_URL}/release/${KUBE_VERSION}/${KUBE_TAR_NAME}"
+    curl -L --fail -o "kubernetes-${KUBE_VERSION}.tar.gz" "${KUBE_RELEASE_BUCKET_URL}/release/${KUBE_VERSION}/${KUBE_TAR_NAME}"
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     curl --fail -o "kubernetes-${KUBE_VERSION}.tar.gz" "${KUBE_DEV_RELEASE_BUCKET_URL}/ci/${KUBE_VERSION}/${KUBE_TAR_NAME}"
   else

@@ -17,11 +17,12 @@ limitations under the License.
 package plugin
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	utiltesting "k8s.io/client-go/util/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -317,11 +318,11 @@ providers:
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			file, err := ioutil.TempFile("", "config.yaml")
+			file, err := os.CreateTemp("", "config.yaml")
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer os.Remove(file.Name())
+			defer utiltesting.CloseAndRemove(t, file)
 
 			_, err = file.WriteString(testcase.configData)
 			if err != nil {

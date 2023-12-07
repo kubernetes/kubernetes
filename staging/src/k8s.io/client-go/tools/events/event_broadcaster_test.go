@@ -21,10 +21,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestRecordEventToSink(t *testing.T) {
@@ -78,11 +79,12 @@ func TestRecordEventToSink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			kubeClient := fake.NewSimpleClientset()
 			eventSink := &EventSinkImpl{Interface: kubeClient.EventsV1()}
 
 			for _, ev := range tc.eventsToRecord {
-				recordEvent(eventSink, &ev)
+				recordEvent(ctx, eventSink, &ev)
 			}
 
 			recordedEvents, err := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
@@ -96,7 +98,7 @@ func TestRecordEventToSink(t *testing.T) {
 
 			recordedEvent := recordedEvents.Items[0]
 			if !reflect.DeepEqual(recordedEvent, tc.expectedRecordedEvent) {
-				t.Errorf("expected to have recorded Event: %#+v, got: %#+v\n diff: %s", tc.expectedRecordedEvent, recordedEvent, diff.ObjectReflectDiff(tc.expectedRecordedEvent, recordedEvent))
+				t.Errorf("expected to have recorded Event: %#+v, got: %#+v\n diff: %s", tc.expectedRecordedEvent, recordedEvent, cmp.Diff(tc.expectedRecordedEvent, recordedEvent))
 			}
 		})
 	}

@@ -15,8 +15,6 @@ import (
 	"golang.org/x/sys/windows/svc"
 )
 
-// TODO(brainman): Use EnumDependentServices to enumerate dependent services.
-
 // Service is used to access Windows service.
 type Service struct {
 	Name   string
@@ -47,17 +45,25 @@ func (s *Service) Start(args ...string) error {
 	return windows.StartService(s.Handle, uint32(len(args)), p)
 }
 
-// Control sends state change request c to the service s.
+// Control sends state change request c to the service s. It returns the most
+// recent status the service reported to the service control manager, and an
+// error if the state change request was not accepted.
+// Note that the returned service status is only set if the status change
+// request succeeded, or if it failed with error ERROR_INVALID_SERVICE_CONTROL,
+// ERROR_SERVICE_CANNOT_ACCEPT_CTRL, or ERROR_SERVICE_NOT_ACTIVE.
 func (s *Service) Control(c svc.Cmd) (svc.Status, error) {
 	var t windows.SERVICE_STATUS
 	err := windows.ControlService(s.Handle, uint32(c), &t)
-	if err != nil {
+	if err != nil &&
+		err != windows.ERROR_INVALID_SERVICE_CONTROL &&
+		err != windows.ERROR_SERVICE_CANNOT_ACCEPT_CTRL &&
+		err != windows.ERROR_SERVICE_NOT_ACTIVE {
 		return svc.Status{}, err
 	}
 	return svc.Status{
 		State:   svc.State(t.CurrentState),
 		Accepts: svc.Accepted(t.ControlsAccepted),
-	}, nil
+	}, err
 }
 
 // Query returns current status of service s.
@@ -75,4 +81,45 @@ func (s *Service) Query() (svc.Status, error) {
 		Win32ExitCode:           t.Win32ExitCode,
 		ServiceSpecificExitCode: t.ServiceSpecificExitCode,
 	}, nil
+}
+
+// ListDependentServices returns the names of the services dependent on service s, which match the given status.
+func (s *Service) ListDependentServices(status svc.ActivityStatus) ([]string, error) {
+	var bytesNeeded, returnedServiceCount uint32
+	var services []windows.ENUM_SERVICE_STATUS
+	for {
+		var servicesPtr *windows.ENUM_SERVICE_STATUS
+		if len(services) > 0 {
+			servicesPtr = &services[0]
+		}
+		allocatedBytes := uint32(len(services)) * uint32(unsafe.Sizeof(windows.ENUM_SERVICE_STATUS{}))
+		err := windows.EnumDependentServices(s.Handle, uint32(status), servicesPtr, allocatedBytes, &bytesNeeded,
+			&returnedServiceCount)
+		if err == nil {
+			break
+		}
+		if err != syscall.ERROR_MORE_DATA {
+			return nil, err
+		}
+		if bytesNeeded <= allocatedBytes {
+			return nil, err
+		}
+		// ERROR_MORE_DATA indicates the provided buffer was too small, run the call again after resizing the buffer
+		requiredSliceLen := bytesNeeded / uint32(unsafe.Sizeof(windows.ENUM_SERVICE_STATUS{}))
+		if bytesNeeded%uint32(unsafe.Sizeof(windows.ENUM_SERVICE_STATUS{})) != 0 {
+			requiredSliceLen += 1
+		}
+		services = make([]windows.ENUM_SERVICE_STATUS, requiredSliceLen)
+	}
+	if returnedServiceCount == 0 {
+		return nil, nil
+	}
+
+	// The slice mutated by EnumDependentServices may have a length greater than returnedServiceCount, any elements
+	// past that should be ignored.
+	var dependents []string
+	for i := 0; i < int(returnedServiceCount); i++ {
+		dependents = append(dependents, windows.UTF16PtrToString(services[i].ServiceName))
+	}
+	return dependents, nil
 }

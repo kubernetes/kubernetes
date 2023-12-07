@@ -32,14 +32,22 @@ import (
 
 var fakeSchema = testing.Fake{Path: filepath.Join("..", "..", "testdata", "openapi", "swagger.json")}
 
+// fakeResourcesGetter implements the OpenAPIResourcesGetter interface, returning the
+// openapi resources from the swagger.json (above).
+type fakeResourcesGetter struct{}
+
+func (r *fakeResourcesGetter) OpenAPISchema() (openapi.Resources, error) {
+	doc, err := fakeSchema.OpenAPISchema()
+	if err != nil {
+		return nil, err
+	}
+	return openapi.NewOpenAPIData(doc)
+}
+
 var _ = Describe("resource validation using OpenAPI Schema", func() {
 	var validator Schema
 	BeforeEach(func() {
-		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).To(BeNil())
-		resources, err := openapi.NewOpenAPIData(s)
-		Expect(err).To(BeNil())
-		validator = NewSchemaValidation(resources)
+		validator = NewSchemaValidation(&fakeResourcesGetter{})
 		Expect(validator).ToNot(BeNil())
 	})
 
@@ -65,7 +73,7 @@ spec:
       - image: redis
         name: redis
 `))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("validates a valid pod", func() {
@@ -87,7 +95,7 @@ spec:
     image: gcr.io/fake_project/fake_image:fake_tag
     name: master
 `))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("finds invalid command (string instead of []string) in Json Pod", func() {
@@ -317,7 +325,7 @@ spec:
     command:
 `))
 
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("can validate lists", func() {
@@ -336,7 +344,7 @@ items:
       - name: name
 `))
 
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("fails because apiVersion is not provided", func() {
@@ -407,6 +415,6 @@ metadata:
 spec:
   foo: bar
 `))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 })

@@ -39,4 +39,10 @@ popd >/dev/null
 LEVEE_BIN="$(which levee)"
 CONFIG_FILE="${KUBE_ROOT}/hack/testdata/levee/levee-config.yaml"
 
-"${KUBE_ROOT}"/hack/verify-govet.sh -vettool="${LEVEE_BIN}" -config="${CONFIG_FILE}"
+# Do not run on third_party directories or generated client code or build tools.
+targets=()
+while IFS='' read -r line; do
+  targets+=("${line}")
+done < <(go list --find -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
+
+go vet -vettool="${LEVEE_BIN}" -config="${CONFIG_FILE}" "${targets[@]}"

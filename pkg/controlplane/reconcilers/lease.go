@@ -26,6 +26,7 @@ import (
 	"net"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -92,6 +93,7 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 }
 
 // UpdateLease resets the TTL on a master IP in storage
+// UpdateLease will create a new key if it doesn't exist.
 func (s *storageLeases) UpdateLease(ip string) error {
 	key := path.Join(s.baseKey, ip)
 	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
@@ -130,7 +132,9 @@ func (s *storageLeases) Destroy() {
 
 // NewLeases creates a new etcd-based Leases implementation.
 func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTime time.Duration) (Leases, error) {
-	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil)
+	// note that newFunc, newListFunc and resourcePrefix
+	// can be left blank unless the storage.Watch method is used
+	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error creating storage factory: %v", err)
 	}
@@ -146,16 +150,15 @@ func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTi
 type leaseEndpointReconciler struct {
 	epAdapter             EndpointsAdapter
 	masterLeases          Leases
-	stopReconcilingCalled bool
+	stopReconcilingCalled atomic.Bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
 func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases) EndpointReconciler {
 	return &leaseEndpointReconciler{
-		epAdapter:             epAdapter,
-		masterLeases:          masterLeases,
-		stopReconcilingCalled: false,
+		epAdapter:    epAdapter,
+		masterLeases: masterLeases,
 	}
 }
 
@@ -167,12 +170,14 @@ func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases)
 // different from the directory listing, and update the endpoints object
 // accordingly.
 func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
-	r.reconcilingLock.Lock()
-	defer r.reconcilingLock.Unlock()
-
-	if r.stopReconcilingCalled {
+	// reconcile endpoints only if apiserver was not shutdown
+	if r.stopReconcilingCalled.Load() {
 		return nil
 	}
+
+	// Ensure that there will be no race condition with the RemoveEndpoints.
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
 
 	// Refresh the TTL on our key, independently of whether any error or
 	// update conflict happens below. This makes sure that at least some of
@@ -184,12 +189,19 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 	return r.doReconcile(serviceName, endpointPorts, reconcilePorts)
 }
 
+// doReconcile can be called from ReconcileEndpoints() or RemoveEndpoints().
+// it is NOT SAFE to call it from multiple goroutines.
 func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	e, err := r.epAdapter.Get(corev1.NamespaceDefault, serviceName, metav1.GetOptions{})
 	shouldCreate := false
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
+		}
+
+		// there are no endpoints and we should stop reconciling
+		if r.stopReconcilingCalled.Load() {
+			return nil
 		}
 
 		shouldCreate = true
@@ -210,8 +222,10 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// Since we just refreshed our own key, assume that zero endpoints
 	// returned from storage indicates an issue or invalid state, and thus do
 	// not update the endpoints list based on the result.
-	if len(masterIPs) == 0 {
-		return fmt.Errorf("no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
+	// If the controller was ordered to stop and is this is the last apiserver
+	// we keep going to remove our endpoint before shutting down.
+	if !r.stopReconcilingCalled.Load() && len(masterIPs) == 0 {
+		return fmt.Errorf("no API server IP addresses were listed in storage, refusing to erase all endpoints for the kubernetes Service")
 	}
 
 	// Don't use the EndpointSliceMirroring controller to mirror this to
@@ -243,7 +257,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
 	}
 
-	if !portsCorrect {
+	if len(e.Subsets) != 0 && !portsCorrect {
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
@@ -313,6 +327,10 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 }
 
 func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+	// Ensure that there will be no race condition with the ReconcileEndpoints.
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
+
 	if err := r.masterLeases.RemoveLease(ip.String()); err != nil {
 		return err
 	}
@@ -321,9 +339,7 @@ func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP,
 }
 
 func (r *leaseEndpointReconciler) StopReconciling() {
-	r.reconcilingLock.Lock()
-	defer r.reconcilingLock.Unlock()
-	r.stopReconcilingCalled = true
+	r.stopReconcilingCalled.Store(true)
 }
 
 func (r *leaseEndpointReconciler) Destroy() {

@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -68,7 +68,7 @@ func TestResolve(t *testing.T) {
 						Type:      v1.ServiceTypeClusterIP,
 						ClusterIP: "hit",
 						Ports: []v1.ServicePort{
-							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+							{Port: 1234, TargetPort: intstr.FromInt32(1234)},
 						},
 					},
 				},
@@ -87,8 +87,8 @@ func TestResolve(t *testing.T) {
 						Type:      v1.ServiceTypeClusterIP,
 						ClusterIP: "hit",
 						Ports: []v1.ServicePort{
-							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
-							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt32(1234)},
 						},
 					},
 				},
@@ -107,13 +107,66 @@ func TestResolve(t *testing.T) {
 						Type:      v1.ServiceTypeClusterIP,
 						ClusterIP: "hit",
 						Ports: []v1.ServicePort{
-							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
-							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt32(1234)},
 						},
 					},
 				},
 			},
 			endpoints: nil,
+
+			clusterMode:  expectation{url: "https://hit:443"},
+			endpointMode: expectation{error: true},
+		},
+		{
+			name: "endpoint without subset",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt32(1234)},
+						},
+					},
+				},
+			},
+			endpoints: func(svc *v1.Service) []*v1.Endpoints {
+				return []*v1.Endpoints{{
+					ObjectMeta: metav1.ObjectMeta{Namespace: svc.Namespace, Name: svc.Name},
+					Subsets:    []v1.EndpointSubset{},
+				}}
+			},
+
+			clusterMode:  expectation{url: "https://hit:443"},
+			endpointMode: expectation{error: true},
+		},
+		{
+			name: "endpoint subset without addresses",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt32(1234)},
+						},
+					},
+				},
+			},
+			endpoints: func(svc *v1.Service) []*v1.Endpoints {
+				return []*v1.Endpoints{{
+					ObjectMeta: metav1.ObjectMeta{Namespace: svc.Namespace, Name: svc.Name},
+					Subsets: []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{},
+						Ports:     []v1.EndpointPort{{Name: "https", Port: 443}},
+					}},
+				}}
+			},
 
 			clusterMode:  expectation{url: "https://hit:443"},
 			endpointMode: expectation{error: true},
@@ -143,8 +196,8 @@ func TestResolve(t *testing.T) {
 						Type:      v1.ServiceTypeLoadBalancer,
 						ClusterIP: "lb",
 						Ports: []v1.ServicePort{
-							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
-							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt32(1234)},
 						},
 					},
 				},
@@ -163,8 +216,8 @@ func TestResolve(t *testing.T) {
 						Type:      v1.ServiceTypeNodePort,
 						ClusterIP: "np",
 						Ports: []v1.ServicePort{
-							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
-							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt32(1234)},
 						},
 					},
 				},
@@ -188,6 +241,21 @@ func TestResolve(t *testing.T) {
 			endpoints: nil,
 
 			clusterMode:  expectation{url: "https://foo.bar.com:443"},
+			endpointMode: expectation{error: true},
+		},
+		{
+			name: "unsupported service",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type: "unsupported",
+					},
+				},
+			},
+			endpoints: nil,
+
+			clusterMode:  expectation{error: true},
 			endpointMode: expectation{error: true},
 		},
 		{

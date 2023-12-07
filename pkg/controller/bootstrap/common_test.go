@@ -19,11 +19,10 @@ package bootstrap
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	core "k8s.io/client-go/testing"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -56,13 +55,13 @@ func addSecretSigningUsage(s *v1.Secret, value string) {
 func verifyActions(t *testing.T, expected, actual []core.Action) {
 	for i, a := range actual {
 		if len(expected) < i+1 {
-			t.Errorf("%d unexpected actions: %s", len(actual)-len(expected), spew.Sdump(actual[i:]))
+			t.Errorf("%d unexpected actions: %s", len(actual)-len(expected), dump.Pretty(actual[i:]))
 			break
 		}
 
 		e := expected[i]
 		if !helper.Semantic.DeepEqual(e, a) {
-			t.Errorf("Expected\n\t%s\ngot\n\t%s", spew.Sdump(e), spew.Sdump(a))
+			t.Errorf("Expected\n\t%s\ngot\n\t%s", dump.Pretty(e), dump.Pretty(a))
 			continue
 		}
 	}
@@ -70,7 +69,7 @@ func verifyActions(t *testing.T, expected, actual []core.Action) {
 	if len(expected) > len(actual) {
 		t.Errorf("%d additional expected actions", len(expected)-len(actual))
 		for _, a := range expected[len(actual):] {
-			t.Logf("    %s", spew.Sdump(a))
+			t.Logf("    %s", dump.Pretty(a))
 		}
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -29,9 +30,9 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", func() {
+var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "Horizontal pod autoscaling (non-default behavior)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	hpaName := "consumer"
 
@@ -398,7 +399,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 
 		ginkgo.It("should keep recommendation within the range over two stabilization windows", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
-			initPods := 2
+			initPods := 1
 			initCPUUsageTotal := usageForReplicas(initPods)
 			upScaleStabilization := 3 * time.Minute
 			downScaleStabilization := 3 * time.Minute
@@ -411,22 +412,22 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
-				rc, int32(targetCPUUtilizationPercent), 2, 5,
+				rc, int32(targetCPUUtilizationPercent), 1, 5,
 				e2eautoscaling.HPABehaviorWithStabilizationWindows(upScaleStabilization, downScaleStabilization),
 			)
 			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
-			rc.ConsumeCPU(usageForReplicas(4))
+			rc.ConsumeCPU(usageForReplicas(3))
 			waitDeadline := upScaleStabilization
 
 			ginkgo.By("verifying number of replicas stay in desired range within stabilisation window")
-			rc.EnsureDesiredReplicasInRange(ctx, 2, 2, waitDeadline, hpa.Name)
+			rc.EnsureDesiredReplicasInRange(ctx, 1, 1, waitDeadline, hpa.Name)
 
 			ginkgo.By("waiting for replicas to scale up after stabilisation window passed")
 			waitStart := time.Now()
 			waitDeadline = maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
-			rc.WaitForReplicas(ctx, 4, waitDeadline)
+			rc.WaitForReplicas(ctx, 3, waitDeadline)
 			timeWaited := time.Now().Sub(waitStart)
 			framework.Logf("time waited for scale up: %s", timeWaited)
 			gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
@@ -436,7 +437,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			waitDeadline = downScaleStabilization
 
 			ginkgo.By("verifying number of replicas stay in desired range within stabilisation window")
-			rc.EnsureDesiredReplicasInRange(ctx, 4, 4, waitDeadline, hpa.Name)
+			rc.EnsureDesiredReplicasInRange(ctx, 3, 3, waitDeadline, hpa.Name)
 
 			ginkgo.By("waiting for replicas to scale down after stabilisation window passed")
 			waitStart = time.Now()

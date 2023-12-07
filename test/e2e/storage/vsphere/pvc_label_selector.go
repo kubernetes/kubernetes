@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -48,9 +49,9 @@ Test Steps
 8. verify associated pv is also deleted.
 9. delete pvcVvol
 */
-var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSelector]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes", feature.Vsphere, feature.LabelSelector, func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		c          clientset.Interface
 		ns         string
@@ -68,7 +69,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		Bootstrap(f)
-		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx)
+		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx, c)
 		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, f.Timeouts.NodeSchedulable))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
@@ -77,7 +78,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 
 	})
 
-	ginkgo.Describe("Selector-Label Volume Binding:vsphere [Feature:vsphere]", func() {
+	f.Describe("Selector-Label Volume Binding:vsphere", feature.Vsphere, func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Running clean up actions")
 			if framework.ProviderIs("vsphere") {

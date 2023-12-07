@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -107,7 +108,7 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "no controller manager extra args leads to 127.0.0.1 being used",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{},
+					ExtraArgs: []kubeadmapi.Arg{},
 				},
 			},
 			expected: "127.0.0.1",
@@ -116,8 +117,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "10.10.10.10",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "10.10.10.10"},
 					},
 				},
 			},
@@ -127,8 +128,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra ipv6 address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "2001:abcd:bcda::1",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "2001:abcd:bcda::1"},
 					},
 				},
 			},
@@ -138,8 +139,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra address arg to 0.0.0.0 returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "0.0.0.0",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "0.0.0.0"},
 					},
 				},
 			},
@@ -149,8 +150,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra ipv6 address arg to :: returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "::",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "::"},
 					},
 				},
 			},
@@ -178,7 +179,7 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "no scheduler extra args leads to 127.0.0.1 being used",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{},
+					ExtraArgs: []kubeadmapi.Arg{},
 				},
 			},
 			expected: "127.0.0.1",
@@ -187,8 +188,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "10.10.10.10",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "10.10.10.10"},
 					},
 				},
 			},
@@ -198,8 +199,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra ipv6 address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "2001:abcd:bcda::1",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "2001:abcd:bcda::1"},
 					},
 				},
 			},
@@ -209,8 +210,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra ipv6 address arg to 0.0.0.0 returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "0.0.0.0",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "0.0.0.0"},
 					},
 				},
 			},
@@ -220,8 +221,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra ipv6 address arg to :: returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "::",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "::"},
 					},
 				},
 			},
@@ -244,15 +245,16 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 		cfg              *kubeadmapi.Etcd
 		isIPv6           bool
 		expectedHostname string
-		expectedPort     int
+		expectedPort     int32
 		expectedScheme   v1.URIScheme
 	}{
 		{
 			name: "etcd probe URL from two URLs",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://1.2.3.4:1234,https://4.3.2.1:2381"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://1.2.3.4:1234,https://4.3.2.1:2381"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -264,8 +266,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL with HTTP scheme",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://1.2.3.4:1234"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "http://1.2.3.4:1234"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -277,8 +280,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL without scheme should result in defaults",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "1.2.3.4"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "1.2.3.4"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -290,8 +294,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL without port",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://1.2.3.4"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://1.2.3.4"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -303,8 +308,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL from two IPv6 URLs",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://[2001:abcd:bcda::1]:1234,https://[2001:abcd:bcda::2]:2381"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://[2001:abcd:bcda::1]:1234,https://[2001:abcd:bcda::2]:2381"},
+					},
 				},
 			},
 			isIPv6:           true,
@@ -316,8 +322,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe localhost IPv6 URL with HTTP scheme",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://[::1]:1234"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "http://[::1]:1234"},
+					},
 				},
 			},
 			isIPv6:           true,
@@ -329,8 +336,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe IPv6 URL with HTTP scheme",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://[2001:abcd:bcda::1]:1234"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "http://[2001:abcd:bcda::1]:1234"},
+					},
 				},
 			},
 			isIPv6:           true,
@@ -342,8 +350,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe IPv6 URL without port",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://[2001:abcd:bcda::1]"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://[2001:abcd:bcda::1]"},
+					},
 				},
 			},
 			isIPv6:           true,
@@ -630,6 +639,51 @@ spec:
   - image: gcr.io/google_containers/etcd-amd64:3.1.11
 status: {}
 `
+	validPodWithDifferentFieldsOrder = `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    tier: control-plane
+    component: etcd
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - image: gcr.io/google_containers/etcd-amd64:3.1.11
+status: {}
+`
+	invalidWithDefaultFields = `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    tier: control-plane
+    component: etcd
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - image: gcr.io/google_containers/etcd-amd64:3.1.11
+  restartPolicy: "Always"
+status: {}
+`
+
+	validPod2 = `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - image: gcr.io/google_containers/etcd-amd64:3.1.12
+status: {}
+`
+
 	invalidPod = `---{ broken yaml @@@`
 )
 
@@ -692,6 +746,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 		description    string
 		podYamls       []string
 		expectedResult bool
+		expectedDiff   string
 		expectErr      bool
 	}{
 		{
@@ -701,10 +756,29 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			expectErr:      false,
 		},
 		{
+			description:    "manifests are equal, ignore different fields order",
+			podYamls:       []string{validPod, validPodWithDifferentFieldsOrder},
+			expectedResult: true,
+			expectErr:      false,
+		},
+		{
 			description:    "manifests are not equal",
-			podYamls:       []string{validPod, validPod + "\n"},
+			podYamls:       []string{validPod, validPod2},
 			expectedResult: false,
 			expectErr:      false,
+			expectedDiff: `@@ -12 +12 @@
+-  - image: gcr.io/google_containers/etcd-amd64:3.1.11
++  - image: gcr.io/google_containers/etcd-amd64:3.1.12
+`,
+		},
+		{
+			description:    "manifests are not equal for adding new defaults",
+			podYamls:       []string{validPod, invalidWithDefaultFields},
+			expectedResult: false,
+			expectErr:      false,
+			expectedDiff: `@@ -14,0 +15 @@
++  restartPolicy: Always
+`,
 		},
 		{
 			description:    "first manifest doesn't exist",
@@ -737,7 +811,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			}
 
 			// compare them
-			result, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
+			result, diff, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
 			if result != rt.expectedResult {
 				t.Errorf(
 					"ManifestFilesAreEqual failed\n%s\nexpected result: %t\nactual result: %t",
@@ -753,6 +827,14 @@ func TestManifestFilesAreEqual(t *testing.T) {
 					rt.expectErr,
 					(actualErr != nil),
 					actualErr,
+				)
+			}
+			if !strings.Contains(diff, rt.expectedDiff) {
+				t.Errorf(
+					"ManifestFilesAreEqual diff doesn't expected\n%s\n\texpected diff: %s\n\tactual diff: %s",
+					rt.description,
+					rt.expectedDiff,
+					diff,
 				)
 			}
 		})

@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/internal"
 	"google.golang.org/api/internal/impersonate"
 	"google.golang.org/grpc"
@@ -81,6 +82,9 @@ func (w withEndpoint) Apply(o *internal.DialSettings) {
 
 // WithScopes returns a ClientOption that overrides the default OAuth2 scopes
 // to be used for a service.
+//
+// If both WithScopes and WithTokenSource are used, scope settings from the
+// token source will be used instead.
 func WithScopes(scope ...string) ClientOption {
 	return withScopes(scope)
 }
@@ -92,7 +96,9 @@ func (w withScopes) Apply(o *internal.DialSettings) {
 	copy(o.Scopes, w)
 }
 
-// WithUserAgent returns a ClientOption that sets the User-Agent.
+// WithUserAgent returns a ClientOption that sets the User-Agent. This option
+// is incompatible with the [WithHTTPClient] option. If you wish to provide a
+// custom client you will need to add this header via RoundTripper middleware.
 func WithUserAgent(ua string) ClientOption {
 	return withUA(ua)
 }
@@ -144,8 +150,6 @@ func (w withGRPCDialOption) Apply(o *internal.DialSettings) {
 
 // WithGRPCConnectionPool returns a ClientOption that creates a pool of gRPC
 // connections that requests will be balanced between.
-//
-// This is an EXPERIMENTAL API and may be changed or removed in the future.
 func WithGRPCConnectionPool(size int) ClientOption {
 	return withGRPCConnectionPool(size)
 }
@@ -288,10 +292,10 @@ func (w withClientCertSource) Apply(o *internal.DialSettings) {
 // service account SA2 while using delegate service accounts DSA1 and DSA2,
 // the following must be true:
 //
-//   1. Base service account SA1 has roles/iam.serviceAccountTokenCreator on
-//      DSA1.
-//   2. DSA1 has roles/iam.serviceAccountTokenCreator on DSA2.
-//   3. DSA2 has roles/iam.serviceAccountTokenCreator on target SA2.
+//  1. Base service account SA1 has roles/iam.serviceAccountTokenCreator on
+//     DSA1.
+//  2. DSA1 has roles/iam.serviceAccountTokenCreator on DSA2.
+//  3. DSA2 has roles/iam.serviceAccountTokenCreator on target SA2.
 //
 // The resulting impersonated credential will either have the default scopes of
 // the client being instantiating or the scopes from WithScopes if provided.
@@ -306,9 +310,9 @@ func (w withClientCertSource) Apply(o *internal.DialSettings) {
 //
 // This is an EXPERIMENTAL API and may be changed or removed in the future.
 //
-// This option has been replaced by `impersonate` package:
+// Deprecated: This option has been replaced by `impersonate` package:
 // `google.golang.org/api/impersonate`. Please use the `impersonate` package
-// instead.
+// instead with the WithTokenSource option.
 func ImpersonateCredentials(target string, delegates ...string) ClientOption {
 	return impersonateServiceAccount{
 		target:    target,
@@ -327,4 +331,15 @@ func (i impersonateServiceAccount) Apply(o *internal.DialSettings) {
 	}
 	o.ImpersonationConfig.Delegates = make([]string, len(i.delegates))
 	copy(o.ImpersonationConfig.Delegates, i.delegates)
+}
+
+type withCreds google.Credentials
+
+func (w *withCreds) Apply(o *internal.DialSettings) {
+	o.Credentials = (*google.Credentials)(w)
+}
+
+// WithCredentials returns a ClientOption that authenticates API calls.
+func WithCredentials(creds *google.Credentials) ClientOption {
+	return (*withCreds)(creds)
 }

@@ -25,7 +25,7 @@ import (
 // Parser converts loads from metadata into a concrete type.
 type Parser interface {
 	// Parse parses loads from metadata.
-	Parse(md metadata.MD) interface{}
+	Parse(md metadata.MD) any
 }
 
 var parser Parser
@@ -38,7 +38,7 @@ func SetParser(lr Parser) {
 }
 
 // Parse calls parser.Read().
-func Parse(md metadata.MD) interface{} {
+func Parse(md metadata.MD) any {
 	if parser == nil {
 		return nil
 	}

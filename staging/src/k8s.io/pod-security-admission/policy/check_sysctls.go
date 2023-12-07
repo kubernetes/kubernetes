@@ -42,6 +42,11 @@ spec.securityContext.sysctls[*].name
 'net.ipv4.tcp_syncookies'
 'net.ipv4.ping_group_range'
 'net.ipv4.ip_unprivileged_port_start'
+'net.ipv4.ip_local_reserved_ports'
+'net.ipv4.tcp_keepalive_time'
+'net.ipv4.tcp_fin_timeout'
+'net.ipv4.tcp_keepalive_intvl'
+'net.ipv4.tcp_keepalive_probes'
 
 */
 
@@ -58,28 +63,67 @@ func CheckSysctls() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       sysctls_1_0,
+				CheckPod:       sysctlsV1Dot0,
+			},
+			{
+				MinimumVersion: api.MajorMinorVersion(1, 27),
+				CheckPod:       sysctlsV1Dot27,
+			}, {
+				MinimumVersion: api.MajorMinorVersion(1, 29),
+				CheckPod:       sysctlsV1Dot29,
 			},
 		},
 	}
 }
 
 var (
-	sysctls_allowed_1_0 = sets.NewString(
+	sysctlsAllowedV1Dot0 = sets.NewString(
 		"kernel.shm_rmid_forced",
 		"net.ipv4.ip_local_port_range",
 		"net.ipv4.tcp_syncookies",
 		"net.ipv4.ping_group_range",
 		"net.ipv4.ip_unprivileged_port_start",
 	)
+	sysctlsAllowedV1Dot27 = sets.NewString(
+		"kernel.shm_rmid_forced",
+		"net.ipv4.ip_local_port_range",
+		"net.ipv4.tcp_syncookies",
+		"net.ipv4.ping_group_range",
+		"net.ipv4.ip_unprivileged_port_start",
+		"net.ipv4.ip_local_reserved_ports",
+	)
+	sysctlsAllowedV1Dot29 = sets.NewString(
+		"kernel.shm_rmid_forced",
+		"net.ipv4.ip_local_port_range",
+		"net.ipv4.tcp_syncookies",
+		"net.ipv4.ping_group_range",
+		"net.ipv4.ip_unprivileged_port_start",
+		"net.ipv4.ip_local_reserved_ports",
+		"net.ipv4.tcp_keepalive_time",
+		"net.ipv4.tcp_fin_timeout",
+		"net.ipv4.tcp_keepalive_intvl",
+		"net.ipv4.tcp_keepalive_probes",
+	)
 )
 
-func sysctls_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func sysctlsV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	return sysctls(podMetadata, podSpec, sysctlsAllowedV1Dot0)
+}
+
+func sysctlsV1Dot27(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	return sysctls(podMetadata, podSpec, sysctlsAllowedV1Dot27)
+}
+
+func sysctlsV1Dot29(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	return sysctls(podMetadata, podSpec, sysctlsAllowedV1Dot29)
+}
+
+func sysctls(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, sysctls_allowed_set sets.String) CheckResult {
 	var forbiddenSysctls []string
 
 	if podSpec.SecurityContext != nil {
 		for _, sysctl := range podSpec.SecurityContext.Sysctls {
-			if !sysctls_allowed_1_0.Has(sysctl.Name) {
+			if !sysctls_allowed_set.Has(sysctl.Name) {
 				forbiddenSysctls = append(forbiddenSysctls, sysctl.Name)
 			}
 		}

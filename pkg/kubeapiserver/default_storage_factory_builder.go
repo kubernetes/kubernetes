@@ -28,11 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -68,9 +70,12 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		networking.Resource("clustercidrs").WithVersion("v1alpha1"),
-		admissionregistration.Resource("validatingadmissionpolicies").WithVersion("v1alpha1"),
-		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1alpha1"),
+		admissionregistration.Resource("validatingadmissionpolicies").WithVersion("v1beta1"),
+		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1beta1"),
+		networking.Resource("ipaddresses").WithVersion("v1alpha1"),
+		networking.Resource("servicecidrs").WithVersion("v1alpha1"),
+		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
+		storage.Resource("volumeattributesclasses").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{

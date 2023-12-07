@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/metadata/fake"
 	"k8s.io/client-go/tools/cache"
 )
@@ -147,7 +147,7 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 			select {
 			case objFromInformer := <-informerReciveObjectCh:
 				if !equality.Semantic.DeepEqual(testObject, objFromInformer) {
-					t.Fatalf("%v", diff.ObjectDiff(testObject, objFromInformer))
+					t.Fatalf("%v", cmp.Diff(testObject, objFromInformer))
 				}
 			case <-ctx.Done():
 				t.Errorf("tested informer haven't received an object, waited %v", timeout)

@@ -18,12 +18,12 @@
 
 # The golang package that we are building.
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
-readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
+readonly KUBE_GOPATH="${KUBE_GOPATH:-"${KUBE_OUTPUT}/go"}"
+export KUBE_GOPATH
 
 # The server platform we are building on.
 readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
   linux/amd64
-  linux/arm
   linux/arm64
   linux/s390x
   linux/ppc64le
@@ -32,7 +32,6 @@ readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
 # The node platforms we build for
 readonly KUBE_SUPPORTED_NODE_PLATFORMS=(
   linux/amd64
-  linux/arm
   linux/arm64
   linux/s390x
   linux/ppc64le
@@ -59,7 +58,6 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
 # Not all client platforms need these tests
 readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   linux/amd64
-  linux/arm
   linux/arm64
   linux/s390x
   linux/ppc64le
@@ -98,6 +96,7 @@ kube::golang::server_image_targets() {
     cmd/kube-controller-manager
     cmd/kube-scheduler
     cmd/kube-proxy
+    cmd/kubectl
   )
   echo "${targets[@]}"
 }
@@ -264,11 +263,6 @@ readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 # The set of test targets that we are building for all platforms
 kube::golang::test_targets() {
   local targets=(
-    cmd/gendocs
-    cmd/genkubedocs
-    cmd/genman
-    cmd/genyaml
-    cmd/genswaggertypedocs
     ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
@@ -325,6 +319,8 @@ readonly KUBE_ALL_TARGETS=(
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
 readonly KUBE_STATIC_LIBRARIES=(
+  apiextensions-apiserver
+  kube-aggregator
   kube-apiserver
   kube-controller-manager
   kube-scheduler
@@ -334,6 +330,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kubectl
   kubectl-convert
   kubemark
+  mounter
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.
@@ -470,13 +467,23 @@ kube::golang::create_gopath_tree() {
 kube::golang::verify_go_version() {
   # default GO_VERSION to content of .go-version
   GO_VERSION="${GO_VERSION:-"$(cat "${KUBE_ROOT}/.go-version")"}"
-  # only setup go if we haven't set FORCE_HOST_GO, or `go version` doesn't match GO_VERSION
-  if ! ([ -n "${FORCE_HOST_GO:-}" ] || \
-      (command -v go >/dev/null && [ "$(go version | cut -d' ' -f3)" = "go${GO_VERSION}" ])); then
+  if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
+    # no-op, just respect GOTOOLCHAIN
+    :
+  elif [ -n "${FORCE_HOST_GO:-}" ]; then
+    # ensure existing host version is used, like before GOTOOLCHAIN existed
+    export GOTOOLCHAIN='local'
+  else
+    # otherwise, we want to ensure the go version matches GO_VERSION
+    GOTOOLCHAIN="go${GO_VERSION}"
+    export GOTOOLCHAIN
+    # if go is either not installed or too old to respect GOTOOLCHAIN then use gimme
+    if ! (command -v go >/dev/null && [ "$(go version | cut -d' ' -f3)" = "${GOTOOLCHAIN}" ]); then
       export GIMME_ENV_PREFIX=${GIMME_ENV_PREFIX:-"${KUBE_OUTPUT}/.gimme/envs"}
       export GIMME_VERSION_PREFIX=${GIMME_VERSION_PREFIX:-"${KUBE_OUTPUT}/.gimme/versions"}
       # eval because the output of this is shell to set PATH etc.
       eval "$("${KUBE_ROOT}/third_party/gimme/gimme" "${GO_VERSION}")"
+    fi
   fi
 
   if [[ -z "$(command -v go)" ]]; then
@@ -490,7 +497,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.20
+  minimum_go_version=go1.21
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -560,6 +567,25 @@ kube::golang::setup_env() {
 
   # This seems to matter to some tools
   export GO15VENDOREXPERIMENT=1
+}
+
+kube::golang::setup_gomaxprocs() {
+  # GOMAXPROCS by default does not reflect the number of cpu(s) available
+  # when running in a container, please see https://github.com/golang/go/issues/33803
+  if [[ -z "${GOMAXPROCS:-}" ]]; then
+    if ! command -v ncpu >/dev/null 2>&1; then
+      # shellcheck disable=SC2164
+      pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+      GO111MODULE=on go install ./ncpu || echo "Will not automatically set GOMAXPROCS"
+      # shellcheck disable=SC2164
+      popd >/dev/null
+    fi
+    if command -v ncpu >/dev/null 2>&1; then
+      GOMAXPROCS=$(ncpu)
+      export GOMAXPROCS
+      kube::log::status "Set GOMAXPROCS automatically to ${GOMAXPROCS}"
+    fi
+  fi
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
@@ -773,26 +799,15 @@ kube::golang::build_binaries_for_platform() {
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 
-  # Workaround for https://github.com/kubernetes/kubernetes/issues/115675
-  local testgogcflags="${gogcflags}"
-  local testgoexperiment="${GOEXPERIMENT:-}"
-  if [[ "$(go version)" == *"go1.20"* && "${platform}" == "linux/arm" ]]; then
-    # work around https://github.com/golang/go/issues/58339 until fixed in go1.20.x
-    testgogcflags="${testgogcflags} -d=inlstaticinit=0"
-    # work around https://github.com/golang/go/issues/58425
-    testgoexperiment="nounified,${testgoexperiment}"
-    kube::log::info "Building test binaries with GOEXPERIMENT=${testgoexperiment} GCFLAGS=${testgogcflags} ASMFLAGS=${goasmflags} LDFLAGS=${goldflags}"
-  fi
-
   for test in "${tests[@]:+${tests[@]}}"; do
     local outfile testpkg
     outfile=$(kube::golang::outfile_for_binary "${test}" "${platform}")
     testpkg=$(dirname "${test}")
 
     mkdir -p "$(dirname "${outfile}")"
-    GOEXPERIMENT="${testgoexperiment}" go test -c \
+    go test -c \
       ${goflags:+"${goflags[@]}"} \
-      -gcflags="${testgogcflags}" \
+      -gcflags="${gogcflags}" \
       -asmflags="${goasmflags}" \
       -ldflags="${goldflags}" \
       -tags="${gotags:-}" \

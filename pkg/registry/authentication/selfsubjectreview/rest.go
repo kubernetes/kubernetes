@@ -29,11 +29,18 @@ import (
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 )
 
+var _ interface {
+	rest.Creater
+	rest.NamespaceScopedStrategy
+	rest.Scoper
+	rest.Storage
+} = &REST{}
+
 // REST implements a RESTStorage for selfsubjectreviews.
 type REST struct {
 }
 
-// NewREST returns a RESTStorage object that will work against selfsubjectrulesreviews.
+// NewREST returns a RESTStorage object that will work against selfsubjectreviews.
 func NewREST() *REST {
 	return &REST{}
 }
@@ -43,7 +50,7 @@ func (r *REST) NamespaceScoped() bool {
 	return false
 }
 
-// New creates a new selfsubjectrulesreview object.
+// New creates a new selfsubjectreview object.
 func (r *REST) New() runtime.Object {
 	return &authenticationapi.SelfSubjectReview{}
 }
@@ -74,7 +81,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 
 	extra := user.GetExtra()
 
-	selfSAR := &authenticationapi.SelfSubjectReview{
+	selfSR := &authenticationapi.SelfSubjectReview{
 		ObjectMeta: metav1.ObjectMeta{
 			CreationTimestamp: metav1.NewTime(time.Now()),
 		},
@@ -88,14 +95,14 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		},
 	}
 	for key, attr := range extra {
-		selfSAR.Status.UserInfo.Extra[key] = attr
+		selfSR.Status.UserInfo.Extra[key] = attr
 	}
 
-	return selfSAR, nil
+	return selfSR, nil
 }
 
 var _ rest.SingularNameProvider = &REST{}
 
 func (r *REST) GetSingularName() string {
-	return "selfsubjectrulesreview"
+	return "selfsubjectreview"
 }

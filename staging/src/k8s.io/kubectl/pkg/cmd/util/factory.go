@@ -22,6 +22,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	openapiclient "k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/validation"
@@ -61,6 +62,11 @@ type Factory interface {
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validationDirective string) (validation.Schema, error)
-	// OpenAPISchema returns the parsed openapi schema definition
-	OpenAPISchema() (openapi.Resources, error)
+
+	// Used for retrieving openapi v2 resources.
+	openapi.OpenAPIResourcesGetter
+
+	// OpenAPIV3Schema returns a client for fetching parsed schemas for
+	// any group version
+	OpenAPIV3Client() (openapiclient.Client, error)
 }

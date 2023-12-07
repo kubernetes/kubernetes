@@ -401,14 +401,8 @@ func TestBindToCommandArgRequirements(t *testing.T) {
 					continue
 				}
 
-				// Ensure it is the expected function
-				if reflect.ValueOf(cCmd.Args).Pointer() != reflect.ValueOf(args.args).Pointer() {
-					t.Error("The function pointers where not equal.")
-				}
-
 				// Test passing argument set
 				err := cCmd.Args(cCmd, args.pass)
-
 				if err != nil {
 					t.Errorf("command %s should validate the args: %v\n %v", cCmd.Name(), args.pass, err)
 				}

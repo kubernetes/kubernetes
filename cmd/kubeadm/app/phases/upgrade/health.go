@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -82,17 +82,15 @@ func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfi
 			f:      controlPlaneNodesReady,
 		},
 		&healthCheck{
-			name:   "StaticPodManifest",
-			client: client,
-			cfg:    cfg,
-			f:      staticPodManifestHealth,
+			name: "StaticPodManifest",
+			f:    staticPodManifestHealth,
 		},
 	}
 
 	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
 }
 
-// CreateJob is a check that verifies that a Job can be created in the cluster
+// createJob is a check that verifies that a Job can be created in the cluster
 func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) (lastError error) {
 	const (
 		jobName = "upgrade-health-check"
@@ -114,14 +112,14 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 			Namespace: ns,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: pointer.Int32(0),
+			BackoffLimit: ptr.To[int32](0),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					SecurityContext: &v1.PodSecurityContext{
-						RunAsUser:    pointer.Int64(999),
-						RunAsGroup:   pointer.Int64(999),
-						RunAsNonRoot: pointer.Bool(true),
+						RunAsUser:    ptr.To[int64](999),
+						RunAsGroup:   ptr.To[int64](999),
+						RunAsNonRoot: ptr.To(true),
 					},
 					Tolerations: []v1.Toleration{
 						{
@@ -207,9 +205,9 @@ func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error 
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
 func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+	selectorControlPlane := labels.SelectorFromSet(map[string]string{
 		constants.LabelNodeRoleControlPlane: "",
-	}))
+	})
 	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selectorControlPlane.String(),
 	})

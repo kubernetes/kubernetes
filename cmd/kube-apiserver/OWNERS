@@ -3,12 +3,11 @@
 approvers:
   - caesarxuchao
   - deads2k
-  - lavalamp
   - liggitt
   - smarterclayton
   - sttts
+  - jpbetz
 reviewers:
-  - lavalamp
   - cheftako
   - smarterclayton
   - wojtek-t
@@ -22,8 +21,10 @@ reviewers:
   - hzxuzhonghu
   - logicalhan
   - yue9944882
+  - jpbetz
 labels:
   - sig/api-machinery
   - area/apiserver
 emeritus_approvers:
   - nikhiljindal
+  - lavalamp

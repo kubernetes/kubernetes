@@ -19,17 +19,14 @@ package storage
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 	"strings"
-
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 )
 
 // Backend describes the storage servers, the information here should be enough
@@ -52,8 +49,12 @@ type StorageFactory interface {
 	// centralized control over the shape of etcd directories
 	ResourcePrefix(groupResource schema.GroupResource) string
 
+	// Configs gets configurations for all of registered storage destinations.
+	Configs() []storagebackend.Config
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
+	// Deprecated: Use Configs instead
 	Backends() []Backend
 }
 
@@ -111,8 +112,6 @@ type groupResourceOverrides struct {
 	// decoderDecoratorFn is optional and may wrap the provided decoders (can add new decoders). The order of
 	// returned decoders will be priority for attempt to decode.
 	decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder
-	// disablePaging will prevent paging on the provided resource.
-	disablePaging bool
 }
 
 // Apply overrides the provided config and options if the override has a value in that position
@@ -136,9 +135,6 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	if o.decoderDecoratorFn != nil {
 		options.DecoderDecoratorFn = o.decoderDecoratorFn
 	}
-	if o.disablePaging {
-		config.Paging = false
-	}
 }
 
 var _ StorageFactory = &DefaultStorageFactory{}
@@ -153,7 +149,6 @@ func NewDefaultStorageFactory(
 	resourceConfig APIResourceConfigSource,
 	specialDefaultResourcePrefixes map[schema.GroupResource]string,
 ) *DefaultStorageFactory {
-	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}
@@ -179,14 +174,6 @@ func (s *DefaultStorageFactory) SetEtcdLocation(groupResource schema.GroupResour
 func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdPrefix = prefix
-	s.Overrides[groupResource] = overrides
-}
-
-// SetDisableAPIListChunking allows a specific resource to disable paging at the storage layer, to prevent
-// exposure of key names in continuations. This may be overridden by feature gates.
-func (s *DefaultStorageFactory) SetDisableAPIListChunking(groupResource schema.GroupResource) {
-	overrides := s.Overrides[groupResource]
-	overrides.disablePaging = true
 	s.Overrides[groupResource] = overrides
 }
 
@@ -276,14 +263,41 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	return storageConfig.ForResource(groupResource), nil
 }
 
-// Backends returns all backends for all registered storage destinations.
-// Used for getting all instances for health validations.
+// Configs implements StorageFactory.
+func (s *DefaultStorageFactory) Configs() []storagebackend.Config {
+	return configs(s.StorageConfig, s.Overrides)
+}
+
+// Configs gets configurations for all of registered storage destinations.
+func Configs(storageConfig storagebackend.Config) []storagebackend.Config {
+	return configs(storageConfig, nil)
+}
+
+// Returns all storage configurations including those for group resource overrides
+func configs(storageConfig storagebackend.Config, grOverrides map[schema.GroupResource]groupResourceOverrides) []storagebackend.Config {
+	configs := []storagebackend.Config{storageConfig}
+
+	for _, override := range grOverrides {
+		if len(override.etcdLocation) == 0 {
+			continue
+		}
+		// copy
+		newConfig := storageConfig
+		override.Apply(&newConfig, &StorageCodecConfig{})
+		newConfig.Transport.ServerList = override.etcdLocation
+		configs = append(configs, newConfig)
+	}
+	return configs
+}
+
+// Backends implements StorageFactory.
 func (s *DefaultStorageFactory) Backends() []Backend {
 	return backends(s.StorageConfig, s.Overrides)
 }
 
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
+// Deprecated: Validate health by passing storagebackend.Config directly to storagefactory.CreateProber.
 func Backends(storageConfig storagebackend.Config) []Backend {
 	return backends(storageConfig, nil)
 }
@@ -307,7 +321,7 @@ func backends(storageConfig storagebackend.Config, grOverrides map[schema.GroupR
 		}
 	}
 	if len(storageConfig.Transport.TrustedCAFile) > 0 {
-		if caCert, err := ioutil.ReadFile(storageConfig.Transport.TrustedCAFile); err != nil {
+		if caCert, err := os.ReadFile(storageConfig.Transport.TrustedCAFile); err != nil {
 			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()

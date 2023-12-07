@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -83,7 +84,7 @@ var (
 		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
 		kubectl delete -k dir
 
-		# Delete resources from all files that end with '.json' - i.e. expand wildcard characters in file names
+		# Delete resources from all files that end with '.json'
 		kubectl delete -f '*.json'
 
 		# Delete a pod based on the type and name in the JSON passed into stdin
@@ -120,6 +121,7 @@ type DeleteOptions struct {
 	Quiet               bool
 	WarnClusterScope    bool
 	Raw                 string
+	Interactive         bool
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -128,15 +130,17 @@ type DeleteOptions struct {
 
 	Output string
 
-	DynamicClient dynamic.Interface
-	Mapper        meta.RESTMapper
-	Result        *resource.Result
+	DynamicClient      dynamic.Interface
+	Mapper             meta.RESTMapper
+	Result             *resource.Result
+	PreviewResult      *resource.Result
+	previewResourceMap map[cmdwait.ResourceLocation]struct{}
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
 }
 
-func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDelete(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
@@ -196,8 +200,38 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		return err
 	}
 
-	if len(o.Raw) == 0 {
-		r := f.NewBuilder().
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
+
+	if len(o.Raw) != 0 {
+		return nil
+	}
+
+	r := f.NewBuilder().
+		Unstructured().
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.LabelSelector).
+		FieldSelectorParam(o.FieldSelector).
+		SelectAllParam(o.DeleteAll).
+		AllNamespaces(o.DeleteAllNamespaces).
+		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+	o.Result = r
+
+	if o.Interactive {
+		// preview result will be used to list resources for confirmation prior to actual delete.
+		// We can not use r as result object because it can only be used once. But we need to traverse
+		// twice. Parameters in preview result must be equal to genuine result.
+		previewr := f.NewBuilder().
 			Unstructured().
 			ContinueOnError().
 			NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -209,26 +243,22 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 			ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 			Flatten().
 			Do()
-		err = r.Err()
+		err = previewr.Err()
 		if err != nil {
 			return err
 		}
-		o.Result = r
-
-		o.Mapper, err = f.ToRESTMapper()
-		if err != nil {
-			return err
-		}
-
-		o.DynamicClient, err = f.DynamicClient()
-		if err != nil {
-			return err
-		}
+		o.PreviewResult = previewr
+		o.previewResourceMap = make(map[cmdwait.ResourceLocation]struct{})
 	}
 
-	// Set default WarningPrinter if not already set.
-	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	o.Mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -256,24 +286,29 @@ func (o *DeleteOptions) Validate() error {
 		return fmt.Errorf("--force and --grace-period greater than 0 cannot be specified together")
 	}
 
-	if len(o.Raw) > 0 {
-		if len(o.FilenameOptions.Filenames) > 1 {
-			return fmt.Errorf("--raw can only use a single local file or stdin")
-		} else if len(o.FilenameOptions.Filenames) == 1 {
-			if strings.Index(o.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.FilenameOptions.Filenames[0], "https://") == 0 {
-				return fmt.Errorf("--raw cannot read from a url")
-			}
-		}
+	if len(o.Raw) == 0 {
+		return nil
+	}
 
-		if o.FilenameOptions.Recursive {
-			return fmt.Errorf("--raw and --recursive are mutually exclusive")
+	if o.Interactive {
+		return fmt.Errorf("--interactive can not be used with --raw")
+	}
+	if len(o.FilenameOptions.Filenames) > 1 {
+		return fmt.Errorf("--raw can only use a single local file or stdin")
+	} else if len(o.FilenameOptions.Filenames) == 1 {
+		if strings.Index(o.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.FilenameOptions.Filenames[0], "https://") == 0 {
+			return fmt.Errorf("--raw cannot read from a url")
 		}
-		if len(o.Output) > 0 {
-			return fmt.Errorf("--raw and --output are mutually exclusive")
-		}
-		if _, err := url.ParseRequestURI(o.Raw); err != nil {
-			return fmt.Errorf("--raw must be a valid URL path: %v", err)
-		}
+	}
+
+	if o.FilenameOptions.Recursive {
+		return fmt.Errorf("--raw and --recursive are mutually exclusive")
+	}
+	if len(o.Output) > 0 {
+		return fmt.Errorf("--raw and --output are mutually exclusive")
+	}
+	if _, err := url.ParseRequestURI(o.Raw); err != nil {
+		return fmt.Errorf("--raw must be a valid URL path: %v", err)
 	}
 
 	return nil
@@ -290,6 +325,39 @@ func (o *DeleteOptions) RunDelete(f cmdutil.Factory) error {
 		}
 		return rawhttp.RawDelete(restClient, o.IOStreams, o.Raw, o.Filenames[0])
 	}
+
+	if o.Interactive {
+		previewInfos := []*resource.Info{}
+		if o.IgnoreNotFound {
+			o.PreviewResult = o.PreviewResult.IgnoreErrors(errors.IsNotFound)
+		}
+		err := o.PreviewResult.Visit(func(info *resource.Info, err error) error {
+			if err != nil {
+				return err
+			}
+			previewInfos = append(previewInfos, info)
+			o.previewResourceMap[cmdwait.ResourceLocation{
+				GroupResource: info.Mapping.Resource.GroupResource(),
+				Namespace:     info.Namespace,
+				Name:          info.Name,
+			}] = struct{}{}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if len(previewInfos) == 0 {
+			fmt.Fprintf(o.Out, "No resources found\n")
+			return nil
+		}
+
+		if !o.confirmation(previewInfos) {
+			fmt.Fprintf(o.Out, "deletion is cancelled\n")
+			return nil
+		}
+	}
+
 	return o.DeleteResult(o.Result)
 }
 
@@ -305,6 +373,18 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		if err != nil {
 			return err
 		}
+
+		if o.Interactive {
+			if _, ok := o.previewResourceMap[cmdwait.ResourceLocation{
+				GroupResource: info.Mapping.Resource.GroupResource(),
+				Namespace:     info.Namespace,
+				Name:          info.Name,
+			}]; !ok {
+				// resource not in the list of previewed resources based on resourceLocation
+				return nil
+			}
+		}
+
 		deletedInfos = append(deletedInfos, info)
 		found++
 
@@ -438,4 +518,25 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 
 	// understandable output by default
 	fmt.Fprintf(o.Out, "%s \"%s\" %s\n", kindString, info.Name, operation)
+}
+
+func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
+	fmt.Fprintf(o.Out, i18n.T("You are about to delete the following %d resource(s):\n"), len(infos))
+	for _, info := range infos {
+		groupKind := info.Mapping.GroupVersionKind
+		kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
+		if len(groupKind.Group) == 0 {
+			kindString = strings.ToLower(groupKind.Kind)
+		}
+
+		fmt.Fprintf(o.Out, "%s/%s\n", kindString, info.Name)
+	}
+	fmt.Fprintf(o.Out, i18n.T("Do you want to continue?")+" (y/n): ")
+	var input string
+	_, err := fmt.Fscan(o.In, &input)
+	if err != nil {
+		return false
+	}
+
+	return strings.EqualFold(input, "y")
 }

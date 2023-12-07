@@ -37,9 +37,22 @@ var (
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "pods_logs_insecure_backend_total",
+			Name:           "insecure_backend_total",
 			Help:           "Total number of requests for pods/logs sliced by usage type: enforce_tls, skip_tls_allowed, skip_tls_denied",
 			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"usage"},
+	)
+
+	// deprecatedPodLogsUsage counts and categorizes how the insecure backend skip TLS option is used and allowed.
+	deprecatedPodLogsUsage = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "pods_logs_insecure_backend_total",
+			Help:              "Total number of requests for pods/logs sliced by usage type: enforce_tls, skip_tls_allowed, skip_tls_denied",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.27.0",
 		},
 		[]string{"usage"},
 	)
@@ -49,9 +62,21 @@ var (
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "pods_logs_backend_tls_failure_total",
+			Name:           "backend_tls_failure_total",
 			Help:           "Total number of requests for pods/logs that failed due to kubelet server TLS verification",
 			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// deprecatedPodLogsTLSFailure counts how many attempts to get pod logs fail on tls verification
+	deprecatedPodLogsTLSFailure = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "pods_logs_backend_tls_failure_total",
+			Help:              "Total number of requests for pods/logs that failed due to kubelet server TLS verification",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.27.0",
 		},
 	)
 )
@@ -62,5 +87,7 @@ func registerMetrics() {
 	registerMetricsOnce.Do(func() {
 		legacyregistry.MustRegister(podLogsUsage)
 		legacyregistry.MustRegister(podLogsTLSFailure)
+		legacyregistry.MustRegister(deprecatedPodLogsUsage)
+		legacyregistry.MustRegister(deprecatedPodLogsTLSFailure)
 	})
 }

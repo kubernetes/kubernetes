@@ -19,10 +19,10 @@ package reconciliation
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func role(rules []rbacv1.PolicyRule, labels map[string]string, annotations map[string]string) *rbacv1.ClusterRole {
@@ -392,7 +392,7 @@ func TestComputeReconciledRoleAggregationRules(t *testing.T) {
 			continue
 		}
 		if reconciliationNeeded && !apiequality.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
-			t.Errorf("%s: %v", k, diff.ObjectDiff(tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole))
+			t.Errorf("%s: %v", k, cmp.Diff(tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole))
 		}
 	}
 }

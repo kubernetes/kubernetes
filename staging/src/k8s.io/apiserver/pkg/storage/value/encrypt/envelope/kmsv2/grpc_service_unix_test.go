@@ -25,12 +25,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
-	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2alpha1"
-	"k8s.io/component-base/metrics/testutil"
-
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kmsservice "k8s.io/kms/service"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
+	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2"
+	"k8s.io/component-base/metrics/testutil"
+	kmsservice "k8s.io/kms/pkg/service"
 )
 
 const (
@@ -70,14 +69,7 @@ func TestKMSPluginLateStart(t *testing.T) {
 	defer destroyService(service)
 
 	time.Sleep(callTimeout / 2)
-	f, err := mock.NewBase64Plugin(s.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, s.path)
 
 	data := []byte("test data")
 	uid := string(uuid.NewUUID())
@@ -149,7 +141,8 @@ func TestTimeouts(t *testing.T) {
 
 				service, err = NewGRPCService(ctx, socketName.endpoint, testProviderName, tt.callTimeout)
 				if err != nil {
-					t.Fatalf("failed to create envelope service, error: %v", err)
+					t.Errorf("failed to create envelope service, error: %v", err)
+					return
 				}
 				defer destroyService(service)
 				kubeAPIServerWG.Done()
@@ -162,20 +155,16 @@ func TestTimeouts(t *testing.T) {
 				// Simulating delayed start of kms-plugin, kube-apiserver is up before the plugin, if requested by the testcase.
 				time.Sleep(tt.pluginDelay)
 
-				f, err := mock.NewBase64Plugin(socketName.path)
-				if err != nil {
-					t.Fatalf("failed to construct test KMS provider server, error: %v", err)
-				}
-				if err := f.Start(); err != nil {
-					t.Fatalf("Failed to start test KMS provider server, error: %v", err)
-				}
-				defer f.CleanUp()
+				_ = mock.NewBase64Plugin(t, socketName.path)
 				kmsPluginWG.Done()
 				// Keeping plugin up to process requests.
 				testCompletedWG.Wait()
 			}()
 
 			kubeAPIServerWG.Wait()
+			if t.Failed() {
+				return
+			}
 			_, err = service.Encrypt(ctx, uid, data)
 
 			if err == nil && tt.wantErr != "" {
@@ -206,13 +195,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		encryptErr error
 	)
 	// Start KMS Plugin
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
+	f := mock.NewBase64Plugin(t, endpoint.path)
 
 	ctx := testContext(t)
 
@@ -250,14 +233,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 	wg1.Wait()
 	time.Sleep(blackOut)
 	// Start KMS Plugin
-	f, err = mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, endpoint.path)
 	t.Log("Restarted KMS Plugin")
 
 	wg2.Wait()
@@ -272,14 +248,7 @@ func TestGRPCService(t *testing.T) {
 	t.Parallel()
 	// Start a test gRPC server.
 	endpoint := newEndpoint()
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to construct test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, endpoint.path)
 
 	ctx := testContext(t)
 
@@ -315,14 +284,7 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 	t.Parallel()
 	// Start a test gRPC server.
 	endpoint := newEndpoint()
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, endpoint.path)
 
 	ctx := testContext(t)
 
@@ -374,14 +336,7 @@ func destroyService(service kmsservice.Service) {
 func TestInvalidConfiguration(t *testing.T) {
 	t.Parallel()
 	// Start a test gRPC server.
-	f, err := mock.NewBase64Plugin(newEndpoint().path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, newEndpoint().path)
 
 	ctx := testContext(t)
 
@@ -405,13 +360,7 @@ func TestInvalidConfiguration(t *testing.T) {
 
 func TestKMSOperationsMetric(t *testing.T) {
 	endpoint := newEndpoint()
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
+	_ = mock.NewBase64Plugin(t, endpoint.path)
 
 	ctx := testContext(t)
 
@@ -421,6 +370,7 @@ func TestKMSOperationsMetric(t *testing.T) {
 	}
 	defer destroyService(service)
 	metrics.RegisterMetrics()
+	metrics.KMSOperationsLatencyMetric.Reset() // support running `go test -count X`
 
 	testCases := []struct {
 		name        string
@@ -435,7 +385,7 @@ func TestKMSOperationsMetric(t *testing.T) {
 					t.Fatalf("failed when execute encrypt, error: %v", err)
 				}
 			},
-			labelValues: []string{testProviderName, "/v2alpha1.KeyManagementService/Encrypt", "OK"},
+			labelValues: []string{testProviderName, "/v2.KeyManagementService/Encrypt", "OK"},
 			wantCount:   1,
 		},
 		{
@@ -445,7 +395,7 @@ func TestKMSOperationsMetric(t *testing.T) {
 					t.Fatalf("failed when execute decrypt, error: %v", err)
 				}
 			},
-			labelValues: []string{testProviderName, "/v2alpha1.KeyManagementService/Decrypt", "OK"},
+			labelValues: []string{testProviderName, "/v2.KeyManagementService/Decrypt", "OK"},
 			wantCount:   1,
 		},
 		{
@@ -455,7 +405,7 @@ func TestKMSOperationsMetric(t *testing.T) {
 					t.Fatalf("failed when execute status, error: %v", err)
 				}
 			},
-			labelValues: []string{testProviderName, "/v2alpha1.KeyManagementService/Status", "OK"},
+			labelValues: []string{testProviderName, "/v2.KeyManagementService/Status", "OK"},
 			wantCount:   1,
 		},
 		{
@@ -467,7 +417,7 @@ func TestKMSOperationsMetric(t *testing.T) {
 					}
 				}
 			},
-			labelValues: []string{testProviderName, "/v2alpha1.KeyManagementService/Status", "OK"},
+			labelValues: []string{testProviderName, "/v2.KeyManagementService/Status", "OK"},
 			wantCount:   10,
 		},
 	}

@@ -224,3 +224,59 @@ const (
 	UsageMicrosoftSGC      KeyUsage = "microsoft sgc"
 	UsageNetscapeSGC       KeyUsage = "netscape sgc"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
+// (root certificates).
+//
+// ClusterTrustBundle objects are considered to be readable by any authenticated
+// user in the cluster.
+//
+// It can be optionally associated with a particular assigner, in which case it
+// contains one valid set of trust anchors for that signer. Signers may have
+// multiple associated ClusterTrustBundles; each is an independent set of trust
+// anchors for that signer.
+type ClusterTrustBundle struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec contains the signer (if any) and trust anchors.
+	// +optional
+	Spec ClusterTrustBundleSpec
+}
+
+// ClusterTrustBundleSpec contains the signer and trust anchors.
+type ClusterTrustBundleSpec struct {
+	// SignerName indicates the associated signer, if any.
+	SignerName string
+
+	// TrustBundle contains the individual X.509 trust anchors for this
+	// bundle, as PEM bundle of PEM-wrapped, DER-formatted X.509 certificates.
+	//
+	// The data must consist only of PEM certificate blocks that parse as valid
+	// X.509 certificates.  Each certificate must include a basic constraints
+	// extension with the CA bit set.  The API server will reject objects that
+	// contain duplicate certificates, or that use PEM block headers.
+	//
+	// Users of ClusterTrustBundles, including Kubelet, are free to reorder and
+	// deduplicate certificate blocks in this file according to their own logic,
+	// as well as to drop PEM block headers and inter-block data.
+	TrustBundle string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterTrustBundleList is a collection of ClusterTrustBundle objects
+type ClusterTrustBundleList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is a collection of ClusterTrustBundle objects
+	Items []ClusterTrustBundle
+}
+
+// MaxTrustBundleSize is the maximimum size of a single trust bundle field.
+const MaxTrustBundleSize = 1 * 1024 * 1024

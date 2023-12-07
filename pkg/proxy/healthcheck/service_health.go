@@ -20,20 +20,19 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/lithammer/dedent"
+
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/events"
-	api "k8s.io/kubernetes/pkg/apis/core"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // ServiceHealthServer serves HTTP endpoints for each service name, with results
@@ -52,21 +51,23 @@ type ServiceHealthServer interface {
 	SyncEndpoints(newEndpoints map[types.NamespacedName]int) error
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses []string) ServiceHealthServer {
+type proxierHealthChecker interface {
+	// IsHealthy returns the proxier's health state, following the same
+	// definition the HTTP server defines.
+	IsHealthy() bool
+}
 
-	nodeAddresses, err := utilproxy.GetNodeAddresses(nodePortAddresses, utilproxy.RealNetwork{})
-	if err != nil || nodeAddresses.Len() == 0 {
-		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
-		nodeAddresses = sets.NewString()
-		nodeAddresses.Insert(utilproxy.IPv4ZeroCIDR)
-	}
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
+	// treats them all the same.
+	nodeIPs := []net.IP{net.IPv4zero}
 
-	// if any of the addresses is zero cidr then we listen
-	// to old style :<port>
-	for _, addr := range nodeAddresses.List() {
-		if utilproxy.IsZeroCIDR(addr) {
-			nodeAddresses = sets.NewString("")
-			break
+	if !nodePortAddresses.MatchAll() {
+		ips, err := nodePortAddresses.GetNodeIPs(proxyutil.RealNetwork{})
+		if err == nil {
+			nodeIPs = ips
+		} else {
+			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
 		}
 	}
 
@@ -75,23 +76,26 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 		recorder:      recorder,
 		listener:      listener,
 		httpFactory:   factory,
+		healthzServer: healthzServer,
 		services:      map[types.NamespacedName]*hcInstance{},
-		nodeAddresses: nodeAddresses,
+		nodeIPs:       nodeIPs,
 	}
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses []string) ServiceHealthServer {
-	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses)
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
 }
 
 type server struct {
 	hostname string
 	// node addresses where health check port will listen on
-	nodeAddresses sets.String
-	recorder      events.EventRecorder // can be nil
-	listener      listener
-	httpFactory   httpServerFactory
+	nodeIPs     []net.IP
+	recorder    events.EventRecorder // can be nil
+	listener    listener
+	httpFactory httpServerFactory
+
+	healthzServer proxierHealthChecker
 
 	lock     sync.RWMutex
 	services map[types.NamespacedName]*hcInstance
@@ -160,12 +164,11 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 	var err error
 	var listener net.Listener
 
-	addresses := hcs.nodeAddresses.List()
-	hcI.httpServers = make([]httpServer, 0, len(addresses))
+	hcI.httpServers = make([]httpServer, 0, len(hcs.nodeIPs))
 
 	// for each of the node addresses start listening and serving
-	for _, address := range addresses {
-		addr := net.JoinHostPort(address, fmt.Sprint(hcI.port))
+	for _, ip := range hcs.nodeIPs {
+		addr := net.JoinHostPort(ip.String(), fmt.Sprint(hcI.port))
 		// create http server
 		httpSrv := hcs.httpFactory.New(addr, hcHandler{name: hcI.nsn, hcs: hcs})
 		// start listener
@@ -227,13 +230,16 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 	count := svc.endpoints
 	h.hcs.lock.RUnlock()
+	kubeProxyHealthy := h.hcs.healthzServer.IsHealthy()
 
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
-	if count == 0 {
-		resp.WriteHeader(http.StatusServiceUnavailable)
-	} else {
+	resp.Header().Set("X-Load-Balancing-Endpoint-Weight", strconv.Itoa(count))
+
+	if count != 0 && kubeProxyHealthy {
 		resp.WriteHeader(http.StatusOK)
+	} else {
+		resp.WriteHeader(http.StatusServiceUnavailable)
 	}
 	fmt.Fprint(resp, strings.Trim(dedent.Dedent(fmt.Sprintf(`
 		{
@@ -241,9 +247,10 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 				"namespace": %q,
 				"name": %q
 			},
-			"localEndpoints": %d
+			"localEndpoints": %d,
+			"serviceProxyHealthy": %v
 		}
-		`, h.name.Namespace, h.name.Name, count)), "\n"))
+		`, h.name.Namespace, h.name.Name, count, kubeProxyHealthy)), "\n"))
 }
 
 func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {

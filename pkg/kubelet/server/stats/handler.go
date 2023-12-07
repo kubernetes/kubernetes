@@ -51,8 +51,13 @@ type Provider interface {
 	// for more details.
 	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	// ImageFsStats returns the stats of the image filesystem.
-	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
-
+	// Kubelet allows three options for container filesystems
+	// Everything is on node fs (so no image filesystem)
+	// Container storage is on a dedicated disk (imageFs is separate from root)
+	// Container Filesystem is on root and Images are stored on ImageFs
+	// First return parameter is the image filesystem and
+	// second parameter is the container filesystem
+	ImageFsStats(ctx context.Context) (imageFs *statsapi.FsStats, containerFs *statsapi.FsStats, callErr error)
 	// The following stats are provided by cAdvisor.
 	//
 	// GetCgroupStats returns the stats and the networking usage of the cgroup

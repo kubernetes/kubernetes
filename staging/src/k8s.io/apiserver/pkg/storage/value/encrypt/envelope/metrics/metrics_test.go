@@ -36,6 +36,12 @@ const (
 	testKeyHash2              = "sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
 	testKeyHash3              = "sha256:4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
 	testProviderNameForMetric = "providerName"
+	testAPIServerID           = "testAPIServerID"
+	testAPIServerIDHash       = "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"
+)
+
+var (
+	errCode = "empty"
 )
 
 func TestRecordKMSOperationLatency(t *testing.T) {
@@ -54,24 +60,26 @@ func TestRecordKMSOperationLatency(t *testing.T) {
 			want: `
 			# HELP apiserver_envelope_encryption_kms_operations_latency_seconds [ALPHA] KMS operation duration with gRPC error code status total.
 			# TYPE apiserver_envelope_encryption_kms_operations_latency_seconds histogram
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.001"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.002"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.004"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.008"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.016"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.032"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.064"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.128"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.256"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.512"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.024"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="2.048"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="4.096"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="8.192"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="16.384"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="32.768"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="65.536"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="131.072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0001"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0002"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0004"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0008"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0016"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0032"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0064"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0128"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0256"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0512"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.1024"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.2048"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.4096"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.8192"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.6384"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="3.2768"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="6.5536"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="13.1072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="26.2144"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="52.4288"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="+Inf"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_sum{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_count{grpc_status_code="OK",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
@@ -85,24 +93,26 @@ func TestRecordKMSOperationLatency(t *testing.T) {
 			want: `
 			# HELP apiserver_envelope_encryption_kms_operations_latency_seconds [ALPHA] KMS operation duration with gRPC error code status total.
 			# TYPE apiserver_envelope_encryption_kms_operations_latency_seconds histogram
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.001"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.002"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.004"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.008"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.016"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.032"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.064"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.128"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.256"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.512"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.024"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="2.048"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="4.096"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="8.192"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="16.384"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="32.768"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="65.536"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="131.072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0001"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0002"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0004"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0008"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0016"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0032"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0064"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0128"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0256"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0512"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.1024"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.2048"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.4096"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.8192"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.6384"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="3.2768"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="6.5536"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="13.1072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="26.2144"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="52.4288"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="+Inf"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_sum{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_count{grpc_status_code="Internal",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
@@ -116,24 +126,26 @@ func TestRecordKMSOperationLatency(t *testing.T) {
 			want: `
 			# HELP apiserver_envelope_encryption_kms_operations_latency_seconds [ALPHA] KMS operation duration with gRPC error code status total.
 			# TYPE apiserver_envelope_encryption_kms_operations_latency_seconds histogram
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.001"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.002"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.004"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.008"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.016"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.032"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.064"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.128"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.256"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.512"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.024"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="2.048"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="4.096"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="8.192"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="16.384"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="32.768"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="65.536"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="131.072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0001"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0002"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0004"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0008"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0016"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0032"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0064"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0128"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0256"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0512"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.1024"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.2048"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.4096"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.8192"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.6384"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="3.2768"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="6.5536"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="13.1072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="26.2144"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="52.4288"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="+Inf"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_sum{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_count{grpc_status_code="NotFound",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
@@ -147,24 +159,26 @@ func TestRecordKMSOperationLatency(t *testing.T) {
 			want: `
 			# HELP apiserver_envelope_encryption_kms_operations_latency_seconds [ALPHA] KMS operation duration with gRPC error code status total.
 			# TYPE apiserver_envelope_encryption_kms_operations_latency_seconds histogram
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.001"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.002"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.004"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.008"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.016"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.032"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.064"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.128"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.256"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.512"} 0
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.024"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="2.048"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="4.096"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="8.192"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="16.384"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="32.768"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="65.536"} 1
-			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="131.072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0001"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0002"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0004"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0008"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0016"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0032"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0064"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0128"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0256"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.0512"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.1024"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.2048"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.4096"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="0.8192"} 0
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="1.6384"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="3.2768"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="6.5536"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="13.1072"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="26.2144"} 1
+			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="52.4288"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_bucket{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName",le="+Inf"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_sum{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
 			apiserver_envelope_encryption_kms_operations_latency_seconds_count{grpc_status_code="unknown-non-grpc",method_name="/v2alpha1.KeyManagementService/Encrypt",provider_name="providerName"} 1
@@ -185,13 +199,14 @@ func TestRecordKMSOperationLatency(t *testing.T) {
 	}
 }
 
-func TestEnvelopeMetrics_Serial(t *testing.T) {
+func TestRecordKeyID_Serial(t *testing.T) {
 	testCases := []struct {
 		desc               string
 		keyID              string
 		metrics            []string
 		providerName       string
 		transformationType string
+		apiServerID        string
 		want               string
 	}{
 		{
@@ -202,11 +217,12 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, testKeyHash1, testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, testKeyHash1, testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total more labels",
@@ -216,12 +232,13 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
         	# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-        	apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-        	apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
+        	apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+        	apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testAPIServerIDHash, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total same labels",
@@ -231,12 +248,13 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
-			`, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
+			`, testAPIServerIDHash, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testAPIServerIDHash, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total exceeds limit, remove first label, and empty keyID",
@@ -246,12 +264,29 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, testKeyHash2, testProviderNameForMetric, FromStorageLabel, "", testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, testKeyHash2, testProviderNameForMetric, FromStorageLabel, testAPIServerIDHash, "", testProviderNameForMetric, FromStorageLabel),
+		},
+		{
+			desc:  "keyIDHash total exceeds limit, remove first label, empty keyID, and empty testAPIServerID",
+			keyID: "",
+			metrics: []string{
+				"apiserver_envelope_encryption_key_id_hash_total",
+			},
+			providerName:       testProviderNameForMetric,
+			transformationType: FromStorageLabel,
+			apiServerID:        "",
+			want: fmt.Sprintf(`
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
+			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, "", testProviderNameForMetric, FromStorageLabel, "", "", testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total exceeds limit 2, remove first label",
@@ -261,12 +296,13 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        "",
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, "", testProviderNameForMetric, FromStorageLabel, testKeyHash1, testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, "", "", testProviderNameForMetric, FromStorageLabel, "", testKeyHash1, testProviderNameForMetric, FromStorageLabel),
 		},
 	}
 
@@ -277,7 +313,7 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			RecordKeyID(tt.transformationType, tt.providerName, tt.keyID)
+			RecordKeyID(tt.transformationType, tt.providerName, tt.keyID, tt.apiServerID)
 			// We are not resetting the metric here as each test is not independent in order to validate the behavior
 			// when the metric labels exceed the limit to ensure the labels are not unbounded.
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
@@ -287,7 +323,7 @@ func TestEnvelopeMetrics_Serial(t *testing.T) {
 	}
 }
 
-func TestEnvelopeMetricsLRUKey(t *testing.T) {
+func TestRecordKeyIDLRUKey(t *testing.T) {
 	RegisterMetrics()
 
 	cacheSize = 3
@@ -301,12 +337,14 @@ func TestEnvelopeMetricsLRUKey(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			keyID := rand.String(32)
+			apiServerID := rand.String(32)
 			key := metricLabels{
 				transformationType: rand.String(32),
 				providerName:       rand.String(32),
 				keyIDHash:          getHash(keyID),
+				apiServerIDHash:    getHash(apiServerID),
 			}
-			RecordKeyID(key.transformationType, key.providerName, keyID)
+			RecordKeyID(key.transformationType, key.providerName, keyID, apiServerID)
 		}()
 	}
 	wg.Wait()
@@ -330,5 +368,111 @@ func TestEnvelopeMetricsLRUKey(t *testing.T) {
 	}
 	if validMetrics != cacheSize {
 		t.Fatalf("expected total valid metrics to be the same as cacheSize %d, got %d", cacheSize, validMetrics)
+	}
+}
+
+func TestRecordKeyIDFromStatus(t *testing.T) {
+	RegisterMetrics()
+
+	cacheSize = 3
+	registerLRUMetrics()
+	KeyIDHashStatusLastTimestampSeconds.Reset()
+	defer KeyIDHashStatusLastTimestampSeconds.Reset()
+
+	var wg sync.WaitGroup
+	for i := 1; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			keyID := rand.String(32)
+			apiServerID := rand.String(32)
+			key := metricLabels{
+				providerName:    rand.String(32),
+				keyIDHash:       getHash(keyID),
+				apiServerIDHash: getHash(apiServerID),
+			}
+			RecordKeyIDFromStatus(key.providerName, keyID, apiServerID)
+		}()
+	}
+	wg.Wait()
+
+	validMetrics := 0
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_envelope_encryption_key_id_hash_status_last_timestamp_seconds" {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			if metric.Gauge.GetValue() == 0 {
+				t.Errorf("invalid metric seen: %s", metric.String())
+			} else {
+				validMetrics++
+			}
+		}
+	}
+	if validMetrics != cacheSize {
+		t.Fatalf("expected total valid metrics to be the same as cacheSize %d, got %d", cacheSize, validMetrics)
+	}
+}
+
+func TestRecordInvalidKeyIDFromStatus(t *testing.T) {
+	testCases := []struct {
+		desc         string
+		count        int
+		metrics      []string
+		providerName string
+		want         string
+	}{
+		{
+			desc:  "invalid KeyID From Status Total 3",
+			count: 3,
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			providerName: testProviderNameForMetric,
+			want: fmt.Sprintf(`
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+        	# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+        	apiserver_envelope_encryption_invalid_key_id_from_status_total{error="%s",provider_name="%s"} %d
+			`, errCode, testProviderNameForMetric, 3),
+		},
+		{
+			desc:  "invalid KeyID From Status Total 10",
+			count: 10,
+			metrics: []string{
+				"apiserver_envelope_encryption_invalid_key_id_from_status_total",
+			},
+			providerName: testProviderNameForMetric,
+			want: fmt.Sprintf(`
+			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
+        	# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
+        	apiserver_envelope_encryption_invalid_key_id_from_status_total{error="%s",provider_name="%s"} %d
+			`, errCode, testProviderNameForMetric, 10),
+		},
+	}
+
+	InvalidKeyIDFromStatusTotal.Reset()
+	RegisterMetrics()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer InvalidKeyIDFromStatusTotal.Reset()
+			var wg sync.WaitGroup
+			for i := 0; i < tt.count; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					RecordInvalidKeyIDFromStatus(tt.providerName, errCode)
+				}()
+			}
+			wg.Wait()
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

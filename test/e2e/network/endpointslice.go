@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,13 +39,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = common.SIGDescribe("EndpointSlice", func() {
 	f := framework.NewDefaultFramework("endpointslice")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var cs clientset.Interface
 	var podClient *e2epod.PodClient
@@ -266,7 +269,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example",
 					Port:       80,
-					TargetPort: intstr.FromInt(3000),
+					TargetPort: intstr.FromInt32(3000),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
@@ -298,7 +301,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example-no-match",
 					Port:       80,
-					TargetPort: intstr.FromInt(8080),
+					TargetPort: intstr.FromInt32(8080),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
@@ -433,12 +436,12 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("getting")
 		queriedEPS, err := epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(queriedEPS.UID, createdEPS.UID)
+		gomega.Expect(queriedEPS.UID).To(gomega.Equal(createdEPS.UID))
 
 		ginkgo.By("listing")
 		epsList, err := epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(epsList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
@@ -450,7 +453,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("cluster-wide listing")
 		clusterEPSList, err := clusterEPSClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterEPSList.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(clusterEPSList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
@@ -460,7 +463,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("patching")
 		patchedEPS, err := epsClient.Patch(ctx, createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedEPS.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedEPS.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		var epsToUpdate, updatedEPS *discoveryv1.EndpointSlice
@@ -474,7 +477,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedEPS.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedEPS.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
@@ -483,7 +486,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				if !ok {
 					framework.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedEPS, isEPS := evt.Object.(*discoveryv1.EndpointSlice)
 				if !isEPS {
 					framework.Failf("expected EndpointSlice, got %T", evt.Object)
@@ -510,7 +513,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(epsList.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 		for _, eps := range epsList.Items {
 			if eps.Namespace == createdEPS.Namespace && eps.Name == createdEPS.Name {
 				framework.Fail("listing after deleting createdEPS")
@@ -522,8 +525,211 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(epsList.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
+
+	ginkgo.It("should support a Service with multiple ports specified in multiple EndpointSlices", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Name:     "port80",
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					},
+					{
+						Name:     "port81",
+						Port:     81,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		})
+
+		// Add a backend pod to the service in the other node
+		port8090 := []v1.ContainerPort{
+			{
+				ContainerPort: 8090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+		port9090 := []v1.ContainerPort{
+			{
+				ContainerPort: 9090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+
+		serverPod := e2epod.NewAgnhostPodFromContainers(
+			"", "pod-handle-http-request", nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, port8090, "netexec", "--http-port", "8090", "--udp-port", "-1"),
+			e2epod.NewAgnhostContainer("container-handle-9090-request", nil, port9090, "netexec", "--http-port", "9090", "--udp-port", "-1"),
+		)
+
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, serverPod)
+
+		if pod.Status.PodIP == "" {
+			framework.Failf("PodIP not assigned for pod %s", pod.Name)
+		}
+
+		addressType := discoveryv1.AddressTypeIPv4
+		if framework.TestContext.ClusterIsIPv6() {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
+
+		// create custom endpoint slices
+		tcpProtocol := v1.ProtocolTCP
+		epsTemplate := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+					discoveryv1.LabelManagedBy:   "e2e-test" + ns,
+				}},
+			AddressType: addressType,
+			Endpoints: []discoveryv1.Endpoint{
+				{Addresses: []string{pod.Status.PodIP}},
+			},
+		}
+
+		ginkgo.By("creating")
+		eps1 := epsTemplate.DeepCopy()
+		eps1.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port80"),
+			Port:     pointer.Int32(8090),
+			Protocol: &tcpProtocol,
+		}}
+
+		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps1, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		eps2 := epsTemplate.DeepCopy()
+		eps2.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port81"),
+			Port:     pointer.Int32(9090),
+			Protocol: &tcpProtocol,
+		}}
+
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		// connect to the service must work
+		ginkgo.By("Creating a pause pods that will try to connect to the webserver")
+		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(ctx, pausePod0)
+
+		dest1 := net.JoinHostPort(svc.Spec.ClusterIP, "80")
+		dest2 := net.JoinHostPort(svc.Spec.ClusterIP, "81")
+		execHostnameTest(*pausePod0, dest1, serverPod.Name)
+		execHostnameTest(*pausePod0, dest2, serverPod.Name)
+
+	})
+
+	ginkgo.It("should support a Service with multiple endpoint IPs specified in multiple EndpointSlices", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Name:     "port80",
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					},
+					{
+						Name:     "port81",
+						Port:     81,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		})
+
+		// Add a backend pod to the service in the other node
+		port8090 := []v1.ContainerPort{
+			{
+				ContainerPort: 8090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+
+		serverPod1 := e2epod.NewAgnhostPodFromContainers(
+			"", "pod1-handle-http-request", nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, port8090, "netexec", "--http-port", "8090", "--udp-port", "-1"),
+		)
+		pod1 := e2epod.NewPodClient(f).CreateSync(ctx, serverPod1)
+
+		if pod1.Status.PodIP == "" {
+			framework.Failf("PodIP not assigned for pod %s", pod1.Name)
+		}
+
+		serverPod2 := e2epod.NewAgnhostPodFromContainers(
+			"", "pod2-handle-http-request", nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, port8090, "netexec", "--http-port", "8090", "--udp-port", "-1"),
+		)
+		pod2 := e2epod.NewPodClient(f).CreateSync(ctx, serverPod2)
+
+		if pod2.Status.PodIP == "" {
+			framework.Failf("PodIP not assigned for pod %s", pod2.Name)
+		}
+
+		addressType := discoveryv1.AddressTypeIPv4
+		if framework.TestContext.ClusterIsIPv6() {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
+
+		// create custom endpoint slices
+		tcpProtocol := v1.ProtocolTCP
+		epsTemplate := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+					discoveryv1.LabelManagedBy:   "e2e-test" + ns,
+				}},
+			AddressType: addressType,
+		}
+
+		ginkgo.By("creating")
+		eps1 := epsTemplate.DeepCopy()
+		eps1.Endpoints = []discoveryv1.Endpoint{
+			{Addresses: []string{pod1.Status.PodIP}},
+		}
+		eps1.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port80"),
+			Port:     pointer.Int32(8090),
+			Protocol: &tcpProtocol,
+		}}
+
+		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps1, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		eps2 := epsTemplate.DeepCopy()
+		eps2.Endpoints = []discoveryv1.Endpoint{
+			{Addresses: []string{pod2.Status.PodIP}},
+		}
+		eps2.Ports = []discoveryv1.EndpointPort{{
+			Name:     pointer.String("port81"),
+			Port:     pointer.Int32(8090),
+			Protocol: &tcpProtocol,
+		}}
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		// connect to the service must work
+		ginkgo.By("Creating a pause pods that will try to connect to the webserver")
+		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(ctx, pausePod0)
+
+		dest1 := net.JoinHostPort(svc.Spec.ClusterIP, "80")
+		dest2 := net.JoinHostPort(svc.Spec.ClusterIP, "81")
+		execHostnameTest(*pausePod0, dest1, serverPod1.Name)
+		execHostnameTest(*pausePod0, dest2, serverPod2.Name)
+
+	})
+
 })
 
 // expectEndpointsAndSlices verifies that Endpoints and EndpointSlices exist for
@@ -534,7 +740,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 // the only caller of this function.
 func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
 	endpointSlices := []discoveryv1.EndpointSlice{}
-	if err := wait.PollImmediateWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(ctx, cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
 			return false, nil

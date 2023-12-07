@@ -17,6 +17,10 @@ limitations under the License.
 package spec3
 
 import (
+	"encoding/json"
+
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -32,6 +36,40 @@ type OpenAPI struct {
 	Servers []*Server `json:"servers,omitempty"`
 	// Components hold various schemas for the specification
 	Components *Components `json:"components,omitempty"`
+	// SecurityRequirement holds a declaration of which security mechanisms can be used across the API
+	SecurityRequirement []map[string][]string `json:"security,omitempty"`
 	// ExternalDocs holds additional external documentation
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
+}
+
+func (o *OpenAPI) UnmarshalJSON(data []byte) error {
+	type OpenAPIWithNoFunctions OpenAPI
+	p := (*OpenAPIWithNoFunctions)(o)
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, &p)
+	}
+	return json.Unmarshal(data, &p)
+}
+
+func (o *OpenAPI) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(o)
+	}
+	type OpenAPIWithNoFunctions OpenAPI
+	p := (*OpenAPIWithNoFunctions)(o)
+	return json.Marshal(&p)
+}
+
+func (o *OpenAPI) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type OpenAPIOmitZero struct {
+		Version             string                 `json:"openapi"`
+		Info                *spec.Info             `json:"info"`
+		Paths               *Paths                 `json:"paths,omitzero"`
+		Servers             []*Server              `json:"servers,omitempty"`
+		Components          *Components            `json:"components,omitzero"`
+		SecurityRequirement []map[string][]string  `json:"security,omitempty"`
+		ExternalDocs        *ExternalDocumentation `json:"externalDocs,omitzero"`
+	}
+	x := (*OpenAPIOmitZero)(o)
+	return opts.MarshalNext(enc, x)
 }

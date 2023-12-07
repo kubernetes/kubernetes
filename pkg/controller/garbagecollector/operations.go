@@ -82,7 +82,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt t
 	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(context.TODO(), item.Name, pt, patch, metav1.PatchOptions{})
 }
 
-func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string) error {
+func (gc *GarbageCollector) removeFinalizer(logger klog.Logger, owner *node, targetFinalizer string) error {
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ownerObject, err := gc.getObject(owner.identity)
 		if errors.IsNotFound(err) {
@@ -106,7 +106,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			newFinalizers = append(newFinalizers, f)
 		}
 		if !found {
-			klog.V(5).Infof("the %s finalizer is already removed from object %s", targetFinalizer, owner.identity)
+			logger.V(5).Info("finalizer already removed from object", "finalizer", targetFinalizer, "object", owner.identity)
 			return nil
 		}
 

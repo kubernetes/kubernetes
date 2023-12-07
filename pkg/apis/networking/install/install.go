@@ -23,7 +23,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/networking/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/networking/v1"
 	"k8s.io/kubernetes/pkg/apis/networking/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/networking/v1beta1"
 )

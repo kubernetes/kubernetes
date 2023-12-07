@@ -20,8 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
-
+	"github.com/google/go-cmp/cmp"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -37,7 +36,7 @@ import (
 
 func TestSetDefaultHPA(t *testing.T) {
 	utilizationDefaultVal := int32(autoscaling.DefaultCPUUtilization)
-	defaultReplicas := utilpointer.Int32Ptr(1)
+	defaultReplicas := utilpointer.Int32(1)
 	defaultTemplate := []autoscalingv2beta1.MetricSpec{
 		{
 			Type: autoscalingv2beta1.ResourceMetricSourceType,
@@ -68,13 +67,13 @@ func TestSetDefaultHPA(t *testing.T) {
 		{ // MinReplicas update
 			original: &autoscalingv2beta1.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta1.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32Ptr(3),
+					MinReplicas: utilpointer.Int32(3),
 					Metrics:     defaultTemplate,
 				},
 			},
 			expected: &autoscalingv2beta1.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta1.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32Ptr(3),
+					MinReplicas: utilpointer.Int32(3),
 					Metrics:     defaultTemplate,
 				},
 			},
@@ -163,7 +162,7 @@ func TestHorizontalPodAutoscalerAnnotations(t *testing.T) {
 			t.Fatalf("unexpected object: %v", obj)
 		}
 		if !reflect.DeepEqual(*hpa, hpaBeforeMuatate) {
-			t.Errorf("diff: %v", diff.ObjectDiff(*hpa, hpaBeforeMuatate))
+			t.Errorf("diff: %v", cmp.Diff(*hpa, hpaBeforeMuatate))
 			t.Errorf("expected: %#v\n actual:   %#v", *hpa, hpaBeforeMuatate)
 		}
 

@@ -45,7 +45,7 @@ func Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.
 		if len(in.Service.Port.Name) > 0 {
 			out.ServicePort = intstr.FromString(in.Service.Port.Name)
 		} else {
-			out.ServicePort = intstr.FromInt(int(in.Service.Port.Number))
+			out.ServicePort = intstr.FromInt32(in.Service.Port.Number)
 		}
 	}
 	return nil

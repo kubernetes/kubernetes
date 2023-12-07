@@ -18,6 +18,7 @@ package ingress
 
 import (
 	"context"
+	"fmt"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/networking/validation"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+)
+
+const (
+	annotationIngressClass = "kubernetes.io/ingress.class"
 )
 
 // ingressStrategy implements verification logic for Replication Ingress.
@@ -93,7 +98,15 @@ func (ingressStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (ingressStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (ingressStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	var warnings []string
+	ingress := obj.(*networking.Ingress)
+	_, annotationIsSet := ingress.Annotations[annotationIngressClass]
+	if annotationIsSet && ingress.Spec.IngressClassName == nil {
+		warnings = append(warnings, fmt.Sprintf("annotation %q is deprecated, please use 'spec.ingressClassName' instead", annotationIngressClass))
+	}
+	return warnings
+}
 
 // Canonicalize normalizes the object after validation.
 func (ingressStrategy) Canonicalize(obj runtime.Object) {

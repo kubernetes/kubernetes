@@ -282,6 +282,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRILogsStats(assert, c1, &rootFsInfo, containerLogStats1)
 	checkCRINetworkStats(assert, p0.Network, infos[sandbox0.PodSandboxStatus.Id].Stats[0].Network)
 	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
+	checkCRIPodSwapStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
@@ -298,6 +299,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRILogsStats(assert, c2, &rootFsInfo, containerLogStats2)
 	checkCRINetworkStats(assert, p1.Network, infos[sandbox1.PodSandboxStatus.Id].Stats[0].Network)
 	checkCRIPodCPUAndMemoryStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
+	checkCRIPodSwapStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
 
 	p2 := podStatsMap[statsapi.PodReference{Name: "sandbox2-name", UID: "sandbox2-uid", Namespace: "sandbox2-ns"}]
 	assert.Equal(sandbox2.CreatedAt, p2.StartTime.UnixNano())
@@ -316,6 +318,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRILogsStats(assert, c3, &rootFsInfo, containerLogStats4)
 	checkCRINetworkStats(assert, p2.Network, infos[sandbox2.PodSandboxStatus.Id].Stats[0].Network)
 	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
+	checkCRIPodSwapStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
 
 	p3 := podStatsMap[statsapi.PodReference{Name: "sandbox3-name", UID: "sandbox3-uid", Namespace: "sandbox3-ns"}]
 	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
@@ -327,6 +330,7 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.NotNil(c8.CPU.Time)
 	assert.NotNil(c8.Memory.Time)
 	checkCRIPodCPUAndMemoryStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
+	checkCRIPodSwapStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
@@ -769,7 +773,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ImageFsStats(ctx)
+	stats, containerStats, err := provider.ImageFsStats(ctx)
 	assert := assert.New(t)
 	assert.NoError(err)
 
@@ -780,6 +784,15 @@ func TestCRIImagesFsStats(t *testing.T) {
 	assert.Equal(imageFsInfo.Inodes, stats.Inodes)
 	assert.Equal(imageFsUsage.UsedBytes.Value, *stats.UsedBytes)
 	assert.Equal(imageFsUsage.InodesUsed.Value, *stats.InodesUsed)
+
+	assert.Equal(imageFsUsage.Timestamp, containerStats.Time.UnixNano())
+	assert.Equal(imageFsInfo.Available, *containerStats.AvailableBytes)
+	assert.Equal(imageFsInfo.Capacity, *containerStats.CapacityBytes)
+	assert.Equal(imageFsInfo.InodesFree, containerStats.InodesFree)
+	assert.Equal(imageFsInfo.Inodes, containerStats.Inodes)
+	assert.Equal(imageFsUsage.UsedBytes.Value, *containerStats.UsedBytes)
+	assert.Equal(imageFsUsage.InodesUsed.Value, *containerStats.InodesUsed)
+
 }
 
 func makeFakePodSandbox(name, uid, namespace string, terminated bool) *critest.FakePodSandbox {
@@ -894,9 +907,7 @@ func makeFakePodSandboxStatsStrictlyFromCRI(seed int, podSandbox *critest.FakePo
 		},
 		Linux: &runtimeapi.LinuxPodSandboxStats{},
 	}
-	for _, cs := range podContainerStats {
-		podSandboxStats.Linux.Containers = append(podSandboxStats.Linux.Containers, cs)
-	}
+	podSandboxStats.Linux.Containers = append(podSandboxStats.Linux.Containers, podContainerStats...)
 	if podSandbox.State == runtimeapi.PodSandboxState_SANDBOX_NOTREADY {
 		podSandboxStats.Linux.Cpu = nil
 		podSandboxStats.Linux.Memory = nil
@@ -1072,6 +1083,15 @@ func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.Pod
 	assert.Equal(cs.Memory.RSS, *actual.Memory.RSSBytes)
 	assert.Equal(cs.Memory.ContainerData.Pgfault, *actual.Memory.PageFaults)
 	assert.Equal(cs.Memory.ContainerData.Pgmajfault, *actual.Memory.MajorPageFaults)
+}
+
+func checkCRIPodSwapStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
+	if runtime.GOOS != "linux" {
+		return
+	}
+
+	assert.Equal(cs.Timestamp.UnixNano(), actual.Swap.Time.UnixNano())
+	assert.Equal(cs.Memory.Swap, *actual.Swap.SwapUsageBytes)
 }
 
 func checkCRIPodCPUAndMemoryStatsStrictlyFromCRI(assert *assert.Assertions, actual statsapi.PodStats, excepted statsapi.PodStats) {

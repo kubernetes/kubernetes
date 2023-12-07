@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 )
 
 // FakeRecorder is used as a fake during tests. It is thread safe. It is usable
@@ -31,6 +32,8 @@ type FakeRecorder struct {
 	IncludeObject bool
 }
 
+var _ EventRecorderLogger = &FakeRecorder{}
+
 func objectString(object runtime.Object, includeObject bool) string {
 	if !includeObject {
 		return ""
@@ -41,20 +44,35 @@ func objectString(object runtime.Object, includeObject bool) string {
 	)
 }
 
-func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	if f.Events != nil {
-		f.Events <- fmt.Sprintf("%s %s %s%s", eventtype, reason, message, objectString(object, f.IncludeObject))
+func annotationsString(annotations map[string]string) string {
+	if len(annotations) == 0 {
+		return ""
+	} else {
+		return " " + fmt.Sprint(annotations)
 	}
+}
+
+func (f *FakeRecorder) writeEvent(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	if f.Events != nil {
+		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) +
+			objectString(object, f.IncludeObject) + annotationsString(annotations)
+	}
+}
+
+func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	f.writeEvent(object, nil, eventtype, reason, "%s", message)
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-	if f.Events != nil {
-		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) + objectString(object, f.IncludeObject)
-	}
+	f.writeEvent(object, nil, eventtype, reason, messageFmt, args...)
 }
 
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Eventf(object, eventtype, reason, messageFmt, args...)
+	f.writeEvent(object, annotations, eventtype, reason, messageFmt, args...)
+}
+
+func (f *FakeRecorder) WithLogger(logger klog.Logger) EventRecorderLogger {
+	return f
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with

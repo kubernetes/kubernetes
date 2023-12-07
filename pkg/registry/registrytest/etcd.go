@@ -42,11 +42,11 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	completedConfig.APIResourceConfig = serverstorage.NewResourceConfig()
 	factory, err := completedConfig.New()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error while making storage factory: %v", err)
 	}
 	resourceConfig, err := factory.NewConfig(resource)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error while finding storage destination: %v", err)
 	}
 	return resourceConfig, server
 }

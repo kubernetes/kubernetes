@@ -17,21 +17,26 @@ limitations under the License.
 package storage
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
+	"context"
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/core/persistentvolume"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -57,6 +62,7 @@ func newHostPathType(pathType string) *api.HostPathType {
 }
 
 func validNewPersistentVolume(name string) *api.PersistentVolume {
+	now := persistentvolume.NowFunc()
 	pv := &api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -72,9 +78,10 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
 		},
 		Status: api.PersistentVolumeStatus{
-			Phase:   api.VolumePending,
-			Message: "bar",
-			Reason:  "foo",
+			Phase:                   api.VolumePending,
+			Message:                 "bar",
+			Reason:                  "foo",
+			LastPhaseTransitionTime: &now,
 		},
 	}
 	return pv
@@ -166,6 +173,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeLastPhaseTransitionTime, true)()
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -177,12 +185,19 @@ func TestUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	pvStartTimestamp, err := getPhaseTranstitionTime(ctx, pvStart.Name, storage)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	pvIn := &api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 		Status: api.PersistentVolumeStatus{
 			Phase: api.VolumeBound,
+			// Set the same timestamp as original PV so this won't get updated on phase change breaking DeepEqual() later in test.
+			LastPhaseTransitionTime: pvStartTimestamp,
 		},
 	}
 
@@ -197,8 +212,16 @@ func TestUpdateStatus(t *testing.T) {
 	pvOut := obj.(*api.PersistentVolume)
 	// only compare the relevant change b/c metadata will differ
 	if !apiequality.Semantic.DeepEqual(pvIn.Status, pvOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(pvIn.Status, pvOut.Status))
+		t.Errorf("unexpected object: %s", cmp.Diff(pvIn.Status, pvOut.Status))
 	}
+}
+
+func getPhaseTranstitionTime(ctx context.Context, pvName string, storage *REST) (*metav1.Time, error) {
+	obj, err := storage.Get(ctx, pvName, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.PersistentVolume).Status.LastPhaseTransitionTime, nil
 }
 
 func TestShortNames(t *testing.T) {

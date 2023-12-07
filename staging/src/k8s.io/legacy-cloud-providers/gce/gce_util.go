@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	netutils "k8s.io/utils/net"
 )
@@ -57,6 +58,7 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{})
 	gce.nodeInformerSynced = func() bool { return true }
 	gce.client = fake.NewSimpleClientset()
+	gce.eventRecorder = &record.FakeRecorder{}
 
 	mockGCE := gce.c.(*cloud.MockGCE)
 	mockGCE.MockTargetPools.AddInstanceHook = mock.AddInstanceHook

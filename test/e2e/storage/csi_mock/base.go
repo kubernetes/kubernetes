@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -72,6 +73,7 @@ const (
 type csiCall struct {
 	expectedMethod string
 	expectedError  codes.Code
+	expectedSecret map[string]string
 	// This is a mark for the test itself to delete the tested pod *after*
 	// this csiCall is received.
 	deletePod bool
@@ -98,6 +100,7 @@ type testParameters struct {
 	fsGroupPolicy                 *storagev1.FSGroupPolicy
 	enableSELinuxMount            *bool
 	enableRecoverExpansionFailure bool
+	enableCSINodeExpandSecret     bool
 }
 
 type mockDriverSetup struct {
@@ -127,6 +130,9 @@ const (
 	volumeSnapshotContentFinalizer = "snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection"
 	volumeSnapshotBoundFinalizer   = "snapshot.storage.kubernetes.io/volumesnapshot-bound-protection"
 	errReasonNotEnoughSpace        = "node(s) did not have enough free storage"
+
+	csiNodeExpandSecretKey          = "csi.storage.k8s.io/node-expand-secret-name"
+	csiNodeExpandSecretNamespaceKey = "csi.storage.k8s.io/node-expand-secret-namespace"
 )
 
 var (
@@ -247,6 +253,18 @@ func (m *mockDriverSetup) createPod(ctx context.Context, withVolume volumeType) 
 	f := m.f
 
 	sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
+	if m.tp.enableCSINodeExpandSecret {
+		if sc.Parameters == nil {
+			parameters := map[string]string{
+				csiNodeExpandSecretKey:          "test-secret",
+				csiNodeExpandSecretNamespaceKey: f.Namespace.Name,
+			}
+			sc.Parameters = parameters
+		} else {
+			sc.Parameters[csiNodeExpandSecretKey] = "test-secret"
+			sc.Parameters[csiNodeExpandSecretNamespaceKey] = f.Namespace.Name
+		}
+	}
 	scTest := testsuites.StorageClassTest{
 		Name:                 m.driver.GetDriverInfo().Name,
 		Timeouts:             f.Timeouts,
@@ -815,6 +833,14 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 		if c.Method != expectedCall.expectedMethod || c.FullError.Code != expectedCall.expectedError {
 			return allCalls, i, fmt.Errorf("Unexpected CSI call %d: expected %s (%d), got %s (%d)", i, expectedCall.expectedMethod, expectedCall.expectedError, c.Method, c.FullError.Code)
 		}
+
+		// if the secret is not nil, compare it
+		if expectedCall.expectedSecret != nil {
+			if !reflect.DeepEqual(expectedCall.expectedSecret, c.Request.Secrets) {
+				return allCalls, i, fmt.Errorf("Unexpected secret: expected %v, got %v", expectedCall.expectedSecret, c.Request.Secrets)
+			}
+		}
+
 	}
 	if len(calls) > len(expectedCallSequence) {
 		return allCalls, len(expectedCallSequence), fmt.Errorf("Received %d unexpected CSI driver calls", len(calls)-len(expectedCallSequence))

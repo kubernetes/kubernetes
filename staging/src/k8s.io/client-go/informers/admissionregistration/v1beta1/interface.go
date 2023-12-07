@@ -26,6 +26,10 @@ import (
 type Interface interface {
 	// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
 	MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer
+	// ValidatingAdmissionPolicies returns a ValidatingAdmissionPolicyInformer.
+	ValidatingAdmissionPolicies() ValidatingAdmissionPolicyInformer
+	// ValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindingInformer.
+	ValidatingAdmissionPolicyBindings() ValidatingAdmissionPolicyBindingInformer
 	// ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
 	ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInformer
 }
@@ -44,6 +48,16 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
 func (v *version) MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer {
 	return &mutatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ValidatingAdmissionPolicies returns a ValidatingAdmissionPolicyInformer.
+func (v *version) ValidatingAdmissionPolicies() ValidatingAdmissionPolicyInformer {
+	return &validatingAdmissionPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindingInformer.
+func (v *version) ValidatingAdmissionPolicyBindings() ValidatingAdmissionPolicyBindingInformer {
+	return &validatingAdmissionPolicyBindingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.

@@ -22,11 +22,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 var (
@@ -338,23 +338,23 @@ func TestToDOTGraphObj(t *testing.T) {
 
 func compareGraphs(expectedNodes, actualNodes []*dotVertex, expectedEdges, actualEdges []dotEdge, t *testing.T) {
 	if len(expectedNodes) != len(actualNodes) {
-		t.Fatal(spew.Sdump(actualNodes))
+		t.Fatal(dump.Pretty(actualNodes))
 	}
 	for i := range expectedNodes {
 		currExpected := expectedNodes[i]
 		currActual := actualNodes[i]
 		if currExpected.uid != currActual.uid {
-			t.Errorf("expected %v, got %v", spew.Sdump(currExpected), spew.Sdump(currActual))
+			t.Errorf("expected %v, got %v", dump.Pretty(currExpected), dump.Pretty(currActual))
 		}
 	}
 	if len(expectedEdges) != len(actualEdges) {
-		t.Fatal(spew.Sdump(actualEdges))
+		t.Fatal(dump.Pretty(actualEdges))
 	}
 	for i := range expectedEdges {
 		currExpected := expectedEdges[i]
 		currActual := actualEdges[i]
 		if currExpected != currActual {
-			t.Errorf("expected %v, got %v", spew.Sdump(currExpected), spew.Sdump(currActual))
+			t.Errorf("expected %v, got %v", dump.Pretty(currExpected), dump.Pretty(currActual))
 		}
 	}
 }

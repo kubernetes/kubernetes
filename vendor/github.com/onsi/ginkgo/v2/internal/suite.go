@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/ginkgo/v2/internal/parallel_support"
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
+	"golang.org/x/net/context"
 )
 
 type Phase uint
@@ -19,9 +20,13 @@ const (
 	PhaseRun
 )
 
+var PROGRESS_REPORTER_DEADLING = 5 * time.Second
+
 type Suite struct {
 	tree               *TreeNode
 	topLevelContainers Nodes
+
+	*ProgressReporterManager
 
 	phase Phase
 
@@ -64,11 +69,26 @@ type Suite struct {
 
 func NewSuite() *Suite {
 	return &Suite{
-		tree:  &TreeNode{},
-		phase: PhaseBuildTopLevel,
+		tree:                    &TreeNode{},
+		phase:                   PhaseBuildTopLevel,
+		ProgressReporterManager: NewProgressReporterManager(),
 
 		selectiveLock: &sync.Mutex{},
 	}
+}
+
+func (suite *Suite) Clone() (*Suite, error) {
+	if suite.phase != PhaseBuildTopLevel {
+		return nil, fmt.Errorf("cnanot clone suite after tree has been built")
+	}
+	return &Suite{
+		tree:                    &TreeNode{},
+		phase:                   PhaseBuildTopLevel,
+		ProgressReporterManager: NewProgressReporterManager(),
+		topLevelContainers:      suite.topLevelContainers.Clone(),
+		suiteNodes:              suite.suiteNodes.Clone(),
+		selectiveLock:           &sync.Mutex{},
+	}, nil
 }
 
 func (suite *Suite) BuildTree() error {
@@ -239,7 +259,9 @@ func (suite *Suite) pushCleanupNode(node Node) error {
 
 	node.NodeIDWhereCleanupWasGenerated = suite.currentNode.ID
 	node.NestingLevel = suite.currentNode.NestingLevel
+	suite.selectiveLock.Lock()
 	suite.cleanupNodes = append(suite.cleanupNodes, node)
+	suite.selectiveLock.Unlock()
 
 	return nil
 }
@@ -320,6 +342,16 @@ func (suite *Suite) CurrentSpecReport() types.SpecReport {
 	return report
 }
 
+// Only valid in the preview context.  In general suite.report only includes
+// the specs run by _this_ node - it is only at the end of the suite that
+// the parallel reports are aggregated.  However in the preview context we run
+// in series and
+func (suite *Suite) GetPreviewReport() types.Report {
+	suite.selectiveLock.Lock()
+	defer suite.selectiveLock.Unlock()
+	return suite.report
+}
+
 func (suite *Suite) AddReportEntry(entry ReportEntry) error {
 	if suite.phase != PhaseRun {
 		return types.GinkgoErrors.AddReportEntryNotDuringRunPhase(entry.Location)
@@ -338,10 +370,13 @@ func (suite *Suite) generateProgressReport(fullReport bool) types.ProgressReport
 	suite.selectiveLock.Lock()
 	defer suite.selectiveLock.Unlock()
 
+	deadline, cancel := context.WithTimeout(context.Background(), PROGRESS_REPORTER_DEADLING)
+	defer cancel()
 	var additionalReports []string
 	if suite.currentSpecContext != nil {
-		additionalReports = suite.currentSpecContext.QueryProgressReporters()
+		additionalReports = append(additionalReports, suite.currentSpecContext.QueryProgressReporters(deadline, suite.failer)...)
 	}
+	additionalReports = append(additionalReports, suite.QueryProgressReporters(deadline, suite.failer)...)
 	gwOutput := suite.currentSpecReport.CapturedGinkgoWriterOutput + string(suite.writer.Bytes())
 	pr, err := NewProgressReport(suite.isRunningInParallel(), suite.currentSpecReport, suite.currentNode, suite.currentNodeStartTime, suite.currentByStep, gwOutput, timelineLocation, additionalReports, suite.config.SourceRoots, fullReport)
 
@@ -928,6 +963,12 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 			gracePeriodChannel = time.After(gracePeriod)
 		case <-interruptStatus.Channel:
 			interruptStatus = suite.interruptHandler.Status()
+			// ignore interruption from other process if we are cleaning up or reporting
+			if interruptStatus.Cause == interrupt_handler.InterruptCauseAbortByOtherProcess &&
+				node.NodeType.Is(types.NodeTypesAllowedDuringReportInterrupt|types.NodeTypesAllowedDuringCleanupInterrupt) {
+				continue
+			}
+
 			deadlineChannel = nil // don't worry about deadlines, time's up now
 
 			failureTimelineLocation := suite.generateTimelineLocation()

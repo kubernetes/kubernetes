@@ -54,7 +54,7 @@ const (
 // FromInt creates an IntOrString object with an int32 value. It is
 // your responsibility not to call this method with a value greater
 // than int32.
-// TODO: convert to (val int32)
+// Deprecated: use FromInt32 instead.
 func FromInt(val int) IntOrString {
 	if val > math.MaxInt32 || val < math.MinInt32 {
 		klog.Errorf("value: %d overflows int32\n%s\n", val, debug.Stack())
@@ -62,19 +62,24 @@ func FromInt(val int) IntOrString {
 	return IntOrString{Type: Int, IntVal: int32(val)}
 }
 
+// FromInt32 creates an IntOrString object with an int32 value.
+func FromInt32(val int32) IntOrString {
+	return IntOrString{Type: Int, IntVal: val}
+}
+
 // FromString creates an IntOrString object with a string value.
 func FromString(val string) IntOrString {
 	return IntOrString{Type: String, StrVal: val}
 }
 
-// Parse the given string and try to convert it to an integer before
+// Parse the given string and try to convert it to an int32 integer before
 // setting it as a string value.
 func Parse(val string) IntOrString {
-	i, err := strconv.Atoi(val)
+	i, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
 		return FromString(val)
 	}
-	return FromInt(i)
+	return FromInt32(int32(i))
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.

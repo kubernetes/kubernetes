@@ -32,6 +32,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode, hostDir string) *v1.Pod {
@@ -82,7 +83,7 @@ func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode
 
 var _ = SIGDescribe("Mount propagation", func() {
 	f := framework.NewDefaultFramework("mount-propagation")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should propagate mounts within defined scopes", func(ctx context.Context) {
 		// This test runs two pods: master and slave with respective mount
@@ -100,7 +101,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Fail the test if the namespace is not set. We expect that the
 		// namespace is unique and we might delete user data if it's not.
 		if len(f.Namespace.Name) == 0 {
-			framework.ExpectNotEqual(f.Namespace.Name, "")
+			gomega.Expect(f.Namespace.Name).NotTo(gomega.BeEmpty())
 			return
 		}
 
@@ -178,10 +179,10 @@ var _ = SIGDescribe("Mount propagation", func() {
 				shouldBeVisible := mounts.Has(mountName)
 				if shouldBeVisible {
 					framework.ExpectNoError(err, "%s: failed to run %q", msg, cmd)
-					framework.ExpectEqual(stdout, mountName, msg)
+					gomega.Expect(stdout).To(gomega.Equal(mountName), msg)
 				} else {
 					// We *expect* cat to return error here
-					framework.ExpectError(err, msg)
+					gomega.Expect(err).To(gomega.HaveOccurred(), msg)
 				}
 			}
 		}
@@ -191,7 +192,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		kubeletPid, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 		framework.ExpectNoError(err, "Checking kubelet pid")
 		kubeletPid = strings.TrimSuffix(kubeletPid, "\n")
-		framework.ExpectEqual(strings.Count(kubeletPid, " "), 0, "kubelet should only have a single PID in the system (pidof returned %q)", kubeletPid)
+		gomega.Expect(strings.Count(kubeletPid, " ")).To(gomega.Equal(0), "kubelet should only have a single PID in the system (pidof returned %q)", kubeletPid)
 		enterKubeletMountNS := fmt.Sprintf("nsenter -t %s -m", kubeletPid)
 
 		// Check that the master and host mounts are propagated to the container runtime's mount namespace
@@ -200,7 +201,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 			output, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 			framework.ExpectNoError(err, "host container namespace should see mount from %s: %s", mountName, output)
 			output = strings.TrimSuffix(output, "\n")
-			framework.ExpectEqual(output, mountName, "host container namespace should see mount contents from %s", mountName)
+			gomega.Expect(output).To(gomega.Equal(mountName), "host container namespace should see mount contents from %s", mountName)
 		}
 
 		// Check that the slave, private, and default mounts are not propagated to the container runtime's mount namespace

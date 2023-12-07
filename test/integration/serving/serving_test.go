@@ -83,10 +83,8 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 
 	// Insulate this test from picking up in-cluster config when run inside a pod
 	// We can't assume we have permissions to write to /var/run/secrets/... from a unit test to mock in-cluster config for testing
-	originalHost := os.Getenv("KUBERNETES_SERVICE_HOST")
-	if len(originalHost) > 0 {
-		os.Setenv("KUBERNETES_SERVICE_HOST", "")
-		defer os.Setenv("KUBERNETES_SERVICE_HOST", originalHost)
+	if len(os.Getenv("KUBERNETES_SERVICE_HOST")) > 0 {
+		t.Setenv("KUBERNETES_SERVICE_HOST", "")
 	}
 
 	// authenticate to apiserver via bearer token
@@ -165,7 +163,7 @@ users:
 		extraFlags []string
 	}{
 		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
-		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}},
+		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake", "--webhook-secure-port=0"}},
 		{"kube-scheduler", kubeSchedulerTester{}, nil},
 	}
 

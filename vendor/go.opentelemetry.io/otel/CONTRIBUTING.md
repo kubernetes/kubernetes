@@ -6,7 +6,7 @@ OpenTelemetry
 repo for information on this and other language SIGs.
 
 See the [public meeting
-notes](https://docs.google.com/document/d/1A63zSWX0x2CyCK_LoNhmQC4rqhLpYXJzXbEPDUQ2n6w/edit#heading=h.9tngw7jdwd6b)
+notes](https://docs.google.com/document/d/1E5e7Ld0NuU1iVvf-42tOBpu2VBBLYnh73GJuITGJTTU/edit)
 for a summary description of past meetings. To request edit access,
 join the meeting or get in touch on
 [Slack](https://cloud-native.slack.com/archives/C01NPAXACKT).
@@ -27,6 +27,11 @@ precommit` - the `precommit` target is the default).
 
 The `precommit` target also fixes the formatting of the code and
 checks the status of the go module files.
+
+Additionally, there is a `codespell` target that checks for common
+typos in the code. It is not run by default, but you can run it
+manually with `make codespell`. It will set up a virtual environment
+in `venv` and install `codespell` there.
 
 If after running `make precommit` the output of `git status` contains
 `nothing to commit, working tree clean` then it means that everything
@@ -94,38 +99,66 @@ request ID to the entry you added to `CHANGELOG.md`.
 
 ### How to Get PRs Merged
 
-A PR is considered to be **ready to merge** when:
+A PR is considered **ready to merge** when:
 
-* It has received two approvals from Collaborators/Maintainers (at
-  different companies). This is not enforced through technical means
-  and a PR may be **ready to merge** with a single approval if the change
-  and its approach have been discussed and consensus reached.
-* Feedback has been addressed.
-* Any substantive changes to your PR will require that you clear any prior
-  Approval reviews, this includes changes resulting from other feedback. Unless
-  the approver explicitly stated that their approval will persist across
-  changes it should be assumed that the PR needs their review again. Other
-  project members (e.g. approvers, maintainers) can help with this if there are
-  any questions or if you forget to clear reviews.
-* It has been open for review for at least one working day. This gives
-  people reasonable time to review.
-* Trivial changes (typo, cosmetic, doc, etc.) do not have to wait for
-  one day and may be merged with a single Maintainer's approval.
-* `CHANGELOG.md` has been updated to reflect what has been
-  added, changed, removed, or fixed.
-* `README.md` has been updated if necessary.
-* Urgent fix can take exception as long as it has been actively
-  communicated.
+* It has received two qualified approvals[^1].
 
-Any Maintainer can merge the PR once it is **ready to merge**.
+  This is not enforced through automation, but needs to be validated by the
+  maintainer merging.
+  * The qualified approvals need to be from [Approver]s/[Maintainer]s
+    affiliated with different companies. Two qualified approvals from
+    [Approver]s or [Maintainer]s affiliated with the same company counts as a
+    single qualified approval.
+  * PRs introducing changes that have already been discussed and consensus
+    reached only need one qualified approval. The discussion and resolution
+    needs to be linked to the PR.
+  * Trivial changes[^2] only need one qualified approval.
+
+* All feedback has been addressed.
+  * All PR comments and suggestions are resolved.
+  * All GitHub Pull Request reviews with a status of "Request changes" have
+    been addressed. Another review by the objecting reviewer with a different
+    status can be submitted to clear the original review, or the review can be
+    dismissed by a [Maintainer] when the issues from the original review have
+    been addressed.
+  * Any comments or reviews that cannot be resolved between the PR author and
+    reviewers can be submitted to the community [Approver]s and [Maintainer]s
+    during the weekly SIG meeting. If consensus is reached among the
+    [Approver]s and [Maintainer]s during the SIG meeting the objections to the
+    PR may be dismissed or resolved or the PR closed by a [Maintainer].
+  * Any substantive changes to the PR require existing Approval reviews be
+    cleared unless the approver explicitly states that their approval persists
+    across changes. This includes changes resulting from other feedback.
+    [Approver]s and [Maintainer]s can help in clearing reviews and they should
+    be consulted if there are any questions.
+
+* The PR branch is up to date with the base branch it is merging into.
+  * To ensure this does not block the PR, it should be configured to allow
+    maintainers to update it.
+
+* It has been open for review for at least one working day. This gives people
+  reasonable time to review.
+  * Trivial changes[^2] do not have to wait for one day and may be merged with
+    a single [Maintainer]'s approval.
+
+* All required GitHub workflows have succeeded.
+* Urgent fix can take exception as long as it has been actively communicated
+  among [Maintainer]s.
+
+Any [Maintainer] can merge the PR once the above criteria have been met.
+
+[^1]: A qualified approval is a GitHub Pull Request review with "Approve"
+  status from an OpenTelemetry Go [Approver] or [Maintainer].
+[^2]: Trivial changes include: typo corrections, cosmetic non-substantive
+  changes, documentation corrections or updates, dependency updates, etc.
 
 ## Design Choices
 
 As with other OpenTelemetry clients, opentelemetry-go follows the
-[opentelemetry-specification](https://github.com/open-telemetry/opentelemetry-specification).
+[OpenTelemetry Specification](https://opentelemetry.io/docs/specs/otel).
 
 It's especially valuable to read through the [library
-guidelines](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/library-guidelines.md).
+guidelines](https://opentelemetry.io/docs/specs/otel/library-guidelines).
 
 ### Focus on Capabilities, Not Structure Compliance
 
@@ -146,23 +179,23 @@ For a deeper discussion, see
 
 ## Documentation
 
-Each non-example Go Module should have its own `README.md` containing:
+Each (non-internal, non-test) package must be documented using
+[Go Doc Comments](https://go.dev/doc/comment),
+preferably in a `doc.go` file.
 
-- A pkg.go.dev badge which can be generated [here](https://pkg.go.dev/badge/).
-- Brief description.
-- Installation instructions (and requirements if applicable).
-- Hyperlink to an example. Depending on the component the example can be:
-  - An `example_test.go` like [here](exporters/stdout/stdouttrace/example_test.go).
-  - A sample Go application with its own `README.md`, like [here](example/zipkin).
-- Additional documentation sections such us:
-  - Configuration,
-  - Contributing,
-  - References.
+Prefer using [Examples](https://pkg.go.dev/testing#hdr-Examples)
+instead of putting code snippets in Go doc comments.
+In some cases, you can even create [Testable Examples](https://go.dev/blog/examples).
 
-[Here](exporters/jaeger/README.md) is an example of a concise `README.md`.
+You can install and run a "local Go Doc site" in the following way:
 
-Moreover, it should be possible to navigate to any `README.md` from the
-root `README.md`.
+  ```sh
+  go install golang.org/x/pkgsite/cmd/pkgsite@latest
+  pkgsite
+  ```
+
+[`go.opentelemetry.io/otel/metric`](https://pkg.go.dev/go.opentelemetry.io/otel/metric)
+is an example of a very well-documented package.
 
 ## Style Guide
 
@@ -216,7 +249,7 @@ Meaning a `config` from one package should not be directly used by another. The
 one exception is the API packages.  The configs from the base API, eg.
 `go.opentelemetry.io/otel/trace.TracerConfig` and
 `go.opentelemetry.io/otel/metric.InstrumentConfig`, are intended to be consumed
-by the SDK therefor it is expected that these are exported.
+by the SDK therefore it is expected that these are exported.
 
 When a config is exported we want to maintain forward and backward
 compatibility, to achieve this no fields should be exported but should
@@ -234,12 +267,12 @@ func newConfig(options ...Option) config {
 	for _, option := range options {
 		config = option.apply(config)
 	}
-	// Preform any validation here.
+	// Perform any validation here.
 	return config
 }
 ```
 
-If validation of the `config` options is also preformed this can return an
+If validation of the `config` options is also performed this can return an
 error as well that is expected to be handled by the instantiation function
 or propagated to the user.
 
@@ -438,11 +471,36 @@ their parameters appropriately named.
 #### Interface Stability
 
 All exported stable interfaces that include the following warning in their
-doumentation are allowed to be extended with additional methods.
+documentation are allowed to be extended with additional methods.
 
 > Warning: methods may be added to this interface in minor releases.
 
+These interfaces are defined by the OpenTelemetry specification and will be
+updated as the specification evolves.
+
 Otherwise, stable interfaces MUST NOT be modified.
+
+#### How to Change Specification Interfaces
+
+When an API change must be made, we will update the SDK with the new method one
+release before the API change. This will allow the SDK one version before the
+API change to work seamlessly with the new API.
+
+If an incompatible version of the SDK is used with the new API the application
+will fail to compile.
+
+#### How Not to Change Specification Interfaces
+
+We have explored using a v2 of the API to change interfaces and found that there
+was no way to introduce a v2 and have it work seamlessly with the v1 of the API.
+Problems happened with libraries that upgraded to v2 when an application did not,
+and would not produce any telemetry.
+
+More detail of the approaches considered and their limitations can be found in
+the [Use a V2 API to evolve interfaces](https://github.com/open-telemetry/opentelemetry-go/issues/3920)
+issue.
+
+#### How to Change Other Interfaces
 
 If new functionality is needed for an interface that cannot be changed it MUST
 be added by including an additional interface. That added interface can be a
@@ -498,29 +556,65 @@ functionality should be added, each one will need their own super-set
 interfaces and will duplicate the pattern. For this reason, the simple targeted
 interface that defines the specific functionality should be preferred.
 
+### Testing
+
+The tests should never leak goroutines.
+
+Use the term `ConcurrentSafe` in the test name when it aims to verify the
+absence of race conditions.
+
+### Internal packages
+
+The use of internal packages should be scoped to a single module. A sub-module
+should never import from a parent internal package. This creates a coupling
+between the two modules where a user can upgrade the parent without the child
+and if the internal package API has changed it will fail to upgrade[^3].
+
+There are two known exceptions to this rule:
+
+- `go.opentelemetry.io/otel/internal/global`
+  - This package manages global state for all of opentelemetry-go. It needs to
+  be a single package in order to ensure the uniqueness of the global state.
+- `go.opentelemetry.io/otel/internal/baggage`
+  - This package provides values in a `context.Context` that need to be
+  recognized by `go.opentelemetry.io/otel/baggage` and
+  `go.opentelemetry.io/otel/bridge/opentracing` but remain private.
+
+If you have duplicate code in multiple modules, make that code into a Go
+template stored in `go.opentelemetry.io/otel/internal/shared` and use [gotmpl]
+to render the templates in the desired locations. See [#4404] for an example of
+this.
+
+[^3]: https://github.com/open-telemetry/opentelemetry-go/issues/3548
+
 ## Approvers and Maintainers
 
-Approvers:
+### Approvers
 
 - [Evan Torrie](https://github.com/evantorrie), Verizon Media
-- [Josh MacDonald](https://github.com/jmacd), LightStep
 - [Sam Xie](https://github.com/XSAM), Cisco/AppDynamics
 - [David Ashpole](https://github.com/dashpole), Google
-- [Robert Pająk](https://github.com/pellared), Splunk
 - [Chester Cheung](https://github.com/hanyuancheung), Tencent
-- [Damien Mathieu](https://github.com/dmathieu), Auth0/Okta
+- [Damien Mathieu](https://github.com/dmathieu), Elastic
+- [Anthony Mirabella](https://github.com/Aneurysm9), AWS
 
-Maintainers:
+### Maintainers
 
 - [Aaron Clawson](https://github.com/MadVikingGod), LightStep
-- [Anthony Mirabella](https://github.com/Aneurysm9), AWS
+- [Robert Pająk](https://github.com/pellared), Splunk
 - [Tyler Yahn](https://github.com/MrAlias), Splunk
 
-Emeritus:
+### Emeritus
 
 - [Gustavo Silva Paiva](https://github.com/paivagustavo), LightStep
+- [Josh MacDonald](https://github.com/jmacd), LightStep
 
 ### Become an Approver or a Maintainer
 
 See the [community membership document in OpenTelemetry community
 repo](https://github.com/open-telemetry/community/blob/main/community-membership.md).
+
+[Approver]: #approvers
+[Maintainer]: #maintainers
+[gotmpl]: https://pkg.go.dev/go.opentelemetry.io/build-tools/gotmpl
+[#4404]: https://github.com/open-telemetry/opentelemetry-go/pull/4404

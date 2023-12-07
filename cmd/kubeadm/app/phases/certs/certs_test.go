@@ -23,7 +23,6 @@ import (
 	"crypto/x509"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -263,7 +262,7 @@ func TestWriteCSRFilesIfNotExist(t *testing.T) {
 		{
 			name: "existing CSR is garbage",
 			setupFunc: func(csrPath string) error {
-				return os.WriteFile(path.Join(csrPath, "dummy.csr"), []byte("a--bunch--of-garbage"), os.ModePerm)
+				return os.WriteFile(filepath.Join(csrPath, "dummy.csr"), []byte("a--bunch--of-garbage"), os.ModePerm)
 			},
 			expectedError: true,
 		},
@@ -348,7 +347,7 @@ func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 				}
 			}
 
-			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, x509.RSA)
+			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, kubeadmapi.EncryptionAlgorithmRSA)
 			if (err != nil) != tt.expectedErr {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tt.expectedErr, err != nil, err)
 			} else if tt.expectedErr {

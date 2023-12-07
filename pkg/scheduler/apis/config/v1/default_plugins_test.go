@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestApplyFeatureGates(t *testing.T) {
@@ -38,16 +38,19 @@ func TestApplyFeatureGates(t *testing.T) {
 	}{
 		{
 			name: "Feature gates disabled",
+			features: map[featuregate.Feature]bool{
+				features.PodSchedulingReadiness: false,
+			},
 			wantConfig: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
 					Enabled: []v1.Plugin{
 						{Name: names.PrioritySort},
 						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
-						{Name: names.TaintToleration, Weight: pointer.Int32(3)},
-						{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
-						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 						{Name: names.VolumeRestrictions},
 						{Name: names.EBSLimits},
 						{Name: names.GCEPDLimits},
@@ -55,11 +58,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.AzureDiskLimits},
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
-						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
-						{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.DefaultPreemption},
-						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
-						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
 					},
 				},
@@ -76,10 +79,10 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.PrioritySort},
 						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
-						{Name: names.TaintToleration, Weight: pointer.Int32(3)},
-						{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
-						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 						{Name: names.VolumeRestrictions},
 						{Name: names.EBSLimits},
 						{Name: names.GCEPDLimits},
@@ -87,11 +90,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.AzureDiskLimits},
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
-						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
-						{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.DefaultPreemption},
-						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
-						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
 						{Name: names.SchedulingGates},
 					},
@@ -109,10 +112,10 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.PrioritySort},
 						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
-						{Name: names.TaintToleration, Weight: pointer.Int32(3)},
-						{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
-						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 						{Name: names.VolumeRestrictions},
 						{Name: names.EBSLimits},
 						{Name: names.GCEPDLimits},
@@ -120,13 +123,14 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.AzureDiskLimits},
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
-						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
-						{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.DynamicResources},
 						{Name: names.DefaultPreemption},
-						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
-						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
+						{Name: names.SchedulingGates},
 					},
 				},
 			},
@@ -308,8 +312,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1.Plugins{
 				Filter: v1.PluginSet{
 					Enabled: []v1.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32(2)},
-						{Name: "Plugin3", Weight: pointer.Int32(3)},
+						{Name: "Plugin1", Weight: ptr.To[int32](2)},
+						{Name: "Plugin3", Weight: ptr.To[int32](3)},
 					},
 				},
 			},
@@ -325,9 +329,9 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1.Plugins{
 				Filter: v1.PluginSet{
 					Enabled: []v1.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32(2)},
+						{Name: "Plugin1", Weight: ptr.To[int32](2)},
 						{Name: "Plugin2"},
-						{Name: "Plugin3", Weight: pointer.Int32(3)},
+						{Name: "Plugin3", Weight: ptr.To[int32](3)},
 					},
 				},
 			},
@@ -337,8 +341,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1.Plugins{
 				Filter: v1.PluginSet{
 					Enabled: []v1.Plugin{
-						{Name: "Plugin2", Weight: pointer.Int32(2)},
-						{Name: "Plugin1", Weight: pointer.Int32(1)},
+						{Name: "Plugin2", Weight: ptr.To[int32](2)},
+						{Name: "Plugin1", Weight: ptr.To[int32](1)},
 					},
 				},
 			},
@@ -354,8 +358,8 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1.Plugins{
 				Filter: v1.PluginSet{
 					Enabled: []v1.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32(1)},
-						{Name: "Plugin2", Weight: pointer.Int32(2)},
+						{Name: "Plugin1", Weight: ptr.To[int32](1)},
+						{Name: "Plugin2", Weight: ptr.To[int32](2)},
 						{Name: "Plugin3"},
 					},
 				},
@@ -367,9 +371,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1.PluginSet{
 					Enabled: []v1.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32(2)},
+						{Name: "Plugin2", Weight: ptr.To[int32](2)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32(4)},
+						{Name: "Plugin2", Weight: ptr.To[int32](4)},
 					},
 				},
 			},
@@ -386,9 +390,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1.PluginSet{
 					Enabled: []v1.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32(4)},
+						{Name: "Plugin2", Weight: ptr.To[int32](4)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32(2)},
+						{Name: "Plugin2", Weight: ptr.To[int32](2)},
 					},
 				},
 			},
@@ -469,7 +473,7 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
 					Enabled: []v1.Plugin{
-						{Name: "DefaultPlugin", Weight: pointer.Int32(5)},
+						{Name: "DefaultPlugin", Weight: ptr.To[int32](5)},
 					},
 				},
 			},
@@ -483,7 +487,7 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
 					Enabled: []v1.Plugin{
-						{Name: "DefaultPlugin", Weight: pointer.Int32(5)},
+						{Name: "DefaultPlugin", Weight: ptr.To[int32](5)},
 					},
 				},
 			},

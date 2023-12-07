@@ -17,9 +17,5 @@ limitations under the License.
 package daemon
 
 import (
-	"k8s.io/klog/v2"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
-
-func init() {
-	klog.InitFlags(nil)
-}

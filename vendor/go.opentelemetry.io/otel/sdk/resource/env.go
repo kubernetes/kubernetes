@@ -17,11 +17,13 @@ package resource // import "go.opentelemetry.io/otel/sdk/resource"
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 const (
@@ -57,7 +59,7 @@ func (fromEnv) Detect(context.Context) (*Resource, error) {
 	var res *Resource
 
 	if svcName != "" {
-		res = NewSchemaless(semconv.ServiceNameKey.String(svcName))
+		res = NewSchemaless(semconv.ServiceName(svcName))
 	}
 
 	r2, err := constructOTResources(attrs)
@@ -80,16 +82,23 @@ func constructOTResources(s string) (*Resource, error) {
 		return Empty(), nil
 	}
 	pairs := strings.Split(s, ",")
-	attrs := []attribute.KeyValue{}
+	var attrs []attribute.KeyValue
 	var invalid []string
 	for _, p := range pairs {
-		field := strings.SplitN(p, "=", 2)
-		if len(field) != 2 {
+		k, v, found := strings.Cut(p, "=")
+		if !found {
 			invalid = append(invalid, p)
 			continue
 		}
-		k, v := strings.TrimSpace(field[0]), strings.TrimSpace(field[1])
-		attrs = append(attrs, attribute.String(k, v))
+		key := strings.TrimSpace(k)
+		val, err := url.QueryUnescape(strings.TrimSpace(v))
+		if err != nil {
+			// Retain original value if decoding fails, otherwise it will be
+			// an empty string.
+			val = v
+			otel.Handle(err)
+		}
+		attrs = append(attrs, attribute.String(key, val))
 	}
 	var err error
 	if len(invalid) > 0 {

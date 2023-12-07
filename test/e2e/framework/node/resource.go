@@ -393,25 +393,6 @@ func isNodeUntainted(node *v1.Node) bool {
 // isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
 // but allows for taints in the list of non-blocking taints.
 func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
-	fakePod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "fake-not-scheduled",
-			Namespace: "fake-not-scheduled",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-not-scheduled",
-					Image: "fake-not-scheduled",
-				},
-			},
-		},
-	}
-
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -431,7 +412,8 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		}
 		n = nodeCopy
 	}
-	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, fakePod.Spec.Tolerations)
+
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
 }
 
 func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
@@ -554,7 +536,7 @@ func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, e
 }
 
 // GetSchedulableClusterZones returns the values of zone label collected from all nodes which are schedulable.
-func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
+func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.Set[string], error) {
 	// GetReadySchedulableNodes already filters our tainted and unschedulable nodes.
 	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {
@@ -562,7 +544,7 @@ func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (set
 	}
 
 	// collect values of zone label from all nodes
-	zones := sets.NewString()
+	zones := sets.New[string]()
 	for _, node := range nodes.Items {
 		if zone, found := node.Labels[v1.LabelFailureDomainBetaZone]; found {
 			zones.Insert(zone)

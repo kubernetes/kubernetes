@@ -48,7 +48,7 @@ type HTTPExtender struct {
 	weight           int64
 	client           *http.Client
 	nodeCacheCapable bool
-	managedResources sets.String
+	managedResources sets.Set[string]
 	ignorable        bool
 }
 
@@ -96,7 +96,7 @@ func NewHTTPExtender(config *schedulerapi.Extender) (framework.Extender, error) 
 		Transport: transport,
 		Timeout:   config.HTTPTimeout.Duration,
 	}
-	managedResources := sets.NewString()
+	managedResources := sets.New[string]()
 	for _, r := range config.ManagedResources {
 		managedResources.Insert(string(r.Name))
 	}

@@ -20,14 +20,18 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestResourceMapper(t *testing.T) {
-	gvr := func(g, v, r string) schema.GroupVersionResource { return schema.GroupVersionResource{g, v, r} }
+	gvr := func(g, v, r string) schema.GroupVersionResource {
+		return schema.GroupVersionResource{Group: g, Version: v, Resource: r}
+	}
 
-	gvk := func(g, v, k string) schema.GroupVersionKind { return schema.GroupVersionKind{g, v, k} }
+	gvk := func(g, v, k string) schema.GroupVersionKind {
+		return schema.GroupVersionKind{Group: g, Version: v, Kind: k}
+	}
 
 	kindsToRegister := []struct {
 		gvr         schema.GroupVersionResource
@@ -118,14 +122,14 @@ func TestResourceMapper(t *testing.T) {
 
 			// Verify equivalents to primary resource
 			if resources := mapper.EquivalentResourcesFor(gvr("apps", "v1", "deployments"), ""); !reflect.DeepEqual(resources, tc.ResourcesForV1Deployment) {
-				t.Errorf("diff:\n%s", diff.ObjectReflectDiff(tc.ResourcesForV1Deployment, resources))
+				t.Errorf("diff:\n%s", cmp.Diff(tc.ResourcesForV1Deployment, resources))
 			}
 			// Verify equivalents to subresources
 			if resources := mapper.EquivalentResourcesFor(gvr("apps", "v1", "deployments"), "scale"); !reflect.DeepEqual(resources, tc.ResourcesForV1DeploymentScale) {
-				t.Errorf("diff:\n%s", diff.ObjectReflectDiff(tc.ResourcesForV1DeploymentScale, resources))
+				t.Errorf("diff:\n%s", cmp.Diff(tc.ResourcesForV1DeploymentScale, resources))
 			}
 			if resources := mapper.EquivalentResourcesFor(gvr("apps", "v1", "deployments"), "status"); !reflect.DeepEqual(resources, tc.ResourcesForV1DeploymentStatus) {
-				t.Errorf("diff:\n%s", diff.ObjectReflectDiff(tc.ResourcesForV1DeploymentStatus, resources))
+				t.Errorf("diff:\n%s", cmp.Diff(tc.ResourcesForV1DeploymentStatus, resources))
 			}
 		})
 	}

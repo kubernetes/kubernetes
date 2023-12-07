@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -42,7 +43,7 @@ func InitCustomDisruptiveTestSuite(patterns []storageframework.TestPattern) stor
 	return &disruptiveTestSuite{
 		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "disruptive",
-			FeatureTag:   "[Disruptive][LinuxOnly]",
+			TestTags:     []interface{}{framework.WithDisruptive(), framework.WithLabel("LinuxOnly")},
 			TestPatterns: patterns,
 		},
 	}
@@ -90,7 +91,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("disruptive", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode) {
 		l = local{}
@@ -207,26 +208,26 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	}
 	multiplePodTests := []multiplePodTest{
 		{
-			testItStmt: "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt: "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns",
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, false, false, pod2, e2epod.VolumeMountPath1)
 			},
 		},
 		{
-			testItStmt: "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt: "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns",
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, true, false, pod2, e2epod.VolumeMountPath1)
 			},
 		},
 		{
-			testItStmt:            "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt:            "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns",
 			changeSELinuxContexts: true,
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, false, false, pod2, e2epod.VolumeMountPath1)
 			},
 		},
 		{
-			testItStmt:            "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt:            "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns",
 			changeSELinuxContexts: true,
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, true, false, pod2, e2epod.VolumeMountPath1)
@@ -237,7 +238,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	for _, test := range multiplePodTests {
 		func(t multiplePodTest) {
 			if pattern.VolMode == v1.PersistentVolumeFilesystem && t.runTestFile != nil {
-				ginkgo.It(t.testItStmt, func(ctx context.Context) {
+				f.It(t.testItStmt, feature.SELinux, func(ctx context.Context) {
 					init(ctx, []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod})
 					ginkgo.DeferCleanup(cleanup)
 

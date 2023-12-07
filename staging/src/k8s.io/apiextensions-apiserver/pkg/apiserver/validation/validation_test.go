@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // TestRoundTrip checks the conversion to go-openapi types.
@@ -600,7 +601,7 @@ func TestValidateCustomResource(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.schema})
+			validator, _, err := NewSchemaValidator(&tt.schema)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -608,7 +609,7 @@ func TestValidateCustomResource(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			celValidator := cel.NewValidator(structural, false, cel.PerCallLimit)
+			celValidator := cel.NewValidator(structural, false, celconfig.PerCallLimit)
 			for i, obj := range tt.objects {
 				var oldObject interface{}
 				if len(tt.oldObjects) == len(tt.objects) {
@@ -617,14 +618,14 @@ func TestValidateCustomResource(t *testing.T) {
 				if errs := ValidateCustomResource(nil, obj, validator); len(errs) > 0 {
 					t.Errorf("unexpected validation error for %v: %v", obj, errs)
 				}
-				errs, _ := celValidator.Validate(context.TODO(), nil, structural, obj, oldObject, cel.RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(context.TODO(), nil, structural, obj, oldObject, celconfig.RuntimeCELCostBudget)
 				if len(errs) > 0 {
 					t.Errorf(errs.ToAggregate().Error())
 				}
 			}
 			for i, failingObject := range tt.failingObjects {
 				errs := ValidateCustomResource(nil, failingObject.object, validator)
-				celErrs, _ := celValidator.Validate(context.TODO(), nil, structural, failingObject.object, failingObject.oldObject, cel.RuntimeCELCostBudget)
+				celErrs, _ := celValidator.Validate(context.TODO(), nil, structural, failingObject.object, failingObject.oldObject, celconfig.RuntimeCELCostBudget)
 				errs = append(errs, celErrs...)
 				if len(errs) == 0 {
 					t.Errorf("missing error for %v", failingObject.object)
@@ -688,7 +689,7 @@ func TestItemsProperty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.args.schema})
+			validator, _, err := NewSchemaValidator(&tt.args.schema)
 			if err != nil {
 				t.Fatal(err)
 			}

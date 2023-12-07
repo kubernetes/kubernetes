@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -25,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utiltesting "k8s.io/client-go/util/testing"
 )
 
 var rsaCertPEM = `-----BEGIN CERTIFICATE-----
@@ -84,17 +82,14 @@ rLTt0TTazzwBCgCD0Jkoqg==
 
 func TestCreateSecretTLS(t *testing.T) {
 
-	validCertTmpDir := utiltesting.MkTmpdirOrDie("tls-valid-cert-test")
+	validCertTmpDir := t.TempDir()
 	validKeyPath, validCertPath := writeKeyPair(validCertTmpDir, rsaKeyPEM, rsaCertPEM, t)
-	defer tearDown(validCertTmpDir)
 
-	invalidCertTmpDir := utiltesting.MkTmpdirOrDie("tls-invalid-cert-test")
+	invalidCertTmpDir := t.TempDir()
 	invalidKeyPath, invalidCertPath := writeKeyPair(invalidCertTmpDir, "test", "test", t)
-	defer tearDown(invalidCertTmpDir)
 
-	mismatchCertTmpDir := utiltesting.MkTmpdirOrDie("tls-mismatch-test")
+	mismatchCertTmpDir := t.TempDir()
 	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, rsaKeyPEM, mismatchRSAKeyPEM, t)
-	defer tearDown(mismatchCertTmpDir)
 
 	tests := map[string]struct {
 		tlsSecretName string
@@ -186,13 +181,6 @@ func TestCreateSecretTLS(t *testing.T) {
 				t.Errorf("test %s\n expected:\n%#v\ngot:\n%#v", name, test.expected, secretTLS)
 			}
 		})
-	}
-}
-
-func tearDown(tmpDir string) {
-	err := os.RemoveAll(tmpDir)
-	if err != nil {
-		fmt.Printf("Error in cleaning up test: %v", err)
 	}
 }
 

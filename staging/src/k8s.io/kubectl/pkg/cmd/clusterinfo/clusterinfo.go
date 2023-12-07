@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -47,7 +48,7 @@ var (
 )
 
 type ClusterInfoOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	Namespace string
 
@@ -55,7 +56,7 @@ type ClusterInfoOptions struct {
 	Client  *restclient.Config
 }
 
-func NewCmdClusterInfo(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdClusterInfo(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoOptions{
 		IOStreams: ioStreams,
 	}

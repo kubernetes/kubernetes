@@ -28,6 +28,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -52,9 +53,9 @@ import (
 		10. Delete storage class.
 */
 
-var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Operations Storm", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const defaultVolumeOpsScale = 30
 	var (
 		client            clientset.Interface
@@ -70,7 +71,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		gomega.Expect(GetReadySchedulableNodeInfos(ctx)).NotTo(gomega.BeEmpty())
+		gomega.Expect(GetReadySchedulableNodeInfos(ctx, client)).NotTo(gomega.BeEmpty())
 		if scale := os.Getenv("VOLUME_OPS_SCALE"); scale != "" {
 			volumeOpsScale, err = strconv.Atoi(scale)
 			framework.ExpectNoError(err)
@@ -110,7 +111,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PVs to the node")
-		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verify all volumes are accessible and available in the pod")

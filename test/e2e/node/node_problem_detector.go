@@ -49,7 +49,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		maxNodesToProcess = 10
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
@@ -121,14 +121,14 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 				psCmd := "ps aux | grep [n]ode-problem-detector"
 				result, err = e2essh.SSH(ctx, psCmd, host, framework.TestContext.Provider)
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 				ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 				journalctlCmd := "sudo journalctl -r -u node-problem-detector"
 				result, err = e2essh.SSH(ctx, journalctlCmd, host, framework.TestContext.Provider)
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
 				// We only will check for the KubeletStart even if parsing of date here succeeded.
@@ -136,7 +136,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 				npdStartTimeCommand := "sudo systemctl show --timestamp=utc node-problem-detector -P ActiveEnterTimestamp"
 				result, err = e2essh.SSH(ctx, npdStartTimeCommand, host, framework.TestContext.Provider)
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Code).To(gomega.Equal(0))
 
 				// The time format matches the systemd format.
 				// 'utc': 'Day YYYY-MM-DD HH:MM:SS UTC (see https://www.freedesktop.org/software/systemd/man/systemd.time.html)
@@ -157,7 +157,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
 			result, err = e2essh.SSH(ctx, injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(result.Code, 0)
+			gomega.Expect(result.Code).To(gomega.Equal(0))
 		}
 
 		ginkgo.By("Check node-problem-detector can post conditions and events to API server")
@@ -297,7 +297,7 @@ func getMemoryStat(ctx context.Context, f *framework.Framework, host string) (rs
 
 	result, err := e2essh.SSH(ctx, memCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
 
 	memoryUsage, err := strconv.ParseFloat(lines[0], 64)
@@ -351,7 +351,7 @@ func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage
 
 	result, err := e2essh.SSH(ctx, cpuCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
 
 	usage, err = strconv.ParseFloat(lines[0], 64)
@@ -367,7 +367,7 @@ func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage
 func isHostRunningCgroupV2(ctx context.Context, f *framework.Framework, host string) bool {
 	result, err := e2essh.SSH(ctx, "stat -fc %T /sys/fs/cgroup/", host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	gomega.Expect(result.Code).To(gomega.Equal(0))
 
 	// 0x63677270 == CGROUP2_SUPER_MAGIC
 	// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
@@ -380,7 +380,7 @@ func getNpdPodStat(ctx context.Context, f *framework.Framework, nodeName string)
 
 	hasNpdPod := false
 	for _, pod := range summary.Pods {
-		if !strings.HasPrefix(pod.PodRef.Name, "npd") {
+		if !strings.HasPrefix(pod.PodRef.Name, "node-problem-detector") {
 			continue
 		}
 		cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9

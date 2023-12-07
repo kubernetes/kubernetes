@@ -97,9 +97,9 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	}
 
 	duration := maxHousekeepingInterval
-	housekeepingConfig := manager.HouskeepingConfig{
+	housekeepingConfig := manager.HousekeepingConfig{
 		Interval:     &duration,
-		AllowDynamic: pointer.BoolPtr(allowDynamicHousekeeping),
+		AllowDynamic: pointer.Bool(allowDynamicHousekeeping),
 	}
 
 	// Create the cAdvisor container manager.
@@ -184,6 +184,14 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 	}
 
 	return res[0], nil
+}
+
+func (cc *cadvisorClient) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
+	label, err := cc.imageFsInfoProvider.ContainerFsInfoLabel()
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+	return cc.getFsInfo(label)
 }
 
 func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {

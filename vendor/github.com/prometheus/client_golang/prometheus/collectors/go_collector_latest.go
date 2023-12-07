@@ -28,6 +28,8 @@ var (
 	MetricsAll = GoRuntimeMetricsRule{regexp.MustCompile("/.*")}
 	// MetricsGC allows only GC metrics to be collected from Go runtime.
 	// e.g. go_gc_cycles_automatic_gc_cycles_total
+	// NOTE: This does not include new class of "/cpu/classes/gc/..." metrics.
+	// Use custom metric rule to access those.
 	MetricsGC = GoRuntimeMetricsRule{regexp.MustCompile(`^/gc/.*`)}
 	// MetricsMemory allows only memory metrics to be collected from Go runtime.
 	// e.g. go_memory_classes_heap_free_bytes

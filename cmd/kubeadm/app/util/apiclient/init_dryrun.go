@@ -109,7 +109,7 @@ func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (boo
 				{
 					Name:       "https",
 					Port:       443,
-					TargetPort: intstr.FromInt(6443),
+					TargetPort: intstr.FromInt32(6443),
 				},
 			},
 		},

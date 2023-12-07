@@ -18,7 +18,10 @@ package spec3
 
 import (
 	"encoding/json"
+
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -32,6 +35,9 @@ type MediaType struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode MediaType as JSON
 func (m *MediaType) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(m)
+	}
 	b1, err := json.Marshal(m.MediaTypeProps)
 	if err != nil {
 		return nil, err
@@ -43,13 +49,40 @@ func (m *MediaType) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
+func (e *MediaType) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		MediaTypeProps mediaTypePropsOmitZero `json:",inline"`
+		spec.Extensions
+	}
+	x.Extensions = internal.SanitizeExtensions(e.Extensions)
+	x.MediaTypeProps = mediaTypePropsOmitZero(e.MediaTypeProps)
+	return opts.MarshalNext(enc, x)
+}
+
 func (m *MediaType) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, m)
+	}
 	if err := json.Unmarshal(data, &m.MediaTypeProps); err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, &m.VendorExtensible); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (m *MediaType) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		spec.Extensions
+		MediaTypeProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	m.Extensions = internal.SanitizeExtensions(x.Extensions)
+	m.MediaTypeProps = x.MediaTypeProps
+
 	return nil
 }
 
@@ -62,5 +95,12 @@ type MediaTypeProps struct {
 	// Examples of the media type. Each example object should match the media type and specific schema if present
 	Examples map[string]*Example `json:"examples,omitempty"`
 	// A map between a property name and its encoding information. The key, being the property name, MUST exist in the schema as a property. The encoding object SHALL only apply to requestBody objects when the media type is multipart or application/x-www-form-urlencoded
+	Encoding map[string]*Encoding `json:"encoding,omitempty"`
+}
+
+type mediaTypePropsOmitZero struct {
+	Schema   *spec.Schema         `json:"schema,omitzero"`
+	Example  interface{}          `json:"example,omitempty"`
+	Examples map[string]*Example  `json:"examples,omitempty"`
 	Encoding map[string]*Encoding `json:"encoding,omitempty"`
 }

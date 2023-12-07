@@ -20,6 +20,9 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -33,6 +36,9 @@ type Example struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode RequestBody as JSON
 func (e *Example) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(e)
+	}
 	b1, err := json.Marshal(e.Refable)
 	if err != nil {
 		return nil, err
@@ -47,8 +53,22 @@ func (e *Example) MarshalJSON() ([]byte, error) {
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
+func (e *Example) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref          string `json:"$ref,omitempty"`
+		ExampleProps `json:",inline"`
+		spec.Extensions
+	}
+	x.Ref = e.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(e.Extensions)
+	x.ExampleProps = e.ExampleProps
+	return opts.MarshalNext(enc, x)
+}
 
 func (e *Example) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, e)
+	}
 	if err := json.Unmarshal(data, &e.Refable); err != nil {
 		return err
 	}
@@ -58,6 +78,23 @@ func (e *Example) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &e.VendorExtensible); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (e *Example) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		spec.Extensions
+		ExampleProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	if err := internal.JSONRefFromMap(&e.Ref.Ref, x.Extensions); err != nil {
+		return err
+	}
+	e.Extensions = internal.SanitizeExtensions(x.Extensions)
+	e.ExampleProps = x.ExampleProps
+
 	return nil
 }
 

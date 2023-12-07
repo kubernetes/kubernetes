@@ -49,7 +49,7 @@ func NewGenericControllerManagerConfigurationOptions(cfg *cmconfig.GenericContro
 }
 
 // AddFlags adds flags related to generic for controller manager to the specified FlagSet.
-func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.NamedFlagSets, allControllers, disabledByDefaultControllers []string) {
+func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.NamedFlagSets, allControllers, disabledByDefaultControllers []string, controllerAliases map[string]string) {
 	if o == nil {
 		return
 	}
@@ -71,7 +71,7 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.Nam
 }
 
 // ApplyTo fills up generic config with options.
-func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *cmconfig.GenericControllerManagerConfiguration) error {
+func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *cmconfig.GenericControllerManagerConfiguration, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) error {
 	if o == nil {
 		return nil
 	}
@@ -88,13 +88,26 @@ func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *cmconfig.Gen
 	cfg.ClientConnection = o.ClientConnection
 	cfg.ControllerStartInterval = o.ControllerStartInterval
 	cfg.LeaderElection = o.LeaderElection
-	cfg.Controllers = o.Controllers
+
+	// copy controller names and replace aliases with canonical names
+	cfg.Controllers = make([]string, len(o.Controllers))
+	for i, initialName := range o.Controllers {
+		initialNameWithoutPrefix := strings.TrimPrefix(initialName, "-")
+		controllerName := initialNameWithoutPrefix
+		if canonicalName, ok := controllerAliases[controllerName]; ok {
+			controllerName = canonicalName
+		}
+		if strings.HasPrefix(initialName, "-") {
+			controllerName = fmt.Sprintf("-%s", controllerName)
+		}
+		cfg.Controllers[i] = controllerName
+	}
 
 	return nil
 }
 
 // Validate checks validation of GenericOptions.
-func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers []string, disabledByDefaultControllers []string) []error {
+func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) []error {
 	if o == nil {
 		return nil
 	}
@@ -109,13 +122,17 @@ func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers [
 	}
 
 	allControllersSet := sets.NewString(allControllers...)
-	for _, controller := range o.Controllers {
-		if controller == "*" {
+	for _, initialName := range o.Controllers {
+		if initialName == "*" {
 			continue
 		}
-		controller = strings.TrimPrefix(controller, "-")
-		if !allControllersSet.Has(controller) {
-			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
+		initialNameWithoutPrefix := strings.TrimPrefix(initialName, "-")
+		controllerName := initialNameWithoutPrefix
+		if canonicalName, ok := controllerAliases[controllerName]; ok {
+			controllerName = canonicalName
+		}
+		if !allControllersSet.Has(controllerName) {
+			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", initialNameWithoutPrefix))
 		}
 	}
 

@@ -17,6 +17,8 @@ limitations under the License.
 package volumemanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -46,12 +48,12 @@ func (f *FakeVolumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan 
 }
 
 // WaitForAttachAndMount is not implemented
-func (f *FakeVolumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
+func (f *FakeVolumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
 // WaitForUnmount is not implemented
-func (f *FakeVolumeManager) WaitForUnmount(pod *v1.Pod) error {
+func (f *FakeVolumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 

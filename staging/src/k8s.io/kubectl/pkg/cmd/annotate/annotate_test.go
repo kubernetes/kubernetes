@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -440,7 +440,7 @@ func TestAnnotateErrors(t *testing.T) {
 
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			iostreams, _, bufOut, bufErr := genericclioptions.NewTestIOStreams()
+			iostreams, _, bufOut, bufErr := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)
@@ -498,7 +498,7 @@ func TestAnnotateObject(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
@@ -564,7 +564,7 @@ func TestAnnotateResourceVersion(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
@@ -619,7 +619,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
@@ -651,7 +651,7 @@ func TestAnnotateLocal(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	flags := NewAnnotateFlags(iostreams)
 	flags.Local = true
@@ -707,7 +707,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(iostreams.Out)
 	cmd.SetErr(iostreams.Out)

@@ -14,20 +14,16 @@
 package prometheus
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/cespare/xxhash/v2"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/model"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/prometheus/client_golang/prometheus/internal"
-
-	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/golang/protobuf/proto"
-	"github.com/prometheus/common/model"
-
-	dto "github.com/prometheus/client_model/go"
 )
 
 // Desc is the descriptor used by every Prometheus Metric. It is essentially
@@ -54,9 +50,9 @@ type Desc struct {
 	// constLabelPairs contains precalculated DTO label pairs based on
 	// the constant labels.
 	constLabelPairs []*dto.LabelPair
-	// variableLabels contains names of labels for which the metric
-	// maintains variable values.
-	variableLabels []string
+	// variableLabels contains names of labels and normalization function for
+	// which the metric maintains variable values.
+	variableLabels ConstrainedLabels
 	// id is a hash of the values of the ConstLabels and fqName. This
 	// must be unique among all registered descriptors and can therefore be
 	// used as an identifier of the descriptor.
@@ -80,10 +76,24 @@ type Desc struct {
 // For constLabels, the label values are constant. Therefore, they are fully
 // specified in the Desc. See the Collector example for a usage pattern.
 func NewDesc(fqName, help string, variableLabels []string, constLabels Labels) *Desc {
+	return V2.NewDesc(fqName, help, UnconstrainedLabels(variableLabels), constLabels)
+}
+
+// NewDesc allocates and initializes a new Desc. Errors are recorded in the Desc
+// and will be reported on registration time. variableLabels and constLabels can
+// be nil if no such labels should be set. fqName must not be empty.
+//
+// variableLabels only contain the label names and normalization functions. Their
+// label values are variable and therefore not part of the Desc. (They are managed
+// within the Metric.)
+//
+// For constLabels, the label values are constant. Therefore, they are fully
+// specified in the Desc. See the Collector example for a usage pattern.
+func (v2) NewDesc(fqName, help string, variableLabels ConstrainableLabels, constLabels Labels) *Desc {
 	d := &Desc{
 		fqName:         fqName,
 		help:           help,
-		variableLabels: variableLabels,
+		variableLabels: variableLabels.constrainedLabels(),
 	}
 	if !model.IsValidMetricName(model.LabelValue(fqName)) {
 		d.err = fmt.Errorf("%q is not a valid metric name", fqName)
@@ -93,7 +103,7 @@ func NewDesc(fqName, help string, variableLabels []string, constLabels Labels) *
 	// their sorted label names) plus the fqName (at position 0).
 	labelValues := make([]string, 1, len(constLabels)+1)
 	labelValues[0] = fqName
-	labelNames := make([]string, 0, len(constLabels)+len(variableLabels))
+	labelNames := make([]string, 0, len(constLabels)+len(d.variableLabels))
 	labelNameSet := map[string]struct{}{}
 	// First add only the const label names and sort them...
 	for labelName := range constLabels {
@@ -118,16 +128,16 @@ func NewDesc(fqName, help string, variableLabels []string, constLabels Labels) *
 	// Now add the variable label names, but prefix them with something that
 	// cannot be in a regular label name. That prevents matching the label
 	// dimension with a different mix between preset and variable labels.
-	for _, labelName := range variableLabels {
-		if !checkLabelName(labelName) {
-			d.err = fmt.Errorf("%q is not a valid label name for metric %q", labelName, fqName)
+	for _, label := range d.variableLabels {
+		if !checkLabelName(label.Name) {
+			d.err = fmt.Errorf("%q is not a valid label name for metric %q", label.Name, fqName)
 			return d
 		}
-		labelNames = append(labelNames, "$"+labelName)
-		labelNameSet[labelName] = struct{}{}
+		labelNames = append(labelNames, "$"+label.Name)
+		labelNameSet[label.Name] = struct{}{}
 	}
 	if len(labelNames) != len(labelNameSet) {
-		d.err = errors.New("duplicate label names")
+		d.err = fmt.Errorf("duplicate label names in constant and variable labels for metric %q", fqName)
 		return d
 	}
 

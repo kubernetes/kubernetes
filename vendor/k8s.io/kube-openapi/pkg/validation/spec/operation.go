@@ -42,6 +42,23 @@ type OperationProps struct {
 	Responses    *Responses             `json:"responses,omitempty"`
 }
 
+// Marshaling structure only, always edit along with corresponding
+// struct (or compilation will fail).
+type operationPropsOmitZero struct {
+	Description  string                 `json:"description,omitempty"`
+	Consumes     []string               `json:"consumes,omitempty"`
+	Produces     []string               `json:"produces,omitempty"`
+	Schemes      []string               `json:"schemes,omitempty"`
+	Tags         []string               `json:"tags,omitempty"`
+	Summary      string                 `json:"summary,omitempty"`
+	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitzero"`
+	ID           string                 `json:"operationId,omitempty"`
+	Deprecated   bool                   `json:"deprecated,omitempty,omitzero"`
+	Security     []map[string][]string  `json:"security,omitempty"`
+	Parameters   []Parameter            `json:"parameters,omitempty"`
+	Responses    *Responses             `json:"responses,omitzero"`
+}
+
 // MarshalJSON takes care of serializing operation properties to JSON
 //
 // We use a custom marhaller here to handle a special cases related to
@@ -96,17 +113,16 @@ func (o *Operation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.
 	if err := opts.UnmarshalNext(dec, &x); err != nil {
 		return err
 	}
-	x.Extensions.sanitize()
-	if len(x.Extensions) == 0 {
-		x.Extensions = nil
-	}
-	o.VendorExtensible.Extensions = x.Extensions
+	o.Extensions = internal.SanitizeExtensions(x.Extensions)
 	o.OperationProps = OperationProps(x.OperationPropsNoMethods)
 	return nil
 }
 
 // MarshalJSON converts this items object to JSON
 func (o Operation) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshaling {
+		return internal.DeterministicMarshal(o)
+	}
 	b1, err := json.Marshal(o.OperationProps)
 	if err != nil {
 		return nil, err
@@ -117,4 +133,14 @@ func (o Operation) MarshalJSON() ([]byte, error) {
 	}
 	concated := swag.ConcatJSON(b1, b2)
 	return concated, nil
+}
+
+func (o Operation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Extensions
+		OperationProps operationPropsOmitZero `json:",inline"`
+	}
+	x.Extensions = internal.SanitizeExtensions(o.Extensions)
+	x.OperationProps = operationPropsOmitZero(o.OperationProps)
+	return opts.MarshalNext(enc, x)
 }

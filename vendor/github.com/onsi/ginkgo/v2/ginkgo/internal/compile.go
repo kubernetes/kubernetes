@@ -25,7 +25,16 @@ func CompileSuite(suite TestSuite, goFlagsConfig types.GoFlagsConfig) TestSuite 
 		return suite
 	}
 
-	args, err := types.GenerateGoTestCompileArgs(goFlagsConfig, path, "./")
+	ginkgoInvocationPath, _ := os.Getwd()
+	ginkgoInvocationPath, _ = filepath.Abs(ginkgoInvocationPath)
+	packagePath := suite.AbsPath()
+	pathToInvocationPath, err := filepath.Rel(packagePath, ginkgoInvocationPath)
+	if err != nil {
+		suite.State = TestSuiteStateFailedToCompile
+		suite.CompilationError = fmt.Errorf("Failed to get relative path from package to the current working directory:\n%s", err.Error())
+		return suite
+	}
+	args, err := types.GenerateGoTestCompileArgs(goFlagsConfig, path, "./", pathToInvocationPath)
 	if err != nil {
 		suite.State = TestSuiteStateFailedToCompile
 		suite.CompilationError = fmt.Errorf("Failed to generate go test compile flags:\n%s", err.Error())

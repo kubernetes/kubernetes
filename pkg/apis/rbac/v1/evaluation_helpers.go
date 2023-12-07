@@ -21,12 +21,7 @@ import (
 	"strings"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-func RoleRefGroupKind(roleRef rbacv1.RoleRef) schema.GroupKind {
-	return schema.GroupKind{Group: roleRef.APIGroup, Kind: roleRef.Kind}
-}
 
 func VerbMatches(rule *rbacv1.PolicyRule, requestedVerb string) bool {
 	for _, ruleVerb := range rule.Verbs {
@@ -110,36 +105,6 @@ func NonResourceURLMatches(rule *rbacv1.PolicyRule, requestedURL string) bool {
 	}
 
 	return false
-}
-
-// subjectsStrings returns users, groups, serviceaccounts, unknown for display purposes.
-func SubjectsStrings(subjects []rbacv1.Subject) ([]string, []string, []string, []string) {
-	users := []string{}
-	groups := []string{}
-	sas := []string{}
-	others := []string{}
-
-	for _, subject := range subjects {
-		switch subject.Kind {
-		case rbacv1.ServiceAccountKind:
-			sas = append(sas, fmt.Sprintf("%s/%s", subject.Namespace, subject.Name))
-
-		case rbacv1.UserKind:
-			users = append(users, subject.Name)
-
-		case rbacv1.GroupKind:
-			groups = append(groups, subject.Name)
-
-		default:
-			others = append(others, fmt.Sprintf("%s/%s/%s", subject.Kind, subject.Namespace, subject.Name))
-		}
-	}
-
-	return users, groups, sas, others
-}
-
-func String(r rbacv1.PolicyRule) string {
-	return "PolicyRule" + CompactString(r)
 }
 
 // CompactString exposes a compact string representation for use in escalation error messages

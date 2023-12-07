@@ -36,7 +36,7 @@ import (
 // This will require some smart.
 var _ = SIGDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// TODO permission denied cleanup failures
@@ -49,7 +49,7 @@ var _ = SIGDescribe("HostPath", func() {
 	   Create a Pod with host volume mounted. The volume mounted MUST be a directory with permissions mode -rwxrwxrwx and that is has the sticky bit (mode flag t) set.
 	   This test is marked LinuxOnly since Windows does not support setting the sticky bit (mode flag t).
 	*/
-	ginkgo.It("should give a volume the correct mode [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+	f.It("should give a volume the correct mode [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
@@ -66,7 +66,7 @@ var _ = SIGDescribe("HostPath", func() {
 	})
 
 	// This test requires mounting a folder into a container with write privileges.
-	ginkgo.It("should support r/w [NodeConformance]", func(ctx context.Context) {
+	f.It("should support r/w", f.WithNodeConformance(), func(ctx context.Context) {
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
@@ -94,7 +94,7 @@ var _ = SIGDescribe("HostPath", func() {
 		})
 	})
 
-	ginkgo.It("should support subPath [NodeConformance]", func(ctx context.Context) {
+	f.It("should support subPath", f.WithNodeConformance(), func(ctx context.Context) {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180

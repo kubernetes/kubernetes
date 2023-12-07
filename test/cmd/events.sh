@@ -42,6 +42,61 @@ run_kubectl_events_tests() {
     kube::test::get_object_assert 'cronjob --namespace=test-events' "{{range.items}}{{ if eq $id_field \"pi\" }}found{{end}}{{end}}:" ':'
     ### Create a cronjob in a specific namespace
     kubectl create cronjob pi --schedule="59 23 31 2 *" --namespace=test-events "--image=$IMAGE_PERL" -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]:?}"
+    ### Create a crd
+    kubectl create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "metadata": {
+    "name": "cronjobs.example.com"
+  },
+  "spec": {
+    "group": "example.com",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "cronjobs",
+      "singular": "cronjob",
+      "kind": "Cronjob"
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "properties": {
+              "spec": {
+                "type": "object",
+                "properties": {
+                  "image": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+__EOF__
+
+    ### Create a example.com/v1 Cronjob in a specific namespace
+    kubectl create -f - << __EOF__
+{
+  "kind": "Cronjob",
+  "apiVersion": "example.com/v1",
+  "metadata": {
+    "name": "pi",
+    "namespace": "test-events"
+  },
+  "spec": {
+    "image": "test"
+  }
+}
+__EOF__
+
     # Post-Condition: assertion object exists
     kube::test::get_object_assert 'cronjob/pi --namespace=test-events' "{{$id_field}}" 'pi'
 
@@ -55,6 +110,18 @@ run_kubectl_events_tests() {
 
     # Post-Condition: events returns event for Cronjob/pi when --for flag is used
     output_message=$(kubectl events -n test-events --for=Cronjob/pi "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events returns event for fully qualified Cronjob.v1.batch/pi when --for flag is used
+    output_message=$(kubectl events -n test-events --for Cronjob.v1.batch/pi "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events not returns event for fully qualified Cronjob.v1.example.com/pi when --for flag is used
+    output_message=$(kubectl events -n test-events --for Cronjob.v1.example.com/pi "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_not_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events returns event for fully qualified without version Cronjob.batch/pi when --for flag is used
+    output_message=$(kubectl events -n test-events --for=Cronjob.batch/pi "${kube_flags[@]:?}" 2>&1)
     kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
 
     # Post-Condition: events returns event for Cronjob/pi when watch is enabled
@@ -84,6 +151,8 @@ run_kubectl_events_tests() {
 
     #Clean up
     kubectl delete cronjob pi --namespace=test-events
+    kubectl delete cronjobs.v1.example.com pi --namespace=test-events
+    kubectl delete crd cronjobs.example.com
     kubectl delete namespace test-events
 
     set +o nounset

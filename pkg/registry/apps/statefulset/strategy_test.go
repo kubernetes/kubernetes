@@ -308,7 +308,7 @@ func generateStatefulSetWithMinReadySeconds(minReadySeconds int32) *apps.Statefu
 func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	rollingUpdate := apps.RollingUpdateStatefulSetStrategy{}
 	if maxUnavailable != nil {
-		maxUnavailableIntStr := intstr.FromInt(*maxUnavailable)
+		maxUnavailableIntStr := intstr.FromInt32(int32(*maxUnavailable))
 		rollingUpdate = apps.RollingUpdateStatefulSetStrategy{
 			MaxUnavailable: &maxUnavailableIntStr,
 		}

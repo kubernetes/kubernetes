@@ -38,10 +38,15 @@ type Manager interface {
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
+
+	// GetContainerClaimInfos gets Container ClaimInfo objects
+	GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error)
 }
 
 // ContainerInfo contains information required by the runtime to consume prepared resources.
 type ContainerInfo struct {
 	// The Annotations for the container
 	Annotations []kubecontainer.Annotation
+	// CDI Devices for the container
+	CDIDevices []kubecontainer.CDIDevice
 }

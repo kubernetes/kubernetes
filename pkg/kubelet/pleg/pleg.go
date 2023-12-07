@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // PodLifeCycleEventType define the event type of pod life cycle events.
@@ -63,9 +64,16 @@ type PodLifecycleEvent struct {
 // PodLifecycleEventGenerator contains functions for generating pod life cycle events.
 type PodLifecycleEventGenerator interface {
 	Start()
-	Stop()
-	Update(relistDuration *RelistDuration)
 	Watch() chan *PodLifecycleEvent
 	Healthy() (bool, error)
+	UpdateCache(*kubecontainer.Pod, types.UID) (error, bool)
+}
+
+// podLifecycleEventGeneratorHandler contains functions that are useful for different PLEGs
+// and need not be exposed to rest of the kubelet
+type podLifecycleEventGeneratorHandler interface {
+	PodLifecycleEventGenerator
+	Stop()
+	Update(relistDuration *RelistDuration)
 	Relist()
 }

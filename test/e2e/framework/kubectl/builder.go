@@ -22,6 +22,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -48,9 +49,12 @@ func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
 	return b
 }
 
-// WithEnv sets the given environment and returns itself.
-func (b *KubectlBuilder) WithEnv(env []string) *KubectlBuilder {
-	b.cmd.Env = env
+// AppendEnv appends the given environment and returns itself.
+func (b *KubectlBuilder) AppendEnv(env []string) *KubectlBuilder {
+	if b.cmd.Env == nil {
+		b.cmd.Env = os.Environ()
+	}
+	b.cmd.Env = append(b.cmd.Env, env...)
 	return b
 }
 

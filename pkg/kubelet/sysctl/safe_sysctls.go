@@ -16,17 +16,83 @@ limitations under the License.
 
 package sysctl
 
+import (
+	goruntime "runtime"
+
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog/v2"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
+)
+
+type sysctl struct {
+	// the name of sysctl
+	name string
+	// the minimum kernel version where the sysctl is available
+	kernel string
+}
+
+var safeSysctls = []sysctl{
+	{
+		name: "kernel.shm_rmid_forced",
+	}, {
+		name: "net.ipv4.ip_local_port_range",
+	}, {
+		name: "net.ipv4.tcp_syncookies",
+	}, {
+		name: "net.ipv4.ping_group_range",
+	}, {
+		name: "net.ipv4.ip_unprivileged_port_start",
+	}, {
+		name:   "net.ipv4.ip_local_reserved_ports",
+		kernel: utilkernel.IPLocalReservedPortsNamespacedKernelVersion,
+	}, {
+		name:   "net.ipv4.tcp_keepalive_time",
+		kernel: utilkernel.TCPKeepAliveTimeNamespacedKernelVersion,
+	}, {
+		name:   "net.ipv4.tcp_fin_timeout",
+		kernel: utilkernel.TCPFinTimeoutNamespacedKernelVersion,
+	},
+	{
+		name:   "net.ipv4.tcp_keepalive_intvl",
+		kernel: utilkernel.TCPKeepAliveIntervalNamespacedKernelVersion,
+	},
+	{
+		name:   "net.ipv4.tcp_keepalive_probes",
+		kernel: utilkernel.TCPKeepAliveProbesNamespacedKernelVersion,
+	},
+}
+
 // SafeSysctlAllowlist returns the allowlist of safe sysctls and safe sysctl patterns (ending in *).
 //
 // A sysctl is called safe iff
 // - it is namespaced in the container or the pod
 // - it is isolated, i.e. has no influence on any other pod on the same node.
 func SafeSysctlAllowlist() []string {
-	return []string{
-		"kernel.shm_rmid_forced",
-		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_syncookies",
-		"net.ipv4.ping_group_range",
-		"net.ipv4.ip_unprivileged_port_start",
+	if goruntime.GOOS != "linux" {
+		return nil
 	}
+
+	return getSafeSysctlAllowlist(utilkernel.GetVersion)
+}
+
+func getSafeSysctlAllowlist(getVersion func() (*version.Version, error)) []string {
+	kernelVersion, err := getVersion()
+	if err != nil {
+		klog.ErrorS(err, "failed to get kernel version, unable to determine which sysctls are available")
+	}
+
+	var safeSysctlAllowlist []string
+	for _, sc := range safeSysctls {
+		if sc.kernel == "" {
+			safeSysctlAllowlist = append(safeSysctlAllowlist, sc.name)
+			continue
+		}
+
+		if kernelVersion != nil && kernelVersion.AtLeast(version.MustParseGeneric(sc.kernel)) {
+			safeSysctlAllowlist = append(safeSysctlAllowlist, sc.name)
+		} else {
+			klog.InfoS("kernel version is too old, dropping the sysctl from safe sysctl list", "kernelVersion", kernelVersion, "sysctl", sc.name)
+		}
+	}
+	return safeSysctlAllowlist
 }

@@ -1,3 +1,18 @@
+// Copyright 2019 Wataru Ishida. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package sctp
 
 import (
@@ -490,6 +505,14 @@ func (c *SCTPConn) GetDefaultSentParam() (*SndRcvInfo, error) {
 	return info, err
 }
 
+func (c *SCTPConn) Getsockopt(optname, optval, optlen uintptr) (uintptr, uintptr, error) {
+	return getsockopt(c.fd(), optname, optval, optlen)
+}
+
+func (c *SCTPConn) Setsockopt(optname, optval, optlen uintptr) (uintptr, uintptr, error) {
+	return setsockopt(c.fd(), optname, optval, optlen)
+}
+
 func resolveFromRawAddr(ptr unsafe.Pointer, n int) (*SCTPAddr, error) {
 	addr := &SCTPAddr{
 		IPAddrs: make([]net.IPAddr, n),
@@ -693,4 +716,22 @@ func (c *SCTPSndRcvInfoWrappedConn) SetReadBuffer(bytes int) error {
 
 func (c *SCTPSndRcvInfoWrappedConn) GetReadBuffer() (int, error) {
 	return c.conn.GetReadBuffer()
+}
+
+// SocketConfig contains options for the SCTP socket.
+type SocketConfig struct {
+	// If Control is not nil it is called after the socket is created but before
+	// it is bound or connected.
+	Control func(network, address string, c syscall.RawConn) error
+
+	// InitMsg is the options to send in the initial SCTP message
+	InitMsg InitMsg
+}
+
+func (cfg *SocketConfig) Listen(net string, laddr *SCTPAddr) (*SCTPListener, error) {
+	return listenSCTPExtConfig(net, laddr, cfg.InitMsg, cfg.Control)
+}
+
+func (cfg *SocketConfig) Dial(net string, laddr, raddr *SCTPAddr) (*SCTPConn, error) {
+	return dialSCTPExtConfig(net, laddr, raddr, cfg.InitMsg, cfg.Control)
 }

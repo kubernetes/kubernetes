@@ -6,3 +6,4 @@ reviewers:
   - sig-network-reviewers
 labels:
   - sig/network
+  - area/kube-proxy

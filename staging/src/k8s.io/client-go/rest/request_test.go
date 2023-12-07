@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
@@ -137,11 +136,6 @@ func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 	r := (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("/foo/")
-	if s := r.URL().String(); s != "/foo/" {
-		t.Errorf("trailing slash should be preserved: %s", s)
-	}
-
-	r = (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -323,7 +317,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test error set when failing to read file
-	f, err := os.CreateTemp("", "test")
+	f, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
@@ -925,22 +919,22 @@ func TestTransformUnstructuredError(t *testing.T) {
 				expect = err
 			}
 			if !reflect.DeepEqual(expect, transformed) {
-				t.Errorf("unexpected Error(): %s", diff.ObjectReflectDiff(expect, transformed))
+				t.Errorf("unexpected Error(): %s", cmp.Diff(expect, transformed))
 			}
 
 			// verify result.Get properly transforms the error
 			if _, err := result.Get(); !reflect.DeepEqual(expect, err) {
-				t.Errorf("unexpected error on Get(): %s", diff.ObjectReflectDiff(expect, err))
+				t.Errorf("unexpected error on Get(): %s", cmp.Diff(expect, err))
 			}
 
 			// verify result.Into properly handles the error
 			if err := result.Into(&v1.Pod{}); !reflect.DeepEqual(expect, err) {
-				t.Errorf("unexpected error on Into(): %s", diff.ObjectReflectDiff(expect, err))
+				t.Errorf("unexpected error on Into(): %s", cmp.Diff(expect, err))
 			}
 
 			// verify result.Raw leaves the error in the untransformed state
 			if _, err := result.Raw(); !reflect.DeepEqual(result.err, err) {
-				t.Errorf("unexpected error on Raw(): %s", diff.ObjectReflectDiff(expect, err))
+				t.Errorf("unexpected error on Raw(): %s", cmp.Diff(expect, err))
 			}
 		})
 	}
@@ -1220,7 +1214,7 @@ func TestRequestWatch(t *testing.T) {
 						t.Fatalf("Watch closed early, %d/%d read", i, len(testCase.Expect))
 					}
 					if !reflect.DeepEqual(evt, out) {
-						t.Fatalf("Event %d does not match: %s", i, diff.ObjectReflectDiff(evt, out))
+						t.Fatalf("Event %d does not match: %s", i, cmp.Diff(evt, out))
 					}
 				}
 			}
@@ -1466,7 +1460,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1709,7 +1703,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1748,7 +1742,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1803,7 +1797,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1848,7 +1842,7 @@ func TestWasCreated(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{

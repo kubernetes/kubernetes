@@ -43,6 +43,10 @@ import (
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
 
+	// define and freeze constants
+	_ "k8s.io/kubernetes/test/e2e/feature"
+	_ "k8s.io/kubernetes/test/e2e/nodefeature"
+
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
 	_ "k8s.io/kubernetes/test/e2e/apps"
@@ -90,6 +94,11 @@ func TestMain(m *testing.M) {
 	if versionFlag {
 		fmt.Printf("%s\n", version.Get())
 		os.Exit(0)
+	}
+
+	if flag.CommandLine.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", flag.CommandLine.Args())
+		os.Exit(1)
 	}
 
 	// Enable embedded FS file lookup as fallback

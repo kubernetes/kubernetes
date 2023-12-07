@@ -22,6 +22,7 @@ window.
 
 * Paul Moore, paul@paul-moore.com
 * Tom Hromatka, tom.hromatka@oracle.com
+* Kir Kolyshkin, kolyshkin@gmail.com
 
 ### Resolving Sensitive Security Issues
 

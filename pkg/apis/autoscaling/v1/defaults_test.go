@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
@@ -46,7 +46,7 @@ func TestSetDefaultHPA(t *testing.T) {
 		{
 			hpa: autoscalingv1.HorizontalPodAutoscaler{
 				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32Ptr(3),
+					MinReplicas: utilpointer.Int32(3),
 				},
 			},
 			expectReplicas: 3,
@@ -124,7 +124,7 @@ func TestHorizontalPodAutoscalerAnnotations(t *testing.T) {
 			t.Fatalf("unexpected object: %v", obj)
 		}
 		if !reflect.DeepEqual(*hpa, hpaBeforeMuatate) {
-			t.Errorf("diff: %v", diff.ObjectDiff(*hpa, hpaBeforeMuatate))
+			t.Errorf("diff: %v", cmp.Diff(*hpa, hpaBeforeMuatate))
 			t.Errorf("expected: %#v\n actual:   %#v", *hpa, hpaBeforeMuatate)
 		}
 

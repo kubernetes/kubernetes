@@ -25,6 +25,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -308,11 +309,30 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 }
 
 func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string, validation rest.ValidateObjectFunc, options *metav1.DeleteOptions) error {
-	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-		pod, err := getPod(r, ctx, name)
-		if err != nil {
-			return err
+	if !dryrun.IsDryRun(options.DryRun) && feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		getLatestPod := func(_ context.Context, _, oldObj runtime.Object) (runtime.Object, error) {
+			// Throwaway the newObj. We care only about the latest pod obtained from etcd (oldObj).
+			// So we can add DisruptionTarget condition in conditionAppender without conflicts.
+			latestPod := oldObj.(*api.Pod).DeepCopy()
+			if options.Preconditions != nil {
+				if uid := options.Preconditions.UID; uid != nil && len(*uid) > 0 && *uid != latestPod.UID {
+					return nil, errors.NewConflict(
+						schema.GroupResource{Group: "", Resource: "Pod"},
+						latestPod.Name,
+						fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *uid, latestPod.UID),
+					)
+				}
+				if rv := options.Preconditions.ResourceVersion; rv != nil && len(*rv) > 0 && *rv != latestPod.ResourceVersion {
+					return nil, errors.NewConflict(
+						schema.GroupResource{Group: "", Resource: "Pod"},
+						latestPod.Name,
+						fmt.Errorf("the ResourceVersion in the precondition (%s) does not match the ResourceVersion in record (%s). The object might have been modified", *rv, latestPod.ResourceVersion),
+					)
+				}
+			}
+			return latestPod, nil
 		}
+
 		conditionAppender := func(_ context.Context, newObj, _ runtime.Object) (runtime.Object, error) {
 			podObj := newObj.(*api.Pod)
 			podutil.UpdatePodCondition(&podObj.Status, &api.PodCondition{
@@ -324,10 +344,21 @@ func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string,
 			return podObj, nil
 		}
 
-		podCopyUpdated := rest.DefaultUpdatedObjectInfo(pod, conditionAppender)
+		podUpdatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, getLatestPod, conditionAppender) // order important
 
-		if _, _, err = r.store.Update(ctx, name, podCopyUpdated, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		updatedPodObject, _, err := r.store.Update(ctx, name, podUpdatedObjectInfo, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if err != nil {
 			return err
+		}
+
+		if !resourceVersionIsUnset(options) {
+			newResourceVersion, err := meta.NewAccessor().ResourceVersion(updatedPodObject)
+			if err != nil {
+				return err
+			}
+			// bump the resource version, since we are the one who modified it via the update
+			options = options.DeepCopy()
+			options.Preconditions.ResourceVersion = &newResourceVersion
 		}
 	}
 	_, _, err := r.store.Delete(ctx, name, rest.ValidateAllObjectFunc, options)
@@ -444,8 +475,7 @@ func (r *EvictionREST) getPodDisruptionBudgets(ctx context.Context, pod *api.Pod
 			// This object has an invalid selector, it does not match the pod
 			continue
 		}
-		// If a PDB with a nil or empty selector creeps in, it should match nothing, not everything.
-		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 

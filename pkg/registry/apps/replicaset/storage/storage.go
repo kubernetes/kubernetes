@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -54,12 +54,12 @@ type ReplicaSetStorage struct {
 }
 
 // ReplicasPathMappings returns the mappings between each group version and a replicas path
-func ReplicasPathMappings() fieldmanager.ResourcePathMappings {
+func ReplicasPathMappings() managedfields.ResourcePathMappings {
 	return replicasPathInReplicaSet
 }
 
 // maps a group version to the replicas path in a replicaset object
-var replicasPathInReplicaSet = fieldmanager.ResourcePathMappings{
+var replicasPathInReplicaSet = managedfields.ResourcePathMappings{
 	schema.GroupVersion{Group: "apps", Version: "v1beta2"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 	schema.GroupVersion{Group: "apps", Version: "v1"}.String():      fieldpath.MakePathOrDie("spec", "replicas"),
 }
@@ -317,7 +317,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		}
 	}
 
-	managedFieldsHandler := fieldmanager.NewScaleHandler(
+	managedFieldsHandler := managedfields.NewScaleHandler(
 		replicaset.ManagedFields,
 		groupVersion,
 		replicasPathInReplicaSet,

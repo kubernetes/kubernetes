@@ -197,36 +197,37 @@ func (c FieldClearer) Filter(rn *RNode) (*RNode, error) {
 		return nil, err
 	}
 
-	for i := 0; i < len(rn.Content()); i += 2 {
-		// if name matches, remove these 2 elements from the list because
-		// they are treated as a fieldName/fieldValue pair.
-		if rn.Content()[i].Value == c.Name {
-			if c.IfEmpty {
-				if len(rn.Content()[i+1].Content) > 0 {
-					continue
-				}
-			}
-
-			// save the item we are about to remove
-			removed := NewRNode(rn.Content()[i+1])
-			if len(rn.YNode().Content) > i+2 {
-				l := len(rn.YNode().Content)
-				// remove from the middle of the list
-				rn.YNode().Content = rn.Content()[:i]
-				rn.YNode().Content = append(
-					rn.YNode().Content,
-					rn.Content()[i+2:l]...)
-			} else {
-				// remove from the end of the list
-				rn.YNode().Content = rn.Content()[:i]
-			}
-
-			// return the removed field name and value
-			return removed, nil
+	var removed *RNode
+	visitFieldsWhileTrue(rn.Content(), func(key, value *yaml.Node, keyIndex int) bool {
+		if key.Value != c.Name {
+			return true
 		}
-	}
-	// nothing removed
-	return nil, nil
+
+		// the name matches: remove these 2 elements from the list because
+		// they are treated as a fieldName/fieldValue pair.
+		if c.IfEmpty {
+			if len(value.Content) > 0 {
+				return true
+			}
+		}
+
+		// save the item we are about to remove
+		removed = NewRNode(value)
+		if len(rn.YNode().Content) > keyIndex+2 {
+			l := len(rn.YNode().Content)
+			// remove from the middle of the list
+			rn.YNode().Content = rn.Content()[:keyIndex]
+			rn.YNode().Content = append(
+				rn.YNode().Content,
+				rn.Content()[keyIndex+2:l]...)
+		} else {
+			// remove from the end of the list
+			rn.YNode().Content = rn.Content()[:keyIndex]
+		}
+		return false
+	})
+
+	return removed, nil
 }
 
 func MatchElement(field, value string) ElementMatcher {
@@ -402,14 +403,15 @@ func (f FieldMatcher) Filter(rn *RNode) (*RNode, error) {
 		return nil, err
 	}
 
-	for i := 0; i < len(rn.Content()); i = IncrementFieldIndex(i) {
-		isMatchingField := rn.Content()[i].Value == f.Name
-		if isMatchingField {
-			requireMatchFieldValue := f.Value != nil
-			if !requireMatchFieldValue || rn.Content()[i+1].Value == f.Value.YNode().Value {
-				return NewRNode(rn.Content()[i+1]), nil
-			}
+	var returnNode *RNode
+	requireMatchFieldValue := f.Value != nil
+	visitMappingNodeFields(rn.Content(), func(key, value *yaml.Node) {
+		if !requireMatchFieldValue || value.Value == f.Value.YNode().Value {
+			returnNode = NewRNode(value)
 		}
+	}, f.Name)
+	if returnNode != nil {
+		return returnNode, nil
 	}
 
 	if f.Create != nil {
@@ -550,7 +552,7 @@ func (l PathGetter) getFilter(part, nextPart string, fieldPath *[]string) (Filte
 	default:
 		// mapping node
 		*fieldPath = append(*fieldPath, part)
-		return l.fieldFilter(part, l.getKind(nextPart))
+		return l.fieldFilter(part, getPathPartKind(nextPart, l.Create))
 	}
 }
 
@@ -590,15 +592,18 @@ func (l PathGetter) fieldFilter(
 	return FieldMatcher{Name: name, Create: &RNode{value: &yaml.Node{Kind: kind, Style: l.Style}}}, nil
 }
 
-func (l PathGetter) getKind(nextPart string) yaml.Kind {
+func getPathPartKind(nextPart string, defaultKind yaml.Kind) yaml.Kind {
 	if IsListIndex(nextPart) {
 		// if nextPart is of the form [a=b], then it is an index into a Sequence
 		// so the current part must be a SequenceNode
 		return yaml.SequenceNode
 	}
+	if IsIdxNumber(nextPart) {
+		return yaml.SequenceNode
+	}
 	if nextPart == "" {
-		// final name in the path, use the l.Create defined Kind
-		return l.Create
+		// final name in the path, use the default kind provided
+		return defaultKind
 	}
 
 	// non-sequence intermediate Node
@@ -640,13 +645,19 @@ func (s MapEntrySetter) Filter(rn *RNode) (*RNode, error) {
 	if s.Name == "" {
 		s.Name = GetValue(s.Key)
 	}
-	for i := 0; i < len(rn.Content()); i = IncrementFieldIndex(i) {
-		isMatchingField := rn.Content()[i].Value == s.Name
-		if isMatchingField {
-			rn.Content()[i] = s.Key.YNode()
-			rn.Content()[i+1] = s.Value.YNode()
-			return rn, nil
+
+	content := rn.Content()
+	fieldStillNotFound := true
+	visitFieldsWhileTrue(content, func(key, value *yaml.Node, keyIndex int) bool {
+		if key.Value == s.Name {
+			content[keyIndex] = s.Key.YNode()
+			content[keyIndex+1] = s.Value.YNode()
+			fieldStillNotFound = false
 		}
+		return fieldStillNotFound
+	})
+	if !fieldStillNotFound {
+		return rn, nil
 	}
 
 	// create the field
@@ -794,12 +805,22 @@ func ErrorIfAnyInvalidAndNonNull(kind yaml.Kind, rn ...*RNode) error {
 	return nil
 }
 
-var nodeTypeIndex = map[yaml.Kind]string{
-	yaml.SequenceNode: "SequenceNode",
-	yaml.MappingNode:  "MappingNode",
-	yaml.ScalarNode:   "ScalarNode",
-	yaml.DocumentNode: "DocumentNode",
-	yaml.AliasNode:    "AliasNode",
+type InvalidNodeKindError struct {
+	expectedKind yaml.Kind
+	node         *RNode
+}
+
+func (e *InvalidNodeKindError) Error() string {
+	msg := fmt.Sprintf("wrong node kind: expected %s but got %s",
+		nodeKindString(e.expectedKind), nodeKindString(e.node.YNode().Kind))
+	if content, err := e.node.String(); err == nil {
+		msg += fmt.Sprintf(": node contents:\n%s", content)
+	}
+	return msg
+}
+
+func (e *InvalidNodeKindError) ActualNodeKind() Kind {
+	return e.node.YNode().Kind
 }
 
 func ErrorIfInvalid(rn *RNode, kind yaml.Kind) error {
@@ -809,11 +830,7 @@ func ErrorIfInvalid(rn *RNode, kind yaml.Kind) error {
 	}
 
 	if rn.YNode().Kind != kind {
-		s, _ := rn.String()
-		return errors.Errorf(
-			"wrong Node Kind for %s expected: %v was %v: value: {%s}",
-			strings.Join(rn.FieldPath(), "."),
-			nodeTypeIndex[kind], nodeTypeIndex[rn.YNode().Kind], strings.TrimSpace(s))
+		return &InvalidNodeKindError{node: rn, expectedKind: kind}
 	}
 
 	if kind == yaml.MappingNode {
@@ -858,10 +875,4 @@ func SplitIndexNameValue(p string) (string, string, error) {
 		return "", "", fmt.Errorf("list path element must contain fieldName=fieldValue for element to match")
 	}
 	return parts[0], parts[1], nil
-}
-
-// IncrementFieldIndex increments i to point to the next field name element in
-// a slice of Contents.
-func IncrementFieldIndex(i int) int {
-	return i + 2
 }

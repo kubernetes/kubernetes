@@ -67,12 +67,7 @@
       },
       "requests": {
         "requestsKey": "0"
-      },
-      "claims": [
-        {
-          "name": "nameValue"
-        }
-      ]
+      }
     },
     "volumeName": "volumeNameValue",
     "storageClassName": "storageClassNameValue",
@@ -87,7 +82,8 @@
       "kind": "kindValue",
       "name": "nameValue",
       "namespace": "namespaceValue"
-    }
+    },
+    "volumeAttributesClassName": "volumeAttributesClassNameValue"
   },
   "status": {
     "phase": "phaseValue",
@@ -110,6 +106,13 @@
     "allocatedResources": {
       "allocatedResourcesKey": "0"
     },
-    "resizeStatus": "resizeStatusValue"
+    "allocatedResourceStatuses": {
+      "allocatedResourceStatusesKey": "allocatedResourceStatusesValue"
+    },
+    "currentVolumeAttributesClassName": "currentVolumeAttributesClassNameValue",
+    "modifyVolumeStatus": {
+      "targetVolumeAttributesClassName": "targetVolumeAttributesClassNameValue",
+      "status": "statusValue"
+    }
   }
 }

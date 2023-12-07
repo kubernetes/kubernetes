@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/internal/utils"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
@@ -24,7 +24,7 @@ type gitRunner struct {
 func newCmdRunner(timeout time.Duration) (*gitRunner, error) {
 	gitProgram, err := exec.LookPath("git")
 	if err != nil {
-		return nil, errors.Wrap(err, "no 'git' program on path")
+		return nil, errors.WrapPrefixf(err, "no 'git' program on path")
 	}
 	dir, err := filesys.NewTmpConfirmedDir()
 	if err != nil {
@@ -46,9 +46,9 @@ func (r gitRunner) run(args ...string) error {
 		cmd.String(),
 		r.duration,
 		func() error {
-			_, err := cmd.CombinedOutput()
+			out, err := cmd.CombinedOutput()
 			if err != nil {
-				return errors.Wrapf(err, "git cmd = '%s'", cmd.String())
+				return errors.WrapPrefixf(err, "failed to run '%s': %s", cmd.String(), string(out))
 			}
 			return err
 		})

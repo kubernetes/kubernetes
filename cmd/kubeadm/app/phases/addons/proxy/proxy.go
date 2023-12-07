@@ -189,7 +189,7 @@ func printOrCreateKubeProxyObjects(cmByte []byte, dsByte []byte, client clientse
 }
 
 func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface, printManifest bool) ([]byte, error) {
-	// Generate ControlPlane Enpoint kubeconfig file
+	// Generate ControlPlane Endpoint kubeconfig file
 	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
 	if err != nil {
 		return []byte(""), err
@@ -259,7 +259,7 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 	}
 	// Propagate the http/https proxy host environment variables to the container
 	env := &kubeproxyDaemonSet.Spec.Template.Spec.Containers[0].Env
-	*env = append(*env, kubeadmutil.GetProxyEnvVars()...)
+	*env = append(*env, kubeadmutil.MergeKubeadmEnvVars(kubeadmutil.GetProxyEnvVars())...)
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
 	return []byte(""), apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet)

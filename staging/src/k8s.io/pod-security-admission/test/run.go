@@ -37,8 +37,8 @@ import (
 )
 
 const (
-	newestMinorVersionToTest            = 25
-	podOSBasedRestrictionEnabledVersion = 25
+	newestMinorVersionToTest            = 29
+	podOSBasedRestrictionEnabledVersion = 29
 )
 
 // Options hold configuration for running integration tests against an existing server.

@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -39,11 +39,11 @@ var (
 type GetUsersOptions struct {
 	configAccess clientcmd.ConfigAccess
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewGetUsersOptions creates the options for the command
-func NewGetUsersOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *GetUsersOptions {
+func NewGetUsersOptions(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *GetUsersOptions {
 	return &GetUsersOptions{
 		configAccess: configAccess,
 		IOStreams:    ioStreams,
@@ -52,7 +52,7 @@ func NewGetUsersOptions(ioStreams genericclioptions.IOStreams, configAccess clie
 
 // NewCmdConfigGetUsers creates a command object for the "get-users" action, which
 // lists all users defined in the kubeconfig.
-func NewCmdConfigGetUsers(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigGetUsers(streams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	o := NewGetUsersOptions(streams, configAccess)
 
 	cmd := &cobra.Command{

@@ -18,9 +18,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// NewEnumValueDescription produces an enum value description with the fully qualified enum value
+// newEnumValueDescription produces an enum value description with the fully qualified enum value
 // name and the enum value descriptor.
-func NewEnumValueDescription(name string, desc protoreflect.EnumValueDescriptor) *EnumValueDescription {
+func newEnumValueDescription(name string, desc protoreflect.EnumValueDescriptor) *EnumValueDescription {
 	return &EnumValueDescription{
 		enumValueName: name,
 		desc:          desc,

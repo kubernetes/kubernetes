@@ -7,34 +7,35 @@
 // Starlark values are represented by the Value interface.
 // The following built-in Value types are known to the evaluator:
 //
-//      NoneType        -- NoneType
-//      Bool            -- bool
-//      Int             -- int
-//      Float           -- float
-//      String          -- string
-//      *List           -- list
-//      Tuple           -- tuple
-//      *Dict           -- dict
-//      *Set            -- set
-//      *Function       -- function (implemented in Starlark)
-//      *Builtin        -- builtin_function_or_method (function or method implemented in Go)
+//	NoneType        -- NoneType
+//	Bool            -- bool
+//	Bytes           -- bytes
+//	Int             -- int
+//	Float           -- float
+//	String          -- string
+//	*List           -- list
+//	Tuple           -- tuple
+//	*Dict           -- dict
+//	*Set            -- set
+//	*Function       -- function (implemented in Starlark)
+//	*Builtin        -- builtin_function_or_method (function or method implemented in Go)
 //
 // Client applications may define new data types that satisfy at least
 // the Value interface.  Such types may provide additional operations by
 // implementing any of these optional interfaces:
 //
-//      Callable        -- value is callable like a function
-//      Comparable      -- value defines its own comparison operations
-//      Iterable        -- value is iterable using 'for' loops
-//      Sequence        -- value is iterable sequence of known length
-//      Indexable       -- value is sequence with efficient random access
-//      Mapping         -- value maps from keys to values, like a dictionary
-//      HasBinary       -- value defines binary operations such as * and +
-//      HasAttrs        -- value has readable fields or methods x.f
-//      HasSetField     -- value has settable fields x.f
-//      HasSetIndex     -- value supports element update using x[i]=y
-//      HasSetKey       -- value supports map update using x[k]=v
-//      HasUnary        -- value defines unary operations such as + and -
+//	Callable        -- value is callable like a function
+//	Comparable      -- value defines its own comparison operations
+//	Iterable        -- value is iterable using 'for' loops
+//	Sequence        -- value is iterable sequence of known length
+//	Indexable       -- value is sequence with efficient random access
+//	Mapping         -- value maps from keys to values, like a dictionary
+//	HasBinary       -- value defines binary operations such as * and +
+//	HasAttrs        -- value has readable fields or methods x.f
+//	HasSetField     -- value has settable fields x.f
+//	HasSetIndex     -- value supports element update using x[i]=y
+//	HasSetKey       -- value supports map update using x[k]=v
+//	HasUnary        -- value defines unary operations such as + and -
 //
 // Client applications may also define domain-specific functions in Go
 // and make them available to Starlark programs.  Use NewBuiltin to
@@ -62,7 +63,6 @@
 // through Starlark code and into callbacks.  When evaluation fails it
 // returns an EvalError from which the application may obtain a
 // backtrace of active Starlark calls.
-//
 package starlark // import "go.starlark.net/starlark"
 
 // This file defines the data types of Starlark and their basic operations.
@@ -131,16 +131,41 @@ type Comparable interface {
 	CompareSameType(op syntax.Token, y Value, depth int) (bool, error)
 }
 
+// A TotallyOrdered is a type whose values form a total order:
+// if x and y are of the same TotallyOrdered type, then x must be less than y,
+// greater than y, or equal to y.
+//
+// It is simpler than Comparable and should be preferred in new code,
+// but if a type implements both interfaces, Comparable takes precedence.
+type TotallyOrdered interface {
+	Value
+	// Cmp compares two values x and y of the same totally ordered type.
+	// It returns negative if x < y, positive if x > y, and zero if the values are equal.
+	//
+	// Implementations that recursively compare subcomponents of
+	// the value should use the CompareDepth function, not Cmp, to
+	// avoid infinite recursion on cyclic structures.
+	//
+	// The depth parameter is used to bound comparisons of cyclic
+	// data structures.  Implementations should decrement depth
+	// before calling CompareDepth and should return an error if depth
+	// < 1.
+	//
+	// Client code should not call this method.  Instead, use the
+	// standalone Compare or Equals functions, which are defined for
+	// all pairs of operands.
+	Cmp(y Value, depth int) (int, error)
+}
+
 var (
-	_ Comparable = None
-	_ Comparable = Int{}
-	_ Comparable = False
-	_ Comparable = Float(0)
-	_ Comparable = String("")
-	_ Comparable = (*Dict)(nil)
-	_ Comparable = (*List)(nil)
-	_ Comparable = Tuple(nil)
-	_ Comparable = (*Set)(nil)
+	_ TotallyOrdered = Int{}
+	_ TotallyOrdered = Float(0)
+	_ Comparable     = False
+	_ Comparable     = String("")
+	_ Comparable     = (*Dict)(nil)
+	_ Comparable     = (*List)(nil)
+	_ Comparable     = Tuple(nil)
+	_ Comparable     = (*Set)(nil)
 )
 
 // A Callable value f may be the operand of a function call, f(x).
@@ -229,13 +254,12 @@ var (
 //
 // Example usage:
 //
-// 	iter := iterable.Iterator()
+//	iter := iterable.Iterator()
 //	defer iter.Done()
 //	var x Value
 //	for iter.Next(&x) {
 //		...
 //	}
-//
 type Iterator interface {
 	// If the iterator is exhausted, Next returns false.
 	// Otherwise it sets *p to the current element of the sequence,
@@ -276,7 +300,7 @@ type HasSetKey interface {
 var _ HasSetKey = (*Dict)(nil)
 
 // A HasBinary value may be used as either operand of these binary operators:
-//     +   -   *   /   //   %   in   not in   |   &   ^   <<   >>
+// +   -   *   /   //   %   in   not in   |   &   ^   <<   >>
 //
 // The Side argument indicates whether the receiver is the left or right operand.
 //
@@ -296,7 +320,7 @@ const (
 )
 
 // A HasUnary value may be used as the operand of these unary operators:
-//     +   -   ~
+// +   -   ~
 //
 // An implementation may decline to handle an operation by returning (nil, nil).
 // For this reason, clients should always call the standalone Unary(op, x)
@@ -354,9 +378,6 @@ func (NoneType) Type() string          { return "NoneType" }
 func (NoneType) Freeze()               {} // immutable
 func (NoneType) Truth() Bool           { return False }
 func (NoneType) Hash() (uint32, error) { return 0, nil }
-func (NoneType) CompareSameType(op syntax.Token, y Value, depth int) (bool, error) {
-	return threeway(op, 0), nil
-}
 
 // Bool is the type of a Starlark bool.
 type Bool bool
@@ -385,10 +406,47 @@ func (x Bool) CompareSameType(op syntax.Token, y_ Value, depth int) (bool, error
 // Float is the type of a Starlark float.
 type Float float64
 
-func (f Float) String() string { return strconv.FormatFloat(float64(f), 'g', 6, 64) }
-func (f Float) Type() string   { return "float" }
-func (f Float) Freeze()        {} // immutable
-func (f Float) Truth() Bool    { return f != 0.0 }
+func (f Float) String() string {
+	var buf strings.Builder
+	f.format(&buf, 'g')
+	return buf.String()
+}
+
+func (f Float) format(buf *strings.Builder, conv byte) {
+	ff := float64(f)
+	if !isFinite(ff) {
+		if math.IsInf(ff, +1) {
+			buf.WriteString("+inf")
+		} else if math.IsInf(ff, -1) {
+			buf.WriteString("-inf")
+		} else {
+			buf.WriteString("nan")
+		}
+		return
+	}
+
+	// %g is the default format used by str.
+	// It uses the minimum precision to avoid ambiguity,
+	// and always includes a '.' or an 'e' so that the value
+	// is self-evidently a float, not an int.
+	if conv == 'g' || conv == 'G' {
+		s := strconv.FormatFloat(ff, conv, -1, 64)
+		buf.WriteString(s)
+		// Ensure result always has a decimal point if no exponent.
+		// "123" -> "123.0"
+		if strings.IndexByte(s, conv-'g'+'e') < 0 && strings.IndexByte(s, '.') < 0 {
+			buf.WriteString(".0")
+		}
+		return
+	}
+
+	// %[eEfF] use 6-digit precision
+	buf.WriteString(strconv.FormatFloat(ff, conv, 6, 64))
+}
+
+func (f Float) Type() string { return "float" }
+func (f Float) Freeze()      {} // immutable
+func (f Float) Truth() Bool  { return f != 0.0 }
 func (f Float) Hash() (uint32, error) {
 	// Equal float and int values must yield the same hash.
 	// TODO(adonovan): opt: if f is non-integral, and thus not equal
@@ -407,29 +465,36 @@ func isFinite(f float64) bool {
 	return math.Abs(f) <= math.MaxFloat64
 }
 
-func (x Float) CompareSameType(op syntax.Token, y_ Value, depth int) (bool, error) {
+func (x Float) Cmp(y_ Value, depth int) (int, error) {
 	y := y_.(Float)
-	switch op {
-	case syntax.EQL:
-		return x == y, nil
-	case syntax.NEQ:
-		return x != y, nil
-	case syntax.LE:
-		return x <= y, nil
-	case syntax.LT:
-		return x < y, nil
-	case syntax.GE:
-		return x >= y, nil
-	case syntax.GT:
-		return x > y, nil
+	return floatCmp(x, y), nil
+}
+
+// floatCmp performs a three-valued comparison on floats,
+// which are totally ordered with NaN > +Inf.
+func floatCmp(x, y Float) int {
+	if x > y {
+		return +1
+	} else if x < y {
+		return -1
+	} else if x == y {
+		return 0
 	}
-	panic(op)
+
+	// At least one operand is NaN.
+	if x == x {
+		return -1 // y is NaN
+	} else if y == y {
+		return +1 // x is NaN
+	}
+	return 0 // both NaN
 }
 
 func (f Float) rational() *big.Rat { return new(big.Rat).SetFloat64(float64(f)) }
 
 // AsFloat returns the float64 value closest to x.
-// The f result is undefined if x is not a float or int.
+// The f result is undefined if x is not a float or Int.
+// The result may be infinite if x is a very large Int.
 func AsFloat(x Value) (f float64, ok bool) {
 	switch x := x.(type) {
 	case Float:
@@ -440,7 +505,13 @@ func AsFloat(x Value) (f float64, ok bool) {
 	return 0, false
 }
 
-func (x Float) Mod(y Float) Float { return Float(math.Mod(float64(x), float64(y))) }
+func (x Float) Mod(y Float) Float {
+	z := Float(math.Mod(float64(x), float64(y)))
+	if (x < 0) != (y < 0) && z != 0 {
+		z += y
+	}
+	return z
+}
 
 // Unary implements the operations +float and -float.
 func (f Float) Unary(op syntax.Token) (Value, error) {
@@ -453,12 +524,19 @@ func (f Float) Unary(op syntax.Token) (Value, error) {
 	return nil, nil
 }
 
-// String is the type of a Starlark string.
+// String is the type of a Starlark text string.
 //
 // A String encapsulates an an immutable sequence of bytes,
 // but strings are not directly iterable. Instead, iterate
 // over the result of calling one of these four methods:
 // codepoints, codepoint_ords, elems, elem_ords.
+//
+// Strings typically contain text; use Bytes for binary strings.
+// The Starlark spec defines text strings as sequences of UTF-k
+// codes that encode Unicode code points. In this Go implementation,
+// k=8, whereas in a Java implementation, k=16. For portability,
+// operations on strings should aim to avoid assumptions about
+// the value of k.
 //
 // Warning: the contract of the Value interface's String method is that
 // it returns the value printed in Starlark notation,
@@ -467,7 +545,7 @@ func (f Float) Unary(op syntax.Token) (Value, error) {
 // of a Starlark string as a Go string.
 type String string
 
-func (s String) String() string        { return strconv.Quote(string(s)) }
+func (s String) String() string        { return syntax.Quote(string(s), false) }
 func (s String) GoString() string      { return string(s) }
 func (s String) Type() string          { return "string" }
 func (s String) Freeze()               {} // immutable
@@ -499,73 +577,106 @@ func (x String) CompareSameType(op syntax.Token, y_ Value, depth int) (bool, err
 
 func AsString(x Value) (string, bool) { v, ok := x.(String); return string(v), ok }
 
-// A stringIterable is an iterable whose iterator yields a sequence of
-// either Unicode code points or elements (bytes),
-// either numerically or as successive substrings.
-type stringIterable struct {
-	s          String
-	ords       bool
-	codepoints bool
+// A stringElems is an iterable whose iterator yields a sequence of
+// elements (bytes), either numerically or as successive substrings.
+// It is an indexable sequence.
+type stringElems struct {
+	s    String
+	ords bool
 }
 
-var _ Iterable = (*stringIterable)(nil)
+var (
+	_ Iterable  = (*stringElems)(nil)
+	_ Indexable = (*stringElems)(nil)
+)
 
-func (si stringIterable) String() string {
-	var etype string
-	if si.codepoints {
-		etype = "codepoint"
-	} else {
-		etype = "elem"
-	}
+func (si stringElems) String() string {
 	if si.ords {
-		return si.s.String() + "." + etype + "_ords()"
+		return si.s.String() + ".elem_ords()"
 	} else {
-		return si.s.String() + "." + etype + "s()"
+		return si.s.String() + ".elems()"
 	}
 }
-func (si stringIterable) Type() string {
-	if si.codepoints {
-		return "codepoints"
+func (si stringElems) Type() string          { return "string.elems" }
+func (si stringElems) Freeze()               {} // immutable
+func (si stringElems) Truth() Bool           { return True }
+func (si stringElems) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: %s", si.Type()) }
+func (si stringElems) Iterate() Iterator     { return &stringElemsIterator{si, 0} }
+func (si stringElems) Len() int              { return len(si.s) }
+func (si stringElems) Index(i int) Value {
+	if si.ords {
+		return MakeInt(int(si.s[i]))
 	} else {
-		return "elems"
+		// TODO(adonovan): opt: preallocate canonical 1-byte strings
+		// to avoid interface allocation.
+		return si.s[i : i+1]
 	}
 }
-func (si stringIterable) Freeze()               {} // immutable
-func (si stringIterable) Truth() Bool           { return True }
-func (si stringIterable) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: %s", si.Type()) }
-func (si stringIterable) Iterate() Iterator     { return &stringIterator{si, 0} }
 
-type stringIterator struct {
-	si stringIterable
+type stringElemsIterator struct {
+	si stringElems
 	i  int
 }
 
-func (it *stringIterator) Next(p *Value) bool {
+func (it *stringElemsIterator) Next(p *Value) bool {
+	if it.i == len(it.si.s) {
+		return false
+	}
+	*p = it.si.Index(it.i)
+	it.i++
+	return true
+}
+
+func (*stringElemsIterator) Done() {}
+
+// A stringCodepoints is an iterable whose iterator yields a sequence of
+// Unicode code points, either numerically or as successive substrings.
+// It is not indexable.
+type stringCodepoints struct {
+	s    String
+	ords bool
+}
+
+var _ Iterable = (*stringCodepoints)(nil)
+
+func (si stringCodepoints) String() string {
+	if si.ords {
+		return si.s.String() + ".codepoint_ords()"
+	} else {
+		return si.s.String() + ".codepoints()"
+	}
+}
+func (si stringCodepoints) Type() string          { return "string.codepoints" }
+func (si stringCodepoints) Freeze()               {} // immutable
+func (si stringCodepoints) Truth() Bool           { return True }
+func (si stringCodepoints) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: %s", si.Type()) }
+func (si stringCodepoints) Iterate() Iterator     { return &stringCodepointsIterator{si, 0} }
+
+type stringCodepointsIterator struct {
+	si stringCodepoints
+	i  int
+}
+
+func (it *stringCodepointsIterator) Next(p *Value) bool {
 	s := it.si.s[it.i:]
 	if s == "" {
 		return false
 	}
-	if it.si.codepoints {
-		r, sz := utf8.DecodeRuneInString(string(s))
-		if !it.si.ords {
+	r, sz := utf8.DecodeRuneInString(string(s))
+	if !it.si.ords {
+		if r == utf8.RuneError {
+			*p = String(r)
+		} else {
 			*p = s[:sz]
-		} else {
-			*p = MakeInt(int(r))
 		}
-		it.i += sz
 	} else {
-		b := int(s[0])
-		if !it.si.ords {
-			*p = s[:1]
-		} else {
-			*p = MakeInt(b)
-		}
-		it.i += 1
+		*p = MakeInt(int(r))
 	}
+	it.i += sz
 	return true
 }
 
-func (*stringIterator) Done() {}
+func (*stringCodepointsIterator) Done() {}
 
 // A Function is a function defined by a Starlark def statement or lambda expression.
 // The initialization behavior of a Starlark module is also represented by a Function.
@@ -624,6 +735,34 @@ func (fn *Function) Param(i int) (string, syntax.Position) {
 	id := fn.funcode.Locals[i]
 	return id.Name, id.Pos
 }
+
+// ParamDefault returns the default value of the specified parameter
+// (0 <= i < NumParams()), or nil if the parameter is not optional.
+func (fn *Function) ParamDefault(i int) Value {
+	if i < 0 || i >= fn.NumParams() {
+		panic(i)
+	}
+
+	// fn.defaults omits all required params up to the first optional param. It
+	// also does not include *args or **kwargs at the end.
+	firstOptIdx := fn.NumParams() - len(fn.defaults)
+	if fn.HasVarargs() {
+		firstOptIdx--
+	}
+	if fn.HasKwargs() {
+		firstOptIdx--
+	}
+	if i < firstOptIdx || i >= firstOptIdx+len(fn.defaults) {
+		return nil
+	}
+
+	dflt := fn.defaults[i-firstOptIdx]
+	if _, ok := dflt.(mandatory); ok {
+		return nil
+	}
+	return dflt
+}
+
 func (fn *Function) HasVarargs() bool { return fn.funcode.HasVarargs }
 func (fn *Function) HasKwargs() bool  { return fn.funcode.HasKwargs }
 
@@ -667,13 +806,12 @@ func NewBuiltin(name string, fn func(thread *Thread, fn *Builtin, args Tuple, kw
 // In the example below, the value of f is the string.index
 // built-in method bound to the receiver value "abc":
 //
-//     f = "abc".index; f("a"); f("b")
+//	f = "abc".index; f("a"); f("b")
 //
 // In the common case, the receiver is bound only during the call,
 // but this still results in the creation of a temporary method closure:
 //
-//     "abc".index("a")
-//
+//	"abc".index("a")
 func (b *Builtin) BindReceiver(recv Value) *Builtin {
 	return &Builtin{name: b.name, fn: b.fn, recv: recv}
 }
@@ -708,6 +846,14 @@ func (d *Dict) Freeze()                                         { d.ht.freeze() 
 func (d *Dict) Truth() Bool                                     { return d.Len() > 0 }
 func (d *Dict) Hash() (uint32, error)                           { return 0, fmt.Errorf("unhashable type: dict") }
 
+func (x *Dict) Union(y *Dict) *Dict {
+	z := new(Dict)
+	z.ht.init(x.Len()) // a lower bound
+	z.ht.addAll(&x.ht) // can't fail
+	z.ht.addAll(&y.ht) // can't fail
+	return z
+}
+
 func (d *Dict) Attr(name string) (Value, error) { return builtinAttr(d, name, dictMethods) }
 func (d *Dict) AttrNames() []string             { return builtinAttrNames(dictMethods) }
 
@@ -729,8 +875,8 @@ func dictsEqual(x, y *Dict, depth int) (bool, error) {
 	if x.Len() != y.Len() {
 		return false, nil
 	}
-	for _, xitem := range x.Items() {
-		key, xval := xitem[0], xitem[1]
+	for e := x.ht.head; e != nil; e = e.next {
+		key, xval := e.key, e.value
 
 		if yval, found, _ := y.Get(key); !found {
 			return false, nil
@@ -970,7 +1116,6 @@ func (s *Set) Len() int                               { return int(s.ht.len) }
 func (s *Set) Iterate() Iterator                      { return s.ht.iterate() }
 func (s *Set) String() string                         { return toString(s) }
 func (s *Set) Type() string                           { return "set" }
-func (s *Set) elems() []Value                         { return s.ht.keys() }
 func (s *Set) Freeze()                                { s.ht.freeze() }
 func (s *Set) Hash() (uint32, error)                  { return 0, fmt.Errorf("unhashable type: set") }
 func (s *Set) Truth() Bool                            { return s.Len() > 0 }
@@ -996,8 +1141,8 @@ func setsEqual(x, y *Set, depth int) (bool, error) {
 	if x.Len() != y.Len() {
 		return false, nil
 	}
-	for _, elem := range x.elems() {
-		if found, _ := y.Has(elem); !found {
+	for e := x.ht.head; e != nil; e = e.next {
+		if found, _ := y.Has(e.key); !found {
 			return false, nil
 		}
 	}
@@ -1006,8 +1151,8 @@ func setsEqual(x, y *Set, depth int) (bool, error) {
 
 func (s *Set) Union(iter Iterator) (Value, error) {
 	set := new(Set)
-	for _, elem := range s.elems() {
-		set.Insert(elem) // can't fail
+	for e := s.ht.head; e != nil; e = e.next {
+		set.Insert(e.key) // can't fail
 	}
 	var x Value
 	for iter.Next(&x) {
@@ -1038,6 +1183,7 @@ func writeValue(out *strings.Builder, x Value, path []Value) {
 	case nil:
 		out.WriteString("<nil>") // indicates a bug
 
+	// These four cases are duplicates of T.String(), for efficiency.
 	case NoneType:
 		out.WriteString("None")
 
@@ -1052,7 +1198,7 @@ func writeValue(out *strings.Builder, x Value, path []Value) {
 		}
 
 	case String:
-		fmt.Fprintf(out, "%q", string(x))
+		out.WriteString(syntax.Quote(string(x), false))
 
 	case *List:
 		out.WriteByte('[')
@@ -1097,8 +1243,8 @@ func writeValue(out *strings.Builder, x Value, path []Value) {
 			out.WriteString("...") // dict contains itself
 		} else {
 			sep := ""
-			for _, item := range x.Items() {
-				k, v := item[0], item[1]
+			for e := x.ht.head; e != nil; e = e.next {
+				k, v := e.key, e.value
 				out.WriteString(sep)
 				writeValue(out, k, path)
 				out.WriteString(": ")
@@ -1110,11 +1256,11 @@ func writeValue(out *strings.Builder, x Value, path []Value) {
 
 	case *Set:
 		out.WriteString("set([")
-		for i, elem := range x.elems() {
-			if i > 0 {
+		for e := x.ht.head; e != nil; e = e.next {
+			if e != x.ht.head {
 				out.WriteString(", ")
 			}
-			writeValue(out, elem, path)
+			writeValue(out, e.key, path)
 		}
 		out.WriteString("])")
 
@@ -1132,14 +1278,16 @@ func pathContains(path []Value, x Value) bool {
 	return false
 }
 
-const maxdepth = 10
+// CompareLimit is the depth limit on recursive comparison operations such as == and <.
+// Comparison of data structures deeper than this limit may fail.
+var CompareLimit = 10
 
 // Equal reports whether two Starlark values are equal.
 func Equal(x, y Value) (bool, error) {
 	if x, ok := x.(String); ok {
 		return x == y, nil // fast path for an important special case
 	}
-	return EqualDepth(x, y, maxdepth)
+	return EqualDepth(x, y, CompareLimit)
 }
 
 // EqualDepth reports whether two Starlark values are equal.
@@ -1158,7 +1306,7 @@ func EqualDepth(x, y Value, depth int) (bool, error) {
 // Recursive comparisons by implementations of Value.CompareSameType
 // should use CompareDepth to prevent infinite recursion.
 func Compare(op syntax.Token, x, y Value) (bool, error) {
-	return CompareDepth(op, x, y, maxdepth)
+	return CompareDepth(op, x, y, CompareLimit)
 }
 
 // CompareDepth compares two Starlark values.
@@ -1177,6 +1325,14 @@ func CompareDepth(op syntax.Token, x, y Value, depth int) (bool, error) {
 			return xcomp.CompareSameType(op, y, depth)
 		}
 
+		if xcomp, ok := x.(TotallyOrdered); ok {
+			t, err := xcomp.Cmp(y, depth)
+			if err != nil {
+				return false, err
+			}
+			return threeway(op, t), nil
+		}
+
 		// use identity comparison
 		switch op {
 		case syntax.EQL:
@@ -1193,11 +1349,10 @@ func CompareDepth(op syntax.Token, x, y Value, depth int) (bool, error) {
 	switch x := x.(type) {
 	case Int:
 		if y, ok := y.(Float); ok {
-			if y != y {
-				return false, nil // y is NaN
-			}
 			var cmp int
-			if !math.IsInf(float64(y), 0) {
+			if y != y {
+				cmp = -1 // y is NaN
+			} else if !math.IsInf(float64(y), 0) {
 				cmp = x.rational().Cmp(y.rational()) // y is finite
 			} else if y > 0 {
 				cmp = -1 // y is +Inf
@@ -1208,16 +1363,15 @@ func CompareDepth(op syntax.Token, x, y Value, depth int) (bool, error) {
 		}
 	case Float:
 		if y, ok := y.(Int); ok {
-			if x != x {
-				return false, nil // x is NaN
-			}
 			var cmp int
-			if !math.IsInf(float64(x), 0) {
+			if x != x {
+				cmp = +1 // x is NaN
+			} else if !math.IsInf(float64(x), 0) {
 				cmp = x.rational().Cmp(y.rational()) // x is finite
 			} else if x > 0 {
-				cmp = -1 // x is +Inf
+				cmp = +1 // x is +Inf
 			} else {
-				cmp = +1 // x is -Inf
+				cmp = -1 // x is -Inf
 			}
 			return threeway(op, cmp), nil
 		}
@@ -1274,6 +1428,8 @@ func Len(x Value) int {
 	switch x := x.(type) {
 	case String:
 		return x.Len()
+	case Indexable:
+		return x.Len()
 	case Sequence:
 		return x.Len()
 	}
@@ -1290,4 +1446,55 @@ func Iterate(x Value) Iterator {
 		return x.Iterate()
 	}
 	return nil
+}
+
+// Bytes is the type of a Starlark binary string.
+//
+// A Bytes encapsulates an immutable sequence of bytes.
+// It is comparable, indexable, and sliceable, but not direcly iterable;
+// use bytes.elems() for an iterable view.
+//
+// In this Go implementation, the elements of 'string' and 'bytes' are
+// both bytes, but in other implementations, notably Java, the elements
+// of a 'string' are UTF-16 codes (Java chars). The spec abstracts text
+// strings as sequences of UTF-k codes that encode Unicode code points,
+// and operations that convert from text to binary incur UTF-k-to-UTF-8
+// transcoding; conversely, conversion from binary to text incurs
+// UTF-8-to-UTF-k transcoding. Because k=8 for Go, these operations
+// are the identity function, at least for valid encodings of text.
+type Bytes string
+
+var (
+	_ Comparable = Bytes("")
+	_ Sliceable  = Bytes("")
+	_ Indexable  = Bytes("")
+)
+
+func (b Bytes) String() string        { return syntax.Quote(string(b), true) }
+func (b Bytes) Type() string          { return "bytes" }
+func (b Bytes) Freeze()               {} // immutable
+func (b Bytes) Truth() Bool           { return len(b) > 0 }
+func (b Bytes) Hash() (uint32, error) { return String(b).Hash() }
+func (b Bytes) Len() int              { return len(b) }
+func (b Bytes) Index(i int) Value     { return b[i : i+1] }
+
+func (b Bytes) Attr(name string) (Value, error) { return builtinAttr(b, name, bytesMethods) }
+func (b Bytes) AttrNames() []string             { return builtinAttrNames(bytesMethods) }
+
+func (b Bytes) Slice(start, end, step int) Value {
+	if step == 1 {
+		return b[start:end]
+	}
+
+	sign := signum(step)
+	var str []byte
+	for i := start; signum(end-i) == sign; i += step {
+		str = append(str, b[i])
+	}
+	return Bytes(str)
+}
+
+func (x Bytes) CompareSameType(op syntax.Token, y_ Value, depth int) (bool, error) {
+	y := y_.(Bytes)
+	return threeway(op, strings.Compare(string(x), string(y))), nil
 }

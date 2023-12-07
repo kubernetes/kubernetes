@@ -26,9 +26,10 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apiserver/pkg/cel"
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // UnstructuredToVal converts a Kubernetes unstructured data element to a CEL Val.
@@ -83,18 +84,22 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 				},
 			}
 		}
-		// A object with x-kubernetes-preserve-unknown-fields but no properties or additionalProperties is treated
-		// as an empty object.
-		if schema.IsXPreserveUnknownFields() {
-			return &unstructuredMap{
-				value:  m,
-				schema: schema,
-				propSchema: func(key string) (Schema, bool) {
-					return nil, false
-				},
-			}
+
+		// properties and additionalProperties are mutual exclusive, but nothing prevents the situation
+		// where both are missing.
+		// An object that (1) has no properties (2) has no additionalProperties or additionalProperties == false
+		// is treated as an empty object.
+		// An object that has additionalProperties == true is treated as an unstructured map.
+		// An object that has x-kubernetes-preserve-unknown-field extension set is treated as an unstructured map.
+		// Empty object vs unstructured map is differentiated by unstructuredMap implementation with the set schema.
+		// The resulting result remains the same.
+		return &unstructuredMap{
+			value:  m,
+			schema: schema,
+			propSchema: func(key string) (Schema, bool) {
+				return nil, false
+			},
 		}
-		return types.NewErr("invalid object type, expected either Properties or AdditionalProperties with Allows=true and non-empty Schema")
 	}
 
 	if schema.Type() == "array" {
@@ -425,7 +430,22 @@ var _ = traits.Lister(&unstructuredList{})
 func (t *unstructuredList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
 	case reflect.Slice:
-		return t.elements, nil
+		switch t.itemsSchema.Type() {
+		// Workaround for https://github.com/kubernetes/kubernetes/issues/117590 until we
+		// resolve the desired behavior in cel-go via https://github.com/google/cel-go/issues/688
+		case "string":
+			var result []string
+			for _, e := range t.elements {
+				s, ok := e.(string)
+				if !ok {
+					return nil, fmt.Errorf("expected all elements to be of type string, but got %T", e)
+				}
+				result = append(result, s)
+			}
+			return result, nil
+		default:
+			return t.elements, nil
+		}
 	}
 	return nil, fmt.Errorf("type conversion error from '%s' to '%s'", t.Type(), typeDesc)
 }

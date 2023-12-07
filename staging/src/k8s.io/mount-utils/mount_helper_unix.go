@@ -20,14 +20,17 @@ limitations under the License.
 package mount
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
+	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
 )
@@ -58,7 +61,7 @@ func IsCorruptedMnt(err error) bool {
 		underlyingError = err
 	}
 
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES || underlyingError == syscall.EHOSTDOWN
+	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES || underlyingError == syscall.EHOSTDOWN || underlyingError == syscall.EWOULDBLOCK
 }
 
 // MountInfo represents a single line in /proc/<pid>/mountinfo.
@@ -91,7 +94,7 @@ type MountInfo struct { // nolint: golint
 
 // ParseMountInfo parses /proc/xxx/mountinfo.
 func ParseMountInfo(filename string) ([]MountInfo, error) {
-	content, err := utilio.ConsistentRead(filename, maxListTries)
+	content, err := readMountInfo(filename)
 	if err != nil {
 		return []MountInfo{}, err
 	}
@@ -173,8 +176,7 @@ func splitMountOptions(s string) []string {
 // isMountPointMatch returns true if the path in mp is the same as dir.
 // Handles case where mountpoint dir has been renamed due to stale NFS mount.
 func isMountPointMatch(mp MountPoint, dir string) bool {
-	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
-	return ((mp.Path == dir) || (mp.Path == deletedDir))
+	return strings.TrimSuffix(mp.Path, "\\040(deleted)") == dir
 }
 
 // PathExists returns true if the specified path exists.
@@ -198,4 +200,51 @@ func PathExists(path string) (bool, error) {
 		return true, err
 	}
 	return false, err
+}
+
+// These variables are used solely by kernelHasMountinfoBug.
+var (
+	hasMountinfoBug       bool
+	checkMountinfoBugOnce sync.Once
+)
+
+// kernelHasMountinfoBug checks if the kernel bug that can lead to incomplete
+// mountinfo being read is fixed. It does so by checking the kernel version.
+//
+// The bug was fixed by the kernel commit 9f6c61f96f2d97 (since Linux 5.8).
+// Alas, there is no better way to check if the bug is fixed other than to
+// rely on the kernel version returned by uname.
+func kernelHasMountinfoBug() bool {
+	checkMountinfoBugOnce.Do(func() {
+		// Assume old kernel.
+		hasMountinfoBug = true
+
+		uname := unix.Utsname{}
+		err := unix.Uname(&uname)
+		if err != nil {
+			return
+		}
+
+		end := bytes.IndexByte(uname.Release[:], 0)
+		v := bytes.SplitN(uname.Release[:end], []byte{'.'}, 3)
+		if len(v) != 3 {
+			return
+		}
+		major, _ := strconv.Atoi(string(v[0]))
+		minor, _ := strconv.Atoi(string(v[1]))
+
+		if major > 5 || (major == 5 && minor >= 8) {
+			hasMountinfoBug = false
+		}
+	})
+
+	return hasMountinfoBug
+}
+
+func readMountInfo(path string) ([]byte, error) {
+	if kernelHasMountinfoBug() {
+		return utilio.ConsistentRead(path, maxListTries)
+	}
+
+	return os.ReadFile(path)
 }

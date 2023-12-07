@@ -22,7 +22,6 @@ package volumepathhandler
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,7 +132,7 @@ func getLoopDeviceFromSysfs(path string) (string, error) {
 		backingFile := fmt.Sprintf("%s/loop/backing_file", device)
 
 		// The contents of this file is the absolute path of "path".
-		data, err := ioutil.ReadFile(backingFile)
+		data, err := os.ReadFile(backingFile)
 		if err != nil {
 			continue
 		}

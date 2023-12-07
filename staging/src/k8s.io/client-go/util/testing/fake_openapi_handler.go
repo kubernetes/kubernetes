@@ -50,12 +50,8 @@ func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 	}
 	server := httptest.NewServer(mux)
 
-	openAPIVersionedService, err := handler3.NewOpenAPIService(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	err = openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
+	openAPIVersionedService := handler3.NewOpenAPIService()
+	err := openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
 	if err != nil {
 		return nil, err
 	}

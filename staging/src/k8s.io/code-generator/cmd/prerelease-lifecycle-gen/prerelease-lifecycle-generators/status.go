@@ -71,7 +71,7 @@ func extractKubeVersionTag(tagName string, t *types.Type) (*tagValue, int, int, 
 	}
 
 	splitValue := strings.Split(rawTag.value, ".")
-	if len(splitValue) != 2 || len(splitValue[0]) == 0 || len(splitValue[0]) == 0 {
+	if len(splitValue) != 2 || len(splitValue[0]) == 0 || len(splitValue[1]) == 0 {
 		return nil, -1, -1, fmt.Errorf("%v format must match %v=xx.yy tag", t, tagName)
 	}
 	major, err := strconv.ParseInt(splitValue[0], 10, 32)
@@ -159,16 +159,7 @@ func extractTag(tagName string, comments []string) *tagValue {
 	for i := range parts {
 		kv := strings.SplitN(parts[i], "=", 2)
 		k := kv[0]
-		//v := ""
-		//if len(kv) == 2 {
-		//	v = kv[1]
-		//}
-		switch k {
-		//case "register":
-		//	if v != "false" {
-		//		tag.register = true
-		//	}
-		default:
+		if k != "" {
 			klog.Fatalf("Unsupported %s param: %q", tagName, parts[i])
 		}
 	}
@@ -213,7 +204,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		if ptag != nil {
 			pkgNeedsGeneration, err = strconv.ParseBool(ptag.value)
 			if err != nil {
-				klog.Fatalf("Package %v: unsupported %s value: %q :%w", i, tagEnabledName, ptag.value, err)
+				klog.Fatalf("Package %v: unsupported %s value: %q :%v", i, tagEnabledName, ptag.value, err)
 			}
 		}
 		if !pkgNeedsGeneration {

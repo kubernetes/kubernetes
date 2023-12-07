@@ -176,6 +176,11 @@ func (c *Conn) Close() {
 	c.sigconn.Close()
 }
 
+// Connected returns whether conn is connected
+func (c *Conn) Connected() bool {
+	return c.sysconn.Connected() && c.sigconn.Connected()
+}
+
 // NewConnection establishes a connection to a bus using a caller-supplied function.
 // This allows connecting to remote buses through a user-supplied mechanism.
 // The supplied function may be called multiple times, and should return independent connections.

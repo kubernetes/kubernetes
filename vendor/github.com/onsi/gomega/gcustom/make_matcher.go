@@ -97,7 +97,9 @@ func MakeMatcher(matchFunc any, args ...any) CustomGomegaMatcher {
 		finalMatchFunc = reflect.MakeFunc(reflect.TypeOf(finalMatchFunc),
 			func(args []reflect.Value) []reflect.Value {
 				actual := args[0].Interface()
-				if reflect.TypeOf(actual).AssignableTo(t.In(0)) {
+				if actual == nil && reflect.TypeOf(actual) == reflect.TypeOf(nil) {
+					return matchFuncValue.Call([]reflect.Value{reflect.New(t.In(0)).Elem()})
+				} else if reflect.TypeOf(actual).AssignableTo(t.In(0)) {
 					return matchFuncValue.Call([]reflect.Value{reflect.ValueOf(actual)})
 				} else {
 					return []reflect.Value{

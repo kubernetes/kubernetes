@@ -27,6 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -46,9 +47,9 @@ The following actions will be performed as part of this test.
 4. Each instance of routine iterates for n times, where n is read from system env - VCP_STRESS_ITERATIONS
 5. Each iteration creates 1 PVC, 1 POD using the provisioned PV, Verify disk is attached to the node, Verify pod can access the volume, delete the pod and finally delete the PVC.
 */
-var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("vsphere cloud provider stress", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("vcp-stress")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client        clientset.Interface
 		namespace     string
@@ -153,7 +154,7 @@ func PerformVolumeLifeCycleInParallel(ctx context.Context, f *framework.Framewor
 
 		ginkgo.By(fmt.Sprintf("%v Creating Pod using the claim: %v", logPrefix, pvclaim.Name))
 		// Create pod to attach Volume to Node
-		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Waiting for the Pod: %v to be in the running state", logPrefix, pod.Name))

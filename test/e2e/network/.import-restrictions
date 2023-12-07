@@ -1,0 +1,6 @@
+rules:
+  # prevent any k8s.io/kubernetes/third_party imports outside of this package
+  # External Packages are used in the network/dns_common.go path
+  - selectorRegexp: k8s[.]io/kubernetes/third_party/
+    allowedPrefixes:
+    - k8s.io/kubernetes/third_party/forked/golang/net

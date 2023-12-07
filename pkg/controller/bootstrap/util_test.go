@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/klog/v2/ktesting"
 )
 
 const (
@@ -79,38 +80,42 @@ func TestValidateSecretForSigning(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		secret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:       metav1.NamespaceSystem,
-				Name:            bootstrapapi.BootstrapTokenSecretPrefix + givenTokenID,
-				ResourceVersion: "1",
-			},
-			Type: bootstrapapi.SecretTypeBootstrapToken,
-			Data: map[string][]byte{
-				bootstrapapi.BootstrapTokenIDKey:           []byte(tc.tokenID),
-				bootstrapapi.BootstrapTokenSecretKey:       []byte(tc.tokenSecret),
-				bootstrapapi.BootstrapTokenUsageSigningKey: []byte(tc.okToSign),
-				bootstrapapi.BootstrapTokenExpirationKey:   []byte(tc.expiration),
-			},
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			secret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:       metav1.NamespaceSystem,
+					Name:            bootstrapapi.BootstrapTokenSecretPrefix + givenTokenID,
+					ResourceVersion: "1",
+				},
+				Type: bootstrapapi.SecretTypeBootstrapToken,
+				Data: map[string][]byte{
+					bootstrapapi.BootstrapTokenIDKey:           []byte(tc.tokenID),
+					bootstrapapi.BootstrapTokenSecretKey:       []byte(tc.tokenSecret),
+					bootstrapapi.BootstrapTokenUsageSigningKey: []byte(tc.okToSign),
+					bootstrapapi.BootstrapTokenExpirationKey:   []byte(tc.expiration),
+				},
+			}
 
-		tokenID, tokenSecret, ok := validateSecretForSigning(secret)
-		if ok != tc.valid {
-			t.Errorf("%s: Unexpected validation failure. Expected %v, got %v", tc.description, tc.valid, ok)
-		}
-		if ok {
-			if tokenID != tc.tokenID {
-				t.Errorf("%s: Unexpected Token ID. Expected %q, got %q", tc.description, givenTokenID, tokenID)
+			tokenID, tokenSecret, ok := validateSecretForSigning(ctx, secret)
+			if ok != tc.valid {
+				t.Errorf("Unexpected validation failure. Expected %v, got %v", tc.valid, ok)
 			}
-			if tokenSecret != tc.tokenSecret {
-				t.Errorf("%s: Unexpected Token Secret. Expected %q, got %q", tc.description, givenTokenSecret, tokenSecret)
+			if ok {
+				if tokenID != tc.tokenID {
+					t.Errorf("Unexpected Token ID. Expected %q, got %q", givenTokenID, tokenID)
+				}
+				if tokenSecret != tc.tokenSecret {
+					t.Errorf("Unexpected Token Secret. Expected %q, got %q", givenTokenSecret, tokenSecret)
+				}
 			}
-		}
+		})
 	}
 
 }
 
 func TestValidateSecret(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       metav1.NamespaceSystem,
@@ -125,7 +130,7 @@ func TestValidateSecret(t *testing.T) {
 		},
 	}
 
-	tokenID, tokenSecret, ok := validateSecretForSigning(secret)
+	tokenID, tokenSecret, ok := validateSecretForSigning(ctx, secret)
 	if !ok {
 		t.Errorf("Unexpected validation failure.")
 	}
@@ -138,6 +143,7 @@ func TestValidateSecret(t *testing.T) {
 }
 
 func TestBadSecretName(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       metav1.NamespaceSystem,
@@ -152,13 +158,14 @@ func TestBadSecretName(t *testing.T) {
 		},
 	}
 
-	_, _, ok := validateSecretForSigning(secret)
+	_, _, ok := validateSecretForSigning(ctx, secret)
 	if ok {
 		t.Errorf("Token validation should fail with bad name")
 	}
 }
 
 func TestMismatchSecretName(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       metav1.NamespaceSystem,
@@ -173,7 +180,7 @@ func TestMismatchSecretName(t *testing.T) {
 		},
 	}
 
-	_, _, ok := validateSecretForSigning(secret)
+	_, _, ok := validateSecretForSigning(ctx, secret)
 	if ok {
 		t.Errorf("Token validation should fail with mismatched name")
 	}

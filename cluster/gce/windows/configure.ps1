@@ -165,11 +165,13 @@ try {
   DownloadAndInstall-KubernetesBinaries
   DownloadAndInstall-NodeProblemDetector
   DownloadAndInstall-CSIProxyBinaries
+  DownloadAndInstall-AuthProviderGcpBinary
   Start-CSIProxy
   Create-NodePki
   Create-KubeletKubeconfig
   Create-KubeproxyKubeconfig
   Create-NodeProblemDetectorKubeConfig
+  Create-AuthProviderGcpConfig
   Set-PodCidr
   Configure-HostNetworkingService
   Prepare-CniNetworking

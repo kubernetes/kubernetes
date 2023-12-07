@@ -39,6 +39,7 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/internal/grpclog"
 	"google.golang.org/grpc/internal/grpcutil"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -46,24 +47,32 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// NewServerHandlerTransport returns a ServerTransport handling gRPC
-// from inside an http.Handler. It requires that the http Server
-// supports HTTP/2.
+// NewServerHandlerTransport returns a ServerTransport handling gRPC from
+// inside an http.Handler, or writes an HTTP error to w and returns an error.
+// It requires that the http Server supports HTTP/2.
 func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats []stats.Handler) (ServerTransport, error) {
 	if r.ProtoMajor != 2 {
-		return nil, errors.New("gRPC requires HTTP/2")
+		msg := "gRPC requires HTTP/2"
+		http.Error(w, msg, http.StatusBadRequest)
+		return nil, errors.New(msg)
 	}
 	if r.Method != "POST" {
-		return nil, errors.New("invalid gRPC request method")
+		msg := fmt.Sprintf("invalid gRPC request method %q", r.Method)
+		http.Error(w, msg, http.StatusBadRequest)
+		return nil, errors.New(msg)
 	}
 	contentType := r.Header.Get("Content-Type")
 	// TODO: do we assume contentType is lowercase? we did before
 	contentSubtype, validContentType := grpcutil.ContentSubtype(contentType)
 	if !validContentType {
-		return nil, errors.New("invalid gRPC request content-type")
+		msg := fmt.Sprintf("invalid gRPC request content-type %q", contentType)
+		http.Error(w, msg, http.StatusUnsupportedMediaType)
+		return nil, errors.New(msg)
 	}
 	if _, ok := w.(http.Flusher); !ok {
-		return nil, errors.New("gRPC requires a ResponseWriter supporting http.Flusher")
+		msg := "gRPC requires a ResponseWriter supporting http.Flusher"
+		http.Error(w, msg, http.StatusInternalServerError)
+		return nil, errors.New(msg)
 	}
 
 	st := &serverHandlerTransport{
@@ -75,11 +84,14 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats []s
 		contentSubtype: contentSubtype,
 		stats:          stats,
 	}
+	st.logger = prefixLoggerForServerHandlerTransport(st)
 
 	if v := r.Header.Get("grpc-timeout"); v != "" {
 		to, err := decodeTimeout(v)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "malformed time-out: %v", err)
+			msg := fmt.Sprintf("malformed grpc-timeout: %v", err)
+			http.Error(w, msg, http.StatusBadRequest)
+			return nil, status.Error(codes.Internal, msg)
 		}
 		st.timeoutSet = true
 		st.timeout = to
@@ -97,7 +109,9 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats []s
 		for _, v := range vv {
 			v, err := decodeMetadataHeader(k, v)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "malformed binary metadata: %v", err)
+				msg := fmt.Sprintf("malformed binary metadata %q in header %q: %v", v, k, err)
+				http.Error(w, msg, http.StatusBadRequest)
+				return nil, status.Error(codes.Internal, msg)
 			}
 			metakv = append(metakv, k, v)
 		}
@@ -138,14 +152,18 @@ type serverHandlerTransport struct {
 	// TODO make sure this is consistent across handler_server and http2_server
 	contentSubtype string
 
-	stats []stats.Handler
+	stats  []stats.Handler
+	logger *grpclog.PrefixLogger
 }
 
-func (ht *serverHandlerTransport) Close() {
-	ht.closeOnce.Do(ht.closeCloseChanOnce)
+func (ht *serverHandlerTransport) Close(err error) {
+	ht.closeOnce.Do(func() {
+		if ht.logger.V(logLevel) {
+			ht.logger.Infof("Closing: %v", err)
+		}
+		close(ht.closedCh)
+	})
 }
-
-func (ht *serverHandlerTransport) closeCloseChanOnce() { close(ht.closedCh) }
 
 func (ht *serverHandlerTransport) RemoteAddr() net.Addr { return strAddr(ht.req.RemoteAddr) }
 
@@ -236,7 +254,7 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) erro
 			})
 		}
 	}
-	ht.Close()
+	ht.Close(errors.New("finished writing status"))
 	return err
 }
 
@@ -346,7 +364,7 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 		case <-ht.req.Context().Done():
 		}
 		cancel()
-		ht.Close()
+		ht.Close(errors.New("request is done processing"))
 	}()
 
 	req := ht.req
@@ -435,7 +453,7 @@ func (ht *serverHandlerTransport) IncrMsgSent() {}
 
 func (ht *serverHandlerTransport) IncrMsgRecv() {}
 
-func (ht *serverHandlerTransport) Drain() {
+func (ht *serverHandlerTransport) Drain(debugData string) {
 	panic("Drain() is not implemented")
 }
 

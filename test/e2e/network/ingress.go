@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
@@ -45,6 +46,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -59,7 +61,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		conformanceTests []e2eingress.ConformanceTests
 	)
 	f := framework.NewDefaultFramework("ingress")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		jig = e2eingress.NewIngressTestJig(f.ClientSet)
@@ -84,7 +86,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 	//
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
-	ginkgo.Describe("GCE [Slow] [Feature:Ingress]", func() {
+	f.Describe("GCE", framework.WithSlow(), feature.Ingress, func() {
 		var gceController *gce.IngressController
 
 		// Platform specific setup
@@ -129,7 +131,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 	})
 
-	ginkgo.Describe("GCE [Slow] [Feature:NEG]", func() {
+	f.Describe("GCE", framework.WithSlow(), feature.NEG, func() {
 		var gceController *gce.IngressController
 
 		// Platform specific setup
@@ -233,7 +235,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 			// ClusterIP ServicePorts have no NodePort
 			for _, sp := range svcPorts {
-				framework.ExpectEqual(sp.NodePort, int32(0))
+				gomega.Expect(sp.NodePort).To(gomega.Equal(int32(0)))
 			}
 		})
 
@@ -541,7 +543,7 @@ func detectNegAnnotation(ctx context.Context, f *framework.Framework, jig *e2ein
 
 var _ = common.SIGDescribe("Ingress API", func() {
 	f := framework.NewDefaultFramework("ingress")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.19
 		Testname: Ingress API
@@ -676,12 +678,12 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("getting")
 		gottenIngress, err := ingClient.Get(ctx, createdIngress.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenIngress.UID, createdIngress.UID)
+		gomega.Expect(gottenIngress.UID).To(gomega.Equal(createdIngress.UID))
 
 		ginkgo.By("listing")
 		ings, err := ingClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ings.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(ings.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
@@ -693,7 +695,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("cluster-wide listing")
 		clusterIngs, err := clusterIngClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterIngs.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(clusterIngs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
@@ -703,7 +705,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("patching")
 		patchedIngress, err := ingClient.Patch(ctx, createdIngress.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedIngress.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedIngress.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		var ingToUpdate, updatedIngress *networkingv1.Ingress
@@ -717,7 +719,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedIngress.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedIngress.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
@@ -726,7 +728,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 				if !ok {
 					framework.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedIngress, isIngress := evt.Object.(*networkingv1.Ingress)
 				if !isIngress {
 					framework.Failf("expected Ingress, got %T", evt.Object)
@@ -754,8 +756,8 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":{"loadBalancer":`+string(lbStatusJSON)+`}}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedStatus.Status.LoadBalancer, lbStatus, "patched object should have the applied loadBalancer status")
-		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedStatus.Status.LoadBalancer).To(gomega.Equal(lbStatus), "patched object should have the applied loadBalancer status")
+		gomega.Expect(patchedStatus.Annotations).To(gomega.HaveKeyWithValue("patchedstatus", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
 		var statusToUpdate, updatedStatus *networkingv1.Ingress
@@ -771,7 +773,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedStatus.Status.LoadBalancer, statusToUpdate.Status.LoadBalancer, fmt.Sprintf("updated object expected to have updated loadbalancer status %#v, got %#v", statusToUpdate.Status.LoadBalancer, updatedStatus.Status.LoadBalancer))
+		gomega.Expect(updatedStatus.Status.LoadBalancer).To(gomega.Equal(statusToUpdate.Status.LoadBalancer), "updated object expected to have updated loadbalancer status %#v, got %#v", statusToUpdate.Status.LoadBalancer, updatedStatus.Status.LoadBalancer)
 
 		ginkgo.By("get /status")
 		ingResource := schema.GroupVersionResource{Group: "networking.k8s.io", Version: ingVersion, Resource: "ingresses"}
@@ -779,13 +781,13 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		framework.ExpectNoError(err)
 		statusUID, _, err := unstructured.NestedFieldCopy(gottenStatus.Object, "metadata", "uid")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(string(createdIngress.UID), statusUID, fmt.Sprintf("createdIngress.UID: %v expected to match statusUID: %v ", createdIngress.UID, statusUID))
+		gomega.Expect(string(createdIngress.UID)).To(gomega.Equal(statusUID), "createdIngress.UID: %v expected to match statusUID: %v ", createdIngress.UID, statusUID)
 
 		// Ingress resource delete operations
 		ginkgo.By("deleting")
 
 		expectFinalizer := func(ing *networkingv1.Ingress, msg string) {
-			framework.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
+			gomega.Expect(ing.DeletionTimestamp).ToNot(gomega.BeNil(), "expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing)
 			if len(ing.Finalizers) == 0 {
 				framework.Failf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing)
 			}

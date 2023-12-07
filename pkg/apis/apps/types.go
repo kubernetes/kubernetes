@@ -180,6 +180,7 @@ type StatefulSetSpec struct {
 	// of the StatefulSet. Each pod will be named with the format
 	// <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named
 	// "web" with index number "3" would be named "web-3".
+	// The only allowed template.spec.restartPolicy value is "Always".
 	Template api.PodTemplateSpec
 
 	// VolumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -229,7 +230,7 @@ type StatefulSetSpec struct {
 
 	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
 	// the StatefulSet VolumeClaimTemplates. This requires the
-	// StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
+	// StatefulSetAutoDeletePVC feature gate to be enabled, which is beta and default on from 1.27.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy
 
@@ -237,7 +238,7 @@ type StatefulSetSpec struct {
 	// default ordinals behavior assigns a "0" index to the first replica and
 	// increments the index by one for each additional replica requested. Using
 	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
-	// enabled, which is alpha.
+	// enabled, which is beta.
 	// +optional
 	Ordinals *StatefulSetOrdinals
 }
@@ -376,6 +377,7 @@ type DeploymentSpec struct {
 	Selector *metav1.LabelSelector
 
 	// Template describes the pods that will be created.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	Template api.PodTemplateSpec
 
 	// The deployment strategy to use to replace existing pods with new ones.
@@ -666,6 +668,7 @@ type DaemonSetSpec struct {
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	Template api.PodTemplateSpec
 
@@ -857,6 +860,7 @@ type ReplicaSetSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// +optional
 	Template api.PodTemplateSpec
 }

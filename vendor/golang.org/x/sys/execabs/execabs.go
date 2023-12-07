@@ -63,7 +63,7 @@ func LookPath(file string) (string, error) {
 }
 
 func fixCmd(name string, cmd *exec.Cmd) {
-	if filepath.Base(name) == name && !filepath.IsAbs(cmd.Path) {
+	if filepath.Base(name) == name && !filepath.IsAbs(cmd.Path) && !isGo119ErrFieldSet(cmd) {
 		// exec.Command was called with a bare binary name and
 		// exec.LookPath returned a path which is not absolute.
 		// Set cmd.lookPathErr and clear cmd.Path so that it

@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -72,11 +73,11 @@ type CreateSecretTLSOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewSecretTLSOptions creates a new *CreateSecretTLSOptions with default value
-func NewSecretTLSOptions(ioStrems genericclioptions.IOStreams) *CreateSecretTLSOptions {
+func NewSecretTLSOptions(ioStrems genericiooptions.IOStreams) *CreateSecretTLSOptions {
 	return &CreateSecretTLSOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStrems,
@@ -84,7 +85,7 @@ func NewSecretTLSOptions(ioStrems genericclioptions.IOStreams) *CreateSecretTLSO
 }
 
 // NewCmdCreateSecretTLS is a macro command for creating secrets to work with TLS client or server
-func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSecretTLSOptions(ioStreams)
 
 	cmd := &cobra.Command{

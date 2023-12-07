@@ -30,7 +30,10 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -47,6 +50,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
 
@@ -81,40 +85,54 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string) (*transformTest, error) {
+func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+	if storageConfig == nil {
+		storageConfig = framework.SharedEtcd()
+	}
 	e := transformTest{
 		logger:            l,
 		transformerConfig: transformerConfigYAML,
-		storageConfig:     framework.SharedEtcd(),
+		storageConfig:     storageConfig,
 	}
 
 	var err error
 	// create config dir with provided config yaml
 	if transformerConfigYAML != "" && configDir == "" {
 		if e.configDir, err = e.createEncryptionConfig(); err != nil {
-			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %v", err)
+			e.cleanUp()
+			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %w", err)
 		}
 	} else {
 		// configDir already exists. api-server must be restarting with existing encryption config
 		e.configDir = configDir
 	}
+	configFile := filepath.Join(e.configDir, encryptionConfigFileName)
+	_, err = os.ReadFile(configFile)
+	if err != nil {
+		e.cleanUp()
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
 
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
-		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
+		e.cleanUp()
+		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
 	}
 	klog.Infof("Started kube-apiserver %v", e.kubeAPIServer.ClientConfig.Host)
 
 	if e.restClient, err = kubernetes.NewForConfig(e.kubeAPIServer.ClientConfig); err != nil {
-		return nil, fmt.Errorf("error while creating rest client: %v", err)
+		e.cleanUp()
+		return nil, fmt.Errorf("error while creating rest client: %w", err)
 	}
 
 	if e.ns, err = e.createNamespace(testNamespace); err != nil {
+		e.cleanUp()
 		return nil, err
 	}
 
 	if transformerConfigYAML != "" && reload {
 		// when reloading is enabled, this healthz endpoint is always present
 		mustBeHealthy(l, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
+		mustNotHaveLivez(l, "/kms-providers", "404 page not found", e.kubeAPIServer.ClientConfig)
 
 		// excluding healthz endpoints even if they do not exist should work
 		mustBeHealthy(l, "", `warn: some health checks cannot be excluded: no matches for "kms-provider-0","kms-provider-1","kms-provider-2","kms-provider-3"`,
@@ -125,7 +143,9 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 }
 
 func (e *transformTest) cleanUp() {
-	os.RemoveAll(e.configDir)
+	if e.configDir != "" {
+		os.RemoveAll(e.configDir)
+	}
 
 	if e.kubeAPIServer.ClientConfig != nil {
 		e.shutdownAPIServer()
@@ -133,7 +153,6 @@ func (e *transformTest) cleanUp() {
 }
 
 func (e *transformTest) shutdownAPIServer() {
-	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
 	e.kubeAPIServer.TearDownFn()
 }
 
@@ -186,7 +205,7 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 
 	// Data should be un-enveloped on direct reads from Kube API Server.
 	if resource == "secrets" {
-		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testSecret, metav1.GetOptions{})
+		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			l.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
 		}
@@ -297,7 +316,14 @@ func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) 
 	}
 
 	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
-		return nil, fmt.Errorf("unable to create testing namespace %v", err)
+		if errors.IsAlreadyExists(err) {
+			existingNs, err := e.restClient.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("unable to get testing namespace, err: [%v]", err)
+			}
+			return existingNs, nil
+		}
+		return nil, fmt.Errorf("unable to create testing namespace, err: [%v]", err)
 	}
 
 	return ns, nil
@@ -335,6 +361,79 @@ func (e *transformTest) createConfigMap(name, namespace string) (*corev1.ConfigM
 	}
 
 	return cm, nil
+}
+
+// create jobs
+func (e *transformTest) createJob(name, namespace string) (*batchv1.Job, error) {
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+	if _, err := e.restClient.BatchV1().Jobs(job.Namespace).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
+		return nil, fmt.Errorf("error while creating job: %v", err)
+	}
+
+	return job, nil
+}
+
+// create deployment
+func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deployment, error) {
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: pointer.Int32(2),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "nginx",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "nginx",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.17",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									Protocol:      corev1.ProtocolTCP,
+									ContainerPort: 80,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	if _, err := e.restClient.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{}); err != nil {
+		return nil, fmt.Errorf("error while creating deployment: %v", err)
+	}
+
+	return deployment, nil
 }
 
 func gvr(group, version, resource string) schema.GroupVersionResource {
@@ -376,6 +475,15 @@ func (e *transformTest) createPod(namespace string, dynamicInterface dynamic.Int
 		return nil, fmt.Errorf("error while writing pod: %v", err)
 	}
 	return pod, nil
+}
+
+func (e *transformTest) deletePod(namespace string, dynamicInterface dynamic.Interface) error {
+	podGVR := gvr("", "v1", "pods")
+	stubObj, err := getStubObj(podGVR)
+	if err != nil {
+		return err
+	}
+	return dynamicInterface.Resource(podGVR).Namespace(namespace).Delete(context.TODO(), stubObj.GetName(), metav1.DeleteOptions{})
 }
 
 func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Unstructured, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
@@ -443,7 +551,7 @@ func (e *transformTest) printMetrics() error {
 func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -456,7 +564,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 		return done, nil
 	})
 
-	if pollErr == wait.ErrWaitTimeout {
+	if pollErr != nil {
 		t.Fatalf("failed to get the expected healthz status of OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
@@ -464,7 +572,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -477,8 +585,29 @@ func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains 
 		return done, nil
 	})
 
-	if pollErr == wait.ErrWaitTimeout {
+	if pollErr != nil {
 		t.Fatalf("failed to get the expected healthz status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
+	}
+}
+
+func mustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+	t.Helper()
+	var restErr error
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		body, ok, err := getLivez(checkName, clientConfig, excludes...)
+		restErr = err
+		if err != nil {
+			return false, err
+		}
+		done := !ok && strings.Contains(body, wantBodyContains)
+		if !done {
+			t.Logf("expected server check %q with message %q but it is not: %s", checkName, wantBodyContains, body)
+		}
+		return done, nil
+	})
+
+	if pollErr != nil {
+		t.Fatalf("failed to get the expected livez status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
 
@@ -489,6 +618,20 @@ func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string)
 	}
 
 	req := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/healthz%v", checkName)).Param("verbose", "true")
+	for _, exclude := range excludes {
+		req.Param("exclude", exclude)
+	}
+	body, err := req.DoRaw(context.TODO()) // we can still have a response body during an error case
+	return string(body), err == nil, nil
+}
+
+func getLivez(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to create a client: %v", err)
+	}
+
+	req := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/livez%v", checkName)).Param("verbose", "true")
 	for _, exclude := range excludes {
 		req.Param("exclude", exclude)
 	}

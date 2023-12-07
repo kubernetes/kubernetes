@@ -18,8 +18,11 @@ package config
 
 import (
 	"errors"
+
 	"github.com/spf13/cobra"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -45,7 +48,7 @@ type ViewOptions struct {
 	Context      string
 	OutputFormat string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -58,7 +61,7 @@ var (
 		# Show merged kubeconfig settings
 		kubectl config view
 
-		# Show merged kubeconfig settings and raw certificate data and exposed secrets
+		# Show merged kubeconfig settings, raw certificate data, and exposed secrets
 		kubectl config view --raw
 
 		# Get the password for the e2e user
@@ -66,7 +69,7 @@ var (
 )
 
 // NewCmdConfigView returns a Command instance for 'config view' sub command
-func NewCmdConfigView(streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigView(streams genericiooptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	o := &ViewOptions{
 		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		ConfigAccess: ConfigAccess,

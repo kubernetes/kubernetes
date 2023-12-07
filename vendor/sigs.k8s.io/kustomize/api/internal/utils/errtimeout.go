@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 )
 
 type errTimeOut struct {
@@ -24,13 +24,6 @@ func (e errTimeOut) Error() string {
 }
 
 func IsErrTimeout(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(errTimeOut)
-	if ok {
-		return true
-	}
-	_, ok = errors.Cause(err).(errTimeOut)
-	return ok
+	e := &errTimeOut{}
+	return errors.As(err, &e)
 }

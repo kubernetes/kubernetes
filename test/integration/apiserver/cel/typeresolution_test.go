@@ -26,6 +26,8 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/interpreter"
 
+	"k8s.io/apiserver/pkg/cel/environment"
+
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -34,22 +36,23 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	commoncel "k8s.io/apiserver/pkg/cel"
-	"k8s.io/apiserver/pkg/cel/library"
 	celopenapi "k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/utils/pointer"
+
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/pointer"
 )
 
 func TestTypeResolver(t *testing.T) {
@@ -77,7 +80,7 @@ func TestTypeResolver(t *testing.T) {
 		}
 	}(crd)
 	discoveryResolver := &resolver.ClientDiscoveryResolver{Discovery: client.Discovery()}
-	definitionsResolver := resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, openapi.GetOpenAPIDefinitions)
+	definitionsResolver := resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme)
 	// wait until the CRD schema is published at the OpenAPI v3 endpoint
 	err = wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
 		p, err := client.OpenAPIV3().Paths()
@@ -328,7 +331,7 @@ func TestBuiltinResolution(t *testing.T) {
 	}{
 		{
 			name:     "definitions",
-			resolver: resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, openapi.GetOpenAPIDefinitions),
+			resolver: resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme),
 			scheme:   buildTestScheme(),
 		},
 		{
@@ -352,6 +355,14 @@ func TestBuiltinResolution(t *testing.T) {
 				if gvk.Version == "__internal" {
 					continue
 				}
+				// apiextensions.k8s.io/v1beta1 not published
+				if tc.name == "discovery" && gvk.Group == "apiextensions.k8s.io" && gvk.Version == "v1beta1" {
+					continue
+				}
+				// apiextensions.k8s.io ConversionReview not published
+				if tc.name == "discovery" && gvk.Group == "apiextensions.k8s.io" && gvk.Kind == "ConversionReview" {
+					continue
+				}
 				_, err = tc.resolver.ResolveSchema(gvk)
 				if err != nil {
 					t.Errorf("resolver %q cannot resolve %v", tc.name, gvk)
@@ -365,21 +376,13 @@ func TestBuiltinResolution(t *testing.T) {
 // with the practical defaults.
 // `self` is defined as the object being evaluated against.
 func simpleCompileCEL(schema *spec.Schema, expression string) (cel.Program, error) {
-	var opts []cel.EnvOption
-	opts = append(opts, cel.HomogeneousAggregateLiterals())
-	opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
-	opts = append(opts, library.ExtensionLibs...)
-	env, err := cel.NewEnv(opts...)
+	env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Env(environment.NewExpressions)
 	if err != nil {
 		return nil, err
 	}
-	reg := commoncel.NewRegistry(env)
-	declType := celopenapi.SchemaDeclType(schema, true)
-	rt, err := commoncel.NewRuleTypes("selfType", declType, reg)
-	if err != nil {
-		return nil, err
-	}
-	opts, err = rt.EnvOptions(env.TypeProvider())
+	declType := celopenapi.SchemaDeclType(schema, true).MaybeAssignTypeName("selfType")
+	rt := commoncel.NewDeclTypeProvider(declType)
+	opts, err := rt.EnvOptions(env.TypeProvider())
 	if err != nil {
 		return nil, err
 	}
@@ -512,5 +515,6 @@ func buildTestScheme() *runtime.Scheme {
 	_ = networkingv1.AddToScheme(scheme)
 	_ = nodev1.AddToScheme(scheme)
 	_ = storagev1.AddToScheme(scheme)
+	_ = apiextensionsscheme.AddToScheme(scheme)
 	return scheme
 }

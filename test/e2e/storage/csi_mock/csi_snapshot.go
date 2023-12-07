@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -42,10 +43,10 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-snapshot")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
-	ginkgo.Context("CSI Volume Snapshots [Feature:VolumeSnapshotDataSource]", func() {
+	f.Context("CSI Volume Snapshots", feature.VolumeSnapshotDataSource, func() {
 		tests := []struct {
 			name               string
 			createSnapshotHook func(counter int64) error
@@ -172,7 +173,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 		}
 	})
 
-	ginkgo.Context("CSI Volume Snapshots secrets [Feature:VolumeSnapshotDataSource]", func() {
+	f.Context("CSI Volume Snapshots secrets", feature.VolumeSnapshotDataSource, func() {
 
 		var (
 			// CSISnapshotterSecretName is the name of the secret to be created
@@ -281,7 +282,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 		}
 	})
 
-	ginkgo.Context("CSI Snapshot Controller metrics [Feature:VolumeSnapshotDataSource]", func() {
+	f.Context("CSI Snapshot Controller metrics", feature.VolumeSnapshotDataSource, func() {
 		tests := []struct {
 			name    string
 			pattern storageframework.TestPattern

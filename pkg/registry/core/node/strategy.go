@@ -38,7 +38,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -123,7 +122,7 @@ func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.Erro
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (nodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return dynamicKubeletConfigIsDeprecatedWarning(obj)
+	return fieldIsDeprecatedWarnings(obj)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -138,7 +137,7 @@ func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object)
 
 // WarningsOnUpdate returns warnings for the given update.
 func (nodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return dynamicKubeletConfigIsDeprecatedWarning(obj)
+	return fieldIsDeprecatedWarnings(obj)
 }
 
 func (nodeStrategy) AllowUnconditionalUpdate() bool {
@@ -223,16 +222,10 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // MatchNode returns a generic matcher for a given label and field selector.
 func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
 	return pkgstorage.SelectionPredicate{
-		Label:       label,
-		Field:       field,
-		GetAttrs:    GetAttrs,
-		IndexFields: []string{"metadata.name"},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
-}
-
-// NameTriggerFunc returns value metadata.namespace of given object.
-func NameTriggerFunc(obj runtime.Object) string {
-	return obj.(*api.Node).ObjectMeta.Name
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.
@@ -247,7 +240,7 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, err
 	}
 
-	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
+	if err := isProxyableHostname(ctx, info.Hostname); err != nil {
 		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
@@ -267,13 +260,33 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
 }
 
-func dynamicKubeletConfigIsDeprecatedWarning(obj runtime.Object) []string {
+func isProxyableHostname(ctx context.Context, hostname string) error {
+	resp, err := net.DefaultResolver.LookupIPAddr(ctx, hostname)
+	if err != nil {
+		return err
+	}
+
+	if len(resp) == 0 {
+		return fmt.Errorf("no addresses for hostname")
+	}
+	for _, host := range resp {
+		if !host.IP.IsGlobalUnicast() {
+			return fmt.Errorf("address not allowed")
+		}
+	}
+
+	return nil
+}
+
+func fieldIsDeprecatedWarnings(obj runtime.Object) []string {
 	newNode := obj.(*api.Node)
+	var warnings []string
 	if newNode.Spec.ConfigSource != nil {
-		var warnings []string
 		// KEP https://github.com/kubernetes/enhancements/issues/281
 		warnings = append(warnings, "spec.configSource: the feature is removed")
-		return warnings
 	}
-	return nil
+	if len(newNode.Spec.DoNotUseExternalID) > 0 {
+		warnings = append(warnings, "spec.externalID: this field is deprecated, and is unused by Kubernetes")
+	}
+	return warnings
 }

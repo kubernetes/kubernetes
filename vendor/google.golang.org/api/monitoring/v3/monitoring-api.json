@@ -21,7 +21,7 @@
   "baseUrl": "https://monitoring.googleapis.com/",
   "batchPath": "batch",
   "canonicalName": "Monitoring",
-  "description": "Manages your Cloud Monitoring data and configurations. Most projects must be associated with a Workspace, with a few exceptions as noted on the individual method pages. The table entries below are presented in alphabetical order, not in order of common use. For explanations of the concepts found in the table entries, read the Cloud Monitoring documentation (https://cloud.google.com/monitoring/docs).",
+  "description": "Manages your Cloud Monitoring data and configurations.",
   "discoveryVersion": "v1",
   "documentationLink": "https://cloud.google.com/monitoring/api/",
   "fullyEncodeReservedExpansion": true,
@@ -119,7 +119,7 @@
         "timeSeries": {
           "methods": {
             "list": {
-              "description": "Lists time series that match a filter. This method does not require a Workspace.",
+              "description": "Lists time series that match a filter.",
               "flatPath": "v3/folders/{foldersId}/timeSeries",
               "httpMethod": "GET",
               "id": "monitoring.folders.timeSeries.list",
@@ -392,7 +392,7 @@
         "timeSeries": {
           "methods": {
             "list": {
-              "description": "Lists time series that match a filter. This method does not require a Workspace.",
+              "description": "Lists time series that match a filter.",
               "flatPath": "v3/organizations/{organizationsId}/timeSeries",
               "httpMethod": "GET",
               "id": "monitoring.organizations.timeSeries.list",
@@ -665,7 +665,7 @@
         "alertPolicies": {
           "methods": {
             "create": {
-              "description": "Creates a new alerting policy.",
+              "description": "Creates a new alerting policy.Design your application to single-thread API calls that modify the state of alerting policies in a single project. This includes calls to CreateAlertPolicy, DeleteAlertPolicy and UpdateAlertPolicy.",
               "flatPath": "v3/projects/{projectsId}/alertPolicies",
               "httpMethod": "POST",
               "id": "monitoring.projects.alertPolicies.create",
@@ -674,7 +674,7 @@
               ],
               "parameters": {
                 "name": {
-                  "description": "Required. The project (https://cloud.google.com/monitoring/api/v3#project_name) in which to create the alerting policy. The format is: projects/[PROJECT_ID_OR_NUMBER] Note that this field names the parent container in which the alerting policy will be written, not the name of the created policy. |name| must be a host project of a workspace, otherwise INVALID_ARGUMENT error will return. The alerting policy that is returned will have a name that contains a normalized representation of this name as a prefix but adds a suffix of the form /alertPolicies/[ALERT_POLICY_ID], identifying the policy in the container.",
+                  "description": "Required. The project (https://cloud.google.com/monitoring/api/v3#project_name) in which to create the alerting policy. The format is: projects/[PROJECT_ID_OR_NUMBER] Note that this field names the parent container in which the alerting policy will be written, not the name of the created policy. |name| must be a host project of a Metrics Scope, otherwise INVALID_ARGUMENT error will return. The alerting policy that is returned will have a name that contains a normalized representation of this name as a prefix but adds a suffix of the form /alertPolicies/[ALERT_POLICY_ID], identifying the policy in the container.",
                   "location": "path",
                   "pattern": "^projects/[^/]+$",
                   "required": true,
@@ -694,7 +694,7 @@
               ]
             },
             "delete": {
-              "description": "Deletes an alerting policy.",
+              "description": "Deletes an alerting policy.Design your application to single-thread API calls that modify the state of alerting policies in a single project. This includes calls to CreateAlertPolicy, DeleteAlertPolicy and UpdateAlertPolicy.",
               "flatPath": "v3/projects/{projectsId}/alertPolicies/{alertPoliciesId}",
               "httpMethod": "DELETE",
               "id": "monitoring.projects.alertPolicies.delete",
@@ -795,7 +795,7 @@
               ]
             },
             "patch": {
-              "description": "Updates an alerting policy. You can either replace the entire policy with a new one or replace only certain fields in the current alerting policy by specifying the fields to be updated via updateMask. Returns the updated alerting policy.",
+              "description": "Updates an alerting policy. You can either replace the entire policy with a new one or replace only certain fields in the current alerting policy by specifying the fields to be updated via updateMask. Returns the updated alerting policy.Design your application to single-thread API calls that modify the state of alerting policies in a single project. This includes calls to CreateAlertPolicy, DeleteAlertPolicy and UpdateAlertPolicy.",
               "flatPath": "v3/projects/{projectsId}/alertPolicies/{alertPoliciesId}",
               "httpMethod": "PATCH",
               "id": "monitoring.projects.alertPolicies.patch",
@@ -804,7 +804,7 @@
               ],
               "parameters": {
                 "name": {
-                  "description": "Required if the policy exists. The resource name for this policy. The format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID] [ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
+                  "description": "Required if the policy exists. The resource name for this policy. The format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID] [ALERT_POLICY_ID] is assigned by Cloud Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
                   "location": "path",
                   "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
                   "required": true,
@@ -834,7 +834,7 @@
         "collectdTimeSeries": {
           "methods": {
             "create": {
-              "description": "Stackdriver Monitoring Agent only: Creates a new time series.This method is only for use by the Stackdriver Monitoring Agent. Use projects.timeSeries.create instead.",
+              "description": "Cloud Monitoring Agent only: Creates a new time series.This method is only for use by the Cloud Monitoring Agent. Use projects.timeSeries.create instead.",
               "flatPath": "v3/projects/{projectsId}/collectdTimeSeries",
               "httpMethod": "POST",
               "id": "monitoring.projects.collectdTimeSeries.create",
@@ -1112,7 +1112,7 @@
         "metricDescriptors": {
           "methods": {
             "create": {
-              "description": "Creates a new metric descriptor. The creation is executed asynchronously and callers may check the returned operation to track its progress. User-created metric descriptors define custom metrics (https://cloud.google.com/monitoring/custom-metrics).",
+              "description": "Creates a new metric descriptor. The creation is executed asynchronously. User-created metric descriptors define custom metrics (https://cloud.google.com/monitoring/custom-metrics). The metric descriptor is updated if it already exists, except that metric labels are never removed.",
               "flatPath": "v3/projects/{projectsId}/metricDescriptors",
               "httpMethod": "POST",
               "id": "monitoring.projects.metricDescriptors.create",
@@ -1168,7 +1168,7 @@
               ]
             },
             "get": {
-              "description": "Gets a single metric descriptor. This method does not require a Workspace.",
+              "description": "Gets a single metric descriptor.",
               "flatPath": "v3/projects/{projectsId}/metricDescriptors/{metricDescriptorsId}",
               "httpMethod": "GET",
               "id": "monitoring.projects.metricDescriptors.get",
@@ -1196,7 +1196,7 @@
               ]
             },
             "list": {
-              "description": "Lists metric descriptors that match a filter. This method does not require a Workspace.",
+              "description": "Lists metric descriptors that match a filter.",
               "flatPath": "v3/projects/{projectsId}/metricDescriptors",
               "httpMethod": "GET",
               "id": "monitoring.projects.metricDescriptors.list",
@@ -1217,7 +1217,7 @@
                   "type": "string"
                 },
                 "pageSize": {
-                  "description": "A positive number that is the maximum number of results to return.",
+                  "description": "A positive number that is the maximum number of results to return. The default and maximum value is 10,000. If a page_size \u003c= 0 or \u003e 10,000 is submitted, will instead return a maximum of 10,000 results.",
                   "format": "int32",
                   "location": "query",
                   "type": "integer"
@@ -1244,7 +1244,7 @@
         "monitoredResourceDescriptors": {
           "methods": {
             "get": {
-              "description": "Gets a single monitored resource descriptor. This method does not require a Workspace.",
+              "description": "Gets a single monitored resource descriptor.",
               "flatPath": "v3/projects/{projectsId}/monitoredResourceDescriptors/{monitoredResourceDescriptorsId}",
               "httpMethod": "GET",
               "id": "monitoring.projects.monitoredResourceDescriptors.get",
@@ -1272,7 +1272,7 @@
               ]
             },
             "list": {
-              "description": "Lists monitored resource descriptors that match a filter. This method does not require a Workspace.",
+              "description": "Lists monitored resource descriptors that match a filter.",
               "flatPath": "v3/projects/{projectsId}/monitoredResourceDescriptors",
               "httpMethod": "GET",
               "id": "monitoring.projects.monitoredResourceDescriptors.list",
@@ -1389,7 +1389,7 @@
         "notificationChannels": {
           "methods": {
             "create": {
-              "description": "Creates a new notification channel, representing a single notification endpoint such as an email address, SMS number, or PagerDuty service.",
+              "description": "Creates a new notification channel, representing a single notification endpoint such as an email address, SMS number, or PagerDuty service.Design your application to single-thread API calls that modify the state of notification channels in a single project. This includes calls to CreateNotificationChannel, DeleteNotificationChannel and UpdateNotificationChannel.",
               "flatPath": "v3/projects/{projectsId}/notificationChannels",
               "httpMethod": "POST",
               "id": "monitoring.projects.notificationChannels.create",
@@ -1418,7 +1418,7 @@
               ]
             },
             "delete": {
-              "description": "Deletes a notification channel.",
+              "description": "Deletes a notification channel.Design your application to single-thread API calls that modify the state of notification channels in a single project. This includes calls to CreateNotificationChannel, DeleteNotificationChannel and UpdateNotificationChannel.",
               "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}",
               "httpMethod": "DELETE",
               "id": "monitoring.projects.notificationChannels.delete",
@@ -1505,7 +1505,7 @@
               ]
             },
             "list": {
-              "description": "Lists the notification channels that have been created for the project.",
+              "description": "Lists the notification channels that have been created for the project. To list the types of notification channels that are supported, use the ListNotificationChannelDescriptors method.",
               "flatPath": "v3/projects/{projectsId}/notificationChannels",
               "httpMethod": "GET",
               "id": "monitoring.projects.notificationChannels.list",
@@ -1553,7 +1553,7 @@
               ]
             },
             "patch": {
-              "description": "Updates a notification channel. Fields not specified in the field mask remain unchanged.",
+              "description": "Updates a notification channel. Fields not specified in the field mask remain unchanged.Design your application to single-thread API calls that modify the state of notification channels in a single project. This includes calls to CreateNotificationChannel, DeleteNotificationChannel and UpdateNotificationChannel.",
               "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}",
               "httpMethod": "PATCH",
               "id": "monitoring.projects.notificationChannels.patch",
@@ -1647,6 +1647,144 @@
             }
           }
         },
+        "snoozes": {
+          "methods": {
+            "create": {
+              "description": "Creates a Snooze that will prevent alerts, which match the provided criteria, from being opened. The Snooze applies for a specific time interval.",
+              "flatPath": "v3/projects/{projectsId}/snoozes",
+              "httpMethod": "POST",
+              "id": "monitoring.projects.snoozes.create",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "parent": {
+                  "description": "Required. The project (https://cloud.google.com/monitoring/api/v3#project_name) in which a Snooze should be created. The format is: projects/[PROJECT_ID_OR_NUMBER] ",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+parent}/snoozes",
+              "request": {
+                "$ref": "Snooze"
+              },
+              "response": {
+                "$ref": "Snooze"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ]
+            },
+            "get": {
+              "description": "Retrieves a Snooze by name.",
+              "flatPath": "v3/projects/{projectsId}/snoozes/{snoozesId}",
+              "httpMethod": "GET",
+              "id": "monitoring.projects.snoozes.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "Required. The ID of the Snooze to retrieve. The format is: projects/[PROJECT_ID_OR_NUMBER]/snoozes/[SNOOZE_ID] ",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/snoozes/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+name}",
+              "response": {
+                "$ref": "Snooze"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read"
+              ]
+            },
+            "list": {
+              "description": "Lists the Snoozes associated with a project. Can optionally pass in filter, which specifies predicates to match Snoozes.",
+              "flatPath": "v3/projects/{projectsId}/snoozes",
+              "httpMethod": "GET",
+              "id": "monitoring.projects.snoozes.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "filter": {
+                  "description": "Optional. Optional filter to restrict results to the given criteria. The following fields are supported. interval.start_time interval.end_timeFor example: ``` interval.start_time \u003e \"2022-03-11T00:00:00-08:00\" AND interval.end_time \u003c \"2022-03-12T00:00:00-08:00\" ``` ",
+                  "location": "query",
+                  "type": "string"
+                },
+                "pageSize": {
+                  "description": "Optional. The maximum number of results to return for a single query. The server may further constrain the maximum number of results returned in a single page. The value should be in the range 1, 1000. If the value given is outside this range, the server will decide the number of results to be returned.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "Optional. The next_page_token from a previous call to ListSnoozesRequest to get the next page of results.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "parent": {
+                  "description": "Required. The project (https://cloud.google.com/monitoring/api/v3#project_name) whose Snoozes should be listed. The format is: projects/[PROJECT_ID_OR_NUMBER] ",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+parent}/snoozes",
+              "response": {
+                "$ref": "ListSnoozesResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read"
+              ]
+            },
+            "patch": {
+              "description": "Updates a Snooze, identified by its name, with the parameters in the given Snooze object.",
+              "flatPath": "v3/projects/{projectsId}/snoozes/{snoozesId}",
+              "httpMethod": "PATCH",
+              "id": "monitoring.projects.snoozes.patch",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "Required. The name of the Snooze. The format is: projects/[PROJECT_ID_OR_NUMBER]/snoozes/[SNOOZE_ID] The ID of the Snooze will be generated by the system.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/snoozes/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "updateMask": {
+                  "description": "Required. The fields to update.For each field listed in update_mask: If the Snooze object supplied in the UpdateSnoozeRequest has a value for that field, the value of the field in the existing Snooze will be set to the value of the field in the supplied Snooze. If the field does not have a value in the supplied Snooze, the field in the existing Snooze is set to its default value.Fields not listed retain their existing value.The following are the field names that are accepted in update_mask: display_name interval.start_time interval.end_timeThat said, the start time and end time of the Snooze determines which fields can legally be updated. Before attempting an update, users should consult the documentation for UpdateSnoozeRequest, which talks about which fields can be updated.",
+                  "format": "google-fieldmask",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+name}",
+              "request": {
+                "$ref": "Snooze"
+              },
+              "response": {
+                "$ref": "Snooze"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ]
+            }
+          }
+        },
         "timeSeries": {
           "methods": {
             "create": {
@@ -1710,7 +1848,7 @@
               ]
             },
             "list": {
-              "description": "Lists time series that match a filter. This method does not require a Workspace.",
+              "description": "Lists time series that match a filter.",
               "flatPath": "v3/projects/{projectsId}/timeSeries",
               "httpMethod": "GET",
               "id": "monitoring.projects.timeSeries.list",
@@ -1975,7 +2113,7 @@
               ]
             },
             "query": {
-              "description": "Queries time series using Monitoring Query Language. This method does not require a Workspace.",
+              "description": "Queries time series using Monitoring Query Language.",
               "flatPath": "v3/projects/{projectsId}/timeSeries:query",
               "httpMethod": "POST",
               "id": "monitoring.projects.timeSeries.query",
@@ -2099,6 +2237,11 @@
                 "parent"
               ],
               "parameters": {
+                "filter": {
+                  "description": "If provided, this field specifies the criteria that must be met by uptime checks to be included in the response.For more details, see Filtering syntax (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering#filter_syntax).",
+                  "location": "query",
+                  "type": "string"
+                },
                 "pageSize": {
                   "description": "The maximum number of results to return in a single response. The server may further constrain the maximum number of results returned in a single page. If the page_size is \u003c=0, the server will decide the number of results to be returned.",
                   "format": "int32",
@@ -2179,7 +2322,7 @@
           ],
           "parameters": {
             "parent": {
-              "description": "Required. Resource name (https://cloud.google.com/monitoring/api/v3#project_name) of the parent workspace. The format is: projects/[PROJECT_ID_OR_NUMBER] ",
+              "description": "Required. Resource name (https://cloud.google.com/monitoring/api/v3#project_name) of the parent Metrics Scope. The format is: projects/[PROJECT_ID_OR_NUMBER] ",
               "location": "path",
               "pattern": "^[^/]+/[^/]+$",
               "required": true,
@@ -2257,7 +2400,7 @@
           ]
         },
         "list": {
-          "description": "List Services for this workspace.",
+          "description": "List Services for this Metrics Scope.",
           "flatPath": "v3/{v3Id}/{v3Id1}/services",
           "httpMethod": "GET",
           "id": "monitoring.services.list",
@@ -2266,7 +2409,7 @@
           ],
           "parameters": {
             "filter": {
-              "description": "A filter specifying what Services to return. The filter currently supports the following fields: - `identifier_case` - `app_engine.module_id` - `cloud_endpoints.service` (reserved for future use) - `mesh_istio.mesh_uid` - `mesh_istio.service_namespace` - `mesh_istio.service_name` - `cluster_istio.location` (deprecated) - `cluster_istio.cluster_name` (deprecated) - `cluster_istio.service_namespace` (deprecated) - `cluster_istio.service_name` (deprecated) identifier_case refers to which option in the identifier oneof is populated. For example, the filter identifier_case = \"CUSTOM\" would match all services with a value for the custom field. Valid options are \"CUSTOM\", \"APP_ENGINE\", \"MESH_ISTIO\", plus \"CLUSTER_ISTIO\" (deprecated) and \"CLOUD_ENDPOINTS\" (reserved for future use).",
+              "description": "A filter specifying what Services to return. The filter supports filtering on a particular service-identifier type or one of its attributes.To filter on a particular service-identifier type, the identifier_case refers to which option in the identifier field is populated. For example, the filter identifier_case = \"CUSTOM\" would match all services with a value for the custom field. Valid options include \"CUSTOM\", \"APP_ENGINE\", \"MESH_ISTIO\", and the other options listed at https://cloud.google.com/monitoring/api/ref_v3/rest/v3/services#ServiceTo filter on an attribute of a service-identifier type, apply the filter name by using the snake case of the service-identifier type and the attribute of that service-identifier type, and join the two with a period. For example, to filter by the meshUid field of the MeshIstio service-identifier type, you must filter on mesh_istio.mesh_uid = \"123\" to match all services with mesh UID \"123\". Service-identifier types and their attributes are described at https://cloud.google.com/monitoring/api/ref_v3/rest/v3/services#Service",
               "location": "query",
               "type": "string"
             },
@@ -2282,7 +2425,7 @@
               "type": "string"
             },
             "parent": {
-              "description": "Required. Resource name of the parent containing the listed services, either a project (https://cloud.google.com/monitoring/api/v3#project_name) or a Monitoring Workspace. The formats are: projects/[PROJECT_ID_OR_NUMBER] workspaces/[HOST_PROJECT_ID_OR_NUMBER] ",
+              "description": "Required. Resource name of the parent containing the listed services, either a project (https://cloud.google.com/monitoring/api/v3#project_name) or a Monitoring Metrics Scope. The formats are: projects/[PROJECT_ID_OR_NUMBER] workspaces/[HOST_PROJECT_ID_OR_NUMBER] ",
               "location": "path",
               "pattern": "^[^/]+/[^/]+$",
               "required": true,
@@ -2466,7 +2609,7 @@
                   "type": "string"
                 },
                 "parent": {
-                  "description": "Required. Resource name of the parent containing the listed SLOs, either a project or a Monitoring Workspace. The formats are: projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID] workspaces/[HOST_PROJECT_ID_OR_NUMBER]/services/- ",
+                  "description": "Required. Resource name of the parent containing the listed SLOs, either a project or a Monitoring Metrics Scope. The formats are: projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID] workspaces/[HOST_PROJECT_ID_OR_NUMBER]/services/- ",
                   "location": "path",
                   "pattern": "^[^/]+/[^/]+/services/[^/]+$",
                   "required": true,
@@ -2571,7 +2714,7 @@
       }
     }
   },
-  "revision": "20211017",
+  "revision": "20230531",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -2700,7 +2843,7 @@
           "type": "string"
         },
         "conditions": {
-          "description": "A list of conditions for the policy. The conditions are combined by AND or OR according to the combiner field. If the combined conditions evaluate to true, then an incident is created. A policy can have from one to six conditions. If condition_time_series_query_language is present, it must be the only condition.",
+          "description": "A list of conditions for the policy. The conditions are combined by AND or OR according to the combiner field. If the combined conditions evaluate to true, then an incident is created. A policy can have from one to six conditions. If condition_time_series_query_language is present, it must be the only condition. If condition_monitoring_query_language is present, it must be the only condition.",
           "items": {
             "$ref": "Condition"
           },
@@ -2711,7 +2854,7 @@
           "description": "A read-only record of the creation of the alerting policy. If provided in a call to create or update, this field will be ignored."
         },
         "displayName": {
-          "description": "A short name or phrase used to identify the policy in dashboards, notifications, and incidents. To avoid confusion, don't use the same display name for multiple policies in the same project. The name is limited to 512 Unicode characters.",
+          "description": "A short name or phrase used to identify the policy in dashboards, notifications, and incidents. To avoid confusion, don't use the same display name for multiple policies in the same project. The name is limited to 512 Unicode characters.The convention for the display_name of a PrometheusQueryLanguageCondition is \"/\", where the and should be taken from the corresponding Prometheus configuration file. This convention is not enforced. In any case the display_name is not a unique key of the AlertPolicy.",
           "type": "string"
         },
         "documentation": {
@@ -2727,7 +2870,7 @@
           "description": "A read-only record of the most recent change to the alerting policy. If provided in a call to create or update, this field will be ignored."
         },
         "name": {
-          "description": "Required if the policy exists. The resource name for this policy. The format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID] [ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
+          "description": "Required if the policy exists. The resource name for this policy. The format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID] [ALERT_POLICY_ID] is assigned by Cloud Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
           "type": "string"
         },
         "notificationChannels": {
@@ -2741,12 +2884,12 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "User-supplied key/value data to be used for organizing and identifying the AlertPolicy objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.",
+          "description": "User-supplied key/value data to be used for organizing and identifying the AlertPolicy objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.Note that Prometheus and are valid Prometheus label names (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels). This means that they cannot be stored as is in user labels, because Prometheus labels may contain upper-case letters.",
           "type": "object"
         },
         "validity": {
           "$ref": "Status",
-          "description": "Read-only description of how the alert policy is invalid. OK if the alert policy is valid. If not OK, the alert policy will not generate incidents."
+          "description": "Read-only description of how the alert policy is invalid. This field is only set when the alert policy is invalid. An invalid alert policy will not generate incidents."
         }
       },
       "type": "object"
@@ -2760,6 +2903,13 @@
           "format": "google-duration",
           "type": "string"
         },
+        "notificationChannelStrategy": {
+          "description": "Control how notifications will be sent out, on a per-channel basis.",
+          "items": {
+            "$ref": "NotificationChannelStrategy"
+          },
+          "type": "array"
+        },
         "notificationRateLimit": {
           "$ref": "NotificationRateLimit",
           "description": "Required for alert policies with a LogMatch condition.This limit is not implemented for alert policies that are not log-based."
@@ -2772,7 +2922,7 @@
       "id": "AppEngine",
       "properties": {
         "moduleId": {
-          "description": "The ID of the App Engine module underlying this service. Corresponds to the module_id resource label in the gae_app monitored resource: https://cloud.google.com/monitoring/api/resources#tag_gae_app",
+          "description": "The ID of the App Engine module underlying this service. Corresponds to the module_id resource label in the gae_app monitored resource (https://cloud.google.com/monitoring/api/resources#tag_gae_app).",
           "type": "string"
         }
       },
@@ -2794,6 +2944,24 @@
         },
         "username": {
           "description": "The username to use when authenticating with the HTTP server.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BasicService": {
+      "description": "A well-known service type, defined by its service type and service labels. Documentation and examples here (https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/api/api-structures#basic-svc-w-basic-sli).",
+      "id": "BasicService",
+      "properties": {
+        "serviceLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels that specify the resource that emits the monitoring data which is used for SLO reporting of this Service. Documentation and valid values for given service types here (https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/api/api-structures#basic-svc-w-basic-sli).",
+          "type": "object"
+        },
+        "serviceType": {
+          "description": "The type of service that this basic service defines, e.g. APP_ENGINE service type. Documentation and valid values here (https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/api/api-structures#basic-svc-w-basic-sli).",
           "type": "string"
         }
       },
@@ -2859,7 +3027,22 @@
       "id": "CloudEndpoints",
       "properties": {
         "service": {
-          "description": "The name of the Cloud Endpoints service underlying this service. Corresponds to the service resource label in the api monitored resource: https://cloud.google.com/monitoring/api/resources#tag_api",
+          "description": "The name of the Cloud Endpoints service underlying this service. Corresponds to the service resource label in the api monitored resource (https://cloud.google.com/monitoring/api/resources#tag_api).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CloudRun": {
+      "description": "Cloud Run service. Learn more at https://cloud.google.com/run.",
+      "id": "CloudRun",
+      "properties": {
+        "location": {
+          "description": "The location the service is run. Corresponds to the location resource label in the cloud_run_revision monitored resource (https://cloud.google.com/monitoring/api/resources#tag_cloud_run_revision).",
+          "type": "string"
+        },
+        "serviceName": {
+          "description": "The name of the Cloud Run service. Corresponds to the service_name resource label in the cloud_run_revision monitored resource (https://cloud.google.com/monitoring/api/resources#tag_cloud_run_revision).",
           "type": "string"
         }
       },
@@ -3032,7 +3215,7 @@
           "type": "string"
         },
         "name": {
-          "description": "Required if the condition exists. The unique resource name for this condition. Its format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[POLICY_ID]/conditions/[CONDITION_ID] [CONDITION_ID] is assigned by Stackdriver Monitoring when the condition is created as part of a new or updated alerting policy.When calling the alertPolicies.create method, do not include the name field in the conditions of the requested alerting policy. Stackdriver Monitoring creates the condition identifiers and includes them in the new policy.When calling the alertPolicies.update method to update a policy, including a condition name causes the existing condition to be updated. Conditions without names are added to the updated policy. Existing conditions are deleted if they are not updated.Best practice is to preserve [CONDITION_ID] if you make only small changes, such as those to condition thresholds, durations, or trigger values. Otherwise, treat the change as a new condition and let the existing condition be deleted.",
+          "description": "Required if the condition exists. The unique resource name for this condition. Its format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[POLICY_ID]/conditions/[CONDITION_ID] [CONDITION_ID] is assigned by Cloud Monitoring when the condition is created as part of a new or updated alerting policy.When calling the alertPolicies.create method, do not include the name field in the conditions of the requested alerting policy. Cloud Monitoring creates the condition identifiers and includes them in the new policy.When calling the alertPolicies.update method to update a policy, including a condition name causes the existing condition to be updated. Conditions without names are added to the updated policy. Existing conditions are deleted if they are not updated.Best practice is to preserve [CONDITION_ID] if you make only small changes, such as those to condition thresholds, durations, or trigger values. Otherwise, treat the change as a new condition and let the existing condition be deleted.",
           "type": "string"
         }
       },
@@ -3043,8 +3226,12 @@
       "id": "ContentMatcher",
       "properties": {
         "content": {
-          "description": "String or regex content to match. Maximum 1024 bytes. An empty content string indicates no content matching is to be performed.",
+          "description": "String, regex or JSON content to match. Maximum 1024 bytes. An empty content string indicates no content matching is to be performed.",
           "type": "string"
+        },
+        "jsonPathMatcher": {
+          "$ref": "JsonPathMatcher",
+          "description": "Matcher information for MATCHES_JSON_PATH and NOT_MATCHES_JSON_PATH"
         },
         "matcher": {
           "description": "The type of content matcher that will be applied to the server output, compared to the content string when the check is run.",
@@ -3053,14 +3240,18 @@
             "CONTAINS_STRING",
             "NOT_CONTAINS_STRING",
             "MATCHES_REGEX",
-            "NOT_MATCHES_REGEX"
+            "NOT_MATCHES_REGEX",
+            "MATCHES_JSON_PATH",
+            "NOT_MATCHES_JSON_PATH"
           ],
           "enumDescriptions": [
             "No content matcher type specified (maintained for backward compatibility, but deprecated for future use). Treated as CONTAINS_STRING.",
             "Selects substring matching. The match succeeds if the output contains the content string. This is the default value for checks without a matcher option, or where the value of matcher is CONTENT_MATCHER_OPTION_UNSPECIFIED.",
             "Selects negation of substring matching. The match succeeds if the output does NOT contain the content string.",
-            "Selects regular-expression matching. The match succeeds of the output matches the regular expression specified in the content string. Regex matching is only supported for HTTP/HTTPS checks.",
-            "Selects negation of regular-expression matching. The match succeeds if the output does NOT match the regular expression specified in the content string. Regex matching is only supported for HTTP/HTTPS checks."
+            "Selects regular-expression matching. The match succeeds if the output matches the regular expression specified in the content string. Regex matching is only supported for HTTP/HTTPS checks.",
+            "Selects negation of regular-expression matching. The match succeeds if the output does NOT match the regular expression specified in the content string. Regex matching is only supported for HTTP/HTTPS checks.",
+            "Selects JSONPath matching. See JsonPathMatcher for details on when the match succeeds. JSONPath matching is only supported for HTTP/HTTPS checks.",
+            "Selects JSONPath matching. See JsonPathMatcher for details on when the match succeeds. Succeeds when output does NOT match as specified. JSONPath is only supported for HTTP/HTTPS checks."
           ],
           "type": "string"
         }
@@ -3145,8 +3336,22 @@
       },
       "type": "object"
     },
+    "Criteria": {
+      "description": "Criteria specific to the AlertPolicys that this Snooze applies to. The Snooze will suppress alerts that come from one of the AlertPolicys whose names are supplied.",
+      "id": "Criteria",
+      "properties": {
+        "policies": {
+          "description": "The specific AlertPolicy names for the alert that should be snoozed. The format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[POLICY_ID] There is a limit of 16 policies per snooze. This limit is checked during snooze creation.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "Custom": {
-      "description": "Custom view of service telemetry. Currently a place-holder pending final design.",
+      "description": "Use a custom service to designate a service that you want to monitor when none of the other service types (like App Engine, Cloud Run, or a GKE type) matches your intended service.",
       "id": "Custom",
       "properties": {},
       "type": "object"
@@ -3216,7 +3421,7 @@
       "id": "Documentation",
       "properties": {
         "content": {
-          "description": "The text of the documentation, interpreted according to mime_type. The content may not exceed 8,192 Unicode characters and may not exceed more than 10,240 bytes when encoded in UTF-8 format, whichever is smaller.",
+          "description": "The body of the documentation, interpreted according to mime_type. The content may not exceed 8,192 Unicode characters and may not exceed more than 10,240 bytes when encoded in UTF-8 format, whichever is smaller. This text can be templatized by using variables (https://cloud.google.com/monitoring/alerts/doc-variables).",
           "type": "string"
         },
         "mimeType": {
@@ -3241,7 +3446,7 @@
       "type": "object"
     },
     "Empty": {
-      "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance: service Foo { rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty); } The JSON representation for Empty is empty JSON object {}.",
+      "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance: service Foo { rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty); } ",
       "id": "Empty",
       "properties": {},
       "type": "object"
@@ -3306,7 +3511,7 @@
       "type": "object"
     },
     "Exponential": {
-      "description": "Specifies an exponential sequence of buckets that have a width that is proportional to the value of the lower bound. Each bucket represents a constant relative uncertainty on a specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): scale * (growth_factor ^ i). Lower bound (1 \u003c= i \u003c N): scale * (growth_factor ^ (i - 1)).",
+      "description": "Specifies an exponential sequence of buckets that have a width that is proportional to the value of the lower bound. Each bucket represents a constant relative uncertainty on a specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): scale * (growth_factor ^ i).Lower bound (1 \u003c= i \u003c N): scale * (growth_factor ^ (i - 1)).",
       "id": "Exponential",
       "properties": {
         "growthFactor": {
@@ -3433,6 +3638,18 @@
       },
       "type": "object"
     },
+    "ForecastOptions": {
+      "description": "Options used when forecasting the time series and testing the predicted value against the threshold.",
+      "id": "ForecastOptions",
+      "properties": {
+        "forecastHorizon": {
+          "description": "Required. The length of time into the future to forecast whether a time series will violate the threshold. If the predicted value is found to violate the threshold, and the violation is observed in all forecasts made for the configured duration, then the time series is considered to be failing.",
+          "format": "google-duration",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "GetNotificationChannelVerificationCodeRequest": {
       "description": "The GetNotificationChannelVerificationCode request.",
       "id": "GetNotificationChannelVerificationCodeRequest",
@@ -3456,6 +3673,90 @@
         "expireTime": {
           "description": "The expiration time associated with the code that was returned. If an expiration was provided in the request, this is the minimum of the requested expiration in the request and the max permitted expiration.",
           "format": "google-datetime",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GkeNamespace": {
+      "description": "GKE Namespace. The field names correspond to the resource metadata labels on monitored resources that fall under a namespace (for example, k8s_container or k8s_pod).",
+      "id": "GkeNamespace",
+      "properties": {
+        "clusterName": {
+          "description": "The name of the parent cluster.",
+          "type": "string"
+        },
+        "location": {
+          "description": "The location of the parent cluster. This may be a zone or region.",
+          "type": "string"
+        },
+        "namespaceName": {
+          "description": "The name of this namespace.",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Output only. The project this resource lives in. For legacy services migrated from the Custom type, this may be a distinct project from the one parenting the service itself.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GkeService": {
+      "description": "GKE Service. The \"service\" here represents a Kubernetes service object (https://kubernetes.io/docs/concepts/services-networking/service). The field names correspond to the resource labels on k8s_service monitored resources (https://cloud.google.com/monitoring/api/resources#tag_k8s_service).",
+      "id": "GkeService",
+      "properties": {
+        "clusterName": {
+          "description": "The name of the parent cluster.",
+          "type": "string"
+        },
+        "location": {
+          "description": "The location of the parent cluster. This may be a zone or region.",
+          "type": "string"
+        },
+        "namespaceName": {
+          "description": "The name of the parent namespace.",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Output only. The project this resource lives in. For legacy services migrated from the Custom type, this may be a distinct project from the one parenting the service itself.",
+          "readOnly": true,
+          "type": "string"
+        },
+        "serviceName": {
+          "description": "The name of this service.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GkeWorkload": {
+      "description": "A GKE Workload (Deployment, StatefulSet, etc). The field names correspond to the metadata labels on monitored resources that fall under a workload (for example, k8s_container or k8s_pod).",
+      "id": "GkeWorkload",
+      "properties": {
+        "clusterName": {
+          "description": "The name of the parent cluster.",
+          "type": "string"
+        },
+        "location": {
+          "description": "The location of the parent cluster. This may be a zone or region.",
+          "type": "string"
+        },
+        "namespaceName": {
+          "description": "The name of the parent namespace.",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Output only. The project this resource lives in. For legacy services migrated from the Custom type, this may be a distinct project from the one parenting the service itself.",
+          "readOnly": true,
+          "type": "string"
+        },
+        "topLevelControllerName": {
+          "description": "The name of this workload.",
+          "type": "string"
+        },
+        "topLevelControllerType": {
+          "description": "The type of this workload (for example, \"Deployment\" or \"DaemonSet\")",
           "type": "string"
         }
       },
@@ -3509,12 +3810,19 @@
       "description": "Information involved in an HTTP/HTTPS Uptime check request.",
       "id": "HttpCheck",
       "properties": {
+        "acceptedResponseStatusCodes": {
+          "description": "If present, the check will only pass if the HTTP response status code is in this set of status codes. If empty, the HTTP status code will only pass if the HTTP status code is 200-299.",
+          "items": {
+            "$ref": "ResponseStatusCode"
+          },
+          "type": "array"
+        },
         "authInfo": {
           "$ref": "BasicAuthentication",
           "description": "The authentication information. Optional when creating an HTTP check; defaults to empty."
         },
         "body": {
-          "description": "The request body associated with the HTTP POST request. If content_type is URL_ENCODED, the body passed in must be URL-encoded. Users can provide a Content-Length header via the headers field or the API will do so. If the request_method is GET and body is not empty, the API will return an error. The maximum byte size is 1 megabyte. Note: As with all bytes fields, JSON representations are base64 encoded. e.g.: \"foo=bar\" in URL-encoded form is \"foo%3Dbar\" and in base64 encoding is \"Zm9vJTI1M0RiYXI=\".",
+          "description": "The request body associated with the HTTP POST request. If content_type is URL_ENCODED, the body passed in must be URL-encoded. Users can provide a Content-Length header via the headers field or the API will do so. If the request_method is GET and body is not empty, the API will return an error. The maximum byte size is 1 megabyte.Note: If client libraries aren't used (which performs the conversion automatically) base64 encode your body data since the field is of bytes type.",
           "format": "byte",
           "type": "string"
         },
@@ -3522,12 +3830,18 @@
           "description": "The content type header to use for the check. The following configurations result in errors: 1. Content type is specified in both the headers field and the content_type field. 2. Request method is GET and content_type is not TYPE_UNSPECIFIED 3. Request method is POST and content_type is TYPE_UNSPECIFIED. 4. Request method is POST and a \"Content-Type\" header is provided via headers field. The content_type field should be used instead.",
           "enum": [
             "TYPE_UNSPECIFIED",
-            "URL_ENCODED"
+            "URL_ENCODED",
+            "USER_PROVIDED"
           ],
           "enumDescriptions": [
             "No content type specified.",
-            "body is in URL-encoded form. Equivalent to setting the Content-Type to application/x-www-form-urlencoded in the HTTP request."
+            "body is in URL-encoded form. Equivalent to setting the Content-Type to application/x-www-form-urlencoded in the HTTP request.",
+            "body is in custom_content_type form. Equivalent to setting the Content-Type to the contents of custom_content_type in the HTTP request."
           ],
+          "type": "string"
+        },
+        "customContentType": {
+          "description": "A user provided content type header to use for the check. The invalid configurations outlined in the content_type field apply to custom_content_type, as well as the following: 1. content_type is URL_ENCODED and custom_content_type is set. 2. content_type is USER_PROVIDED and custom_content_type is not set.",
           "type": "string"
         },
         "headers": {
@@ -3544,6 +3858,10 @@
         "path": {
           "description": "Optional (defaults to \"/\"). The path to the page against which to run the check. Will be combined with the host (specified within the monitored_resource) and port to construct the full URL. If the provided path does not begin with \"/\", a \"/\" will be prepended automatically.",
           "type": "string"
+        },
+        "pingConfig": {
+          "$ref": "PingConfig",
+          "description": "Contains information needed to add pings to an HTTP check."
         },
         "port": {
           "description": "Optional (defaults to 80 when use_ssl is false, and 443 when use_ssl is true). The TCP port on the HTTP server against which to run the check. Will be combined with host (specified within the monitored_resource) and path to construct the full URL.",
@@ -3580,7 +3898,7 @@
       "id": "InternalChecker",
       "properties": {
         "displayName": {
-          "description": "The checker's human-readable name. The display name should be unique within a Stackdriver Workspace in order to make it easier to identify; however, uniqueness is not enforced.",
+          "description": "The checker's human-readable name. The display name should be unique within a Cloud Monitoring Metrics Scope in order to make it easier to identify; however, uniqueness is not enforced.",
           "type": "string"
         },
         "gcpZone": {
@@ -3588,7 +3906,7 @@
           "type": "string"
         },
         "name": {
-          "description": "A unique resource name for this InternalChecker. The format is: projects/[PROJECT_ID_OR_NUMBER]/internalCheckers/[INTERNAL_CHECKER_ID] [PROJECT_ID_OR_NUMBER] is the Stackdriver Workspace project for the Uptime check config associated with the internal checker.",
+          "description": "A unique resource name for this InternalChecker. The format is: projects/[PROJECT_ID_OR_NUMBER]/internalCheckers/[INTERNAL_CHECKER_ID] [PROJECT_ID_OR_NUMBER] is the Cloud Monitoring Metrics Scope project for the Uptime check config associated with the internal checker.",
           "type": "string"
         },
         "network": {
@@ -3596,7 +3914,7 @@
           "type": "string"
         },
         "peerProjectId": {
-          "description": "The GCP project ID where the internal checker lives. Not necessary the same as the Workspace project.",
+          "description": "The GCP project ID where the internal checker lives. Not necessary the same as the Metrics Scope project.",
           "type": "string"
         },
         "state": {
@@ -3630,6 +3948,31 @@
         },
         "meshUid": {
           "description": "Identifier for the Istio mesh in which this canonical service is defined. Corresponds to the mesh_uid metric label in Istio metrics (https://cloud.google.com/monitoring/api/metrics_istio).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "JsonPathMatcher": {
+      "description": "Information needed to perform a JSONPath content match. Used for ContentMatcherOption::MATCHES_JSON_PATH and ContentMatcherOption::NOT_MATCHES_JSON_PATH.",
+      "id": "JsonPathMatcher",
+      "properties": {
+        "jsonMatcher": {
+          "description": "The type of JSONPath match that will be applied to the JSON output (ContentMatcher.content)",
+          "enum": [
+            "JSON_PATH_MATCHER_OPTION_UNSPECIFIED",
+            "EXACT_MATCH",
+            "REGEX_MATCH"
+          ],
+          "enumDescriptions": [
+            "No JSONPath matcher type specified (not valid).",
+            "Selects 'exact string' matching. The match succeeds if the content at the json_path within the output is exactly the same as the content string.",
+            "Selects regular-expression matching. The match succeeds if the content at the json_path within the output matches the regular expression specified in the content string."
+          ],
+          "type": "string"
+        },
+        "jsonPath": {
+          "description": "JSONPath within the response output pointing to the expected ContentMatcher::content to match against.",
           "type": "string"
         }
       },
@@ -3697,7 +4040,7 @@
       "type": "object"
     },
     "Linear": {
-      "description": "Specifies a linear sequence of buckets that all have the same width (except overflow and underflow). Each bucket represents a constant absolute uncertainty on the specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): offset + (width * i). Lower bound (1 \u003c= i \u003c N): offset + (width * (i - 1)).",
+      "description": "Specifies a linear sequence of buckets that all have the same width (except overflow and underflow). Each bucket represents a constant absolute uncertainty on the specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): offset + (width * i).Lower bound (1 \u003c= i \u003c N): offset + (width * (i - 1)).",
       "id": "Linear",
       "properties": {
         "numFiniteBuckets": {
@@ -3895,6 +4238,24 @@
       },
       "type": "object"
     },
+    "ListSnoozesResponse": {
+      "description": "The results of a successful ListSnoozes call, containing the matching Snoozes.",
+      "id": "ListSnoozesResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "Page token for repeated calls to ListSnoozes, to fetch additional pages of results. If this is empty or missing, there are no more pages.",
+          "type": "string"
+        },
+        "snoozes": {
+          "description": "Snoozes matching this list call.",
+          "items": {
+            "$ref": "Snooze"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "ListTimeSeriesResponse": {
       "description": "The ListTimeSeries response.",
       "id": "ListTimeSeriesResponse",
@@ -4083,10 +4444,10 @@
             "The feature is not yet implemented. Users can not use it.",
             "Prelaunch features are hidden from users and are only visible internally.",
             "Early Access features are limited to a closed group of testers. To use these features, you must sign up in advance and sign a Trusted Tester agreement (which includes confidentiality provisions). These features may be unstable, changed in backward-incompatible ways, and are not guaranteed to be released.",
-            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don’t have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
+            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don't have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
             "Beta is the point at which we are ready to open a release for any customer to use. There are no SLA or technical support obligations in a Beta release. Products will be complete from a feature perspective, but may have some open outstanding issues. Beta releases are suitable for limited production use cases.",
             "GA features are open to all developers and are considered stable and fully qualified for production use.",
-            "Deprecated features are scheduled to be shut down and removed. For more information, see the “Deprecation Policy” section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
+            "Deprecated features are scheduled to be shut down and removed. For more information, see the \"Deprecation Policy\" section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
           ],
           "type": "string"
         },
@@ -4180,10 +4541,10 @@
             "The feature is not yet implemented. Users can not use it.",
             "Prelaunch features are hidden from users and are only visible internally.",
             "Early Access features are limited to a closed group of testers. To use these features, you must sign up in advance and sign a Trusted Tester agreement (which includes confidentiality provisions). These features may be unstable, changed in backward-incompatible ways, and are not guaranteed to be released.",
-            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don’t have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
+            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don't have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
             "Beta is the point at which we are ready to open a release for any customer to use. There are no SLA or technical support obligations in a Beta release. Products will be complete from a feature perspective, but may have some open outstanding issues. Beta releases are suitable for limited production use cases.",
             "GA features are open to all developers and are considered stable and fully qualified for production use.",
-            "Deprecated features are scheduled to be shut down and removed. For more information, see the “Deprecation Policy” section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
+            "Deprecated features are scheduled to be shut down and removed. For more information, see the \"Deprecation Policy\" section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
           ],
           "type": "string"
         },
@@ -4259,9 +4620,29 @@
           "format": "google-duration",
           "type": "string"
         },
+        "evaluationMissingData": {
+          "description": "A condition control that determines how metric-threshold conditions are evaluated when data stops arriving.",
+          "enum": [
+            "EVALUATION_MISSING_DATA_UNSPECIFIED",
+            "EVALUATION_MISSING_DATA_INACTIVE",
+            "EVALUATION_MISSING_DATA_ACTIVE",
+            "EVALUATION_MISSING_DATA_NO_OP"
+          ],
+          "enumDescriptions": [
+            "An unspecified evaluation missing data option. Equivalent to EVALUATION_MISSING_DATA_NO_OP.",
+            "If there is no data to evaluate the condition, then evaluate the condition as false.",
+            "If there is no data to evaluate the condition, then evaluate the condition as true.",
+            "Do not evaluate the condition to any value if there is no data."
+          ],
+          "type": "string"
+        },
         "filter": {
           "description": "Required. A filter (https://cloud.google.com/monitoring/api/v3/filters) that identifies which time series should be compared with the threshold.The filter is similar to the one that is specified in the ListTimeSeries request (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.timeSeries/list) (that call is useful to verify the time series that will be retrieved / processed). The filter must specify the metric type and the resource type. Optionally, it can specify resource labels and metric labels. This field must not exceed 2048 Unicode characters in length.",
           "type": "string"
+        },
+        "forecastOptions": {
+          "$ref": "ForecastOptions",
+          "description": "When this field is present, the MetricThreshold condition forecasts whether the time series is predicted to violate the threshold within the forecast_horizon. When this field is not set, the MetricThreshold tests the current value of the timeseries against the threshold."
         },
         "thresholdValue": {
           "description": "A value against which to compare the time series.",
@@ -4276,7 +4657,7 @@
       "type": "object"
     },
     "MonitoredResource": {
-      "description": "An object representing a resource that can be used for monitoring, logging, billing, or other purposes. Examples include virtual machine instances, databases, and storage devices such as disks. The type field identifies a MonitoredResourceDescriptor object that describes the resource's schema. Information in the labels field identifies the actual resource and its attributes according to the schema. For example, a particular Compute Engine VM instance could be represented by the following object, because the MonitoredResourceDescriptor for \"gce_instance\" has labels \"instance_id\" and \"zone\": { \"type\": \"gce_instance\", \"labels\": { \"instance_id\": \"12345678901234\", \"zone\": \"us-central1-a\" }} ",
+      "description": "An object representing a resource that can be used for monitoring, logging, billing, or other purposes. Examples include virtual machine instances, databases, and storage devices such as disks. The type field identifies a MonitoredResourceDescriptor object that describes the resource's schema. Information in the labels field identifies the actual resource and its attributes according to the schema. For example, a particular Compute Engine VM instance could be represented by the following object, because the MonitoredResourceDescriptor for \"gce_instance\" has labels \"project_id\", \"instance_id\" and \"zone\": { \"type\": \"gce_instance\", \"labels\": { \"project_id\": \"my-project\", \"instance_id\": \"12345678901234\", \"zone\": \"us-central1-a\" }} ",
       "id": "MonitoredResource",
       "properties": {
         "labels": {
@@ -4329,10 +4710,10 @@
             "The feature is not yet implemented. Users can not use it.",
             "Prelaunch features are hidden from users and are only visible internally.",
             "Early Access features are limited to a closed group of testers. To use these features, you must sign up in advance and sign a Trusted Tester agreement (which includes confidentiality provisions). These features may be unstable, changed in backward-incompatible ways, and are not guaranteed to be released.",
-            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don’t have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
+            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don't have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
             "Beta is the point at which we are ready to open a release for any customer to use. There are no SLA or technical support obligations in a Beta release. Products will be complete from a feature perspective, but may have some open outstanding issues. Beta releases are suitable for limited production use cases.",
             "GA features are open to all developers and are considered stable and fully qualified for production use.",
-            "Deprecated features are scheduled to be shut down and removed. For more information, see the “Deprecation Policy” section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
+            "Deprecated features are scheduled to be shut down and removed. For more information, see the \"Deprecation Policy\" section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
           ],
           "type": "string"
         },
@@ -4376,6 +4757,22 @@
         "duration": {
           "description": "The amount of time that a time series must violate the threshold to be considered failing. Currently, only values that are a multiple of a minute--e.g., 0, 60, 120, or 300 seconds--are supported. If an invalid value is given, an error will be returned. When choosing a duration, it is useful to keep in mind the frequency of the underlying time series data (which may also be affected by any alignments specified in the aggregations field); a good duration is long enough so that a single outlier does not generate spurious alerts, but short enough that unhealthy states are detected and alerted on quickly.",
           "format": "google-duration",
+          "type": "string"
+        },
+        "evaluationMissingData": {
+          "description": "A condition control that determines how metric-threshold conditions are evaluated when data stops arriving.",
+          "enum": [
+            "EVALUATION_MISSING_DATA_UNSPECIFIED",
+            "EVALUATION_MISSING_DATA_INACTIVE",
+            "EVALUATION_MISSING_DATA_ACTIVE",
+            "EVALUATION_MISSING_DATA_NO_OP"
+          ],
+          "enumDescriptions": [
+            "An unspecified evaluation missing data option. Equivalent to EVALUATION_MISSING_DATA_NO_OP.",
+            "If there is no data to evaluate the condition, then evaluate the condition as false.",
+            "If there is no data to evaluate the condition, then evaluate the condition as true.",
+            "Do not evaluate the condition to any value if there is no data."
+          ],
           "type": "string"
         },
         "query": {
@@ -4507,10 +4904,10 @@
             "The feature is not yet implemented. Users can not use it.",
             "Prelaunch features are hidden from users and are only visible internally.",
             "Early Access features are limited to a closed group of testers. To use these features, you must sign up in advance and sign a Trusted Tester agreement (which includes confidentiality provisions). These features may be unstable, changed in backward-incompatible ways, and are not guaranteed to be released.",
-            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don’t have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
+            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects allowlisted. Alpha releases don't have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
             "Beta is the point at which we are ready to open a release for any customer to use. There are no SLA or technical support obligations in a Beta release. Products will be complete from a feature perspective, but may have some open outstanding issues. Beta releases are suitable for limited production use cases.",
             "GA features are open to all developers and are considered stable and fully qualified for production use.",
-            "Deprecated features are scheduled to be shut down and removed. For more information, see the “Deprecation Policy” section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
+            "Deprecated features are scheduled to be shut down and removed. For more information, see the \"Deprecation Policy\" section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
           ],
           "type": "string"
         },
@@ -4528,8 +4925,8 @@
             ],
             "enumDescriptions": [
               "An invalid sentinel value, used to indicate that a tier has not been provided explicitly.",
-              "The Stackdriver Basic tier, a free tier of service that provides basic features, a moderate allotment of logs, and access to built-in metrics. A number of features are not available in this tier. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers).",
-              "The Stackdriver Premium tier, a higher, more expensive tier of service that provides access to all Stackdriver features, lets you use Stackdriver with AWS accounts, and has a larger allotments for logs and metrics. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers)."
+              "The Cloud Monitoring Basic tier, a free tier of service that provides basic features, a moderate allotment of logs, and access to built-in metrics. A number of features are not available in this tier. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers).",
+              "The Cloud Monitoring Premium tier, a higher, more expensive tier of service that provides access to all Cloud Monitoring features, lets you use Cloud Monitoring with AWS accounts, and has a larger allotments for logs and metrics. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers)."
             ],
             "type": "string"
           },
@@ -4537,6 +4934,25 @@
         },
         "type": {
           "description": "The type of notification channel, such as \"email\" and \"sms\". To view the full list of channels, see Channel descriptors (https://cloud.google.com/monitoring/alerts/using-channels-api#ncd). Notification channel types are globally unique.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "NotificationChannelStrategy": {
+      "description": "Control over how the notification channels in notification_channels are notified when this alert fires, on a per-channel basis.",
+      "id": "NotificationChannelStrategy",
+      "properties": {
+        "notificationChannelNames": {
+          "description": "The full REST resource name for the notification channels that these settings apply to. Each of these correspond to the name field in one of the NotificationChannel objects referenced in the notification_channels field of this AlertPolicy. The format is: projects/[PROJECT_ID_OR_NUMBER]/notificationChannels/[CHANNEL_ID] ",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "renotifyInterval": {
+          "description": "The frequency at which to send reminder notifications for open incidents.",
+          "format": "google-duration",
           "type": "string"
         }
       },
@@ -4624,6 +5040,18 @@
           "description": "If window performance \u003e= threshold, the window is counted as good.",
           "format": "double",
           "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "PingConfig": {
+      "description": "Information involved in sending ICMP pings alongside public HTTP/TCP checks. For HTTP, the pings are performed for each part of the redirect chain.",
+      "id": "PingConfig",
+      "properties": {
+        "pingsCount": {
+          "description": "Number of ICMP pings. A maximum of 3 ICMP pings is currently supported.",
+          "format": "int32",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -4767,6 +5195,40 @@
       },
       "type": "object"
     },
+    "ResponseStatusCode": {
+      "description": "A status to accept. Either a status code class like \"2xx\", or an integer status code like \"200\".",
+      "id": "ResponseStatusCode",
+      "properties": {
+        "statusClass": {
+          "description": "A class of status codes to accept.",
+          "enum": [
+            "STATUS_CLASS_UNSPECIFIED",
+            "STATUS_CLASS_1XX",
+            "STATUS_CLASS_2XX",
+            "STATUS_CLASS_3XX",
+            "STATUS_CLASS_4XX",
+            "STATUS_CLASS_5XX",
+            "STATUS_CLASS_ANY"
+          ],
+          "enumDescriptions": [
+            "Default value that matches no status codes.",
+            "The class of status codes between 100 and 199.",
+            "The class of status codes between 200 and 299.",
+            "The class of status codes between 300 and 399.",
+            "The class of status codes between 400 and 499.",
+            "The class of status codes between 500 and 599.",
+            "The class of all status codes."
+          ],
+          "type": "string"
+        },
+        "statusValue": {
+          "description": "A status code to accept.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
     "SendNotificationChannelVerificationCodeRequest": {
       "description": "The SendNotificationChannelVerificationCode request.",
       "id": "SendNotificationChannelVerificationCodeRequest",
@@ -4781,9 +5243,17 @@
           "$ref": "AppEngine",
           "description": "Type used for App Engine services."
         },
+        "basicService": {
+          "$ref": "BasicService",
+          "description": "Message that contains the service type and service labels of this service if it is a basic service. Documentation and examples here (https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/api/api-structures#basic-svc-w-basic-sli)."
+        },
         "cloudEndpoints": {
           "$ref": "CloudEndpoints",
           "description": "Type used for Cloud Endpoints services."
+        },
+        "cloudRun": {
+          "$ref": "CloudRun",
+          "description": "Type used for Cloud Run services."
         },
         "clusterIstio": {
           "$ref": "ClusterIstio",
@@ -4796,6 +5266,18 @@
         "displayName": {
           "description": "Name used for UI elements listing this Service.",
           "type": "string"
+        },
+        "gkeNamespace": {
+          "$ref": "GkeNamespace",
+          "description": "Type used for GKE Namespaces."
+        },
+        "gkeService": {
+          "$ref": "GkeService",
+          "description": "Type used for GKE Services (the Kubernetes concept of a service)."
+        },
+        "gkeWorkload": {
+          "$ref": "GkeWorkload",
+          "description": "Type used for GKE Workloads."
         },
         "istioCanonicalService": {
           "$ref": "IstioCanonicalService",
@@ -4902,6 +5384,29 @@
       },
       "type": "object"
     },
+    "Snooze": {
+      "description": "A Snooze will prevent any alerts from being opened, and close any that are already open. The Snooze will work on alerts that match the criteria defined in the Snooze. The Snooze will be active from interval.start_time through interval.end_time.",
+      "id": "Snooze",
+      "properties": {
+        "criteria": {
+          "$ref": "Criteria",
+          "description": "Required. This defines the criteria for applying the Snooze. See Criteria for more information."
+        },
+        "displayName": {
+          "description": "Required. A display name for the Snooze. This can be, at most, 512 unicode characters.",
+          "type": "string"
+        },
+        "interval": {
+          "$ref": "TimeInterval",
+          "description": "Required. The Snooze will be active from interval.start_time through interval.end_time. interval.start_time cannot be in the past. There is a 15 second clock skew to account for the time it takes for a request to reach the API from the UI."
+        },
+        "name": {
+          "description": "Required. The name of the Snooze. The format is: projects/[PROJECT_ID_OR_NUMBER]/snoozes/[SNOOZE_ID] The ID of the Snooze will be generated by the system.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "SourceContext": {
       "description": "SourceContext represents information about the source of a protobuf element, like the file in which it is defined.",
       "id": "SourceContext",
@@ -4955,6 +5460,10 @@
       "description": "Information required for a TCP Uptime check request.",
       "id": "TcpCheck",
       "properties": {
+        "pingConfig": {
+          "$ref": "PingConfig",
+          "description": "Contains information needed to add pings to a TCP check."
+        },
         "port": {
           "description": "The TCP port on the server against which to run the check. Will be combined with host (specified within the monitored_resource) to construct the full URL. Required.",
           "format": "int32",
@@ -4975,7 +5484,7 @@
       "type": "object"
     },
     "TimeInterval": {
-      "description": "A closed time interval. It extends from the start time to the end time, and includes both: [startTime, endTime]. Valid time intervals depend on the MetricKind (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.metricDescriptors#MetricKind) of the metric value. The end time must not be earlier than the start time. When writing data points, the start time must not be more than 25 hours in the past and the end time must not be more than five minutes in the future. For GAUGE metrics, the startTime value is technically optional; if no value is specified, the start time defaults to the value of the end time, and the interval represents a single point in time. If both start and end times are specified, they must be identical. Such an interval is valid only for GAUGE metrics, which are point-in-time measurements. The end time of a new interval must be at least a millisecond after the end time of the previous interval. For DELTA metrics, the start time and end time must specify a non-zero interval, with subsequent points specifying contiguous and non-overlapping intervals. For DELTA metrics, the start time of the next interval must be at least a millisecond after the end time of the previous interval. For CUMULATIVE metrics, the start time and end time must specify a non-zero interval, with subsequent points specifying the same start time and increasing end times, until an event resets the cumulative value to zero and sets a new start time for the following points. The new start time must be at least a millisecond after the end time of the previous interval. The start time of a new interval must be at least a millisecond after the end time of the previous interval because intervals are closed. If the start time of a new interval is the same as the end time of the previous interval, then data written at the new start time could overwrite data written at the previous end time.",
+      "description": "Describes a time interval: Reads: A half-open time interval. It includes the end time but excludes the start time: (startTime, endTime]. The start time must be specified, must be earlier than the end time, and should be no older than the data retention period for the metric. Writes: A closed time interval. It extends from the start time to the end time, and includes both: [startTime, endTime]. Valid time intervals depend on the MetricKind (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.metricDescriptors#MetricKind) of the metric value. The end time must not be earlier than the start time, and the end time must not be more than 25 hours in the past or more than five minutes in the future. For GAUGE metrics, the startTime value is technically optional; if no value is specified, the start time defaults to the value of the end time, and the interval represents a single point in time. If both start and end times are specified, they must be identical. Such an interval is valid only for GAUGE metrics, which are point-in-time measurements. The end time of a new interval must be at least a millisecond after the end time of the previous interval. For DELTA metrics, the start time and end time must specify a non-zero interval, with subsequent points specifying contiguous and non-overlapping intervals. For DELTA metrics, the start time of the next interval must be at least a millisecond after the end time of the previous interval. For CUMULATIVE metrics, the start time and end time must specify a non-zero interval, with subsequent points specifying the same start time and increasing end times, until an event resets the cumulative value to zero and sets a new start time for the following points. The new start time must be at least a millisecond after the end time of the previous interval. The start time of a new interval must be at least a millisecond after the end time of the previous interval because intervals are closed. If the start time of a new interval is the same as the end time of the previous interval, then data written at the new start time could overwrite data written at the previous end time.",
       "id": "TimeInterval",
       "properties": {
         "endTime": {
@@ -5141,6 +5650,10 @@
       "description": "A protocol buffer message type.",
       "id": "Type",
       "properties": {
+        "edition": {
+          "description": "The source edition string, only valid when syntax is SYNTAX_EDITIONS.",
+          "type": "string"
+        },
         "fields": {
           "description": "The list of fields.",
           "items": {
@@ -5174,11 +5687,13 @@
           "description": "The source syntax.",
           "enum": [
             "SYNTAX_PROTO2",
-            "SYNTAX_PROTO3"
+            "SYNTAX_PROTO3",
+            "SYNTAX_EDITIONS"
           ],
           "enumDescriptions": [
             "Syntax proto2.",
-            "Syntax proto3."
+            "Syntax proto3.",
+            "Syntax editions."
           ],
           "type": "string"
         }
@@ -5218,6 +5733,20 @@
       "description": "This message configures which resources and services to monitor for availability.",
       "id": "UptimeCheckConfig",
       "properties": {
+        "checkerType": {
+          "description": "The type of checkers to use to execute the Uptime check.",
+          "enum": [
+            "CHECKER_TYPE_UNSPECIFIED",
+            "STATIC_IP_CHECKERS",
+            "VPC_CHECKERS"
+          ],
+          "enumDescriptions": [
+            "The default checker type. Currently converted to STATIC_IP_CHECKERS on creation, the default conversion behavior may change in the future.",
+            "STATIC_IP_CHECKERS are used for uptime checks that perform egress across the public internet. STATIC_IP_CHECKERS use the static IP addresses returned by ListUptimeCheckIps.",
+            "VPC_CHECKERS are used for uptime checks that perform egress using Service Directory and private network access. When using VPC_CHECKERS, the monitored resource type must be servicedirectory_service."
+          ],
+          "type": "string"
+        },
         "contentMatchers": {
           "description": "The content that is expected to appear in the data returned by the target server against which the check is run. Currently, only the first entry in the content_matchers list is supported, and additional entries will be ignored. This field is optional and should only be specified if a content match is required as part of the/ Uptime check.",
           "items": {
@@ -5226,7 +5755,7 @@
           "type": "array"
         },
         "displayName": {
-          "description": "A human-friendly name for the Uptime check configuration. The display name should be unique within a Stackdriver Workspace in order to make it easier to identify; however, uniqueness is not enforced. Required.",
+          "description": "A human-friendly name for the Uptime check configuration. The display name should be unique within a Cloud Monitoring Workspace in order to make it easier to identify; however, uniqueness is not enforced. Required.",
           "type": "string"
         },
         "httpCheck": {
@@ -5246,7 +5775,7 @@
         },
         "monitoredResource": {
           "$ref": "MonitoredResource",
-          "description": "The monitored resource (https://cloud.google.com/monitoring/api/resources) associated with the configuration. The following monitored resource types are valid for this field: uptime_url, gce_instance, gae_app, aws_ec2_instance, aws_elb_load_balancer k8s_service"
+          "description": "The monitored resource (https://cloud.google.com/monitoring/api/resources) associated with the configuration. The following monitored resource types are valid for this field: uptime_url, gce_instance, gae_app, aws_ec2_instance, aws_elb_load_balancer k8s_service servicedirectory_service cloud_run_revision"
         },
         "name": {
           "description": "A unique resource name for this Uptime check configuration. The format is: projects/[PROJECT_ID_OR_NUMBER]/uptimeCheckConfigs/[UPTIME_CHECK_ID] [PROJECT_ID_OR_NUMBER] is the Workspace host project associated with the Uptime check.This field should be omitted when creating the Uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
@@ -5269,14 +5798,20 @@
               "USA",
               "EUROPE",
               "SOUTH_AMERICA",
-              "ASIA_PACIFIC"
+              "ASIA_PACIFIC",
+              "USA_OREGON",
+              "USA_IOWA",
+              "USA_VIRGINIA"
             ],
             "enumDescriptions": [
               "Default value if no region is specified. Will result in Uptime checks running from all regions.",
               "Allows checks to run from locations within the United States of America.",
               "Allows checks to run from locations within the continent of Europe.",
               "Allows checks to run from locations within the continent of South America.",
-              "Allows checks to run from locations within the Asia Pacific area (ex: Singapore)."
+              "Allows checks to run from locations within the Asia Pacific area (ex: Singapore).",
+              "Allows checks to run from locations within the western United States of America",
+              "Allows checks to run from locations within the central United States of America",
+              "Allows checks to run from locations within the eastern United States of America"
             ],
             "type": "string"
           },
@@ -5290,6 +5825,13 @@
           "description": "The maximum amount of time to wait for the request to complete (must be between 1 and 60 seconds). Required.",
           "format": "google-duration",
           "type": "string"
+        },
+        "userLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "User-supplied key/value data to be used for organizing and identifying the UptimeCheckConfig objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.",
+          "type": "object"
         }
       },
       "type": "object"
@@ -5313,14 +5855,20 @@
             "USA",
             "EUROPE",
             "SOUTH_AMERICA",
-            "ASIA_PACIFIC"
+            "ASIA_PACIFIC",
+            "USA_OREGON",
+            "USA_IOWA",
+            "USA_VIRGINIA"
           ],
           "enumDescriptions": [
             "Default value if no region is specified. Will result in Uptime checks running from all regions.",
             "Allows checks to run from locations within the United States of America.",
             "Allows checks to run from locations within the continent of Europe.",
             "Allows checks to run from locations within the continent of South America.",
-            "Allows checks to run from locations within the Asia Pacific area (ex: Singapore)."
+            "Allows checks to run from locations within the Asia Pacific area (ex: Singapore).",
+            "Allows checks to run from locations within the western United States of America",
+            "Allows checks to run from locations within the central United States of America",
+            "Allows checks to run from locations within the eastern United States of America"
           ],
           "type": "string"
         }

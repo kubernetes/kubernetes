@@ -17,7 +17,7 @@ runcmd:
   - mkdir -p /home/kubernetes/containerized_mounter/rootfs
   - mount --bind /home/kubernetes/containerized_mounter/ /home/kubernetes/containerized_mounter/
   - mount -o remount, exec /home/kubernetes/containerized_mounter/
-  - wget https://dl.k8s.io/gci-mounter/mounter.tar -O /tmp/mounter.tar
+  - wget https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar -O /tmp/mounter.tar
   - tar xvf /tmp/mounter.tar -C /home/kubernetes/containerized_mounter/rootfs
   - mkdir -p /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet
   - mount --rbind /var/lib/kubelet /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet

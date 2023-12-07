@@ -229,10 +229,10 @@ type PolicyRule struct {
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,6,rep,name=namespaces"`
 
 	// NonResourceURLs is a set of URL paths that should be audited.
-	// *s are allowed, but only as the full, final step in the path.
+	// `*`s are allowed, but only as the full, final step in the path.
 	// Examples:
-	//  "/metrics" - Log requests for apiserver metrics
-	//  "/healthz*" - Log all health checks
+	// - `/metrics` - Log requests for apiserver metrics
+	// - `/healthz*` - Log all health checks
 	// +optional
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
 
@@ -263,11 +263,11 @@ type GroupResources struct {
 	// Resources is a list of resources this rule applies to.
 	//
 	// For example:
-	// 'pods' matches pods.
-	// 'pods/log' matches the log subresource of pods.
-	// '*' matches all resources and their subresources.
-	// 'pods/*' matches all subresources of pods.
-	// '*/scale' matches all scale subresources.
+	// - `pods` matches pods.
+	// - `pods/log` matches the log subresource of pods.
+	// - `*` matches all resources and their subresources.
+	// - `pods/*` matches all subresources of pods.
+	// - `*/scale` matches all scale subresources.
 	//
 	// If wildcard is present, the validation rule will ensure resources do not
 	// overlap with each other.

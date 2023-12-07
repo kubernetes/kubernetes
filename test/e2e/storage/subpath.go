@@ -31,11 +31,10 @@ import (
 
 var _ = utils.SIGDescribe("Subpath", func() {
 	f := framework.NewDefaultFramework("subpath")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("Atomic writer volumes", func() {
 		var err error
-		var privilegedSecurityContext bool = false
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Setting up data")
@@ -58,7 +57,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a secret mounted volume which was configured with a subpath.
 		*/
 		framework.ConformanceIt("should support subpaths with secret pod", func(ctx context.Context) {
-			pod := testsuites.SubpathTestPod(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
+			pod := testsuites.SubpathTestPod(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, f.NamespacePodSecurityLevel)
 			testsuites.TestBasicSubpath(ctx, f, "secret-value", pod)
 		})
 
@@ -68,7 +67,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath.
 		*/
 		framework.ConformanceIt("should support subpaths with configmap pod", func(ctx context.Context) {
-			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
+			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, f.NamespacePodSecurityLevel)
 			testsuites.TestBasicSubpath(ctx, f, "configmap-value", pod)
 		})
 
@@ -78,7 +77,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath and also using a mountpath that is a specific file.
 		*/
 		framework.ConformanceIt("should support subpaths with configmap pod with mountPath of existing file", func(ctx context.Context) {
-			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
+			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, f.NamespacePodSecurityLevel)
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
 			testsuites.TestBasicSubpathFile(ctx, f, "configmap-value", pod, file)
@@ -94,7 +93,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
 				},
-			}, privilegedSecurityContext)
+			}, f.NamespacePodSecurityLevel)
 			testsuites.TestBasicSubpath(ctx, f, pod.Name, pod)
 		})
 
@@ -113,7 +112,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 						}},
 					},
 				},
-			}, privilegedSecurityContext)
+			}, f.NamespacePodSecurityLevel)
 			testsuites.TestBasicSubpath(ctx, f, "configmap-value", pod)
 		})
 

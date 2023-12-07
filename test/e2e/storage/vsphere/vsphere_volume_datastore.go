@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -50,9 +51,9 @@ const (
 	4. Verify the error returned on PVC failure is the correct.
 */
 
-var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Provisioning on Datastore", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-datastore")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client                     clientset.Interface
 		namespace                  string

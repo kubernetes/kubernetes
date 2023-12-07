@@ -78,3 +78,9 @@ tend to use bpf_link to do so. Older hooks unfortunately use a combination of
 syscalls, netlink messages, etc. Adding support for a new link type should not
 pull in large dependencies like netlink, so XDP programs or tracepoints are
 out of scope.
+
+Each bpf_link_type has one corresponding Go type, e.g. `link.tracing` corresponds
+to BPF_LINK_TRACING. In general, these types should be unexported as long as they
+don't export methods outside of the Link interface. Each Go type may have multiple
+exported constructors. For example `AttachTracing` and `AttachLSM` create a
+tracing link, but are distinct functions since they may require different arguments.

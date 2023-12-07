@@ -79,6 +79,10 @@ func (cu *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 
+func (cu *cadvisorClient) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cadvisorapiv2.FsInfo{}, nil
+}
+
 func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cu.GetDirFsInfo(cu.rootPath)
 }

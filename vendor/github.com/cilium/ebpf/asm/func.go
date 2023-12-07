@@ -5,6 +5,10 @@ package asm
 // BuiltinFunc is a built-in eBPF function.
 type BuiltinFunc int32
 
+func (_ BuiltinFunc) Max() BuiltinFunc {
+	return maxBuiltinFunc - 1
+}
+
 // eBPF built-in functions
 //
 // You can regenerate this list using the following gawk script:
@@ -190,6 +194,43 @@ const (
 	FnSysBpf
 	FnBtfFindByNameKind
 	FnSysClose
+	FnTimerInit
+	FnTimerSetCallback
+	FnTimerStart
+	FnTimerCancel
+	FnGetFuncIp
+	FnGetAttachCookie
+	FnTaskPtRegs
+	FnGetBranchSnapshot
+	FnTraceVprintk
+	FnSkcToUnixSock
+	FnKallsymsLookupName
+	FnFindVma
+	FnLoop
+	FnStrncmp
+	FnGetFuncArg
+	FnGetFuncRet
+	FnGetFuncArgCnt
+	FnGetRetval
+	FnSetRetval
+	FnXdpGetBuffLen
+	FnXdpLoadBytes
+	FnXdpStoreBytes
+	FnCopyFromUserTask
+	FnSkbSetTstamp
+	FnImaFileHash
+	FnKptrXchg
+	FnMapLookupPercpuElem
+	FnSkcToMptcpSock
+	FnDynptrFromMem
+	FnRingbufReserveDynptr
+	FnRingbufSubmitDynptr
+	FnRingbufDiscardDynptr
+	FnDynptrRead
+	FnDynptrWrite
+	FnDynptrData
+
+	maxBuiltinFunc
 )
 
 // Call emits a function call.

@@ -24,6 +24,7 @@ import (
 	"math/rand"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -102,7 +103,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("topology", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) *topologyTest {
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
@@ -138,7 +139,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		}
 
 		l.resource.Sc = dDriver.GetDynamicProvisionStorageClass(ctx, l.config, pattern.FsType)
-		framework.ExpectNotEqual(l.resource.Sc, nil, "driver failed to provide a StorageClass")
+		gomega.Expect(l.resource.Sc).ToNot(gomega.BeNil(), "driver failed to provide a StorageClass")
 		l.resource.Sc.VolumeBindingMode = &pattern.BindingMode
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange

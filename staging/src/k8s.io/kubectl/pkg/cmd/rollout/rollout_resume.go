@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/set"
@@ -50,7 +51,7 @@ type ResumeOptions struct {
 	LabelSelector    string
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	fieldManager string
 }
@@ -69,7 +70,7 @@ var (
 )
 
 // NewRolloutResumeOptions returns an initialized ResumeOptions instance
-func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions {
+func NewRolloutResumeOptions(streams genericiooptions.IOStreams) *ResumeOptions {
 	return &ResumeOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("resumed").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -77,7 +78,7 @@ func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions
 }
 
 // NewCmdRolloutResume returns a Command instance for 'rollout resume' sub command
-func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutResume(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutResumeOptions(streams)
 
 	validArgs := []string{"deployment"}

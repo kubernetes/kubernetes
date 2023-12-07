@@ -26,14 +26,24 @@ import (
 
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
-func startDaemonSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newDaemonSetControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.DaemonSetController,
+		aliases:  []string{"daemonset"},
+		initFunc: startDaemonSetController,
+	}
+}
+func startDaemonSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	dsc, err := daemon.NewDaemonSetsController(
+		ctx,
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
@@ -48,8 +58,16 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 	return nil, true, nil
 }
 
-func startStatefulSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newStatefulSetControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.StatefulSetController,
+		aliases:  []string{"statefulset"},
+		initFunc: startStatefulSetController,
+	}
+}
+func startStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go statefulset.NewStatefulSetController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
@@ -59,8 +77,17 @@ func startStatefulSetController(ctx context.Context, controllerContext Controlle
 	return nil, true, nil
 }
 
-func startReplicaSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newReplicaSetControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.ReplicaSetController,
+		aliases:  []string{"replicaset"},
+		initFunc: startReplicaSetController,
+	}
+}
+
+func startReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go replicaset.NewReplicaSetController(
+		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("replicaset-controller"),
@@ -69,8 +96,17 @@ func startReplicaSetController(ctx context.Context, controllerContext Controller
 	return nil, true, nil
 }
 
-func startDeploymentController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newDeploymentControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.DeploymentController,
+		aliases:  []string{"deployment"},
+		initFunc: startDeploymentController,
+	}
+}
+
+func startDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	dc, err := deployment.NewDeploymentController(
+		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),

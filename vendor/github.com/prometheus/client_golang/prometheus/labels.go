@@ -32,6 +32,78 @@ import (
 // create a Desc.
 type Labels map[string]string
 
+// ConstrainedLabels represents a label name and its constrain function
+// to normalize label values. This type is commonly used when constructing
+// metric vector Collectors.
+type ConstrainedLabel struct {
+	Name       string
+	Constraint func(string) string
+}
+
+func (cl ConstrainedLabel) Constrain(v string) string {
+	if cl.Constraint == nil {
+		return v
+	}
+	return cl.Constraint(v)
+}
+
+// ConstrainableLabels is an interface that allows creating of labels that can
+// be optionally constrained.
+//
+//	prometheus.V2().NewCounterVec(CounterVecOpts{
+//	  CounterOpts: {...}, // Usual CounterOpts fields
+//	  VariableLabels: []ConstrainedLabels{
+//	    {Name: "A"},
+//	    {Name: "B", Constraint: func(v string) string { ... }},
+//	  },
+//	})
+type ConstrainableLabels interface {
+	constrainedLabels() ConstrainedLabels
+	labelNames() []string
+}
+
+// ConstrainedLabels represents a collection of label name -> constrain function
+// to normalize label values. This type is commonly used when constructing
+// metric vector Collectors.
+type ConstrainedLabels []ConstrainedLabel
+
+func (cls ConstrainedLabels) constrainedLabels() ConstrainedLabels {
+	return cls
+}
+
+func (cls ConstrainedLabels) labelNames() []string {
+	names := make([]string, len(cls))
+	for i, label := range cls {
+		names[i] = label.Name
+	}
+	return names
+}
+
+// UnconstrainedLabels represents collection of label without any constraint on
+// their value. Thus, it is simply a collection of label names.
+//
+//	UnconstrainedLabels([]string{ "A", "B" })
+//
+// is equivalent to
+//
+//	ConstrainedLabels {
+//	  { Name: "A" },
+//	  { Name: "B" },
+//	}
+type UnconstrainedLabels []string
+
+func (uls UnconstrainedLabels) constrainedLabels() ConstrainedLabels {
+	constrainedLabels := make([]ConstrainedLabel, len(uls))
+	for i, l := range uls {
+		constrainedLabels[i] = ConstrainedLabel{Name: l}
+	}
+	return constrainedLabels
+}
+
+func (uls UnconstrainedLabels) labelNames() []string {
+	return uls
+}
+
 // reservedLabelPrefix is a prefix which is not legal in user-supplied
 // label names.
 const reservedLabelPrefix = "__"

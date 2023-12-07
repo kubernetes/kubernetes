@@ -26,7 +26,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -58,7 +59,7 @@ var (
 	ValidPluginFilenamePrefixes = []string{"kubectl"}
 )
 
-func NewCmdPlugin(streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPlugin(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "plugin [flags]",
 		DisableFlagsInUseLine: true,
@@ -79,11 +80,11 @@ type PluginListOptions struct {
 
 	PluginPaths []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCmdPluginList provides a way to list all plugin executables visible to kubectl
-func NewCmdPluginList(streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPluginList(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PluginListOptions{
 		IOStreams: streams,
 	}

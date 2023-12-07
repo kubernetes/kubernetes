@@ -29,9 +29,9 @@ import (
 // CAdvisorE2ERemote contains the specific functions in the cadvisor e2e test suite.
 type CAdvisorE2ERemote struct{}
 
-// InitCAdvisorE2ERemote performs initialization for cadvisor remote testing
-func InitCAdvisorE2ERemote() TestSuite {
-	return &CAdvisorE2ERemote{}
+// init performs initialization for cadvisor remote testing
+func init() {
+	RegisterTestSuite("cadvisor", &CAdvisorE2ERemote{})
 }
 
 // SetupTestPackage implements TestSuite.SetupTestPackage

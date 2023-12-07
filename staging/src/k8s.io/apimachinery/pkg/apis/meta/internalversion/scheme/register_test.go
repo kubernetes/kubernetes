@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestListOptions(t *testing.T) {
@@ -45,7 +45,7 @@ func TestListOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(in, actual) {
-		t.Errorf("unexpected: %s", diff.ObjectReflectDiff(in, actual))
+		t.Errorf("unexpected: %s", cmp.Diff(in, actual))
 	}
 
 	// verify failing conversion
@@ -85,6 +85,6 @@ func TestListOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(in, actual) {
-		t.Errorf("unexpected: %s", diff.ObjectReflectDiff(in, actual))
+		t.Errorf("unexpected: %s", cmp.Diff(in, actual))
 	}
 }

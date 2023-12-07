@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -80,10 +81,16 @@ func TestTCPPortExhaustion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf(tt.name), func(t *testing.T) {
-			podManager := kubepod.NewBasicPodManager(nil)
+			testRootDir := ""
+			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
+				t.Fatalf("can't make a temp rootdir: %v", err)
+			} else {
+				testRootDir = tempDir
+			}
+			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 			m := NewManager(
-				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
+				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir),
 				results.NewManager(),
 				results.NewManager(),
 				results.NewManager(),
@@ -250,14 +257,14 @@ func (f *fakePod) probeHandler() v1.ProbeHandler {
 		handler = v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Host: "127.0.0.1",
-				Port: intstr.FromInt(port),
+				Port: intstr.FromInt32(int32(port)),
 			},
 		}
 	} else {
 		handler = v1.ProbeHandler{
 			TCPSocket: &v1.TCPSocketAction{
 				Host: "127.0.0.1",
-				Port: intstr.FromInt(port),
+				Port: intstr.FromInt32(int32(port)),
 			},
 		}
 	}

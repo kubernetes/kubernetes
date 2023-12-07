@@ -21,13 +21,11 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -197,7 +195,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	if !opts.allowLegacySignerName && csr.Spec.SignerName == certificates.LegacyUnknownSignerName {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
 	} else {
-		allErrs = append(allErrs, ValidateCertificateSigningRequestSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
+		allErrs = append(allErrs, apivalidation.ValidateSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
 	}
 	if csr.Spec.ExpirationSeconds != nil && *csr.Spec.ExpirationSeconds < 600 {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), *csr.Spec.ExpirationSeconds, "may not specify a duration less than 600 seconds (10 minutes)"))
@@ -265,82 +263,6 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 	return allErrs
 }
 
-// ensure signerName is of the form domain.com/something and up to 571 characters.
-// This length and format is specified to accommodate signerNames like:
-// <fqdn>/<resource-namespace>.<resource-name>.
-// The max length of a FQDN is 253 characters (DNS1123Subdomain max length)
-// The max length of a namespace name is 63 characters (DNS1123Label max length)
-// The max length of a resource name is 253 characters (DNS1123Subdomain max length)
-// We then add an additional 2 characters to account for the one '.' and one '/'.
-func ValidateCertificateSigningRequestSignerName(fldPath *field.Path, signerName string) field.ErrorList {
-	var el field.ErrorList
-	if len(signerName) == 0 {
-		el = append(el, field.Required(fldPath, ""))
-		return el
-	}
-
-	segments := strings.Split(signerName, "/")
-	// validate that there is one '/' in the signerName.
-	// we do this after validating the domain segment to provide more info to the user.
-	if len(segments) != 2 {
-		el = append(el, field.Invalid(fldPath, signerName, "must be a fully qualified domain and path of the form 'example.com/signer-name'"))
-		// return early here as we should not continue attempting to validate a missing or malformed path segment
-		// (i.e. one containing multiple or zero `/`)
-		return el
-	}
-
-	// validate that segments[0] is less than 253 characters altogether
-	maxDomainSegmentLength := utilvalidation.DNS1123SubdomainMaxLength
-	if len(segments[0]) > maxDomainSegmentLength {
-		el = append(el, field.TooLong(fldPath, segments[0], maxDomainSegmentLength))
-	}
-	// validate that segments[0] consists of valid DNS1123 labels separated by '.'
-	domainLabels := strings.Split(segments[0], ".")
-	for _, lbl := range domainLabels {
-		// use IsDNS1123Label as we want to ensure the max length of any single label in the domain
-		// is 63 characters
-		if errs := utilvalidation.IsDNS1123Label(lbl); len(errs) > 0 {
-			for _, err := range errs {
-				el = append(el, field.Invalid(fldPath, segments[0], fmt.Sprintf("validating label %q: %s", lbl, err)))
-			}
-			// if we encounter any errors whilst parsing the domain segment, break from
-			// validation as any further error messages will be duplicates, and non-distinguishable
-			// from each other, confusing users.
-			break
-		}
-	}
-
-	// validate that there is at least one '.' in segments[0]
-	if len(domainLabels) < 2 {
-		el = append(el, field.Invalid(fldPath, segments[0], "should be a domain with at least two segments separated by dots"))
-	}
-
-	// validate that segments[1] consists of valid DNS1123 subdomains separated by '.'.
-	pathLabels := strings.Split(segments[1], ".")
-	for _, lbl := range pathLabels {
-		// use IsDNS1123Subdomain because it enforces a length restriction of 253 characters
-		// which is required in order to fit a full resource name into a single 'label'
-		if errs := utilvalidation.IsDNS1123Subdomain(lbl); len(errs) > 0 {
-			for _, err := range errs {
-				el = append(el, field.Invalid(fldPath, segments[1], fmt.Sprintf("validating label %q: %s", lbl, err)))
-			}
-			// if we encounter any errors whilst parsing the path segment, break from
-			// validation as any further error messages will be duplicates, and non-distinguishable
-			// from each other, confusing users.
-			break
-		}
-	}
-
-	// ensure that segments[1] can accommodate a dns label + dns subdomain + '.'
-	maxPathSegmentLength := utilvalidation.DNS1123SubdomainMaxLength + utilvalidation.DNS1123LabelMaxLength + 1
-	maxSignerNameLength := maxDomainSegmentLength + maxPathSegmentLength + 1
-	if len(signerName) > maxSignerNameLength {
-		el = append(el, field.TooLong(fldPath, signerName, maxSignerNameLength))
-	}
-
-	return el
-}
-
 func ValidateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
 	opts := getValidationOptions(newCSR, oldCSR)
 	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
@@ -382,7 +304,7 @@ func validateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.Certif
 			case len(newConditions) > len(oldConditions):
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not add a condition of type %q", t)))
 			case !apiequality.Semantic.DeepEqual(oldConditions, newConditions):
-				conditionDiff := diff.ObjectDiff(oldConditions, newConditions)
+				conditionDiff := cmp.Diff(oldConditions, newConditions)
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not modify a condition of type %q\n%v", t, conditionDiff)))
 			}
 		}
@@ -536,4 +458,117 @@ func hasDuplicateUsage(usages []certificates.KeyUsage) bool {
 		seen[usage] = true
 	}
 	return false
+}
+
+type ValidateClusterTrustBundleOptions struct {
+	SuppressBundleParsing bool
+}
+
+// ValidateClusterTrustBundle runs all validation checks on bundle.
+func ValidateClusterTrustBundle(bundle *certificates.ClusterTrustBundle, opts ValidateClusterTrustBundleOptions) field.ErrorList {
+	var allErrors field.ErrorList
+
+	metaErrors := apivalidation.ValidateObjectMeta(&bundle.ObjectMeta, false, apivalidation.ValidateClusterTrustBundleName(bundle.Spec.SignerName), field.NewPath("metadata"))
+	allErrors = append(allErrors, metaErrors...)
+
+	if bundle.Spec.SignerName != "" {
+		signerNameErrors := apivalidation.ValidateSignerName(field.NewPath("spec", "signerName"), bundle.Spec.SignerName)
+		allErrors = append(allErrors, signerNameErrors...)
+	}
+
+	if !opts.SuppressBundleParsing {
+		pemErrors := validateTrustBundle(field.NewPath("spec", "trustBundle"), bundle.Spec.TrustBundle)
+		allErrors = append(allErrors, pemErrors...)
+	}
+
+	return allErrors
+}
+
+// ValidateClusterTrustBundleUpdate runs all update validation checks on an
+// update.
+func ValidateClusterTrustBundleUpdate(newBundle, oldBundle *certificates.ClusterTrustBundle) field.ErrorList {
+	// If the caller isn't changing the TrustBundle field, don't parse it.
+	// This helps smoothly handle changes in Go's PEM or X.509 parsing
+	// libraries.
+	opts := ValidateClusterTrustBundleOptions{}
+	if newBundle.Spec.TrustBundle == oldBundle.Spec.TrustBundle {
+		opts.SuppressBundleParsing = true
+	}
+
+	var allErrors field.ErrorList
+	allErrors = append(allErrors, ValidateClusterTrustBundle(newBundle, opts)...)
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newBundle.ObjectMeta, &oldBundle.ObjectMeta, field.NewPath("metadata"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	return allErrors
+}
+
+// validateTrustBundle rejects intra-block headers, blocks
+// that don't parse as X.509 CA certificates, and duplicate trust anchors.  It
+// requires that at least one trust anchor is provided.
+func validateTrustBundle(path *field.Path, in string) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if len(in) > certificates.MaxTrustBundleSize {
+		allErrors = append(allErrors, field.TooLong(path, fmt.Sprintf("<value omitted, len %d>", len(in)), certificates.MaxTrustBundleSize))
+		return allErrors
+	}
+
+	blockDedupe := map[string][]int{}
+
+	rest := []byte(in)
+	var b *pem.Block
+	i := -1
+	for {
+		b, rest = pem.Decode(rest)
+		if b == nil {
+			break
+		}
+		i++
+
+		if b.Type != "CERTIFICATE" {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has bad block type: %v", i, b.Type)))
+			continue
+		}
+
+		if len(b.Headers) != 0 {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has PEM block headers", i)))
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(b.Bytes)
+		if err != nil {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d does not parse as X.509", i)))
+			continue
+		}
+
+		if !cert.IsCA {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d does not have the CA bit set", i)))
+			continue
+		}
+
+		if !cert.BasicConstraintsValid {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has invalid basic constraints", i)))
+			continue
+		}
+
+		blockDedupe[string(b.Bytes)] = append(blockDedupe[string(b.Bytes)], i)
+	}
+
+	// If we had a malformed block, don't also output potentially-redundant
+	// errors about duplicate or missing trust anchors.
+	if len(allErrors) != 0 {
+		return allErrors
+	}
+
+	if len(blockDedupe) == 0 {
+		allErrors = append(allErrors, field.Invalid(path, "<value omitted>", "at least one trust anchor must be provided"))
+	}
+
+	for _, indices := range blockDedupe {
+		if len(indices) > 1 {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("duplicate trust anchor (indices %v)", indices)))
+		}
+	}
+
+	return allErrors
 }

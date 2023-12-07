@@ -34,6 +34,13 @@ type MarshalOptions struct {
 	// unknown JSON object members.
 	DiscardUnknownMembers bool
 
+	// Deterministic specifies that the same input value will be serialized
+	// as the exact same output bytes. Different processes of
+	// the same program will serialize equal values to the same bytes,
+	// but different versions of the same program are not guaranteed
+	// to produce the exact same sequence of bytes.
+	Deterministic bool
+
 	// formatDepth is the depth at which we respect the format flag.
 	formatDepth int
 	// format is custom formatting for the value at the specified depth.

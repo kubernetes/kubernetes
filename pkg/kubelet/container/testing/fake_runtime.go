@@ -45,6 +45,8 @@ type FakeRuntime struct {
 	PodList           []*FakePod
 	AllPodList        []*FakePod
 	ImageList         []kubecontainer.Image
+	ImageFsStats      []*runtimeapi.FilesystemUsage
+	ContainerFsStats  []*runtimeapi.FilesystemUsage
 	APIPodStatus      v1.PodStatus
 	PodStatus         kubecontainer.PodStatus
 	StartedPods       []string
@@ -58,7 +60,12 @@ type FakeRuntime struct {
 	Err               error
 	InspectErr        error
 	StatusErr         error
-	T                 *testing.T
+	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
+	// UnblockImagePulls() is called. This is used to simulate image pull latency
+	// from container runtime.
+	BlockImagePulls      bool
+	imagePullTokenBucket chan bool
+	T                    *testing.T
 }
 
 const FakeHost = "localhost:12345"
@@ -110,27 +117,6 @@ func (f *FakeRuntimeCache) ForceUpdateIfOlder(context.Context, time.Time) error 
 	return nil
 }
 
-// ClearCalls resets the FakeRuntime to the initial state.
-func (f *FakeRuntime) ClearCalls() {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = []string{}
-	f.PodList = []*FakePod{}
-	f.AllPodList = []*FakePod{}
-	f.APIPodStatus = v1.PodStatus{}
-	f.StartedPods = []string{}
-	f.KilledPods = []string{}
-	f.StartedContainers = []string{}
-	f.KilledContainers = []string{}
-	f.RuntimeStatus = nil
-	f.VersionInfo = ""
-	f.RuntimeType = ""
-	f.Err = nil
-	f.InspectErr = nil
-	f.StatusErr = nil
-}
-
 // UpdatePodCIDR fulfills the cri interface.
 func (f *FakeRuntime) UpdatePodCIDR(_ context.Context, c string) error {
 	return nil
@@ -149,6 +135,23 @@ func (f *FakeRuntime) AssertCalls(calls []string) bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(calls, f.CalledFunctions)
+}
+
+// AssertCallCounts checks if a certain call is called for a certain of numbers
+func (f *FakeRuntime) AssertCallCounts(funcName string, expectedCount int) bool {
+	f.Lock()
+	defer f.Unlock()
+	actualCount := 0
+	for _, c := range f.CalledFunctions {
+		if funcName == c {
+			actualCount += 1
+		}
+	}
+	if expectedCount != actualCount {
+		f.T.Errorf("AssertCallCounts: expected %s to be called %d times, but was actually called %d times.", funcName, expectedCount, actualCount)
+		return false
+	}
+	return true
 }
 
 func (f *FakeRuntime) AssertStartedPods(pods []string) bool {
@@ -302,10 +305,8 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(_ context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	f.Lock()
-	defer f.Unlock()
-
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
 	if f.Err == nil {
 		i := kubecontainer.Image{
@@ -314,7 +315,35 @@ func (f *FakeRuntime) PullImage(_ context.Context, image kubecontainer.ImageSpec
 		}
 		f.ImageList = append(f.ImageList, i)
 	}
-	return image.Image, f.Err
+
+	if !f.BlockImagePulls {
+		f.Unlock()
+		return image.Image, f.Err
+	}
+
+	retErr := f.Err
+	if f.imagePullTokenBucket == nil {
+		f.imagePullTokenBucket = make(chan bool, 1)
+	}
+	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
+	f.Unlock()
+	select {
+	case <-ctx.Done():
+	case <-f.imagePullTokenBucket:
+	}
+	return image.Image, retErr
+}
+
+// UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
+func (f *FakeRuntime) UnblockImagePulls(count int) {
+	if f.imagePullTokenBucket != nil {
+		for i := 0; i < count; i++ {
+			select {
+			case f.imagePullTokenBucket <- true:
+			default:
+			}
+		}
+	}
 }
 
 func (f *FakeRuntime) GetImageRef(_ context.Context, image kubecontainer.ImageSpec) (string, error) {
@@ -335,7 +364,13 @@ func (f *FakeRuntime) ListImages(_ context.Context) ([]kubecontainer.Image, erro
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ListImages")
-	return f.ImageList, f.Err
+	return snapshot(f.ImageList), f.Err
+}
+
+func snapshot(imageList []kubecontainer.Image) []kubecontainer.Image {
+	result := make([]kubecontainer.Image, len(imageList))
+	copy(result, imageList)
+	return result
 }
 
 func (f *FakeRuntime) RemoveImage(_ context.Context, image kubecontainer.ImageSpec) error {
@@ -395,12 +430,36 @@ func (f *FakeRuntime) ListPodSandboxMetrics(_ context.Context) ([]*runtimeapi.Po
 	return nil, f.Err
 }
 
+// SetContainerFsStats sets the containerFsStats for dependency injection.
+func (f *FakeRuntime) SetContainerFsStats(val []*runtimeapi.FilesystemUsage) {
+	f.ContainerFsStats = val
+}
+
+// SetImageFsStats sets the ImageFsStats for dependency injection.
+func (f *FakeRuntime) SetImageFsStats(val []*runtimeapi.FilesystemUsage) {
+	f.ImageFsStats = val
+}
+
 func (f *FakeRuntime) ImageStats(_ context.Context) (*kubecontainer.ImageStats, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ImageStats")
 	return nil, f.Err
+}
+
+// ImageFsInfo returns a ImageFsInfoResponse given the DI injected values of ImageFsStats
+// and ContainerFsStats.
+func (f *FakeRuntime) ImageFsInfo(_ context.Context) (*runtimeapi.ImageFsInfoResponse, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ImageFsInfo")
+	resp := &runtimeapi.ImageFsInfoResponse{
+		ImageFilesystems:     f.ImageFsStats,
+		ContainerFilesystems: f.ContainerFsStats,
+	}
+	return resp, f.Err
 }
 
 func (f *FakeStreamingRuntime) GetExec(_ context.Context, id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {

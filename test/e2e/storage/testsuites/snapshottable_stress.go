@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -67,7 +68,7 @@ func InitCustomSnapshottableStressTestSuite(patterns []storageframework.TestPatt
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
-			FeatureTag: "[Feature:VolumeSnapshotDataSource]",
+			TestTags: []interface{}{feature.VolumeSnapshotDataSource},
 		},
 	}
 }
@@ -120,7 +121,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshottable-stress")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		driverInfo = driver.GetDriverInfo()
@@ -237,7 +238,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resources")
 	}
 
-	ginkgo.It("should support snapshotting of many volumes repeatedly [Slow] [Serial]", func(ctx context.Context) {
+	f.It("should support snapshotting of many volumes repeatedly", f.WithSlow(), f.WithSerial(), func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 		createPodsAndVolumes(ctx)

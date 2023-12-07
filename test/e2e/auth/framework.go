@@ -16,9 +16,7 @@ limitations under the License.
 
 package auth
 
-import "github.com/onsi/ginkgo/v2"
+import "k8s.io/kubernetes/test/e2e/framework"
 
 // SIGDescribe annotates the test with the SIG label.
-func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-auth] "+text, body)
-}
+var SIGDescribe = framework.SIGDescribe("auth")

@@ -49,7 +49,7 @@ fi
 ./hack/pin-dependency.sh sigs.k8s.io/kustomize/kyaml "$LATEST_KYAML"
 ./hack/pin-dependency.sh sigs.k8s.io/kustomize/cmd/config "$LATEST_CONFIG"
 ./hack/pin-dependency.sh sigs.k8s.io/kustomize/api "$LATEST_API"
-./hack/pin-dependency.sh sigs.k8s.io/kustomize/kustomize/v4 "$LATEST_KUSTOMIZE"
+./hack/pin-dependency.sh sigs.k8s.io/kustomize/kustomize/v5 "$LATEST_KUSTOMIZE"
 
 ./hack/update-vendor.sh
 ./hack/update-internal-modules.sh

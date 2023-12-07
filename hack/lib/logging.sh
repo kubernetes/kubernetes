@@ -130,7 +130,7 @@ kube::log::usage_from_stdin() {
 # Print out some info that isn't a top level status line
 kube::log::info() {
   local V="${V:-0}"
-  if [[ ${KUBE_VERBOSE} < ${V} ]]; then
+  if (( KUBE_VERBOSE < V )); then
     return
   fi
 
@@ -158,7 +158,7 @@ kube::log::info_from_stdin() {
 # Print a status line.  Formatted to show up in a stream of output.
 kube::log::status() {
   local V="${V:-0}"
-  if [[ ${KUBE_VERBOSE} < ${V} ]]; then
+  if (( KUBE_VERBOSE < V )); then
     return
   fi
 

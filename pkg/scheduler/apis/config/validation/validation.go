@@ -33,8 +33,6 @@ import (
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -143,16 +141,8 @@ type invalidPlugins struct {
 // version (even if the list of invalid plugins is empty).
 var invalidPluginsByVersion = []invalidPlugins{
 	{
-		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
-		plugins:            []string{},
-	},
-	{
-		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
-		plugins:            []string{},
-	},
-	{
 		schemeGroupVersion: v1.SchemeGroupVersion.String(),
-		plugins:            []string{"SelectorSpread"},
+		plugins:            []string{},
 	},
 }
 
@@ -227,7 +217,7 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		}
 	}
 
-	seenPluginConfig := make(sets.String)
+	seenPluginConfig := sets.New[string]()
 
 	for i := range profile.PluginConfig {
 		pluginConfigPath := path.Child("pluginConfig").Index(i)
@@ -298,7 +288,7 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error {
 	var errs []error
 	binders := 0
-	extenderManagedResources := sets.NewString()
+	extenderManagedResources := sets.New[string]()
 	for i, extender := range extenders {
 		path := fldPath.Index(i)
 		if len(extender.PrioritizeVerb) > 0 && extender.Weight <= 0 {

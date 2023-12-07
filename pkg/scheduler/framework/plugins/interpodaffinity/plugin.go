@@ -17,6 +17,7 @@ limitations under the License.
 package interpodaffinity
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -54,8 +55,8 @@ func (pl *InterPodAffinity) Name() string {
 
 // EventsToRegister returns the possible events that may make a failed Pod
 // schedulable
-func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
 		// deleting an existing Pod may make it schedulable.
@@ -63,13 +64,13 @@ func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEvent {
 		// an unschedulable Pod schedulable.
 		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
 		// adding an assigned Pod may make it schedulable.
-		{Resource: framework.Pod, ActionType: framework.All},
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.All}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
 	}
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
@@ -122,12 +123,12 @@ func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at *framework.
 
 // GetNamespaceLabelsSnapshot returns a snapshot of the labels associated with
 // the namespace.
-func GetNamespaceLabelsSnapshot(ns string, nsLister listersv1.NamespaceLister) (nsLabels labels.Set) {
+func GetNamespaceLabelsSnapshot(logger klog.Logger, ns string, nsLister listersv1.NamespaceLister) (nsLabels labels.Set) {
 	podNS, err := nsLister.Get(ns)
 	if err == nil {
 		// Create and return snapshot of the labels.
 		return labels.Merge(podNS.Labels, nil)
 	}
-	klog.V(3).InfoS("getting namespace, assuming empty set of namespace labels", "namespace", ns, "err", err)
+	logger.V(3).Info("getting namespace, assuming empty set of namespace labels", "namespace", ns, "err", err)
 	return
 }

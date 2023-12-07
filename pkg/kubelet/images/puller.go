@@ -40,14 +40,22 @@ var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
 
 type parallelImagePuller struct {
 	imageService kubecontainer.ImageService
+	tokens       chan struct{}
 }
 
-func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller {
-	return &parallelImagePuller{imageService}
+func newParallelImagePuller(imageService kubecontainer.ImageService, maxParallelImagePulls *int32) imagePuller {
+	if maxParallelImagePulls == nil || *maxParallelImagePulls < 1 {
+		return &parallelImagePuller{imageService, nil}
+	}
+	return &parallelImagePuller{imageService, make(chan struct{}, *maxParallelImagePulls)}
 }
 
 func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	go func() {
+		if pip.tokens != nil {
+			pip.tokens <- struct{}{}
+			defer func() { <-pip.tokens }()
+		}
 		startTime := time.Now()
 		imageRef, err := pip.imageService.PullImage(ctx, spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{

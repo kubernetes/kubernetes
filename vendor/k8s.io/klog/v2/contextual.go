@@ -70,10 +70,13 @@ func SetLogger(logger logr.Logger) {
 // routing log entries through klogr into klog and then into the actual Logger
 // backend.
 func SetLoggerWithOptions(logger logr.Logger, opts ...LoggerOption) {
-	logging.logger = &logger
 	logging.loggerOptions = loggerOptions{}
 	for _, opt := range opts {
 		opt(&logging.loggerOptions)
+	}
+	logging.logger = &logWriter{
+		Logger:          logger,
+		writeKlogBuffer: logging.loggerOptions.writeKlogBuffer,
 	}
 }
 
@@ -93,6 +96,22 @@ func FlushLogger(flush func()) LoggerOption {
 	}
 }
 
+// WriteKlogBuffer sets a callback that will be invoked by klog to write output
+// produced by non-structured log calls like Infof.
+//
+// The buffer will contain exactly the same data that klog normally would write
+// into its own output stream(s). In particular this includes the header, if
+// klog is configured to write one. The callback then can divert that data into
+// its own output streams. The buffer may or may not end in a line break.
+//
+// Without such a callback, klog will call the logger's Info or Error method
+// with just the message string (i.e. no header).
+func WriteKlogBuffer(write func([]byte)) LoggerOption {
+	return func(o *loggerOptions) {
+		o.writeKlogBuffer = write
+	}
+}
+
 // LoggerOption implements the functional parameter paradigm for
 // SetLoggerWithOptions.
 type LoggerOption func(o *loggerOptions)
@@ -100,6 +119,13 @@ type LoggerOption func(o *loggerOptions)
 type loggerOptions struct {
 	contextualLogger bool
 	flush            func()
+	writeKlogBuffer  func([]byte)
+}
+
+// logWriter combines a logger (always set) with a write callback (optional).
+type logWriter struct {
+	Logger
+	writeKlogBuffer func([]byte)
 }
 
 // ClearLogger removes a backing Logger implementation if one was set earlier
@@ -152,7 +178,7 @@ func Background() Logger {
 	if logging.loggerOptions.contextualLogger {
 		// Is non-nil because logging.loggerOptions.contextualLogger is
 		// only true if a logger was set.
-		return *logging.logger
+		return logging.logger.Logger
 	}
 
 	return klogLogger

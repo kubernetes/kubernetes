@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -75,9 +76,9 @@ const (
 
 */
 
-var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-vsan-policy")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client       clientset.Interface
 		namespace    string
@@ -276,7 +277,7 @@ func invokeValidPolicyTest(ctx context.Context, f *framework.Framework, client c
 
 	ginkgo.By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
-	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
+	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, f.NamespacePodSecurityLevel, "")
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify the volume is accessible and available in the pod")

@@ -29,7 +29,7 @@ import (
 
 var _ = SIGDescribe("Conformance Tests", func() {
 	f := framework.NewDefaultFramework("conformance-tests")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.23

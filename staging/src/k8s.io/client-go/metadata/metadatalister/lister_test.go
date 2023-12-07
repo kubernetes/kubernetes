@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -89,7 +89,7 @@ func TestNamespaceGetMethod(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(test.expectedObject, actualObject) {
-				t.Fatalf("unexpected object has been returned expected = %v actual = %v, diff = %v", test.expectedObject, actualObject, diff.ObjectDiff(test.expectedObject, actualObject))
+				t.Fatalf("unexpected object has been returned expected = %v actual = %v, diff = %v", test.expectedObject, actualObject, cmp.Diff(test.expectedObject, actualObject))
 			}
 		})
 	}
@@ -187,7 +187,7 @@ func TestListerGetMethod(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(test.expectedObject, actualObject) {
-				t.Fatalf("unexpected object has been returned expected = %v actual = %v, diff = %v", test.expectedObject, actualObject, diff.ObjectDiff(test.expectedObject, actualObject))
+				t.Fatalf("unexpected object has been returned expected = %v actual = %v, diff = %v", test.expectedObject, actualObject, cmp.Diff(test.expectedObject, actualObject))
 			}
 		})
 	}
@@ -231,7 +231,7 @@ func assertListOrDie(expected, actual []*metav1.PartialObjectMetadata, t *testin
 		for _, actualObject := range actual {
 			if actualObject.GetName() == expectedObject.GetName() {
 				if !reflect.DeepEqual(expectedObject, actualObject) {
-					t.Fatalf("unexpected object has been returned expected = %v actual = %v, diff = %v", expectedObject, actualObject, diff.ObjectDiff(expectedObject, actualObject))
+					t.Fatalf("unexpected object has been returned expected = %v actual = %v, diff = %v", expectedObject, actualObject, cmp.Diff(expectedObject, actualObject))
 				}
 				found = true
 			}

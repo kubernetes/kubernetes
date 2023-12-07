@@ -24,6 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -36,9 +37,9 @@ const (
 )
 
 // This test requires that --feature-gates=APIServerIdentity=true,StorageVersionAPI=true be set on the apiserver and the controller manager
-var _ = SIGDescribe("StorageVersion resources [Feature:StorageVersionAPI]", func() {
+var _ = SIGDescribe("StorageVersion resources", feature.StorageVersionAPI, func() {
 	f := framework.NewDefaultFramework("storage-version")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("storage version with non-existing id should be GC'ed", func(ctx context.Context) {
 		client := f.ClientSet

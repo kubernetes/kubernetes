@@ -93,7 +93,7 @@ var (
 )
 
 // Loosely based on the BPF_F_REPLACE support check in
-//   <https://github.com/cilium/ebpf/blob/v0.6.0/link/syscalls.go>.
+// https://github.com/cilium/ebpf/blob/v0.6.0/link/syscalls.go.
 //
 // TODO: move this logic to cilium/ebpf
 func haveBpfProgReplace() bool {

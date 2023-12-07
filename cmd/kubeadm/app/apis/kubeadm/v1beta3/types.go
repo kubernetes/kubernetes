@@ -54,6 +54,7 @@ type InitConfiguration struct {
 
 	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
 	// a secret in the cluster during the uploadcerts init phase.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	// +optional
 	CertificateKey string `json:"certificateKey,omitempty"`
 
@@ -228,7 +229,8 @@ type NodeRegistrationOptions struct {
 	// +optional
 	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 
-	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
 	// +optional
 	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
 
@@ -353,6 +355,7 @@ type JoinControlPlane struct {
 
 	// CertificateKey is the key that is used for decryption of certificates after they are downloaded from the secret
 	// upon joining a new control plane node. The corresponding encryption key is in the InitConfiguration.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	// +optional
 	CertificateKey string `json:"certificateKey,omitempty"`
 }

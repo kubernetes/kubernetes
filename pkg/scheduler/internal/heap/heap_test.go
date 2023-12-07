@@ -209,7 +209,7 @@ func TestHeap_Get(t *testing.T) {
 	}
 	// Get non-existing object.
 	_, exists, err = h.Get(mkHeapObj("non-existing", 0))
-	if err != nil || exists == true {
+	if err != nil || exists {
 		t.Fatalf("didn't expect to get any object")
 	}
 }
@@ -223,12 +223,12 @@ func TestHeap_GetByKey(t *testing.T) {
 	h.Add(mkHeapObj("baz", 11))
 
 	obj, exists, err := h.GetByKey("baz")
-	if err != nil || exists == false || obj.(testHeapObject).val != 11 {
+	if err != nil || !exists || obj.(testHeapObject).val != 11 {
 		t.Fatalf("unexpected error in getting element")
 	}
 	// Get non-existing object.
 	_, exists, err = h.GetByKey("non-existing")
-	if err != nil || exists == true {
+	if err != nil || exists {
 		t.Fatalf("didn't expect to get any object")
 	}
 }

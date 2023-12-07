@@ -17,18 +17,23 @@ limitations under the License.
 package node
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
@@ -272,7 +277,7 @@ var _ = SIGDescribe("kubelet", func() {
 		ns string
 	)
 	f := framework.NewDefaultFramework("kubelet")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -435,7 +440,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
 					err := e2epod.DeletePodWithWait(ctx, c, pod)
-					framework.ExpectError(err)
+					gomega.Expect(err).To(gomega.HaveOccurred())
 					// pod object is now stale, but is intentionally not nil
 
 					ginkgo.By("Check if pod's host has been cleaned up -- expect not")
@@ -450,4 +455,164 @@ var _ = SIGDescribe("kubelet", func() {
 			}
 		})
 	})
+
+	// Tests for NodeLogQuery feature
+	f.Describe("kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here>", feature.NodeLogQuery, "[LinuxOnly]", func() {
+		var linuxNodeName string
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			nodes, err := e2enode.GetReadyNodesIncludingTainted(ctx, c)
+			framework.ExpectNoError(err)
+			if len(nodes.Items) == 0 {
+				framework.Fail("Expected at least one Linux node to be present")
+			}
+			linuxNodeName = nodes.Items[0].Name
+		})
+
+		/*
+			Test if kubectl get --raw "/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query"
+			returns an error!
+		*/
+
+		ginkgo.It("should return the error with an empty --query option", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			queryCommand := fmt.Sprintf("/api/v1/nodes/%s/proxy/logs/?query", linuxNodeName)
+			cmd := tk.KubectlCmd("get", "--raw", queryCommand)
+			_, _, err := framework.StartCmdAndStreamOutput(cmd)
+			if err != nil {
+				framework.Failf("Failed to start kubectl command! Error: %v", err)
+			}
+			err = cmd.Wait()
+			gomega.Expect(err).To(gomega.HaveOccurred(), "Command kubectl get --raw "+queryCommand+" was expected to return an error!")
+		})
+
+		/*
+			Test if kubectl get --raw "/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=kubelet"
+			returns the kubelet logs
+		*/
+
+		ginkgo.It("should return the kubelet logs ", func(ctx context.Context) {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			queryCommand := fmt.Sprintf("/api/v1/nodes/%s/proxy/logs/?query=kubelet", linuxNodeName)
+			cmd := tk.KubectlCmd("get", "--raw", queryCommand)
+			result := runKubectlCommand(cmd)
+			assertContains("kubelet", result)
+		})
+
+		/*
+			Test if kubectl get --raw "/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=kubelet&boot=0"
+			returns kubelet logs from the current boot
+		*/
+
+		ginkgo.It("should return the kubelet logs for the current boot", func(ctx context.Context) {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			queryCommand := fmt.Sprintf("/api/v1/nodes/%s/proxy/logs/?query=kubelet&boot=0", linuxNodeName)
+			cmd := tk.KubectlCmd("get", "--raw", queryCommand)
+			result := runKubectlCommand(cmd)
+			assertContains("kubelet", result)
+		})
+
+		/*
+			Test if kubectl get --raw "/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=kubelet&tailLines=3"
+			returns the last three lines of the kubelet log
+		*/
+
+		ginkgo.It("should return the last three lines of the kubelet logs", func(ctx context.Context) {
+			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			queryCommand := fmt.Sprintf("/api/v1/nodes/%s/proxy/logs/?query=kubelet&tailLines=3", linuxNodeName)
+			cmd := tk.KubectlCmd("get", "--raw", queryCommand)
+			result := runKubectlCommand(cmd)
+			logs := journalctlCommandOnNode(linuxNodeName, "-u kubelet -n 3")
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
+			}
+		})
+
+		/*
+			Test if kubectl get --raw "/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=kubelet&pattern=kubelet"
+			returns kubelet logs for the current boot with the pattern container
+		*/
+
+		ginkgo.It("should return the kubelet logs for the current boot with the pattern container", func(ctx context.Context) {
+			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			queryCommand := fmt.Sprintf("/api/v1/nodes/%s/proxy/logs/?query=kubelet&boot=0&pattern=container", linuxNodeName)
+			cmd := tk.KubectlCmd("get", "--raw", queryCommand)
+			result := runKubectlCommand(cmd)
+			logs := journalctlCommandOnNode(linuxNodeName, "-u kubelet --grep container --boot 0")
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs")
+			}
+		})
+
+		/*
+			Test if kubectl get --raw "/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=kubelet&sinceTime=<now>"
+			returns the kubelet since the current date and time. This can be "-- No entries --" which is correct.
+		*/
+
+		ginkgo.It("should return the kubelet logs since the current date and time", func() {
+			ginkgo.By("Starting the command")
+			start := time.Now().UTC()
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			currentTime := start.Format(time.RFC3339)
+			queryCommand := fmt.Sprintf("/api/v1/nodes/%s/proxy/logs/?query=kubelet&sinceTime=%s", linuxNodeName, currentTime)
+			cmd := tk.KubectlCmd("get", "--raw", queryCommand)
+			journalctlDateLayout := "2006-1-2 15:4:5"
+			result := runKubectlCommand(cmd)
+			logs := journalctlCommandOnNode(linuxNodeName, fmt.Sprintf("-u kubelet --since \"%s\"", start.Format(journalctlDateLayout)))
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
+			}
+		})
+	})
 })
+
+func runKubectlCommand(cmd *exec.Cmd) (result string) {
+	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
+	var buf bytes.Buffer
+	if err != nil {
+		framework.Failf("Failed to start kubectl command! Stderr: %v, error: %v", stderr, err)
+	}
+	defer stdout.Close()
+	defer stderr.Close()
+	defer framework.TryKill(cmd)
+
+	b_read, err := io.Copy(&buf, stdout)
+	if err != nil {
+		framework.Failf("Expected output from kubectl alpha node-logs %s: %v\n Stderr: %v", cmd.Args, err, stderr)
+	}
+	out := ""
+	if b_read >= 0 {
+		out = buf.String()
+	}
+
+	framework.Logf("Kubectl output: %s", out)
+	return out
+}
+
+func assertContains(expectedString string, result string) {
+	if strings.Contains(result, expectedString) {
+		return
+	}
+	framework.Failf("Failed to find \"%s\"", expectedString)
+}
+
+func journalctlCommandOnNode(nodeName string, args string) string {
+	result, err := e2essh.NodeExec(context.Background(), nodeName,
+		"journalctl --utc --no-pager --output=short-precise "+args, framework.TestContext.Provider)
+	framework.ExpectNoError(err)
+	e2essh.LogResult(result)
+	return result.Stdout
+}

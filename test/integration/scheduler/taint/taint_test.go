@@ -79,7 +79,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
 	testCtx = testutils.InitTestScheduler(t, testCtx)
-	defer testutils.CleanupTest(t, testCtx)
 
 	cs := testCtx.ClientSet
 	nsName := testCtx.NS.Name
@@ -95,12 +94,10 @@ func TestTaintNodeByCondition(t *testing.T) {
 		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
 		time.Second, // Node monitor period
-		time.Second, // Pod eviction timeout
 		100,         // Eviction limiter QPS
 		100,         // Secondary eviction limiter QPS
 		100,         // Large cluster threshold
 		100,         // Unhealthy zone threshold
-		true,        // Run taint manager
 	)
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)
@@ -110,7 +107,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Waiting for all controllers to sync
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
 	// Run all controllers
 	go nc.Run(testCtx.Ctx)
@@ -527,11 +524,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 				},
 			}
 
-			if _, err := cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
 				t.Errorf("Failed to create node, err: %v", err)
 			}
 			if err := testutils.WaitForNodeTaints(cs, node, test.expectedTaints); err != nil {
-				node, err = cs.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+				node, err = cs.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get node <%s>", node.Name)
 				}
@@ -545,7 +542,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 				pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 				pod.Spec.Tolerations = p.tolerations
 
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create pod %s/%s, error: %v",
 						pod.Namespace, pod.Name, err)
@@ -566,7 +563,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 				}
 			}
 
-			testutils.CleanupPods(cs, t, pods)
+			testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 			testutils.CleanupNodes(cs, t)
 			testutils.WaitForSchedulerCacheCleanup(testCtx.Scheduler, t)
 		})

@@ -8,7 +8,7 @@ metadata:
 data:
   a: b
 ---
-apiVersion: resource.k8s.io/v1alpha1
+apiVersion: resource.k8s.io/v1alpha2
 kind: ResourceClaimTemplate
 metadata:
   name: test-inline-claim-template

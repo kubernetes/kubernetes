@@ -30,6 +30,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -40,7 +41,7 @@ import (
 // NodeAuthorizer authorizes requests from kubelets, with the following logic:
 //  1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
 //  2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
-//  3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
+//  3. If a request is for a secret, configmap, persistent volume, resource claim, or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
 //     node <- configmap
 //     node <- pod
 //     node <- pod <- secret
@@ -48,6 +49,7 @@ import (
 //     node <- pod <- pvc
 //     node <- pod <- pvc <- pv
 //     node <- pod <- pvc <- pv <- secret
+//     node <- pod <- ResourceClaim
 //  4. For other resources, authorize all nodes uniformly using statically defined rules
 type NodeAuthorizer struct {
 	graph      *Graph
@@ -72,14 +74,15 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 }
 
 var (
-	configMapResource = api.Resource("configmaps")
-	secretResource    = api.Resource("secrets")
-	pvcResource       = api.Resource("persistentvolumeclaims")
-	pvResource        = api.Resource("persistentvolumes")
-	vaResource        = storageapi.Resource("volumeattachments")
-	svcAcctResource   = api.Resource("serviceaccounts")
-	leaseResource     = coordapi.Resource("leases")
-	csiNodeResource   = storageapi.Resource("csinodes")
+	configMapResource     = api.Resource("configmaps")
+	secretResource        = api.Resource("secrets")
+	pvcResource           = api.Resource("persistentvolumeclaims")
+	pvResource            = api.Resource("persistentvolumes")
+	resourceClaimResource = resourceapi.Resource("resourceclaims")
+	vaResource            = storageapi.Resource("volumeattachments")
+	svcAcctResource       = api.Resource("serviceaccounts")
+	leaseResource         = coordapi.Resource("leases")
+	csiNodeResource       = storageapi.Resource("csinodes")
 )
 
 func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -117,6 +120,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
+		case resourceClaimResource:
+			return r.authorizeGet(nodeName, resourceClaimVertexType, attrs)
 		case vaResource:
 			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:

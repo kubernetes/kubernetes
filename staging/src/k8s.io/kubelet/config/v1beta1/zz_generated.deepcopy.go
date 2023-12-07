@@ -237,6 +237,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
+	out.ImageMaximumGCAge = in.ImageMaximumGCAge
 	if in.ImageGCHighThresholdPercent != nil {
 		in, out := &in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
 		*out = new(int32)
@@ -309,6 +310,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	if in.SerializeImagePulls != nil {
 		in, out := &in.SerializeImagePulls, &out.SerializeImagePulls
 		*out = new(bool)
+		**out = **in
+	}
+	if in.MaxParallelImagePulls != nil {
+		in, out := &in.MaxParallelImagePulls, &out.MaxParallelImagePulls
+		*out = new(int32)
 		**out = **in
 	}
 	if in.EvictionHard != nil {
@@ -405,6 +411,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {
 		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EnableSystemLogQuery != nil {
+		in, out := &in.EnableSystemLogQuery, &out.EnableSystemLogQuery
 		*out = new(bool)
 		**out = **in
 	}

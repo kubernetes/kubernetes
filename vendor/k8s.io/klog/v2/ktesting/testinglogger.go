@@ -34,15 +34,10 @@ limitations under the License.
 //
 // Serialization of the structured log parameters is done in the same way
 // as for klog.InfoS.
-//
-// # Experimental
-//
-// Notice: This package is EXPERIMENTAL and may be changed or removed in a
-// later release.
 package ktesting
 
 import (
-	"bytes"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -50,17 +45,14 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/internal/buffer"
 	"k8s.io/klog/v2/internal/dbg"
 	"k8s.io/klog/v2/internal/serialize"
+	"k8s.io/klog/v2/internal/severity"
 	"k8s.io/klog/v2/internal/verbosity"
 )
 
 // TL is the relevant subset of testing.TB.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type TL interface {
 	Helper()
 	Log(args ...interface{})
@@ -68,17 +60,24 @@ type TL interface {
 
 // NopTL implements TL with empty stubs. It can be used when only capturing
 // output in memory is relevant.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type NopTL struct{}
 
-func (n NopTL) Helper()                 {}
-func (n NopTL) Log(args ...interface{}) {}
+func (n NopTL) Helper()            {}
+func (n NopTL) Log(...interface{}) {}
 
 var _ TL = NopTL{}
+
+// BufferTL implements TL with an in-memory buffer.
+type BufferTL struct {
+	strings.Builder
+}
+
+func (n *BufferTL) Helper() {}
+func (n *BufferTL) Log(args ...interface{}) {
+	n.Builder.WriteString(fmt.Sprintln(args...))
+}
+
+var _ TL = &BufferTL{}
 
 // NewLogger constructs a new logger for the given test interface.
 //
@@ -88,16 +87,17 @@ var _ TL = NopTL{}
 // that output will be printed via the global klog logger with
 // `<test name> leaked goroutine` as prefix.
 //
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
+// Verbosity can be modified at any time through the Config.V and
+// Config.VModule API.
 func NewLogger(t TL, c *Config) logr.Logger {
 	l := tlogger{
 		shared: &tloggerShared{
 			t:      t,
 			config: c,
 		},
+	}
+	if c.co.anyToString != nil {
+		l.shared.formatter.AnyToStringHook = c.co.anyToString
 	}
 
 	type testCleanup interface {
@@ -116,11 +116,6 @@ func NewLogger(t TL, c *Config) logr.Logger {
 
 // Buffer stores log entries as formatted text and structured data.
 // It is safe to use this concurrently.
-//
-// # Experimental
-//
-// Notice: This interface is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type Buffer interface {
 	// String returns the log entries in a format that is similar to the
 	// klog text output.
@@ -131,20 +126,10 @@ type Buffer interface {
 }
 
 // Log contains log entries in the order in which they were generated.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type Log []LogEntry
 
 // DeepCopy returns a copy of the log. The error instance and key/value
 // pairs remain shared.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func (l Log) DeepCopy() Log {
 	log := make(Log, 0, len(l))
 	log = append(log, l...)
@@ -152,11 +137,6 @@ func (l Log) DeepCopy() Log {
 }
 
 // LogEntry represents all information captured for a log entry.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type LogEntry struct {
 	// Timestamp stores the time when the log entry was created.
 	Timestamp time.Time
@@ -189,38 +169,18 @@ type LogEntry struct {
 
 // LogType determines whether a log entry was created with an Error or Info
 // call.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type LogType string
 
 const (
 	// LogError is the special value used for Error log entries.
-	//
-	// Experimental
-	//
-	// Notice: This value is EXPERIMENTAL and may be changed or removed in
-	// a later release.
 	LogError = LogType("ERROR")
 
 	// LogInfo is the special value used for Info log entries.
-	//
-	// Experimental
-	//
-	// Notice: This value is EXPERIMENTAL and may be changed or removed in
-	// a later release.
 	LogInfo = LogType("INFO")
 )
 
 // Underlier is implemented by the LogSink of this logger. It provides access
 // to additional APIs that are normally hidden behind the Logger API.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type Underlier interface {
 	// GetUnderlying returns the testing instance that logging goes to.
 	// It returns nil when the test has completed already.
@@ -230,19 +190,19 @@ type Underlier interface {
 	GetBuffer() Buffer
 }
 
-type buffer struct {
+type logBuffer struct {
 	mutex sync.Mutex
 	text  strings.Builder
 	log   Log
 }
 
-func (b *buffer) String() string {
+func (b *logBuffer) String() string {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	return b.text.String()
 }
 
-func (b *buffer) Data() Log {
+func (b *logBuffer) Data() Log {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	return b.log.DeepCopy()
@@ -261,9 +221,10 @@ type tloggerShared struct {
 	// it logs after test completion.
 	goroutineWarningDone bool
 
+	formatter serialize.Formatter
 	testName  string
 	config    *Config
-	buffer    buffer
+	buffer    logBuffer
 	callDepth int
 }
 
@@ -318,10 +279,9 @@ func (l tlogger) Info(level int, msg string, kvList ...interface{}) {
 	}
 
 	l.shared.t.Helper()
-	buffer := &bytes.Buffer{}
-	merged := serialize.MergeKVs(l.values, kvList)
-	serialize.KVListFormat(buffer, merged...)
-	l.log(LogInfo, msg, level, buffer, nil, kvList)
+	buf := buffer.GetBuffer()
+	l.shared.formatter.MergeAndFormatKVs(&buf.Buffer, l.values, kvList)
+	l.log(LogInfo, msg, level, buf, nil, kvList)
 }
 
 func (l tlogger) Enabled(level int) bool {
@@ -337,27 +297,34 @@ func (l tlogger) Error(err error, msg string, kvList ...interface{}) {
 	}
 
 	l.shared.t.Helper()
-	buffer := &bytes.Buffer{}
+	buf := buffer.GetBuffer()
 	if err != nil {
-		serialize.KVListFormat(buffer, "err", err)
+		l.shared.formatter.KVFormat(&buf.Buffer, "err", err)
 	}
-	merged := serialize.MergeKVs(l.values, kvList)
-	serialize.KVListFormat(buffer, merged...)
-	l.log(LogError, msg, 0, buffer, err, kvList)
+	l.shared.formatter.MergeAndFormatKVs(&buf.Buffer, l.values, kvList)
+	l.log(LogError, msg, 0, buf, err, kvList)
 }
 
-func (l tlogger) log(what LogType, msg string, level int, buffer *bytes.Buffer, err error, kvList []interface{}) {
+func (l tlogger) log(what LogType, msg string, level int, buf *buffer.Buffer, err error, kvList []interface{}) {
 	l.shared.t.Helper()
-	args := []interface{}{what}
+	s := severity.InfoLog
+	if what == LogError {
+		s = severity.ErrorLog
+	}
+	args := []interface{}{buf.SprintHeader(s, time.Now())}
 	if l.prefix != "" {
 		args = append(args, l.prefix+":")
 	}
 	args = append(args, msg)
-	if buffer.Len() > 0 {
+	if buf.Len() > 0 {
 		// Skip leading space inserted by serialize.KVListFormat.
-		args = append(args, string(buffer.Bytes()[1:]))
+		args = append(args, string(buf.Bytes()[1:]))
 	}
 	l.shared.t.Log(args...)
+
+	if !l.shared.config.co.bufferLogs {
+		return
+	}
 
 	l.shared.buffer.mutex.Lock()
 	defer l.shared.buffer.mutex.Unlock()

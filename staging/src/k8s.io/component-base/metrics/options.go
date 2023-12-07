@@ -31,6 +31,7 @@ type Options struct {
 	ShowHiddenMetricsForVersion string
 	DisabledMetrics             []string
 	AllowListMapping            map[string]string
+	AllowListMappingManifest    string
 }
 
 // NewOptions returns default metrics options
@@ -40,6 +41,10 @@ func NewOptions() *Options {
 
 // Validate validates metrics flags options.
 func (o *Options) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
 	var errs []error
 	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), o.ShowHiddenMetricsForVersion)
 	if err != nil {
@@ -77,6 +82,10 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"The map from metric-label to value allow-list of this label. The key's format is <MetricName>,<LabelName>. "+
 			"The value's format is <allowed_value>,<allowed_value>..."+
 			"e.g. metric1,label1='v1,v2,v3', metric1,label2='v1,v2,v3' metric2,label1='v1,v2,v3'.")
+	fs.StringVar(&o.AllowListMappingManifest, "allow-metric-labels-manifest", o.AllowListMappingManifest,
+		"The path to the manifest file that contains the allow-list mapping. "+
+			"The format of the file is the same as the flag --allow-metric-labels. "+
+			"Note that the flag --allow-metric-labels will override the manifest file.")
 }
 
 // Apply applies parameters into global configuration of metrics.
@@ -93,6 +102,8 @@ func (o *Options) Apply() {
 	}
 	if o.AllowListMapping != nil {
 		SetLabelAllowListFromCLI(o.AllowListMapping)
+	} else if len(o.AllowListMappingManifest) > 0 {
+		SetLabelAllowListFromManifest(o.AllowListMappingManifest)
 	}
 }
 
@@ -118,7 +129,7 @@ func validateAllowMetricLabel(allowListMapping map[string]string) error {
 	for k := range allowListMapping {
 		reg := regexp.MustCompile(metricNameRegex + `,` + labelRegex)
 		if reg.FindString(k) != k {
-			return fmt.Errorf("--allow-metric-labels must has a list of kv pair with format `metricName:labelName=labelValue, labelValue,...`")
+			return fmt.Errorf("--allow-metric-labels must have a list of kv pair with format `metricName:labelName=labelValue, labelValue,...`")
 		}
 	}
 	return nil

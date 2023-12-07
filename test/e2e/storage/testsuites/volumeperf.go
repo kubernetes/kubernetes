@@ -22,13 +22,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -126,24 +126,31 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ClientBurst: 400,
 	}
 	f := framework.NewFramework("volume-lifecycle-performance", frameworkOptions, nil)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.AfterEach(func(ctx context.Context) {
-		ginkgo.By("Closing informer channel")
-		close(l.stopCh)
-		ginkgo.By("Deleting all PVCs")
-		for _, pvc := range l.pvcs {
-			err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
+		if l != nil {
+			if l.stopCh != nil {
+				ginkgo.By("Closing informer channel")
+				close(l.stopCh)
+			}
+
+			ginkgo.By("Deleting all PVCs")
+			for _, pvc := range l.pvcs {
+				err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
+				framework.ExpectNoError(err)
+				err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
+				framework.ExpectNoError(err)
+			}
+			ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
+			err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
-			framework.ExpectNoError(err)
+		} else {
+			ginkgo.By("Local l setup is nil")
 		}
-		ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
-		err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func(ctx context.Context) {
+	f.It("should provision volumes at scale within performance constraints", f.WithSlow(), f.WithSerial(), func(ctx context.Context) {
 		l = &local{
 			cs:      f.ClientSet,
 			ns:      f.Namespace,
@@ -205,7 +212,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ginkgo.By("Calculating performance metrics for provisioning operations")
 		createPerformanceStats(provisioningStats, l.options.ProvisioningOptions.Count, l.pvcs)
 
-		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", spew.Sdump(l.options.ProvisioningOptions.ExpectedMetrics)))
+		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", dump.Pretty(l.options.ProvisioningOptions.ExpectedMetrics)))
 		errList := validatePerformanceStats(provisioningStats.operationMetrics, l.options.ProvisioningOptions.ExpectedMetrics)
 		framework.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
 	})
@@ -240,7 +247,7 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 // validatePerformanceStats validates if test performance metrics meet the baseline target
 func validatePerformanceStats(operationMetrics *storageframework.Metrics, baselineMetrics *storageframework.Metrics) []error {
 	var errList []error
-	framework.Logf("Metrics to evaluate: %+v", spew.Sdump(operationMetrics))
+	framework.Logf("Metrics to evaluate: %+v", dump.Pretty(operationMetrics))
 
 	if operationMetrics.AvgLatency > baselineMetrics.AvgLatency {
 		err := fmt.Errorf("expected latency to be less than %v but calculated latency %v", baselineMetrics.AvgLatency, operationMetrics.AvgLatency)

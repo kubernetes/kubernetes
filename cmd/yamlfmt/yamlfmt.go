@@ -28,29 +28,26 @@ import (
 func main() {
 	indent := flag.Int("indent", 2, "default indent")
 	flag.Parse()
-
-	if flag.NArg() > 0 {
-		for _, path := range flag.Args() {
-			sourceYaml, err := os.ReadFile(path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
-				continue
-			}
-			rootNode, err := fetchYaml(sourceYaml)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
-				continue
-			}
-			writer, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
-				continue
-			}
-			err = streamYaml(writer, indent, rootNode)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
-				continue
-			}
+	for _, path := range flag.Args() {
+		sourceYaml, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			continue
+		}
+		rootNode, err := fetchYaml(sourceYaml)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			continue
+		}
+		writer, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			continue
+		}
+		err = streamYaml(writer, indent, rootNode)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			continue
 		}
 	}
 }

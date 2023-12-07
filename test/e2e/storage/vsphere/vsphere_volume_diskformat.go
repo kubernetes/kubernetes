@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -56,9 +57,9 @@ import (
 	11. Delete PVC, PV and Storage Class
 */
 
-var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Disk Format", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_diskformat"
 	)
@@ -74,7 +75,7 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeName = GetReadySchedulableRandomNodeInfo(ctx).Name
+		nodeName = GetReadySchedulableRandomNodeInfo(ctx, client).Name
 		nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
 		nodeKeyValueLabel = map[string]string{NodeLabelKey: nodeLabelValue}
 		e2enode.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
@@ -147,7 +148,9 @@ func invokeTest(ctx context.Context, f *framework.Framework, client clientset.In
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify Disk Format")
-	framework.ExpectEqual(verifyDiskFormat(ctx, client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat), true, "DiskFormat Verification Failed")
+	if !verifyDiskFormat(ctx, client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat) {
+		framework.Failf("DiskFormat Verification Failed. Node: %s, VolumePath: %s, Expected Format: %s", nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)
+	}
 
 	var volumePaths []string
 	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
@@ -194,15 +197,15 @@ func verifyDiskFormat(ctx context.Context, client clientset.Interface, nodeName 
 	}
 	isDiskFormatCorrect := false
 	if diskFormat == "eagerzeroedthick" {
-		if eagerlyScrub == true && thinProvisioned == false {
+		if eagerlyScrub && !thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	} else if diskFormat == "zeroedthick" {
-		if eagerlyScrub == false && thinProvisioned == false {
+		if !eagerlyScrub && !thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	} else if diskFormat == "thin" {
-		if eagerlyScrub == false && thinProvisioned == true {
+		if !eagerlyScrub && thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	}

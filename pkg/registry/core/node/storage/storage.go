@@ -28,7 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -112,7 +111,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
 		AttrFunc:    node.GetAttrs,
-		TriggerFunc: map[string]storage.IndexerFunc{"metadata.name": node.NameTriggerFunc},
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err

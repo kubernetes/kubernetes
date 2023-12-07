@@ -38,11 +38,12 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = common.SIGDescribe("Services GCE [Slow]", func() {
+var _ = common.SIGDescribe("Services GCE", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("services")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	serviceLBNames := []string{}
@@ -64,7 +65,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		//reset serviceLBNames
 		serviceLBNames = []string{}
 	})
-	ginkgo.It("should be able to create and tear down a standard-tier load balancer [Slow]", func(ctx context.Context) {
+	f.It("should be able to create and tear down a standard-tier load balancer", f.WithSlow(), func(ctx context.Context) {
 		lagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
 		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 
@@ -86,7 +87,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		// Verify that service has been updated properly.
 		svcTier, err := gcecloud.GetServiceNetworkTier(svc)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(svcTier, cloud.NetworkTierStandard)
+		gomega.Expect(svcTier).To(gomega.Equal(cloud.NetworkTierStandard))
 		// Record the LB name for test cleanup.
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 
@@ -102,7 +103,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		// Verify that service has been updated properly.
 		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(svcTier, cloud.NetworkTierDefault)
+		gomega.Expect(svcTier).To(gomega.Equal(cloud.NetworkTierDefault))
 
 		// Wait until the ingress IP changes. Each tier has its own pool of
 		// IPs, so changing tiers implies changing IPs.
@@ -133,10 +134,10 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		})
 		framework.ExpectNoError(err)
 		// Verify that service has been updated properly.
-		framework.ExpectEqual(svc.Spec.LoadBalancerIP, requestedIP)
+		gomega.Expect(svc.Spec.LoadBalancerIP).To(gomega.Equal(requestedIP))
 		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(svcTier, cloud.NetworkTierStandard)
+		gomega.Expect(svcTier).To(gomega.Equal(cloud.NetworkTierStandard))
 
 		// Wait until the ingress IP changes and verifies the LB.
 		waitAndVerifyLBWithTier(ctx, jig, ingressIP, createTimeout, lagTimeout)
@@ -156,7 +157,7 @@ func waitAndVerifyLBWithTier(ctx context.Context, jig *e2eservice.TestJig, exist
 	ginkgo.By("running sanity and reachability checks")
 	if svc.Spec.LoadBalancerIP != "" {
 		// Verify that the new ingress IP is the requested IP if it's set.
-		framework.ExpectEqual(ingressIP, svc.Spec.LoadBalancerIP)
+		gomega.Expect(ingressIP).To(gomega.Equal(svc.Spec.LoadBalancerIP))
 	}
 	// If the IP has been used by previous test, sometimes we get the lingering
 	// 404 errors even after the LB is long gone. Tolerate and retry until the
@@ -168,7 +169,7 @@ func waitAndVerifyLBWithTier(ctx context.Context, jig *e2eservice.TestJig, exist
 	framework.ExpectNoError(err)
 	netTier, err := getLBNetworkTierByIP(ingressIP)
 	framework.ExpectNoError(err, "failed to get the network tier of the load balancer")
-	framework.ExpectEqual(netTier, svcNetTier)
+	gomega.Expect(netTier).To(gomega.Equal(svcNetTier))
 
 	return ingressIP
 }

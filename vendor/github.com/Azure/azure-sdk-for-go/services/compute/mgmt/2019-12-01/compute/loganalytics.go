@@ -61,7 +61,7 @@ func (client LogAnalyticsClient) ExportRequestRateByInterval(ctx context.Context
 
 	result, err = client.ExportRequestRateByIntervalSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.LogAnalyticsClient", "ExportRequestRateByInterval", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.LogAnalyticsClient", "ExportRequestRateByInterval", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -94,6 +94,7 @@ func (client LogAnalyticsClient) ExportRequestRateByIntervalPreparer(ctx context
 // http.Response Body if it receives an error.
 func (client LogAnalyticsClient) ExportRequestRateByIntervalSender(req *http.Request) (future LogAnalyticsExportRequestRateByIntervalFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -147,7 +148,7 @@ func (client LogAnalyticsClient) ExportThrottledRequests(ctx context.Context, pa
 
 	result, err = client.ExportThrottledRequestsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.LogAnalyticsClient", "ExportThrottledRequests", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.LogAnalyticsClient", "ExportThrottledRequests", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -180,6 +181,7 @@ func (client LogAnalyticsClient) ExportThrottledRequestsPreparer(ctx context.Con
 // http.Response Body if it receives an error.
 func (client LogAnalyticsClient) ExportThrottledRequestsSender(req *http.Request) (future LogAnalyticsExportThrottledRequestsFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

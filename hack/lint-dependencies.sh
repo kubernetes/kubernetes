@@ -43,6 +43,7 @@ rc=0
 
 # List of dependencies we need to avoid dragging back into kubernetes/kubernetes
 # Check if unwanted dependencies are removed
+# The array and map in `unwanted-dependencies.json` are in alphabetical order.
 go run k8s.io/kubernetes/cmd/dependencyverifier "${KUBE_ROOT}/hack/unwanted-dependencies.json"
 
 outdated=$(go list -m -json all | jq -r "

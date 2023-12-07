@@ -34,11 +34,6 @@ type NetworkPolicy struct {
 	// spec represents the specification of the desired behavior for this NetworkPolicy.
 	// +optional
 	Spec NetworkPolicySpec
-
-	// status represents the current state of the NetworkPolicy.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Status NetworkPolicyStatus
 }
 
 // PolicyType describes the NetworkPolicy type
@@ -198,42 +193,6 @@ type NetworkPolicyPeer struct {
 	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock
-}
-
-// NetworkPolicyConditionType is the type for status conditions on
-// a NetworkPolicy. This type should be used with the
-// NetworkPolicyStatus.Conditions field.
-type NetworkPolicyConditionType string
-
-const (
-	// NetworkPolicyConditionStatusAccepted represents status of a Network Policy that could be properly parsed by
-	// the Network Policy provider and will be implemented in the cluster
-	NetworkPolicyConditionStatusAccepted NetworkPolicyConditionType = "Accepted"
-
-	// NetworkPolicyConditionStatusPartialFailure represents status of a Network Policy that could be partially
-	// parsed by the Network Policy provider and may not be completely implemented due to a lack of a feature or some
-	// other condition
-	NetworkPolicyConditionStatusPartialFailure NetworkPolicyConditionType = "PartialFailure"
-
-	// NetworkPolicyConditionStatusFailure represents status of a Network Policy that could not be parsed by the
-	// Network Policy provider and will not be implemented in the cluster
-	NetworkPolicyConditionStatusFailure NetworkPolicyConditionType = "Failure"
-)
-
-// NetworkPolicyConditionReason defines the set of reasons that explain why a
-// particular NetworkPolicy condition type has been raised.
-type NetworkPolicyConditionReason string
-
-const (
-	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
-	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
-	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
-)
-
-// NetworkPolicyStatus describes the current state of the NetworkPolicy.
-type NetworkPolicyStatus struct {
-	// conditions holds an array of metav1.Condition that describes the state of the NetworkPolicy.
-	Conditions []metav1.Condition
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -639,63 +598,97 @@ type ServiceBackendPort struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterCIDR represents a single configuration for per-Node Pod CIDR
-// allocations when the MultiCIDRRangeAllocator is enabled (see the config for
-// kube-controller-manager).  A cluster may have any number of ClusterCIDR
-// resources, all of which will be considered when allocating a CIDR for a
-// Node.  A ClusterCIDR is eligible to be used for a given Node when the node
-// selector matches the node in question and has free CIDRs to allocate.  In
-// case of multiple matching ClusterCIDR resources, the allocator will attempt
-// to break ties using internal heuristics, but any ClusterCIDR whose node
-// selector matches the Node may be used.
-type ClusterCIDR struct {
+// IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs
+// that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses.
+// An IP address can be represented in different formats, to guarantee the uniqueness of the IP,
+// the name of the object is the IP address in canonical format, four decimal digits separated
+// by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6.
+// Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1
+// Invalid: 10.01.2.3 or 2001:db8:0:0:0::1
+type IPAddress struct {
 	metav1.TypeMeta
-
+	// +optional
 	metav1.ObjectMeta
-
-	Spec ClusterCIDRSpec
+	// +optional
+	Spec IPAddressSpec
 }
 
-// ClusterCIDRSpec defines the desired state of ClusterCIDR.
-type ClusterCIDRSpec struct {
-	// nodeSelector defines which nodes the config is applicable to.
-	// An empty or nil nodeSelector selects all nodes.
-	// This field is immutable.
-	// +optional
-	NodeSelector *api.NodeSelector
-
-	// perNodeHostBits defines the number of host bits to be configured per node.
-	// A subnet mask determines how much of the address is used for network bits
-	// and host bits. For example an IPv4 address of 192.168.0.0/24, splits the
-	// address into 24 bits for the network portion and 8 bits for the host portion.
-	// To allocate 256 IPs, set this field to 8 (a /24 mask for IPv4 or a /120 for IPv6).
-	// Minimum value is 4 (16 IPs).
-	// This field is immutable.
+// IPAddressSpec describe the attributes in an IP Address,
+type IPAddressSpec struct {
+	// ParentRef references the resource that an IPAddress is attached to.
+	// An IPAddress must reference a parent object.
 	// +required
-	PerNodeHostBits int32
-
-	// ipv4 defines an IPv4 IP block in CIDR notation(e.g. "10.0.0.0/8").
-	// At least one of ipv4 and ipv6 must be specified.
-	// This field is immutable.
-	// +optional
-	IPv4 string
-
-	// ipv6 defines an IPv6 IP block in CIDR notation(e.g. "2001:db8::/64").
-	// At least one of ipv4 and ipv6 must be specified.
-	// This field is immutable.
-	// +optional
-	IPv6 string
+	ParentRef *ParentReference
+}
+type ParentReference struct {
+	// Group is the group of the object being referenced.
+	Group string
+	// Resource is the resource of the object being referenced.
+	Resource string
+	// Namespace is the namespace of the object being referenced.
+	Namespace string
+	// Name is the name of the object being referenced.
+	Name string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterCIDRList contains a list of ClusterCIDRs.
-type ClusterCIDRList struct {
+// IPAddressList contains a list of IPAddress.
+type IPAddressList struct {
 	metav1.TypeMeta
-
 	// +optional
 	metav1.ListMeta
 
-	// items is the list of ClusterCIDRs.
-	Items []ClusterCIDR
+	// Items is the list of IPAddress
+	Items []IPAddress
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
+// This range is used to allocate ClusterIPs to Service objects.
+type ServiceCIDR struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+	// spec is the desired state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec ServiceCIDRSpec
+	// status represents the current state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status ServiceCIDRStatus
+}
+
+type ServiceCIDRSpec struct {
+	// CIDRs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
+	// from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family.
+	// This field is immutable.
+	// +optional
+	CIDRs []string
+}
+
+// ServiceCIDRStatus describes the current state of the ServiceCIDR.
+type ServiceCIDRStatus struct {
+	// conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR.
+	Conditions []metav1.Condition
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.27
+
+// ServiceCIDRList contains a list of ServiceCIDR objects.
+type ServiceCIDRList struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+	// items is the list of ServiceCIDRs.
+	Items []ServiceCIDR
 }

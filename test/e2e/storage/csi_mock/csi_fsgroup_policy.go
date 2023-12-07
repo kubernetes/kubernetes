@@ -35,7 +35,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-fsgroup-policy")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	// These tests *only* work on a cluster which has the CSIVolumeFSGroupPolicy feature enabled.
@@ -104,8 +104,8 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				// Delete the created file. This step is mandatory, as the mock driver
 				// won't clean up the contents automatically.
 				defer func() {
-					delete := fmt.Sprintf("rm -fr %s", dirName)
-					_, _, err = e2evolume.PodExec(f, pod, delete)
+					deleteDir := fmt.Sprintf("rm -fr %s", dirName)
+					_, _, err = e2evolume.PodExec(f, pod, deleteDir)
 					framework.ExpectNoError(err, "failed: deleting the directory: %s", err)
 				}()
 

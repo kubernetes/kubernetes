@@ -20,8 +20,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
@@ -125,6 +128,49 @@ func (c *FakeCustomResourceDefinitions) DeleteCollection(ctx context.Context, op
 func (c *FakeCustomResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CustomResourceDefinition, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, name, pt, data, subresources...), &v1.CustomResourceDefinition{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.CustomResourceDefinition), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied customResourceDefinition.
+func (c *FakeCustomResourceDefinitions) Apply(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinitionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CustomResourceDefinition, err error) {
+	if customResourceDefinition == nil {
+		return nil, fmt.Errorf("customResourceDefinition provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(customResourceDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := customResourceDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data), &v1.CustomResourceDefinition{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.CustomResourceDefinition), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeCustomResourceDefinitions) ApplyStatus(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinitionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CustomResourceDefinition, err error) {
+	if customResourceDefinition == nil {
+		return nil, fmt.Errorf("customResourceDefinition provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(customResourceDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := customResourceDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data, "status"), &v1.CustomResourceDefinition{})
 	if obj == nil {
 		return nil, err
 	}

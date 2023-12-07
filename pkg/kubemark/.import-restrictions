@@ -2,5 +2,4 @@ rules:
   # override pkg/ import restriction on cmd/ for kubemark
   - selectorRegexp: k8s[.]io/kubernetes/cmd
     allowedPrefixes:
-      - k8s.io/kubernetes/cmd/kube-proxy/app
       - k8s.io/kubernetes/cmd/kubelet/app

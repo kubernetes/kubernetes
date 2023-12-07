@@ -27,7 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/exec"
@@ -78,18 +78,18 @@ type CopyOptions struct {
 
 	args []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCopyOptions creates the options for copy
-func NewCopyOptions(ioStreams genericclioptions.IOStreams) *CopyOptions {
+func NewCopyOptions(ioStreams genericiooptions.IOStreams) *CopyOptions {
 	return &CopyOptions{
 		IOStreams: ioStreams,
 	}
 }
 
 // NewCmdCp creates a new Copy command.
-func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCp(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCopyOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -109,14 +109,14 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 					// complete <namespace>/<pod>
 					namespace := toComplete[:idx]
 					template := "{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
-					comps = completion.CompGetFromTemplate(&template, f, namespace, cmd, []string{"pod"}, toComplete)
+					comps = completion.CompGetFromTemplate(&template, f, namespace, []string{"pod"}, toComplete)
 				} else {
 					// Complete namespaces followed by a /
-					for _, ns := range completion.CompGetResource(f, cmd, "namespace", toComplete) {
+					for _, ns := range completion.CompGetResource(f, "namespace", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s/", ns))
 					}
 					// Complete pod names followed by a :
-					for _, pod := range completion.CompGetResource(f, cmd, "pod", toComplete) {
+					for _, pod := range completion.CompGetResource(f, "pod", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s:", pod))
 					}
 
@@ -266,7 +266,7 @@ func (o *CopyOptions) Run() error {
 func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
-			IOStreams: genericclioptions.IOStreams{
+			IOStreams: genericiooptions.IOStreams{
 				Out:    bytes.NewBuffer([]byte{}),
 				ErrOut: bytes.NewBuffer([]byte{}),
 			},
@@ -314,7 +314,7 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	}
 
 	options.StreamOptions = exec.StreamOptions{
-		IOStreams: genericclioptions.IOStreams{
+		IOStreams: genericiooptions.IOStreams{
 			In:     reader,
 			Out:    o.Out,
 			ErrOut: o.ErrOut,
@@ -361,7 +361,7 @@ func (t *TarPipe) initReadFrom(n uint64) {
 	t.reader, t.outStream = io.Pipe()
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
-			IOStreams: genericclioptions.IOStreams{
+			IOStreams: genericiooptions.IOStreams{
 				In:     nil,
 				Out:    t.outStream,
 				ErrOut: t.o.Out,

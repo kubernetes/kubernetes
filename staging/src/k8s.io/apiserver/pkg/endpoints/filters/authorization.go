@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -41,14 +42,21 @@ const (
 	reasonError    = "internal error"
 )
 
-// WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
+type recordAuthorizationMetricsFunc func(ctx context.Context, authorized authorizer.Decision, err error, authStart time.Time, authFinish time.Time)
+
+// WithAuthorization passes all authorized requests on to handler, and returns a forbidden error otherwise.
+func WithAuthorization(hhandler http.Handler, auth authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
+	return withAuthorization(hhandler, auth, s, recordAuthorizationMetrics)
+}
+
+func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer, metrics recordAuthorizationMetricsFunc) http.Handler {
 	if a == nil {
 		klog.Warning("Authorization is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
+		authorizationStart := time.Now()
 
 		attributes, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
@@ -56,6 +64,12 @@ func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 			return
 		}
 		authorized, reason, err := a.Authorize(ctx, attributes)
+
+		authorizationFinish := time.Now()
+		defer func() {
+			metrics(ctx, authorized, err, authorizationStart, authorizationFinish)
+		}()
+
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 		if authorized == authorizer.DecisionAllow {
 			audit.AddAuditAnnotations(ctx,

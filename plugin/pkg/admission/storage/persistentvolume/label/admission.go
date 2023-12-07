@@ -57,7 +57,6 @@ type persistentVolumeLabel struct {
 
 	mutex            sync.Mutex
 	cloudConfig      []byte
-	awsPVLabeler     cloudprovider.PVLabeler
 	gcePVLabeler     cloudprovider.PVLabeler
 	azurePVLabeler   cloudprovider.PVLabeler
 	vspherePVLabeler cloudprovider.PVLabeler
@@ -72,7 +71,7 @@ var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
 func newPersistentVolumeLabel() *persistentVolumeLabel {
 	// DEPRECATED: in a future release, we will use mutating admission webhooks to apply PV labels.
-	// Once the mutating admission webhook is used for AWS, Azure, and GCE,
+	// Once the mutating admission webhook is used for Azure, and GCE,
 	// this admission controller will be removed.
 	klog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
 		"Please remove this controller from your configuration files and scripts.")
@@ -200,12 +199,6 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 
 	// Either missing labels or we don't trust the user provided correct values.
 	switch {
-	case volume.Spec.AWSElasticBlockStore != nil:
-		labels, err := l.findAWSEBSLabels(volume)
-		if err != nil {
-			return nil, fmt.Errorf("error querying AWS EBS volume %s: %v", volume.Spec.AWSElasticBlockStore.VolumeID, err)
-		}
-		return labels, nil
 	case volume.Spec.GCEPersistentDisk != nil:
 		labels, err := l.findGCEPDLabels(volume)
 		if err != nil {
@@ -227,54 +220,6 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 	}
 	// Unrecognized volume, do not add any labels
 	return nil, nil
-}
-
-func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {
-	// Ignore any volumes that are being provisioned
-	if volume.Spec.AWSElasticBlockStore.VolumeID == cloudvolume.ProvisionedVolumeName {
-		return nil, nil
-	}
-	pvlabler, err := l.getAWSPVLabeler()
-	if err != nil {
-		return nil, err
-	}
-	if pvlabler == nil {
-		return nil, fmt.Errorf("unable to build AWS cloud provider for EBS")
-	}
-
-	pv := &v1.PersistentVolume{}
-	err = k8s_api_v1.Convert_core_PersistentVolume_To_v1_PersistentVolume(volume, pv, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert PersistentVolume to core/v1: %q", err)
-	}
-
-	return pvlabler.GetLabelsForVolume(context.TODO(), pv)
-}
-
-// getAWSPVLabeler returns the AWS implementation of PVLabeler
-func (l *persistentVolumeLabel) getAWSPVLabeler() (cloudprovider.PVLabeler, error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	if l.awsPVLabeler == nil {
-		var cloudConfigReader io.Reader
-		if len(l.cloudConfig) > 0 {
-			cloudConfigReader = bytes.NewReader(l.cloudConfig)
-		}
-
-		cloudProvider, err := cloudprovider.GetCloudProvider("aws", cloudConfigReader)
-		if err != nil || cloudProvider == nil {
-			return nil, err
-		}
-
-		awsPVLabeler, ok := cloudProvider.(cloudprovider.PVLabeler)
-		if !ok {
-			return nil, errors.New("AWS cloud provider does not implement PV labeling")
-		}
-
-		l.awsPVLabeler = awsPVLabeler
-	}
-	return l.awsPVLabeler, nil
 }
 
 func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (map[string]string, error) {

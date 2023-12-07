@@ -88,6 +88,49 @@ func TestInt64AmountAdd(t *testing.T) {
 		}
 	}
 }
+
+func TestInt64AmountMul(t *testing.T) {
+	for _, test := range []struct {
+		a  int64Amount
+		b  int64
+		c  int64Amount
+		ok bool
+	}{
+		{int64Amount{value: 100, scale: 1}, 1000, int64Amount{value: 100000, scale: 1}, true},
+		{int64Amount{value: 100, scale: -1}, 1000, int64Amount{value: 100000, scale: -1}, true},
+		{int64Amount{value: 1, scale: 100}, 10, int64Amount{value: 1, scale: 100}, false},
+		{int64Amount{value: 1, scale: -100}, 10, int64Amount{value: 1, scale: -100}, false},
+		{int64Amount{value: -5, scale: 2}, 500, int64Amount{value: -2500, scale: 2}, true},
+		{int64Amount{value: -5, scale: -2}, 500, int64Amount{value: -2500, scale: -2}, true},
+		{int64Amount{value: 0, scale: 1}, 0, int64Amount{value: 0, scale: 1}, true},
+
+		{int64Amount{value: mostPositive, scale: -1}, 10, int64Amount{value: mostPositive, scale: -1}, false},
+		{int64Amount{value: mostPositive, scale: -1}, 0, int64Amount{value: 0, scale: 0}, true},
+		{int64Amount{value: mostPositive, scale: 0}, 1, int64Amount{value: mostPositive, scale: 0}, true},
+		{int64Amount{value: mostPositive / 10, scale: 1}, 10, int64Amount{value: mostPositive / 10, scale: 1}, false},
+		{int64Amount{value: mostPositive, scale: 0}, -1, int64Amount{value: -mostPositive, scale: 0}, true},
+		{int64Amount{value: mostNegative, scale: 0}, 1, int64Amount{value: mostNegative, scale: 0}, true},
+		{int64Amount{value: mostNegative, scale: 1}, 0, int64Amount{value: 0, scale: 0}, true},
+		{int64Amount{value: mostNegative, scale: 1}, 1, int64Amount{value: mostNegative, scale: 1}, false},
+	} {
+		c := test.a
+		ok := c.Mul(test.b)
+		if ok && !test.ok {
+			t.Errorf("unextected success: %v", c)
+		} else if !ok && test.ok {
+			t.Errorf("unexpeted failure: %v", c)
+		} else if ok {
+			if c != test.c {
+				t.Errorf("%v: unexpected result: %d", test, c)
+			}
+		} else {
+			if c != test.a {
+				t.Errorf("%v: overflow multiplication mutated source: %d", test, c)
+			}
+		}
+	}
+}
+
 func TestInt64AsCanonicalString(t *testing.T) {
 	for _, test := range []struct {
 		value    int64

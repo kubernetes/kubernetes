@@ -36,6 +36,10 @@ func WriteJUnitReport(report ginkgo.Report, filename string) error {
 		// both, then tools like kettle and spyglass would concatenate
 		// the two strings and thus show duplicated information.
 		OmitFailureMessageAttr: true,
+
+		// All labels are also part of the spec texts in inline [] tags,
+		// so we don't need to write them separately.
+		OmitSpecLabels: true,
 	}
 
 	return reporters.GenerateJUnitReportWithConfig(report, filename, config)

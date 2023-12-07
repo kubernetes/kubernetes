@@ -362,7 +362,7 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 				"foo": "bar",
 			},
 			Ports: []v1.ServicePort{
-				{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt(443)},
+				{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
 			},
 		},
 	}
@@ -448,8 +448,8 @@ func newService(namespace, name string) *v1.Service {
 		Spec: v1.ServiceSpec{
 			Selector: labelMap(),
 			Ports: []v1.ServicePort{
-				{Name: "port-1338", Port: 1338, Protocol: "TCP", TargetPort: intstr.FromInt(1338)},
-				{Name: "port-1337", Port: 1337, Protocol: "TCP", TargetPort: intstr.FromInt(1337)},
+				{Name: "port-1338", Port: 1338, Protocol: "TCP", TargetPort: intstr.FromInt32(1338)},
+				{Name: "port-1337", Port: 1337, Protocol: "TCP", TargetPort: intstr.FromInt32(1337)},
 			},
 		},
 	}

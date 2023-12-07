@@ -12,6 +12,7 @@ package starlark
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"sort"
@@ -38,15 +39,17 @@ func init() {
 		"None":      None,
 		"True":      True,
 		"False":     False,
+		"abs":       NewBuiltin("abs", abs),
 		"any":       NewBuiltin("any", any),
 		"all":       NewBuiltin("all", all),
 		"bool":      NewBuiltin("bool", bool_),
+		"bytes":     NewBuiltin("bytes", bytes_),
 		"chr":       NewBuiltin("chr", chr),
 		"dict":      NewBuiltin("dict", dict),
 		"dir":       NewBuiltin("dir", dir),
 		"enumerate": NewBuiltin("enumerate", enumerate),
 		"fail":      NewBuiltin("fail", fail),
-		"float":     NewBuiltin("float", float), // requires resolve.AllowFloat
+		"float":     NewBuiltin("float", float),
 		"getattr":   NewBuiltin("getattr", getattr),
 		"hasattr":   NewBuiltin("hasattr", hasattr),
 		"hash":      NewBuiltin("hash", hash),
@@ -72,6 +75,10 @@ func init() {
 // methods of built-in types
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#built-in-methods
 var (
+	bytesMethods = map[string]*Builtin{
+		"elems": NewBuiltin("elems", bytes_elems),
+	}
+
 	dictMethods = map[string]*Builtin{
 		"clear":      NewBuiltin("clear", dict_clear),
 		"get":        NewBuiltin("get", dict_get),
@@ -116,6 +123,8 @@ var (
 		"lower":          NewBuiltin("lower", string_lower),
 		"lstrip":         NewBuiltin("lstrip", string_strip), // sic
 		"partition":      NewBuiltin("partition", string_partition),
+		"removeprefix":   NewBuiltin("removeprefix", string_removefix),
+		"removesuffix":   NewBuiltin("removesuffix", string_removefix),
 		"replace":        NewBuiltin("replace", string_replace),
 		"rfind":          NewBuiltin("rfind", string_rfind),
 		"rindex":         NewBuiltin("rindex", string_rindex),
@@ -153,6 +162,25 @@ func builtinAttrNames(methods map[string]*Builtin) []string {
 }
 
 // ---- built-in functions ----
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#abs
+func abs(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	var x Value
+	if err := UnpackPositionalArgs("abs", args, kwargs, 1, &x); err != nil {
+		return nil, err
+	}
+	switch x := x.(type) {
+	case Float:
+		return Float(math.Abs(float64(x))), nil
+	case Int:
+		if x.Sign() >= 0 {
+			return x, nil
+		}
+		return zero.Sub(x), nil
+	default:
+		return nil, fmt.Errorf("got %s, want int or float", x.Type())
+	}
+}
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#all
 func all(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
@@ -197,6 +225,45 @@ func bool_(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error
 	return x.Truth(), nil
 }
 
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#bytes
+func bytes_(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("bytes does not accept keyword arguments")
+	}
+	if len(args) != 1 {
+		return nil, fmt.Errorf("bytes: got %d arguments, want exactly 1", len(args))
+	}
+	switch x := args[0].(type) {
+	case Bytes:
+		return x, nil
+	case String:
+		// Invalid encodings are replaced by that of U+FFFD.
+		return Bytes(utf8Transcode(string(x))), nil
+	case Iterable:
+		// iterable of numeric byte values
+		var buf strings.Builder
+		if n := Len(x); n >= 0 {
+			// common case: known length
+			buf.Grow(n)
+		}
+		iter := x.Iterate()
+		defer iter.Done()
+		var elem Value
+		var b byte
+		for i := 0; iter.Next(&elem); i++ {
+			if err := AsInt(elem, &b); err != nil {
+				return nil, fmt.Errorf("bytes: at index %d, %s", i, err)
+			}
+			buf.WriteByte(b)
+		}
+		return Bytes(buf.String()), nil
+
+	default:
+		// Unlike string(foo), which stringifies it, bytes(foo) is an error.
+		return nil, fmt.Errorf("bytes: got %s, want string, bytes, or iterable of ints", x.Type())
+	}
+}
+
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#chr
 func chr(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
 	if len(kwargs) > 0 {
@@ -207,7 +274,7 @@ func chr(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) 
 	}
 	i, err := AsInt32(args[0])
 	if err != nil {
-		return nil, fmt.Errorf("chr: got %s, want int", args[0].Type())
+		return nil, fmt.Errorf("chr: %s", err)
 	}
 	if i < 0 {
 		return nil, fmt.Errorf("chr: Unicode code point %d out of range (<0)", i)
@@ -215,7 +282,7 @@ func chr(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) 
 	if i > unicode.MaxRune {
 		return nil, fmt.Errorf("chr: Unicode code point U+%X out of range (>0x10FFFF)", i)
 	}
-	return String(string(i)), nil
+	return String(string(rune(i))), nil
 }
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#dict
@@ -260,9 +327,6 @@ func enumerate(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, e
 	}
 
 	iter := iterable.Iterate()
-	if iter == nil {
-		return nil, fmt.Errorf("enumerate: got %s, want iterable", iterable.Type())
-	}
 	defer iter.Done()
 
 	var pairs []Value
@@ -330,19 +394,51 @@ func float(thread *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error
 			return Float(0.0), nil
 		}
 	case Int:
-		return x.Float(), nil
+		return x.finiteFloat()
 	case Float:
 		return x, nil
 	case String:
-		f, err := strconv.ParseFloat(string(x), 64)
+		if x == "" {
+			return nil, fmt.Errorf("float: empty string")
+		}
+		// +/- NaN or Inf or Infinity (case insensitive)?
+		s := string(x)
+		switch x[len(x)-1] {
+		case 'y', 'Y':
+			if strings.EqualFold(s, "infinity") || strings.EqualFold(s, "+infinity") {
+				return inf, nil
+			} else if strings.EqualFold(s, "-infinity") {
+				return neginf, nil
+			}
+		case 'f', 'F':
+			if strings.EqualFold(s, "inf") || strings.EqualFold(s, "+inf") {
+				return inf, nil
+			} else if strings.EqualFold(s, "-inf") {
+				return neginf, nil
+			}
+		case 'n', 'N':
+			if strings.EqualFold(s, "nan") || strings.EqualFold(s, "+nan") || strings.EqualFold(s, "-nan") {
+				return nan, nil
+			}
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if math.IsInf(f, 0) {
+			return nil, fmt.Errorf("floating-point number too large")
+		}
 		if err != nil {
-			return nil, nameErr(b, err)
+			return nil, fmt.Errorf("invalid float literal: %s", s)
 		}
 		return Float(f), nil
 	default:
 		return nil, fmt.Errorf("float got %s, want number or string", x.Type())
 	}
 }
+
+var (
+	inf    = Float(math.Inf(+1))
+	neginf = Float(math.Inf(-1))
+	nan    = Float(math.NaN())
+)
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#getattr
 func getattr(thread *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
@@ -400,19 +496,27 @@ func hasattr(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, err
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#hash
 func hash(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
-	var s string
-	if err := UnpackPositionalArgs("hash", args, kwargs, 1, &s); err != nil {
+	var x Value
+	if err := UnpackPositionalArgs("hash", args, kwargs, 1, &x); err != nil {
 		return nil, err
 	}
 
-	// The Starlark spec requires that the hash function be
-	// deterministic across all runs, motivated by the need
-	// for reproducibility of builds. Thus we cannot call
-	// String.Hash, which uses the fastest implementation
-	// available, because as varies across process restarts,
-	// and may evolve with the implementation.
-
-	return MakeInt(int(javaStringHash(s))), nil
+	var h int64
+	switch x := x.(type) {
+	case String:
+		// The Starlark spec requires that the hash function be
+		// deterministic across all runs, motivated by the need
+		// for reproducibility of builds. Thus we cannot call
+		// String.Hash, which uses the fastest implementation
+		// available, because as varies across process restarts,
+		// and may evolve with the implementation.
+		h = int64(javaStringHash(string(x)))
+	case Bytes:
+		h = int64(softHashString(string(x))) // FNV32
+	default:
+		return nil, fmt.Errorf("hash: got %s, want string or bytes", x.Type())
+	}
+	return MakeInt64(h), nil
 }
 
 // javaStringHash returns the same hash as would be produced by
@@ -440,95 +544,23 @@ func int_(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error)
 		return nil, err
 	}
 
-	// "If x is not a number or base is given, x must be a string."
 	if s, ok := AsString(x); ok {
 		b := 10
 		if base != nil {
 			var err error
 			b, err = AsInt32(base)
-			if err != nil || b != 0 && (b < 2 || b > 36) {
+			if err != nil {
+				return nil, fmt.Errorf("int: for base, got %s, want int", base.Type())
+			}
+			if b != 0 && (b < 2 || b > 36) {
 				return nil, fmt.Errorf("int: base must be an integer >= 2 && <= 36")
 			}
 		}
-
-		orig := s // save original for error message
-
-		// remove sign
-		var neg bool
-		if s != "" {
-			if s[0] == '+' {
-				s = s[1:]
-			} else if s[0] == '-' {
-				neg = true
-				s = s[1:]
-			}
+		res := parseInt(s, b)
+		if res == nil {
+			return nil, fmt.Errorf("int: invalid literal with base %d: %s", b, s)
 		}
-
-		// remove base prefix
-		baseprefix := 0
-		if len(s) > 1 && s[0] == '0' {
-			if len(s) > 2 {
-				switch s[1] {
-				case 'o', 'O':
-					s = s[2:]
-					baseprefix = 8
-				case 'x', 'X':
-					s = s[2:]
-					baseprefix = 16
-				case 'b', 'B':
-					s = s[2:]
-					baseprefix = 2
-				}
-			}
-
-			// For automatic base detection,
-			// a string starting with zero
-			// must be all zeros.
-			// Thus we reject int("0755", 0).
-			if baseprefix == 0 && b == 0 {
-				for i := 1; i < len(s); i++ {
-					if s[i] != '0' {
-						goto invalid
-					}
-				}
-				return zero, nil
-			}
-
-			if b != 0 && baseprefix != 0 && baseprefix != b {
-				// Explicit base doesn't match prefix,
-				// e.g. int("0o755", 16).
-				goto invalid
-			}
-		}
-
-		// select base
-		if b == 0 {
-			if baseprefix != 0 {
-				b = baseprefix
-			} else {
-				b = 10
-			}
-		}
-
-		// we explicitly handled sign above.
-		// if a sign remains, it is invalid.
-		if s != "" && (s[0] == '-' || s[0] == '+') {
-			goto invalid
-		}
-
-		// s has no sign or base prefix.
-		//
-		// int(x) permits arbitrary precision, unlike the scanner.
-		if i, ok := new(big.Int).SetString(s, b); ok {
-			res := MakeBigInt(i)
-			if neg {
-				res = zero.Sub(res)
-			}
-			return res, nil
-		}
-
-	invalid:
-		return nil, fmt.Errorf("int: invalid literal with base %d: %s", b, orig)
+		return res, nil
 	}
 
 	if base != nil {
@@ -548,6 +580,76 @@ func int_(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error)
 		return nil, fmt.Errorf("int: %s", err)
 	}
 	return i, nil
+}
+
+// parseInt defines the behavior of int(string, base=int). It returns nil on error.
+func parseInt(s string, base int) Value {
+	// remove sign
+	var neg bool
+	if s != "" {
+		if s[0] == '+' {
+			s = s[1:]
+		} else if s[0] == '-' {
+			neg = true
+			s = s[1:]
+		}
+	}
+
+	// remove optional base prefix
+	baseprefix := 0
+	if len(s) > 1 && s[0] == '0' {
+		if len(s) > 2 {
+			switch s[1] {
+			case 'o', 'O':
+				baseprefix = 8
+			case 'x', 'X':
+				baseprefix = 16
+			case 'b', 'B':
+				baseprefix = 2
+			}
+		}
+		if baseprefix != 0 {
+			// Remove the base prefix if it matches
+			// the explicit base, or if base=0.
+			if base == 0 || baseprefix == base {
+				base = baseprefix
+				s = s[2:]
+			}
+		} else {
+			// For automatic base detection,
+			// a string starting with zero
+			// must be all zeros.
+			// Thus we reject int("0755", 0).
+			if base == 0 {
+				for i := 1; i < len(s); i++ {
+					if s[i] != '0' {
+						return nil
+					}
+				}
+				return zero
+			}
+		}
+	}
+	if base == 0 {
+		base = 10
+	}
+
+	// we explicitly handled sign above.
+	// if a sign remains, it is invalid.
+	if s != "" && (s[0] == '-' || s[0] == '+') {
+		return nil
+	}
+
+	// s has no sign or base prefix.
+	if i, ok := new(big.Int).SetString(s, base); ok {
+		res := MakeBigInt(i)
+		if neg {
+			res = zero.Sub(res)
+		}
+		return res
+	}
+
+	return nil
 }
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#len
@@ -660,16 +762,26 @@ func ord(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) 
 	if len(args) != 1 {
 		return nil, fmt.Errorf("ord: got %d arguments, want 1", len(args))
 	}
-	s, ok := AsString(args[0])
-	if !ok {
-		return nil, fmt.Errorf("ord: got %s, want string", args[0].Type())
+	switch x := args[0].(type) {
+	case String:
+		// ord(string) returns int value of sole rune.
+		s := string(x)
+		r, sz := utf8.DecodeRuneInString(s)
+		if sz == 0 || sz != len(s) {
+			n := utf8.RuneCountInString(s)
+			return nil, fmt.Errorf("ord: string encodes %d Unicode code points, want 1", n)
+		}
+		return MakeInt(int(r)), nil
+
+	case Bytes:
+		// ord(bytes) returns int value of sole byte.
+		if len(x) != 1 {
+			return nil, fmt.Errorf("ord: bytes has length %d, want 1", len(x))
+		}
+		return MakeInt(int(x[0])), nil
+	default:
+		return nil, fmt.Errorf("ord: got %s, want string or bytes", x.Type())
 	}
-	r, sz := utf8.DecodeRuneInString(s)
-	if sz == 0 || sz != len(s) {
-		n := utf8.RuneCountInString(s)
-		return nil, fmt.Errorf("ord: string encodes %d Unicode code points, want 1", n)
-	}
-	return MakeInt(int(r)), nil
 }
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#print
@@ -685,6 +797,8 @@ func print(thread *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error
 		}
 		if s, ok := AsString(v); ok {
 			buf.WriteString(s)
+		} else if b, ok := v.(Bytes); ok {
+			buf.WriteString(string(b))
 		} else {
 			writeValue(buf, v, nil)
 		}
@@ -707,7 +821,6 @@ func range_(thread *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, erro
 		return nil, err
 	}
 
-	// TODO(adonovan): analyze overflow/underflows cases for 32-bit implementations.
 	if len(args) == 1 {
 		// range(stop)
 		start, stop = 0, start
@@ -963,11 +1076,29 @@ func str(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) 
 	if len(args) != 1 {
 		return nil, fmt.Errorf("str: got %d arguments, want exactly 1", len(args))
 	}
-	x := args[0]
-	if _, ok := AsString(x); !ok {
-		x = String(x.String())
+	switch x := args[0].(type) {
+	case String:
+		return x, nil
+	case Bytes:
+		// Invalid encodings are replaced by that of U+FFFD.
+		return String(utf8Transcode(string(x))), nil
+	default:
+		return String(x.String()), nil
 	}
-	return x, nil
+}
+
+// utf8Transcode returns the UTF-8-to-UTF-8 transcoding of s.
+// The effect is that each code unit that is part of an
+// invalid sequence is replaced by U+FFFD.
+func utf8Transcode(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	var out strings.Builder
+	for _, r := range s {
+		out.WriteRune(r)
+	}
+	return out.String()
 }
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#tuple
@@ -1344,12 +1475,50 @@ func string_iterable(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, 
 	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0); err != nil {
 		return nil, err
 	}
-	return stringIterable{
-		s:          b.Receiver().(String),
-		ords:       b.Name()[len(b.Name())-2] == 'd',
-		codepoints: b.Name()[0] == 'c',
-	}, nil
+	s := b.Receiver().(String)
+	ords := b.Name()[len(b.Name())-2] == 'd'
+	codepoints := b.Name()[0] == 'c'
+	if codepoints {
+		return stringCodepoints{s, ords}, nil
+	} else {
+		return stringElems{s, ords}, nil
+	}
 }
+
+// bytes_elems returns an unspecified iterable value whose
+// iterator yields the int values of successive elements.
+func bytes_elems(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0); err != nil {
+		return nil, err
+	}
+	return bytesIterable{b.Receiver().(Bytes)}, nil
+}
+
+// A bytesIterable is an iterable returned by bytes.elems(),
+// whose iterator yields a sequence of numeric bytes values.
+type bytesIterable struct{ bytes Bytes }
+
+var _ Iterable = (*bytesIterable)(nil)
+
+func (bi bytesIterable) String() string        { return bi.bytes.String() + ".elems()" }
+func (bi bytesIterable) Type() string          { return "bytes.elems" }
+func (bi bytesIterable) Freeze()               {} // immutable
+func (bi bytesIterable) Truth() Bool           { return True }
+func (bi bytesIterable) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: %s", bi.Type()) }
+func (bi bytesIterable) Iterate() Iterator     { return &bytesIterator{bi.bytes} }
+
+type bytesIterator struct{ bytes Bytes }
+
+func (it *bytesIterator) Next(p *Value) bool {
+	if it.bytes == "" {
+		return false
+	}
+	*p = MakeInt(int(it.bytes[0]))
+	it.bytes = it.bytes[1:]
+	return true
+}
+
+func (*bytesIterator) Done() {}
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#string·count
 func string_count(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
@@ -1720,6 +1889,22 @@ func string_partition(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value,
 		tuple = append(tuple, String(recv[:i]), String(sep), String(recv[i+len(sep):]))
 	}
 	return tuple, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#string·removeprefix
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#string·removesuffix
+func string_removefix(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	recv := string(b.Receiver().(String))
+	var fix string
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 1, &fix); err != nil {
+		return nil, err
+	}
+	if b.name[len("remove")] == 'p' {
+		recv = strings.TrimPrefix(recv, fix)
+	} else {
+		recv = strings.TrimSuffix(recv, fix)
+	}
+	return String(recv), nil
 }
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#string·replace

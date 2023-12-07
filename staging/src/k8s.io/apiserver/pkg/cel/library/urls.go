@@ -61,9 +61,9 @@ import (
 //
 //   - getScheme: If absent in the URL, returns an empty string.
 //
-//   - getHostname: IPv6 addresses are returned with braces, e.g. "[::1]". If absent in the URL, returns an empty string.
+//   - getHostname: IPv6 addresses are returned without braces, e.g. "::1". If absent in the URL, returns an empty string.
 //
-//   - getHost: IPv6 addresses are returned without braces, e.g. "::1". If absent in the URL, returns an empty string.
+//   - getHost: IPv6 addresses are returned with braces, e.g. "[::1]". If absent in the URL, returns an empty string.
 //
 //   - getEscapedPath: The string returned by getEscapedPath is URL escaped, e.g. "with space" becomes "with%20space".
 //     If absent in the URL, returns an empty string.
@@ -111,6 +111,10 @@ func URLs() cel.EnvOption {
 var urlsLib = &urls{}
 
 type urls struct{}
+
+func (*urls) LibraryName() string {
+	return "k8s.urls"
+}
 
 var urlLibraryDecls = map[string][]cel.FunctionOpt{
 	"url": {

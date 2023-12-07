@@ -1,15 +1,14 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - lavalamp
   - smarterclayton
   - deads2k
   - sttts
   - liggitt
   - caesarxuchao
+  - jpbetz
 reviewers:
   - thockin
-  - lavalamp
   - smarterclayton
   - wojtek-t
   - deads2k
@@ -21,5 +20,8 @@ reviewers:
   - sttts
   - ncdc
   - logicalhan
+  - jpbetz
 labels:
   - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

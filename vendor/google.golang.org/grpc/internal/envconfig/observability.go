@@ -28,9 +28,15 @@ const (
 var (
 	// ObservabilityConfig is the json configuration for the gcp/observability
 	// package specified directly in the envObservabilityConfig env var.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	ObservabilityConfig = os.Getenv(envObservabilityConfig)
 	// ObservabilityConfigFile is the json configuration for the
 	// gcp/observability specified in a file with the location specified in
 	// envObservabilityConfigFile env var.
+	//
+	// This is used in the 1.0 release of gcp/observability, and thus must not be
+	// deleted or changed.
 	ObservabilityConfigFile = os.Getenv(envObservabilityConfigFile)
 )

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -59,7 +60,7 @@ type SetSelectorOptions struct {
 	ResourceFinder genericclioptions.ResourceFinder
 
 	// set at initialization
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -77,7 +78,7 @@ var (
 )
 
 // NewSelectorOptions returns an initialized SelectorOptions instance
-func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
+func NewSelectorOptions(streams genericiooptions.IOStreams) *SetSelectorOptions {
 	return &SetSelectorOptions{
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithScheme(scheme.Scheme).
@@ -94,7 +95,7 @@ func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions
 }
 
 // NewCmdSelector is the "set selector" command.
-func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdSelector(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSelectorOptions(streams)
 
 	cmd := &cobra.Command{

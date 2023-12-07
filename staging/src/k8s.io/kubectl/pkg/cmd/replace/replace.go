@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -95,12 +96,12 @@ type ReplaceOptions struct {
 
 	Subresource string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	fieldManager string
 }
 
-func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
+func NewReplaceOptions(streams genericiooptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
 		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to replace."),
@@ -109,7 +110,7 @@ func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	}
 }
 
-func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdReplace(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewReplaceOptions(streams)
 
 	cmd := &cobra.Command{

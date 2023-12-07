@@ -53,8 +53,6 @@ func (csiStorageCapacityStrategy) Validate(ctx context.Context, obj runtime.Obje
 		AllowInvalidLabelValueInSelector: false,
 	}
 	errs := validation.ValidateCSIStorageCapacity(csiStorageCapacity, opts)
-	errs = append(errs, validation.ValidateCSIStorageCapacity(csiStorageCapacity, opts)...)
-
 	return errs
 }
 

@@ -54,7 +54,7 @@ const (
 var _ = common.SIGDescribe("Firewall rule", func() {
 	var firewallTestName = "firewall-test"
 	f := framework.NewDefaultFramework(firewallTestName)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var cloudConfig framework.CloudConfig
@@ -71,7 +71,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 	})
 
 	// This test takes around 6 minutes to run
-	ginkgo.It("[Slow] [Serial] should create valid firewall rules for LoadBalancer type service", func(ctx context.Context) {
+	f.It(f.WithSlow(), f.WithSerial(), "should create valid firewall rules for LoadBalancer type service", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		// This source ranges is just used to examine we have exact same things on LB firewall rules
 		firewallTestSourceRanges := []string{"0.0.0.0/1", "128.0.0.0/1"}
@@ -202,16 +202,6 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		ginkgo.By("Accessing service through the external ip and examine got no response from the node without tags")
 		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs), nodesSet, 15)
 		framework.ExpectNoError(err)
-	})
-
-	ginkgo.It("should have correct firewall rules for e2e cluster", func(ctx context.Context) {
-		ginkgo.By("Checking if e2e firewall rules are correct")
-		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
-			fw, err := gceCloud.GetFirewall(expFw.Name)
-			framework.ExpectNoError(err)
-			err = gce.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)
-			framework.ExpectNoError(err)
-		}
 	})
 
 	ginkgo.It("control plane should not expose well-known ports", func(ctx context.Context) {

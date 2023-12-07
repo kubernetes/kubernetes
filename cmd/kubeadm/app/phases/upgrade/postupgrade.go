@@ -27,16 +27,20 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -63,6 +67,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
+		errs = append(errs, err)
+	}
+
+	// TODO: remove this in the 1.30 release cycle:
+	// https://github.com/kubernetes/kubeadm/issues/2414
+	if err := createSuperAdminKubeConfig(cfg, kubeadmconstants.KubernetesDir, dryRun, nil, nil); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -102,6 +112,41 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
 		errs = append(errs, err)
 	}
+
+	if err := PerformAddonsUpgrade(client, cfg, out); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errorsutil.NewAggregate(errs)
+}
+
+// PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
+// When UpgradeAddonsBeforeControlPlane feature gate is enabled, the addons will be upgraded immediately.
+// When UpgradeAddonsBeforeControlPlane feature gate is disabled, the addons will only get updated after all the control plane instances have been upgraded.
+func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) error {
+	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
+			return err
+		}
+
+		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
+		klog.V(1).Info(err)
+	}
+	if len(unupgradedControlPlanes) > 0 {
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
+			fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
+			return nil
+		}
+
+		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
+		klog.V(1).Infof("upgrading addons when control plane instances %v have not been upgraded "+
+			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to "+
+			"ensure that the addons upgrade is executed only when all the control plane instances have been upgraded.", unupgradedControlPlanes)
+	}
+
+	var errs []error
 
 	// If the coredns ConfigMap is missing, show a warning and assume that the
 	// DNS addon was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
@@ -156,6 +201,61 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
+// unupgradedControlPlaneInstances returns a list of control palne instances that have not yet been upgraded.
+//
+// NB. This function can only be called after the current control plane instance has been upgraded already.
+// Because it determines whether the other control plane instances have been upgraded by checking whether
+// the kube-apiserver image of other control plane instance is the same as that of this instance.
+func unupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+		"component": kubeadmconstants.KubeAPIServer,
+	}))
+	pods, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list kube-apiserver Pod from cluster")
+	}
+	if len(pods.Items) == 0 {
+		return nil, errors.Errorf("cannot find kube-apiserver Pod by label selector: %v", selector.String())
+	}
+
+	nodeImageMap := map[string]string{}
+
+	for _, pod := range pods.Items {
+		found := false
+		for _, c := range pod.Spec.Containers {
+			if c.Name == kubeadmconstants.KubeAPIServer {
+				nodeImageMap[pod.Spec.NodeName] = c.Image
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, errors.Errorf("cannot find container by name %q for Pod %v", kubeadmconstants.KubeAPIServer, klog.KObj(&pod))
+		}
+	}
+
+	upgradedImage, ok := nodeImageMap[nodeName]
+	if !ok {
+		return nil, errors.Errorf("cannot find kube-apiserver image for current control plane instance %v", nodeName)
+	}
+
+	unupgradedNodes := sets.New[string]()
+	for node, image := range nodeImageMap {
+		if image != upgradedImage {
+			unupgradedNodes.Insert(node)
+		}
+	}
+
+	if len(unupgradedNodes) > 0 {
+		return sets.List(unupgradedNodes), nil
+	}
+
+	return nil, nil
+}
+
+// WriteKubeletConfigFiles writes the kubelet config file to disk, but first creates a backup of any existing one.
 func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
 	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
 	kubeletDir, err := GetKubeletDir(dryRun)
@@ -173,14 +273,10 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
 
 	if !dryRun {
-		// call `cp` instead of `rename` here since the kubelet config file and back up directory (/etc/kubernetes/tmp/)
-		// might on the filesystem with different mount points in the test environment, such as kinder.
-		// This will lead to a failure to move the file from the source to dest since `rename` normally doesn't work
-		// across different mount points on most Unix system.
 		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
-		output, err := kubeadmutil.CopyDir(src, dest)
+		err := kubeadmutil.CopyFile(src, dest)
 		if err != nil {
-			return errors.Wrapf(err, "error backing up the kubelet config file, output: %q", output)
+			return errors.Wrap(err, "error backing up the kubelet config file")
 		}
 	} else {
 		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
@@ -209,25 +305,63 @@ func GetKubeletDir(dryRun bool) (string, error) {
 	return kubeadmconstants.KubeletRunDirectory, nil
 }
 
-// moveFiles moves files from one directory to another.
-func moveFiles(files map[string]string) error {
-	filesToRecover := make(map[string]string, len(files))
-	for from, to := range files {
-		if err := os.Rename(from, to); err != nil {
-			return rollbackFiles(filesToRecover, err)
-		}
-		filesToRecover[to] = from
-	}
-	return nil
-}
+// createSuperAdminKubeConfig creates new admin.conf and super-admin.conf and then
+// ensures that the admin.conf client has RBAC permissions to be cluster-admin.
+// TODO: this code must not be present in the 1.30 release, remove it during the 1.30
+// release cycle:
+// https://github.com/kubernetes/kubeadm/issues/2414
+func createSuperAdminKubeConfig(cfg *kubeadmapi.InitConfiguration, outDir string, dryRun bool,
+	ensureRBACFunc kubeconfigphase.EnsureRBACFunc,
+	createKubeConfigFileFunc kubeconfigphase.CreateKubeConfigFileFunc) error {
 
-// rollbackFiles moves the files back to the original directory.
-func rollbackFiles(files map[string]string, originalErr error) error {
-	errs := []error{originalErr}
-	for from, to := range files {
-		if err := os.Rename(from, to); err != nil {
-			errs = append(errs, err)
-		}
+	if dryRun {
+		fmt.Printf("[dryrun] Would create a separate %s and RBAC for %s",
+			kubeadmconstants.SuperAdminKubeConfigFileName, kubeadmconstants.AdminKubeConfigFileName)
+		return nil
 	}
-	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
+
+	if ensureRBACFunc == nil {
+		ensureRBACFunc = kubeconfigphase.EnsureAdminClusterRoleBindingImpl
+	}
+	if createKubeConfigFileFunc == nil {
+		createKubeConfigFileFunc = kubeconfigphase.CreateKubeConfigFile
+	}
+
+	var (
+		err                  error
+		adminPath            = filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName)
+		adminBackupPath      = adminPath + ".backup"
+		superAdminPath       = filepath.Join(outDir, kubeadmconstants.SuperAdminKubeConfigFileName)
+		superAdminBackupPath = superAdminPath + ".backup"
+	)
+
+	// Create new admin.conf and super-admin.conf.
+	// If something goes wrong, old existing files will be restored from backup as a best effort.
+
+	restoreBackup := func() {
+		_ = os.Rename(adminBackupPath, adminPath)
+		_ = os.Rename(superAdminBackupPath, superAdminPath)
+	}
+
+	_ = os.Rename(adminPath, adminBackupPath)
+	if err = createKubeConfigFileFunc(kubeadmconstants.AdminKubeConfigFileName, outDir, cfg); err != nil {
+		restoreBackup()
+		return err
+	}
+
+	_ = os.Rename(superAdminPath, superAdminBackupPath)
+	if err = createKubeConfigFileFunc(kubeadmconstants.SuperAdminKubeConfigFileName, outDir, cfg); err != nil {
+		restoreBackup()
+		return err
+	}
+
+	// Ensure the RBAC for admin.conf exists.
+	if _, err = kubeconfigphase.EnsureAdminClusterRoleBinding(outDir, ensureRBACFunc); err != nil {
+		restoreBackup()
+		return err
+	}
+
+	_ = os.Remove(adminBackupPath)
+	_ = os.Remove(superAdminBackupPath)
+	return nil
 }

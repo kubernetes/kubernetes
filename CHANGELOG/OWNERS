@@ -11,13 +11,15 @@ approvers:
   - csantanapr # 1.25 Release Notes Lead
   - harshanarayana # 1.27 Release Notes Lead
   - ramrodo # 1.26 Release Notes Lead
+  - sanchita-07 # 1.28 Release Notes Lead
+  - fsmunoz # 1.29 Release Notes Lead
 reviewers:
   - release-managers
-  - AnaMMedina21 # 1.27 Release Notes Shadow
-  - harshanarayana # 1.27 Release Notes Lead
-  - rjsadow # 1.27 Release Notes Shadow
-  - sanchita-07 # 1.27 Release Notes Shadow
-  - yrs147 # 1.27 Release Notes Shadow
+  - fsmunoz # 1.29 Release Notes Lead
+  - fykaa # 1.29 Release Notes Shadow
+  - mengjiao-liu # 1.29 Release Notes Shadow
+  - muddapu # 1.29 Release Notes Shadow
+  - rashansmith # 1.29 Release Notes Shadow
 labels:
   - sig/release
   - area/release-eng

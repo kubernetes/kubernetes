@@ -328,7 +328,7 @@ func (j *TestJig) GetEndpointNodeNames(ctx context.Context) (sets.String, error)
 
 // WaitForEndpointOnNode waits for a service endpoint on the given node.
 func (j *TestJig) WaitForEndpointOnNode(ctx context.Context, nodeName string) error {
-	return wait.PollImmediateWithContext(ctx, framework.Poll, KubeProxyLagTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(ctx, j.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
@@ -627,7 +627,7 @@ func (j *TestJig) waitForCondition(ctx context.Context, timeout time.Duration, m
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, pollFunc); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollFunc); err != nil {
 		return nil, fmt.Errorf("timed out waiting for service %q to %s: %w", j.Name, message, err)
 	}
 	return service, nil
@@ -663,7 +663,7 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 								PeriodSeconds: 3,
 								ProbeHandler: v1.ProbeHandler{
 									HTTPGet: &v1.HTTPGetAction{
-										Port: intstr.FromInt(80),
+										Port: intstr.FromInt32(80),
 										Path: "/hostName",
 									},
 								},
@@ -716,7 +716,7 @@ func (j *TestJig) CreatePDB(ctx context.Context, rc *v1.ReplicationController) (
 // this j, but does not actually create the PDB.  The default PDB specifies a
 // MinAvailable of N-1 and matches the pods created by the RC.
 func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisruptionBudget {
-	minAvailable := intstr.FromInt(int(*rc.Spec.Replicas) - 1)
+	minAvailable := intstr.FromInt32(*rc.Spec.Replicas - 1)
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -903,20 +903,24 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 	cmd := ""
 	switch protocol {
 	case v1.ProtocolTCP:
-		cmd = fmt.Sprintf("nc -v -z -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", endpoint, port)
 	case v1.ProtocolUDP:
-		cmd = fmt.Sprintf("nc -v -z -u -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("echo hostName | nc -v -u -w 2 %s %v", endpoint, port)
 	default:
 		return fmt.Errorf("service reachability check is not supported for %v", protocol)
 	}
 
-	err := wait.PollImmediateWithContext(ctx, 1*time.Second, ServiceReachabilityShortPollTimeout, func(ctx context.Context) (bool, error) {
-		_, err := e2epodoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, ServiceReachabilityShortPollTimeout, true, func(ctx context.Context) (bool, error) {
+		stdout, err := e2epodoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
 			return false, nil
 		}
-		return true, nil
+		trimmed := strings.TrimSpace(stdout)
+		if trimmed != "" {
+			return true, nil
+		}
+		return false, nil
 	})
 	if err != nil {
 		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
@@ -1002,7 +1006,7 @@ func (j *TestJig) checkExternalServiceReachability(ctx context.Context, svc *v1.
 	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
 	cmd := fmt.Sprintf("nslookup %s", svcName)
-	return wait.PollImmediateWithContext(ctx, framework.Poll, ServiceReachabilityShortPollTimeout, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, ServiceReachabilityShortPollTimeout, true, func(ctx context.Context) (done bool, err error) {
 		_, stderr, err := e2epodoutput.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
 		// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
 		// we can check stderr for the error.

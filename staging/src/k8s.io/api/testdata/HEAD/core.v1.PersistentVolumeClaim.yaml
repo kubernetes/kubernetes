@@ -45,8 +45,6 @@ spec:
     name: nameValue
     namespace: namespaceValue
   resources:
-    claims:
-    - name: nameValue
     limits:
       limitsKey: "0"
     requests:
@@ -60,11 +58,14 @@ spec:
     matchLabels:
       matchLabelsKey: matchLabelsValue
   storageClassName: storageClassNameValue
+  volumeAttributesClassName: volumeAttributesClassNameValue
   volumeMode: volumeModeValue
   volumeName: volumeNameValue
 status:
   accessModes:
   - accessModesValue
+  allocatedResourceStatuses:
+    allocatedResourceStatusesKey: allocatedResourceStatusesValue
   allocatedResources:
     allocatedResourcesKey: "0"
   capacity:
@@ -76,5 +77,8 @@ status:
     reason: reasonValue
     status: statusValue
     type: typeValue
+  currentVolumeAttributesClassName: currentVolumeAttributesClassNameValue
+  modifyVolumeStatus:
+    status: statusValue
+    targetVolumeAttributesClassName: targetVolumeAttributesClassNameValue
   phase: phaseValue
-  resizeStatus: resizeStatusValue
