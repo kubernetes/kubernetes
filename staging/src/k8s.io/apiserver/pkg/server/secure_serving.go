@@ -17,9 +17,11 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
@@ -98,12 +100,21 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			if err != nil {
 				return err
 			}
-			certList, err := x509.ParseCRL(crlBytes)
+
+			// Decode PEM if present
+			if bytes.HasPrefix(crlBytes, []byte("-----BEGIN X509 CRL")) {
+				block, _ := pem.Decode(crlBytes)
+				if block != nil && block.Type == "X509 CRL" {
+					crlBytes = block.Bytes
+				}
+			}
+
+			crl, err := x509.ParseRevocationList(crlBytes)
 			if err != nil {
 				return err
 			}
 			revokedSerials := make(map[string]struct{})
-			for _, rc := range certList.TBSCertList.RevokedCertificates {
+			for _, rc := range crl.RevokedCertificateEntries {
 				revokedSerials[string(rc.SerialNumber.Bytes())] = struct{}{}
 			}
 
