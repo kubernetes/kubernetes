@@ -84,12 +84,12 @@ func TestAdmit(t *testing.T) {
 	}{
 		{
 			name:               "should return admission error when the pod namespace does not allow the workload type",
-			pod:                testManagedPod("500m", "250m", "500Mi", "250Mi"),
+			pod:                testManagedPodWithWorkloadAnnotation("500m", "250m", "500Mi", "250Mi", "non-existent"),
 			expectedCpuRequest: resource.MustParse("250m"),
-			namespace:          testNamespace(),
+			namespace:          testManagedNamespace(),
 			nodes:              []*corev1.Node{testNodeWithManagementResource()},
 			infra:              testClusterSNOInfra(),
-			expectedError:      fmt.Errorf("the pod namespace %q does not allow the workload type management", "namespace"),
+			expectedError:      fmt.Errorf("the pod namespace %q does not allow the workload type non-existent", "managed-namespace"),
 		},
 		{
 			name:               "should ignore pods that do not have managed annotation",
@@ -166,6 +166,25 @@ func TestAdmit(t *testing.T) {
 			nodes:              []*corev1.Node{testNodeWithManagementResource()},
 			expectedError:      fmt.Errorf(`failed to get workload annotation effect: the workload annotation value map["test":"test"] does not have "effect" key`),
 			infra:              testClusterSNOInfra(),
+		},
+		{
+			name: "should return admission warning when the pod has workload annotation but the namespace does not",
+			pod: testManagedPodWithAnnotations(
+				"500m",
+				"250m",
+				"500Mi",
+				"250Mi",
+				map[string]string{
+					fmt.Sprintf("%s%s", podWorkloadTargetAnnotationPrefix, workloadTypeManagement): `{"test": "test"}`,
+				},
+			),
+			expectedCpuRequest: resource.MustParse("250m"),
+			expectedAnnotations: map[string]string{
+				workloadAdmissionWarning: "skipping pod CPUs requests modifications because the namespace namespace is not annotated with workload.openshift.io/allowed to allow workload partitioning",
+			},
+			namespace: testNamespace(),
+			nodes:     []*corev1.Node{testNodeWithManagementResource()},
+			infra:     testClusterSNOInfra(),
 		},
 		{
 			name:               "should delete CPU requests and update workload CPU annotations for the burstable pod with managed annotation",
@@ -437,16 +456,28 @@ func TestValidate(t *testing.T) {
 			expectedError: fmt.Errorf("the pod without workload annotations can not have containers with workload resources %q", "management.workload.openshift.io/cores"),
 		},
 		{
-			name: "should return invalid error when the pod has workload annotation, but the pod namespace does not have allowed annotation",
+			name: "should return invalid error when the pod has workload annotation, but the pod namespace does not have allowed workload type",
+			pod: testManagedPodWithWorkloadAnnotation(
+				"500m",
+				"250m",
+				"500Mi",
+				"250Mi",
+				"non-existent",
+			),
+			namespace:     testManagedNamespace(),
+			nodes:         []*corev1.Node{testNodeWithManagementResource()},
+			expectedError: fmt.Errorf("the pod can not have workload annotation, when the namespace %q does not allow it", "managed-namespace"),
+		},
+		{
+			name: "should not return any errors when the pod has workload annotation, but the pod namespace has no annotations",
 			pod: testManagedPod(
 				"500m",
 				"250m",
 				"500Mi",
 				"250Mi",
 			),
-			namespace:     testNamespace(),
-			nodes:         []*corev1.Node{testNodeWithManagementResource()},
-			expectedError: fmt.Errorf("the pod can not have workload annotation, when the namespace %q does not allow it", "namespace"),
+			namespace: testNamespace(),
+			nodes:     []*corev1.Node{testNodeWithManagementResource()},
 		},
 		{
 			name: "should not return any errors when the pod and namespace valid",
@@ -532,19 +563,12 @@ func testManagedStaticPod(cpuLimit, cpuRequest, memoryLimit, memoryRequest strin
 }
 
 func testManagedPod(cpuLimit, cpuRequest, memoryLimit, memoryRequest string) *kapi.Pod {
+	return testManagedPodWithWorkloadAnnotation(cpuLimit, cpuRequest, memoryLimit, memoryRequest, workloadTypeManagement)
+}
+
+func testManagedPodWithWorkloadAnnotation(cpuLimit, cpuRequest, memoryLimit, memoryRequest string, workloadType string) *kapi.Pod {
 	pod := testPod(cpuLimit, cpuRequest, memoryLimit, memoryRequest)
-
-	pod.Annotations = map[string]string{}
-	for _, c := range pod.Spec.InitContainers {
-		cpusetAnnotation := fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, c.Name)
-		pod.Annotations[cpusetAnnotation] = `{"cpuset": "0-1"}`
-	}
-	for _, c := range pod.Spec.Containers {
-		cpusetAnnotation := fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, c.Name)
-		pod.Annotations[cpusetAnnotation] = `{"cpuset": "0-1"}`
-	}
-
-	managementWorkloadAnnotation := fmt.Sprintf("%s%s", podWorkloadTargetAnnotationPrefix, workloadTypeManagement)
+	managementWorkloadAnnotation := fmt.Sprintf("%s%s", podWorkloadTargetAnnotationPrefix, workloadType)
 	pod.Annotations = map[string]string{
 		managementWorkloadAnnotation: fmt.Sprintf(`{"%s":"%s"}`, podWorkloadAnnotationEffect, workloadEffectPreferredDuringScheduling),
 	}
