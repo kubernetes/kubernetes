@@ -312,7 +312,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			continue
 		}
 
-		pvc, volumeSpec, volumeGidValue, err :=
+		pvc, volumeSpec, volumeGIDValue, err :=
 			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
 		if err != nil {
 			klog.ErrorS(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
@@ -323,7 +323,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 
 		// Add volume to desired state of world
 		_, err = dswp.desiredStateOfWorld.AddPodToVolume(
-			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue, seLinuxContainerContexts[podVolume.Name])
+			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGIDValue, seLinuxContainerContexts[podVolume.Name])
 		if err != nil {
 			klog.ErrorS(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
@@ -493,7 +493,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
 		klog.V(5).InfoS("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName)
 		// Fetch actual PV object
-		volumeSpec, volumeGidValue, err :=
+		volumeSpec, volumeGIDValue, err :=
 			dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
@@ -532,7 +532,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 				podVolume.Name,
 				volumeMode)
 		}
-		return pvc, volumeSpec, volumeGidValue, nil
+		return pvc, volumeSpec, volumeGIDValue, nil
 	}
 
 	// Do not return the original volume object, since the source could mutate it
@@ -613,8 +613,8 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 			expectedClaimUID)
 	}
 
-	volumeGidValue := getPVVolumeGidAnnotationValue(pv)
-	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
+	volumeGIDValue := getPVVolumeGidAnnotationValue(pv)
+	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGIDValue, nil
 }
 
 func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {
