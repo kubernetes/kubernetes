@@ -531,10 +531,17 @@ type label struct {
 	parts []string
 	// extra is an optional fully-formed extra label.
 	extra string
+	// explanation gets set for each label to help developers
+	// who pass a label to a ginkgo function. They need to use
+	// the corresponding framework function instead.
+	explanation string
 }
 
 func newLabel(parts ...string) label {
-	return label{parts: parts}
+	return label{
+		parts:       parts,
+		explanation: "If you see this as part of an 'Unknown Decorator' error from Ginkgo, then you need to replace the ginkgo.It/Context/Describe call with the corresponding framework.It/Context/Describe or (if available) f.It/Context/Describe.",
+	}
 }
 
 // TagsEqual can be used to check whether two tags are the same.
