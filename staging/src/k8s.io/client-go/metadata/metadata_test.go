@@ -56,7 +56,7 @@ func TestClient(t *testing.T) {
 	testCases := []struct {
 		name    string
 		handler func(t *testing.T, w http.ResponseWriter, req *http.Request)
-		want    func(t *testing.T, ctx context.Context, client *Client)
+		want    func(ctx context.Context, t *testing.T, client *Client)
 	}{
 		{
 			name: "GET is able to convert a JSON object to PartialObjectMetadata",
@@ -78,7 +78,7 @@ func TestClient(t *testing.T) {
 					},
 				})
 			},
-			want: func(t *testing.T, ctx context.Context, client *Client) {
+			want: func(ctx context.Context, t *testing.T, client *Client) {
 				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
@@ -126,7 +126,7 @@ func TestClient(t *testing.T) {
 					},
 				})
 			},
-			want: func(t *testing.T, ctx context.Context, client *Client) {
+			want: func(ctx context.Context, t *testing.T, client *Client) {
 				objs, err := client.Resource(gvr).Namespace("ns").List(ctx, metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
@@ -168,7 +168,7 @@ func TestClient(t *testing.T) {
 					},
 				})
 			},
-			want: func(t *testing.T, ctx context.Context, client *Client) {
+			want: func(ctx context.Context, t *testing.T, client *Client) {
 				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err == nil || !runtime.IsMissingKind(err) {
 					t.Fatal(err)
@@ -197,7 +197,7 @@ func TestClient(t *testing.T) {
 					},
 				})
 			},
-			want: func(t *testing.T, ctx context.Context, client *Client) {
+			want: func(ctx context.Context, t *testing.T, client *Client) {
 				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err == nil || !runtime.IsMissingVersion(err) {
 					t.Fatal(err)
@@ -225,7 +225,7 @@ func TestClient(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{},
 				})
 			},
-			want: func(t *testing.T, ctx context.Context, client *Client) {
+			want: func(ctx context.Context, t *testing.T, client *Client) {
 				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err == nil || !strings.Contains(err.Error(), "object does not appear to match the ObjectMeta schema") {
 					t.Fatal(err)
@@ -255,7 +255,7 @@ func TestClient(t *testing.T) {
 				}
 				writeJSON(t, w, statusOK)
 			},
-			want: func(t *testing.T, ctx context.Context, client *Client) {
+			want: func(ctx context.Context, t *testing.T, client *Client) {
 				err := client.Resource(gvr).Namespace("ns").Delete(ctx, "name", metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
@@ -283,7 +283,7 @@ func TestClient(t *testing.T) {
 
 				writeJSON(t, w, statusOK)
 			},
-			want: func(t *testing.T, ctx context.Context, client *Client) {
+			want: func(ctx context.Context, t *testing.T, client *Client) {
 				err := client.Resource(gvr).Namespace("ns").DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
@@ -300,7 +300,7 @@ func TestClient(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			cfg := ConfigFor(&rest.Config{Host: s.URL})
 			client := NewForConfigOrDie(cfg).(*Client)
-			tt.want(t, ctx, client)
+			tt.want(ctx, t, client)
 		})
 	}
 }
