@@ -17,7 +17,6 @@ limitations under the License.
 package metadata
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestClient(t *testing.T) {
@@ -78,7 +78,8 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
+				_, ctx := ktesting.NewTestContext(t)
+				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -126,7 +127,8 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				objs, err := client.Resource(gvr).Namespace("ns").List(context.TODO(), metav1.ListOptions{})
+				_, ctx := ktesting.NewTestContext(t)
+				objs, err := client.Resource(gvr).Namespace("ns").List(ctx, metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -168,7 +170,8 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
+				_, ctx := ktesting.NewTestContext(t)
+				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err == nil || !runtime.IsMissingKind(err) {
 					t.Fatal(err)
 				}
@@ -197,7 +200,8 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
+				_, ctx := ktesting.NewTestContext(t)
+				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err == nil || !runtime.IsMissingVersion(err) {
 					t.Fatal(err)
 				}
@@ -225,7 +229,8 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
+				_, ctx := ktesting.NewTestContext(t)
+				obj, err := client.Resource(gvr).Namespace("ns").Get(ctx, "name", metav1.GetOptions{})
 				if err == nil || !strings.Contains(err.Error(), "object does not appear to match the ObjectMeta schema") {
 					t.Fatal(err)
 				}
@@ -255,7 +260,8 @@ func TestClient(t *testing.T) {
 				writeJSON(t, w, statusOK)
 			},
 			want: func(t *testing.T, client *Client) {
-				err := client.Resource(gvr).Namespace("ns").Delete(context.TODO(), "name", metav1.DeleteOptions{})
+				_, ctx := ktesting.NewTestContext(t)
+				err := client.Resource(gvr).Namespace("ns").Delete(ctx, "name", metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -283,7 +289,8 @@ func TestClient(t *testing.T) {
 				writeJSON(t, w, statusOK)
 			},
 			want: func(t *testing.T, client *Client) {
-				err := client.Resource(gvr).Namespace("ns").DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+				_, ctx := ktesting.NewTestContext(t)
+				err := client.Resource(gvr).Namespace("ns").DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
