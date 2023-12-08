@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -349,6 +350,144 @@ func TestTaintTolerationFilter(t *testing.T) {
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodChange(t *testing.T) {
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          &v1.Pod{},
+			newObj:       "not-a-pod",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-old-object": {
+			pod:          &v1.Pod{},
+			oldObj:       "not-a-pod",
+			newObj:       &v1.Pod{},
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"skip-updates-other-pod-name": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			oldObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-2",
+					Namespace: "ns-1",
+				}},
+			newObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-2",
+					Namespace: "ns-1",
+					Labels:    map[string]string{"foo": "bar"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"skip-updates-other-pod-namespace": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			oldObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-2",
+				}},
+			newObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-2",
+					Labels:    map[string]string{"foo": "bar"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"skip-updates-not-toleration": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			oldObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			newObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+					Labels:    map[string]string{"foo": "bar"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
+		"queue-on-toleration-added": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			oldObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				}},
+			newObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "ns-1",
+				},
+				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    "foo",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			actualHint, err := p.(*TaintToleration).isSchedulableAfterPodChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				if err == nil {
+					t.Errorf("unexpected success")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error")
+				return
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("Unexpected hint (-want, +got):\n%s", diff)
 			}
 		})
 	}

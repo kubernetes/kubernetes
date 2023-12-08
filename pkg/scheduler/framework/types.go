@@ -72,6 +72,17 @@ const (
 	//           - a Pod that is deleted
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
+	//
+	// Note that the Pod event type includes the events for the unscheduled Pod itself.
+	// i.e., when unscheduled Pods are updated, the scheduling queue checks with Pod/Update QueueingHint(s) whether the update may make the pods schedulable,
+	// and requeues them to activeQ/backoffQ when at least one QueueingHint(s) return Queue.
+	// Plugins **have to** implement a QueueingHint for Pod/Update event
+	// if the rejection from them could be resolved by updating unscheduled Pods themselves.
+	// Example: Pods that require excessive resources may be rejected by the noderesources plugin,
+	// if this unscheduled pod is updated to require fewer resources,
+	// the previous rejection from noderesources plugin can be resolved.
+	// this plugin would implement QueueingHint for Pod/Update event
+	// that returns Queue when such label changes are made in unscheduled Pods.
 	Pod GVK = "Pod"
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
