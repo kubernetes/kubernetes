@@ -19,6 +19,7 @@ package clientcmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -26,6 +27,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utilcert "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 )
 
 var (
@@ -254,6 +257,23 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 		} else {
 			defer clientCertCA.Close()
 		}
+		certificateAuthorityData, err := io.ReadAll(clientCertCA)
+		if err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %w", clusterInfo.CertificateAuthority, clusterName, err))
+		}
+		if len(certificateAuthorityData) == 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("certificate-authority %v for %v is empty", clusterInfo.CertificateAuthority, clusterName))
+		} else {
+			err := utilcert.ValidateCertificate(certificateAuthorityData)
+			if err != nil {
+				validationErrors = append(validationErrors, fmt.Errorf("unable to validate certificate-authority %v for %v due to %w", clusterInfo.CertificateAuthority, clusterName, err))
+			}
+		}
+	} else if len(clusterInfo.CertificateAuthorityData) != 0 {
+		err := utilcert.ValidateCertificate(clusterInfo.CertificateAuthorityData)
+		if err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("unable to validate certificate-authority-data for %v due to %w", clusterName, err))
+		}
 	}
 
 	return validationErrors
@@ -293,13 +313,58 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 			} else {
 				defer clientCertFile.Close()
 			}
+			clientCertData, err := io.ReadAll(clientCertFile)
+			if err != nil {
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %w", authInfo.ClientCertificate, authInfoName, err))
+			}
+			if len(clientCertData) == 0 {
+				validationErrors = append(validationErrors, fmt.Errorf("client-cert %v for %v is empty", authInfo.ClientCertificate, authInfoName))
+			} else {
+				err := utilcert.ValidateCertificate(clientCertData)
+				if err != nil {
+					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-cert %v for %v due to %w", authInfo.ClientCertificate, authInfoName, err))
+				}
+			}
+
+		} else {
+			if len(authInfo.ClientCertificateData) == 0 {
+				validationErrors = append(validationErrors, fmt.Errorf("client-cert-data for %v is empty", authInfoName))
+			} else {
+				err := utilcert.ValidateCertificate(authInfo.ClientCertificateData)
+				if err != nil {
+					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-cert-data for %v due to %w", authInfoName, err))
+				}
+			}
 		}
+
 		if len(authInfo.ClientKey) != 0 {
 			clientKeyFile, err := os.Open(authInfo.ClientKey)
 			if err != nil {
 				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %w", authInfo.ClientKey, authInfoName, err))
 			} else {
 				defer clientKeyFile.Close()
+			}
+			// check if the key is a valid PEM block
+			clientKeyData, err := io.ReadAll(clientKeyFile)
+			if err != nil {
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %w", authInfo.ClientKey, authInfoName, err))
+			}
+			if len(clientKeyData) == 0 {
+				validationErrors = append(validationErrors, fmt.Errorf("client-key %v for %v is empty", authInfo.ClientKey, authInfoName))
+			} else {
+				_, err := keyutil.ParsePrivateKeyPEM(clientKeyData)
+				if err != nil {
+					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-key %v for %v due to %w", authInfo.ClientKey, authInfoName, err))
+				}
+			}
+		} else {
+			if len(authInfo.ClientKeyData) == 0 {
+				validationErrors = append(validationErrors, fmt.Errorf("client-key-data for %v is empty", authInfoName))
+			} else {
+				_, err := keyutil.ParsePrivateKeyPEM(authInfo.ClientKeyData)
+				if err != nil {
+					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-key-data for %v due to %w", authInfoName, err))
+				}
 			}
 		}
 	}

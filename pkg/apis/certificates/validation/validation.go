@@ -88,44 +88,6 @@ func validateCSR(obj *certificates.CertificateSigningRequest) error {
 	return csr.CheckSignature()
 }
 
-func validateCertificate(pemData []byte) error {
-	if len(pemData) == 0 {
-		return nil
-	}
-
-	blocks := 0
-	for {
-		block, remainingData := pem.Decode(pemData)
-		if block == nil {
-			break
-		}
-
-		if block.Type != utilcert.CertificateBlockType {
-			return fmt.Errorf("only CERTIFICATE PEM blocks are allowed, found %q", block.Type)
-		}
-		if len(block.Headers) != 0 {
-			return fmt.Errorf("no PEM block headers are permitted")
-		}
-		blocks++
-
-		certs, err := x509.ParseCertificates(block.Bytes)
-		if err != nil {
-			return err
-		}
-		if len(certs) == 0 {
-			return fmt.Errorf("found CERTIFICATE PEM block containing 0 certificates")
-		}
-
-		pemData = remainingData
-	}
-
-	if blocks == 0 {
-		return fmt.Errorf("must contain at least one CERTIFICATE PEM block")
-	}
-
-	return nil
-}
-
 // We don't care what you call your certificate requests.
 func ValidateCertificateRequestName(name string, prefix bool) []string {
 	return nil
@@ -203,7 +165,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	allErrs = append(allErrs, validateConditions(field.NewPath("status", "conditions"), csr, opts)...)
 
 	if !opts.allowArbitraryCertificate {
-		if err := validateCertificate(csr.Status.Certificate); err != nil {
+		if err := utilcert.ValidateCertificate(csr.Status.Certificate); err != nil {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("status", "certificate"), "<certificate data>", err.Error()))
 		}
 	}
@@ -415,7 +377,7 @@ func allowArbitraryCertificate(newCSR, oldCSR *certificates.CertificateSigningRe
 	switch {
 	case newCSR != nil && oldCSR != nil && bytes.Equal(newCSR.Status.Certificate, oldCSR.Status.Certificate):
 		return true // tolerate updates that don't touch status.certificate
-	case oldCSR != nil && validateCertificate(oldCSR.Status.Certificate) != nil:
+	case oldCSR != nil && utilcert.ValidateCertificate(oldCSR.Status.Certificate) != nil:
 		return true // compatibility with existing data
 	default:
 		return false

@@ -228,3 +228,43 @@ func ipsToStrings(ips []net.IP) []string {
 	}
 	return ss
 }
+
+// ValidateCertificate checks that the given PEM-encoded data contains at least one
+// PEM block of type "CERTIFICATE", and that all blocks are of that type.
+func ValidateCertificate(pemData []byte) error {
+	if len(pemData) == 0 {
+		return nil
+	}
+
+	blocks := 0
+	for {
+		block, remainingData := pem.Decode(pemData)
+		if block == nil {
+			break
+		}
+
+		if block.Type != CertificateBlockType {
+			return fmt.Errorf("only CERTIFICATE PEM blocks are allowed, found %q", block.Type)
+		}
+		if len(block.Headers) != 0 {
+			return fmt.Errorf("no PEM block headers are permitted")
+		}
+		blocks++
+
+		certs, err := x509.ParseCertificates(block.Bytes)
+		if err != nil {
+			return err
+		}
+		if len(certs) == 0 {
+			return fmt.Errorf("found CERTIFICATE PEM block containing 0 certificates")
+		}
+
+		pemData = remainingData
+	}
+
+	if blocks == 0 {
+		return fmt.Errorf("must contain at least one CERTIFICATE PEM block")
+	}
+
+	return nil
+}
