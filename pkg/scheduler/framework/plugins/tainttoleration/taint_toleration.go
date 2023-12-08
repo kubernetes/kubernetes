@@ -25,6 +25,7 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -32,7 +33,8 @@ import (
 
 // TaintToleration is a plugin that checks if a pod tolerates a node's taints.
 type TaintToleration struct {
-	handle framework.Handle
+	handle                    framework.Handle
+	enableSchedulingQueueHint bool
 }
 
 var _ framework.FilterPlugin = &TaintToleration{}
@@ -57,9 +59,19 @@ func (pl *TaintToleration) Name() string {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *TaintToleration) EventsToRegister() []framework.ClusterEventWithHint {
-	return []framework.ClusterEventWithHint{
+	clusterEventWithHint := []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}
+	if !pl.enableSchedulingQueueHint {
+		return clusterEventWithHint
+	}
+	// When the QueueingHint feature is enabled,
+	// the scheduling queue uses Pod/Update Queueing Hint
+	// to determine whether a Pod's update makes the Pod schedulable or not.
+	// https://github.com/kubernetes/kubernetes/pull/122234
+	clusterEventWithHint = append(clusterEventWithHint,
+		framework.ClusterEventWithHint{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodChange})
+	return clusterEventWithHint
 }
 
 // isSchedulableAfterNodeChange is invoked for all node events reported by
@@ -191,6 +203,32 @@ func (pl *TaintToleration) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, h framework.Handle) (framework.Plugin, error) {
-	return &TaintToleration{handle: h}, nil
+func New(_ context.Context, _ runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+	return &TaintToleration{
+		handle:                    h,
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+	}, nil
+}
+
+// isSchedulableAfterPodChange is invoked whenever a pod changed. It checks whether
+// that change made a previously unschedulable pod schedulable.
+// When an unscheduled Pod, which was rejected by TaintToleration, is updated to have a new toleration,
+// it may make the Pod schedulable.
+func (pl *TaintToleration) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalPod, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	if pod.UID == modifiedPod.UID &&
+		len(originalPod.Spec.Tolerations) != len(modifiedPod.Spec.Tolerations) {
+		// An unscheduled Pod got a new toleration.
+		// Due to API validation, the user can add, but cannot modify or remove tolerations.
+		// So, it's enough to just check the length of tolerations to notice the update.
+		// And, any updates in tolerations could make Pod schedulable.
+		logger.V(5).Info("a new toleration is added for the Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
+		return framework.Queue, nil
+	}
+
+	return framework.QueueSkip, nil
 }

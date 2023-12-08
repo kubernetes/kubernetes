@@ -43,6 +43,8 @@ var (
 	// AssignedPodUpdate is the event when a pod is updated that causes pods with matching affinity
 	// terms to be more schedulable.
 	AssignedPodUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "AssignedPodUpdate"}
+	// UnscheduledPodUpdate is the event when an unscheduled pod is updated.
+	UnscheduledPodUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "UnschedulablePodUpdate"}
 	// AssignedPodDelete is the event when a pod is deleted that causes pods with matching affinity
 	// terms to be more schedulable.
 	AssignedPodDelete = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete, Label: "AssignedPodDelete"}

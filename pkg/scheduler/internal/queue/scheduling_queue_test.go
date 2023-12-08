@@ -43,6 +43,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -975,6 +976,23 @@ func TestPriorityQueue_Pop(t *testing.T) {
 func TestPriorityQueue_Update(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
 
+	queuePlugin := "queuePlugin"
+	skipPlugin := "skipPlugin"
+	queueingHintMap := QueueingHintMapPerProfile{
+		"": {
+			UnscheduledPodUpdate: {
+				{
+					PluginName:     queuePlugin,
+					QueueingHintFn: queueHintReturnQueue,
+				},
+				{
+					PluginName:     skipPlugin,
+					QueueingHintFn: queueHintReturnSkip,
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		name  string
 		wantQ string
@@ -984,6 +1002,8 @@ func TestPriorityQueue_Update(t *testing.T) {
 		// This function returns three values;
 		// - oldPod/newPod: each test will call Update() with these oldPod and newPod.
 		prepareFunc func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod)
+		// schedulingHintsEnablement shows which value of QHint feature gate we test a test case with.
+		schedulingHintsEnablement []bool
 	}{
 		{
 			name:  "add highPriorityPodInfo to activeQ",
@@ -991,6 +1011,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
 				return nil, highPriorityPodInfo.Pod
 			},
+			schedulingHintsEnablement: []bool{false, true},
 		},
 		{
 			name:  "Update pod that didn't exist in the queue",
@@ -1000,6 +1021,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				updatedPod.Annotations["foo"] = "test"
 				return medPriorityPodInfo.Pod, updatedPod
 			},
+			schedulingHintsEnablement: []bool{false, true},
 		},
 		{
 			name:                 "Update highPriorityPodInfo and add a nominatedNodeName to it",
@@ -1008,6 +1030,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
 				return highPriorityPodInfo.Pod, highPriNominatedPodInfo.Pod
 			},
+			schedulingHintsEnablement: []bool{false, true},
 		},
 		{
 			name:  "When updating a pod that is already in activeQ, the pod should remain in activeQ after Update()",
@@ -1019,6 +1042,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				}
 				return highPriorityPodInfo.Pod, highPriorityPodInfo.Pod
 			},
+			schedulingHintsEnablement: []bool{false, true},
 		},
 		{
 			name:  "When updating a pod that is in backoff queue and is still backing off, it will be updated in backoff queue",
@@ -1030,22 +1054,24 @@ func TestPriorityQueue_Update(t *testing.T) {
 				}
 				return podInfo.Pod, podInfo.Pod
 			},
+			schedulingHintsEnablement: []bool{false, true},
 		},
 		{
 			name:  "when updating a pod which is in unschedulable queue and is backing off, it will be moved to backoff queue",
 			wantQ: backoffQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(medPriorityPodInfo.Pod, "plugin"))
+				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin))
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test"
 				return medPriorityPodInfo.Pod, updatedPod
 			},
+			schedulingHintsEnablement: []bool{false, true},
 		},
 		{
 			name:  "when updating a pod which is in unschedulable queue and is not backing off, it will be moved to active queue",
 			wantQ: activeQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(medPriorityPodInfo.Pod, "plugin"))
+				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin))
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test1"
 				// Move clock by podInitialBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
@@ -1053,56 +1079,71 @@ func TestPriorityQueue_Update(t *testing.T) {
 				c.Step(q.podInitialBackoffDuration)
 				return medPriorityPodInfo.Pod, updatedPod
 			},
+			schedulingHintsEnablement: []bool{false, true},
+		},
+		{
+			name:  "when updating a pod which is in unschedulable pods but the plugin returns skip, it will remain in unschedulablePods",
+			wantQ: unschedulablePods,
+			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
+				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(medPriorityPodInfo.Pod, skipPlugin))
+				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
+				updatedPod.Annotations["foo"] = "test1"
+				return medPriorityPodInfo.Pod, updatedPod
+			},
+			schedulingHintsEnablement: []bool{true},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			objs := []runtime.Object{highPriorityPodInfo.Pod, unschedulablePodInfo.Pod, medPriorityPodInfo.Pod}
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithClock(c))
+		for _, qHintEnabled := range tt.schedulingHintsEnablement {
+			t.Run(fmt.Sprintf("%s, with queuehint(%v)", tt.name, qHintEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, qHintEnabled)
+				logger, ctx := ktesting.NewTestContext(t)
+				objs := []runtime.Object{highPriorityPodInfo.Pod, unschedulablePodInfo.Pod, medPriorityPodInfo.Pod}
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithClock(c), WithQueueingHintMapPerProfile(queueingHintMap))
 
-			oldPod, newPod := tt.prepareFunc(t, logger, q)
+				oldPod, newPod := tt.prepareFunc(t, logger, q)
 
-			if err := q.Update(logger, oldPod, newPod); err != nil {
-				t.Fatalf("unexpected error from Update: %v", err)
-			}
-
-			var pInfo *framework.QueuedPodInfo
-
-			// validate expected queue
-			if obj, exists, _ := q.podBackoffQ.Get(newQueuedPodInfoForLookup(newPod)); exists {
-				if tt.wantQ != backoffQ {
-					t.Errorf("expected pod %s not to be queued to backoffQ, but it was", newPod.Name)
+				if err := q.Update(logger, oldPod, newPod); err != nil {
+					t.Fatalf("unexpected error from Update: %v", err)
 				}
-				pInfo = obj.(*framework.QueuedPodInfo)
-			}
 
-			if obj, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(newPod)); exists {
-				if tt.wantQ != activeQ {
-					t.Errorf("expected pod %s not to be queued to activeQ, but it was", newPod.Name)
+				var pInfo *framework.QueuedPodInfo
+
+				// validate expected queue
+				if obj, exists, _ := q.podBackoffQ.Get(newQueuedPodInfoForLookup(newPod)); exists {
+					if tt.wantQ != backoffQ {
+						t.Errorf("expected pod %s not to be queued to backoffQ, but it was", newPod.Name)
+					}
+					pInfo = obj.(*framework.QueuedPodInfo)
 				}
-				pInfo = obj.(*framework.QueuedPodInfo)
-			}
 
-			if pInfoFromUnsched := q.unschedulablePods.get(newPod); pInfoFromUnsched != nil {
-				if tt.wantQ != unschedulablePods {
-					t.Errorf("expected pod %s to not be queued to unschedulablePods, but it was", newPod.Name)
+				if obj, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(newPod)); exists {
+					if tt.wantQ != activeQ {
+						t.Errorf("expected pod %s not to be queued to activeQ, but it was", newPod.Name)
+					}
+					pInfo = obj.(*framework.QueuedPodInfo)
 				}
-				pInfo = pInfoFromUnsched
-			}
 
-			if diff := cmp.Diff(newPod, pInfo.PodInfo.Pod); diff != "" {
-				t.Errorf("Unexpected updated pod diff (-want, +got): %s", diff)
-			}
+				if pInfoFromUnsched := q.unschedulablePods.get(newPod); pInfoFromUnsched != nil {
+					if tt.wantQ != unschedulablePods {
+						t.Errorf("expected pod %s to not be queued to unschedulablePods, but it was", newPod.Name)
+					}
+					pInfo = pInfoFromUnsched
+				}
 
-			if tt.wantAddedToNominated && len(q.nominator.nominatedPods) != 1 {
-				t.Errorf("Expected one item in nomindatePods map: %v", q.nominator)
-			}
+				if diff := cmp.Diff(newPod, pInfo.PodInfo.Pod); diff != "" {
+					t.Errorf("Unexpected updated pod diff (-want, +got): %s", diff)
+				}
 
-		})
+				if tt.wantAddedToNominated && len(q.nominator.nominatedPods) != 1 {
+					t.Errorf("Expected one item in nomindatePods map: %v", q.nominator)
+				}
+
+			})
+		}
 	}
 }
 
@@ -3746,7 +3787,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 
 func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	plugin, _ := schedulinggates.New(ctx, nil, nil)
+	plugin, _ := schedulinggates.New(ctx, nil, nil, plfeature.Features{})
 	m := map[string][]framework.PreEnqueuePlugin{"": {plugin.(framework.PreEnqueuePlugin)}}
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(m))
 
