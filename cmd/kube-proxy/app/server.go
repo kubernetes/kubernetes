@@ -373,7 +373,6 @@ func (o *Options) Validate() error {
 
 // Run runs the specified ProxyServer.
 func (o *Options) Run() error {
-
 	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
