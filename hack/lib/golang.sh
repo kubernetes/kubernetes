@@ -318,7 +318,7 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
-readonly KUBE_STATIC_LIBRARIES=(
+readonly KUBE_STATIC_BINARIES=(
   apiextensions-apiserver
   kube-aggregator
   kube-apiserver
@@ -344,16 +344,16 @@ readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
 
 # KUBE_CGO_OVERRIDES is a space-separated list of binaries which should be built
 # with CGO enabled, assuming CGO is supported on the target platform.
-# This overrides any entry in KUBE_STATIC_LIBRARIES.
+# This overrides any entry in KUBE_STATIC_BINARIES.
 IFS=" " read -ra KUBE_CGO_OVERRIDES_LIST <<< "${KUBE_CGO_OVERRIDES:-}"
 readonly KUBE_CGO_OVERRIDES_LIST
 # KUBE_STATIC_OVERRIDES is a space-separated list of binaries which should be
 # built with CGO disabled. This is in addition to the list in
-# KUBE_STATIC_LIBRARIES.
+# KUBE_STATIC_BINARIES.
 IFS=" " read -ra KUBE_STATIC_OVERRIDES_LIST <<< "${KUBE_STATIC_OVERRIDES:-}"
 readonly KUBE_STATIC_OVERRIDES_LIST
 
-kube::golang::is_statically_linked_library() {
+kube::golang::is_statically_linked() {
   local e
   # Explicitly enable cgo when building kubectl for darwin from darwin.
   [[ "$(go env GOHOSTOS)" == "darwin" && "$(go env GOOS)" == "darwin" &&
@@ -361,18 +361,18 @@ kube::golang::is_statically_linked_library() {
   if [[ -n "${KUBE_CGO_OVERRIDES_LIST:+x}" ]]; then
     for e in "${KUBE_CGO_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
   fi
-  for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
+  for e in "${KUBE_STATIC_BINARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   if [[ -n "${KUBE_STATIC_OVERRIDES_LIST:+x}" ]]; then
     for e in "${KUBE_STATIC_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   fi
   return 1;
 }
 
-# kube::golang::normalize_go_targets takes a list of build targets, which might
+# kube::golang::best_guess_go_targets takes a list of build targets, which might
 # be Go-style names (e.g. example.com/foo/bar or ./foo/bar) or just local paths
 # (e.g. foo/bar) and produces a respective list (on stdout) of our best guess at
 # Go target names.
-kube::golang::normalize_go_targets() {
+kube::golang::best_guess_go_targets() {
   local target
   for target; do
     if [ "${target}" = "ginkgo" ] ||
@@ -404,6 +404,39 @@ kube::golang::normalize_go_targets() {
     # exists or not, because the last element might be an output file (e.g.
     # bar.test) or even "...".
     echo "./${target}"
+  done
+}
+
+# kube::golang::normalize_go_targets takes a list of build targets, which might
+# be Go-style names (e.g. example.com/foo/bar or ./foo/bar) or just local paths
+# (e.g. foo/bar) and produces a respective list (on stdout) of Go package
+# names.
+kube::golang::normalize_go_targets() {
+  local targets=()
+  kube::util::read-array targets < <(kube::golang::best_guess_go_targets "$@")
+  kube::util::read-array targets < <(kube::golang::dedup "${targets[@]}")
+  set -- "${targets[@]}"
+
+  for target; do
+    if [[ "${target}" =~ ".test"$ ]]; then
+      local dir
+      dir="$(dirname "${target}")"
+      local tst
+      tst="$(basename "${target}")"
+      local pkg
+      pkg="$(go list -find "${dir}")"
+      echo "${pkg}/${tst}"
+      continue
+    fi
+    if [[ "${target}" =~ "/..."$ ]]; then
+      local dir
+      dir="$(dirname "${target}")"
+      local pkg
+      pkg="$(go list -find "${dir}")"
+      echo "${pkg}/..."
+      continue
+    fi
+    go list -find "${target}"
   done
 }
 
@@ -825,14 +858,14 @@ kube::golang::build_binaries_for_platform() {
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=("${binary}")
       kube::log::info "    ${binary} (test)"
-    elif kube::golang::is_statically_linked_library "${binary}"; then
+    elif kube::golang::is_statically_linked "${binary}"; then
       statics+=("${binary}")
       kube::log::info "    ${binary} (static)"
     else
       nonstatics+=("${binary}")
       kube::log::info "    ${binary} (non-static)"
     fi
-  done
+   done
 
   V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
   V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags}"
@@ -957,19 +990,20 @@ kube::golang::build_binaries() {
       fi
     done
 
-    if [[ ${#targets[@]} -eq 0 ]]; then
-      targets=("${KUBE_ALL_TARGETS[@]}")
-    fi
-    kube::util::read-array targets < <(kube::golang::dedup "${targets[@]}")
-
     local -a platforms
     IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
     fi
 
+    if [[ ${#targets[@]} -eq 0 ]]; then
+      targets=("${KUBE_ALL_TARGETS[@]}")
+    fi
+    kube::util::read-array targets < <(kube::golang::dedup "${targets[@]}")
+
     local -a binaries
     kube::util::read-array binaries < <(kube::golang::normalize_go_targets "${targets[@]}")
+    kube::util::read-array binaries < <(kube::golang::dedup "${binaries[@]}")
 
     local parallel=false
     if [[ ${#platforms[@]} -gt 1 ]]; then
