@@ -614,7 +614,7 @@ function kube::build::start_rsyncd_container() {
     -- /rsyncd.sh >/dev/null
 
   local mapped_port
-  if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" ${KUBE_CONTAINER_RSYNC_PORT} 2> /dev/null | cut -d: -f 2) ; then
+  if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" "${KUBE_CONTAINER_RSYNC_PORT}" 2> /dev/null | cut -d: -f 2) ; then
     kube::log::error "Could not get effective rsync port"
     return 1
   fi
@@ -630,7 +630,7 @@ function kube::build::start_rsyncd_container() {
   if kube::build::rsync_probe 127.0.0.1 "${mapped_port}"; then
     KUBE_RSYNC_ADDR="127.0.0.1:${mapped_port}"
     return 0
-  elif kube::build::rsync_probe "${container_ip}" ${KUBE_CONTAINER_RSYNC_PORT}; then
+  elif kube::build::rsync_probe "${container_ip}" "${KUBE_CONTAINER_RSYNC_PORT}"; then
     KUBE_RSYNC_ADDR="${container_ip}:${KUBE_CONTAINER_RSYNC_PORT}"
     return 0
   fi
