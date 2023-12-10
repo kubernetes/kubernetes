@@ -71,7 +71,7 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-boilerplate.sh"
   "verify-external-dependencies-version.sh"
-  "verify-vendor-licenses.sh"
+  "verify-fieldname-docs.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
   "verify-non-mutating-validation.sh"
@@ -82,6 +82,7 @@ QUICK_PATTERNS+=(
   "verify-staging-meta-files.sh"
   "verify-test-featuregates.sh"
   "verify-test-images.sh"
+  "verify-vendor-licenses.sh"
 )
 
 while IFS='' read -r line; do EXCLUDED_CHECKS+=("$line"); done < <(ls "${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}/hack/}" 2>/dev/null || true)
