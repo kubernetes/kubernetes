@@ -26,7 +26,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=cmd/fieldnamedocscheck
 
