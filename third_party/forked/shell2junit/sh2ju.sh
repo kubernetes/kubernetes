@@ -124,7 +124,7 @@ function juLog() {
   # set the appropriate error, based in the exit code and the regex
   [[ ${evErr} != 0 ]] && err=1 || err=0
   out="$(${SED} -e 's/^\([^+]\)/| \1/g' "$outf")"
-  if [ ${err} = 0 ] && [ -n "${ereg:-}" ]; then
+  if [ "${err}" = 0 ] && [ -n "${ereg:-}" ]; then
       H=$(echo "${out}" | grep -E ${icase} "${ereg}")
       [[ -n "${H}" ]] && err=1
   fi
@@ -195,5 +195,5 @@ EOF
 EOF
   fi
 
-  return ${err}
+  return "${err}"
 }
