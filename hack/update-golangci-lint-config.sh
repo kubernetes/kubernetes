@@ -26,7 +26,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 
 # Remove all files, some of them might be obsolete.
 rm -f hack/golangci*.yaml
