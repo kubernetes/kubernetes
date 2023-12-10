@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 kube::util::ensure-temp-dir
 
 ARTIFACTS="${ARTIFACTS:-${PWD}/_artifacts}"
@@ -41,9 +41,6 @@ cd "${KUBE_TEMP}"/tmp_test_licenses/kubernetes && rm -rf vendor
 # Ensure that we find the binaries we build before anything else.
 export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
-
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
 
 function http_code() {
     curl -I -s -o /dev/null -w "%{http_code}" "$1"
