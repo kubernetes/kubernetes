@@ -727,9 +727,9 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			if len(pluginsWithNodes) == 1 {
 				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
 			}
-
-			// When PreFilterResult filters out Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
-			return result, framework.NewStatus(framework.UnschedulableAndUnresolvable, msg)
+			status := framework.NewStatus(framework.Unschedulable, msg)
+			status.SetPlugin(pluginsWithNodes...)
+			return nil, status
 		}
 	}
 	return result, returnStatus
@@ -1502,7 +1502,7 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 		}
 		err := s.AsError()
 		logger.Error(err, "Failed waiting on permit for pod", "pod", klog.KObj(pod))
-		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err)).WithPlugin(s.Plugin())
+		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err)).WithPlugin(s.Plugin()...)
 	}
 	return nil
 }

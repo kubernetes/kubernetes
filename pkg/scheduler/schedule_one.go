@@ -282,7 +282,7 @@ func (sched *Scheduler) bindingCycle(
 				Pod:         assumedPodInfo.Pod,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: status},
-					UnschedulablePlugins: sets.New(status.Plugin()),
+					UnschedulablePlugins: sets.New(status.Plugin()...),
 				},
 			}
 			return framework.NewStatus(status.Code()).WithError(fitErr)

@@ -317,20 +317,20 @@ const (
 )
 
 func (d *Diagnosis) AddPluginStatus(sts *Status) {
-	if sts.Plugin() == "" {
+	if len(sts.Plugin()) == 0 {
 		return
 	}
 	if sts.IsRejected() {
 		if d.UnschedulablePlugins == nil {
 			d.UnschedulablePlugins = sets.New[string]()
 		}
-		d.UnschedulablePlugins.Insert(sts.Plugin())
+		d.UnschedulablePlugins.Insert(sts.Plugin()...)
 	}
 	if sts.Code() == Pending {
 		if d.PendingPlugins == nil {
 			d.PendingPlugins = sets.New[string]()
 		}
-		d.PendingPlugins.Insert(sts.Plugin())
+		d.PendingPlugins.Insert(sts.Plugin()...)
 	}
 }
 

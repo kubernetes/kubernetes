@@ -74,7 +74,7 @@ var cmpOpts = []cmp.Option{
 		if s1 == nil || s2 == nil {
 			return s1.IsSuccess() && s2.IsSuccess()
 		}
-		return s1.Code() == s2.Code() && s1.Plugin() == s2.Plugin() && s1.Message() == s2.Message()
+		return s1.Code() == s2.Code() && cmp.Equal(s1.Plugin(), s2.Plugin()) && s1.Message() == s2.Message()
 	}),
 }
 
