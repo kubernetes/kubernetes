@@ -21,10 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::old::setup_env
-
-# run in module mode to match test command in readme.md
-export GO111MODULE=on
+kube::golang::new::setup_env
 
 # Nuke old files so we don't accidentally carry stuff forward.
 rm -f staging/src/k8s.io/api/testdata/HEAD/*.{yaml,json,pb}
