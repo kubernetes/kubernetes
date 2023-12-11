@@ -404,7 +404,7 @@ func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeN
 	volumeState := asw.GetVolumeMountState(volumeName, podName)
 
 	// only uncertain volumes are reconstructed
-	if volumeState != operationexecutor.VolumeMountUncertain {
+	if volumeState != operationexecutor.VolumeMountUncertain && podName != operationexecutor.EmptyUniquePodName {
 		return false
 	}
 
