@@ -264,14 +264,12 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 		if len(certificateAuthorityData) == 0 {
 			validationErrors = append(validationErrors, fmt.Errorf("certificate-authority %v for %v is empty", clusterInfo.CertificateAuthority, clusterName))
 		} else {
-			err := utilcert.ValidateCertificate(certificateAuthorityData)
-			if err != nil {
+			if err := utilcert.ValidateCertificatePEM(certificateAuthorityData); err != nil {
 				validationErrors = append(validationErrors, fmt.Errorf("unable to validate certificate-authority %v for %v due to %w", clusterInfo.CertificateAuthority, clusterName, err))
 			}
 		}
 	} else if len(clusterInfo.CertificateAuthorityData) != 0 {
-		err := utilcert.ValidateCertificate(clusterInfo.CertificateAuthorityData)
-		if err != nil {
+		if err := utilcert.ValidateCertificatePEM(clusterInfo.CertificateAuthorityData); err != nil {
 			validationErrors = append(validationErrors, fmt.Errorf("unable to validate certificate-authority-data for %v due to %w", clusterName, err))
 		}
 	}
@@ -320,8 +318,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 			if len(clientCertData) == 0 {
 				validationErrors = append(validationErrors, fmt.Errorf("client-cert %v for %v is empty", authInfo.ClientCertificate, authInfoName))
 			} else {
-				err := utilcert.ValidateCertificate(clientCertData)
-				if err != nil {
+				if err := utilcert.ValidateCertificatePEM(clientCertData); err != nil {
 					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-cert %v for %v due to %w", authInfo.ClientCertificate, authInfoName, err))
 				}
 			}
@@ -330,8 +327,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 			if len(authInfo.ClientCertificateData) == 0 {
 				validationErrors = append(validationErrors, fmt.Errorf("client-cert-data for %v is empty", authInfoName))
 			} else {
-				err := utilcert.ValidateCertificate(authInfo.ClientCertificateData)
-				if err != nil {
+				if err := utilcert.ValidateCertificatePEM(authInfo.ClientCertificateData); err != nil {
 					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-cert-data for %v due to %w", authInfoName, err))
 				}
 			}
@@ -352,8 +348,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 			if len(clientKeyData) == 0 {
 				validationErrors = append(validationErrors, fmt.Errorf("client-key %v for %v is empty", authInfo.ClientKey, authInfoName))
 			} else {
-				_, err := keyutil.ParsePrivateKeyPEM(clientKeyData)
-				if err != nil {
+				if _, err := keyutil.ParsePrivateKeyPEM(clientKeyData); err != nil {
 					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-key %v for %v due to %w", authInfo.ClientKey, authInfoName, err))
 				}
 			}
@@ -361,8 +356,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 			if len(authInfo.ClientKeyData) == 0 {
 				validationErrors = append(validationErrors, fmt.Errorf("client-key-data for %v is empty", authInfoName))
 			} else {
-				_, err := keyutil.ParsePrivateKeyPEM(authInfo.ClientKeyData)
-				if err != nil {
+				if _, err := keyutil.ParsePrivateKeyPEM(authInfo.ClientKeyData); err != nil {
 					validationErrors = append(validationErrors, fmt.Errorf("unable to validate client-key-data for %v due to %w", authInfoName, err))
 				}
 			}

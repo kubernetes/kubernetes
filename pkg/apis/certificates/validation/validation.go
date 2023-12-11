@@ -165,7 +165,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	allErrs = append(allErrs, validateConditions(field.NewPath("status", "conditions"), csr, opts)...)
 
 	if !opts.allowArbitraryCertificate {
-		if err := utilcert.ValidateCertificate(csr.Status.Certificate); err != nil {
+		if err := utilcert.ValidateCertificatePEM(csr.Status.Certificate); err != nil {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("status", "certificate"), "<certificate data>", err.Error()))
 		}
 	}
@@ -377,7 +377,7 @@ func allowArbitraryCertificate(newCSR, oldCSR *certificates.CertificateSigningRe
 	switch {
 	case newCSR != nil && oldCSR != nil && bytes.Equal(newCSR.Status.Certificate, oldCSR.Status.Certificate):
 		return true // tolerate updates that don't touch status.certificate
-	case oldCSR != nil && utilcert.ValidateCertificate(oldCSR.Status.Certificate) != nil:
+	case oldCSR != nil && utilcert.ValidateCertificatePEM(oldCSR.Status.Certificate) != nil:
 		return true // compatibility with existing data
 	default:
 		return false

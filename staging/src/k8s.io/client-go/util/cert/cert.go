@@ -229,9 +229,9 @@ func ipsToStrings(ips []net.IP) []string {
 	return ss
 }
 
-// ValidateCertificate checks that the given PEM-encoded data contains at least one
+// ValidateCertificatePEM checks that the given PEM-encoded data contains at least one
 // PEM block of type "CERTIFICATE", and that all blocks are of that type.
-func ValidateCertificate(pemData []byte) error {
+func ValidateCertificatePEM(pemData []byte) error {
 	if len(pemData) == 0 {
 		return nil
 	}
