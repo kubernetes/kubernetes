@@ -60,10 +60,8 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 		if !ok {
 			return types.NewErr("invalid data, expected a map for the provided schema with type=object")
 		}
-		if schema.IsXEmbeddedResource() || schema.Properties() != nil {
-			if schema.IsXEmbeddedResource() {
-				schema = schema.WithTypeAndObjectMeta()
-			}
+		if schema.IsXEmbeddedResource() {
+			schema = schema.WithTypeAndObjectMeta()
 			return &unstructuredMap{
 				value:  m,
 				schema: schema,
@@ -95,7 +93,16 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 				},
 			}
 		}
-		return types.NewErr("invalid object type, expected either Properties or AdditionalProperties with Allows=true and non-empty Schema")
+		return &unstructuredMap{
+			value:  m,
+			schema: schema,
+			propSchema: func(key string) (Schema, bool) {
+				if schema, ok := schema.Properties()[key]; ok {
+					return schema, true
+				}
+				return nil, false
+			},
+		}
 	}
 
 	if schema.Type() == "array" {
