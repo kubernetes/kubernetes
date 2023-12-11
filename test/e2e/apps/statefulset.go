@@ -668,7 +668,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should equal update revision after rolling update")
+			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "Current revision should equal update revision after rolling update")
 		})
 
 		/*

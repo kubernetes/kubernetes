@@ -586,8 +586,9 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 // status's currentReplicas is set to updateReplicas and its updateReplicas
 // are set to 0.
 func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
-	if status.UpdatedReplicas == status.Replicas &&
-		status.ReadyReplicas == status.Replicas {
+	if status.UpdatedReplicas == *set.Spec.Replicas &&
+		status.ReadyReplicas == *set.Spec.Replicas &&
+		status.Replicas == *set.Spec.Replicas {
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
 	}

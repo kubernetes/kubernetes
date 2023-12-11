@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -964,115 +965,174 @@ func createPodsAndRevisionForSet(set *apps.StatefulSet, revision int64) (retRev 
 	return
 }
 
+func newStatefulSetOnDelete() *apps.StatefulSet {
+	set := newStatefulSet(3)
+	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+		Type: apps.OnDeleteStatefulSetStrategyType,
+	}
+	return set
+}
+
 func runForOnDeletePodScenarios(t *testing.T,
 	testFn func(*testing.T, *apps.ControllerRevision, *apps.StatefulSet, []*v1.Pod, []*apps.ControllerRevision),
 ) {
-	type testCase struct {
+
+	type SetPodRevision struct {
+		set      *apps.StatefulSet
+		pods     []*v1.Pod
+		revision *apps.ControllerRevision
+	}
+
+	setNextRevision := func(revisionNumberSetPodRevision []SetPodRevision, revisionNumber int, currRev *apps.ControllerRevision, changeImage string) []SetPodRevision {
+		set := newStatefulSetOnDelete()
+		rev := &apps.ControllerRevision{}
+		pods := []*v1.Pod{}
+		if revisionNumber != 0 {
+			set.Spec.Template.Spec.Containers[0].Image = changeImage
+			set.Status.CurrentRevision = currRev.Name
+			set.Status.CollisionCount = new(int32)
+			rev, pods = createPodsAndRevisionForSet(set, int64(revisionNumber)+1)
+			set.Status.UpdateRevision = rev.Name
+		} else {
+			set.Status.CollisionCount = new(int32)
+			rev, pods = createPodsAndRevisionForSet(set, int64(revisionNumber)+1)
+			set.Status.CurrentRevision = rev.Name
+			set.Status.UpdateRevision = rev.Name
+		}
+		revisionNumberSetPodRevision = append(revisionNumberSetPodRevision, SetPodRevision{
+			set:      set,
+			pods:     pods,
+			revision: rev,
+		})
+		return revisionNumberSetPodRevision
+	}
+
+	revisionNumberSetPodRevision := []SetPodRevision{}
+
+	buildRevisionNumberSetPodRevision := func(revisionNumberSetPodRevision []SetPodRevision) []SetPodRevision {
+		revisionNumberSetPodRevision = setNextRevision(revisionNumberSetPodRevision, 0, nil, "")
+		revisionNumberSetPodRevision = setNextRevision(revisionNumberSetPodRevision, 1, revisionNumberSetPodRevision[0].revision, "foo")
+		revisionNumberSetPodRevision = setNextRevision(revisionNumberSetPodRevision, 2, revisionNumberSetPodRevision[0].revision, "bar")
+		return revisionNumberSetPodRevision
+	}
+
+	revisionNumberSetPodRevision = buildRevisionNumberSetPodRevision(revisionNumberSetPodRevision)
+	pods0 := revisionNumberSetPodRevision[0].pods
+	unsortedPods0 := []*v1.Pod{pods0[1], pods0[2], pods0[0]}
+
+	tests := []struct {
 		name      string
 		expected  *apps.ControllerRevision
 		set       *apps.StatefulSet
 		pods      []*v1.Pod
 		revisions []*apps.ControllerRevision
+	}{
+		{
+			//Test case: stable statefulset
+			name:      "StableRevision",
+			expected:  revisionNumberSetPodRevision[0].revision,
+			set:       revisionNumberSetPodRevision[0].set,
+			pods:      revisionNumberSetPodRevision[0].pods,
+			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
+		},
+		{
+			//Test case: unsorted pods
+			name:      "StableRevisionUnsortedPods",
+			expected:  revisionNumberSetPodRevision[0].revision,
+			set:       revisionNumberSetPodRevision[0].set,
+			pods:      unsortedPods0,
+			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
+		},
+		{
+			//Test case: new revision with one new pod
+			name:     "OneNewRevision",
+			expected: revisionNumberSetPodRevision[0].revision,
+			set:      revisionNumberSetPodRevision[1].set,
+			pods: []*v1.Pod{
+				revisionNumberSetPodRevision[1].pods[0],
+				revisionNumberSetPodRevision[0].pods[1],
+				revisionNumberSetPodRevision[0].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision, revisionNumberSetPodRevision[1].revision},
+		},
+		{
+			//Test case: pods spread across three revisions
+			name:     "TwoNewRevisions",
+			expected: revisionNumberSetPodRevision[0].revision,
+			set:      revisionNumberSetPodRevision[2].set,
+			pods: []*v1.Pod{
+				revisionNumberSetPodRevision[1].pods[0],
+				revisionNumberSetPodRevision[2].pods[1],
+				revisionNumberSetPodRevision[0].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{
+				revisionNumberSetPodRevision[0].revision,
+				revisionNumberSetPodRevision[1].revision,
+				revisionNumberSetPodRevision[2].revision,
+			},
+		},
+		{
+			//Test case: remove pod with current revision
+			name:     "RemoveOldestRevisionPod",
+			expected: revisionNumberSetPodRevision[1].revision,
+			set:      revisionNumberSetPodRevision[2].set,
+			pods: []*v1.Pod{
+				revisionNumberSetPodRevision[1].pods[0],
+				revisionNumberSetPodRevision[2].pods[1],
+				revisionNumberSetPodRevision[2].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{
+				revisionNumberSetPodRevision[0].revision,
+				revisionNumberSetPodRevision[1].revision,
+				revisionNumberSetPodRevision[2].revision,
+			},
+		},
+		{
+			//Remove pod with current revision and unsorted pods
+			name:     "RemoveOldestRevisionPodUnsorted",
+			expected: revisionNumberSetPodRevision[1].revision,
+			set:      revisionNumberSetPodRevision[2].set,
+			pods: []*v1.Pod{
+				revisionNumberSetPodRevision[2].pods[2],
+				revisionNumberSetPodRevision[1].pods[0],
+				revisionNumberSetPodRevision[2].pods[1],
+			},
+			revisions: []*apps.ControllerRevision{
+				revisionNumberSetPodRevision[0].revision,
+				revisionNumberSetPodRevision[1].revision,
+				revisionNumberSetPodRevision[2].revision,
+			},
+		},
+		{
+			//No revisions for existing pods
+			//Remove pod with current revision and unsorted pods
+			name:     "PodRevisionsDoNotExist",
+			expected: nil,
+			set:      revisionNumberSetPodRevision[2].set,
+			pods: []*v1.Pod{
+				revisionNumberSetPodRevision[1].pods[0],
+				revisionNumberSetPodRevision[2].pods[1],
+				revisionNumberSetPodRevision[2].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
+		},
+		{
+			//Test case: pods only have latest revision
+			//This being the case we don't expect the current revision to change as
+			//the update status will take care of this
+			name:     "AllNewRevision",
+			expected: revisionNumberSetPodRevision[0].revision,
+			set:      revisionNumberSetPodRevision[2].set,
+			pods:     revisionNumberSetPodRevision[2].pods,
+			revisions: []*apps.ControllerRevision{
+				revisionNumberSetPodRevision[0].revision,
+				revisionNumberSetPodRevision[1].revision,
+				revisionNumberSetPodRevision[2].revision,
+			},
+		},
 	}
 
-	cases := []testCase{}
-
-	//Test case: stable statefulset
-	set := newStatefulSet(3)
-	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
-		Type: apps.OnDeleteStatefulSetStrategyType,
-	}
-	set.Status.CollisionCount = new(int32)
-	rev0, pods0 := createPodsAndRevisionForSet(set, 1)
-	set.Status.CurrentRevision = rev0.Name
-	set.Status.UpdateRevision = rev0.Name
-	cases = append(cases, testCase{
-		name:      "StableRevision",
-		expected:  rev0,
-		set:       set,
-		pods:      pods0,
-		revisions: []*apps.ControllerRevision{rev0},
-	})
-
-	// Test case: unsorted pods
-	cases = append(cases, testCase{
-		name:      "StableRevisionUnsortedPods",
-		expected:  rev0,
-		set:       set,
-		pods:      []*v1.Pod{pods0[1], pods0[2], pods0[0]},
-		revisions: []*apps.ControllerRevision{rev0},
-	})
-
-	//Test case: new revision with one new pod
-	set1 := set.DeepCopy()
-	set1.Spec.Template.Spec.Containers[0].Image = "foo"
-	set1.Status.CurrentRevision = rev0.Name
-	set1.Status.CollisionCount = new(int32)
-	rev1, pods1 := createPodsAndRevisionForSet(set1, 2)
-	set1.Status.UpdateRevision = rev1.Name
-	cases = append(cases, testCase{
-		name:      "OneNewRevision",
-		expected:  rev0,
-		set:       set1,
-		pods:      []*v1.Pod{pods1[0], pods0[1], pods0[2]},
-		revisions: []*apps.ControllerRevision{rev0, rev1},
-	})
-
-	//Test case: pods spread across three revisions
-	set2 := set1.DeepCopy()
-	set2.Spec.Template.Spec.Containers[0].Image = "bar"
-	set2.Status.CurrentRevision = rev0.Name
-	set2.Status.CollisionCount = new(int32)
-	rev2, pods2 := createPodsAndRevisionForSet(set2, 3)
-	set2.Status.UpdateRevision = rev2.Name
-	cases = append(cases, testCase{
-		name:      "TwoNewRevisions",
-		expected:  rev0,
-		set:       set2,
-		pods:      []*v1.Pod{pods1[0], pods2[1], pods0[2]},
-		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
-	})
-
-	//Test case: remove pod with current revision
-	cases = append(cases, testCase{
-		name:      "RemoveOldestRevisionPod",
-		expected:  rev1,
-		set:       set2,
-		pods:      []*v1.Pod{pods1[0], pods2[1], pods2[2]},
-		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
-	})
-
-	// Remove pod with current revision and unsorted pods
-	cases = append(cases, testCase{
-		name:      "RemoveOldestRevisionPodUnsorted",
-		expected:  rev1,
-		set:       set2,
-		pods:      []*v1.Pod{pods2[2], pods1[0], pods2[1]},
-		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
-	})
-
-	// No revisions for existing pods
-	// Remove pod with current revision and unsorted pods
-	cases = append(cases, testCase{
-		name:      "PodRevisionsDoNotExist",
-		expected:  nil,
-		set:       set2,
-		pods:      []*v1.Pod{pods1[0], pods2[1], pods2[2]},
-		revisions: []*apps.ControllerRevision{rev0},
-	})
-
-	//Test case: pods only have latest revision
-	// This being the case we don't expect the current revision to change as
-	// the update status will take care of this
-	cases = append(cases, testCase{
-		name:      "AllNewRevision",
-		expected:  rev0,
-		set:       set2,
-		pods:      pods2,
-		revisions: []*apps.ControllerRevision{rev0, rev1, rev2},
-	})
-
-	for _, testCase := range cases {
+	for _, testCase := range tests {
 		testName := fmt.Sprintf("OnDeleteTest/%s", testCase.name)
 		t.Run(testName, func(t *testing.T) {
 			testFn(
@@ -1097,18 +1157,8 @@ func TestStatefulSetControl_getCurrentRevision(t *testing.T) {
 		history.SortControllerRevisions(revisions)
 		currentRevision := getCurrentRevision(set, revisions, pods)
 
-		if !history.EqualRevision(currentRevision, expected) {
-			t.Errorf("for current want %v got %v", expected, currentRevision)
-		}
-		if expected == nil {
-			if currentRevision != nil {
-				t.Errorf("for current revision wanted nil got %v", currentRevision)
-			}
-			// Break here to avoid nil pointer errors
-			return
-		}
-		if expected.Revision != currentRevision.Revision {
-			t.Errorf("for current revision want %d got %d", expected.Revision, currentRevision.Revision)
+		if !apiequality.Semantic.DeepEqual(currentRevision, expected) {
+			t.Errorf("for current want %v got %v. \n\nWant current.Revision %d, got %d", expected, currentRevision, expected.Revision, currentRevision.Revision)
 		}
 	}
 
