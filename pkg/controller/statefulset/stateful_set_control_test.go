@@ -1017,8 +1017,6 @@ func runForOnDeletePodScenarios(t *testing.T,
 	}
 
 	revisionNumberSetPodRevision = buildRevisionNumberSetPodRevision(revisionNumberSetPodRevision)
-	pods0 := revisionNumberSetPodRevision[0].pods
-	unsortedPods0 := []*v1.Pod{pods0[1], pods0[2], pods0[0]}
 
 	tests := []struct {
 		name      string
@@ -1040,7 +1038,11 @@ func runForOnDeletePodScenarios(t *testing.T,
 			name:      "StableRevisionUnsortedPods",
 			expected:  revisionNumberSetPodRevision[0].revision,
 			set:       revisionNumberSetPodRevision[0].set,
-			pods:      unsortedPods0,
+			pods:      []*v1.Pod{
+				revisionNumberSetPodRevision[0].pods[1],
+				revisionNumberSetPodRevision[0].pods[2],
+				revisionNumberSetPodRevision[0].pods[0],
+			},
 			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
 		},
 		{
