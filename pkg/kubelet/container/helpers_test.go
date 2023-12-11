@@ -646,6 +646,7 @@ func TestHashContainer(t *testing.T) {
 		image         string
 		args          []string
 		containerPort int32
+		resizePolicy  []v1.ContainerResizePolicy
 		expectedHash  uint64
 	}{
 		{
@@ -657,16 +658,48 @@ func TestHashContainer(t *testing.T) {
 				"echo abc",
 			},
 			containerPort: int32(8001),
+			resizePolicy:  nil,
 			expectedHash:  uint64(0x3c42280f),
+		},
+		{
+			name:  "test_container_resize_policy",
+			image: "bar/image:v1",
+			args: []string{
+				"/bin/sh",
+				"-c",
+				"echo def",
+			},
+			resizePolicy: []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+			},
+			containerPort: int32(8002),
+			expectedHash:  uint64(0x47d4a4c8),
+		},
+		{
+			name:  "test_container_resize_policy2",
+			image: "bar/image:v1",
+			args: []string{
+				"/bin/sh",
+				"-c",
+				"echo ghi",
+			},
+			resizePolicy: []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
+			},
+			containerPort: int32(8002),
+			expectedHash:  uint64(0x849b814c),
 		},
 	}
 
 	for _, tc := range testCases {
 		container := v1.Container{
-			Name:  tc.name,
-			Image: tc.image,
-			Args:  tc.args,
-			Ports: []v1.ContainerPort{{ContainerPort: tc.containerPort}},
+			Name:         tc.name,
+			Image:        tc.image,
+			Args:         tc.args,
+			Ports:        []v1.ContainerPort{{ContainerPort: tc.containerPort}},
+			ResizePolicy: tc.resizePolicy,
 		}
 
 		hashVal := HashContainer(&container)
@@ -938,7 +971,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0x5f62cb4c,
+			0x6b89c7eb,
 		},
 		{
 			"Burstable pod with memory policy restart required",
@@ -951,7 +984,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0xcdab9e00,
+			0x6b89c7eb,
 		},
 		{
 			"Guaranteed pod with CPU policy restart required",
@@ -964,7 +997,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0x5f62cb4c,
+			0x6b89c7eb,
 		},
 		{
 			"Guaranteed pod with memory policy restart required",
@@ -977,7 +1010,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0xcdab9e00,
+			0x6b89c7eb,
 		},
 	}
 	for _, tc := range tests {

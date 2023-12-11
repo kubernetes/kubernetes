@@ -113,6 +113,18 @@ func HashContainer(container *v1.Container) uint64 {
 	// Omit nil or empty field when calculating hash value
 	// Please see https://github.com/kubernetes/kubernetes/issues/53644
 	containerJSON, _ := json.Marshal(container)
+	// container.ResizePolicy is set or defaulted if InPlacePodVerticalScaling feature gate is
+	// enabled. This field is immutable by the user for now. But it can change due to defaulting
+	// kicking in or turning off when this feature gate is toggled in the apiserver regardless of
+	// whether the feature gate is enabled in kubelet. This field is used by kubelet to decide how
+	// to handle pod resize, the usage is limited to kubelet, and does not require container restart.
+	// So, if present, always exclude it from hash.
+	// TODO(vinaykul,InPlacePodVerticalScaling): Always exclude ResizePolicy & Resources from hash on GA+1.
+	if container.ResizePolicy != nil {
+		containerCopy := container.DeepCopy()
+		containerCopy.ResizePolicy = nil
+		containerJSON, _ = json.Marshal(containerCopy)
+	}
 	hashutil.DeepHashObject(hash, containerJSON)
 	return uint64(hash.Sum32())
 }
@@ -129,6 +141,7 @@ func HashContainerWithoutResources(container *v1.Container) uint64 {
 	hashWithoutResources := fnv.New32a()
 	containerCopy := container.DeepCopy()
 	containerCopy.Resources = v1.ResourceRequirements{}
+	containerCopy.ResizePolicy = nil
 	containerJSON, _ := json.Marshal(containerCopy)
 	hashutil.DeepHashObject(hashWithoutResources, containerJSON)
 	return uint64(hashWithoutResources.Sum32())
