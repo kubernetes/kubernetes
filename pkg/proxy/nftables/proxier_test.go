@@ -508,14 +508,14 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add rule ip kube-proxy masquerading mark set mark xor 0x4000
 		add rule ip kube-proxy masquerading masquerade fully-random
 		add chain ip kube-proxy services
-		add chain ip kube-proxy filter-forward { type filter hook forward priority -101 ; }
+		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
+		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
+		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
 		add rule ip kube-proxy filter-forward ct state new jump endpoints-check
 		add rule ip kube-proxy filter-forward jump forward
-		add rule ip kube-proxy filter-forward ct state new jump firewall-check
-		add chain ip kube-proxy filter-input { type filter hook input priority -101 ; }
+		add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
 		add rule ip kube-proxy filter-input ct state new jump endpoints-check
-		add rule ip kube-proxy filter-input ct state new jump firewall-check
-		add chain ip kube-proxy filter-output { type filter hook output priority -101 ; }
+		add chain ip kube-proxy filter-output { type filter hook output priority -110 ; }
 		add rule ip kube-proxy filter-output ct state new jump endpoints-check
 		add rule ip kube-proxy filter-output ct state new jump firewall-check
 		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
@@ -4263,9 +4263,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add table ip kube-proxy { comment "rules for kube-proxy" ; }
 
 		add chain ip kube-proxy endpoints-check
-		add chain ip kube-proxy filter-forward { type filter hook forward priority -101 ; }
-		add chain ip kube-proxy filter-input { type filter hook input priority -101 ; }
-		add chain ip kube-proxy filter-output { type filter hook output priority -101 ; }
+		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
+		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
+		add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
+		add chain ip kube-proxy filter-output { type filter hook output priority -110 ; }
 		add chain ip kube-proxy firewall-check
 		add chain ip kube-proxy forward
 		add chain ip kube-proxy mark-for-masquerade
@@ -4278,11 +4279,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 		add rule ip kube-proxy endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
 		add rule ip kube-proxy endpoints-check fib daddr type local ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @no-endpoint-nodeports
+		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
 		add rule ip kube-proxy filter-forward ct state new jump endpoints-check
 		add rule ip kube-proxy filter-forward jump forward
-		add rule ip kube-proxy filter-forward ct state new jump firewall-check
 		add rule ip kube-proxy filter-input ct state new jump endpoints-check
-		add rule ip kube-proxy filter-input ct state new jump firewall-check
 		add rule ip kube-proxy filter-output ct state new jump endpoints-check
 		add rule ip kube-proxy filter-output ct state new jump firewall-check
 		add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips

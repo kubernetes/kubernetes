@@ -583,31 +583,22 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, destPort string, nodeIPs []string) ([]string, string, bool) {
 	tracer := newNFTablesTracer(t, nft, nodeIPs)
 
-	// Collect "base chains" (ie, the chains that are run by netfilter directly rather
-	// than only being run when they are jumped to). Skip postrouting because it only
-	// does masquerading and we handle that separately.
-	var baseChains []string
-	for chname, ch := range nft.Table.Chains {
-		if ch.Priority != nil && chname != "nat-postrouting" {
-			baseChains = append(baseChains, chname)
-		}
+	// filter-prerouting goes first, then nat-prerouting if not terminated.
+	if tracer.runChain("filter-prerouting", sourceIP, protocol, destIP, destPort) {
+		return tracer.matches, strings.Join(tracer.outputs, ", "), tracer.markMasq
+	}
+	tracer.runChain("nat-prerouting", sourceIP, protocol, destIP, destPort)
+	// After the prerouting rules run, pending DNATs are processed (which would affect
+	// the destination IP that later rules match against).
+	if len(tracer.outputs) != 0 {
+		destIP = strings.Split(tracer.outputs[0], ":")[0]
 	}
 
-	// Sort by priority
-	sort.Slice(baseChains, func(i, j int) bool {
-		// FIXME: IPv4 vs IPv6 doesn't actually matter here
-		iprio, _ := knftables.ParsePriority(knftables.IPv4Family, string(*nft.Table.Chains[baseChains[i]].Priority))
-		jprio, _ := knftables.ParsePriority(knftables.IPv4Family, string(*nft.Table.Chains[baseChains[j]].Priority))
-		return iprio < jprio
-	})
+	// Run filter-forward, skip filter-input as it ought to be fully redundant with the filter-forward chain.
+	tracer.runChain("filter-forward", sourceIP, protocol, destIP, destPort)
 
-	for _, chname := range baseChains {
-		terminated := tracer.runChain(chname, sourceIP, protocol, destIP, destPort)
-		if terminated {
-			break
-		}
-	}
-
+	// Skip filter-output and nat-output as they ought to be fully redundant with the prerouting chains.
+	// Skip nat-postrouting because it only does masquerading and we handle that separately.
 	return tracer.matches, strings.Join(tracer.outputs, ", "), tracer.markMasq
 }
 
