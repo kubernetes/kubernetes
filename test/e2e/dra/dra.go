@@ -18,9 +18,11 @@ package dra
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -32,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
@@ -42,6 +45,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -142,8 +146,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			pod.Spec.NodeName = nodes.NodeNames[0]
 			b.create(ctx, pod)
 
-			gomega.Consistently(func() error {
-				testPod, err := b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod, err := b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 				if err != nil {
 					return fmt.Errorf("expected the test pod %s to exist: %w", pod.Name, err)
 				}
@@ -191,24 +195,187 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	})
 
-	ginkgo.Context("driver", func() {
+	driverTest := func(parameterMode parameterMode) {
 		nodes := NewNodes(f, 1, 1)
-		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
+		maxAllocations := 1
+		numPods := 10
+		generateResources := func() app.Resources {
+			resources := perNode(maxAllocations, nodes)()
+			resources.Shareable = true
+			return resources
+		}
+		driver := NewDriver(f, nodes, generateResources) // All tests get their own driver instance.
+		driver.parameterMode = parameterMode
 		b := newBuilder(f, driver)
 		// We need the parameters name *before* creating it.
 		b.parametersCounter = 1
 		b.classParametersName = b.parametersName()
 
+		expectedEnv := []string{"user_a", "b", "user_request_foo", "bar", "admin_x", "y"}
+		genParameters := func() []klog.KMetadata {
+			var objects []klog.KMetadata
+			switch parameterMode {
+			case parameterModeConfigMap:
+				objects = append(objects,
+					b.parameters("x", "y"),
+					b.parameters("a", "b", "request_foo", "bar"),
+				)
+			case parameterModeTranslated:
+				objects = append(objects,
+					b.parameters("x", "y"),
+					b.classParameters(b.parametersName(), "x", "y"),
+					b.parameters("a", "b", "request_foo", "bar"),
+					b.claimParameters(b.parametersName(), []string{"a", "b"}, []string{"request_foo", "bar"}),
+				)
+				// The parameters object is not the last one but the second-last.
+				b.parametersCounter--
+			case parameterModeStructured:
+				objects = append(objects,
+					b.classParameters("", "x", "y"),
+					b.claimParameters("", []string{"a", "b"}, []string{"request_foo", "bar"}),
+				)
+			}
+			return objects
+		}
+
 		ginkgo.It("supports claim and class parameters", func(ctx context.Context) {
-			classParameters := b.parameters("x", "y")
-			claimParameters := b.parameters()
+			objects := genParameters()
+
+			// TODO: replace with publishing NodeResourceSlice through kubelet
+			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
+				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
+			}
+
 			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			objects = append(objects, pod, template)
 
-			b.create(ctx, classParameters, claimParameters, pod, template)
+			b.create(ctx, objects...)
 
-			b.testPod(ctx, f.ClientSet, pod, "user_a", "b", "admin_x", "y")
+			b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
 		})
+
+		ginkgo.It("supports reusing resources", func(ctx context.Context) {
+			objects := genParameters()
+			pods := make([]*v1.Pod, numPods)
+			for i := 0; i < numPods; i++ {
+				pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				pods[i] = pod
+				objects = append(objects, pod, template)
+			}
+
+			// TODO: replace with publishing NodeResourceSlice through kubelet
+			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
+				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
+			}
+
+			b.create(ctx, objects...)
+
+			// We don't know the order. All that matters is that all of them get scheduled eventually.
+			var wg sync.WaitGroup
+			wg.Add(numPods)
+			for i := 0; i < numPods; i++ {
+				pod := pods[i]
+				go func() {
+					defer ginkgo.GinkgoRecover()
+					defer wg.Done()
+					b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+					err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err, "delete pod")
+					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow))
+				}()
+			}
+			wg.Wait()
+		})
+
+		ginkgo.It("supports sharing a claim concurrently", func(ctx context.Context) {
+			objects := genParameters()
+			objects = append(objects, b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer))
+
+			pods := make([]*v1.Pod, numPods)
+			for i := 0; i < numPods; i++ {
+				pod := b.podExternal()
+				pods[i] = pod
+				objects = append(objects, pod)
+			}
+
+			// TODO: replace with publishing NodeResourceSlice through kubelet
+			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
+				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
+			}
+
+			b.create(ctx, objects...)
+
+			// We don't know the order. All that matters is that all of them get scheduled eventually.
+			f.Timeouts.PodStartSlow *= time.Duration(numPods)
+			var wg sync.WaitGroup
+			wg.Add(numPods)
+			for i := 0; i < numPods; i++ {
+				pod := pods[i]
+				go func() {
+					defer ginkgo.GinkgoRecover()
+					defer wg.Done()
+					b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+				}()
+			}
+			wg.Wait()
+		})
+
+		ginkgo.It("supports sharing a claim sequentially", func(ctx context.Context) {
+			objects := genParameters()
+
+			// Change from "shareable" to "not shareable", if possible.
+			switch parameterMode {
+			case parameterModeConfigMap:
+				ginkgo.Skip("cannot change the driver's controller behavior on-the-fly")
+			case parameterModeTranslated, parameterModeStructured:
+				objects[len(objects)-1].(*resourcev1alpha2.ResourceClaimParameters).Shareable = false
+			}
+
+			objects = append(objects, b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer))
+
+			pods := make([]*v1.Pod, numPods)
+			for i := 0; i < numPods; i++ {
+				pod := b.podExternal()
+				pods[i] = pod
+				objects = append(objects, pod)
+			}
+
+			// TODO: replace with publishing NodeResourceSlice through kubelet
+			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
+				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
+			}
+
+			b.create(ctx, objects...)
+
+			// We don't know the order. All that matters is that all of them get scheduled eventually.
+			f.Timeouts.PodStartSlow *= time.Duration(numPods)
+			var wg sync.WaitGroup
+			wg.Add(numPods)
+			for i := 0; i < numPods; i++ {
+				pod := pods[i]
+				go func() {
+					defer ginkgo.GinkgoRecover()
+					defer wg.Done()
+					b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+					// We need to delete each running pod, otherwise the others cannot use the claim.
+					err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err, "delete pod")
+					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow))
+				}()
+			}
+			wg.Wait()
+		})
+	}
+
+	ginkgo.Context("driver", func() {
+		ginkgo.Context("with ConfigMap parameters", func() { driverTest(parameterModeConfigMap) })
+		ginkgo.Context("with translated parameters", func() { driverTest(parameterModeTranslated) })
+		ginkgo.Context("with structured parameters", func() { driverTest(parameterModeStructured) })
 	})
+
+	// TODO: move most of the test below into `testDriver` so that they get
+	// executed with different parameters. Not done yet because it'll be easier
+	// once publishing NodeResourceSlices works.
 
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 1)
@@ -942,12 +1109,14 @@ func (b *builder) class() *resourcev1alpha2.ResourceClass {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: b.className(),
 		},
-		DriverName:    b.driver.Name,
-		SuitableNodes: b.nodeSelector(),
+		DriverName:           b.driver.Name,
+		SuitableNodes:        b.nodeSelector(),
+		StructuredParameters: ptr.To(b.driver.parameterMode != parameterModeConfigMap),
 	}
 	if b.classParametersName != "" {
 		class.ParametersRef = &resourcev1alpha2.ResourceClassParametersReference{
-			Kind:      "ConfigMap",
+			APIGroup:  b.driver.parameterAPIGroup,
+			Kind:      b.driver.classParameterAPIKind,
 			Name:      b.classParametersName,
 			Namespace: b.f.Namespace.Name,
 		}
@@ -988,8 +1157,9 @@ func (b *builder) externalClaim(allocationMode resourcev1alpha2.AllocationMode) 
 		Spec: resourcev1alpha2.ResourceClaimSpec{
 			ResourceClassName: b.className(),
 			ParametersRef: &resourcev1alpha2.ResourceClaimParametersReference{
-				Kind: "ConfigMap",
-				Name: b.parametersName(),
+				APIGroup: b.driver.parameterAPIGroup,
+				Kind:     b.driver.claimParameterAPIKind,
+				Name:     b.parametersName(),
 			},
 			AllocationMode: allocationMode,
 		},
@@ -1005,20 +1175,15 @@ func (b *builder) parametersName() string {
 // parametersEnv returns the default env variables.
 func (b *builder) parametersEnv() map[string]string {
 	return map[string]string{
-		"a": "b",
+		"a":           "b",
+		"request_foo": "bar",
 	}
 }
 
 // parameters returns a config map with the default env variables.
 func (b *builder) parameters(kv ...string) *v1.ConfigMap {
+	data := b.parameterData(kv...)
 	b.parametersCounter++
-	data := map[string]string{}
-	for i := 0; i < len(kv); i += 2 {
-		data[kv[i]] = kv[i+1]
-	}
-	if len(data) == 0 {
-		data = b.parametersEnv()
-	}
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: b.f.Namespace.Name,
@@ -1026,6 +1191,116 @@ func (b *builder) parameters(kv ...string) *v1.ConfigMap {
 		},
 		Data: data,
 	}
+}
+
+func (b *builder) classParameters(generatedFrom string, kv ...string) *resourcev1alpha2.ResourceClassParameters {
+	raw := b.rawParameterData(kv...)
+	b.parametersCounter++
+	parameters := &resourcev1alpha2.ResourceClassParameters{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.f.Namespace.Name,
+			Name:      b.parametersName(),
+		},
+
+		VendorParameters: []resourcev1alpha2.VendorParameters{
+			{DriverName: b.driver.Name, Parameters: runtime.RawExtension{Raw: raw}},
+		},
+	}
+
+	if generatedFrom != "" {
+		parameters.GeneratedFrom = &resourcev1alpha2.ResourceClassParametersReference{
+			Kind:      "ConfigMap",
+			Namespace: b.f.Namespace.Name,
+			Name:      generatedFrom,
+		}
+	}
+
+	return parameters
+}
+
+func (b *builder) claimParameters(generatedFrom string, claimKV, requestKV []string) *resourcev1alpha2.ResourceClaimParameters {
+	b.parametersCounter++
+	parameters := &resourcev1alpha2.ResourceClaimParameters{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.f.Namespace.Name,
+			Name:      b.parametersName(),
+		},
+
+		Shareable: true,
+
+		// Without any request, nothing gets allocated and vendor
+		// parameters are also not passed down because they get
+		// attached to the allocation result.
+		// TODO: is that the semantic we want?
+		DriverRequests: []resourcev1alpha2.DriverRequests{
+			{
+				DriverName:       b.driver.Name,
+				VendorParameters: runtime.RawExtension{Raw: b.rawParameterData(claimKV...)},
+				Requests: []resourcev1alpha2.ResourceRequest{
+					{
+						VendorParameters: runtime.RawExtension{Raw: b.rawParameterData(requestKV...)},
+						ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
+							NamedResources: &resourcev1alpha2.NamedResourcesRequest{
+								Selector: "true",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if generatedFrom != "" {
+		parameters.GeneratedFrom = &resourcev1alpha2.ResourceClaimParametersReference{
+			Kind: "ConfigMap",
+			Name: generatedFrom,
+		}
+	}
+
+	return parameters
+}
+
+func (b *builder) parameterData(kv ...string) map[string]string {
+	data := map[string]string{}
+	for i := 0; i < len(kv); i += 2 {
+		data[kv[i]] = kv[i+1]
+	}
+	if len(data) == 0 {
+		data = b.parametersEnv()
+	}
+	return data
+}
+
+func (b *builder) rawParameterData(kv ...string) []byte {
+	data := b.parameterData(kv...)
+	raw, err := json.Marshal(data)
+	framework.ExpectNoError(err, "JSON encoding of parameter data")
+	return raw
+}
+
+func (b *builder) nodeResourceSlice(nodeName string, capacity int) *resourcev1alpha2.NodeResourceSlice {
+	slice := &resourcev1alpha2.NodeResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: b.driver.Name + "-" + nodeName,
+		},
+
+		NodeName:   nodeName,
+		DriverName: b.driver.Name,
+
+		NodeResourceModel: resourcev1alpha2.NodeResourceModel{
+			NamedResources: &resourcev1alpha2.NamedResourcesResources{},
+		},
+	}
+
+	for i := 0; i < capacity; i++ {
+		slice.NodeResourceModel.NamedResources.Instances = append(slice.NodeResourceModel.NamedResources.Instances,
+			resourcev1alpha2.NamedResourcesInstance{
+				Name: fmt.Sprintf("instance-%d", i),
+			},
+		)
+	}
+
+	return slice
 }
 
 // makePod returns a simple pod with no resource claims.
@@ -1078,8 +1353,9 @@ func (b *builder) podInline(allocationMode resourcev1alpha2.AllocationMode) (*v1
 			Spec: resourcev1alpha2.ResourceClaimSpec{
 				ResourceClassName: b.className(),
 				ParametersRef: &resourcev1alpha2.ResourceClaimParametersReference{
-					Kind: "ConfigMap",
-					Name: b.parametersName(),
+					APIGroup: b.driver.parameterAPIGroup,
+					Kind:     b.driver.claimParameterAPIKind,
+					Name:     b.parametersName(),
 				},
 				AllocationMode: allocationMode,
 			},
@@ -1134,14 +1410,28 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 		switch obj := obj.(type) {
 		case *resourcev1alpha2.ResourceClass:
 			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "delete resource class")
+			})
 		case *v1.Pod:
 			createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *v1.ConfigMap:
-			_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourcev1alpha2.ResourceClaim:
 			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourcev1alpha2.ResourceClaimTemplate:
 			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.ResourceClassParameters:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClassParameters(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.ResourceClaimParameters:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimParameters(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.NodeResourceSlice:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().NodeResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := b.f.ClientSet.ResourceV1alpha2().NodeResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "delete node resource slice")
+			})
 		default:
 			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
 		}
@@ -1190,9 +1480,6 @@ func (b *builder) setUp() {
 }
 
 func (b *builder) tearDown(ctx context.Context) {
-	err := b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Delete(ctx, b.className(), metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "delete resource class")
-
 	// Before we allow the namespace and all objects in it do be deleted by
 	// the framework, we must ensure that test pods and the claims that
 	// they use are deleted. Otherwise the driver might get deleted first,

@@ -182,6 +182,11 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 		if err := extractParameters(handle.VendorClaimParameters, &p.EnvVars, "user"); err != nil {
 			return nil, err
 		}
+		for _, result := range handle.Results {
+			if err := extractParameters(result.VendorRequestParameters, &p.EnvVars, "user"); err != nil {
+				return nil, err
+			}
+		}
 	default:
 		// Huh?
 		return nil, fmt.Errorf("invalid length of NodePrepareResourceRequest.StructuredResourceHandle: %d", len(req.StructuredResourceHandle))

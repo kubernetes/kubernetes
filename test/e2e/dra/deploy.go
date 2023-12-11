@@ -24,6 +24,7 @@ import (
 	"net"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -125,12 +127,26 @@ type Driver struct {
 	Name       string
 	Nodes      map[string]*app.ExamplePlugin
 
+	parameterMode         parameterMode
+	parameterAPIGroup     string
+	parameterAPIVersion   string
+	claimParameterAPIKind string
+	classParameterAPIKind string
+
 	NodeV1alpha2, NodeV1alpha3 bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
 	callCounts map[MethodInstance]int64
 }
+
+type parameterMode string
+
+const (
+	parameterModeConfigMap  parameterMode = "configmap"  // ConfigMap parameters, control plane controller.
+	parameterModeStructured parameterMode = "structured" // No ConfigMaps, directly create and reference in-tree parameter objects.
+	parameterModeTranslated parameterMode = "translated" // Reference ConfigMaps in claim and class, generate in-tree parameter objects.
+)
 
 func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
@@ -147,19 +163,40 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
 
-	// The controller is easy: we simply connect to the API server.
-	d.Controller = app.NewController(d.f.ClientSet, resources)
-	d.wg.Add(1)
-	go func() {
-		defer d.wg.Done()
-		d.Controller.Run(d.ctx, 5 /* workers */)
-	}()
+	switch d.parameterMode {
+	case "", parameterModeConfigMap:
+		// The controller is easy: we simply connect to the API server.
+		d.Controller = app.NewController(d.f.ClientSet, resources)
+		d.wg.Add(1)
+		go func() {
+			defer d.wg.Done()
+			d.Controller.Run(d.ctx, 5 /* workers */)
+		}()
+	}
 
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
 		// container names, etc.).
 		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
+	if d.parameterMode == "" {
+		d.parameterMode = parameterModeConfigMap
+	}
+	switch d.parameterMode {
+	case parameterModeConfigMap, parameterModeTranslated:
+		d.parameterAPIGroup = ""
+		d.parameterAPIVersion = "v1"
+		d.claimParameterAPIKind = "ConfigMap"
+		d.classParameterAPIKind = "ConfigMap"
+	case parameterModeStructured:
+		d.parameterAPIGroup = "resource.k8s.io"
+		d.parameterAPIVersion = "v1alpha2"
+		d.claimParameterAPIKind = "ResourceClaimParameters"
+		d.classParameterAPIKind = "ResourceClassParameters"
+	default:
+		framework.Failf("unknown test driver parameter mode: %s", d.parameterMode)
+	}
+
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
@@ -192,6 +229,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			item.Spec.Template.Spec.Volumes[2].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
 			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
 			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
+		case *apiextensionsv1.CustomResourceDefinition:
+			item.Name = strings.ReplaceAll(item.Name, "dra.e2e.example.com", d.parameterAPIGroup)
+			item.Spec.Group = d.parameterAPIGroup
+
 		}
 		return nil
 	}, manifests...)
