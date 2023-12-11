@@ -1748,11 +1748,6 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 			klog.ErrorS(err, "Failed to ensure chain exists", "table", ch.table, "chain", ch.chain)
 			return
 		}
-		if ch.table == utiliptables.TableNAT {
-			proxier.natChains.Write(utiliptables.MakeChainLine(ch.chain))
-		} else {
-			proxier.filterChains.Write(utiliptables.MakeChainLine(ch.chain))
-		}
 	}
 
 	for _, jc := range iptablesJumpChain {
