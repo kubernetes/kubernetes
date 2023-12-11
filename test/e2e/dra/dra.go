@@ -1128,26 +1128,25 @@ func (b *builder) podExternalMultiple() *v1.Pod {
 func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMetadata {
 	var createdObjs []klog.KMetadata
 	for _, obj := range objs {
-		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()), func() {
-			var err error
-			var createdObj klog.KMetadata
-			switch obj := obj.(type) {
-			case *resourcev1alpha2.ResourceClass:
-				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
-			case *v1.Pod:
-				createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			case *v1.ConfigMap:
-				_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			case *resourcev1alpha2.ResourceClaim:
-				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			case *resourcev1alpha2.ResourceClaimTemplate:
-				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			default:
-				framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
-			}
-			framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
-			createdObjs = append(createdObjs, createdObj)
-		})
+		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()))
+		var err error
+		var createdObj klog.KMetadata
+		switch obj := obj.(type) {
+		case *resourcev1alpha2.ResourceClass:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
+		case *v1.Pod:
+			createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *v1.ConfigMap:
+			_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.ResourceClaim:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.ResourceClaimTemplate:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		default:
+			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
+		}
+		framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
+		createdObjs = append(createdObjs, createdObj)
 	}
 	return createdObjs
 }
