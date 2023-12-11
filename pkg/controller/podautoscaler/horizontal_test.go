@@ -1289,7 +1289,7 @@ func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
+func TestScaleUpCMUnreadyAndCpuHot(t *testing.T) {
 	averageValue := resource.MustParse("15.0")
 	tc := testCase{
 		minReplicas:             2,
