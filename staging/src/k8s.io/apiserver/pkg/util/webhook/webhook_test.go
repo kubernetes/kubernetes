@@ -48,7 +48,7 @@ import (
 const (
 	errBadCertificate    = "Get .*: remote error: tls: (bad certificate|unknown certificate authority)"
 	errNoConfiguration   = "invalid configuration: no configuration has been provided"
-	errMissingCertPath   = "invalid configuration: unable to read %s %s for %s due to open %s: .*"
+	errMissingCertPath   = `invalid configuration: \[?unable to read %s %s for %s due to open %s: .*\]?`
 	errSignedByUnknownCA = "Get .*: x509: .*(unknown authority|not standards compliant|not trusted)"
 )
 
@@ -151,6 +151,7 @@ func TestKubeConfigFile(t *testing.T) {
 			errRegex:       "", // Not an error at parse time, only when using the webhook
 		},
 		{
+
 			test: "cluster with invalid CA certificate path",
 			cluster: &v1.NamedCluster{
 				Cluster: v1.Cluster{
@@ -170,7 +171,7 @@ func TestKubeConfigFile(t *testing.T) {
 				},
 			},
 			user:     &defaultUser,
-			errRegex: "unable to load root certificates: no valid certificate authority data seen",
+			errRegex: "invalid configuration: unable to validate certificate-authority-data for  due to only CERTIFICATE PEM blocks are allowed, found \"RSA PRIVATE KEY\"",
 		},
 		{
 			test: "cluster with invalid CA certificate - no PEM",
@@ -181,7 +182,7 @@ func TestKubeConfigFile(t *testing.T) {
 				},
 			},
 			user:     &defaultUser,
-			errRegex: "unable to load root certificates: unable to parse bytes as PEM block",
+			errRegex: "invalid configuration: unable to validate certificate-authority-data for  due to must contain at least one CERTIFICATE PEM block",
 		},
 		{
 			test: "cluster with invalid CA certificate - parse error",
@@ -196,7 +197,7 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 				},
 			},
 			user:     &defaultUser,
-			errRegex: "unable to load root certificates: failed to parse certificate: (asn1: syntax error: data truncated|x509: malformed certificate)",
+			errRegex: "invalid configuration: unable to validate certificate-authority-data for  due to x509: malformed certificate",
 		},
 		{
 			test:    "user with invalid client certificate path",
@@ -218,7 +219,7 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 					ClientKeyData:         defaultUser.AuthInfo.ClientKeyData,
 				},
 			},
-			errRegex: "tls: failed to find certificate PEM data in certificate input, but did find a private key; PEM inputs may have been switched",
+			errRegex: "invalid configuration: unable to validate client-cert-data for  due to only CERTIFICATE PEM blocks are allowed, found \"RSA PRIVATE KEY\"",
 		},
 		{
 			test:    "user with invalid client certificate path",
@@ -232,7 +233,7 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 			errRegex: fmt.Sprintf(errMissingCertPath, "client-key", badClientKeyPath, "", badClientKeyPath),
 		},
 		{
-			test:    "user with invalid client certificate",
+			test:    "user with invalid client key",
 			cluster: &defaultCluster,
 			user: &v1.NamedAuthInfo{
 				AuthInfo: v1.AuthInfo{
@@ -240,7 +241,7 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 					ClientKeyData:         clientCert,
 				},
 			},
-			errRegex: "tls: found a certificate rather than a key in the PEM for the private key",
+			errRegex: "invalid configuration: unable to validate client-key-data for  due to data does not contain a valid RSA or ECDSA private key",
 		},
 		{
 			test:     "valid configuration (certificate data embedded in config)",
@@ -345,18 +346,6 @@ func TestTLSConfig(t *testing.T) {
 			clientCert: clientCert, clientKey: clientKey, clientCA: caCert,
 			serverCert: serverCert, serverKey: serverKey, serverCA: invalidCert,
 			errRegex: errBadCertificate,
-		},
-		{
-			test:       "invalid client certificate",
-			clientCert: invalidCert, clientKey: clientKey, clientCA: caCert,
-			serverCert: serverCert, serverKey: serverKey, serverCA: caCert,
-			errRegex: "tls: failed to find any PEM data in certificate input",
-		},
-		{
-			test:       "invalid client key",
-			clientCert: clientCert, clientKey: invalidCert, clientCA: caCert,
-			serverCert: serverCert, serverKey: serverKey, serverCA: caCert,
-			errRegex: "tls: failed to find any PEM data in key input",
 		},
 		{
 			test:       "client does not trust server",
