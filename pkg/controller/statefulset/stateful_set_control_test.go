@@ -983,7 +983,7 @@ func runForOnDeletePodScenarios(t *testing.T,
 		revision *apps.ControllerRevision
 	}
 
-	setNextRevision := func(revisionNumberSetPodRevision []SetPodRevision, revisionNumber int, currRev *apps.ControllerRevision, changeImage string) []SetPodRevision {
+	setNextRevision := func(setPodRevisionByRevisionNumber []SetPodRevision, revisionNumber int, currRev *apps.ControllerRevision, changeImage string) []SetPodRevision {
 		set := newStatefulSetOnDelete()
 		rev := &apps.ControllerRevision{}
 		var pods []*v1.Pod
@@ -999,24 +999,24 @@ func runForOnDeletePodScenarios(t *testing.T,
 			set.Status.CurrentRevision = rev.Name
 			set.Status.UpdateRevision = rev.Name
 		}
-		revisionNumberSetPodRevision = append(revisionNumberSetPodRevision, SetPodRevision{
+		setPodRevisionByRevisionNumber = append(setPodRevisionByRevisionNumber, SetPodRevision{
 			set:      set,
 			pods:     pods,
 			revision: rev,
 		})
-		return revisionNumberSetPodRevision
+		return setPodRevisionByRevisionNumber
 	}
 
-	revisionNumberSetPodRevision := []SetPodRevision{}
+	setPodRevisionByRevisionNumber := []SetPodRevision{}
 
-	buildRevisionNumberSetPodRevision := func(revisionNumberSetPodRevision []SetPodRevision) []SetPodRevision {
-		revisionNumberSetPodRevision = setNextRevision(revisionNumberSetPodRevision, 0, nil, "")
-		revisionNumberSetPodRevision = setNextRevision(revisionNumberSetPodRevision, 1, revisionNumberSetPodRevision[0].revision, "foo")
-		revisionNumberSetPodRevision = setNextRevision(revisionNumberSetPodRevision, 2, revisionNumberSetPodRevision[0].revision, "bar")
-		return revisionNumberSetPodRevision
+	buildSetPodRevisionByRevisionNumber := func(setPodRevisionByRevisionNumber []SetPodRevision) []SetPodRevision {
+		setPodRevisionByRevisionNumber = setNextRevision(setPodRevisionByRevisionNumber, 0, nil, "")
+		setPodRevisionByRevisionNumber = setNextRevision(setPodRevisionByRevisionNumber, 1, setPodRevisionByRevisionNumber[0].revision, "foo")
+		setPodRevisionByRevisionNumber = setNextRevision(setPodRevisionByRevisionNumber, 2, setPodRevisionByRevisionNumber[0].revision, "bar")
+		return setPodRevisionByRevisionNumber
 	}
 
-	revisionNumberSetPodRevision = buildRevisionNumberSetPodRevision(revisionNumberSetPodRevision)
+	setPodRevisionByRevisionNumber = buildSetPodRevisionByRevisionNumber(setPodRevisionByRevisionNumber)
 
 	tests := []struct {
 		name      string
@@ -1028,81 +1028,81 @@ func runForOnDeletePodScenarios(t *testing.T,
 		{
 			// Test case: stable statefulset
 			name:      "StableRevision",
-			expected:  revisionNumberSetPodRevision[0].revision,
-			set:       revisionNumberSetPodRevision[0].set,
-			pods:      revisionNumberSetPodRevision[0].pods,
-			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
+			expected:  setPodRevisionByRevisionNumber[0].revision,
+			set:       setPodRevisionByRevisionNumber[0].set,
+			pods:      setPodRevisionByRevisionNumber[0].pods,
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision},
 		},
 		{
 			// Test case: unsorted pods
 			name:     "StableRevisionUnsortedPods",
-			expected: revisionNumberSetPodRevision[0].revision,
-			set:      revisionNumberSetPodRevision[0].set,
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[0].set,
 			pods: []*v1.Pod{
-				revisionNumberSetPodRevision[0].pods[1],
-				revisionNumberSetPodRevision[0].pods[2],
-				revisionNumberSetPodRevision[0].pods[0],
+				setPodRevisionByRevisionNumber[0].pods[1],
+				setPodRevisionByRevisionNumber[0].pods[2],
+				setPodRevisionByRevisionNumber[0].pods[0],
 			},
-			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision},
 		},
 		{
 			// Test case: new revision with one new pod
 			name:     "OneNewRevision",
-			expected: revisionNumberSetPodRevision[0].revision,
-			set:      revisionNumberSetPodRevision[1].set,
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[1].set,
 			pods: []*v1.Pod{
-				revisionNumberSetPodRevision[1].pods[0],
-				revisionNumberSetPodRevision[0].pods[1],
-				revisionNumberSetPodRevision[0].pods[2],
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[0].pods[1],
+				setPodRevisionByRevisionNumber[0].pods[2],
 			},
-			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision, revisionNumberSetPodRevision[1].revision},
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision, setPodRevisionByRevisionNumber[1].revision},
 		},
 		{
 			// Test case: pods spread across three revisions
 			name:     "TwoNewRevisions",
-			expected: revisionNumberSetPodRevision[0].revision,
-			set:      revisionNumberSetPodRevision[2].set,
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
 			pods: []*v1.Pod{
-				revisionNumberSetPodRevision[1].pods[0],
-				revisionNumberSetPodRevision[2].pods[1],
-				revisionNumberSetPodRevision[0].pods[2],
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
+				setPodRevisionByRevisionNumber[0].pods[2],
 			},
 			revisions: []*apps.ControllerRevision{
-				revisionNumberSetPodRevision[0].revision,
-				revisionNumberSetPodRevision[1].revision,
-				revisionNumberSetPodRevision[2].revision,
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
 			},
 		},
 		{
 			// Test case: remove pod with current revision
 			name:     "RemoveOldestRevisionPod",
-			expected: revisionNumberSetPodRevision[1].revision,
-			set:      revisionNumberSetPodRevision[2].set,
+			expected: setPodRevisionByRevisionNumber[1].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
 			pods: []*v1.Pod{
-				revisionNumberSetPodRevision[1].pods[0],
-				revisionNumberSetPodRevision[2].pods[1],
-				revisionNumberSetPodRevision[2].pods[2],
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
+				setPodRevisionByRevisionNumber[2].pods[2],
 			},
 			revisions: []*apps.ControllerRevision{
-				revisionNumberSetPodRevision[0].revision,
-				revisionNumberSetPodRevision[1].revision,
-				revisionNumberSetPodRevision[2].revision,
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
 			},
 		},
 		{
 			// Remove pod with current revision and unsorted pods
 			name:     "RemoveOldestRevisionPodUnsorted",
-			expected: revisionNumberSetPodRevision[1].revision,
-			set:      revisionNumberSetPodRevision[2].set,
+			expected: setPodRevisionByRevisionNumber[1].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
 			pods: []*v1.Pod{
-				revisionNumberSetPodRevision[2].pods[2],
-				revisionNumberSetPodRevision[1].pods[0],
-				revisionNumberSetPodRevision[2].pods[1],
+				setPodRevisionByRevisionNumber[2].pods[2],
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
 			},
 			revisions: []*apps.ControllerRevision{
-				revisionNumberSetPodRevision[0].revision,
-				revisionNumberSetPodRevision[1].revision,
-				revisionNumberSetPodRevision[2].revision,
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
 			},
 		},
 		{
@@ -1110,26 +1110,26 @@ func runForOnDeletePodScenarios(t *testing.T,
 			// Remove pod with current revision and unsorted pods
 			name:     "PodRevisionsDoNotExist",
 			expected: nil,
-			set:      revisionNumberSetPodRevision[2].set,
+			set:      setPodRevisionByRevisionNumber[2].set,
 			pods: []*v1.Pod{
-				revisionNumberSetPodRevision[1].pods[0],
-				revisionNumberSetPodRevision[2].pods[1],
-				revisionNumberSetPodRevision[2].pods[2],
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
+				setPodRevisionByRevisionNumber[2].pods[2],
 			},
-			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision},
 		},
 		{
 			// Test case: pods only have latest revision
 			// This being the case we don't expect the current revision to change as
 			// the update status will take care of this
 			name:     "AllNewRevision",
-			expected: revisionNumberSetPodRevision[0].revision,
-			set:      revisionNumberSetPodRevision[2].set,
-			pods:     revisionNumberSetPodRevision[2].pods,
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
+			pods:     setPodRevisionByRevisionNumber[2].pods,
 			revisions: []*apps.ControllerRevision{
-				revisionNumberSetPodRevision[0].revision,
-				revisionNumberSetPodRevision[1].revision,
-				revisionNumberSetPodRevision[2].revision,
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
 			},
 		},
 	}
