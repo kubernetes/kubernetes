@@ -1370,7 +1370,10 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			// Simulate what DSOWP does
 			pvWithSize.Spec.Capacity[v1.ResourceStorage] = tc.newPVSize
 			volumeSpec = &volume.Spec{PersistentVolume: pvWithSize}
-			dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContexts */)
+			_, err = dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContexts */)
+			if err != nil {
+				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+			}
 
 			t.Logf("Changing size of the volume to %s", tc.newPVSize.String())
 			newSize := tc.newPVSize.DeepCopy()
