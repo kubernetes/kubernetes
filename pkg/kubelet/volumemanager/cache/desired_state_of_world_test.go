@@ -89,8 +89,8 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod3",
-			UID:  "pod3uid",
+			Name: "pod4",
+			UID:  "pod4uid",
 		},
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
@@ -112,12 +112,19 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
-
-	// Assert
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+	generatedVolumeName2, err := dsw.AddPodToVolume(
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	// Assert
+	if generatedVolumeName != generatedVolumeName2 {
+		t.Fatalf("AddPodToVolume should generate same names, but got %q != %q", generatedVolumeName, generatedVolumeName2)
+	}
 	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
