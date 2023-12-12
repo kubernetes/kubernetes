@@ -604,7 +604,7 @@ func getCurrentRevision(
 	revisions []*apps.ControllerRevision,
 	pods []*v1.Pod,
 ) *apps.ControllerRevision {
-	//If current revision isn't set then we can just return nil
+	// If current revision isn't set then we can just return nil
 	if set.Status.CurrentRevision == "" {
 		return nil
 	}

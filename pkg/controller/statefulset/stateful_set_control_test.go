@@ -986,7 +986,7 @@ func runForOnDeletePodScenarios(t *testing.T,
 	setNextRevision := func(revisionNumberSetPodRevision []SetPodRevision, revisionNumber int, currRev *apps.ControllerRevision, changeImage string) []SetPodRevision {
 		set := newStatefulSetOnDelete()
 		rev := &apps.ControllerRevision{}
-		pods := []*v1.Pod{}
+		var pods []*v1.Pod
 		if revisionNumber != 0 {
 			set.Spec.Template.Spec.Containers[0].Image = changeImage
 			set.Status.CurrentRevision = currRev.Name
@@ -1026,7 +1026,7 @@ func runForOnDeletePodScenarios(t *testing.T,
 		revisions []*apps.ControllerRevision
 	}{
 		{
-			//Test case: stable statefulset
+			// Test case: stable statefulset
 			name:      "StableRevision",
 			expected:  revisionNumberSetPodRevision[0].revision,
 			set:       revisionNumberSetPodRevision[0].set,
@@ -1034,11 +1034,11 @@ func runForOnDeletePodScenarios(t *testing.T,
 			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
 		},
 		{
-			//Test case: unsorted pods
-			name:      "StableRevisionUnsortedPods",
-			expected:  revisionNumberSetPodRevision[0].revision,
-			set:       revisionNumberSetPodRevision[0].set,
-			pods:      []*v1.Pod{
+			// Test case: unsorted pods
+			name:     "StableRevisionUnsortedPods",
+			expected: revisionNumberSetPodRevision[0].revision,
+			set:      revisionNumberSetPodRevision[0].set,
+			pods: []*v1.Pod{
 				revisionNumberSetPodRevision[0].pods[1],
 				revisionNumberSetPodRevision[0].pods[2],
 				revisionNumberSetPodRevision[0].pods[0],
@@ -1046,7 +1046,7 @@ func runForOnDeletePodScenarios(t *testing.T,
 			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
 		},
 		{
-			//Test case: new revision with one new pod
+			// Test case: new revision with one new pod
 			name:     "OneNewRevision",
 			expected: revisionNumberSetPodRevision[0].revision,
 			set:      revisionNumberSetPodRevision[1].set,
@@ -1058,7 +1058,7 @@ func runForOnDeletePodScenarios(t *testing.T,
 			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision, revisionNumberSetPodRevision[1].revision},
 		},
 		{
-			//Test case: pods spread across three revisions
+			// Test case: pods spread across three revisions
 			name:     "TwoNewRevisions",
 			expected: revisionNumberSetPodRevision[0].revision,
 			set:      revisionNumberSetPodRevision[2].set,
@@ -1074,7 +1074,7 @@ func runForOnDeletePodScenarios(t *testing.T,
 			},
 		},
 		{
-			//Test case: remove pod with current revision
+			// Test case: remove pod with current revision
 			name:     "RemoveOldestRevisionPod",
 			expected: revisionNumberSetPodRevision[1].revision,
 			set:      revisionNumberSetPodRevision[2].set,
@@ -1090,7 +1090,7 @@ func runForOnDeletePodScenarios(t *testing.T,
 			},
 		},
 		{
-			//Remove pod with current revision and unsorted pods
+			// Remove pod with current revision and unsorted pods
 			name:     "RemoveOldestRevisionPodUnsorted",
 			expected: revisionNumberSetPodRevision[1].revision,
 			set:      revisionNumberSetPodRevision[2].set,
@@ -1106,8 +1106,8 @@ func runForOnDeletePodScenarios(t *testing.T,
 			},
 		},
 		{
-			//No revisions for existing pods
-			//Remove pod with current revision and unsorted pods
+			// No revisions for existing pods
+			// Remove pod with current revision and unsorted pods
 			name:     "PodRevisionsDoNotExist",
 			expected: nil,
 			set:      revisionNumberSetPodRevision[2].set,
@@ -1119,9 +1119,9 @@ func runForOnDeletePodScenarios(t *testing.T,
 			revisions: []*apps.ControllerRevision{revisionNumberSetPodRevision[0].revision},
 		},
 		{
-			//Test case: pods only have latest revision
-			//This being the case we don't expect the current revision to change as
-			//the update status will take care of this
+			// Test case: pods only have latest revision
+			// This being the case we don't expect the current revision to change as
+			// the update status will take care of this
 			name:     "AllNewRevision",
 			expected: revisionNumberSetPodRevision[0].revision,
 			set:      revisionNumberSetPodRevision[2].set,

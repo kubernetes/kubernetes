@@ -634,7 +634,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(firstRevision).To(gomega.Equal(currentRevision), "Current revision still be the oldest revision",
-			gomega.Expect(currentRevision).ToNot(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update"))
+				gomega.Expect(currentRevision).ToNot(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update"))
 
 			ginkgo.By("Recreating Pods at the third revision")
 			deleteStatefulPodAtIndex(ctx, c, 1, ss)
