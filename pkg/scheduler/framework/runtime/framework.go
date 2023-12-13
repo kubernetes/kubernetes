@@ -355,6 +355,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		options.captureProfile(outputProfile)
 	}
 
+	// Logs Enabled Plugins at each extension point, taking default plugins, given config, and multipoint into consideration
+	logger.V(2).Info("the scheduler starts to work with those plugins", "Plugins", *f.ListPlugins())
 	f.setInstrumentedPlugins()
 	return f, nil
 }
