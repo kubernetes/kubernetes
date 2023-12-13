@@ -1059,7 +1059,7 @@ func Test_setIPSetDefaults(t *testing.T) {
 	}
 }
 
-func Test_checkIPandProtocol(t *testing.T) {
+func Test_checkIPAndProtocol(t *testing.T) {
 	testset := &IPSet{
 		Name:       "test1",
 		SetType:    HashIPPort,
@@ -1127,7 +1127,7 @@ func Test_checkIPandProtocol(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			result := test.entry.checkIPandProtocol(testset)
+			result := test.entry.checkIPAndProtocol(testset)
 			if result != test.valid {
 				t.Errorf("expected valid: %v, got valid: %v", test.valid, result)
 			}

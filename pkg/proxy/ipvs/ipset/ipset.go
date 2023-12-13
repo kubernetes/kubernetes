@@ -178,12 +178,12 @@ func (e *Entry) Validate(set *IPSet) bool {
 		}
 	case HashIPPort:
 		//check if IP and Protocol of Entry is valid.
-		if valid := e.checkIPandProtocol(set); !valid {
+		if valid := e.checkIPAndProtocol(set); !valid {
 			return false
 		}
 	case HashIPPortIP:
 		//check if IP and Protocol of Entry is valid.
-		if valid := e.checkIPandProtocol(set); !valid {
+		if valid := e.checkIPAndProtocol(set); !valid {
 			return false
 		}
 
@@ -194,7 +194,7 @@ func (e *Entry) Validate(set *IPSet) bool {
 		}
 	case HashIPPortNet:
 		//check if IP and Protocol of Entry is valid.
-		if valid := e.checkIPandProtocol(set); !valid {
+		if valid := e.checkIPAndProtocol(set); !valid {
 			return false
 		}
 
@@ -249,8 +249,8 @@ func (e *Entry) String() string {
 	return ""
 }
 
-// checkIPandProtocol checks if IP and Protocol of Entry is valid.
-func (e *Entry) checkIPandProtocol(set *IPSet) bool {
+// checkIPAndProtocol checks if IP and Protocol of Entry is valid.
+func (e *Entry) checkIPAndProtocol(set *IPSet) bool {
 	// set default protocol to tcp if empty
 	if len(e.Protocol) == 0 {
 		e.Protocol = ProtocolTCP
