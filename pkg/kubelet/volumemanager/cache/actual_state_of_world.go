@@ -404,7 +404,7 @@ func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeN
 	volumeState := asw.GetVolumeMountState(volumeName, podName)
 
 	// only uncertain volumes are reconstructed
-	if volumeState != operationexecutor.VolumeMountUncertain && podName != operationexecutor.EmptyUniquePodName {
+	if volumeState != operationexecutor.VolumeMountUncertain {
 		return false
 	}
 
@@ -414,12 +414,15 @@ func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeN
 	if !ok {
 		return false
 	}
-
-	if podName == operationexecutor.EmptyUniquePodName {
-		return true
-	}
 	_, foundPod := podMap[podName]
 	return foundPod
+}
+
+func (asw *actualStateOfWorld) IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+	_, ok := asw.foundDuringReconstruction[volumeName]
+	return ok
 }
 
 func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(opts operationexecutor.MarkVolumeOpts) (bool, error) {
