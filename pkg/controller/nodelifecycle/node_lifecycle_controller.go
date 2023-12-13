@@ -323,7 +323,7 @@ func NewNodeLifecycleController(
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 
 	nc := &Controller{
@@ -454,7 +454,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// Start events processing pipeline.
-	nc.broadcaster.StartStructuredLogging(0)
+	nc.broadcaster.StartStructuredLogging(3)
 	logger := klog.FromContext(ctx)
 	logger.Info("Sending events to api server")
 	nc.broadcaster.StartRecordingToSink(

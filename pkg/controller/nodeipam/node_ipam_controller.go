@@ -88,7 +88,6 @@ func NewNodeIpamController(
 	nodeCIDRMaskSizes []int,
 	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 
-	logger := klog.FromContext(ctx)
 	if kubeClient == nil {
 		return nil, fmt.Errorf("kubeClient is nil when starting Controller")
 	}
@@ -110,7 +109,7 @@ func NewNodeIpamController(
 	ic := &Controller{
 		cloud:                cloud,
 		kubeClient:           kubeClient,
-		eventBroadcaster:     record.NewBroadcaster(),
+		eventBroadcaster:     record.NewBroadcaster(record.WithContext(ctx)),
 		clusterCIDRs:         clusterCIDRs,
 		serviceCIDR:          serviceCIDR,
 		secondaryServiceCIDR: secondaryServiceCIDR,
@@ -120,7 +119,7 @@ func NewNodeIpamController(
 	// TODO: Abstract this check into a generic controller manager should run method.
 	if ic.allocatorType == ipam.IPAMFromClusterAllocatorType || ic.allocatorType == ipam.IPAMFromCloudAllocatorType {
 		var err error
-		ic.legacyIPAM, err = createLegacyIPAM(logger, ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
+		ic.legacyIPAM, err = createLegacyIPAM(ctx, ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +150,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
-	nc.eventBroadcaster.StartStructuredLogging(0)
+	nc.eventBroadcaster.StartStructuredLogging(3)
 	nc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: nc.kubeClient.CoreV1().Events("")})
 	defer nc.eventBroadcaster.Shutdown()
 	klog.FromContext(ctx).Info("Starting ipam controller")

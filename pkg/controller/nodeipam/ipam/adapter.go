@@ -48,8 +48,8 @@ type adapter struct {
 	recorder    record.EventRecorder
 }
 
-func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
-	broadcaster := record.NewBroadcaster()
+func newAdapter(ctx context.Context, k8s clientset.Interface, cloud *gce.Cloud) *adapter {
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 
 	ret := &adapter{
 		k8s:         k8s,
@@ -65,7 +65,7 @@ func (a *adapter) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
-	a.broadcaster.StartStructuredLogging(0)
+	a.broadcaster.StartStructuredLogging(3)
 	a.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: a.k8s.CoreV1().Events("")})
 	defer a.broadcaster.Shutdown()
 

@@ -47,11 +47,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -247,9 +247,13 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	}
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
+		ctx,
 		clientSet,
 		metadataClient,
 		restMapper,
@@ -261,8 +265,6 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
 	tearDown := func() {
 		cancel()
 		result.TearDownFn()

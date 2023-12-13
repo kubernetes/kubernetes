@@ -85,6 +85,7 @@ var _ controller.Debuggable = (*GarbageCollector)(nil)
 
 // NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	mapper meta.ResettableRESTMapper,
@@ -93,7 +94,7 @@ func NewGarbageCollector(
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
 
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
@@ -147,7 +148,7 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	// Start events processing pipeline.
-	gc.eventBroadcaster.StartStructuredLogging(0)
+	gc.eventBroadcaster.StartStructuredLogging(3)
 	gc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: gc.kubeClient.CoreV1().Events("")})
 	defer gc.eventBroadcaster.Shutdown()
 

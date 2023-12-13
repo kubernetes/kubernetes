@@ -203,6 +203,7 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
+		ctx,
 		clientSet,
 		metadataClient,
 		restMapper,
@@ -660,7 +661,6 @@ func PodScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // InitDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
 func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.DisruptionController {
-	_, ctx := ktesting.NewTestContext(t)
 	informers := informers.NewSharedInformerFactory(testCtx.ClientSet, 12*time.Hour)
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.ClientSet.Discovery())
@@ -674,7 +674,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 	}
 
 	dc := disruption.NewDisruptionController(
-		ctx,
+		testCtx.Ctx,
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),

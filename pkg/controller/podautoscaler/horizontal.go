@@ -126,6 +126,7 @@ type HorizontalController struct {
 
 // NewHorizontalController creates a new HorizontalController.
 func NewHorizontalController(
+	ctx context.Context,
 	evtNamespacer v1core.EventsGetter,
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
@@ -140,8 +141,8 @@ func NewHorizontalController(
 	delayOfInitialReadinessStatus time.Duration,
 	containerResourceMetricsEnabled bool,
 ) *HorizontalController {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
