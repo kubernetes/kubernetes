@@ -41,11 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-const (
-	// EmptyUniquePodName is a UniquePodName for empty string.
-	EmptyUniquePodName volumetypes.UniquePodName = volumetypes.UniquePodName("")
-)
-
 // OperationExecutor defines a set of operations for attaching, detaching,
 // mounting, or unmounting a volume that are executed with a NewNestedPendingOperations which
 // prevents more than one operation from being triggered on the same volume.
@@ -238,6 +233,10 @@ type ActualStateOfWorldMounterUpdater interface {
 	// IsVolumeReconstructed returns true if volume currently added to actual state of the world
 	// was found during reconstruction.
 	IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
+	// IsVolumeDeviceReconstructed returns true if volume device identified by volumeName has been
+	// found during reconstruction.
+	IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
