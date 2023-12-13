@@ -746,7 +746,7 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred 
 		}
 		return nil, readResourceVersion, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, pred.MatcherIndex())
+	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, pred.MatcherIndex(ctx))
 }
 
 // GetList implements storage.Interface
