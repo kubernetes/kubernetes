@@ -1137,7 +1137,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ElasticIndexedJob: {Default: true, PreRelease: featuregate.Beta},
 
-	SchedulerQueueingHints: {Default: true, PreRelease: featuregate.Beta},
+	SchedulerQueueingHints: {Default: false, PreRelease: featuregate.Beta},
 
 	SeccompDefault: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
