@@ -536,6 +536,7 @@ func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleSt
 // TestRequeueByPermitRejection verify Pods failed by permit plugins in the binding cycle are
 // put back to the queue, according to the correct scheduling cycle number.
 func TestRequeueByPermitRejection(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)()
 	queueingHintCalledCounter := 0
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{

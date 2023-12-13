@@ -1176,7 +1176,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ElasticIndexedJob: {Default: true, PreRelease: featuregate.Beta},
 
-	SchedulerQueueingHints: {Default: true, PreRelease: featuregate.Beta},
+	SchedulerQueueingHints: {Default: false, PreRelease: featuregate.Beta},
 
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
