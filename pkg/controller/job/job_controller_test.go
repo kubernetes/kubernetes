@@ -5261,13 +5261,12 @@ func TestFinalizerCleanup(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	// Initialize the controller with 0 workers to make sure the
-	// pod finalizers are not removed by the "syncJob" function.
-	go manager.Run(ctx, 0)
-
 	// Start the Pod and Job informers.
 	sharedInformers.Start(ctx.Done())
 	sharedInformers.WaitForCacheSync(ctx.Done())
+	// Initialize the controller with 0 workers to make sure the
+	// pod finalizers are not removed by the "syncJob" function.
+	go manager.Run(ctx, 0)
 
 	// Create a simple Job
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
@@ -5276,12 +5275,30 @@ func TestFinalizerCleanup(t *testing.T) {
 		t.Fatalf("Creating job: %v", err)
 	}
 
+	// Await for the Job to appear in the jobLister to ensure so that Job Pod gets tracked correctly.
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		job, _ := manager.jobLister.Jobs(job.GetNamespace()).Get(job.Name)
+		return job != nil, nil
+	}); err != nil {
+		t.Fatalf("Waiting for Job object to appear in jobLister: %v", err)
+	}
+
 	// Create a Pod with the job tracking finalizer
 	pod := newPod("test-pod", job)
 	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
 	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating pod: %v", err)
+	}
+
+	// Await for the Pod to appear in the podStore to ensure that the pod exists when cleaning up the Job.
+	// In a production environment, there wouldn't be these guarantees, but the Pod would be cleaned up
+	// by the orphan pod worker, when the Pod finishes.
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		pod, _ := manager.podStore.Pods(pod.GetNamespace()).Get(pod.Name)
+		return pod != nil, nil
+	}); err != nil {
+		t.Fatalf("Waiting for Pod to appear in podLister: %v", err)
 	}
 
 	// Mark Job as complete.
