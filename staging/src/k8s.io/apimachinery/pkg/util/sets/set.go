@@ -38,7 +38,7 @@ func New[T comparable](items ...T) Set[T] {
 // KeySet creates a Set from a keys of a map[comparable](? extends interface{}).
 // If the value passed in is not actually a map, this will panic.
 func KeySet[T comparable, V any](theMap map[T]V) Set[T] {
-	ret := Set[T]{}
+	ret := make(Set[T], len(theMap))
 	for keyValue := range theMap {
 		ret.Insert(keyValue)
 	}
