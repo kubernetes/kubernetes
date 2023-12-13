@@ -753,6 +753,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
+			// Check if the request has already timed out before decode object
+			select {
+			case <-ctx.Done():
+				// parent context is canceled or timed out, no point in continuing
+				return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
+			default:
+			}
+
 			if err := appendListItem(v, data, uint64(kv.ModRevision), opts.Predicate, s.codec, s.versioner, newItemFunc); err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
 				return err

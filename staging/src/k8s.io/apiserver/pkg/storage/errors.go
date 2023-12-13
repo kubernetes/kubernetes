@@ -33,6 +33,7 @@ const (
 	ErrCodeResourceVersionConflicts
 	ErrCodeInvalidObj
 	ErrCodeUnreachable
+	ErrCodeTimeout
 )
 
 var errCodeToMessage = map[int]string{
@@ -41,6 +42,7 @@ var errCodeToMessage = map[int]string{
 	ErrCodeResourceVersionConflicts: "resource version conflicts",
 	ErrCodeInvalidObj:               "invalid object",
 	ErrCodeUnreachable:              "server unreachable",
+	ErrCodeTimeout:                  "request timeout",
 }
 
 func NewKeyNotFoundError(key string, rv int64) *StorageError {
@@ -72,6 +74,14 @@ func NewUnreachableError(key string, rv int64) *StorageError {
 		Code:            ErrCodeUnreachable,
 		Key:             key,
 		ResourceVersion: rv,
+	}
+}
+
+func NewTimeoutError(key, msg string) *StorageError {
+	return &StorageError{
+		Code:               ErrCodeTimeout,
+		Key:                key,
+		AdditionalErrorMsg: msg,
 	}
 }
 
@@ -113,6 +123,11 @@ func IsUnreachable(err error) bool {
 // IsConflict returns true if and only if err is a write conflict.
 func IsConflict(err error) bool {
 	return isErrCode(err, ErrCodeResourceVersionConflicts)
+}
+
+// IsRequestTimeout returns true if and only if err indicates that the request has timed out.
+func IsRequestTimeout(err error) bool {
+	return isErrCode(err, ErrCodeTimeout)
 }
 
 // IsInvalidObj returns true if and only if err is invalid error
