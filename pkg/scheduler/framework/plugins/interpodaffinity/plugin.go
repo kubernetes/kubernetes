@@ -64,8 +64,17 @@ func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEventWithHint 
 		// an unschedulable Pod schedulable.
 		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
 		// adding an assigned Pod may make it schedulable.
+		//
+		// A note about UpdateNodeTaint event:
+		// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
+		// As a common problematic scenario,
+		// when a node is added but not ready, NodeAdd event is filtered out by preCheck and doesn't arrive.
+		// In such cases, this plugin may miss some events that actually make pods schedulable.
+		// As a workaround, we add UpdateNodeTaint event to catch the case.
+		// We can remove UpdateNodeTaint when we remove the preCheck feature.
+		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 	}
 }
 

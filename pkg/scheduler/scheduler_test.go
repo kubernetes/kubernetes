@@ -662,6 +662,9 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+				},
 			},
 		},
 		{
@@ -674,6 +677,9 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
 		},
@@ -691,6 +697,9 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
+				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
 		},
@@ -800,7 +809,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[framework.GVK]framework.ActionType{
-				framework.Node: framework.Add,
+				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{
@@ -830,7 +839,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:  framework.Add,
-				framework.Node: framework.Add,
+				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{

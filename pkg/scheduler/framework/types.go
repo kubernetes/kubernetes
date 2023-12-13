@@ -72,7 +72,16 @@ const (
 	//           - a Pod that is deleted
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
-	Pod                     GVK = "Pod"
+	Pod GVK = "Pod"
+	// A note about NodeAdd event and UpdateNodeTaint event:
+	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
+	// It's definitely not something expected for plugin developers,
+	// and registering UpdateNodeTaint event is the only mitigation for now.
+	// So, kube-scheduler registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
+	// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuck in the
+	// unschedulable pod pool.
+	// This behavior will be removed when we remove the preCheck feature.
+	// See: https://github.com/kubernetes/kubernetes/issues/110175
 	Node                    GVK = "Node"
 	PersistentVolume        GVK = "PersistentVolume"
 	PersistentVolumeClaim   GVK = "PersistentVolumeClaim"
