@@ -338,16 +338,11 @@ func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 	return nil
 }
 
-// isSchedulableAfterClaimChange is invoked for all claim events reported by
+// isSchedulableAfterClaimChange is invoked for add and update claim events reported by
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable. It errs on the side of letting a pod scheduling attempt
-// happen.
+// happen. The delete claim event will not invoke it, so newObj will never be nil.
 func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	if newObj == nil {
-		// Deletes don't make a pod schedulable.
-		return framework.QueueSkip, nil
-	}
-
 	originalClaim, modifiedClaim, err := schedutil.As[*resourcev1alpha2.ResourceClaim](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
