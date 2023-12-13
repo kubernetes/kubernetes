@@ -76,6 +76,7 @@ type CustomResourceDefinitionSpec struct {
 	// major version, then minor version. An example sorted list of versions:
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	// +optional
+	// +listType=atomic
 	Versions []CustomResourceDefinitionVersion `json:"versions,omitempty" protobuf:"bytes,7,rep,name=versions"`
 	// additionalPrinterColumns specifies additional columns returned in Table output.
 	// See https://kubernetes.io/docs/reference/using-api/api-concepts/#receiving-resources-as-tables for details.
@@ -83,6 +84,7 @@ type CustomResourceDefinitionSpec struct {
 	// Top-level and per-version columns are mutually exclusive.
 	// If no top-level or per-version columns are specified, a single column displaying the age of the custom resource is used.
 	// +optional
+	// +listType=atomic
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
 
 	// conversion defines conversion settings for the CRD.
@@ -122,6 +124,7 @@ type CustomResourceConversion struct {
 	// include any versions known to the API Server, calls to the webhook will fail.
 	// Defaults to `["v1beta1"]`.
 	// +optional
+	// +listType=atomic
 	ConversionReviewVersions []string `json:"conversionReviewVersions,omitempty" protobuf:"bytes,3,rep,name=conversionReviewVersions"`
 }
 
@@ -227,6 +230,7 @@ type CustomResourceDefinitionVersion struct {
 	// Per-version columns must not all be set to identical values (top-level columns should be used instead).
 	// If no top-level or per-version columns are specified, a single column displaying the age of the custom resource is used.
 	// +optional
+	// +listType=atomic
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,6,rep,name=additionalPrinterColumns"`
 }
 
@@ -269,6 +273,7 @@ type CustomResourceDefinitionNames struct {
 	// and used by clients to support invocations like `kubectl get <shortname>`.
 	// It must be all lowercase.
 	// +optional
+	// +listType=atomic
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,3,opt,name=shortNames"`
 	// kind is the serialized kind of the resource. It is normally CamelCase and singular.
 	// Custom resource instances will use this value as the `kind` attribute in API calls.
@@ -280,6 +285,7 @@ type CustomResourceDefinitionNames struct {
 	// This is published in API discovery documents, and used by clients to support invocations like
 	// `kubectl get all`.
 	// +optional
+	// +listType=atomic
 	Categories []string `json:"categories,omitempty" protobuf:"bytes,6,rep,name=categories"`
 }
 
@@ -377,6 +383,7 @@ type CustomResourceDefinitionStatus struct {
 	// versions from this list.
 	// Versions may not be removed from `spec.versions` while they exist in this list.
 	// +optional
+	// +listType=atomic
 	StoredVersions []string `json:"storedVersions" protobuf:"bytes,3,rep,name=storedVersions"`
 }
 
@@ -509,6 +516,7 @@ type ConversionRequest struct {
 	// desiredAPIVersion is the version to convert given objects to. e.g. "myapi.example.com/v1"
 	DesiredAPIVersion string `json:"desiredAPIVersion" protobuf:"bytes,2,name=desiredAPIVersion"`
 	// objects is the list of custom resource objects to be converted.
+	// +listType=atomic
 	Objects []runtime.RawExtension `json:"objects" protobuf:"bytes,3,rep,name=objects"`
 }
 
@@ -521,6 +529,7 @@ type ConversionResponse struct {
 	// The webhook is expected to set `apiVersion` of these objects to the `request.desiredAPIVersion`. The list
 	// must also have the same size as the input list with the same objects in the same order (equal kind, metadata.uid, metadata.name and metadata.namespace).
 	// The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
+	// +listType=atomic
 	ConvertedObjects []runtime.RawExtension `json:"convertedObjects" protobuf:"bytes,2,rep,name=convertedObjects"`
 	// result contains the result of conversion with extra details if the conversion failed. `result.status` determines if
 	// the conversion failed or succeeded. The `result.status` field is required and represents the success or failure of the

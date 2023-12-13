@@ -45,6 +45,7 @@ type ImageReview struct {
 type ImageReviewSpec struct {
 	// Containers is a list of a subset of the information in each container of the Pod being created.
 	// +optional
+	// +listType=atomic
 	Containers []ImageReviewContainerSpec `json:"containers,omitempty" protobuf:"bytes,1,rep,name=containers"`
 	// Annotations is a list of key-value pairs extracted from the Pod's annotations.
 	// It only includes keys which match the pattern `*.image-policy.k8s.io/*`.

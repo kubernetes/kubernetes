@@ -76,6 +76,7 @@ message MutatingWebhook {
   // from putting the cluster in a state which cannot be recovered from without completely
   // disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
   // on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
+  // +listType=atomic
   repeated RuleWithOperations rules = 3;
 
   // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -183,6 +184,7 @@ message MutatingWebhook {
   // If a persisted webhook configuration specifies allowed versions and does not
   // include any versions known to the API Server, calls to the webhook will fail
   // and be subject to the failure policy.
+  // +listType=atomic
   repeated string admissionReviewVersions = 8;
 
   // reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation.
@@ -236,6 +238,8 @@ message MutatingWebhookConfiguration {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated MutatingWebhook Webhooks = 2;
 }
 
@@ -352,6 +356,7 @@ message ValidatingWebhook {
   // from putting the cluster in a state which cannot be recovered from without completely
   // disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
   // on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
+  // +listType=atomic
   repeated RuleWithOperations rules = 3;
 
   // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -459,6 +464,7 @@ message ValidatingWebhook {
   // If a persisted webhook configuration specifies allowed versions and does not
   // include any versions known to the API Server, calls to the webhook will fail
   // and be subject to the failure policy.
+  // +listType=atomic
   repeated string admissionReviewVersions = 8;
 
   // MatchConditions is a list of conditions that must be met for a request to be sent to this
@@ -494,6 +500,8 @@ message ValidatingWebhookConfiguration {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated ValidatingWebhook Webhooks = 2;
 }
 
