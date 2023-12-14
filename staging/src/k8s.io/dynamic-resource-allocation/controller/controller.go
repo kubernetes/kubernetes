@@ -189,7 +189,7 @@ func New(
 	schedulingCtxInformer := informerFactory.Resource().V1alpha2().PodSchedulingContexts()
 	claimNameLookup := resourceclaim.NewNameLookup(kubeClient)
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	go func() {
 		<-ctx.Done()
 		eventBroadcaster.Shutdown()
