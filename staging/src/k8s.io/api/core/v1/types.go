@@ -663,7 +663,7 @@ type PersistentVolumeClaimCondition struct {
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// reason is a unique, this should be a short, machine understandable string that gives the reason
-	// for condition's last transition. If it reports "ResizeStarted" that means the underlying
+	// for condition's last transition. If it reports "Resizing" that means the underlying
 	// persistent volume is being resized.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
@@ -686,7 +686,7 @@ type PersistentVolumeClaimStatus struct {
 	// +optional
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 	// conditions is the current Condition of persistent volume claim. If underlying persistent volume is being
-	// resized then the Condition will be set to 'ResizeStarted'.
+	// resized then the Condition will be set to 'Resizing'.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge

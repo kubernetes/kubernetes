@@ -3122,7 +3122,7 @@
             "type": "string"
           },
           "reason": {
-            "description": "reason is a unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized.",
+            "description": "reason is a unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"Resizing\" that means the underlying persistent volume is being resized.",
             "type": "string"
           },
           "status": {
@@ -3240,7 +3240,7 @@
             "type": "object"
           },
           "conditions": {
-            "description": "conditions is the current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
+            "description": "conditions is the current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'Resizing'.",
             "items": {
               "allOf": [
                 {
