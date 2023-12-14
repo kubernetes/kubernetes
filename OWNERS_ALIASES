@@ -135,6 +135,7 @@ aliases:
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
+    - carlory
     - chrishenzie
     - gnufied
     - humblec
