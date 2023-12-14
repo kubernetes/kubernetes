@@ -133,7 +133,7 @@ func NewMultiCIDRSet(cidrConfig *net.IPNet, perNodeHostBits int) (*MultiCIDRSet,
 	}
 
 	// Register MultiCIDRSet metrics.
-	registerCidrsetMetrics()
+	registerCIDRSetMetrics()
 
 	maxCIDRs := getMaxCIDRs(subNetMaskSize, clusterMaskSize)
 	multiCIDRSet := &MultiCIDRSet{
