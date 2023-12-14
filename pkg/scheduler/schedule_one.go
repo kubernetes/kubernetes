@@ -28,7 +28,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -985,20 +984,6 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
-	} else if apierrors.IsNotFound(err) {
-		logger.V(2).Info("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", errMsg)
-		if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
-			nodeName := errStatus.Status().Details.Name
-			// when node is not found, We do not remove the node right away. Trying again to get
-			// the node and if the node is still not found, then remove it from the scheduler cache.
-			_, err := fwk.ClientSet().CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-				if err := sched.Cache.RemoveNode(logger, &node); err != nil {
-					logger.V(4).Info("Node is not found; failed to remove it from the cache", "node", node.Name)
-				}
-			}
-		}
 	} else {
 		logger.Error(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
 	}
