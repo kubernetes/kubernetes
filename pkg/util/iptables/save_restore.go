@@ -40,7 +40,7 @@ func GetChainsFromTable(save []byte) map[Chain]struct{} {
 		start := i + 2
 		save = save[start:]
 		end := bytes.Index(save, []byte(" "))
-		if i == -1 {
+		if end == -1 {
 			// shouldn't happen, but...
 			break
 		}
