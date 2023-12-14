@@ -139,8 +139,7 @@ func (ft *fightTest) createController(invert bool, i int) {
 		AsFieldManager:         fieldMgr,
 		InformerFactory:        informerFactory,
 		FlowcontrolClient:      fcIfc,
-		ServerConcurrencyLimit: 200,             // server concurrency limit
-		RequestWaitLimit:       time.Minute / 4, // request wait limit
+		ServerConcurrencyLimit: 200, // server concurrency limit
 		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqtesting.NewNoRestraintFactory(),

@@ -109,7 +109,6 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 		InformerFactory:        informerFactory,
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: 24,
-		RequestWaitLimit:       time.Minute,
 		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
