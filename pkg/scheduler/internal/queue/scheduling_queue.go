@@ -294,7 +294,7 @@ type QueueingHintMapPerProfile map[string]QueueingHintMap
 // QueueingHintMap is keyed with ClusterEvent, valued with queueing hint functions registered for the event.
 type QueueingHintMap map[framework.ClusterEvent][]*QueueingHintFunction
 
-// WithQueueingHintMapPerProfile sets preEnqueuePluginMap for PriorityQueue.
+// WithQueueingHintMapPerProfile sets queueingHintMap for PriorityQueue.
 func WithQueueingHintMapPerProfile(m QueueingHintMapPerProfile) Option {
 	return func(o *priorityQueueOptions) {
 		o.queueingHintMap = m
