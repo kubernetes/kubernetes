@@ -7,7 +7,7 @@ go 1.21
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v1.3.0
-	github.com/go-logr/zapr v1.2.3
+	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.6.0
 	github.com/moby/term v0.0.0-20221205130635-1aeaba878587
 	github.com/prometheus/client_golang v1.16.0
@@ -22,7 +22,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.19.0
 	go.opentelemetry.io/otel/sdk v1.19.0
 	go.opentelemetry.io/otel/trace v1.19.0
-	go.uber.org/zap v1.19.0
+	go.uber.org/zap v1.26.0
 	golang.org/x/sys v0.13.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.0.0
@@ -62,7 +62,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0 // indirect
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect

@@ -1,0 +1,77 @@
+output:
+  # Make output more digestible with quickfix in vim/emacs/etc.
+  sort-results: true
+  print-issued-lines: false
+
+linters:
+  # We'll track the golangci-lint default linters manually
+  # instead of letting them change without our control.
+  disable-all: true
+  enable:
+    # golangci-lint defaults:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Our own extras:
+    - gofmt
+    - nolintlint # lints nolint directives
+    - revive
+
+linters-settings:
+  govet:
+    # These govet checks are disabled by default, but they're useful.
+    enable:
+      - niliness
+      - reflectvaluecompare
+      - sortslice
+      - unusedwrite
+
+  errcheck:
+    exclude-functions:
+      # These methods can not fail.
+      # They operate on an in-memory buffer.
+      - (*go.uber.org/zap/buffer.Buffer).Write
+      - (*go.uber.org/zap/buffer.Buffer).WriteByte
+      - (*go.uber.org/zap/buffer.Buffer).WriteString
+
+      - (*go.uber.org/zap/zapio.Writer).Close
+      - (*go.uber.org/zap/zapio.Writer).Sync
+      - (*go.uber.org/zap/zapio.Writer).Write
+      # Write to zapio.Writer cannot fail,
+      # so io.WriteString on it cannot fail.
+      - io.WriteString(*go.uber.org/zap/zapio.Writer)
+
+      # Writing a plain string to a fmt.State cannot fail.
+      - io.WriteString(fmt.State)
+
+issues:
+  # Print all issues reported by all linters.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Don't ignore some of the issues that golangci-lint considers okay.
+  # This includes documenting all exported entities.
+  exclude-use-default: false
+
+  exclude-rules:
+    # Don't warn on unused parameters.
+    # Parameter names are useful; replacing them with '_' is undesirable.
+    - linters: [revive]
+      text: 'unused-parameter: parameter \S+ seems to be unused, consider removing or renaming it as _'
+
+    # staticcheck already has smarter checks for empty blocks.
+    # revive's empty-block linter has false positives.
+    # For example, as of writing this, the following is not allowed.
+    #   for foo() { }
+    - linters: [revive]
+      text: 'empty-block: this block is empty, you can remove it'
+
+    # Ignore logger.Sync() errcheck failures in example_test.go
+    # since those are intended to be uncomplicated examples.
+    - linters: [errcheck]
+      path: example_test.go
+      text: 'Error return value of `logger.Sync` is not checked'
