@@ -66,11 +66,6 @@ func (c *Fake) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoReque
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 
-// DockerContainer is a fake implementation of Interface.DockerContainer.
-func (c *Fake) DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error) {
-	return cadvisorapi.ContainerInfo{}, nil
-}
-
 // MachineInfo is a fake implementation of Interface.MachineInfo.
 func (c *Fake) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	// Simulate a machine with 1 core and 3.75GB of memory.

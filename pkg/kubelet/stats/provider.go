@@ -165,29 +165,6 @@ func (p *Provider) RootFsStats() (*statsapi.FsStats, error) {
 	}, nil
 }
 
-// GetContainerInfo returns stats (from cAdvisor) for a container.
-func (p *Provider) GetContainerInfo(ctx context.Context, podFullName string, podUID types.UID, containerName string, req *cadvisorapiv1.ContainerInfoRequest) (*cadvisorapiv1.ContainerInfo, error) {
-	// Resolve and type convert back again.
-	// We need the static pod UID but the kubecontainer API works with types.UID.
-	podUID = types.UID(p.podManager.TranslatePodUID(podUID))
-
-	pods, err := p.runtimeCache.GetPods(ctx)
-	if err != nil {
-		return nil, err
-	}
-	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
-	container := pod.FindContainerByName(containerName)
-	if container == nil {
-		return nil, kubecontainer.ErrContainerNotFound
-	}
-
-	ci, err := p.cadvisor.DockerContainer(container.ID.ID, req)
-	if err != nil {
-		return nil, err
-	}
-	return &ci, nil
-}
-
 // GetRawContainerInfo returns the stats (from cadvisor) for a non-Kubernetes
 // container.
 func (p *Provider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapiv1.ContainerInfo, error) {

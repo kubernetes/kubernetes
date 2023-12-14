@@ -97,21 +97,6 @@ func (mr *MockInterfaceMockRecorder) ContainerInfoV2(name, options interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerInfoV2", reflect.TypeOf((*MockInterface)(nil).ContainerInfoV2), name, options)
 }
 
-// DockerContainer mocks base method.
-func (m *MockInterface) DockerContainer(name string, req *v1.ContainerInfoRequest) (v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DockerContainer", name, req)
-	ret0, _ := ret[0].(v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DockerContainer indicates an expected call of DockerContainer.
-func (mr *MockInterfaceMockRecorder) DockerContainer(name, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DockerContainer", reflect.TypeOf((*MockInterface)(nil).DockerContainer), name, req)
-}
-
 // GetDirFsInfo mocks base method.
 func (m *MockInterface) GetDirFsInfo(path string) (v2.FsInfo, error) {
 	m.ctrl.T.Helper()

@@ -43,10 +43,6 @@ func (cu *cadvisorUnsupported) Start() error {
 	return errUnsupported
 }
 
-func (cu *cadvisorUnsupported) DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error) {
-	return cadvisorapi.ContainerInfo{}, errUnsupported
-}
-
 func (cu *cadvisorUnsupported) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	return nil, errUnsupported
 }
