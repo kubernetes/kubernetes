@@ -282,13 +282,6 @@ const (
 	// Enables apiserver and kubelet to allow up to 32 DNSSearchPaths and up to 2048 DNSSearchListChars.
 	ExpandedDNSConfig featuregate.Feature = "ExpandedDNSConfig"
 
-	// owner: @pweil-
-	// alpha: v1.5
-	// deprecated: v1.28
-	//
-	// This flag used to be needed for dockershim CRI and currently does nothing.
-	ExperimentalHostUserNamespaceDefaultingGate featuregate.Feature = "ExperimentalHostUserNamespaceDefaulting"
-
 	// owner: @bobbypage
 	// alpha: v1.20
 	// beta:  v1.21
@@ -1033,8 +1026,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
 	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
-
-	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.30
 
 	GracefulNodeShutdown: {Default: true, PreRelease: featuregate.Beta},
 
