@@ -554,14 +554,6 @@ const (
 	// Enable MinDomains in Pod Topology Spread.
 	MinDomainsInPodTopologySpread featuregate.Feature = "MinDomainsInPodTopologySpread"
 
-	// owner: @danwinship
-	// kep: http://kep.k8s.io/3453
-	// alpha: v1.26
-	// beta: v1.27
-	//
-	// Enables new performance-improving code in kube-proxy iptables mode
-	MinimizeIPTablesRestore featuregate.Feature = "MinimizeIPTablesRestore"
-
 	// owner: @aojea
 	// kep: https://kep.k8s.io/1880
 	// alpha: v1.27
@@ -1124,8 +1116,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MemoryQoS: {Default: false, PreRelease: featuregate.Alpha},
 
 	MinDomainsInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
-
-	MinimizeIPTablesRestore: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
