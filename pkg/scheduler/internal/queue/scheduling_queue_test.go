@@ -2730,6 +2730,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 }
 
 func TestIncomingPodsMetrics(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)()
 	timestamp := time.Now()
 	unschedulablePlg := "unschedulable_plugin"
 	metrics.Register()
