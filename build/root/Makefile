@@ -35,9 +35,13 @@ BASH_ENV := ./hack/lib/logging.sh
 
 # Define variables so `make --warn-undefined-variables` works.
 PRINT_HELP ?=
+WHAT ?=
+TESTS ?=
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
+# Be pedantic about undefined variables.
+MAKEFLAGS += --warn-undefined-variables
 .SUFFIXES:
 
 # Constants used throughout.
