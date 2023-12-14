@@ -137,6 +137,30 @@ func (pl *node2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
+type equalPrioritizerPlugin struct{}
+
+// NewEqualPrioritizerPlugin returns a factory function to build equalPrioritizerPlugin.
+func NewEqualPrioritizerPlugin() frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &equalPrioritizerPlugin{}, nil
+	}
+}
+
+// Name returns the name of the plugin.
+func (pl *equalPrioritizerPlugin) Name() string {
+	return "EqualPrioritizerPlugin"
+}
+
+// Score returns score 1 for each node.
+func (pl *equalPrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
+	return int64(1), nil
+}
+
+// ScoreExtensions returns nil.
+func (pl *equalPrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
+	return nil
+}
+
 // FakeExtender is a data struct which implements the Extender interface.
 type FakeExtender struct {
 	// ExtenderName indicates this fake extender's name.
@@ -378,6 +402,11 @@ func (f *FakeExtender) Bind(binding *v1.Binding) error {
 // IsBinder returns true indicating the extender implements the Binder function.
 func (f *FakeExtender) IsBinder() bool {
 	return true
+}
+
+// IsPrioritizer returns true if there are any prioritizers.
+func (f *FakeExtender) IsPrioritizer() bool {
+	return len(f.Prioritizers) > 0
 }
 
 // IsInterested returns a bool indicating whether this extender is interested in this Pod.
