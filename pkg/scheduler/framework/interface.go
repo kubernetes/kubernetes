@@ -650,11 +650,17 @@ type Handle interface {
 	PluginsRunner
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
-	// a pod finishes "Permit" point. There is no guarantee that the information
-	// remains unchanged in the binding phase of scheduling, so plugins in the binding
-	// cycle (pre-bind/bind/post-bind/un-reserve plugin) should not use it,
-	// otherwise a concurrent read/write error might occur, they should use scheduler
-	// cache instead.
+	// a pod finishes "Permit" point.
+	//
+	// It should be used only during scheduling cycle:
+	// - There is no guarantee that the information remains unchanged in the binding phase of scheduling.
+	//   So, plugins shouldn't use it in the binding cycle (pre-bind/bind/post-bind/un-reserve plugin)
+	//   otherwise, a concurrent read/write error might occur.
+	// - There is no guarantee that the information is always up-to-date.
+	//   So, plugins shouldn't use it in QueueingHint and PreEnqueue
+	//   otherwise, they might make a decision based on stale information.
+	//
+	// Instead, they should use the resources getting from Informer created from SharedInformerFactory().
 	SnapshotSharedLister() SharedLister
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
