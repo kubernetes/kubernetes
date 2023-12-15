@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -162,21 +161,6 @@ func (p *Provider) RootFsStats() (*statsapi.FsStats, error) {
 		InodesFree:     rootFsInfo.InodesFree,
 		Inodes:         rootFsInfo.Inodes,
 		InodesUsed:     nodeFsInodesUsed,
-	}, nil
-}
-
-// GetRawContainerInfo returns the stats (from cadvisor) for a non-Kubernetes
-// container.
-func (p *Provider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapiv1.ContainerInfo, error) {
-	if subcontainers {
-		return p.cadvisor.SubcontainerInfo(containerName, req)
-	}
-	containerInfo, err := p.cadvisor.ContainerInfo(containerName, req)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]*cadvisorapiv1.ContainerInfo{
-		containerInfo.Name: containerInfo,
 	}, nil
 }
 

@@ -177,64 +177,6 @@ func TestRootFsStats(t *testing.T) {
 	assert.Equal(*rootFsInfo.Inodes-*rootFsInfo.InodesFree, *stats.InodesUsed)
 }
 
-func TestGetRawContainerInfoRoot(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	var (
-		mockCadvisor     = cadvisortest.NewMockInterface(mockCtrl)
-		mockPodManager   = new(kubepodtest.MockManager)
-		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
-
-		cadvisorReq   = &cadvisorapiv1.ContainerInfoRequest{}
-		containerPath = "/"
-		containerInfo = &cadvisorapiv1.ContainerInfo{
-			ContainerReference: cadvisorapiv1.ContainerReference{
-				Name: containerPath,
-			},
-		}
-	)
-
-	mockCadvisor.EXPECT().ContainerInfo(containerPath, cadvisorReq).Return(containerInfo, nil)
-
-	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
-	_, err := provider.GetRawContainerInfo(containerPath, cadvisorReq, false)
-	assert.NoError(t, err)
-}
-
-func TestGetRawContainerInfoSubcontainers(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	var (
-		mockCadvisor     = cadvisortest.NewMockInterface(mockCtrl)
-		mockPodManager   = new(kubepodtest.MockManager)
-		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
-
-		cadvisorReq   = &cadvisorapiv1.ContainerInfoRequest{}
-		containerPath = "/kubelet"
-		containerInfo = map[string]*cadvisorapiv1.ContainerInfo{
-			containerPath: {
-				ContainerReference: cadvisorapiv1.ContainerReference{
-					Name: containerPath,
-				},
-			},
-			"/kubelet/sub": {
-				ContainerReference: cadvisorapiv1.ContainerReference{
-					Name: "/kubelet/sub",
-				},
-			},
-		}
-	)
-
-	mockCadvisor.EXPECT().SubcontainerInfo(containerPath, cadvisorReq).Return(containerInfo, nil)
-
-	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
-	result, err := provider.GetRawContainerInfo(containerPath, cadvisorReq, true)
-	assert.NoError(t, err)
-	assert.Len(t, result, 2)
-}
-
 func TestHasDedicatedImageFs(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
