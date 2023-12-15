@@ -171,21 +171,6 @@ func (mr *MockInterfaceMockRecorder) Start() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockInterface)(nil).Start))
 }
 
-// SubcontainerInfo mocks base method.
-func (m *MockInterface) SubcontainerInfo(name string, req *v1.ContainerInfoRequest) (map[string]*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubcontainerInfo", name, req)
-	ret0, _ := ret[0].(map[string]*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SubcontainerInfo indicates an expected call of SubcontainerInfo.
-func (mr *MockInterfaceMockRecorder) SubcontainerInfo(name, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubcontainerInfo", reflect.TypeOf((*MockInterface)(nil).SubcontainerInfo), name, req)
-}
-
 // VersionInfo mocks base method.
 func (m *MockInterface) VersionInfo() (*v1.VersionInfo, error) {
 	m.ctrl.T.Helper()
