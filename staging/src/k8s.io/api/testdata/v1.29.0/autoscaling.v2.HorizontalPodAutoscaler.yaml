@@ -1,0 +1,200 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+    annotationsKey: annotationsValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
+  finalizers:
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
+  labels:
+    labelsKey: labelsValue
+  managedFields:
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
+  ownerReferences:
+  - apiVersion: apiVersionValue
+    blockOwnerDeletion: true
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
+spec:
+  behavior:
+    scaleDown:
+      policies:
+      - periodSeconds: 3
+        type: typeValue
+        value: 2
+      selectPolicy: selectPolicyValue
+      stabilizationWindowSeconds: 3
+    scaleUp:
+      policies:
+      - periodSeconds: 3
+        type: typeValue
+        value: 2
+      selectPolicy: selectPolicyValue
+      stabilizationWindowSeconds: 3
+  maxReplicas: 3
+  metrics:
+  - containerResource:
+      container: containerValue
+      name: nameValue
+      target:
+        averageUtilization: 4
+        averageValue: "0"
+        type: typeValue
+        value: "0"
+    external:
+      metric:
+        name: nameValue
+        selector:
+          matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchLabels:
+            matchLabelsKey: matchLabelsValue
+      target:
+        averageUtilization: 4
+        averageValue: "0"
+        type: typeValue
+        value: "0"
+    object:
+      describedObject:
+        apiVersion: apiVersionValue
+        kind: kindValue
+        name: nameValue
+      metric:
+        name: nameValue
+        selector:
+          matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchLabels:
+            matchLabelsKey: matchLabelsValue
+      target:
+        averageUtilization: 4
+        averageValue: "0"
+        type: typeValue
+        value: "0"
+    pods:
+      metric:
+        name: nameValue
+        selector:
+          matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchLabels:
+            matchLabelsKey: matchLabelsValue
+      target:
+        averageUtilization: 4
+        averageValue: "0"
+        type: typeValue
+        value: "0"
+    resource:
+      name: nameValue
+      target:
+        averageUtilization: 4
+        averageValue: "0"
+        type: typeValue
+        value: "0"
+    type: typeValue
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apiVersionValue
+    kind: kindValue
+    name: nameValue
+status:
+  conditions:
+  - lastTransitionTime: "2003-01-01T01:01:01Z"
+    message: messageValue
+    reason: reasonValue
+    status: statusValue
+    type: typeValue
+  currentMetrics:
+  - containerResource:
+      container: containerValue
+      current:
+        averageUtilization: 3
+        averageValue: "0"
+        value: "0"
+      name: nameValue
+    external:
+      current:
+        averageUtilization: 3
+        averageValue: "0"
+        value: "0"
+      metric:
+        name: nameValue
+        selector:
+          matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchLabels:
+            matchLabelsKey: matchLabelsValue
+    object:
+      current:
+        averageUtilization: 3
+        averageValue: "0"
+        value: "0"
+      describedObject:
+        apiVersion: apiVersionValue
+        kind: kindValue
+        name: nameValue
+      metric:
+        name: nameValue
+        selector:
+          matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchLabels:
+            matchLabelsKey: matchLabelsValue
+    pods:
+      current:
+        averageUtilization: 3
+        averageValue: "0"
+        value: "0"
+      metric:
+        name: nameValue
+        selector:
+          matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchLabels:
+            matchLabelsKey: matchLabelsValue
+    resource:
+      current:
+        averageUtilization: 3
+        averageValue: "0"
+        value: "0"
+      name: nameValue
+    type: typeValue
+  currentReplicas: 3
+  desiredReplicas: 4
+  lastScaleTime: "2002-01-01T01:01:01Z"
+  observedGeneration: 1
