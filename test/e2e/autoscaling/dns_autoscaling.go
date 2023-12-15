@@ -38,15 +38,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-// This test requires coredns to be installed on the cluster with autoscaling enabled.
-// Compare your coredns manifest against the command below
-// helm template coredns -n kube-system coredns/coredns --set k8sAppLabelOverride=kube-dns --set fullnameOverride=coredns --set autoscaler.enabled=true
-
 // Constants used in dns-autoscaling test.
 const (
-	DNSdefaultTimeout    = 5 * time.Minute
-	ClusterAddonLabelKey = "k8s-app"
-	DNSLabelName         = "kube-dns"
+	DNSdefaultTimeout      = 5 * time.Minute
+	ClusterAddonLabelKey   = "k8s-app"
+	DNSLabelName           = "kube-dns"
+	DNSAutoscalerLabelName = "kube-dns-autoscaler"
 )
 
 var _ = SIGDescribe("DNS horizontal autoscaling", func() {
@@ -54,7 +51,6 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var previousParams map[string]string
-	var configMapNames map[string]string
 	var originDNSReplicasCount int
 	var DNSParams1 DNSParamsLinear
 	var DNSParams2 DNSParamsLinear
@@ -69,21 +65,10 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		nodeCount := len(nodes.Items)
 
 		ginkgo.By("Collecting original replicas count and DNS scaling params")
-
-		// Check if we are running coredns or kube-dns, the only difference is the name of the autoscaling CM.
-		// The test should be have identically on both dns providers
-		provider, err := detectDNSProvider(ctx, c)
-		framework.ExpectNoError(err)
-
 		originDNSReplicasCount, err = getDNSReplicas(ctx, c)
 		framework.ExpectNoError(err)
-		configMapNames = map[string]string{
-			"kube-dns": "kube-dns-autoscaler",
-			"coredns":  "coredns-autoscaler",
-		}
 
-		pcm, err := fetchDNSScalingConfigMap(ctx, c, configMapNames[provider])
-		framework.Logf("original DNS scaling params: %v", pcm)
+		pcm, err := fetchDNSScalingConfigMap(ctx, c)
 		framework.ExpectNoError(err)
 		previousParams = pcm.Data
 
@@ -124,19 +109,12 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		numNodes, err := e2enode.TotalRegistered(ctx, c)
 		framework.ExpectNoError(err)
 
-		configMapNames = map[string]string{
-			"kube-dns": "kube-dns-autoscaler",
-			"coredns":  "coredns-autoscaler",
-		}
-		provider, err := detectDNSProvider(ctx, c)
-		framework.ExpectNoError(err)
-
 		ginkgo.By("Replace the dns autoscaling parameters with testing parameters")
-		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(configMapNames[provider], packLinearParams(&DNSParams1)))
+		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
 		framework.ExpectNoError(err)
 		defer func() {
 			ginkgo.By("Restoring initial dns autoscaling parameters")
-			err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(configMapNames[provider], previousParams))
+			err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(previousParams))
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Wait for number of running and ready kube-dns pods recover")
@@ -173,7 +151,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Replace the dns autoscaling parameters with another testing parameters")
-		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(configMapNames[provider], packLinearParams(&DNSParams3)))
+		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(packLinearParams(&DNSParams3)))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Wait for kube-dns scaled to expected number")
@@ -193,21 +171,12 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 	ginkgo.It("kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios", func(ctx context.Context) {
 
-		configMapNames = map[string]string{
-			"kube-dns": "kube-dns-autoscaler",
-			"coredns":  "coredns-autoscaler",
-		}
-		provider, err := detectDNSProvider(ctx, c)
-		framework.ExpectNoError(err)
-
 		ginkgo.By("Replace the dns autoscaling parameters with testing parameters")
-		cm := packDNSScalingConfigMap(configMapNames[provider], packLinearParams(&DNSParams1))
-		framework.Logf("Updating the following cm: %v", cm)
-		err = updateDNSScalingConfigMap(ctx, c, cm)
+		err := updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
 		framework.ExpectNoError(err)
 		defer func() {
 			ginkgo.By("Restoring initial dns autoscaling parameters")
-			err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(configMapNames[provider], previousParams))
+			err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(previousParams))
 			framework.ExpectNoError(err)
 		}()
 		ginkgo.By("Wait for kube-dns scaled to expected number")
@@ -217,7 +186,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 		ginkgo.By("--- Scenario: should scale kube-dns based on changed parameters ---")
 		ginkgo.By("Replace the dns autoscaling parameters with another testing parameters")
-		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(configMapNames[provider], packLinearParams(&DNSParams3)))
+		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(packLinearParams(&DNSParams3)))
 		framework.ExpectNoError(err)
 		ginkgo.By("Wait for kube-dns scaled to expected number")
 		getExpectReplicasLinear = getExpectReplicasFuncLinear(ctx, c, &DNSParams3)
@@ -226,30 +195,30 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 		ginkgo.By("--- Scenario: should re-create scaling parameters with default value when parameters got deleted ---")
 		ginkgo.By("Delete the ConfigMap for autoscaler")
-		err = deleteDNSScalingConfigMap(ctx, c, configMapNames[provider])
+		err = deleteDNSScalingConfigMap(ctx, c)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Wait for the ConfigMap got re-created")
-		_, err = waitForDNSConfigMapCreated(ctx, c, DNSdefaultTimeout, configMapNames[provider])
+		_, err = waitForDNSConfigMapCreated(ctx, c, DNSdefaultTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Replace the dns autoscaling parameters with another testing parameters")
-		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(configMapNames[provider], packLinearParams(&DNSParams2)))
+		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(packLinearParams(&DNSParams2)))
 		framework.ExpectNoError(err)
-		ginkgo.By("Wait for kube-dns/coredns scaled to expected number")
+		ginkgo.By("Wait for kube-dns scaled to expected number")
 		getExpectReplicasLinear = getExpectReplicasFuncLinear(ctx, c, &DNSParams2)
 		err = waitForDNSReplicasSatisfied(ctx, c, getExpectReplicasLinear, DNSdefaultTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("--- Scenario: should recover after autoscaler pod got deleted ---")
-		ginkgo.By("Delete the autoscaler pod for kube-dns/coredns")
+		ginkgo.By("Delete the autoscaler pod for kube-dns")
 		err = deleteDNSAutoscalerPod(ctx, c)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Replace the dns autoscaling parameters with another testing parameters")
-		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(configMapNames[provider], packLinearParams(&DNSParams1)))
+		err = updateDNSScalingConfigMap(ctx, c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
 		framework.ExpectNoError(err)
-		ginkgo.By("Wait for kube-dns/coredns scaled to expected number")
+		ginkgo.By("Wait for kube-dns scaled to expected number")
 		getExpectReplicasLinear = getExpectReplicasFuncLinear(ctx, c, &DNSParams1)
 		err = waitForDNSReplicasSatisfied(ctx, c, getExpectReplicasLinear, DNSdefaultTimeout)
 		framework.ExpectNoError(err)
@@ -292,30 +261,16 @@ func getSchedulableCores(nodes []v1.Node) int64 {
 	return sc.Value()
 }
 
-func detectDNSProvider(ctx context.Context, c clientset.Interface) (string, error) {
-	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, "coredns-autoscaler", metav1.GetOptions{})
-	if cm != nil && err == nil {
-		return "coredns", nil
-	}
-
-	cm, err = c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, "kube-dns-autoscaler", metav1.GetOptions{})
-	if cm != nil && err == nil {
-		return "kube-dns", nil
-	}
-
-	return "", fmt.Errorf("the cluster doesn't have kube-dns or coredns autoscaling configured")
-}
-
-func fetchDNSScalingConfigMap(ctx context.Context, c clientset.Interface, configMapName string) (*v1.ConfigMap, error) {
-	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, configMapName, metav1.GetOptions{})
+func fetchDNSScalingConfigMap(ctx context.Context, c clientset.Interface) (*v1.ConfigMap, error) {
+	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, DNSAutoscalerLabelName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 	return cm, nil
 }
 
-func deleteDNSScalingConfigMap(ctx context.Context, c clientset.Interface, configMapName string) error {
-	if err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(ctx, configMapName, metav1.DeleteOptions{}); err != nil {
+func deleteDNSScalingConfigMap(ctx context.Context, c clientset.Interface) error {
+	if err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(ctx, DNSAutoscalerLabelName, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	framework.Logf("DNS autoscaling ConfigMap deleted.")
@@ -332,9 +287,9 @@ func packLinearParams(params *DNSParamsLinear) map[string]string {
 	return paramsMap
 }
 
-func packDNSScalingConfigMap(configMapName string, params map[string]string) *v1.ConfigMap {
+func packDNSScalingConfigMap(params map[string]string) *v1.ConfigMap {
 	configMap := v1.ConfigMap{}
-	configMap.ObjectMeta.Name = configMapName
+	configMap.ObjectMeta.Name = DNSAutoscalerLabelName
 	configMap.ObjectMeta.Namespace = metav1.NamespaceSystem
 	configMap.Data = params
 	return &configMap
@@ -365,8 +320,8 @@ func getDNSReplicas(ctx context.Context, c clientset.Interface) (int, error) {
 }
 
 func deleteDNSAutoscalerPod(ctx context.Context, c clientset.Interface) error {
-	selector, _ := labels.Parse(fmt.Sprintf("%s in (kube-dns-autoscaler, coredns-autoscaler)", ClusterAddonLabelKey))
-	listOpts := metav1.ListOptions{LabelSelector: selector.String()}
+	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSAutoscalerLabelName}))
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
 	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, listOpts)
 	if err != nil {
 		return err
@@ -387,7 +342,7 @@ func waitForDNSReplicasSatisfied(ctx context.Context, c clientset.Interface, get
 	var current int
 	var expected int
 	framework.Logf("Waiting up to %v for kube-dns to reach expected replicas", timeout)
-	condition := func(ctx context.Context) (bool, error) {
+	condition := func() (bool, error) {
 		current, err = getDNSReplicas(ctx, c)
 		if err != nil {
 			return false, err
@@ -400,24 +355,24 @@ func waitForDNSReplicasSatisfied(ctx context.Context, c clientset.Interface, get
 		return true, nil
 	}
 
-	if err = wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, false, condition); err != nil {
+	if err = wait.Poll(2*time.Second, timeout, condition); err != nil {
 		return fmt.Errorf("err waiting for DNS replicas to satisfy %v, got %v: %w", expected, current, err)
 	}
 	framework.Logf("kube-dns reaches expected replicas: %v", expected)
 	return nil
 }
 
-func waitForDNSConfigMapCreated(ctx context.Context, c clientset.Interface, timeout time.Duration, configMapName string) (configMap *v1.ConfigMap, err error) {
-	framework.Logf("Waiting up to %v for DNS autoscaling ConfigMap to be re-created", timeout)
-	condition := func(ctx context.Context) (bool, error) {
-		configMap, err = fetchDNSScalingConfigMap(ctx, c, configMapName)
+func waitForDNSConfigMapCreated(ctx context.Context, c clientset.Interface, timeout time.Duration) (configMap *v1.ConfigMap, err error) {
+	framework.Logf("Waiting up to %v for DNS autoscaling ConfigMap got re-created", timeout)
+	condition := func() (bool, error) {
+		configMap, err = fetchDNSScalingConfigMap(ctx, c)
 		if err != nil {
 			return false, nil
 		}
 		return true, nil
 	}
 
-	if err = wait.PollUntilContextTimeout(ctx, time.Second, timeout, false, condition); err != nil {
+	if err = wait.Poll(time.Second, timeout, condition); err != nil {
 		return nil, fmt.Errorf("err waiting for DNS autoscaling ConfigMap got re-created: %w", err)
 	}
 	return configMap, nil
