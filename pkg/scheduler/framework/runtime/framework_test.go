@@ -144,7 +144,7 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *TestScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
@@ -212,7 +212,7 @@ func (pl *TestPlugin) PostFilter(_ context.Context, _ *framework.CycleState, _ *
 	return nil, framework.NewStatus(framework.Code(pl.inj.PostFilterStatus), injectReason)
 }
 
-func (pl *TestPlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *TestPlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
@@ -1468,7 +1468,7 @@ func TestRunScorePlugins(t *testing.T) {
 
 			state := framework.NewCycleState()
 			state.SkipScorePlugins = tt.skippedPlugins
-			res, status := f.RunScorePlugins(ctx, state, pod, nodes)
+			res, status := f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
 
 			if tt.err {
 				if status.IsSuccess() {
@@ -2781,8 +2781,10 @@ func TestRecordingMetrics(t *testing.T) {
 			wantStatus:         framework.Success,
 		},
 		{
-			name:               "Score - Success",
-			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
+			name: "Score - Success",
+			action: func(f framework.Framework) {
+				f.RunScorePlugins(context.Background(), state, pod, BuildNodeInfos(nodes))
+			},
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Success,
 		},
@@ -2838,8 +2840,10 @@ func TestRecordingMetrics(t *testing.T) {
 			wantStatus:         framework.Error,
 		},
 		{
-			name:               "Score - Error",
-			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
+			name: "Score - Error",
+			action: func(f framework.Framework) {
+				f.RunScorePlugins(context.Background(), state, pod, BuildNodeInfos(nodes))
+			},
 			inject:             injectedResult{ScoreStatus: int(framework.Error)},
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Error,
@@ -3317,4 +3321,14 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 		t.Fatal(err)
 	}
 	return podInfo
+}
+
+// BuildNodeInfos build NodeInfo slice from a v1.Node slice
+func BuildNodeInfos(nodes []*v1.Node) []*framework.NodeInfo {
+	res := make([]*framework.NodeInfo, len(nodes))
+	for i := 0; i < len(nodes); i++ {
+		res[i] = framework.NewNodeInfo()
+		res[i].SetNode(nodes[i])
+	}
+	return res
 }

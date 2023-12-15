@@ -268,7 +268,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 }
 
 // PreScore invoked at the preScore extension point. It checks whether volumeBinding can skip Score
-func (pl *VolumeBinding) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *VolumeBinding) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	if pl.scorer == nil {
 		return framework.NewStatus(framework.Skip)
 	}

@@ -416,7 +416,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	// When only one node after predicate, just use it.
 	if len(feasibleNodes) == 1 {
 		return ScheduleResult{
-			SuggestedHost:  feasibleNodes[0].Name,
+			SuggestedHost:  feasibleNodes[0].Node().Name,
 			EvaluatedNodes: 1 + len(diagnosis.NodeToStatusMap),
 			FeasibleNodes:  1,
 		}, nil
@@ -439,7 +439,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
-func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
+func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*framework.NodeInfo, framework.Diagnosis, error) {
 	logger := klog.FromContext(ctx)
 	diagnosis := framework.Diagnosis{
 		NodeToStatusMap: make(framework.NodeToStatusMap),
@@ -524,7 +524,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 	return feasibleNodesAfterExtender, diagnosis, nil
 }
 
-func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*v1.Node, error) {
+func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*framework.NodeInfo, error) {
 	nnn := pod.Status.NominatedNodeName
 	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
@@ -551,17 +551,17 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	state *framework.CycleState,
 	pod *v1.Pod,
 	diagnosis *framework.Diagnosis,
-	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
+	nodes []*framework.NodeInfo) ([]*framework.NodeInfo, error) {
 	numAllNodes := len(nodes)
 	numNodesToFind := sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes))
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
-	feasibleNodes := make([]*v1.Node, numNodesToFind)
+	feasibleNodes := make([]*framework.NodeInfo, numNodesToFind)
 
 	if !fwk.HasFilterPlugins() {
 		for i := range feasibleNodes {
-			feasibleNodes[i] = nodes[(sched.nextStartNodeIndex+i)%numAllNodes].Node()
+			feasibleNodes[i] = nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		}
 		return feasibleNodes, nil
 	}
@@ -586,7 +586,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 				cancel()
 				atomic.AddInt32(&feasibleNodesLen, -1)
 			} else {
-				feasibleNodes[length-1] = nodeInfo.Node()
+				feasibleNodes[length-1] = nodeInfo
 			}
 		} else {
 			statusesLock.Lock()
@@ -646,7 +646,7 @@ func (sched *Scheduler) numFeasibleNodesToFind(percentageOfNodesToScore *int32, 
 	return numNodes
 }
 
-func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []*v1.Node, statuses framework.NodeToStatusMap) ([]*v1.Node, error) {
+func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []*framework.NodeInfo, statuses framework.NodeToStatusMap) ([]*framework.NodeInfo, error) {
 	logger := klog.FromContext(ctx)
 	// Extenders are called sequentially.
 	// Nodes in original feasibleNodes can be excluded in one extender, and pass on to the next
@@ -711,7 +711,7 @@ func prioritizeNodes(
 	fwk framework.Framework,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	nodes []*v1.Node,
+	nodes []*framework.NodeInfo,
 ) ([]framework.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
 	// If no priority configs are provided, then all nodes will have a score of one.
@@ -720,7 +720,7 @@ func prioritizeNodes(
 		result := make([]framework.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
 			result = append(result, framework.NodePluginScores{
-				Name:       nodes[i].Name,
+				Name:       nodes[i].Node().Name,
 				TotalScore: 1,
 			})
 		}
@@ -802,7 +802,7 @@ func prioritizeNodes(
 		// wait for all go routines to finish
 		wg.Wait()
 		for i := range nodesScores {
-			if score, ok := allNodeExtendersScores[nodes[i].Name]; ok {
+			if score, ok := allNodeExtendersScores[nodes[i].Node().Name]; ok {
 				nodesScores[i].Scores = append(nodesScores[i].Scores, score.Scores...)
 				nodesScores[i].TotalScore += score.TotalScore
 			}

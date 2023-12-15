@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
@@ -1149,7 +1150,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 			}
 			var status *framework.Status
 			if test.runPreScore {
-				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}

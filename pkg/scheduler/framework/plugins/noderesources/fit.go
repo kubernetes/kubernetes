@@ -121,7 +121,7 @@ func (s *preScoreState) Clone() framework.StateData {
 }
 
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
-func (f *Fit) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (f *Fit) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	state := &preScoreState{
 		podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 	}

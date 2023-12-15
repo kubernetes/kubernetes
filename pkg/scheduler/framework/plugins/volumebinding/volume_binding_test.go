@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 var (
@@ -868,7 +869,7 @@ func TestVolumeBinding(t *testing.T) {
 			}
 
 			t.Logf("Verify: call PreScore and check status")
-			gotPreScoreStatus := p.PreScore(ctx, state, item.pod, item.nodes)
+			gotPreScoreStatus := p.PreScore(ctx, state, item.pod, tf.BuildNodeInfos(item.nodes))
 			if diff := cmp.Diff(item.wantPreScoreStatus, gotPreScoreStatus); diff != "" {
 				t.Errorf("state got after prescore does not match (-want,+got):\n%s", diff)
 			}

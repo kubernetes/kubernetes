@@ -815,7 +815,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 // PreScore is passed a list of all nodes that would fit the pod. Not all
 // claims are necessarily allocated yet, so here we can set the SuitableNodes
 // field for those which are pending.
-func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	if !pl.enabled {
 		return nil
 	}
@@ -841,6 +841,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 		logger.V(5).Info("no pending claims", "pod", klog.KObj(pod))
 		return nil
 	}
+
 	if haveAllPotentialNodes(state.podSchedulingState.schedulingCtx, nodes) {
 		logger.V(5).Info("all potential nodes already set", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodes))
 		return nil
@@ -859,7 +860,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	if numNodes == len(nodes) {
 		// Copy all node names.
 		for _, node := range nodes {
-			potentialNodes = append(potentialNodes, node.Name)
+			potentialNodes = append(potentialNodes, node.Node().Name)
 		}
 	} else {
 		// Select a random subset of the nodes to comply with
@@ -868,7 +869,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 		// randomly.
 		nodeNames := map[string]struct{}{}
 		for _, node := range nodes {
-			nodeNames[node.Name] = struct{}{}
+			nodeNames[node.Node().Name] = struct{}{}
 		}
 		for nodeName := range nodeNames {
 			if len(potentialNodes) >= resourcev1alpha2.PodSchedulingNodeListMaxSize {
@@ -882,12 +883,12 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	return nil
 }
 
-func haveAllPotentialNodes(schedulingCtx *resourcev1alpha2.PodSchedulingContext, nodes []*v1.Node) bool {
+func haveAllPotentialNodes(schedulingCtx *resourcev1alpha2.PodSchedulingContext, nodes []*framework.NodeInfo) bool {
 	if schedulingCtx == nil {
 		return false
 	}
 	for _, node := range nodes {
-		if !haveNode(schedulingCtx.Spec.PotentialNodes, node.Name) {
+		if !haveNode(schedulingCtx.Spec.PotentialNodes, node.Node().Name) {
 			return false
 		}
 	}
