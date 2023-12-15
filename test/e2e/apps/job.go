@@ -144,9 +144,9 @@ var _ = SIGDescribe("Job", func() {
 		// In order to ensure a Job's pod fails once before succeeding we force
 		// the Job's Pods to be scheduled to a single Node and use a hostPath
 		// volume to persist data across new Pods.
-		backoffLimit := int32(0)
 		parallelism := int32(2)
 		completions := int32(4)
+		backoffLimit := int32(0)
 
 		ginkgo.By("Looking for a node to schedule job pod")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -195,9 +195,9 @@ var _ = SIGDescribe("Job", func() {
 			// We set the backoffLimit to 0 so that any pod failure would trigger
 			// job failure if not for the pod failure policy to ignore the failed
 			// pods from counting them towards the backoffLimit.
-			backoffLimit := int32(0)
 			parallelism := int32(2)
 			completions := int32(4)
+			backoffLimit := int32(0)
 
 			ginkgo.By("Looking for a node to schedule job pods")
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -494,6 +494,9 @@ done`}
 	ginkgo.It("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
 		// we use parallelism=1 to make sure in the asserts only one pod was created
 		parallelism := int32(1)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
 		ginkgo.By("Creating an indexed job with backoffLimit per index and maxFailedIndexes")
 		job := e2ejob.NewTestJob("fail", "with-max-failed-indexes", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.BackoffLimit = nil
@@ -524,7 +527,9 @@ done`}
 		backoffLimitPerIndex > 0.
 	*/
 	ginkgo.It("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
+		parallelism := int32(2)
 		completions := int32(2)
+		backoffLimit := int32(6) // default value
 
 		ginkgo.By("Creating an indexed job with failing pods matching the FailIndex action")
 		job := e2ejob.NewTestJob("failOddSucceedEven", "matching-fail-index-action", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
