@@ -46,11 +46,6 @@ func (c *Fake) Start() error {
 	return nil
 }
 
-// ContainerInfo is a fake implementation of Interface.ContainerInfo.
-func (c *Fake) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-	return new(cadvisorapi.ContainerInfo), nil
-}
-
 // ContainerInfoV2 is a fake implementation of Interface.ContainerInfoV2.
 func (c *Fake) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return map[string]cadvisorapiv2.ContainerInfo{}, nil

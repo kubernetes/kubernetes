@@ -67,21 +67,6 @@ func (mr *MockInterfaceMockRecorder) ContainerFsInfo() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerFsInfo", reflect.TypeOf((*MockInterface)(nil).ContainerFsInfo))
 }
 
-// ContainerInfo mocks base method.
-func (m *MockInterface) ContainerInfo(name string, req *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ContainerInfo", name, req)
-	ret0, _ := ret[0].(*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ContainerInfo indicates an expected call of ContainerInfo.
-func (mr *MockInterfaceMockRecorder) ContainerInfo(name, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerInfo", reflect.TypeOf((*MockInterface)(nil).ContainerInfo), name, req)
-}
-
 // ContainerInfoV2 mocks base method.
 func (m *MockInterface) ContainerInfoV2(name string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
 	m.ctrl.T.Helper()
