@@ -255,7 +255,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				}
 
 			default:
-				klog.Errorf("Failed to recognize Event type %q", event.Type)
+				klog.ErrorS(nil, "Failed to recognize Event type", "eventType", event.Type, "eventObject", event.Object)
 				_ = rw.send(watch.Event{
 					Type:   watch.Error,
 					Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %#v failed to recognize Event type %q", event.Object, event.Type)).ErrStatus,
