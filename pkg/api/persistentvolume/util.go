@@ -69,6 +69,10 @@ func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.P
 		)
 	}
 
+	if pvSpec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRecycle {
+		warnings = append(warnings, fmt.Sprintf("%s: The Recycle reclaim policy is deprecated. Instead, the recommended approach is to use dynamic provisioning.", fieldPath.Child("spec", "persistentVolumeReclaimPolicy")))
+	}
+
 	if pvSpec.NodeAffinity != nil && pvSpec.NodeAffinity.Required != nil {
 		termFldPath := fieldPath.Child("spec", "nodeAffinity", "required", "nodeSelectorTerms")
 		// use of deprecated node labels in node affinity
