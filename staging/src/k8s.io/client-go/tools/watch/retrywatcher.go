@@ -248,7 +248,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 					// Log here so we have a record of hitting the unexpected error
 					// and we can whitelist some error codes if we missed any that are expected.
-					klog.V(5).Info(fmt.Sprintf("Retrying after unexpected error: %s", dump.Pretty(event.Object)))
+					klog.V(5).InfoS("Retrying after unexpected error", "error", errObject, "eventObject", event.Object)
 
 					// Retry
 					return false, statusDelay
@@ -304,7 +304,7 @@ func (rw *RetryWatcher) receive() {
 		case <-timer.C:
 		}
 
-		klog.V(4).Infof("Restarting RetryWatcher at RV=%q", rw.lastResourceVersion)
+		klog.V(4).InfoS("Restarting RetryWatcher", "lastResourceVersion", rw.lastResourceVersion)
 	}, rw.minRestartDelay)
 }
 
