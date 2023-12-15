@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -89,11 +88,6 @@ func (c *Fake) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 // ContainerFsInfo is a fake implementation of Interface.ContainerFsInfo.
 func (c *Fake) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
-}
-
-// WatchEvents is a fake implementation of Interface.WatchEvents.
-func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
-	return new(events.EventChannel), nil
 }
 
 // GetDirFsInfo is a fake implementation of Interface.GetDirFsInfo.

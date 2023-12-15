@@ -34,7 +34,6 @@ import (
 
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
-	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
@@ -175,8 +174,4 @@ func (cc *cadvisorClient) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
 		return cadvisorapiv2.FsInfo{}, err
 	}
 	return cc.getFsInfo(label)
-}
-
-func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
-	return cc.WatchForEvents(request)
 }

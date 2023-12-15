@@ -24,7 +24,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	events "github.com/google/cadvisor/events"
 	v1 "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
 )
@@ -184,21 +183,6 @@ func (m *MockInterface) VersionInfo() (*v1.VersionInfo, error) {
 func (mr *MockInterfaceMockRecorder) VersionInfo() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VersionInfo", reflect.TypeOf((*MockInterface)(nil).VersionInfo))
-}
-
-// WatchEvents mocks base method.
-func (m *MockInterface) WatchEvents(request *events.Request) (*events.EventChannel, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WatchEvents", request)
-	ret0, _ := ret[0].(*events.EventChannel)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// WatchEvents indicates an expected call of WatchEvents.
-func (mr *MockInterfaceMockRecorder) WatchEvents(request interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchEvents", reflect.TypeOf((*MockInterface)(nil).WatchEvents), request)
 }
 
 // MockImageFsInfoProvider is a mock of ImageFsInfoProvider interface.

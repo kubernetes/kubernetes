@@ -20,7 +20,6 @@ limitations under the License.
 package cadvisor
 
 import (
-	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
@@ -73,10 +72,6 @@ func (cu *cadvisorClient) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
 
 func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cu.GetDirFsInfo(cu.rootPath)
-}
-
-func (cu *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
-	return &events.EventChannel{}, nil
 }
 
 func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
