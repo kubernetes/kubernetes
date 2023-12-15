@@ -792,11 +792,11 @@ func (qs *queueSet) findDispatchQueueToBoundLocked() (*queue, *request) {
 		queue := qs.queues[qs.robinIndex]
 		oldestWaiting, _ := queue.requestsWaiting.Peek()
 		if oldestWaiting != nil {
-			sMin = ssMin(sMin, queue.nextDispatchR)
-			sMax = ssMax(sMax, queue.nextDispatchR)
+			sMin = min(sMin, queue.nextDispatchR)
+			sMax = max(sMax, queue.nextDispatchR)
 			estimatedWorkInProgress := fqrequest.SeatsTimesDuration(float64(queue.seatsInUse), qs.estimatedServiceDuration)
-			dsMin = ssMin(dsMin, queue.nextDispatchR-estimatedWorkInProgress)
-			dsMax = ssMax(dsMax, queue.nextDispatchR-estimatedWorkInProgress)
+			dsMin = min(dsMin, queue.nextDispatchR-estimatedWorkInProgress)
+			dsMax = max(dsMax, queue.nextDispatchR-estimatedWorkInProgress)
 			currentVirtualFinish := queue.nextDispatchR + oldestWaiting.totalWork()
 			klog.V(11).InfoS("Considering queue to dispatch", "queueSet", qs.qCfg.Name, "queue", qs.robinIndex, "finishR", currentVirtualFinish)
 			if currentVirtualFinish < minVirtualFinish {
@@ -846,20 +846,6 @@ func (qs *queueSet) findDispatchQueueToBoundLocked() (*queue, *request) {
 	}
 	metrics.SetDispatchMetrics(qs.qCfg.Name, qs.currentR.ToFloat(), minQueue.nextDispatchR.ToFloat(), sMin.ToFloat(), sMax.ToFloat(), dsMin.ToFloat(), dsMax.ToFloat())
 	return minQueue, oldestReqFromMinQueue
-}
-
-func ssMin(a, b fqrequest.SeatSeconds) fqrequest.SeatSeconds {
-	if a > b {
-		return b
-	}
-	return a
-}
-
-func ssMax(a, b fqrequest.SeatSeconds) fqrequest.SeatSeconds {
-	if a < b {
-		return b
-	}
-	return a
 }
 
 // finishRequestAndDispatchAsMuchAsPossible is a convenience method
