@@ -17,18 +17,98 @@ limitations under the License.
 package server
 
 import (
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	goatomic "sync/atomic"
+	"time"
 
 	"go.uber.org/atomic"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
+
+// EventSink allows to create events.
+type EventSink interface {
+	Create(event *corev1.Event) (*corev1.Event, error)
+}
+
+type OpenShiftGenericAPIServerPatch struct {
+	// EventSink creates events.
+	eventSink EventSink
+	eventRef  *corev1.ObjectReference
+
+	// when we emit the lifecycle events, we store the event ID of the first
+	// shutdown event "ShutdownInitiated" emitted so we can correlate it to
+	// the other shutdown events for a particular apiserver restart.
+	// This provides a more deterministic way to determine the shutdown
+	// duration for an apiserver restart
+	eventLock                sync.Mutex
+	shutdownInitiatedEventID types.UID
+}
+
+// Eventf creates an event with the API server as source, either in default namespace against default namespace, or
+// if POD_NAME/NAMESPACE are set against that pod.
+func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...interface{}) {
+	t := metav1.NewTime(time.Now())
+	host, _ := os.Hostname() // expicitly ignore error. Empty host is fine
+
+	ref := *s.eventRef
+	if len(ref.Namespace) == 0 {
+		ref.Namespace = "default" // TODO: event broadcaster sets event ns to default. We have to match. Odd.
+	}
+
+	e := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+			Namespace: ref.Namespace,
+		},
+		FirstTimestamp: t,
+		LastTimestamp:  t,
+		Count:          1,
+		InvolvedObject: ref,
+		Reason:         reason,
+		Message:        fmt.Sprintf(messageFmt, args...),
+		Type:           eventType,
+		Source:         corev1.EventSource{Component: "apiserver", Host: host},
+	}
+
+	func() {
+		s.eventLock.Lock()
+		defer s.eventLock.Unlock()
+		if len(s.shutdownInitiatedEventID) != 0 {
+			e.Related = &corev1.ObjectReference{
+				UID: s.shutdownInitiatedEventID,
+			}
+		}
+	}()
+
+	klog.V(2).Infof("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
+
+	ev, err := s.eventSink.Create(e)
+	if err != nil {
+		klog.Warningf("failed to create event %s/%s: %v", e.Namespace, e.Name, err)
+		return
+	}
+
+	if ev != nil && ev.Reason == "ShutdownInitiated" {
+		// we have successfully created the shutdown initiated event,
+		// all consecutive shutdown events we are going to write for
+		// this restart can be tied to this initiated event
+		s.eventLock.Lock()
+		defer s.eventLock.Unlock()
+		if len(s.shutdownInitiatedEventID) == 0 {
+			s.shutdownInitiatedEventID = ev.GetUID()
+		}
+	}
+}
 
 // terminationLoggingListener wraps the given listener to mark late connections
 // as such, identified by the remote address. In parallel, we have a filter that
