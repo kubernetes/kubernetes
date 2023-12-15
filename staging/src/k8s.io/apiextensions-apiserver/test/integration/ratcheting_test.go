@@ -31,6 +31,7 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -1947,5 +1948,89 @@ func BenchmarkRatcheting(b *testing.B) {
 				}
 			})
 		})
+	}
+}
+
+func TestRatchetingDropFields(t *testing.T) {
+	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	group := myCRDV1Beta1.Group
+	version := myCRDV1Beta1.Version
+	resource := myCRDV1Beta1.Resource
+	kind := fakeRESTMapper[myCRDV1Beta1]
+
+	myCRD := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: resource + "." + group},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: group,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+				Name:    version,
+				Served:  true,
+				Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"spec": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
+									"field": {
+										Type: "string",
+										XValidations: []apiextensionsv1.ValidationRule{
+											{
+												Rule:            "self == oldSelf",
+												OptionalOldSelf: ptr(true),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   resource,
+				Kind:     kind,
+				ListKind: kind + "List",
+			},
+			Scope: apiextensionsv1.NamespaceScoped,
+		},
+	}
+
+	created, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), myCRD, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf != nil {
+		t.Errorf("Expected OpeiontalOldSelf field to be dropped for create when feature gate is disabled")
+	}
+
+	var updated *apiextensionsv1.CustomResourceDefinition
+	err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		existing, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), created.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		existing.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf = ptr(true)
+		updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), existing, metav1.UpdateOptions{})
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error waiting for CRD update: %v", err)
+	}
+
+	if updated.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf != nil {
+		t.Errorf("Expected OpeiontalOldSelf field to be dropped for update when feature gate is disabled")
 	}
 }

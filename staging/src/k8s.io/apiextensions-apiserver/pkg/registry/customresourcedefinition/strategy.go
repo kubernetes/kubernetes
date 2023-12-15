@@ -80,6 +80,7 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 			break
 		}
 	}
+	dropDisabledFields(crd, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -108,6 +109,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 			break
 		}
 	}
+	dropDisabledFields(newCRD, oldCRD)
 }
 
 // Validate validates a new CustomResourceDefinition.
