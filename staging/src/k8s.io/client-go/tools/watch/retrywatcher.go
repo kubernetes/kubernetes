@@ -18,7 +18,6 @@ package watch
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -188,7 +187,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				if !ok {
 					_ = rw.send(watch.Event{
 						Type:   watch.Error,
-						Object: &apierrors.NewInternalError(errors.New("retryWatcher: doesn't support resourceVersion")).ErrStatus,
+						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %#v doesn't support resourceVersion", event.Object)).ErrStatus,
 					})
 					// We have to abort here because this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 					return true, 0
