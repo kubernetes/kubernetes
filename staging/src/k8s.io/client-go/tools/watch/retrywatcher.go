@@ -258,7 +258,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				klog.Errorf("Failed to recognize Event type %q", event.Type)
 				_ = rw.send(watch.Event{
 					Type:   watch.Error,
-					Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher failed to recognize Event type %q", event.Type)).ErrStatus,
+					Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %#v failed to recognize Event type %q", event.Object, event.Type)).ErrStatus,
 				})
 				// We are unable to restart the watch and have to stop the loop or this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 				return true, 0
