@@ -123,6 +123,13 @@ var baseOpts = []VersionedOptions{
 			ext.Sets(),
 		},
 	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 30),
+		EnvOptions: []cel.EnvOption{
+			library.IP(),
+			library.CIDR(),
+		},
+	},
 }
 
 // MustBaseEnvSet returns the common CEL base environments for Kubernetes for Version, or panics
