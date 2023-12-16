@@ -40,16 +40,9 @@ import (
 	"k8s.io/client-go/util/cert"
 )
 
-const (
-	atLeastOneRequiredErrFmt = "at least one %s is required"
-)
-
-var (
-	root = field.NewPath("jwt")
-)
-
 // ValidateAuthenticationConfiguration validates a given AuthenticationConfiguration.
 func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration) field.ErrorList {
+	root := field.NewPath("jwt")
 	var allErrs field.ErrorList
 
 	// This stricter validation is solely based on what the current implementation supports.
