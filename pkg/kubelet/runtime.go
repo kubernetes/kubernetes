@@ -92,7 +92,8 @@ func (s *runtimeState) runtimeErrors() error {
 	defer s.RUnlock()
 	errs := []error{}
 	if s.lastBaseRuntimeSync.IsZero() {
-		errs = append(errs, errors.New("container runtime status check may not have completed yet"))
+		// return nil when kubelet start the first time
+		return nil
 	} else if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
 		errs = append(errs, errors.New("container runtime is down"))
 	}
