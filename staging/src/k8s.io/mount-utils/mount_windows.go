@@ -150,12 +150,12 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		mklinkSource = mklinkSource + "\\"
 	}
 
-	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, mklinkSource).CombinedOutput()
+	err := os.Symlink(mklinkSource, target)
 	if err != nil {
-		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, mklinkSource, target, string(output))
+		klog.Errorf("symlink failed: %v, source(%q) target(%q)", err, mklinkSource, target)
 		return err
 	}
-	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", mklinkSource, target, string(output))
+	klog.V(2).Infof("symlink source(%q) on target(%q) successfully", mklinkSource, target)
 
 	return nil
 }
@@ -219,8 +219,9 @@ func removeSMBMapping(remotepath string) (string, error) {
 func (mounter *Mounter) Unmount(target string) error {
 	klog.V(4).Infof("Unmount target (%q)", target)
 	target = NormalizeWindowsPath(target)
-	if output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput(); err != nil {
-		klog.Errorf("rmdir failed: %v, output: %q", err, string(output))
+
+	if err := os.Remove(target); err != nil {
+		klog.Errorf("removing directory %s failed: %v", target, err)
 		return err
 	}
 	return nil

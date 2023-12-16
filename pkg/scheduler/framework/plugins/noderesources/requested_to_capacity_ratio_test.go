@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
@@ -130,7 +131,7 @@ func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
-				status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+				status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, tf.BuildNodeInfos(test.nodes))
 				if !status.IsSuccess() {
 					t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 				}
@@ -327,7 +328,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
-				status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+				status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, tf.BuildNodeInfos(test.nodes))
 				if !status.IsSuccess() {
 					t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 				}
@@ -553,7 +554,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if !status.IsSuccess() {
 				t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 			}

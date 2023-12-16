@@ -34,6 +34,7 @@ message APIGroup {
   optional string name = 1;
 
   // versions are the versions supported in this group.
+  // +listType=atomic
   repeated GroupVersionForDiscovery versions = 2;
 
   // preferredVersion is the version preferred by the API server, which
@@ -49,6 +50,7 @@ message APIGroup {
   // For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
   // Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
   // +optional
+  // +listType=atomic
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 4;
 }
 
@@ -56,6 +58,7 @@ message APIGroup {
 // /apis.
 message APIGroupList {
   // groups is a list of APIGroup.
+  // +listType=atomic
   repeated APIGroup groups = 1;
 }
 
@@ -88,9 +91,11 @@ message APIResource {
   optional Verbs verbs = 4;
 
   // shortNames is a list of suggested short names of the resource.
+  // +listType=atomic
   repeated string shortNames = 5;
 
   // categories is a list of the grouped resources this resource belongs to (e.g. 'all')
+  // +listType=atomic
   repeated string categories = 7;
 
   // The hash value of the storage version, the version this resource is
@@ -112,6 +117,7 @@ message APIResourceList {
   optional string groupVersion = 1;
 
   // resources contains the name of the resources and if they are namespaced.
+  // +listType=atomic
   repeated APIResource resources = 2;
 }
 
@@ -122,6 +128,7 @@ message APIResourceList {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message APIVersions {
   // versions are the api versions that are available.
+  // +listType=atomic
   repeated string versions = 1;
 
   // a map of client CIDR to server address that is serving this group.
@@ -131,6 +138,7 @@ message APIVersions {
   // The server returns only those CIDRs that it thinks that the client can match.
   // For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
   // Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
+  // +listType=atomic
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 2;
 }
 
@@ -145,6 +153,7 @@ message ApplyOptions {
   // request. Valid values are:
   // - All: all dry run stages will be processed
   // +optional
+  // +listType=atomic
   repeated string dryRun = 1;
 
   // Force is going to "force" Apply requests. It means user will
@@ -235,6 +244,7 @@ message CreateOptions {
   // request. Valid values are:
   // - All: all dry run stages will be processed
   // +optional
+  // +listType=atomic
   repeated string dryRun = 1;
 
   // fieldManager is a name associated with the actor or entity
@@ -303,6 +313,7 @@ message DeleteOptions {
   // request. Valid values are:
   // - All: all dry run stages will be processed
   // +optional
+  // +listType=atomic
   repeated string dryRun = 5;
 }
 
@@ -418,6 +429,7 @@ message LabelSelector {
 
   // matchExpressions is a list of label selector requirements. The requirements are ANDed.
   // +optional
+  // +listType=atomic
   repeated LabelSelectorRequirement matchExpressions = 2;
 }
 
@@ -436,6 +448,7 @@ message LabelSelectorRequirement {
   // the values array must be empty. This array is replaced during a strategic
   // merge patch.
   // +optional
+  // +listType=atomic
   repeated string values = 3;
 }
 
@@ -788,6 +801,8 @@ message ObjectMeta {
   // +optional
   // +patchMergeKey=uid
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=uid
   repeated OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
@@ -805,6 +820,7 @@ message ObjectMeta {
   // are not vulnerable to ordering changes in the list.
   // +optional
   // +patchStrategy=merge
+  // +listType=set
   repeated string finalizers = 14;
 
   // ManagedFields maps workflow-id and version to the set of fields
@@ -816,6 +832,7 @@ message ObjectMeta {
   // workflow used when modifying the object.
   //
   // +optional
+  // +listType=atomic
   repeated ManagedFieldsEntry managedFields = 17;
 }
 
@@ -890,6 +907,7 @@ message PatchOptions {
   // request. Valid values are:
   // - All: all dry run stages will be processed
   // +optional
+  // +listType=atomic
   repeated string dryRun = 1;
 
   // Force is going to "force" Apply requests. It means user will
@@ -943,6 +961,7 @@ message Preconditions {
 // For example: "/healthz", "/apis".
 message RootPaths {
   // paths are the paths available at root.
+  // +listType=atomic
   repeated string paths = 1;
 }
 
@@ -985,6 +1004,7 @@ message Status {
   // is not guaranteed to conform to any schema except that defined by
   // the reason type.
   // +optional
+  // +listType=atomic
   optional StatusDetails details = 5;
 
   // Suggested HTTP return code for this status, 0 if not set.
@@ -1049,6 +1069,7 @@ message StatusDetails {
   // The Causes array includes more details associated with the StatusReason
   // failure. Not all StatusReasons may provide detailed causes.
   // +optional
+  // +listType=atomic
   repeated StatusCause causes = 4;
 
   // If specified, the time in seconds before the operation should be retried. Some errors may indicate
@@ -1135,6 +1156,7 @@ message UpdateOptions {
   // request. Valid values are:
   // - All: all dry run stages will be processed
   // +optional
+  // +listType=atomic
   repeated string dryRun = 1;
 
   // fieldManager is a name associated with the actor or entity

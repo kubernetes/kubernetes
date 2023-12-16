@@ -65,6 +65,7 @@ type Fischer struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// DisallowedFlunders holds a list of Flunder.Names that are disallowed.
+	// +listType=atomic
 	DisallowedFlunders []string `json:"disallowedFlunders,omitempty" protobuf:"bytes,2,rep,name=disallowedFlunders"`
 }
 

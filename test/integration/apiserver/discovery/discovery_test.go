@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -241,6 +242,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 
 	// For each groupversion served by our resourcemanager, create an APIService
 	// object connected to our fake APIServer
+	var groupVersions []metav1.GroupVersion
 	for _, versionInfo := range basicTestGroup.Versions {
 		groupVersion := metav1.GroupVersion{
 			Group:   basicTestGroup.Name,
@@ -248,14 +250,19 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 		}
 
 		require.NoError(t, registerAPIService(ctx, client, groupVersion, service))
-		defer func() {
-			require.NoError(t, unregisterAPIService(ctx, client, groupVersion))
-		}()
+		groupVersions = append(groupVersions, groupVersion)
 	}
 
 	// Keep repeatedly fetching document from aggregator.
 	// Check to see if it contains our service within a reasonable amount of time
 	require.NoError(t, WaitForGroups(ctx, client, basicTestGroupWithFixup))
+	require.NoError(t, WaitForRootPaths(t, ctx, client, sets.New("/apis/"+basicTestGroup.Name), nil))
+
+	// Unregister and ensure the group gets dropped from root paths
+	for _, groupVersion := range groupVersions {
+		require.NoError(t, unregisterAPIService(ctx, client, groupVersion))
+	}
+	require.NoError(t, WaitForRootPaths(t, ctx, client, nil, sets.New("/apis/"+basicTestGroup.Name)))
 }
 
 func runTestCases(t *testing.T, cases []testCase) {

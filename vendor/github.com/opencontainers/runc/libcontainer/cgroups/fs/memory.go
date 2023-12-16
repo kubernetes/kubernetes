@@ -234,6 +234,12 @@ func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 	memoryData.Failcnt = value
 	value, err = fscommon.GetCgroupParamUint(path, limit)
 	if err != nil {
+		if name == "kmem" && os.IsNotExist(err) {
+			// Ignore ENOENT as kmem.limit_in_bytes has
+			// been removed in newer kernels.
+			return memoryData, nil
+		}
+
 		return cgroups.MemoryData{}, err
 	}
 	memoryData.Limit = value

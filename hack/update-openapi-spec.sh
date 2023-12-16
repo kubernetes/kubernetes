@@ -28,6 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::util::require-jq
 kube::golang::setup_env
+kube::etcd::install
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
@@ -45,8 +46,6 @@ function cleanup()
 }
 
 trap cleanup EXIT SIGINT
-
-kube::golang::setup_env
 
 TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}

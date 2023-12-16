@@ -107,6 +107,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodeResourcesFit},
+			{Name: names.VolumeBinding},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.NodeResourcesBalancedAllocation},

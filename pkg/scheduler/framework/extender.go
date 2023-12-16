@@ -33,12 +33,12 @@ type Extender interface {
 	// The failedNodes and failedAndUnresolvableNodes optionally contains the list
 	// of failed nodes and failure reasons, except nodes in the latter are
 	// unresolvable.
-	Filter(pod *v1.Pod, nodes []*v1.Node) (filteredNodes []*v1.Node, failedNodesMap extenderv1.FailedNodesMap, failedAndUnresolvable extenderv1.FailedNodesMap, err error)
+	Filter(pod *v1.Pod, nodes []*NodeInfo) (filteredNodes []*NodeInfo, failedNodesMap extenderv1.FailedNodesMap, failedAndUnresolvable extenderv1.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
 	// the scores computed by Kubernetes scheduler. The total scores are used to do the host selection.
-	Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error)
+	Prioritize(pod *v1.Pod, nodes []*NodeInfo) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error)
 
 	// Bind delegates the action of binding a pod to a node to the extender.
 	Bind(binding *v1.Binding) error

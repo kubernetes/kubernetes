@@ -177,8 +177,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		message := fmt.Sprintf("No preemption victims found for incoming pod")
-		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
+		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 
 	// If the new pod does not fit after removing all the lower priority pods,
@@ -262,6 +261,11 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 		}
 	}
 	return true, ""
+}
+
+// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
+func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
+	return nil
 }
 
 // podTerminatingByPreemption returns the pod's terminating state if feature PodDisruptionConditions is not enabled.

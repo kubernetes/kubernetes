@@ -287,6 +287,10 @@ func (s *Status) Equal(x *Status) bool {
 	return cmp.Equal(s.plugin, x.plugin)
 }
 
+func (s *Status) String() string {
+	return s.Message()
+}
+
 // NewStatus makes a Status out of the given arguments and returns its pointer.
 func NewStatus(code Code, reasons ...string) *Status {
 	s := &Status{
@@ -371,8 +375,6 @@ type EnqueueExtensions interface {
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
 	//
-	// The returned events could be nil to indicate that no events other than the pod's own update
-	// can make the pod re-schedulable. An example is SchedulingGates plugin.
 	// Appropriate implementation of this function will make Pod's re-scheduling accurate and performant.
 	EventsToRegister() []ClusterEventWithHint
 }
@@ -460,7 +462,7 @@ type PreScorePlugin interface {
 	// the pod will be rejected
 	// When it returns Skip status, other fields in status are just ignored,
 	// and coupled Score plugin will be skipped in this scheduling cycle.
-	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
+	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*NodeInfo) *Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -648,11 +650,17 @@ type Handle interface {
 	PluginsRunner
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
-	// a pod finishes "Permit" point. There is no guarantee that the information
-	// remains unchanged in the binding phase of scheduling, so plugins in the binding
-	// cycle (pre-bind/bind/post-bind/un-reserve plugin) should not use it,
-	// otherwise a concurrent read/write error might occur, they should use scheduler
-	// cache instead.
+	// a pod finishes "Permit" point.
+	//
+	// It should be used only during scheduling cycle:
+	// - There is no guarantee that the information remains unchanged in the binding phase of scheduling.
+	//   So, plugins shouldn't use it in the binding cycle (pre-bind/bind/post-bind/un-reserve plugin)
+	//   otherwise, a concurrent read/write error might occur.
+	// - There is no guarantee that the information is always up-to-date.
+	//   So, plugins shouldn't use it in QueueingHint and PreEnqueue
+	//   otherwise, they might make a decision based on stale information.
+	//
+	// Instead, they should use the resources getting from Informer created from SharedInformerFactory().
 	SnapshotSharedLister() SharedLister
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
@@ -768,12 +776,12 @@ type PodNominator interface {
 type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
-	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
+	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*NodeInfo) *Status
 	// RunScorePlugins runs the set of configured scoring plugins.
 	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) ([]NodePluginScores, *Status)
+	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*NodeInfo) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods

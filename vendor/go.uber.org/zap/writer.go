@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Uber Technologies, Inc.
+// Copyright (c) 2016-2022 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,6 @@ package zap
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"go.uber.org/zap/zapcore"
 
@@ -49,40 +48,40 @@ import (
 // os.Stdout and os.Stderr. When specified without a scheme, relative file
 // paths also work.
 func Open(paths ...string) (zapcore.WriteSyncer, func(), error) {
-	writers, close, err := open(paths)
+	writers, closeAll, err := open(paths)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	writer := CombineWriteSyncers(writers...)
-	return writer, close, nil
+	return writer, closeAll, nil
 }
 
 func open(paths []string) ([]zapcore.WriteSyncer, func(), error) {
 	writers := make([]zapcore.WriteSyncer, 0, len(paths))
 	closers := make([]io.Closer, 0, len(paths))
-	close := func() {
+	closeAll := func() {
 		for _, c := range closers {
-			c.Close()
+			_ = c.Close()
 		}
 	}
 
 	var openErr error
 	for _, path := range paths {
-		sink, err := newSink(path)
+		sink, err := _sinkRegistry.newSink(path)
 		if err != nil {
-			openErr = multierr.Append(openErr, fmt.Errorf("couldn't open sink %q: %v", path, err))
+			openErr = multierr.Append(openErr, fmt.Errorf("open sink %q: %w", path, err))
 			continue
 		}
 		writers = append(writers, sink)
 		closers = append(closers, sink)
 	}
 	if openErr != nil {
-		close()
-		return writers, nil, openErr
+		closeAll()
+		return nil, nil, openErr
 	}
 
-	return writers, close, nil
+	return writers, closeAll, nil
 }
 
 // CombineWriteSyncers is a utility that combines multiple WriteSyncers into a
@@ -93,7 +92,7 @@ func open(paths []string) ([]zapcore.WriteSyncer, func(), error) {
 // using zapcore.NewMultiWriteSyncer and zapcore.Lock individually.
 func CombineWriteSyncers(writers ...zapcore.WriteSyncer) zapcore.WriteSyncer {
 	if len(writers) == 0 {
-		return zapcore.AddSync(ioutil.Discard)
+		return zapcore.AddSync(io.Discard)
 	}
 	return zapcore.Lock(zapcore.NewMultiWriteSyncer(writers...))
 }

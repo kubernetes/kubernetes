@@ -35,9 +35,13 @@ BASH_ENV := ./hack/lib/logging.sh
 
 # Define variables so `make --warn-undefined-variables` works.
 PRINT_HELP ?=
+WHAT ?=
+TESTS ?=
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
+# Be pedantic about undefined variables.
+MAKEFLAGS += --warn-undefined-variables
 .SUFFIXES:
 
 # Constants used throughout.
@@ -123,9 +127,12 @@ endef
 ifeq ($(PRINT_HELP),y)
 verify:
 	echo "$$VERIFY_HELP_INFO"
-else
+else ifeq ($(origin KUBE_VERIFY_GIT_BRANCH), undefined)
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh
+else
+verify:
+	hack/make-rules/verify.sh
 endif
 
 define QUICK_VERIFY_HELP_INFO

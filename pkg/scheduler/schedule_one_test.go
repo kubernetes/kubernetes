@@ -113,13 +113,13 @@ func (f *fakeExtender) SupportsPreemption() bool {
 	return false
 }
 
-func (f *fakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
+func (f *fakeExtender) Filter(pod *v1.Pod, nodes []*framework.NodeInfo) ([]*framework.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
 	return nil, nil, nil, nil
 }
 
 func (f *fakeExtender) Prioritize(
 	_ *v1.Pod,
-	_ []*v1.Node,
+	_ []*framework.NodeInfo,
 ) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error) {
 	return nil, 0, nil
 }
@@ -1627,11 +1627,11 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
-						if node.Name == "a" {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+						if node.Node().Name == "a" {
 							return framework.NewStatus(framework.Success)
 						}
-						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 					}},
 				},
 			},
@@ -1648,14 +1648,14 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
-						if node.Name == "a" {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+						if node.Node().Name == "a" {
 							return framework.NewStatus(framework.Success)
 						}
-						if node.Name == "b" {
-							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						if node.Node().Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 						}
-						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 					}},
 				},
 			},
@@ -1673,14 +1673,14 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
-						if node.Name == "a" {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+						if node.Node().Name == "a" {
 							return framework.NewStatus(framework.Success)
 						}
-						if node.Name == "b" {
-							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						if node.Node().Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 						}
-						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 					}},
 				},
 			},
@@ -1700,23 +1700,23 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
-						if node.Name == "a" {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+						if node.Node().Name == "a" {
 							return framework.NewStatus(framework.Success)
 						}
-						if node.Name == "b" {
-							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						if node.Node().Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 						}
-						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 					}},
 				},
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
-						if node.Name == "a" {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+						if node.Node().Name == "a" {
 							return framework.NewStatus(framework.Success)
 						}
-						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 					}},
 				},
 			},
@@ -1746,7 +1746,11 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			}
 
 			pod := st.MakePod().Name("1").UID("1").Obj()
-			got, err := findNodesThatPassExtenders(ctx, extenders, pod, tt.nodes, tt.filteredNodesStatuses)
+			got, err := findNodesThatPassExtenders(ctx, extenders, pod, tf.BuildNodeInfos(tt.nodes), tt.filteredNodesStatuses)
+			nodes := make([]*v1.Node, len(got))
+			for i := 0; i < len(got); i++ {
+				nodes[i] = got[i].Node()
+			}
 			if tt.expectsErr {
 				if err == nil {
 					t.Error("Unexpected non-error")
@@ -1755,7 +1759,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
-				if diff := cmp.Diff(tt.expectedNodes, got); diff != "" {
+				if diff := cmp.Diff(tt.expectedNodes, nodes); diff != "" {
 					t.Errorf("filtered nodes (-want,+got):\n%s", diff)
 				}
 				if diff := cmp.Diff(tt.expectedStatuses, tt.filteredNodesStatuses, cmpOpts...); diff != "" {
@@ -1771,6 +1775,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 	tests := []struct {
 		name               string
 		registerPlugins    []tf.RegisterPluginFunc
+		extenders          []tf.FakeExtender
 		nodes              []string
 		pvcs               []v1.PersistentVolumeClaim
 		pod                *v1.Pod
@@ -2079,6 +2084,39 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			},
 		},
 		{
+			name: "test with extender which filters out some Nodes",
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterFilterPlugin(
+					"FakeFilter",
+					tf.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.Unschedulable}),
+				),
+				tf.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: []tf.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
+				},
+			},
+			nodes:     []string{"1", "2", "3"},
+			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
+			wantNodes: nil,
+			wErr: &framework.FitError{
+				Pod:         st.MakePod().Name("test-filter").UID("test-filter").Obj(),
+				NumAllNodes: 3,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"1": framework.NewStatus(framework.Unschedulable, `FakeExtender: node "1" failed`),
+						"2": framework.NewStatus(framework.Unschedulable, `FakeExtender: node "2" failed`),
+						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithPlugin("FakeFilter"),
+					},
+					UnschedulablePlugins: sets.New("FakeFilter", framework.ExtenderName),
+				},
+			},
+		},
+		{
 			name: "test with filter plugin returning UnschedulableAndUnresolvable status",
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -2336,10 +2374,15 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			var extenders []framework.Extender
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
+			}
 			sched := &Scheduler{
 				Cache:                    cache,
 				nodeInfoSnapshot:         snapshot,
 				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+				Extenders:                extenders,
 			}
 			sched.applyDefaultHandlers()
 
@@ -2351,7 +2394,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
 				if gotOK != wantOK {
-					t.Errorf("Expected err to be FitError: %v, but got %v", wantOK, gotOK)
+					t.Errorf("Expected err to be FitError: %v, but got %v (error: %v)", wantOK, gotOK, err)
 				} else if gotOK {
 					if diff := cmp.Diff(gotFitErr, wantFitErr); diff != "" {
 						t.Errorf("Unexpected fitErr: (-want, +got): %s", diff)
@@ -2663,8 +2706,8 @@ func TestZeroRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
-			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
-			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, test.nodes)
+			fwk.RunPreScorePlugins(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3060,7 +3103,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, test.nodes)
+			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

@@ -54,6 +54,7 @@ message ImageReviewContainerSpec {
 message ImageReviewSpec {
   // Containers is a list of a subset of the information in each container of the Pod being created.
   // +optional
+  // +listType=atomic
   repeated ImageReviewContainerSpec containers = 1;
 
   // Annotations is a list of key-value pairs extracted from the Pod's annotations.

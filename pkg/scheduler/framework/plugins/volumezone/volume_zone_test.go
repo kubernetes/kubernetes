@@ -35,7 +35,7 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
-func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
+func createPodWithVolume(pod, pvc string) *v1.Pod {
 	return st.MakePod().Name(pod).Namespace(metav1.NamespaceDefault).PVC(pvc).Obj()
 }
 
@@ -112,7 +112,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "node without labels",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "host1",
@@ -121,7 +121,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "beta zone label matched",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -131,7 +131,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "beta region label matched",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_2"),
+			Pod:  createPodWithVolume("pod_1", "PVC_2"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -141,7 +141,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "beta region label doesn't match",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_2"),
+			Pod:  createPodWithVolume("pod_1", "PVC_2"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -152,7 +152,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "beta zone label doesn't match",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -163,7 +163,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "zone label matched",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -173,7 +173,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "region label matched",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_2", "PVC_Stable_2"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_2"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -183,7 +183,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "region label doesn't match",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_2", "PVC_Stable_2"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_2"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -194,7 +194,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "zone label doesn't match",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -205,7 +205,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "pv with zone and region, node with only zone",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_3", "PVC_Stable_3"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_3"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "host1",
@@ -218,7 +218,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "pv with zone,node with beta zone",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "host1",
@@ -231,7 +231,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "pv with beta label,node with ga label, matched",
-			Pod:  createPodWithVolume("pod_1", "Vol_1", "PVC_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "host1",
@@ -243,7 +243,7 @@ func TestSingleZone(t *testing.T) {
 		},
 		{
 			name: "pv with beta label,node with ga label, don't match",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "host1",
@@ -337,7 +337,7 @@ func TestMultiZone(t *testing.T) {
 	}{
 		{
 			name: "node without labels",
-			Pod:  createPodWithVolume("pod_1", "Vol_3", "PVC_3"),
+			Pod:  createPodWithVolume("pod_1", "PVC_3"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "host1",
@@ -346,7 +346,7 @@ func TestMultiZone(t *testing.T) {
 		},
 		{
 			name: "beta zone label matched",
-			Pod:  createPodWithVolume("pod_1", "Vol_3", "PVC_3"),
+			Pod:  createPodWithVolume("pod_1", "PVC_3"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -356,7 +356,7 @@ func TestMultiZone(t *testing.T) {
 		},
 		{
 			name: "beta zone label doesn't match",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -367,7 +367,7 @@ func TestMultiZone(t *testing.T) {
 		},
 		{
 			name: "zone label matched",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_2", "PVC_Stable_2"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_2"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -377,7 +377,7 @@ func TestMultiZone(t *testing.T) {
 		},
 		{
 			name: "zone label doesn't match",
-			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_Stable_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
@@ -477,12 +477,12 @@ func TestWithBinding(t *testing.T) {
 	}{
 		{
 			name: "label zone failure domain matched",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Pod:  createPodWithVolume("pod_1", "PVC_1"),
 			Node: testNode,
 		},
 		{
 			name: "unbound volume empty storage class",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_EmptySC"),
+			Pod:  createPodWithVolume("pod_1", "PVC_EmptySC"),
 			Node: testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
 				"PersistentVolumeClaim had no pv name and storageClass name"),
@@ -491,23 +491,23 @@ func TestWithBinding(t *testing.T) {
 		},
 		{
 			name: "unbound volume no storage class",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
+			Pod:  createPodWithVolume("pod_1", "PVC_NoSC"),
 			Node: testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"unable to find storage class: Class_0"),
+				`storageclasses.storage.k8s.io "Class_0" not found`),
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"unable to find storage class: Class_0"),
+				`storageclasses.storage.k8s.io "Class_0" not found`),
 		},
 		{
 			name:                "unbound volume immediate binding mode",
-			Pod:                 createPodWithVolume("pod_1", "vol_1", "PVC_ImmediateSC"),
+			Pod:                 createPodWithVolume("pod_1", "PVC_ImmediateSC"),
 			Node:                testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
 			wantFilterStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
 		},
 		{
 			name:                "unbound volume wait binding mode",
-			Pod:                 createPodWithVolume("pod_1", "vol_1", "PVC_WaitSC"),
+			Pod:                 createPodWithVolume("pod_1", "PVC_WaitSC"),
 			Node:                testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
@@ -550,7 +550,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 	}{
 		{
 			Name:      "with prefilter",
-			Pod:       createPodWithVolume("pod_0", "Vol_Stable_0", "PVC_Stable_0"),
+			Pod:       createPodWithVolume("pod_0", "PVC_Stable_0"),
 			NumPV:     1000,
 			NumPVC:    1000,
 			NumNodes:  1000,
@@ -558,7 +558,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 		},
 		{
 			Name:      "without prefilter",
-			Pod:       createPodWithVolume("pod_0", "Vol_Stable_0", "PVC_Stable_0"),
+			Pod:       createPodWithVolume("pod_0", "PVC_Stable_0"),
 			NumPV:     1000,
 			NumPVC:    1000,
 			NumNodes:  1000,

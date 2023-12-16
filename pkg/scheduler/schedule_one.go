@@ -28,7 +28,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -149,6 +148,9 @@ func (sched *Scheduler) schedulingCycle(
 	pod := podInfo.Pod
 	scheduleResult, err := sched.SchedulePod(ctx, fwk, state, pod)
 	if err != nil {
+		defer func() {
+			metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
+		}()
 		if err == ErrNoNodesAvailable {
 			status := framework.NewStatus(framework.UnschedulableAndUnresolvable).WithError(err)
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, status
@@ -414,7 +416,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	// When only one node after predicate, just use it.
 	if len(feasibleNodes) == 1 {
 		return ScheduleResult{
-			SuggestedHost:  feasibleNodes[0].Name,
+			SuggestedHost:  feasibleNodes[0].Node().Name,
 			EvaluatedNodes: 1 + len(diagnosis.NodeToStatusMap),
 			FeasibleNodes:  1,
 		}, nil
@@ -437,7 +439,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
-func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
+func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*framework.NodeInfo, framework.Diagnosis, error) {
 	logger := klog.FromContext(ctx)
 	diagnosis := framework.Diagnosis{
 		NodeToStatusMap: make(framework.NodeToStatusMap),
@@ -500,14 +502,29 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		return nil, diagnosis, err
 	}
 
-	feasibleNodes, err = findNodesThatPassExtenders(ctx, sched.Extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	feasibleNodesAfterExtender, err := findNodesThatPassExtenders(ctx, sched.Extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
 	if err != nil {
 		return nil, diagnosis, err
 	}
-	return feasibleNodes, diagnosis, nil
+	if len(feasibleNodesAfterExtender) != len(feasibleNodes) {
+		// Extenders filtered out some nodes.
+		//
+		// Extender doesn't support any kind of requeueing feature like EnqueueExtensions in the scheduling framework.
+		// When Extenders reject some Nodes and the pod ends up being unschedulable,
+		// we put framework.ExtenderName to pInfo.UnschedulablePlugins.
+		// This Pod will be requeued from unschedulable pod pool to activeQ/backoffQ
+		// by any kind of cluster events.
+		// https://github.com/kubernetes/kubernetes/issues/122019
+		if diagnosis.UnschedulablePlugins == nil {
+			diagnosis.UnschedulablePlugins = sets.New[string]()
+		}
+		diagnosis.UnschedulablePlugins.Insert(framework.ExtenderName)
+	}
+
+	return feasibleNodesAfterExtender, diagnosis, nil
 }
 
-func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*v1.Node, error) {
+func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*framework.NodeInfo, error) {
 	nnn := pod.Status.NominatedNodeName
 	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
@@ -534,17 +551,17 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	state *framework.CycleState,
 	pod *v1.Pod,
 	diagnosis *framework.Diagnosis,
-	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
+	nodes []*framework.NodeInfo) ([]*framework.NodeInfo, error) {
 	numAllNodes := len(nodes)
 	numNodesToFind := sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes))
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
-	feasibleNodes := make([]*v1.Node, numNodesToFind)
+	feasibleNodes := make([]*framework.NodeInfo, numNodesToFind)
 
 	if !fwk.HasFilterPlugins() {
 		for i := range feasibleNodes {
-			feasibleNodes[i] = nodes[(sched.nextStartNodeIndex+i)%numAllNodes].Node()
+			feasibleNodes[i] = nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		}
 		return feasibleNodes, nil
 	}
@@ -569,7 +586,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 				cancel()
 				atomic.AddInt32(&feasibleNodesLen, -1)
 			} else {
-				feasibleNodes[length-1] = nodeInfo.Node()
+				feasibleNodes[length-1] = nodeInfo
 			}
 		} else {
 			statusesLock.Lock()
@@ -629,7 +646,7 @@ func (sched *Scheduler) numFeasibleNodesToFind(percentageOfNodesToScore *int32, 
 	return numNodes
 }
 
-func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []*v1.Node, statuses framework.NodeToStatusMap) ([]*v1.Node, error) {
+func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []*framework.NodeInfo, statuses framework.NodeToStatusMap) ([]*framework.NodeInfo, error) {
 	logger := klog.FromContext(ctx)
 	// Extenders are called sequentially.
 	// Nodes in original feasibleNodes can be excluded in one extender, and pass on to the next
@@ -694,7 +711,7 @@ func prioritizeNodes(
 	fwk framework.Framework,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	nodes []*v1.Node,
+	nodes []*framework.NodeInfo,
 ) ([]framework.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
 	// If no priority configs are provided, then all nodes will have a score of one.
@@ -703,7 +720,7 @@ func prioritizeNodes(
 		result := make([]framework.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
 			result = append(result, framework.NodePluginScores{
-				Name:       nodes[i].Name,
+				Name:       nodes[i].Node().Name,
 				TotalScore: 1,
 			})
 		}
@@ -785,7 +802,7 @@ func prioritizeNodes(
 		// wait for all go routines to finish
 		wg.Wait()
 		for i := range nodesScores {
-			if score, ok := allNodeExtendersScores[nodes[i].Name]; ok {
+			if score, ok := allNodeExtendersScores[nodes[i].Node().Name]; ok {
 				nodesScores[i].Scores = append(nodesScores[i].Scores, score.Scores...)
 				nodesScores[i].TotalScore += score.TotalScore
 			}
@@ -985,20 +1002,6 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
-	} else if apierrors.IsNotFound(err) {
-		logger.V(2).Info("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", errMsg)
-		if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
-			nodeName := errStatus.Status().Details.Name
-			// when node is not found, We do not remove the node right away. Trying again to get
-			// the node and if the node is still not found, then remove it from the scheduler cache.
-			_, err := fwk.ClientSet().CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-				if err := sched.Cache.RemoveNode(logger, &node); err != nil {
-					logger.V(4).Info("Node is not found; failed to remove it from the cache", "node", node.Name)
-				}
-			}
-		}
 	} else {
 		logger.Error(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
 	}

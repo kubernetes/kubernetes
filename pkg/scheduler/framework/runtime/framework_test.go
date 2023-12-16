@@ -46,6 +46,7 @@ const (
 	scoreWithNormalizePlugin1         = "score-with-normalize-plugin-1"
 	scoreWithNormalizePlugin2         = "score-with-normalize-plugin-2"
 	scorePlugin1                      = "score-plugin-1"
+	scorePlugin2                      = "score-plugin-2"
 	pluginNotImplementingScore        = "plugin-not-implementing-score"
 	preFilterPluginName               = "prefilter-plugin"
 	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
@@ -100,6 +101,14 @@ func newScorePlugin1(_ context.Context, injArgs runtime.Object, f framework.Hand
 	return &TestScorePlugin{scorePlugin1, inj}, nil
 }
 
+func newScorePlugin2(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	var inj injectedResult
+	if err := DecodeInto(injArgs, &inj); err != nil {
+		return nil, err
+	}
+	return &TestScorePlugin{scorePlugin2, inj}, nil
+}
+
 func newPluginNotImplementingScore(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &PluginNotImplementingScore{}, nil
 }
@@ -135,7 +144,7 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *TestScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
@@ -203,7 +212,7 @@ func (pl *TestPlugin) PostFilter(_ context.Context, _ *framework.CycleState, _ *
 	return nil, framework.NewStatus(framework.Code(pl.inj.PostFilterStatus), injectReason)
 }
 
-func (pl *TestPlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *TestPlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
@@ -358,11 +367,13 @@ func (t TestBindPlugin) Bind(ctx context.Context, state *framework.CycleState, p
 	return nil
 }
 
+// nolint:errcheck   // Ignore the error returned by Register as before
 var registry = func() Registry {
 	r := make(Registry)
 	r.Register(scoreWithNormalizePlugin1, newScoreWithNormalizePlugin1)
 	r.Register(scoreWithNormalizePlugin2, newScoreWithNormalizePlugin2)
 	r.Register(scorePlugin1, newScorePlugin1)
+	r.Register(scorePlugin2, newScorePlugin2)
 	r.Register(pluginNotImplementingScore, newPluginNotImplementingScore)
 	r.Register(duplicatePluginName, newDuplicatePlugin)
 	r.Register(testPlugin, newTestPlugin)
@@ -825,6 +836,44 @@ func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 				},
 			},
 			wantErr: "already registered",
+		},
+		{
+			name: "Override MultiPoint plugins weights and avoid a plugin being loaded multiple times",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+						{Name: scorePlugin1},
+					},
+				},
+				Score: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: scorePlugin1, Weight: 5},
+						{Name: scorePlugin2, Weight: 5},
+						{Name: testPlugin, Weight: 3},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreScore: config.PluginSet{Enabled: []config.Plugin{
+					{Name: testPlugin},
+					{Name: scorePlugin1},
+				}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1, Weight: 5},
+					{Name: testPlugin, Weight: 3},
+					{Name: scorePlugin2, Weight: 5},
+				}},
+				Reserve:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+			},
 		},
 	}
 
@@ -1419,7 +1468,7 @@ func TestRunScorePlugins(t *testing.T) {
 
 			state := framework.NewCycleState()
 			state.SkipScorePlugins = tt.skippedPlugins
-			res, status := f.RunScorePlugins(ctx, state, pod, nodes)
+			res, status := f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
 
 			if tt.err {
 				if status.IsSuccess() {
@@ -2732,8 +2781,10 @@ func TestRecordingMetrics(t *testing.T) {
 			wantStatus:         framework.Success,
 		},
 		{
-			name:               "Score - Success",
-			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
+			name: "Score - Success",
+			action: func(f framework.Framework) {
+				f.RunScorePlugins(context.Background(), state, pod, BuildNodeInfos(nodes))
+			},
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Success,
 		},
@@ -2789,8 +2840,10 @@ func TestRecordingMetrics(t *testing.T) {
 			wantStatus:         framework.Error,
 		},
 		{
-			name:               "Score - Error",
-			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
+			name: "Score - Error",
+			action: func(f framework.Framework) {
+				f.RunScorePlugins(context.Background(), state, pod, BuildNodeInfos(nodes))
+			},
 			inject:             injectedResult{ScoreStatus: int(framework.Error)},
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Error,
@@ -3268,4 +3321,14 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 		t.Fatal(err)
 	}
 	return podInfo
+}
+
+// BuildNodeInfos build NodeInfo slice from a v1.Node slice
+func BuildNodeInfos(nodes []*v1.Node) []*framework.NodeInfo {
+	res := make([]*framework.NodeInfo, len(nodes))
+	for i := 0; i < len(nodes); i++ {
+		res[i] = framework.NewNodeInfo()
+		res[i].SetNode(nodes[i])
+	}
+	return res
 }

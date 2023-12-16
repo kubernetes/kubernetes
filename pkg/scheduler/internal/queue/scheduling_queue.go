@@ -294,7 +294,7 @@ type QueueingHintMapPerProfile map[string]QueueingHintMap
 // QueueingHintMap is keyed with ClusterEvent, valued with queueing hint functions registered for the event.
 type QueueingHintMap map[framework.ClusterEvent][]*QueueingHintFunction
 
-// WithQueueingHintMapPerProfile sets preEnqueuePluginMap for PriorityQueue.
+// WithQueueingHintMapPerProfile sets queueingHintMap for PriorityQueue.
 func WithQueueingHintMapPerProfile(m QueueingHintMapPerProfile) Option {
 	return func(o *priorityQueueOptions) {
 		o.queueingHintMap = m
@@ -515,7 +515,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 		if s.Code() == framework.Error {
 			logger.Error(s.AsError(), "Unexpected error running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name())
 		} else {
-			logger.Info("Status after running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s)
+			logger.V(4).Info("Status after running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s)
 		}
 		return false
 	}

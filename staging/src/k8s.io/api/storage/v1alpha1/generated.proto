@@ -119,8 +119,6 @@ message CSIStorageCapacityList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CSIStorageCapacity objects.
-  // +listType=map
-  // +listMapKey=name
   repeated CSIStorageCapacity items = 2;
 }
 

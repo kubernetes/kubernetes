@@ -266,7 +266,7 @@ func (pl *FakePreScoreAndScorePlugin) ScoreExtensions() framework.ScoreExtension
 	return nil
 }
 
-func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	return pl.preScoreStatus
 }
 

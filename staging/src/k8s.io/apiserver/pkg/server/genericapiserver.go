@@ -60,7 +60,6 @@ import (
 	"k8s.io/kube-openapi/pkg/handler3"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"k8s.io/utils/clock"
 )
 
 // Info about an API group.
@@ -191,19 +190,11 @@ type GenericAPIServer struct {
 	preShutdownHooksCalled bool
 
 	// healthz checks
-	healthzLock            sync.Mutex
-	healthzChecks          []healthz.HealthChecker
-	healthzChecksInstalled bool
-	// livez checks
-	livezLock            sync.Mutex
-	livezChecks          []healthz.HealthChecker
-	livezChecksInstalled bool
-	// readyz checks
-	readyzLock            sync.Mutex
-	readyzChecks          []healthz.HealthChecker
-	readyzChecksInstalled bool
-	livezGracePeriod      time.Duration
-	livezClock            clock.Clock
+	healthzRegistry healthCheckRegistry
+	readyzRegistry  healthCheckRegistry
+	livezRegistry   healthCheckRegistry
+
+	livezGracePeriod time.Duration
 
 	// auditing. The backend is started before the server starts listening.
 	AuditBackend audit.Backend
@@ -330,7 +321,7 @@ func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return s.preShutdownHooks
 }
 func (s *GenericAPIServer) HealthzChecks() []healthz.HealthChecker {
-	return s.healthzChecks
+	return s.healthzRegistry.checks
 }
 func (s *GenericAPIServer) ListedPaths() []string {
 	return s.listedPathProvider.ListedPaths()

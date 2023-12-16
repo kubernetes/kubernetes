@@ -1,4 +1,4 @@
-//  Copyright (c) 2021 Uber Technologies, Inc.
+// Copyright (c) 2022 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,19 +18,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package atomic
+// Package internal and its subpackages hold types and functionality
+// that are not part of Zap's public API.
+package internal
 
-import "time"
+import "go.uber.org/zap/zapcore"
 
-//go:generate bin/gen-atomicwrapper -name=Time -type=time.Time -wrapped=Value -pack=packTime -unpack=unpackTime -imports time -file=time.go
+// LeveledEnabler is an interface satisfied by LevelEnablers that are able to
+// report their own level.
+//
+// This interface is defined to use more conveniently in tests and non-zapcore
+// packages.
+// This cannot be imported from zapcore because of the cyclic dependency.
+type LeveledEnabler interface {
+	zapcore.LevelEnabler
 
-func packTime(t time.Time) interface{} {
-	return t
-}
-
-func unpackTime(v interface{}) time.Time {
-	if t, ok := v.(time.Time); ok {
-		return t
-	}
-	return time.Time{}
+	Level() zapcore.Level
 }

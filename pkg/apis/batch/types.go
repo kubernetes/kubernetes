@@ -405,7 +405,8 @@ type JobSpec struct {
 	//
 	// When using podFailurePolicy, Failed is the the only allowed value.
 	// TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.
-	// This is an alpha field. Enable JobPodReplacementPolicy to be able to use this field.
+	// This is an beta field. To use this, enable the JobPodReplacementPolicy feature toggle.
+	// This is on by default.
 	// +optional
 	PodReplacementPolicy *PodReplacementPolicy
 }
@@ -443,8 +444,8 @@ type JobStatus struct {
 	// The number of pods which are terminating (in phase Pending or Running
 	// and have a deletionTimestamp).
 	//
-	// This field is alpha-level. The job controller populates the field when
-	// the feature gate JobPodReplacementPolicy is enabled (disabled by default).
+	// This field is beta-level. The job controller populates the field when
+	// the feature gate JobPodReplacementPolicy is enabled (enabled by default).
 	// +optional
 	Terminating *int32
 

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 
 	"fmt"
 
@@ -848,13 +849,13 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-			VolumeMode: nil,
+			VolumeMode: ptr.To(v1.PersistentVolumeFilesystem),
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
-			VolumeMode: nil,
+			VolumeMode: ptr.To(v1.PersistentVolumeFilesystem),
 		},
 		Status: v1.PersistentVolumeClaimStatus{
 			Phase: v1.ClaimBound,
@@ -1285,6 +1286,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 					Name: "dswp-test-volume-name",
 				},
 				Spec: v1.PersistentVolumeSpec{
+					VolumeMode:             ptr.To(v1.PersistentVolumeFilesystem),
 					PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{}},
 					Capacity:               volumeCapacity(1),
 					ClaimRef:               &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
@@ -1293,6 +1295,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 			}
 			pvc := &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
+					VolumeMode: ptr.To(v1.PersistentVolumeFilesystem),
 					VolumeName: pv.Name,
 					Resources: v1.VolumeResourceRequirements{
 						Requests: pv.Spec.Capacity,

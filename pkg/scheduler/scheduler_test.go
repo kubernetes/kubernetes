@@ -26,10 +26,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -320,76 +318,6 @@ func TestFailureHandler(t *testing.T) {
 
 			if diff := cmp.Diff(tt.expect, got); diff != "" {
 				t.Errorf("Unexpected pod (-want, +got): %s", diff)
-			}
-		})
-	}
-}
-
-func TestFailureHandler_NodeNotFound(t *testing.T) {
-	nodeFoo := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	nodeBar := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
-	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
-	tests := []struct {
-		name             string
-		nodes            []v1.Node
-		nodeNameToDelete string
-		injectErr        error
-		expectNodeNames  sets.Set[string]
-	}{
-		{
-			name:             "node is deleted during a scheduling cycle",
-			nodes:            []v1.Node{*nodeFoo, *nodeBar},
-			nodeNameToDelete: "foo",
-			injectErr:        apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames:  sets.New("bar"),
-		},
-		{
-			name:            "node is not deleted but NodeNotFound is received incorrectly",
-			nodes:           []v1.Node{*nodeFoo, *nodeBar},
-			injectErr:       apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames: sets.New("foo", "bar"),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: tt.nodes})
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			podInformer := informerFactory.Core().V1().Pods()
-			// Need to add testPod to the store.
-			podInformer.Informer().GetStore().Add(testPod)
-
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(ctx, 30*time.Second)
-
-			for i := range tt.nodes {
-				node := tt.nodes[i]
-				// Add node to schedulerCache no matter it's deleted in API server or not.
-				schedulerCache.AddNode(logger, &node)
-				if node.Name == tt.nodeNameToDelete {
-					client.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
-				}
-			}
-
-			s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(tt.injectErr), nil, time.Now())
-
-			gotNodes := schedulerCache.Dump().Nodes
-			gotNodeNames := sets.New[string]()
-			for _, nodeInfo := range gotNodes {
-				gotNodeNames.Insert(nodeInfo.Node().Name)
-			}
-			if diff := cmp.Diff(tt.expectNodeNames, gotNodeNames); diff != "" {
-				t.Errorf("Unexpected nodes (-want, +got): %s", diff)
 			}
 		})
 	}

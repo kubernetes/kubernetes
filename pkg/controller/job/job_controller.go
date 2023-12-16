@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/integer"
 	"k8s.io/utils/ptr"
 )
 
@@ -1557,7 +1556,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
-		for batchSize := int32(integer.IntMin(int(diff), controller.SlowStartInitialBatchSize)); diff > 0; batchSize = integer.Int32Min(2*batchSize, diff) {
+		for batchSize := min(diff, int32(controller.SlowStartInitialBatchSize)); diff > 0; batchSize = min(2*batchSize, diff) {
 			errorCount := len(errCh)
 			wait.Add(int(batchSize))
 			for i := int32(0); i < batchSize; i++ {

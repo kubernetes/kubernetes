@@ -77,8 +77,8 @@ var (
 
 var registerMetrics sync.Once
 
-// registerCidrsetMetrics the metrics that are to be monitored.
-func registerCidrsetMetrics() {
+// registerCIDRSetMetrics the metrics that are to be monitored.
+func registerCIDRSetMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(cidrSetAllocations)
 		legacyregistry.MustRegister(cidrSetReleases)

@@ -421,7 +421,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		natChains.Write("*nat")
 		// Start with chains we know we need to remove.
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
-			if _, found := existingNATChains[chain]; found {
+			if existingNATChains.Has(chain) {
 				chainString := string(chain)
 				natChains.Write(utiliptables.MakeChainLine(chain)) // flush
 				natRules.Write("-X", chainString)                  // delete
@@ -457,7 +457,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		filterRules := proxyutil.NewLineBuffer()
 		filterChains.Write("*filter")
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
-			if _, found := existingFilterChains[chain]; found {
+			if existingFilterChains.Has(chain) {
 				chainString := string(chain)
 				filterChains.Write(utiliptables.MakeChainLine(chain))
 				filterRules.Write("-X", chainString)
@@ -926,7 +926,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Accumulate NAT chains to keep.
-	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
+	activeNATChains := sets.New[utiliptables.Chain]()
 
 	// To avoid growing this slice, we arbitrarily set its size to 64,
 	// there is never more than that many arguments for a single line.
@@ -964,26 +964,13 @@ func (proxier *Proxier) syncProxyRules() {
 		allEndpoints := proxier.endpointsMap[svcName]
 		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
 
-		// Note the endpoint chains that will be used
-		for _, ep := range allLocallyReachableEndpoints {
-			if epInfo, ok := ep.(*endpointInfo); ok {
-				activeNATChains[epInfo.ChainName] = true
-			}
-		}
-
 		// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
 		clusterPolicyChain := svcInfo.clusterPolicyChainName
 		usesClusterPolicyChain := len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints()
-		if usesClusterPolicyChain {
-			activeNATChains[clusterPolicyChain] = true
-		}
 
 		// localPolicyChain contains the endpoints used with "Local" traffic policy
 		localPolicyChain := svcInfo.localPolicyChainName
 		usesLocalPolicyChain := len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints()
-		if usesLocalPolicyChain {
-			activeNATChains[localPolicyChain] = true
-		}
 
 		// internalPolicyChain is the chain containing the endpoints for
 		// "internal" (ClusterIP) traffic. internalTrafficChain is the chain that
@@ -1023,9 +1010,6 @@ func (proxier *Proxier) syncProxyRules() {
 		// because we need the local-traffic-short-circuiting rules even when there
 		// are no externally-usable endpoints.
 		usesExternalTrafficChain := hasEndpoints && svcInfo.ExternallyAccessible()
-		if usesExternalTrafficChain {
-			activeNATChains[externalTrafficChain] = true
-		}
 
 		// Traffic to LoadBalancer IPs can go directly to externalTrafficChain
 		// unless LoadBalancerSourceRanges is in use in which case we will
@@ -1034,7 +1018,6 @@ func (proxier *Proxier) syncProxyRules() {
 		fwChain := svcInfo.firewallChainName
 		usesFWChain := hasEndpoints && len(svcInfo.LoadBalancerVIPStrings()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
 		if usesFWChain {
-			activeNATChains[fwChain] = true
 			loadBalancerTrafficChain = fwChain
 		}
 
@@ -1203,10 +1186,9 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// If the SVC/SVL/EXT/FW/SEP chains have not changed since the last sync
-		// then we can omit them from the restore input. (We have already marked
-		// them in activeNATChains, so they won't get deleted.) However, we have
-		// to still figure out how many chains we _would_ have written to make the
-		// metrics come out right, so we just compute them and throw them away.
+		// then we can omit them from the restore input. However, we have to still
+		// figure out how many chains we _would_ have written, to make the metrics
+		// come out right, so we just compute them and throw them away.
 		if tryPartialSync && !serviceChanged.Has(svcName.NamespacedName.String()) && !endpointsChanged.Has(svcName.NamespacedName.String()) {
 			natChains = skippedNatChains
 			natRules = skippedNatRules
@@ -1245,6 +1227,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// then jump to externalPolicyChain.
 		if usesExternalTrafficChain {
 			natChains.Write(utiliptables.MakeChainLine(externalTrafficChain))
+			activeNATChains.Insert(externalTrafficChain)
 
 			if !svcInfo.ExternalPolicyLocal() {
 				// If we are using non-local endpoints we need to masquerade,
@@ -1299,6 +1282,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Set up firewall chain, if needed
 		if usesFWChain {
 			natChains.Write(utiliptables.MakeChainLine(fwChain))
+			activeNATChains.Insert(fwChain)
 
 			// The service firewall rules are created based on the
 			// loadBalancerSourceRanges field. This only works for VIP-like
@@ -1347,6 +1331,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// from clusterPolicyChain to the clusterEndpoints
 		if usesClusterPolicyChain {
 			natChains.Write(utiliptables.MakeChainLine(clusterPolicyChain))
+			activeNATChains.Insert(clusterPolicyChain)
 			proxier.writeServiceToEndpointRules(natRules, svcPortNameString, svcInfo, clusterPolicyChain, clusterEndpoints, args)
 		}
 
@@ -1354,6 +1339,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// from localPolicyChain to the localEndpoints
 		if usesLocalPolicyChain {
 			natChains.Write(utiliptables.MakeChainLine(localPolicyChain))
+			activeNATChains.Insert(localPolicyChain)
 			proxier.writeServiceToEndpointRules(natRules, svcPortNameString, svcInfo, localPolicyChain, localEndpoints, args)
 		}
 
@@ -1369,7 +1355,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// Create the endpoint chain
 			natChains.Write(utiliptables.MakeChainLine(endpointChain))
-			activeNATChains[endpointChain] = true
+			activeNATChains.Insert(endpointChain)
 
 			args = append(args[:0], "-A", string(endpointChain))
 			args = proxier.appendServiceCommentLocked(args, svcPortNameString)
@@ -1394,26 +1380,21 @@ func (proxier *Proxier) syncProxyRules() {
 	// active rules, so they're harmless other than taking up memory.)
 	deletedChains := 0
 	if !proxier.largeClusterMode || time.Since(proxier.lastIPTablesCleanup) > proxier.syncPeriod {
-		var existingNATChains map[utiliptables.Chain]struct{}
-
 		proxier.iptablesData.Reset()
 		if err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData); err == nil {
-			existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
-
-			for chain := range existingNATChains {
-				if !activeNATChains[chain] {
-					chainString := string(chain)
-					if !isServiceChainName(chainString) {
-						// Ignore chains that aren't ours.
-						continue
-					}
-					// We must (as per iptables) write a chain-line
-					// for it, which has the nice effect of flushing
-					// the chain. Then we can remove the chain.
-					proxier.natChains.Write(utiliptables.MakeChainLine(chain))
-					proxier.natRules.Write("-X", chainString)
-					deletedChains++
+			existingNATChains := utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
+			for chain := range existingNATChains.Difference(activeNATChains) {
+				chainString := string(chain)
+				if !isServiceChainName(chainString) {
+					// Ignore chains that aren't ours.
+					continue
 				}
+				// We must (as per iptables) write a chain-line
+				// for it, which has the nice effect of flushing
+				// the chain. Then we can remove the chain.
+				proxier.natChains.Write(utiliptables.MakeChainLine(chain))
+				proxier.natRules.Write("-X", chainString)
+				deletedChains++
 			}
 			proxier.lastIPTablesCleanup = time.Now()
 		} else {

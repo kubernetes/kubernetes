@@ -159,6 +159,9 @@ linters-settings: # please keep this alphabetized
       path: ../_output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
+      settings:
+        config: |
+          {{include "hack/logcheck.conf" | indent 10 | trim}}
   forbidigo:
     analyze-types: true
     forbid:

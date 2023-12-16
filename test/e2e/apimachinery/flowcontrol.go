@@ -255,18 +255,19 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	})
 
 	/*
-			   Release: v1.29
-			   Testname: FlowSchema API
-		           Description:
-			   The flowcontrol.apiserver.k8s.io API group MUST exist in the /apis discovery document.
-			   The flowcontrol.apiserver.k8s.io/v1 API group/version MUST exist
-			    in the /apis/flowcontrol.apiserver.k8s.io discovery document.
-			   The flowschemas and flowschemas/status resources MUST exist
-			    in the /apis/flowcontrol.apiserver.k8s.io/v1 discovery document.
-			   The flowschema resource must support create, get, list, watch,
-			    update, patch, delete, and deletecollection.
+	   Release: v1.29
+	   Testname: Priority and Fairness FlowSchema API
+	   Description:
+	   The flowcontrol.apiserver.k8s.io API group MUST exist in the
+	     /apis discovery document.
+	   The flowcontrol.apiserver.k8s.io/v1 API group/version MUST exist
+	     in the /apis/flowcontrol.apiserver.k8s.io discovery document.
+	   The flowschemas and flowschemas/status resources MUST exist
+	     in the /apis/flowcontrol.apiserver.k8s.io/v1 discovery document.
+	   The flowschema resource must support create, get, list, watch,
+	     update, patch, delete, and deletecollection.
 	*/
-	ginkgo.It("should support Priority and Fairness FlowSchema API operations", func(ctx context.Context) {
+	framework.ConformanceIt("should support FlowSchema API operations", func(ctx context.Context) {
 		fsVersion := "v1"
 		ginkgo.By("getting /apis")
 		{
@@ -497,18 +498,20 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	})
 
 	/*
-					Release: v1.29
-					Testname: PriorityLevelConfiguration API
-					Description:
-					The flowcontrol.apiserver.k8s.io API group MUST exist in the /apis discovery document.
-					The flowcontrol.apiserver.k8s.io/v1 API group/version MUST exist
-					  in the /apis/flowcontrol.apiserver.k8s.io discovery document.
-					The prioritylevelconfiguration and prioritylevelconfiguration/status resources
-		                          MUST exist in the /apis/flowcontrol.apiserver.k8s.io/v1 discovery document.
-					The prioritylevelconfiguration resource must support create, get, list, watch,
-				          update, patch, delete, and deletecollection.
+	   Release: v1.29
+	   Testname: Priority and Fairness PriorityLevelConfiguration API
+	   Description:
+	   The flowcontrol.apiserver.k8s.io API group MUST exist in the
+	     /apis discovery document.
+	   The flowcontrol.apiserver.k8s.io/v1 API group/version MUST exist
+	     in the /apis/flowcontrol.apiserver.k8s.io discovery document.
+	   The prioritylevelconfiguration and prioritylevelconfiguration/status
+	     resources MUST exist in the
+	     /apis/flowcontrol.apiserver.k8s.io/v1 discovery document.
+	   The prioritylevelconfiguration resource must support create, get,
+	     list, watch, update, patch, delete, and deletecollection.
 	*/
-	ginkgo.It("should support Priority and Fairness PriorityLevelConfiguration API operations", func(ctx context.Context) {
+	framework.ConformanceIt("should support PriorityLevelConfiguration API operations", func(ctx context.Context) {
 		plVersion := "v1"
 		ginkgo.By("getting /apis")
 		{

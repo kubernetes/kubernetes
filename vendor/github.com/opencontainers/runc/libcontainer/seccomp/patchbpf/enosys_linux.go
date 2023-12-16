@@ -81,7 +81,7 @@ import "C"
 var retErrnoEnosys = uint32(C.C_ACT_ERRNO_ENOSYS)
 
 // This syscall is used for multiplexing "large" syscalls on s390(x). Unknown
-// syscalls will end up with this syscall number, so we need to explcitly
+// syscalls will end up with this syscall number, so we need to explicitly
 // return -ENOSYS for this syscall on those architectures.
 const s390xMultiplexSyscall libseccomp.ScmpSyscall = 0
 

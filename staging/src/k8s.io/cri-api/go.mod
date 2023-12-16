@@ -2,7 +2,7 @@
 
 module k8s.io/cri-api
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/gogo/protobuf v1.3.2

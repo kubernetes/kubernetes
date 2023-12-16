@@ -118,9 +118,6 @@ type realImageGCManager struct {
 	// Reference to this node.
 	nodeRef *v1.ObjectReference
 
-	// Track initialization
-	initialized bool
-
 	// imageCache is the cache of latest image list.
 	imageCache imageCache
 
@@ -196,7 +193,6 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 		statsProvider: statsProvider,
 		recorder:      recorder,
 		nodeRef:       nodeRef,
-		initialized:   false,
 		tracer:        tracer,
 	}
 
@@ -206,16 +202,9 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 func (im *realImageGCManager) Start() {
 	ctx := context.Background()
 	go wait.Until(func() {
-		// Initial detection make detected time "unknown" in the past.
-		var ts time.Time
-		if im.initialized {
-			ts = time.Now()
-		}
-		_, err := im.detectImages(ctx, ts)
+		_, err := im.detectImages(ctx, time.Now())
 		if err != nil {
 			klog.InfoS("Failed to monitor images", "err", err)
-		} else {
-			im.initialized = true
 		}
 	}, 5*time.Minute, wait.NeverStop)
 

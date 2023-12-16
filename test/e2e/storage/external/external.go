@@ -174,7 +174,7 @@ func AddDriverDefinition(filename string) error {
 	args = append(args, func() {
 		storageframework.DefineTestSuites(driver, testsuites.CSISuites)
 	})
-	framework.Describe(args)
+	framework.Describe(args...)
 
 	return nil
 }

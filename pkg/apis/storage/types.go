@@ -284,7 +284,7 @@ type CSIDriverSpec struct {
 	// permission of the volume before being mounted.
 	// Refer to the specific FSGroupPolicy values for additional details.
 	//
-	// This field is immutable.
+	// This field was immutable in Kubernetes < 1.29 and now is mutable.
 	//
 	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
 	// to determine if Kubernetes should modify ownership and permissions of the volume.
@@ -318,7 +318,7 @@ type CSIDriverSpec struct {
 	// deployed on such a cluster and the deployment determines which mode that is, for example
 	// via a command line parameter of the driver.
 	//
-	// This field is immutable.
+	// This field was immutable in Kubernetes < 1.29 and now is mutable.
 	//
 	// +optional
 	PodInfoOnMount *bool

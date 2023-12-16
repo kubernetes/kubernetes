@@ -2,7 +2,7 @@
 
 module k8s.io/apimachinery
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
@@ -23,7 +23,7 @@ require (
 	golang.org/x/time v0.3.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.110.1
-	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00
+	k8s.io/kube-openapi v0.0.0-20231113174909-778a5567bc1e
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1

@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -x
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # This script builds and runs a local kubernetes cluster. You may need to run
@@ -1282,6 +1284,9 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # let's log it where we can grab it later
   echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
 
+  echo "stopping docker"
+  service docker stop
+
   # bump up things
   refresh_docker_containerd_runc
 
@@ -1290,8 +1295,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   containerd --version
   runc --version
 
-  echo "restarting docker"
-  service docker restart
+  echo "starting docker"
+  service docker start
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.

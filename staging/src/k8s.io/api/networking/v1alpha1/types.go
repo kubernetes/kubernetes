@@ -111,6 +111,7 @@ type ServiceCIDRSpec struct {
 	// from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family.
 	// This field is immutable.
 	// +optional
+	// +listType=atomic
 	CIDRs []string `json:"cidrs,omitempty" protobuf:"bytes,1,opt,name=cidrs"`
 }
 

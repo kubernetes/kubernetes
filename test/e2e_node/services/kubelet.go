@@ -250,7 +250,7 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		cmdArgs = append(cmdArgs,
 			systemdRun,
 			// Set the environment variable to enable kubelet config drop-in directory.
-			"-E", "KUBELET_CONFIG_DROPIN_DIR_ALPHA=yes",
+			"--setenv", "KUBELET_CONFIG_DROPIN_DIR_ALPHA=yes",
 			"-p", "Delegate=true",
 			"-p", logLocation+framework.TestContext.ReportDir+"/kubelet.log",
 			"--unit="+unitName,

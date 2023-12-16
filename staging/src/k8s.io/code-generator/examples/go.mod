@@ -2,13 +2,13 @@
 
 module k8s.io/code-generator/examples
 
-go 1.21.3
+go 1.21
 
 require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00
+	k8s.io/kube-openapi v0.0.0-20231113174909-778a5567bc1e
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 )
 
@@ -55,5 +55,3 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
-
-replace k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20231026184525-77259d15f4f0

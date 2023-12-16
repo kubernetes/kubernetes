@@ -256,6 +256,7 @@ func TestControllerSyncJob(t *testing.T) {
 		wasSuspended         bool
 		suspend              bool
 		podReplacementPolicy *batch.PodReplacementPolicy
+		podFailurePolicy     *batch.PodFailurePolicy
 		initialStatus        *jobInitialStatus
 		backoffRecord        *backoffRecord
 		controllerTime       *time.Time
@@ -293,6 +294,7 @@ func TestControllerSyncJob(t *testing.T) {
 		// features
 		podIndexLabelDisabled   bool
 		jobPodReplacementPolicy bool
+		jobPodFailurePolicy     bool
 	}{
 		"job start": {
 			parallelism:       2,
@@ -406,6 +408,22 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:          1,
 			expectedDeletions:       1,
 			expectedPodPatches:      1,
+		},
+		"more terminating pods than parallelism; PodFailurePolicy used": {
+			// Repro for https://github.com/kubernetes/kubernetes/issues/122235
+			parallelism:         1,
+			completions:         1,
+			backoffLimit:        6,
+			activePods:          2,
+			failedPods:          0,
+			terminatingPods:     4,
+			jobPodFailurePolicy: true,
+			podFailurePolicy:    &batch.PodFailurePolicy{},
+			expectedTerminating: nil,
+			expectedReady:       ptr.To[int32](0),
+			expectedActive:      1,
+			expectedDeletions:   1,
+			expectedPodPatches:  1,
 		},
 		"too few active pods and active back-off": {
 			parallelism:  1,
@@ -935,6 +953,7 @@ func TestControllerSyncJob(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobPodFailurePolicy)()
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -956,6 +975,9 @@ func TestControllerSyncJob(t *testing.T) {
 			job.Spec.Suspend = ptr.To(tc.suspend)
 			if tc.jobPodReplacementPolicy {
 				job.Spec.PodReplacementPolicy = tc.podReplacementPolicy
+			}
+			if tc.jobPodFailurePolicy {
+				job.Spec.PodFailurePolicy = tc.podFailurePolicy
 			}
 			if tc.initialStatus != nil {
 				startTime := metav1.Now()
@@ -5261,13 +5283,12 @@ func TestFinalizerCleanup(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	// Initialize the controller with 0 workers to make sure the
-	// pod finalizers are not removed by the "syncJob" function.
-	go manager.Run(ctx, 0)
-
 	// Start the Pod and Job informers.
 	sharedInformers.Start(ctx.Done())
 	sharedInformers.WaitForCacheSync(ctx.Done())
+	// Initialize the controller with 0 workers to make sure the
+	// pod finalizers are not removed by the "syncJob" function.
+	go manager.Run(ctx, 0)
 
 	// Create a simple Job
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
@@ -5276,12 +5297,30 @@ func TestFinalizerCleanup(t *testing.T) {
 		t.Fatalf("Creating job: %v", err)
 	}
 
+	// Await for the Job to appear in the jobLister to ensure so that Job Pod gets tracked correctly.
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		job, _ := manager.jobLister.Jobs(job.GetNamespace()).Get(job.Name)
+		return job != nil, nil
+	}); err != nil {
+		t.Fatalf("Waiting for Job object to appear in jobLister: %v", err)
+	}
+
 	// Create a Pod with the job tracking finalizer
 	pod := newPod("test-pod", job)
 	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
 	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating pod: %v", err)
+	}
+
+	// Await for the Pod to appear in the podStore to ensure that the pod exists when cleaning up the Job.
+	// In a production environment, there wouldn't be these guarantees, but the Pod would be cleaned up
+	// by the orphan pod worker, when the Pod finishes.
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		pod, _ := manager.podStore.Pods(pod.GetNamespace()).Get(pod.Name)
+		return pod != nil, nil
+	}); err != nil {
+		t.Fatalf("Waiting for Pod to appear in podLister: %v", err)
 	}
 
 	// Mark Job as complete.

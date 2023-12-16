@@ -79,10 +79,10 @@ type kubeConfigSpec struct {
 // When not using external CA mode, if a kubeconfig file already exists it is used only if evaluated equal,
 // otherwise an error is returned. For external CA mode, the creation of kubeconfig files is skipped.
 func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	var externaCA bool
+	var externalCA bool
 	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
 	if _, err := os.Stat(caKeyPath); os.IsNotExist(err) {
-		externaCA = true
+		externalCA = true
 	}
 
 	files := []string{
@@ -92,7 +92,7 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 	}
 
 	for _, file := range files {
-		if externaCA {
+		if externalCA {
 			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", file)
 			continue
 		}

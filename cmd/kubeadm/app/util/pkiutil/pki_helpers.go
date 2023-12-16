@@ -334,21 +334,6 @@ func TryLoadKeyFromDisk(pkiPath, name string) (crypto.Signer, error) {
 	return key, nil
 }
 
-// TryLoadCSRAndKeyFromDisk tries to load the CSR and key from the disk
-func TryLoadCSRAndKeyFromDisk(pkiPath, name string) (*x509.CertificateRequest, crypto.Signer, error) {
-	csr, err := TryLoadCSRFromDisk(pkiPath, name)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load CSR file")
-	}
-
-	key, err := TryLoadKeyFromDisk(pkiPath, name)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load key file")
-	}
-
-	return csr, key, nil
-}
-
 // TryLoadPrivatePublicKeyFromDisk tries to load the key from the disk and validates that it is valid
 func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, crypto.PublicKey, error) {
 	privateKeyPath := pathForKey(pkiPath, name)

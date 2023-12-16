@@ -1186,21 +1186,36 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		})
 		framework.ExpectNoError(err, "failed to locate ResourceQuota %q in namespace %q", patchedResourceQuota.Name, ns)
 
-		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		// the resource_quota_controller ignores changes to the status so we have to wait for a full resync of the controller
+		// to reconcile the status again, this full resync is set every 5 minutes by default so we need to poll at least one
+		// minute more just in case we we start to poll just after the full resync has happened and he have to wait until
+		// next full resync.
+		// Ref: https://issues.k8s.io/121911
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 6*time.Minute, true, func(ctx context.Context) (bool, error) {
 			resourceQuotaResult, err := rqClient.Get(ctx, rqName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-
-			if apiequality.Semantic.DeepEqual(resourceQuotaResult.Spec.Hard.Cpu(), resourceQuotaResult.Status.Hard.Cpu()) {
-				gomega.Expect(*resourceQuotaResult.Status.Hard.Cpu()).To(gomega.Equal(resource.MustParse("1")), "Hard cpu value for ResourceQuota %q is %s not 1.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Cpu().String())
-				gomega.Expect(*resourceQuotaResult.Status.Hard.Memory()).To(gomega.Equal(resource.MustParse("1Gi")), "Hard memory value for ResourceQuota %q is %s not 1Gi.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Memory().String())
-				framework.Logf("ResourceQuota %q Spec was unchanged and /status reset", resourceQuotaResult.Name)
-
-				return true, nil
+			if err != nil {
+				return false, nil
 			}
 
+			if *resourceQuotaResult.Spec.Hard.Cpu() == *resourceQuotaResult.Status.Hard.Cpu() {
+				if *resourceQuotaResult.Status.Hard.Cpu() != resource.MustParse("1") {
+					framework.Logf("Hard cpu status value for ResourceQuota %q is %s not 1.", repatchedResourceQuota.Name, resourceQuotaResult.Status.Hard.Cpu().String())
+					return false, nil
+				}
+				if *resourceQuotaResult.Status.Hard.Memory() != resource.MustParse("1Gi") {
+					framework.Logf("Hard memory status value for ResourceQuota %q is %s not 1Gi.", repatchedResourceQuota.Name, resourceQuotaResult.Status.Hard.Memory().String())
+					return false, nil
+				}
+				framework.Logf("ResourceQuota %q Spec was unchanged and /status reset", resourceQuotaResult.Name)
+				return true, nil
+			}
+			framework.Logf("ResourceQuota %q Spec and Status does not match: %#v", resourceQuotaResult.Name, resourceQuotaResult)
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		if err != nil {
+			framework.Failf("Error waiting for ResourceQuota %q to reset its Status: %v", patchedResourceQuota.Name, err)
+		}
+
 	})
 })
 

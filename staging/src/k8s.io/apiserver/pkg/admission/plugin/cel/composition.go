@@ -178,7 +178,7 @@ func (a *variableAccessor) Callback(_ *lazy.MapValue) ref.Val {
 		return types.NewErr("composited variable %q fails to compile: %v", a.name, a.result.Error)
 	}
 
-	v, details, err := a.result.Program.Eval(a.activation)
+	v, details, err := a.result.Program.ContextEval(a.context, a.activation)
 	if details == nil {
 		return types.NewErr("unable to get evaluation details of variable %q", a.name)
 	}

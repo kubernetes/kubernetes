@@ -28,27 +28,41 @@ var (
 		StabilityLevel: k8smetrics.ALPHA,
 		Help:           "Gauge of if the reporting system is master of the relevant lease, 0 indicates backup, 1 indicates master. 'name' is the string used to identify the lease. Please make sure to group by name.",
 	}, []string{"name"})
+	// A cumulative counter should be sufficient to get a rough ratio of slow path
+	// exercised given the leader election frequency is specified explicitly. So that
+	// to avoid the overhead to report a counter exercising fastpath.
+	leaderSlowpathCounter = k8smetrics.NewCounterVec(&k8smetrics.CounterOpts{
+		Name:           "leader_election_slowpath_total",
+		StabilityLevel: k8smetrics.ALPHA,
+		Help:           "Total number of slow path exercised in renewing leader leases. 'name' is the string used to identify the lease. Please make sure to group by name.",
+	}, []string{"name"})
 )
 
 func init() {
 	legacyregistry.MustRegister(leaderGauge)
+	legacyregistry.MustRegister(leaderSlowpathCounter)
 	leaderelection.SetProvider(prometheusMetricsProvider{})
 }
 
 type prometheusMetricsProvider struct{}
 
-func (prometheusMetricsProvider) NewLeaderMetric() leaderelection.SwitchMetric {
-	return &switchAdapter{gauge: leaderGauge}
+func (prometheusMetricsProvider) NewLeaderMetric() leaderelection.LeaderMetric {
+	return &leaderAdapter{gauge: leaderGauge, counter: leaderSlowpathCounter}
 }
 
-type switchAdapter struct {
-	gauge *k8smetrics.GaugeVec
+type leaderAdapter struct {
+	gauge   *k8smetrics.GaugeVec
+	counter *k8smetrics.CounterVec
 }
 
-func (s *switchAdapter) On(name string) {
+func (s *leaderAdapter) On(name string) {
 	s.gauge.WithLabelValues(name).Set(1.0)
 }
 
-func (s *switchAdapter) Off(name string) {
+func (s *leaderAdapter) Off(name string) {
 	s.gauge.WithLabelValues(name).Set(0.0)
+}
+
+func (s *leaderAdapter) SlowpathExercised(name string) {
+	s.counter.WithLabelValues(name).Inc()
 }

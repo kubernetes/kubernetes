@@ -76,6 +76,7 @@ type HorizontalPodAutoscalerSpec struct {
 	// more information about how each type of metric must respond.
 	// If not set, the default metric will be set to 80% average CPU utilization.
 	// +optional
+	// +listType=atomic
 	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
 
 	// behavior configures the scaling behavior of the target
@@ -199,6 +200,7 @@ type HPAScalingRules struct {
 	// policies is a list of potential scaling polices which can be used during scaling.
 	// At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
 	// +optional
+	// +listType=atomic
 	Policies []HPAScalingPolicy `json:"policies,omitempty" protobuf:"bytes,2,rep,name=policies"`
 }
 
@@ -393,11 +395,13 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// currentMetrics is the last read state of the metrics used by this autoscaler.
 	// +optional
+	// +listType=atomic
 	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
 
 	// conditions is the set of conditions required for this autoscaler to scale its target,
 	// and indicates whether or not those conditions are met.
 	// +optional
+	// +listType=atomic
 	Conditions []HorizontalPodAutoscalerCondition `json:"conditions" protobuf:"bytes,6,rep,name=conditions"`
 }
 

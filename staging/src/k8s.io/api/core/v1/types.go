@@ -331,6 +331,7 @@ type PersistentVolumeSpec struct {
 	// accessModes contains all ways the volume can be mounted.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
 	// +optional
+	// +listType=atomic
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,3,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// Expected to be non-nil when bound.
@@ -354,6 +355,7 @@ type PersistentVolumeSpec struct {
 	// simply fail if one is invalid.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
 	// +optional
+	// +listType=atomic
 	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,7,opt,name=mountOptions"`
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
@@ -486,6 +488,7 @@ type PersistentVolumeClaimSpec struct {
 	// accessModes contains the desired access modes the volume should have.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
 	// +optional
+	// +listType=atomic
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// selector is a label query over volumes to consider for binding.
 	// +optional
@@ -660,7 +663,7 @@ type PersistentVolumeClaimCondition struct {
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// reason is a unique, this should be a short, machine understandable string that gives the reason
-	// for condition's last transition. If it reports "ResizeStarted" that means the underlying
+	// for condition's last transition. If it reports "Resizing" that means the underlying
 	// persistent volume is being resized.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
@@ -677,15 +680,18 @@ type PersistentVolumeClaimStatus struct {
 	// accessModes contains the actual access modes the volume backing the PVC has.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
 	// +optional
+	// +listType=atomic
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,2,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// capacity represents the actual resources of the underlying volume.
 	// +optional
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 	// conditions is the current Condition of persistent volume claim. If underlying persistent volume is being
-	// resized then the Condition will be set to 'ResizeStarted'.
+	// resized then the Condition will be set to 'Resizing'.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
 	// allocatedResources tracks the resources allocated to a PVC including its capacity.
 	// Key names follow standard Kubernetes label syntax. Valid values are either:
@@ -921,6 +927,7 @@ type GlusterfsPersistentVolumeSource struct {
 type RBDVolumeSource struct {
 	// monitors is a collection of Ceph monitors.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	// +listType=atomic
 	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// image is the rados image name.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
@@ -965,6 +972,7 @@ type RBDVolumeSource struct {
 type RBDPersistentVolumeSource struct {
 	// monitors is a collection of Ceph monitors.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	// +listType=atomic
 	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// image is the rados image name.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
@@ -1059,6 +1067,7 @@ type CinderPersistentVolumeSource struct {
 type CephFSVolumeSource struct {
 	// monitors is Required: Monitors is a collection of Ceph monitors
 	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+	// +listType=atomic
 	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
 	// +optional
@@ -1099,6 +1108,7 @@ type SecretReference struct {
 type CephFSPersistentVolumeSource struct {
 	// monitors is Required: Monitors is a collection of Ceph monitors
 	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+	// +listType=atomic
 	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
 	// +optional
@@ -1341,6 +1351,7 @@ type SecretVolumeSource struct {
 	// the volume setup will error unless it is marked optional. Paths must be
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
+	// +listType=atomic
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// defaultMode is Optional: mode bits used to set permissions on created files by default.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
@@ -1376,6 +1387,7 @@ type SecretProjection struct {
 	// the volume setup will error unless it is marked optional. Paths must be
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
+	// +listType=atomic
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// optional field specify whether the Secret or its key must be defined
 	// +optional
@@ -1429,6 +1441,7 @@ type ISCSIVolumeSource struct {
 	// portals is the iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
 	// +optional
+	// +listType=atomic
 	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 	// chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
 	// +optional
@@ -1475,6 +1488,7 @@ type ISCSIPersistentVolumeSource struct {
 	// portals is the iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
 	// +optional
+	// +listType=atomic
 	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 	// chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
 	// +optional
@@ -1498,6 +1512,7 @@ type ISCSIPersistentVolumeSource struct {
 type FCVolumeSource struct {
 	// targetWWNs is Optional: FC target worldwide names (WWNs)
 	// +optional
+	// +listType=atomic
 	TargetWWNs []string `json:"targetWWNs,omitempty" protobuf:"bytes,1,rep,name=targetWWNs"`
 	// lun is Optional: FC target lun number
 	// +optional
@@ -1515,6 +1530,7 @@ type FCVolumeSource struct {
 	// wwids Optional: FC volume world wide identifiers (wwids)
 	// Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
 	// +optional
+	// +listType=atomic
 	WWIDs []string `json:"wwids,omitempty" protobuf:"bytes,5,rep,name=wwids"`
 }
 
@@ -1771,6 +1787,7 @@ type ConfigMapVolumeSource struct {
 	// the volume setup will error unless it is marked optional. Paths must be
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
+	// +listType=atomic
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// defaultMode is optional: mode bits used to set permissions on created files by default.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
@@ -1807,6 +1824,7 @@ type ConfigMapProjection struct {
 	// the volume setup will error unless it is marked optional. Paths must be
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
+	// +listType=atomic
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// optional specify whether the ConfigMap or its keys must be defined
 	// +optional
@@ -1875,6 +1893,7 @@ type ClusterTrustBundleProjection struct {
 type ProjectedVolumeSource struct {
 	// sources is the list of volume projections
 	// +optional
+	// +listType=atomic
 	Sources []VolumeProjection `json:"sources" protobuf:"bytes,1,rep,name=sources"`
 	// defaultMode are the mode bits used to set permissions on created files by default.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
@@ -2347,6 +2366,7 @@ type HTTPGetAction struct {
 	Scheme URIScheme `json:"scheme,omitempty" protobuf:"bytes,4,opt,name=scheme,casttype=URIScheme"`
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
+	// +listType=atomic
 	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty" protobuf:"bytes,5,rep,name=httpHeaders"`
 }
 
@@ -2393,6 +2413,7 @@ type ExecAction struct {
 	// a shell, you need to explicitly call out to that shell.
 	// Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
 	// +optional
+	// +listType=atomic
 	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
 }
 
@@ -2514,9 +2535,11 @@ type Capability string
 type Capabilities struct {
 	// Added capabilities
 	// +optional
+	// +listType=atomic
 	Add []Capability `json:"add,omitempty" protobuf:"bytes,1,rep,name=add,casttype=Capability"`
 	// Removed capabilities
 	// +optional
+	// +listType=atomic
 	Drop []Capability `json:"drop,omitempty" protobuf:"bytes,2,rep,name=drop,casttype=Capability"`
 }
 
@@ -2602,6 +2625,7 @@ type Container struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
+	// +listType=atomic
 	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
 	// Arguments to the entrypoint.
 	// The container image's CMD is used if this is not provided.
@@ -2612,6 +2636,7 @@ type Container struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
+	// +listType=atomic
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 	// Container's working directory.
 	// If not specified, the container runtime's default will be used, which
@@ -2640,12 +2665,15 @@ type Container struct {
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
 	// +optional
+	// +listType=atomic
 	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// List of environment variables to set in the container.
 	// Cannot be updated.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
@@ -2680,10 +2708,14 @@ type Container struct {
 	// +optional
 	// +patchMergeKey=mountPath
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=mountPath
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=devicePath
 	// +optional
 	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
 	// Periodic probe of container liveness.
@@ -3123,6 +3155,7 @@ const (
 // +structType=atomic
 type NodeSelector struct {
 	// Required. A list of node selector terms. The terms are ORed.
+	// +listType=atomic
 	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms" protobuf:"bytes,1,rep,name=nodeSelectorTerms"`
 }
 
@@ -3133,9 +3166,11 @@ type NodeSelector struct {
 type NodeSelectorTerm struct {
 	// A list of node selector requirements by node's labels.
 	// +optional
+	// +listType=atomic
 	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
 	// A list of node selector requirements by node's fields.
 	// +optional
+	// +listType=atomic
 	MatchFields []NodeSelectorRequirement `json:"matchFields,omitempty" protobuf:"bytes,2,rep,name=matchFields"`
 }
 
@@ -3153,6 +3188,7 @@ type NodeSelectorRequirement struct {
 	// array must have a single element, which will be interpreted as an integer.
 	// This array is replaced during a strategic merge patch.
 	// +optional
+	// +listType=atomic
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
@@ -3181,6 +3217,7 @@ type TopologySelectorTerm struct {
 
 	// A list of topology selector requirements by labels.
 	// +optional
+	// +listType=atomic
 	MatchLabelExpressions []TopologySelectorLabelRequirement `json:"matchLabelExpressions,omitempty" protobuf:"bytes,1,rep,name=matchLabelExpressions"`
 }
 
@@ -3191,6 +3228,7 @@ type TopologySelectorLabelRequirement struct {
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// An array of string values. One value must match the label to be selected.
 	// Each entry in Values is ORed.
+	// +listType=atomic
 	Values []string `json:"values" protobuf:"bytes,2,rep,name=values"`
 }
 
@@ -3228,6 +3266,7 @@ type PodAffinity struct {
 	// When there are multiple elements, the lists of nodes corresponding to each
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
+	// +listType=atomic
 	RequiredDuringSchedulingIgnoredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,1,rep,name=requiredDuringSchedulingIgnoredDuringExecution"`
 	// The scheduler will prefer to schedule pods to nodes that satisfy
 	// the affinity expressions specified by this field, but it may choose
@@ -3239,6 +3278,7 @@ type PodAffinity struct {
 	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
 	// node(s) with the highest sum are the most preferred.
 	// +optional
+	// +listType=atomic
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,2,rep,name=preferredDuringSchedulingIgnoredDuringExecution"`
 }
 
@@ -3263,6 +3303,7 @@ type PodAntiAffinity struct {
 	// When there are multiple elements, the lists of nodes corresponding to each
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
+	// +listType=atomic
 	RequiredDuringSchedulingIgnoredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,1,rep,name=requiredDuringSchedulingIgnoredDuringExecution"`
 	// The scheduler will prefer to schedule pods to nodes that satisfy
 	// the anti-affinity expressions specified by this field, but it may choose
@@ -3274,6 +3315,7 @@ type PodAntiAffinity struct {
 	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
 	// node(s) with the highest sum are the most preferred.
 	// +optional
+	// +listType=atomic
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,2,rep,name=preferredDuringSchedulingIgnoredDuringExecution"`
 }
 
@@ -3302,6 +3344,7 @@ type PodAffinityTerm struct {
 	// and the ones selected by namespaceSelector.
 	// null or empty namespaces list and null namespaceSelector means "this pod's namespace".
 	// +optional
+	// +listType=atomic
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,2,rep,name=namespaces"`
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
@@ -3370,6 +3413,7 @@ type NodeAffinity struct {
 	// "weight" to the sum if the node matches the corresponding matchExpressions; the
 	// node(s) with the highest sum are the most preferred.
 	// +optional
+	// +listType=atomic
 	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,2,rep,name=preferredDuringSchedulingIgnoredDuringExecution"`
 }
 
@@ -3475,6 +3519,8 @@ type PodSpec struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
 	// List of initialization containers belonging to the pod.
 	// Init containers are executed in order prior to containers being started. If any
@@ -3491,6 +3537,8 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
@@ -3498,6 +3546,8 @@ type PodSpec struct {
 	// Cannot be updated.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
 	// List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
@@ -3506,6 +3556,8 @@ type PodSpec struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	EphemeralContainers []EphemeralContainer `json:"ephemeralContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,34,rep,name=ephemeralContainers"`
 	// Restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted.
@@ -3595,6 +3647,8 @@ type PodSpec struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,15,rep,name=imagePullSecrets"`
 	// Specifies the hostname of the Pod
 	// If not specified, the pod's hostname will be set to a system-defined value.
@@ -3613,12 +3667,15 @@ type PodSpec struct {
 	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,19,opt,name=schedulerName"`
 	// If specified, the pod's tolerations.
 	// +optional
+	// +listType=atomic
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
 	// file if specified. This is only valid for non-hostNetwork pods.
 	// +optional
 	// +patchMergeKey=ip
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=ip
 	HostAliases []HostAlias `json:"hostAliases,omitempty" patchStrategy:"merge" patchMergeKey:"ip" protobuf:"bytes,23,rep,name=hostAliases"`
 	// If specified, indicates the pod's priority. "system-node-critical" and
 	// "system-cluster-critical" are two special keywords which indicate the
@@ -3645,6 +3702,7 @@ type PodSpec struct {
 	// all conditions specified in the readiness gates have status equal to "True"
 	// More info: https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates
 	// +optional
+	// +listType=atomic
 	ReadinessGates []PodReadinessGate `json:"readinessGates,omitempty" protobuf:"bytes,28,opt,name=readinessGates"`
 	// RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used
 	// to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
@@ -4001,6 +4059,7 @@ type HostAlias struct {
 	// IP address of the host file entry.
 	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 	// Hostnames for the above IP address.
+	// +listType=atomic
 	Hostnames []string `json:"hostnames,omitempty" protobuf:"bytes,2,rep,name=hostnames"`
 }
 
@@ -4071,6 +4130,7 @@ type PodSecurityContext struct {
 	// even if they are not included in this list.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +listType=atomic
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,4,rep,name=supplementalGroups"`
 	// A special supplemental group that applies to all containers in a pod.
 	// Some volume types allow the Kubelet to change the ownership of that volume
@@ -4088,6 +4148,7 @@ type PodSecurityContext struct {
 	// sysctls (by the container runtime) might fail to launch.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +listType=atomic
 	Sysctls []Sysctl `json:"sysctls,omitempty" protobuf:"bytes,7,rep,name=sysctls"`
 	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
 	// before being exposed inside Pod. This field will only apply to
@@ -4158,17 +4219,20 @@ type PodDNSConfig struct {
 	// This will be appended to the base nameservers generated from DNSPolicy.
 	// Duplicated nameservers will be removed.
 	// +optional
+	// +listType=atomic
 	Nameservers []string `json:"nameservers,omitempty" protobuf:"bytes,1,rep,name=nameservers"`
 	// A list of DNS search domains for host-name lookup.
 	// This will be appended to the base search paths generated from DNSPolicy.
 	// Duplicated search paths will be removed.
 	// +optional
+	// +listType=atomic
 	Searches []string `json:"searches,omitempty" protobuf:"bytes,2,rep,name=searches"`
 	// A list of DNS resolver options.
 	// This will be merged with the base options generated from DNSPolicy.
 	// Duplicated entries will be removed. Resolution options given in Options
 	// will override those that appear in the base DNSPolicy.
 	// +optional
+	// +listType=atomic
 	Options []PodDNSConfigOption `json:"options,omitempty" protobuf:"bytes,3,rep,name=options"`
 }
 
@@ -4212,6 +4276,7 @@ type EphemeralContainerCommon struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
+	// +listType=atomic
 	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
 	// Arguments to the entrypoint.
 	// The image's CMD is used if this is not provided.
@@ -4222,6 +4287,7 @@ type EphemeralContainerCommon struct {
 	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
+	// +listType=atomic
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 	// Container's working directory.
 	// If not specified, the container runtime's default will be used, which
@@ -4244,12 +4310,15 @@ type EphemeralContainerCommon struct {
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
 	// +optional
+	// +listType=atomic
 	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// List of environment variables to set in the container.
 	// Cannot be updated.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
 	// already allocated to the pod.
@@ -4272,10 +4341,14 @@ type EphemeralContainerCommon struct {
 	// +optional
 	// +patchMergeKey=mountPath
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=mountPath
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=devicePath
 	// +optional
 	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
 	// Probes are not allowed for ephemeral containers.
@@ -4401,6 +4474,8 @@ type PodStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []PodCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 	// A human readable message indicating details about why the pod is in this condition.
 	// +optional
@@ -4446,6 +4521,8 @@ type PodStatus struct {
 	// +optional
 	// +patchStrategy=merge
 	// +patchMergeKey=ip
+	// +listType=map
+	// +listMapKey=ip
 	PodIPs []PodIP `json:"podIPs,omitempty" protobuf:"bytes,12,rep,name=podIPs" patchStrategy:"merge" patchMergeKey:"ip"`
 
 	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
@@ -4457,11 +4534,13 @@ type PodStatus struct {
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
+	// +listType=atomic
 	InitContainerStatuses []ContainerStatus `json:"initContainerStatuses,omitempty" protobuf:"bytes,10,rep,name=initContainerStatuses"`
 
 	// The list has one entry per container in the manifest.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
 	// +optional
+	// +listType=atomic
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
 	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
 	// See PodQOSClass type for available QOS classes
@@ -4470,6 +4549,7 @@ type PodStatus struct {
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
 	// Status for any ephemeral containers that have run in this pod.
 	// +optional
+	// +listType=atomic
 	EphemeralContainerStatuses []ContainerStatus `json:"ephemeralContainerStatuses,omitempty" protobuf:"bytes,13,rep,name=ephemeralContainerStatuses"`
 
 	// Status of resources resize desired for pod's containers.
@@ -4658,6 +4738,8 @@ type ReplicationControllerStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []ReplicationControllerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 }
 
@@ -4859,6 +4941,7 @@ type LoadBalancerStatus struct {
 	// Ingress is a list containing ingress points for the load-balancer.
 	// Traffic intended for the service should be sent to these ingress points.
 	// +optional
+	// +listType=atomic
 	Ingress []LoadBalancerIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
 }
 
@@ -5024,6 +5107,7 @@ type ServiceSpec struct {
 	// at a node with this IP.  A common example is external load-balancers
 	// that are not part of the Kubernetes system.
 	// +optional
+	// +listType=atomic
 	ExternalIPs []string `json:"externalIPs,omitempty" protobuf:"bytes,5,rep,name=externalIPs"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
@@ -5049,6 +5133,7 @@ type ServiceSpec struct {
 	// cloud-provider does not support the feature."
 	// More info: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/
 	// +optional
+	// +listType=atomic
 	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty" protobuf:"bytes,9,opt,name=loadBalancerSourceRanges"`
 
 	// externalName is the external reference that discovery mechanisms will
@@ -5303,6 +5388,8 @@ type ServiceAccount struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Secrets []ObjectReference `json:"secrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=secrets"`
 
 	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
@@ -5310,6 +5397,7 @@ type ServiceAccount struct {
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
 	// More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
 	// +optional
+	// +listType=atomic
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" protobuf:"bytes,3,rep,name=imagePullSecrets"`
 
 	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
@@ -5364,6 +5452,7 @@ type Endpoints struct {
 	// NotReadyAddresses in the same subset.
 	// Sets of addresses and ports that comprise a service.
 	// +optional
+	// +listType=atomic
 	Subsets []EndpointSubset `json:"subsets,omitempty" protobuf:"bytes,2,rep,name=subsets"`
 }
 
@@ -5384,14 +5473,17 @@ type EndpointSubset struct {
 	// IP addresses which offer the related ports that are marked as ready. These endpoints
 	// should be considered safe for load balancers and clients to utilize.
 	// +optional
+	// +listType=atomic
 	Addresses []EndpointAddress `json:"addresses,omitempty" protobuf:"bytes,1,rep,name=addresses"`
 	// IP addresses which offer the related ports but are not currently marked as ready
 	// because they have not yet finished starting, have recently failed a readiness check,
 	// or have recently failed a liveness check.
 	// +optional
+	// +listType=atomic
 	NotReadyAddresses []EndpointAddress `json:"notReadyAddresses,omitempty" protobuf:"bytes,2,rep,name=notReadyAddresses"`
 	// Port numbers available on the related IP addresses.
 	// +optional
+	// +listType=atomic
 	Ports []EndpointPort `json:"ports,omitempty" protobuf:"bytes,3,rep,name=ports"`
 }
 
@@ -5476,6 +5568,7 @@ type NodeSpec struct {
 	// each of IPv4 and IPv6.
 	// +optional
 	// +patchStrategy=merge
+	// +listType=set
 	PodCIDRs []string `json:"podCIDRs,omitempty" protobuf:"bytes,7,opt,name=podCIDRs" patchStrategy:"merge"`
 
 	// ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
@@ -5487,6 +5580,7 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
 	// If specified, the node's taints.
 	// +optional
+	// +listType=atomic
 	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
 
 	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.
@@ -5657,6 +5751,8 @@ type NodeStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []NodeCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
 	// List of addresses reachable to the node.
 	// Queried from cloud provider, if available.
@@ -5671,6 +5767,8 @@ type NodeStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Addresses []NodeAddress `json:"addresses,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,5,rep,name=addresses"`
 	// Endpoints of daemons running on the Node.
 	// +optional
@@ -5681,12 +5779,15 @@ type NodeStatus struct {
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty" protobuf:"bytes,7,opt,name=nodeInfo"`
 	// List of container images on this node
 	// +optional
+	// +listType=atomic
 	Images []ContainerImage `json:"images,omitempty" protobuf:"bytes,8,rep,name=images"`
 	// List of attachable volumes in use (mounted) by the node.
 	// +optional
+	// +listType=atomic
 	VolumesInUse []UniqueVolumeName `json:"volumesInUse,omitempty" protobuf:"bytes,9,rep,name=volumesInUse"`
 	// List of volumes that are attached to the node.
 	// +optional
+	// +listType=atomic
 	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
@@ -5711,6 +5812,7 @@ type AvoidPods struct {
 	// Bounded-sized list of signatures of pods that should avoid this node, sorted
 	// in timestamp order from oldest to newest. Size of the slice is unspecified.
 	// +optional
+	// +listType=atomic
 	PreferAvoidPods []PreferAvoidPodsEntry `json:"preferAvoidPods,omitempty" protobuf:"bytes,1,rep,name=preferAvoidPods"`
 }
 
@@ -5742,6 +5844,7 @@ type ContainerImage struct {
 	// Names by which this image is known.
 	// e.g. ["kubernetes.example/hyperkube:v1.0.7", "cloud-vendor.registry.example/cloud-vendor/hyperkube:v1.0.7"]
 	// +optional
+	// +listType=atomic
 	Names []string `json:"names" protobuf:"bytes,1,rep,name=names"`
 	// The size of the image in bytes.
 	// +optional
@@ -5867,7 +5970,6 @@ const (
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	// The resource name for ResourceEphemeralStorage is alpha and it can change across releases.
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
 )
 
@@ -5937,6 +6039,7 @@ type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
 	// More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
 	// +optional
+	// +listType=atomic
 	Finalizers []FinalizerName `json:"finalizers,omitempty" protobuf:"bytes,1,rep,name=finalizers,casttype=FinalizerName"`
 }
 
@@ -5951,6 +6054,8 @@ type NamespaceStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []NamespaceCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 }
 
@@ -6188,6 +6293,7 @@ type PodExecOptions struct {
 	Container string `json:"container,omitempty" protobuf:"bytes,5,opt,name=container"`
 
 	// Command is the remote command to execute. argv array. Not executed within a shell.
+	// +listType=atomic
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
 }
 
@@ -6206,6 +6312,7 @@ type PodPortForwardOptions struct {
 	// List of ports to forward
 	// Required when using WebSockets
 	// +optional
+	// +listType=atomic
 	Ports []int32 `json:"ports,omitempty" protobuf:"varint,1,rep,name=ports"`
 }
 
@@ -6499,6 +6606,7 @@ type LimitRangeItem struct {
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 type LimitRangeSpec struct {
 	// Limits is the list of LimitRangeItem objects that are enforced.
+	// +listType=atomic
 	Limits []LimitRangeItem `json:"limits" protobuf:"bytes,1,rep,name=limits"`
 }
 
@@ -6607,6 +6715,7 @@ type ResourceQuotaSpec struct {
 	// A collection of filters that must match each object tracked by a quota.
 	// If not specified, the quota matches all objects.
 	// +optional
+	// +listType=atomic
 	Scopes []ResourceQuotaScope `json:"scopes,omitempty" protobuf:"bytes,2,rep,name=scopes,casttype=ResourceQuotaScope"`
 	// scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
 	// but expressed using ScopeSelectorOperator in combination with possible values.
@@ -6621,6 +6730,7 @@ type ResourceQuotaSpec struct {
 type ScopeSelector struct {
 	// A list of scope selector requirements by scope of the resources.
 	// +optional
+	// +listType=atomic
 	MatchExpressions []ScopedResourceSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
 }
 
@@ -6637,6 +6747,7 @@ type ScopedResourceSelectorRequirement struct {
 	// the values array must be empty.
 	// This array is replaced during a strategic merge patch.
 	// +optional
+	// +listType=atomic
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
@@ -6936,6 +7047,8 @@ type ComponentStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []ComponentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 }
 
@@ -6959,6 +7072,7 @@ type ComponentStatusList struct {
 type DownwardAPIVolumeSource struct {
 	// Items is a list of downward API volume file
 	// +optional
+	// +listType=atomic
 	Items []DownwardAPIVolumeFile `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
 	// Optional: mode bits to use on created files by default. Must be a
 	// Optional: mode bits used to set permissions on created files by default.
@@ -7003,6 +7117,7 @@ type DownwardAPIVolumeFile struct {
 type DownwardAPIProjection struct {
 	// Items is a list of DownwardAPIVolume file
 	// +optional
+	// +listType=atomic
 	Items []DownwardAPIVolumeFile `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
 }
 

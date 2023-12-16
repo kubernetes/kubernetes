@@ -56,7 +56,6 @@ func newController(t *testing.T, objects []*networkingapiv1alpha1.ServiceCIDR) (
 		eventRecorder:      record.NewFakeRecorder(100),
 		serviceCIDRLister:  serviceCIDRInformer.Lister(),
 		serviceCIDRsSynced: func() bool { return true },
-		readyCh:            make(chan struct{}),
 	}
 
 	return client, c

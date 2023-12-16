@@ -577,6 +577,12 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 		return admission.NewForbidden(a, fmt.Errorf("node requested token bound to a pod scheduled on a different node"))
 	}
 
+	// Note: A token may only be bound to one object at a time. By requiring
+	// the Pod binding, noderestriction eliminates the opportunity to spoof
+	// a Node binding. Instead, kube-apiserver automatically infers and sets
+	// the Node binding when it receives a Pod binding. See:
+	// https://github.com/kubernetes/kubernetes/issues/121723 for more info.
+
 	return nil
 }
 

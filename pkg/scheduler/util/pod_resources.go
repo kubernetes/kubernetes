@@ -65,12 +65,6 @@ func GetRequestForResource(resourceName v1.ResourceName, requests *v1.ResourceLi
 			return *resource.NewQuantity(DefaultMemoryRequest, resource.DecimalSI)
 		}
 		return requests.Memory().DeepCopy()
-	case v1.ResourceEphemeralStorage:
-		quantity, found := (*requests)[v1.ResourceEphemeralStorage]
-		if !found {
-			return resource.Quantity{}
-		}
-		return quantity.DeepCopy()
 	default:
 		quantity, found := (*requests)[resourceName]
 		if !found {
