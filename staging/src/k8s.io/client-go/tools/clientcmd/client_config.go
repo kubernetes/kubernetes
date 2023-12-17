@@ -586,12 +586,6 @@ func (config *inClusterClientConfig) Namespace() (string, bool, error) {
 		return ns, false, nil
 	}
 
-	// If a kubeconfig file is specified and it doesn't contains the namespace attribute,
-	// it returns the default namespace to keep the namespace defaulting logic consistent.
-	if config.overrides != nil && config.overrides.Context.Namespace == "" {
-		return "default", false, nil
-	}
-
 	// Fall back to the namespace associated with the service account token, if available
 	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {

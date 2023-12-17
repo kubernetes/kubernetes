@@ -141,6 +141,11 @@ func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 		return ns, overridden, err
 	}
 
+	if !config.icc.Possible() && config.overrides != nil && config.overrides.Context.Namespace == "" {
+		// If the kubeconfig doesn't contain any namespace, use the default namespace
+		return "default", false, nil
+	}
+
 	if len(ns) > 0 {
 		// if we got a non-default namespace from the kubeconfig, use it
 		if ns != "default" {
