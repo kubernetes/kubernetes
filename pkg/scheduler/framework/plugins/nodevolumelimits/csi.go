@@ -127,7 +127,8 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				logger.V(5).Info("A PVC for a deleted Pod is not found", "deletedPod", deletedPod, "namespace", deletedPod.Namespace, "pvc name", pvcName)
-				return framework.QueueSkip, nil
+				// Ignore the PVC that is not found.
+				continue
 			}
 			return framework.Queue, fmt.Errorf("unable to look up a PVC of a deleted pod: %w", err)
 
