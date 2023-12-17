@@ -549,9 +549,9 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+	hasVolumes := kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.True(t, hasVolumes, "HasPossiblyMountedVolumesForPod should return true")
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -635,9 +635,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+	hasVolumes := kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.True(t, hasVolumes, "HasPossiblyMountedVolumesForPod should return true")
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -663,9 +663,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	allPodVolumes = kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+	hasVolumes = kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.False(t, hasVolumes, "HasPossiblyMountedVolumesForPod should return false")
 
 	assert.Len(t, podVolumes, 0,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
