@@ -76,7 +76,7 @@ func (pl *CSILimits) Name() string {
 	return CSIName
 }
 
-// EventsToRegister returns the possible events that may make a Pod
+// EventsToRegister returns the possible events that may make a Pod.
 // failed by this plugin schedulable.
 func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
@@ -102,7 +102,9 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 	csiNode, err := pl.csiNodeLister.Get(deletedPod.Spec.NodeName)
 	if apierrors.IsNotFound(err) {
-		logger.V(5).Info("csiNodeLister is not found", "nodeName", deletedPod.Spec.NodeName)
+		// When csiNode for a deleted Pod is not found, it doesn't make the pod schedulable
+		// because csiNode should be recreated again to let the pod go to this node.
+		logger.V(5).Info("csiNode for a deleted Pod is not found", "nodeName", deletedPod.Spec.NodeName)
 		return framework.QueueSkip, nil
 	} else if err != nil {
 		logger.V(5).Error(err, "Could not get a CSINode object", "nodeName", deletedPod.Spec.NodeName)
@@ -124,11 +126,10 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(deletedPod.Namespace).Get(pvcName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				logger.V(5).Info("A PVC is not found", "namespace", pod.Namespace, "pvc name", pvcName)
+				logger.V(5).Info("A PVC for a deleted Pod is not found", "deletedPod", deletedPod, "namespace", deletedPod.Namespace, "pvc name", pvcName)
 				return framework.QueueSkip, nil
 			}
-			logger.V(5).Error(err, "Unable to look up a PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
-			return framework.Queue, fmt.Errorf("unable to look up a PVC info: %w", err)
+			return framework.Queue, fmt.Errorf("unable to look up a PVC of a deleted pod: %w", err)
 
 		}
 
@@ -153,7 +154,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 			return framework.QueueSkip, nil
 		} else if err != nil {
 			logger.V(5).Error(err, "Unable to look up a PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
-			return framework.Queue, fmt.Errorf("unable to look up a PVC info: %w", err)
+			return framework.Queue, fmt.Errorf("unable to look up a PVC of the pod: %w", err)
 		}
 
 		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
@@ -166,7 +167,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		}
 	}
 
-	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", fmt.Sprintf("%s/%s", deletedPod.Namespace, deletedPod.Name), "pod", fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", klog.KObj(pod), "pod", fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
 	return framework.QueueSkip, nil
 }
 
