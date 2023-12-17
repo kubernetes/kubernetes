@@ -168,10 +168,6 @@ type ActualStateOfWorld interface {
 	// or have a mount/unmount operation pending.
 	GetAttachedVolumes() []AttachedVolume
 
-	// SyncReconstructedVolume check the volume.outerVolumeSpecName in asw and
-	// the one populated from dsw, if they do not match, update this field from the value from dsw.
-	SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string)
-
 	// Add the specified volume to ASW as uncertainly attached.
 	AddAttachUncertainReconstructedVolume(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
@@ -344,12 +340,6 @@ type mountedPod struct {
 	// /var/lib/kubelet/pods/{podUID}/volumes/{escapeQualifiedPluginName}/{volumeSpecName}/
 	volumeSpec *volume.Spec
 
-	// outerVolumeSpecName is the volume.Spec.Name() of the volume as referenced
-	// directly in the pod. If the volume was referenced through a persistent
-	// volume claim, this contains the volume.Spec.Name() of the persistent
-	// volume claim
-	outerVolumeSpecName string
-
 	// remountRequired indicates the underlying volume has been successfully
 	// mounted to this pod but it should be remounted to reflect changes in the
 	// referencing pod.
@@ -450,7 +440,6 @@ func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(op
 	volumeName := opts.VolumeName
 	mounter := opts.Mounter
 	blockVolumeMapper := opts.BlockVolumeMapper
-	outerVolumeSpecName := opts.OuterVolumeSpecName
 	volumeGIDValue := opts.VolumeGIDVolume
 	volumeSpec := opts.VolumeSpec
 
@@ -459,7 +448,6 @@ func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(op
 		podUID:                 podUID,
 		mounter:                mounter,
 		blockVolumeMapper:      blockVolumeMapper,
-		outerVolumeSpecName:    outerVolumeSpecName,
 		volumeGIDValue:         volumeGIDValue,
 		volumeSpec:             volumeSpec,
 		remountRequired:        false,
@@ -697,7 +685,6 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	volumeName := markVolumeOpts.VolumeName
 	mounter := markVolumeOpts.Mounter
 	blockVolumeMapper := markVolumeOpts.BlockVolumeMapper
-	outerVolumeSpecName := markVolumeOpts.OuterVolumeSpecName
 	volumeGIDValue := markVolumeOpts.VolumeGIDVolume
 	volumeSpec := markVolumeOpts.VolumeSpec
 	asw.Lock()
@@ -726,7 +713,6 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 			podUID:                 podUID,
 			mounter:                mounter,
 			blockVolumeMapper:      blockVolumeMapper,
-			outerVolumeSpecName:    outerVolumeSpecName,
 			volumeGIDValue:         volumeGIDValue,
 			volumeSpec:             volumeSpec,
 			volumeMountStateForPod: markVolumeOpts.VolumeMountState,
@@ -1119,19 +1105,6 @@ func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
 	return unmountedVolumes
 }
 
-func (asw *actualStateOfWorld) SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string) {
-	asw.Lock()
-	defer asw.Unlock()
-	if volumeObj, volumeExists := asw.attachedVolumes[volumeName]; volumeExists {
-		if podObj, podExists := volumeObj.mountedPods[podName]; podExists {
-			if podObj.outerVolumeSpecName != outerVolumeSpecName {
-				podObj.outerVolumeSpecName = outerVolumeSpecName
-				asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
-			}
-		}
-	}
-}
-
 func (asw *actualStateOfWorld) newAttachedVolume(
 	attachedVolume *attachedVolume) AttachedVolume {
 	seLinuxMountContext := ""
@@ -1246,7 +1219,6 @@ func getMountedVolume(
 			PodName:             mountedPod.podName,
 			VolumeName:          attachedVolume.volumeName,
 			InnerVolumeSpecName: mountedPod.volumeSpec.Name(),
-			OuterVolumeSpecName: mountedPod.outerVolumeSpecName,
 			PluginName:          attachedVolume.pluginName,
 			PodUID:              mountedPod.podUID,
 			Mounter:             mountedPod.mounter,
