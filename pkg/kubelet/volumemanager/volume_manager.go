@@ -126,13 +126,11 @@ type VolumeManager interface {
 	// volumes.
 	GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
 
-	// GetPossiblyMountedVolumesForPod returns a VolumeMap containing the volumes
-	// referenced by the specified pod that are either successfully attached
+	// HasPossiblyMountedVolumesForPod returns whether the pod has
+	// any volumes that are either successfully attached
 	// and mounted or are "uncertain", i.e. a volume plugin may be mounting
-	// them right now. The key in the map is the OuterVolumeSpecName (i.e.
-	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
-	// volumes.
-	GetPossiblyMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
+	// them right now.
+	HasPossiblyMountedVolumesForPod(podName types.UniquePodName) bool
 
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -332,17 +330,8 @@ func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) co
 	return podVolumes
 }
 
-func (vm *volumeManager) GetPossiblyMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
-	podVolumes := make(container.VolumeMap)
-	for _, mountedVolume := range vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
-			Mounter:             mountedVolume.Mounter,
-			BlockVolumeMapper:   mountedVolume.BlockVolumeMapper,
-			ReadOnly:            mountedVolume.VolumeSpec.ReadOnly,
-			InnerVolumeSpecName: mountedVolume.InnerVolumeSpecName,
-		}
-	}
-	return podVolumes
+func (vm *volumeManager) HasPossiblyMountedVolumesForPod(podName types.UniquePodName) bool {
+	return len(vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(podName)) > 0
 }
 
 func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
