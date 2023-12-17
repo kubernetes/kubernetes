@@ -88,7 +88,6 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		logger.V(5).Error(err, "Unexpected objects in isSchedulableAfterPodDeleted", "oldObj", oldObj)
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
 	}
 
@@ -107,7 +106,6 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		logger.V(5).Info("csiNode for a deleted Pod is not found", "nodeName", deletedPod.Spec.NodeName)
 		return framework.QueueSkip, nil
 	} else if err != nil {
-		logger.V(5).Error(err, "Could not get a CSINode object", "nodeName", deletedPod.Spec.NodeName)
 		return framework.Queue, fmt.Errorf("could not get a CSINode object: %w", err)
 	}
 
@@ -154,7 +152,6 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 			logger.V(5).Info("A PVC info is not found", "namespace", pod.Namespace, "pvc name", pvcName)
 			return framework.QueueSkip, nil
 		} else if err != nil {
-			logger.V(5).Error(err, "Unable to look up a PVC info", "namespace", pod.Namespace, "pvc name", pvcName)
 			return framework.Queue, fmt.Errorf("unable to look up a PVC of the pod: %w", err)
 		}
 
@@ -168,7 +165,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		}
 	}
 
-	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", klog.KObj(pod), "pod", fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", klog.KObj(pod), "pod", klog.KObj(pod))
 	return framework.QueueSkip, nil
 }
 
