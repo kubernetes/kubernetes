@@ -83,15 +83,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	PreemptionVictims = metrics.NewHistogram(
+	PreemptionVictims = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "preemption_victims",
-			Help:      "Number of selected preemption victims",
+			Help:      "Number of selected preemption victims, by the priority of the preemptor pod.",
 			// we think #victims>64 is pretty rare, therefore [64, +Inf) is considered a single bucket.
 			Buckets:        metrics.ExponentialBuckets(1, 2, 7),
 			StabilityLevel: metrics.STABLE,
-		})
+		}, []string{"priority"})
 	PreemptionAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,

@@ -395,7 +395,14 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 		return framework.AsStatus(err)
 	}
 
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
+	// Record the number of pods preempted by priority class.
+	podsByPriorityClass := make(map[string]int)
+	for _, pod := range c.Victims().Pods {
+		podsByPriorityClass[pod.Spec.PriorityClassName]++
+	}
+	for priorityClass, count := range podsByPriorityClass {
+		metrics.PreemptionVictims.WithLabelValues(priorityClass).Observe(float64(count))
+	}
 
 	// Lower priority pods nominated to run on this node, may no longer fit on
 	// this node. So, we should remove their nomination. Removing their
