@@ -108,7 +108,7 @@ type VolumeManager interface {
 	WaitForUnmount(ctx context.Context, pod *v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
-	// referenced by the specified pod that are successfully attached and
+	// referenced by the specified pod that are desired and actually attached and
 	// mounted. The key in the map is the OuterVolumeSpecName (i.e.
 	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
 	// volumes.
@@ -300,8 +300,8 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	podVolumes := make(container.VolumeMap)
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
+	for name, mountedVolume := range vm.getMountedVolumes(podName) {
+		podVolumes[name] = container.VolumeInfo{
 			Mounter:             mountedVolume.Mounter,
 			BlockVolumeMapper:   mountedVolume.BlockVolumeMapper,
 			ReadOnly:            mountedVolume.VolumeSpec.ReadOnly,
