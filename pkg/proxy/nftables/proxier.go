@@ -185,6 +185,12 @@ type Proxier struct {
 
 	// staleChains contains information about chains to be deleted later
 	staleChains map[string]time.Time
+
+	// numgen defines the algorithm for load-balancing using the ntfables "numgen" module.
+	// It can be "random", which will be about the same as the old "iptables" proxier,
+	// or "inc", which will give a round-robin distribution similar to the "ipvs"
+	// proxier with the "rr" scheduler
+	numgen string
 }
 
 // Proxier implements proxy.Provider
@@ -262,6 +268,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		networkInterfacer:   proxyutil.RealNetwork{},
 		conntrackTCPLiberal: conntrackTCPLiberal,
 		staleChains:         make(map[string]time.Time),
+		numgen:              "inc",
 	}
 
 	burstSyncs := 2
@@ -1635,7 +1642,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, s
 	tx.Add(&knftables.Rule{
 		Chain: svcChain,
 		Rule: knftables.Concat(
-			"numgen random mod", len(endpoints), "vmap",
+			"numgen", proxier.numgen, "mod", len(endpoints), "vmap",
 			"{", elements, "}",
 		),
 	})
