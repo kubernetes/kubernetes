@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -531,29 +532,35 @@ func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName)
 	}
 }
 
-// getUnmountedVolumes fetches the current list of mounted volumes from
-// the actual state of the world, and uses it to process the list of
-// expectedVolumes. It returns a list of unmounted volumes.
-// The list also includes volume that may be mounted in uncertain state.
-func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
-	mountedVolumes := sets.NewString()
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		mountedVolumes.Insert(mountedVolume.OuterVolumeSpecName)
+// getMountedVolumes returns volumes that are desired and actually mounted,
+// indexed by the outer volume spec name.
+func (vm *volumeManager) getMountedVolumes(podName types.UniquePodName) map[string]*cache.MountedVolume {
+	outerNames := map[v1.UniqueVolumeName]string{}
+	for _, toMountVolumes := range vm.desiredStateOfWorld.GetVolumesToMount() {
+		if toMountVolumes.PodName == podName {
+			outerNames[toMountVolumes.VolumeName] = toMountVolumes.OuterVolumeSpecName
+		}
 	}
-	return filterUnmountedVolumes(mountedVolumes, expectedVolumes)
+	volumes := vm.actualStateOfWorld.GetMountedVolumesForPod(podName)
+	volumesByOuterName := make(map[string]*cache.MountedVolume)
+	for i, mountedVolume := range volumes {
+		volumesByOuterName[outerNames[mountedVolume.VolumeName]] = &volumes[i]
+	}
+	return volumesByOuterName
 }
 
-// filterUnmountedVolumes adds each element of expectedVolumes that is not in
-// mountedVolumes to a list of unmountedVolumes and returns it.
-func filterUnmountedVolumes(mountedVolumes sets.String, expectedVolumes []string) []string {
+// getUnmountedVolumes returns a list of unmounted volumes.
+// This includes the volumes in expectedVolumes, but not in one of DSW/ASW.
+// The list also includes volume that may be mounted in uncertain state.
+func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
+	mountedVolumes := vm.getMountedVolumes(podName)
 	unmountedVolumes := []string{}
 	for _, expectedVolume := range expectedVolumes {
-		if !mountedVolumes.Has(expectedVolume) {
+		if _, ok := mountedVolumes[expectedVolume]; !ok {
 			unmountedVolumes = append(unmountedVolumes, expectedVolume)
 		}
 	}
-	sort.Strings(unmountedVolumes)
-
+	slices.Sort(unmountedVolumes)
 	return unmountedVolumes
 }
 
