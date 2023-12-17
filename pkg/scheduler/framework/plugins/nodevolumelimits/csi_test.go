@@ -645,14 +645,15 @@ func TestCSILimitsQHint(t *testing.T) {
 	podEbs := st.MakePod().PVC("csi-ebs.csi.aws.com-3").Obj()
 
 	tests := []struct {
-		newPod      *v1.Pod
-		deletedPod  *v1.Pod
-		extraClaims []v1.PersistentVolumeClaim
-		filterName  string
-		driverNames []string
-		test        string
-		limitSource string
-		wantQHint   framework.QueueingHint
+		newPod                 *v1.Pod
+		deletedPod             *v1.Pod
+		deletedPodNotScheduled bool
+		extraClaims            []v1.PersistentVolumeClaim
+		filterName             string
+		driverNames            []string
+		test                   string
+		limitSource            string
+		wantQHint              framework.QueueingHint
 	}{
 		{
 			newPod:      podEbs,
@@ -690,6 +691,16 @@ func TestCSILimitsQHint(t *testing.T) {
 			limitSource: "csinode",
 			wantQHint:   framework.QueueSkip,
 		},
+		{
+			newPod:                 podEbs,
+			deletedPod:             st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj(),
+			deletedPodNotScheduled: true,
+			filterName:             "csi",
+			driverNames:            []string{ebsCSIDriverName, gceCSIDriverName},
+			test:                   "return a QueueSkip when a deleted pod is not scheduled.",
+			limitSource:            "csinode",
+			wantQHint:              framework.QueueSkip,
+		},
 	}
 
 	for _, test := range tests {
@@ -698,7 +709,11 @@ func TestCSILimitsQHint(t *testing.T) {
 			if csiNode != nil {
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
 			}
-			test.deletedPod.Spec.NodeName = node.Node().Name
+			if !test.deletedPodNotScheduled {
+				test.deletedPod.Spec.NodeName = node.Node().Name
+			} else {
+				test.deletedPod.Spec.NodeName = ""
+			}
 
 			p := &CSILimits{
 				csiNodeLister:        getFakeCSINodeLister(csiNode),
