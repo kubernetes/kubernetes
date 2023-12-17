@@ -482,6 +482,11 @@ func TestClient_GetMemberID(t *testing.T) {
 				Endpoints:     tt.fields.Endpoints,
 				newEtcdClient: tt.fields.newEtcdClient,
 			}
+			c.listMembersFunc = func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+				f, _ := c.newEtcdClient([]string{})
+				resp, _ := f.MemberList(context.TODO())
+				return resp, nil
+			}
 
 			got, err := c.GetMemberID(tt.args.peerURL)
 			if !errors.Is(tt.wantErr, err) {
@@ -490,6 +495,295 @@ func TestClient_GetMemberID(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("Client.GetMemberID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestListMembers(t *testing.T) {
+	type fields struct {
+		Endpoints       []string
+		newEtcdClient   func(endpoints []string) (etcdClient, error)
+		listMembersFunc func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error)
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		want      []Member
+		wantError bool
+	}{
+		{
+			name: "PeerURLs are empty",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{}
+					return f, nil
+				},
+			},
+			want: []Member{},
+		},
+		{
+			name: "PeerURLs are non-empty",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								ID:   1,
+								Name: "member1",
+								PeerURLs: []string{
+									"https://member1:2380",
+								},
+							},
+							{
+								ID:   2,
+								Name: "member2",
+								PeerURLs: []string{
+									"https://member2:2380",
+								},
+							},
+						},
+					}
+					return f, nil
+				},
+			},
+			want: []Member{
+				{
+					Name:    "member1",
+					PeerURL: "https://member1:2380",
+				},
+				{
+					Name:    "member2",
+					PeerURL: "https://member2:2380",
+				},
+			},
+		},
+		{
+			name: "PeerURLs has multiple urls",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								ID:   1,
+								Name: "member1",
+								PeerURLs: []string{
+									"https://member1:2380",
+									"https://member2:2380",
+								},
+							},
+						},
+					}
+					return f, nil
+				},
+			},
+			want: []Member{
+				{
+					Name:    "member1",
+					PeerURL: "https://member1:2380",
+				},
+			},
+		},
+		{
+			name: "ListMembers return error",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								ID:   1,
+								Name: "member1",
+								PeerURLs: []string{
+									"https://member1:2380",
+									"https://member2:2380",
+								},
+							},
+						},
+					}
+					return f, nil
+				},
+				listMembersFunc: func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+					return nil, errNotImplemented
+				},
+			},
+			want:      nil,
+			wantError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{
+				Endpoints:       tt.fields.Endpoints,
+				newEtcdClient:   tt.fields.newEtcdClient,
+				listMembersFunc: tt.fields.listMembersFunc,
+			}
+			if c.listMembersFunc == nil {
+				c.listMembersFunc = func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+					return c.listMembers(&wait.Backoff{Steps: 1})
+				}
+			}
+			got, err := c.ListMembers()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ListMembers() = %v, want %v", got, tt.want)
+			}
+			if (err != nil) != (tt.wantError) {
+				t.Errorf("ListMembers() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestIsLearner(t *testing.T) {
+	type fields struct {
+		Endpoints       []string
+		newEtcdClient   func(endpoints []string) (etcdClient, error)
+		listMembersFunc func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error)
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		memberID  uint64
+		want      bool
+		wantError bool
+	}{
+		{
+			name: "The specified member is not a learner",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								ID:   1,
+								Name: "member1",
+								PeerURLs: []string{
+									"https://member1:2380",
+								},
+								IsLearner: false,
+							},
+						},
+					}
+					return f, nil
+				},
+			},
+			memberID: 1,
+			want:     false,
+		},
+		{
+			name: "The specified member is a learner",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								ID:   1,
+								Name: "member1",
+								PeerURLs: []string{
+									"https://member1:2380",
+								},
+								IsLearner: true,
+							},
+							{
+								ID:   2,
+								Name: "member2",
+								PeerURLs: []string{
+									"https://member2:2380",
+								},
+							},
+						},
+					}
+					return f, nil
+				},
+			},
+			memberID: 1,
+			want:     true,
+		},
+		{
+			name: "The specified member does not exist",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{},
+					}
+					return f, nil
+				},
+			},
+			memberID: 3,
+			want:     false,
+		},
+		{
+			name: "Learner ID is empty",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								Name: "member2",
+								PeerURLs: []string{
+									"https://member2:2380",
+								},
+								IsLearner: true,
+							},
+						},
+					}
+					return f, nil
+				},
+			},
+			want: true,
+		},
+		{
+			name: "ListMembers returns an error",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								Name: "member2",
+								PeerURLs: []string{
+									"https://member2:2380",
+								},
+								IsLearner: true,
+							},
+						},
+					}
+					return f, nil
+				},
+				listMembersFunc: func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+					return nil, errNotImplemented
+				},
+			},
+			want:      false,
+			wantError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{
+				Endpoints:       tt.fields.Endpoints,
+				newEtcdClient:   tt.fields.newEtcdClient,
+				listMembersFunc: tt.fields.listMembersFunc,
+			}
+			if c.listMembersFunc == nil {
+				c.listMembersFunc = func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+					f, _ := c.newEtcdClient([]string{})
+					resp, _ := f.MemberList(context.TODO())
+					return resp, nil
+				}
+			}
+			got, err := c.isLearner(tt.memberID)
+			if got != tt.want {
+				t.Errorf("isLearner() = %v, want %v", got, tt.want)
+			}
+			if (err != nil) != (tt.wantError) {
+				t.Errorf("isLearner() error = %v, wantError %v", err, tt.wantError)
 			}
 		})
 	}

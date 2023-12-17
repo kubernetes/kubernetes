@@ -104,6 +104,8 @@ type Client struct {
 	Endpoints []string
 
 	newEtcdClient func(endpoints []string) (etcdClient, error)
+
+	listMembersFunc func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error)
 }
 
 // New creates a new EtcdCluster client
@@ -134,6 +136,8 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 			TLS: tlsConfig,
 		})
 	}
+
+	client.listMembersFunc = client.listMembers
 
 	return &client, nil
 }
@@ -274,11 +278,14 @@ type Member struct {
 	PeerURL string
 }
 
-func (c *Client) listMembers() (*clientv3.MemberListResponse, error) {
+func (c *Client) listMembers(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
 	// Gets the member list
 	var lastError error
 	var resp *clientv3.MemberListResponse
-	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+	if backoff == nil {
+		backoff = &etcdBackoff
+	}
+	err := wait.ExponentialBackoff(*backoff, func() (bool, error) {
 		cli, err := c.newEtcdClient(c.Endpoints)
 		if err != nil {
 			lastError = err
@@ -304,7 +311,7 @@ func (c *Client) listMembers() (*clientv3.MemberListResponse, error) {
 
 // GetMemberID returns the member ID of the given peer URL
 func (c *Client) GetMemberID(peerURL string) (uint64, error) {
-	resp, err := c.listMembers()
+	resp, err := c.listMembersFunc(nil)
 	if err != nil {
 		return 0, err
 	}
@@ -319,7 +326,7 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 
 // ListMembers returns the member list.
 func (c *Client) ListMembers() ([]Member, error) {
-	resp, err := c.listMembers()
+	resp, err := c.listMembersFunc(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +487,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 
 // isLearner returns true if the given member ID is a learner.
 func (c *Client) isLearner(memberID uint64) (bool, error) {
-	resp, err := c.listMembers()
+	resp, err := c.listMembersFunc(nil)
 	if err != nil {
 		return false, err
 	}
