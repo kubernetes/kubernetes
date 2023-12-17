@@ -758,13 +758,13 @@ type MountedVolume struct {
 // GenerateMsgDetailed returns detailed msgs for mounted volumes
 func (volume *MountedVolume) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q)", volume.VolumeName, volume.PodName, volume.PodUID)
-	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volume.OuterVolumeSpecName, detailedStr)
+	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, string(volume.VolumeName), detailedStr)
 }
 
 // GenerateMsg returns simple and detailed msgs for mounted volumes
 func (volume *MountedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q)", volume.VolumeName, volume.PodName, volume.PodUID)
-	return generateVolumeMsg(prefixMsg, suffixMsg, volume.OuterVolumeSpecName, detailedStr)
+	return generateVolumeMsg(prefixMsg, suffixMsg, string(volume.VolumeName), detailedStr)
 }
 
 // GenerateErrorDetailed returns simple and detailed errors for mounted volumes
