@@ -169,7 +169,6 @@ type MarkVolumeOpts struct {
 	VolumeName          v1.UniqueVolumeName
 	Mounter             volume.Mounter
 	BlockVolumeMapper   volume.BlockVolumeMapper
-	OuterVolumeSpecName string
 	VolumeGIDVolume     string
 	VolumeSpec          *volume.Spec
 	VolumeMountState    VolumeMountState
@@ -678,44 +677,6 @@ type MountedVolume struct {
 	//     	   pdName: my-data-disk
 	//     	   fsType: ext4
 	InnerVolumeSpecName string
-
-	// outerVolumeSpecName is the podSpec.Volume[x].Name of the volume. If the
-	// volume was referenced through a persistent volume claim, this contains
-	// the podSpec.Volume[x].Name of the persistent volume claim.
-	// PVC example:
-	//   kind: Pod
-	//   apiVersion: v1
-	//   metadata:
-	//     name: mypod
-	//   spec:
-	//     containers:
-	//       - name: myfrontend
-	//         image: dockerfile/nginx
-	//         volumeMounts:
-	//         - mountPath: "/var/www/html"
-	//           name: mypd
-	//     volumes:
-	//       - name: mypd				<- OuterVolumeSpecName
-	//         persistentVolumeClaim:
-	//           claimName: myclaim
-	// Non-PVC example:
-	//   apiVersion: v1
-	//   kind: Pod
-	//   metadata:
-	//     name: test-pd
-	//   spec:
-	//     containers:
-	//     - image: registry.k8s.io/test-webserver
-	//     	 name: test-container
-	//     	 volumeMounts:
-	//     	 - mountPath: /test-pd
-	//     	   name: test-volume
-	//     volumes:
-	//     - name: test-volume			<- OuterVolumeSpecName
-	//     	 gcePersistentDisk:
-	//     	   pdName: my-data-disk
-	//     	   fsType: ext4
-	OuterVolumeSpecName string
 
 	// PluginName is the "Unescaped Qualified" name of the volume plugin used to
 	// mount and unmount this volume. It can be used to fetch the volume plugin
