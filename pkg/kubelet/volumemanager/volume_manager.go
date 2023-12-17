@@ -451,16 +451,15 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 		vm.verifyVolumesUnmountedFunc(uniquePodName))
 
 	if err != nil {
-		var mountedVolumes []string
+		var mountedVolumes []v1.UniqueVolumeName
 		for _, v := range vm.actualStateOfWorld.GetMountedVolumesForPod(uniquePodName) {
-			mountedVolumes = append(mountedVolumes, v.OuterVolumeSpecName)
+			mountedVolumes = append(mountedVolumes, v.VolumeName)
 		}
-		sort.Strings(mountedVolumes)
-
 		if len(mountedVolumes) == 0 {
 			return nil
 		}
 
+		slices.Sort(mountedVolumes)
 		return fmt.Errorf(
 			"mounted volumes=%v: %w",
 			mountedVolumes,
