@@ -572,13 +572,7 @@ func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, e
 		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
 			return true, errors.New(strings.Join(errs, "; "))
 		}
-		for _, expectedVolume := range expectedVolumes {
-			_, found := vm.actualStateOfWorld.GetMountedVolumeForPodByOuterVolumeSpecName(podName, expectedVolume)
-			if !found {
-				return false, nil
-			}
-		}
-		return true, nil
+		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
 	}
 }
 
@@ -593,25 +587,21 @@ func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName)
 	}
 }
 
-// getUnmountedVolumes fetches the current list of mounted volumes from
-// the actual state of the world, and uses it to process the list of
-// expectedVolumes. It returns a list of unmounted volumes.
+// getUnmountedVolumes returns a list of unmounted volumes.
+// This includes the volumes in expectedVolumes, but not in one of DSW/ASW.
 // The list also includes volume that may be mounted in uncertain state.
 func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
-	mountedVolumes := sets.New[string]()
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		mountedVolumes.Insert(mountedVolume.OuterVolumeSpecName)
-	}
-	return filterUnmountedVolumes(mountedVolumes, expectedVolumes)
-}
-
-// filterUnmountedVolumes adds each element of expectedVolumes that is not in
-// mountedVolumes to a list of unmountedVolumes and returns it.
-func filterUnmountedVolumes(mountedVolumes sets.Set[string], expectedVolumes []string) []string {
 	unmountedVolumes := []string{}
-	for _, expectedVolume := range expectedVolumes {
-		if !mountedVolumes.Has(expectedVolume) {
-			unmountedVolumes = append(unmountedVolumes, expectedVolume)
+	volumeNames := vm.desiredStateOfWorld.GetVolumeNamesForPod(podName)
+	for _, outerName := range expectedVolumes {
+		volumeName, ok := volumeNames[outerName]
+		if !ok {
+			unmountedVolumes = append(unmountedVolumes, outerName)
+			continue
+		}
+		_, ok = vm.actualStateOfWorld.GetMountedVolumeForPod(podName, volumeName)
+		if !ok {
+			unmountedVolumes = append(unmountedVolumes, outerName)
 		}
 	}
 	slices.Sort(unmountedVolumes)
