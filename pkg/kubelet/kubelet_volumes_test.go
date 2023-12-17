@@ -470,12 +470,9 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(context.Background(), pod))
-	if actual := kubelet.volumeManager.GetMountedVolumesForPod(util.GetUniquePodName(pod)); len(actual) > 0 {
-		t.Fatalf("expected volume unmount to wait for no volumes: %v", actual)
-	}
 
 	// Verify volumes unmounted
-	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
+	podVolumes = kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
 
 	assert.Empty(t, podVolumes,

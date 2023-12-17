@@ -120,7 +120,7 @@ type VolumeManager interface {
 	WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
-	// referenced by the specified pod that are successfully attached and
+	// referenced by the specified pod that are desired and actually attached and
 	// mounted. The key in the map is the OuterVolumeSpecName (i.e.
 	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
 	// volumes.
@@ -321,8 +321,8 @@ func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesRea
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	podVolumes := make(container.VolumeMap)
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
+	for name, mountedVolume := range vm.getMountedVolumes(podName) {
+		podVolumes[name] = container.VolumeInfo{
 			Mounter:             mountedVolume.Mounter,
 			BlockVolumeMapper:   mountedVolume.BlockVolumeMapper,
 			ReadOnly:            mountedVolume.VolumeSpec.ReadOnly,
@@ -585,6 +585,27 @@ func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName)
 		}
 		return !vm.actualStateOfWorld.PodHasMountedVolumes(podName), nil
 	}
+}
+
+// getMountedVolumes returns volumes that are desired and actually mounted,
+// indexed by the outer volume spec name.
+func (vm *volumeManager) getMountedVolumes(podName types.UniquePodName) map[string]*cache.MountedVolume {
+	volumes := vm.actualStateOfWorld.GetMountedVolumesForPod(podName)
+	volumesByName := make(map[v1.UniqueVolumeName]*cache.MountedVolume, len(volumes))
+	for i, mountedVolume := range volumes {
+		volumesByName[mountedVolume.VolumeName] = &volumes[i]
+	}
+
+	volumeNames := vm.desiredStateOfWorld.GetVolumeNamesForPod(podName)
+	volumesByOuterName := make(map[string]*cache.MountedVolume, len(volumeNames))
+	for outerName, volumeName := range volumeNames {
+		mountedVolume, ok := volumesByName[volumeName]
+		if ok {
+			volumesByOuterName[outerName] = mountedVolume
+		}
+	}
+
+	return volumesByOuterName
 }
 
 // getUnmountedVolumes returns a list of unmounted volumes.
