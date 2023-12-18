@@ -182,10 +182,12 @@ func Run(g *Generator) {
 		return
 	}
 
+	pkgs := []string{}
 	for _, p := range protobufNames.List() {
-		if err := b.AddDir(p.Path()); err != nil {
-			log.Fatalf("Unable to add directory %q: %v", p.Path(), err)
-		}
+		pkgs = append(pkgs, p.Path())
+	}
+	if err := b.LoadPackages(pkgs...); err != nil {
+		log.Fatalf("Unable to add load packages: %v", err)
 	}
 
 	c, err := generator.NewContext(

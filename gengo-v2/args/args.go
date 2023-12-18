@@ -140,16 +140,8 @@ func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 	// Ignore all auto-generated files.
 	b.AddBuildTags(g.GeneratedBuildTag)
 
-	for _, d := range g.InputDirs {
-		var err error
-		if strings.HasSuffix(d, "/...") {
-			err = b.AddDirRecursive(strings.TrimSuffix(d, "/..."))
-		} else {
-			err = b.AddDir(d)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("unable to add directory %q: %v", d, err)
-		}
+	if err := b.LoadPackages(g.InputDirs...); err != nil {
+		return nil, err
 	}
 	return b, nil
 }
@@ -178,9 +170,6 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 	if err != nil {
 		return fmt.Errorf("Failed making a parser: %v", err)
 	}
-
-	// pass through the flag on whether to include *_test.go files
-	b.IncludeTestFiles = g.IncludeTestFiles
 
 	c, err := generator.NewContext(b, nameSystems, defaultSystem)
 	if err != nil {

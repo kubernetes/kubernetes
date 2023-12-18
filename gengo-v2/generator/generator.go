@@ -246,7 +246,8 @@ func (ctxt *Context) TransitiveIncomingImports() map[string][]string {
 func (ctxt *Context) AddDir(path string) error {
 	ctxt.incomingImports = nil
 	ctxt.incomingTransitiveImports = nil
-	return ctxt.builder.AddDirTo(path, &ctxt.Universe)
+	_, err := ctxt.builder.LoadPackagesTo(&ctxt.Universe, path)
+	return err
 }
 
 // AddDirectory adds a Go package to the context. The specified path must be a
@@ -255,5 +256,9 @@ func (ctxt *Context) AddDir(path string) error {
 func (ctxt *Context) AddDirectory(path string) (*types.Package, error) {
 	ctxt.incomingImports = nil
 	ctxt.incomingTransitiveImports = nil
-	return ctxt.builder.AddDirectoryTo(path, &ctxt.Universe)
+	pkgs, err := ctxt.builder.LoadPackagesTo(&ctxt.Universe, path)
+	if err != nil {
+		return nil, err
+	}
+	return pkgs[0], nil
 }
