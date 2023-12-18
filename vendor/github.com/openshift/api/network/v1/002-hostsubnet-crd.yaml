@@ -1,0 +1,88 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/527
+  name: hostsubnets.network.openshift.io
+spec:
+  group: network.openshift.io
+  names:
+    kind: HostSubnet
+    listKind: HostSubnetList
+    plural: hostsubnets
+    singular: hostsubnet
+  scope: Cluster
+  versions:
+    - additionalPrinterColumns:
+        - description: The name of the node
+          jsonPath: .host
+          name: Host
+          type: string
+        - description: The IP address to be used as a VTEP by other nodes in the overlay network
+          jsonPath: .hostIP
+          name: Host IP
+          type: string
+        - description: The CIDR range of the overlay network assigned to the node for its pods
+          jsonPath: .subnet
+          name: Subnet
+          type: string
+        - description: The network egress CIDRs
+          jsonPath: .egressCIDRs
+          name: Egress CIDRs
+          type: string
+        - description: The network egress IP addresses
+          jsonPath: .egressIPs
+          name: Egress IPs
+          type: string
+      name: v1
+      schema:
+        openAPIV3Schema:
+          description: "HostSubnet describes the container subnet network on a node. The HostSubnet object must have the same name as the Node object it corresponds to. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - host
+            - hostIP
+            - subnet
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            egressCIDRs:
+              description: EgressCIDRs is the list of CIDR ranges available for automatically assigning egress IPs to this node from. If this field is set then EgressIPs should be treated as read-only.
+              type: array
+              items:
+                description: HostSubnetEgressCIDR represents one egress CIDR from which to assign IP addresses for this node represented by the HostSubnet
+                type: string
+                pattern: ^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$
+            egressIPs:
+              description: EgressIPs is the list of automatic egress IP addresses currently hosted by this node. If EgressCIDRs is empty, this can be set by hand; if EgressCIDRs is set then the master will overwrite the value here with its own allocation of egress IPs.
+              type: array
+              items:
+                description: HostSubnetEgressIP represents one egress IP address currently hosted on the node represented by HostSubnet
+                type: string
+                pattern: ^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$
+            host:
+              description: Host is the name of the node. (This is the same as the object's name, but both fields must be set.)
+              type: string
+              pattern: ^[a-z0-9.-]+$
+            hostIP:
+              description: HostIP is the IP address to be used as a VTEP by other nodes in the overlay network
+              type: string
+              pattern: ^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            subnet:
+              description: Subnet is the CIDR range of the overlay network assigned to the node for its pods
+              type: string
+              pattern: ^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$
+      served: true
+      storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

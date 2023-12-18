@@ -1,0 +1,451 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[TechPreviewNoUpgrade] ImagePolicy"
+crd: 0000_10_config-operator_01_imagepolicy-TechPreviewNoUpgrade.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal ImagePolicy with policyType PublicKey
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+  - name: Should be able to create a minimal ImagePolicy with policyType FulcioCAWithRekor
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: FulcioCAWithRekor
+            fulcioCAWithRekor:
+              fulcioCAData: Zm9vIGJhcg==
+              rekorKeyData: Zm9vIGJhcg==
+              fulcioSubject:
+                oidcIssuer: https://oidc.localhost
+                signedEmail: test-user@example.com
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: FulcioCAWithRekor
+            fulcioCAWithRekor:
+              fulcioCAData: Zm9vIGJhcg==
+              rekorKeyData: Zm9vIGJhcg==
+              fulcioSubject:
+                oidcIssuer: https://oidc.localhost
+                signedEmail: test-user@example.com
+  - name: Should not allow policyType PublicKey but not set publicKey
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            FulcioCAWithRekor:
+              fulcioCAData: Zm9vIGJhcg==
+              rekorKeyData: Zm9vIGJhcg==
+              fulcioSubject:
+                oidcIssuer: https://oidc.localhost
+                signedEmail: test-user@example.com
+    expectedError: "spec.policy.rootOfTrust: Invalid value: \"object\": publicKey is required when policyType is PublicKey, and forbidden otherwise"
+  - name: Should not allow policyType FulcioCAData but not set fulcioCAWithRekor
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: FulcioCAWithRekor
+            PublicKey:
+              keyData: Zm9vIGJhcg==
+    expectedError: "spec.policy.rootOfTrust: Invalid value: \"object\": fulcioCAWithRekor is required when policyType is FulcioCAWithRekor, and forbidden otherwise"
+  - name: Should not allow policyType set but not set corresponding policy
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+    expectedError: "spec.policy.rootOfTrust: Invalid value: \"object\": publicKey is required when policyType is PublicKey, and forbidden otherwise"
+  - name: Should not allow policyType set FulcioCAWith but not set corresponding policy
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: FulcioCAWithRekor
+    expectedError: "spec.policy.rootOfTrust: Invalid value: \"object\": fulcioCAWithRekor is required when policyType is FulcioCAWithRekor, and forbidden otherwise"
+  - name: Should not allow signedIdentity matchPolicy ExactRepository but not set repository
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: ExactRepository
+    expectedError: "spec.policy.signedIdentity: Invalid value: \"object\": exactRepository is required when matchPolicy is ExactRepository, and forbidden otherwise"
+  - name: Should not allow signedIdentity matchPolicy RemapIdentity but not set prefixes
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: RemapIdentity
+    expectedError: "spec.policy.signedIdentity: Invalid value: \"object\": remapIdentity is required when matchPolicy is RemapIdentity, and forbidden otherwise"
+  - name: Test scope should not allow 'busybox'
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - busybox
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expectedError: "spec.scopes[0]: Invalid value: \"string\": invalid image scope format, scope must contain a fully qualified domain name or 'localhost'"
+  - name: Test scope should not allow start with subnamesapces '*.example.com/test'
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - "*.example.com/test"
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expectedError: "spec.scopes[0]: Invalid value: \"string\": invalid image scope with wildcard, a wildcard can only be at the start of the domain and is only supported for subdomain matching, not path matching"
+  - name: Test scope should not allow invalid digest
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com/namespace/namespace@sha256:12dsdf
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expectedError: "spec.scopes[0]: Invalid value: \"string\": invalid repository namespace or image specification in the image scope"
+  - name: Test should not allow tag in ExactRepository repository
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: ExactRepository
+            exactRepository: 
+              repository: example.com/namespace/namespace:latest
+    expectedError: "[spec.policy.signedIdentity.exactRepository.repository: Invalid value: \"string\": invalid repository or prefix in the signedIdentity, should not include the tag or digest, spec.policy.signedIdentity.exactRepository.repository: Invalid value: \"string\": invalid repository or prefix in the signedIdentity]"
+  - name: Test should not allow tag in ExactRepository repository
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: ExactRepository
+            exactRepository: 
+              repository: localhost:1234/namespace/namespace:latest
+    expectedError: "[spec.policy.signedIdentity.exactRepository.repository: Invalid value: \"string\": invalid repository or prefix in the signedIdentity, should not include the tag or digest, spec.policy.signedIdentity.exactRepository.repository: Invalid value: \"string\": invalid repository or prefix in the signedIdentity]"
+  - name: Test should not allow digest in ExactRepository repository
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: ExactRepository
+            exactRepository: 
+              repository: localhost:1234/namespace/namespace@sha256:b7e686e30346e9ace664fa09c0275262f8b9a443ed56d22165a0e201f6488c13
+    expectedError: "[spec.policy.signedIdentity.exactRepository.repository: Invalid value: \"string\": invalid repository or prefix in the signedIdentity, should not include the tag or digest, spec.policy.signedIdentity.exactRepository.repository: Invalid value: \"string\": invalid repository or prefix in the signedIdentity]"
+  - name: Test should not allow tag in prefix/signedPrefix
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: RemapIdentity
+            remapIdentity:
+              prefix: example.com/namespace:latest
+              signedPrefix: example.com/namespace
+    expectedError: "[spec.policy.signedIdentity.remapIdentity.prefix: Invalid value: \"string\": invalid repository or prefix in the signedIdentity, should not include the tag or digest, spec.policy.signedIdentity.remapIdentity.prefix: Invalid value: \"string\": invalid repository or prefix in the signedIdentity]"
+  - name: Test should allow valid ExactRepository repository
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: ExactRepository
+            exactRepository: 
+              repository: example.com
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: ExactRepository
+            exactRepository: 
+              repository: example.com
+  - name: Test should allow valid signedIdentity prefix/signedPrefix
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: RemapIdentity
+            remapIdentity:
+              prefix: example.com
+              signedPrefix: mirror.com
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+          signedIdentity:
+            matchPolicy: RemapIdentity
+            remapIdentity:
+              prefix: example.com
+              signedPrefix: mirror.com
+  - name: Test scope should allow localhost name with port 'localhost:1234/namespace/namespace'
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - localhost:1234/namespace/namespace
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - localhost:1234/namespace/namespace
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+  - name: Test scope should allow localhost 'localhost/foo/bar'
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - localhost/foo/bar
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - localhost/foo/bar
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+  - name: Test scope should allow 'example.com/foo/bar'
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com/foo/bar
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com/foo/bar
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+  - name: Test scope should allow tag 'example.com/foo/bar:latest'
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com/foo/bar:latest
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com/foo/bar:latest
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+  - name: Test scope should allow full specification digest
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com/namespace/namespace@sha256:b7e686e30346e9ace664fa09c0275262f8b9a443ed56d22165a0e201f6488c13
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - example.com/namespace/namespace@sha256:b7e686e30346e9ace664fa09c0275262f8b9a443ed56d22165a0e201f6488c13
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+  - name: Test scope should allow '*.example.com'
+    initial: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - "*.example.com"
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==
+    expected: |
+      apiVersion: config.openshift.io/v1alpha1
+      kind: ImagePolicy
+      spec:
+        scopes:
+        - "*.example.com"
+        policy:
+          rootOfTrust:
+            policyType: PublicKey
+            publicKey:
+              keyData: Zm9vIGJhcg==

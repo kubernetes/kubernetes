@@ -1,0 +1,749 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[TechPreviewNoUpgrade] Infrastructure"
+crd: 0000_10_config-operator_01_infrastructure-TechPreviewNoUpgrade.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Infrastructure
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {} # No spec is required for a Infrastructure
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+  onUpdate:
+  - name: Status Should contain default fields
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status: {}
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        controlPlaneTopology: HighlyAvailable
+  - name: Status update cpuPartitioning should fail validation check
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        cpuPartitioning: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        cpuPartitioning: "Invalid"
+    expectedStatusError: 'status.cpuPartitioning: Unsupported value: "Invalid": supported values: "None", "AllNodes"'
+  - name: Should set load balancer type to OpenShiftManagedDefault if not specified
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+      status:
+        platform: BareMetal
+        platformStatus:
+          baremetal: {}
+          type: BareMetal
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: BareMetal
+        platformStatus:
+          baremetal:
+            loadBalancer:
+              type: OpenShiftManagedDefault
+          type: BareMetal
+  - name: Should be able to override the default load balancer with a valid value
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+      status:
+        platform: BareMetal
+        platformStatus:
+          baremetal:
+            loadBalancer:
+              type: UserManaged
+          type: BareMetal
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: BareMetal
+        platformStatus:
+          baremetal:
+            loadBalancer:
+              type: UserManaged
+          type: BareMetal
+  - name: Should not allow changing the immutable load balancer type field
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: BareMetal
+        platformStatus:
+          baremetal:
+            loadBalancer:
+              type: OpenShiftManagedDefault
+          type: BareMetal
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: BareMetal
+        platformStatus:
+          baremetal:
+            loadBalancer:
+              type: UserManaged
+          type: BareMetal
+    expectedStatusError: "status.platformStatus.baremetal.loadBalancer.type: Invalid value: \"string\": type is immutable once set"
+  - name: Should not allow removing the immutable load balancer type field that was initially set
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: BareMetal
+        platformStatus:
+          baremetal:
+            loadBalancer:
+              type: UserManaged
+          type: BareMetal
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: BareMetal
+        platformStatus:
+          baremetal: {}
+          type: BareMetal
+    expectedStatusError: "status.platformStatus.baremetal.loadBalancer.type: Invalid value: \"string\": type is immutable once set"
+  - name: Should not allow setting the load balancer type to a wrong value
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          baremetal: {}
+          type: BareMetal
+      status:
+        platform: BareMetal
+        platformStatus:
+          baremetal:
+            loadBalancer:
+              type: FooBar
+          type: BareMetal
+    expectedStatusError: "status.platformStatus.baremetal.loadBalancer.type: Unsupported value: \"FooBar\": supported values: \"OpenShiftManagedDefault\", \"UserManaged\""
+  - name: Should not be able to modify an existing GCP ResourceLabels Label
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: "HighlyAvailable"
+        infrastructureTopology: "HighlyAvailable"
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "changed"}
+    expectedStatusError: "status.platformStatus.gcp.resourceLabels: Invalid value: \"array\": resourceLabels are immutable and may only be configured during installation"
+  - name: Should not be able to add a Label to an existing GCP ResourceLabels
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: "HighlyAvailable"
+        infrastructureTopology: "HighlyAvailable"
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+              - {key: "new", value: "entry"}
+    expectedStatusError: "status.platformStatus.gcp.resourceLabels: Invalid value: \"array\": resourceLabels are immutable and may only be configured during installation"
+  - name: Should not be able to remove a Label from an existing GCP ResourceLabels
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+              - {key: "new", value: "entry"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+    expectedStatusError: "status.platformStatus.gcp.resourceLabels: Invalid value: \"array\": resourceLabels are immutable and may only be configured during installation"
+  - name: Should not be able to add GCP ResourceLabels to an empty platformStatus.gcp
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+    expectedStatusError: "status.platformStatus.gcp: Invalid value: \"object\": resourceLabels may only be configured during installation"
+  - name: Should not be able to remove GCP ResourceLabels from platformStatus.gcp
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp: {}
+    expectedStatusError: "status.platformStatus.gcp: Invalid value: \"object\": resourceLabels may only be configured during installation"
+  - name: Should not have label key start with openshift-io for GCP ResourceLabels in platformStatus.gcp
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+              - {key: "openshift-io-created-cluster", value: "true"}
+    expectedStatusError: "status.platformStatus.gcp.resourceLabels[1].key: Invalid value: \"string\": label keys must not start with either `openshift-io` or `kubernetes-io`"
+  - name: Should not have label key start with kubernetes-io for GCP ResourceLabels in platformStatus.gcp
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceLabels:
+              - {key: "key", value: "value"}
+              - {key: "kubernetes-io-created-cluster", value: "true"}
+    expectedStatusError: "status.platformStatus.gcp.resourceLabels[1].key: Invalid value: \"string\": label keys must not start with either `openshift-io` or `kubernetes-io`"
+  - name: Should not be able to modify an existing GCP ResourceTags Tag
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: "HighlyAvailable"
+        infrastructureTopology: "HighlyAvailable"
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key", value: "value"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key", value: "changed"}
+    expectedStatusError: "status.platformStatus.gcp.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+  - name: Should not be able to add a Tag to an existing GCP ResourceTags
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: "HighlyAvailable"
+        infrastructureTopology: "HighlyAvailable"
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key", value: "value"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key", value: "value"}
+              - {parentID: "test-project-123", key: "new", value: "tag"}
+    expectedStatusError: "status.platformStatus.gcp.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+  - name: Should not be able to remove a Tag from an existing GCP ResourceTags
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key1", value: "value1"}
+              - {parentID: "test-project-123", key: "key2", value: "value2"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key1", value: "value1"}
+    expectedStatusError: "status.platformStatus.gcp.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+  - name: Should not be able to add GCP ResourceTags to an empty platformStatus.gcp
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key", value: "value"}
+    expectedStatusError: "status.platformStatus.gcp: Invalid value: \"object\": resourceTags may only be configured during installation"
+  - name: Should not be able to remove GCP ResourceTags from platformStatus.gcp
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key", value: "value"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp: {}
+    expectedStatusError: "status.platformStatus.gcp: Invalid value: \"object\": resourceTags may only be configured during installation"
+  - name: Should not be able to modify ParentID of a Tag in the GCP ResourceTags
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: "HighlyAvailable"
+        infrastructureTopology: "HighlyAvailable"
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "1234567890", key: "key", value: "value"}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: GCP
+        platformStatus:
+          type: GCP
+          gcp:
+            resourceTags:
+              - {parentID: "test-project-123", key: "key", value: "value"}
+    expectedStatusError: "status.platformStatus.gcp.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+  - name: dnsType should default to `PlatformDefault` when not specified
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          gcp: {}
+          type: GCP
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp: {}
+          type: GCP
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp: {}
+          type: GCP
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: PlatformDefault
+          type: GCP
+  - name: should be able to set dnsType to non-default value of `ClusterHosted`
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          gcp: {}
+          type: GCP
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: ClusterHosted
+          type: GCP
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: ClusterHosted
+          type: GCP
+  - name: Should not allow changing the immutable dnsType field
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          gcp: {}
+          type: GCP
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: ClusterHosted
+              clusterHosted:
+                apiIntLoadBalancerIPs:
+                - 10.10.10.20
+          type: GCP
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: PlatformDefault
+          type: GCP
+    expectedStatusError: "status.platformStatus.gcp.cloudLoadBalancerConfig.dnsType: Invalid value: \"string\": dnsType is immutable"
+  - name: Should not accept non-IP address values for Load Balancer IPs
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          gcp: {}
+          type: GCP
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp: 
+            cloudLoadBalancerConfig:
+              dnsType: ClusterHosted
+              clusterHosted:
+                apiIntLoadBalancerIPs:
+                - 10.10.10.20
+          type: GCP
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: ClusterHosted
+              clusterHosted:
+                apiIntLoadBalancerIPs:
+                - 10.10.10.20
+                - not-an-ip-address
+          type: GCP
+    expectedStatusError: "status.platformStatus.gcp.cloudLoadBalancerConfig.clusterHosted.apiIntLoadBalancerIPs[1]: Invalid value: \"not-an-ip-address\": status.platformStatus.gcp.cloudLoadBalancerConfig.clusterHosted.apiIntLoadBalancerIPs[1] in body should match '(^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$)|(^s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:)))(%.+)?s*)'"
+  - name: Should not accept update when `clusterHosted` is specified with DNSType `PlatformDefault`
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          gcp: {}
+          type: GCP
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp: {}
+          type: GCP
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: PlatformDefault
+              clusterHosted:
+                apiIntLoadBalancerIPs:
+                - 10.10.10.20
+          type: GCP
+    expectedStatusError: "status.platformStatus.gcp.cloudLoadBalancerConfig: Invalid value: \"object\": clusterHosted is permitted only when dnsType is ClusterHosted"
+  - name: Should not accept duplicate IP addresses for any of the Load Balancer IPs
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          gcp: {}
+          type: GCP
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: GCP
+          gcp: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        infrastructureTopology: HighlyAvailable
+        platform: GCP
+        platformStatus:
+          gcp:
+            cloudLoadBalancerConfig:
+              dnsType: ClusterHosted
+              clusterHosted:
+                apiIntLoadBalancerIPs:
+                - 10.10.10.20
+                - 10.10.20.20
+                - 10.10.10.20
+          type: GCP
+    expectedStatusError: "status.platformStatus.gcp.cloudLoadBalancerConfig.clusterHosted.apiIntLoadBalancerIPs[2]: Duplicate value: \"10.10.10.20\""

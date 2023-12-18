@@ -1,0 +1,41 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] ClusterCSIDriver"
+crd: 0000_90_cluster_csi_driver_01_config.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal ClusterCSIDriver
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: ClusterCSIDriver
+      metadata:
+        name: csi.sharedresource.openshift.io
+      spec: {} # No spec is required for a ClusterCSIDriver
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: ClusterCSIDriver
+      metadata:
+        name: csi.sharedresource.openshift.io
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+  - name: IBM Cloud CSIDriverType must have a defined IBM Cloud spec
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: ClusterCSIDriver
+      metadata:
+        name: csi.sharedresource.openshift.io
+      spec:
+        driverConfig:
+          driverType: IBMCloud
+    expectedError: "Invalid value: \"object\": ibmcloud must be set if driverType is 'IBMCloud', but remain unset otherwise"
+  - name: IBM Cloud spec must have an EncryptionKeyCRN defined
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: ClusterCSIDriver
+      metadata:
+        name: csi.sharedresource.openshift.io
+      spec:
+        driverConfig:
+          driverType: IBMCloud
+          ibmcloud: {}
+    expectedError: "spec.driverConfig.ibmcloud.encryptionKeyCRN: Required value, <nil>: Invalid value: \"null\": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation"

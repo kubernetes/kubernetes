@@ -1,0 +1,475 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/495
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: Default
+  name: clusterversions.config.openshift.io
+spec:
+  group: config.openshift.io
+  names:
+    kind: ClusterVersion
+    plural: clusterversions
+    singular: clusterversion
+  scope: Cluster
+  versions:
+    - additionalPrinterColumns:
+        - jsonPath: .status.history[?(@.state=="Completed")].version
+          name: Version
+          type: string
+        - jsonPath: .status.conditions[?(@.type=="Available")].status
+          name: Available
+          type: string
+        - jsonPath: .status.conditions[?(@.type=="Progressing")].status
+          name: Progressing
+          type: string
+        - jsonPath: .status.conditions[?(@.type=="Progressing")].lastTransitionTime
+          name: Since
+          type: date
+        - jsonPath: .status.conditions[?(@.type=="Progressing")].message
+          name: Status
+          type: string
+      name: v1
+      schema:
+        openAPIV3Schema:
+          description: "ClusterVersion is the configuration for the ClusterVersionOperator. This is where parameters related to automatic updates can be set. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec is the desired state of the cluster version - the operator will work to ensure that the desired version is applied to the cluster.
+              type: object
+              required:
+                - clusterID
+              properties:
+                capabilities:
+                  description: capabilities configures the installation of optional, core cluster components.  A null value here is identical to an empty object; see the child properties for default semantics.
+                  type: object
+                  properties:
+                    additionalEnabledCapabilities:
+                      description: additionalEnabledCapabilities extends the set of managed capabilities beyond the baseline defined in baselineCapabilitySet.  The default is an empty set.
+                      type: array
+                      items:
+                        description: ClusterVersionCapability enumerates optional, core cluster components.
+                        type: string
+                        enum:
+                          - openshift-samples
+                          - baremetal
+                          - marketplace
+                          - Console
+                          - Insights
+                          - Storage
+                          - CSISnapshot
+                          - NodeTuning
+                          - MachineAPI
+                          - Build
+                          - DeploymentConfig
+                          - ImageRegistry
+                          - OperatorLifecycleManager
+                          - CloudCredential
+                      x-kubernetes-list-type: atomic
+                    baselineCapabilitySet:
+                      description: baselineCapabilitySet selects an initial set of optional capabilities to enable, which can be extended via additionalEnabledCapabilities.  If unset, the cluster will choose a default, and the default may change over time. The current default is vCurrent.
+                      type: string
+                      enum:
+                        - None
+                        - v4.11
+                        - v4.12
+                        - v4.13
+                        - v4.14
+                        - v4.15
+                        - vCurrent
+                channel:
+                  description: channel is an identifier for explicitly requesting that a non-default set of updates be applied to this cluster. The default channel will be contain stable updates that are appropriate for production clusters.
+                  type: string
+                clusterID:
+                  description: clusterID uniquely identifies this cluster. This is expected to be an RFC4122 UUID value (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx in hexadecimal values). This is a required field.
+                  type: string
+                desiredUpdate:
+                  description: "desiredUpdate is an optional field that indicates the desired value of the cluster version. Setting this value will trigger an upgrade (if the current version does not match the desired version). The set of recommended update values is listed as part of available updates in status, and setting values outside that range may cause the upgrade to fail. \n Some of the fields are inter-related with restrictions and meanings described here. 1. image is specified, version is specified, architecture is specified. API validation error. 2. image is specified, version is specified, architecture is not specified. You should not do this. version is silently ignored and image is used. 3. image is specified, version is not specified, architecture is specified. API validation error. 4. image is specified, version is not specified, architecture is not specified. image is used. 5. image is not specified, version is specified, architecture is specified. version and desired architecture are used to select an image. 6. image is not specified, version is specified, architecture is not specified. version and current architecture are used to select an image. 7. image is not specified, version is not specified, architecture is specified. API validation error. 8. image is not specified, version is not specified, architecture is not specified. API validation error. \n If an upgrade fails the operator will halt and report status about the failing component. Setting the desired update value back to the previous version will cause a rollback to be attempted. Not all rollbacks will succeed."
+                  type: object
+                  properties:
+                    architecture:
+                      description: architecture is an optional field that indicates the desired value of the cluster architecture. In this context cluster architecture means either a single architecture or a multi architecture. architecture can only be set to Multi thereby only allowing updates from single to multi architecture. If architecture is set, image cannot be set and version must be set. Valid values are 'Multi' and empty.
+                      type: string
+                      enum:
+                        - Multi
+                        - ""
+                    force:
+                      description: force allows an administrator to update to an image that has failed verification or upgradeable checks. This option should only be used when the authenticity of the provided image has been verified out of band because the provided image will run with full administrative access to the cluster. Do not use this flag with images that comes from unknown or potentially malicious sources.
+                      type: boolean
+                    image:
+                      description: image is a container image location that contains the update. image should be used when the desired version does not exist in availableUpdates or history. When image is set, version is ignored. When image is set, version should be empty. When image is set, architecture cannot be specified.
+                      type: string
+                    version:
+                      description: version is a semantic version identifying the update version. version is ignored if image is specified and required if architecture is specified.
+                      type: string
+                  x-kubernetes-validations:
+                    - rule: 'has(self.architecture) && has(self.image) ? (self.architecture == '''' || self.image == '''') : true'
+                      message: cannot set both Architecture and Image
+                    - rule: 'has(self.architecture) && self.architecture != '''' ? self.version != '''' : true'
+                      message: Version must be set if Architecture is set
+                overrides:
+                  description: overrides is list of overides for components that are managed by cluster version operator. Marking a component unmanaged will prevent the operator from creating or updating the object.
+                  type: array
+                  items:
+                    description: ComponentOverride allows overriding cluster version operator's behavior for a component.
+                    type: object
+                    required:
+                      - group
+                      - kind
+                      - name
+                      - namespace
+                      - unmanaged
+                    properties:
+                      group:
+                        description: group identifies the API group that the kind is in.
+                        type: string
+                      kind:
+                        description: kind indentifies which object to override.
+                        type: string
+                      name:
+                        description: name is the component's name.
+                        type: string
+                      namespace:
+                        description: namespace is the component's namespace. If the resource is cluster scoped, the namespace should be empty.
+                        type: string
+                      unmanaged:
+                        description: 'unmanaged controls if cluster version operator should stop managing the resources in this cluster. Default: false'
+                        type: boolean
+                  x-kubernetes-list-map-keys:
+                    - kind
+                    - group
+                    - namespace
+                    - name
+                  x-kubernetes-list-type: map
+                upstream:
+                  description: upstream may be used to specify the preferred update server. By default it will use the appropriate update server for the cluster and region.
+                  type: string
+            status:
+              description: status contains information about the available updates and any in-progress updates.
+              type: object
+              required:
+                - availableUpdates
+                - desired
+                - observedGeneration
+                - versionHash
+              properties:
+                availableUpdates:
+                  description: availableUpdates contains updates recommended for this cluster. Updates which appear in conditionalUpdates but not in availableUpdates may expose this cluster to known issues. This list may be empty if no updates are recommended, if the update service is unavailable, or if an invalid channel has been specified.
+                  type: array
+                  items:
+                    description: Release represents an OpenShift release image and associated metadata.
+                    type: object
+                    properties:
+                      channels:
+                        description: channels is the set of Cincinnati channels to which the release currently belongs.
+                        type: array
+                        items:
+                          type: string
+                        x-kubernetes-list-type: set
+                      image:
+                        description: image is a container image location that contains the update. When this field is part of spec, image is optional if version is specified and the availableUpdates field contains a matching version.
+                        type: string
+                      url:
+                        description: url contains information about this release. This URL is set by the 'url' metadata property on a release or the metadata returned by the update API and should be displayed as a link in user interfaces. The URL field may not be set for test or nightly releases.
+                        type: string
+                      version:
+                        description: version is a semantic version identifying the update version. When this field is part of spec, version is optional if image is specified.
+                        type: string
+                  nullable: true
+                  x-kubernetes-list-type: atomic
+                capabilities:
+                  description: capabilities describes the state of optional, core cluster components.
+                  type: object
+                  properties:
+                    enabledCapabilities:
+                      description: enabledCapabilities lists all the capabilities that are currently managed.
+                      type: array
+                      items:
+                        description: ClusterVersionCapability enumerates optional, core cluster components.
+                        type: string
+                        enum:
+                          - openshift-samples
+                          - baremetal
+                          - marketplace
+                          - Console
+                          - Insights
+                          - Storage
+                          - CSISnapshot
+                          - NodeTuning
+                          - MachineAPI
+                          - Build
+                          - DeploymentConfig
+                          - ImageRegistry
+                          - OperatorLifecycleManager
+                          - CloudCredential
+                      x-kubernetes-list-type: atomic
+                    knownCapabilities:
+                      description: knownCapabilities lists all the capabilities known to the current cluster.
+                      type: array
+                      items:
+                        description: ClusterVersionCapability enumerates optional, core cluster components.
+                        type: string
+                        enum:
+                          - openshift-samples
+                          - baremetal
+                          - marketplace
+                          - Console
+                          - Insights
+                          - Storage
+                          - CSISnapshot
+                          - NodeTuning
+                          - MachineAPI
+                          - Build
+                          - DeploymentConfig
+                          - ImageRegistry
+                          - OperatorLifecycleManager
+                          - CloudCredential
+                      x-kubernetes-list-type: atomic
+                conditionalUpdates:
+                  description: conditionalUpdates contains the list of updates that may be recommended for this cluster if it meets specific required conditions. Consumers interested in the set of updates that are actually recommended for this cluster should use availableUpdates. This list may be empty if no updates are recommended, if the update service is unavailable, or if an empty or invalid channel has been specified.
+                  type: array
+                  items:
+                    description: ConditionalUpdate represents an update which is recommended to some clusters on the version the current cluster is reconciling, but which may not be recommended for the current cluster.
+                    type: object
+                    required:
+                      - release
+                      - risks
+                    properties:
+                      conditions:
+                        description: 'conditions represents the observations of the conditional update''s current status. Known types are: * Evaluating, for whether the cluster-version operator will attempt to evaluate any risks[].matchingRules. * Recommended, for whether the update is recommended for the current cluster.'
+                        type: array
+                        items:
+                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                          type: object
+                          required:
+                            - lastTransitionTime
+                            - message
+                            - reason
+                            - status
+                            - type
+                          properties:
+                            lastTransitionTime:
+                              description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                              type: string
+                              format: date-time
+                            message:
+                              description: message is a human readable message indicating details about the transition. This may be an empty string.
+                              type: string
+                              maxLength: 32768
+                            observedGeneration:
+                              description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                              type: integer
+                              format: int64
+                              minimum: 0
+                            reason:
+                              description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                              type: string
+                              maxLength: 1024
+                              minLength: 1
+                              pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                            status:
+                              description: status of the condition, one of True, False, Unknown.
+                              type: string
+                              enum:
+                                - "True"
+                                - "False"
+                                - Unknown
+                            type:
+                              description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                              type: string
+                              maxLength: 316
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                        x-kubernetes-list-map-keys:
+                          - type
+                        x-kubernetes-list-type: map
+                      release:
+                        description: release is the target of the update.
+                        type: object
+                        properties:
+                          channels:
+                            description: channels is the set of Cincinnati channels to which the release currently belongs.
+                            type: array
+                            items:
+                              type: string
+                            x-kubernetes-list-type: set
+                          image:
+                            description: image is a container image location that contains the update. When this field is part of spec, image is optional if version is specified and the availableUpdates field contains a matching version.
+                            type: string
+                          url:
+                            description: url contains information about this release. This URL is set by the 'url' metadata property on a release or the metadata returned by the update API and should be displayed as a link in user interfaces. The URL field may not be set for test or nightly releases.
+                            type: string
+                          version:
+                            description: version is a semantic version identifying the update version. When this field is part of spec, version is optional if image is specified.
+                            type: string
+                      risks:
+                        description: risks represents the range of issues associated with updating to the target release. The cluster-version operator will evaluate all entries, and only recommend the update if there is at least one entry and all entries recommend the update.
+                        type: array
+                        minItems: 1
+                        items:
+                          description: ConditionalUpdateRisk represents a reason and cluster-state for not recommending a conditional update.
+                          type: object
+                          required:
+                            - matchingRules
+                            - message
+                            - name
+                            - url
+                          properties:
+                            matchingRules:
+                              description: matchingRules is a slice of conditions for deciding which clusters match the risk and which do not. The slice is ordered by decreasing precedence. The cluster-version operator will walk the slice in order, and stop after the first it can successfully evaluate. If no condition can be successfully evaluated, the update will not be recommended.
+                              type: array
+                              minItems: 1
+                              items:
+                                description: ClusterCondition is a union of typed cluster conditions.  The 'type' property determines which of the type-specific properties are relevant. When evaluated on a cluster, the condition may match, not match, or fail to evaluate.
+                                type: object
+                                required:
+                                  - type
+                                properties:
+                                  promql:
+                                    description: promQL represents a cluster condition based on PromQL.
+                                    type: object
+                                    required:
+                                      - promql
+                                    properties:
+                                      promql:
+                                        description: PromQL is a PromQL query classifying clusters. This query query should return a 1 in the match case and a 0 in the does-not-match case. Queries which return no time series, or which return values besides 0 or 1, are evaluation failures.
+                                        type: string
+                                  type:
+                                    description: type represents the cluster-condition type. This defines the members and semantics of any additional properties.
+                                    type: string
+                                    enum:
+                                      - Always
+                                      - PromQL
+                              x-kubernetes-list-type: atomic
+                            message:
+                              description: message provides additional information about the risk of updating, in the event that matchingRules match the cluster state. This is only to be consumed by humans. It may contain Line Feed characters (U+000A), which should be rendered as new lines.
+                              type: string
+                              minLength: 1
+                            name:
+                              description: name is the CamelCase reason for not recommending a conditional update, in the event that matchingRules match the cluster state.
+                              type: string
+                              minLength: 1
+                            url:
+                              description: url contains information about this risk.
+                              type: string
+                              format: uri
+                              minLength: 1
+                        x-kubernetes-list-map-keys:
+                          - name
+                        x-kubernetes-list-type: map
+                  x-kubernetes-list-type: atomic
+                conditions:
+                  description: conditions provides information about the cluster version. The condition "Available" is set to true if the desiredUpdate has been reached. The condition "Progressing" is set to true if an update is being applied. The condition "Degraded" is set to true if an update is currently blocked by a temporary or permanent error. Conditions are only valid for the current desiredUpdate when metadata.generation is equal to status.generation.
+                  type: array
+                  items:
+                    description: ClusterOperatorStatusCondition represents the state of the operator's managed and monitored components.
+                    type: object
+                    required:
+                      - lastTransitionTime
+                      - status
+                      - type
+                    properties:
+                      lastTransitionTime:
+                        description: lastTransitionTime is the time of the last update to the current status property.
+                        type: string
+                        format: date-time
+                      message:
+                        description: message provides additional information about the current condition. This is only to be consumed by humans.  It may contain Line Feed characters (U+000A), which should be rendered as new lines.
+                        type: string
+                      reason:
+                        description: reason is the CamelCase reason for the condition's current status.
+                        type: string
+                      status:
+                        description: status of the condition, one of True, False, Unknown.
+                        type: string
+                      type:
+                        description: type specifies the aspect reported by this condition.
+                        type: string
+                  x-kubernetes-list-map-keys:
+                    - type
+                  x-kubernetes-list-type: map
+                desired:
+                  description: desired is the version that the cluster is reconciling towards. If the cluster is not yet fully initialized desired will be set with the information available, which may be an image or a tag.
+                  type: object
+                  properties:
+                    channels:
+                      description: channels is the set of Cincinnati channels to which the release currently belongs.
+                      type: array
+                      items:
+                        type: string
+                      x-kubernetes-list-type: set
+                    image:
+                      description: image is a container image location that contains the update. When this field is part of spec, image is optional if version is specified and the availableUpdates field contains a matching version.
+                      type: string
+                    url:
+                      description: url contains information about this release. This URL is set by the 'url' metadata property on a release or the metadata returned by the update API and should be displayed as a link in user interfaces. The URL field may not be set for test or nightly releases.
+                      type: string
+                    version:
+                      description: version is a semantic version identifying the update version. When this field is part of spec, version is optional if image is specified.
+                      type: string
+                history:
+                  description: history contains a list of the most recent versions applied to the cluster. This value may be empty during cluster startup, and then will be updated when a new update is being applied. The newest update is first in the list and it is ordered by recency. Updates in the history have state Completed if the rollout completed - if an update was failing or halfway applied the state will be Partial. Only a limited amount of update history is preserved.
+                  type: array
+                  items:
+                    description: UpdateHistory is a single attempted update to the cluster.
+                    type: object
+                    required:
+                      - completionTime
+                      - image
+                      - startedTime
+                      - state
+                      - verified
+                    properties:
+                      acceptedRisks:
+                        description: acceptedRisks records risks which were accepted to initiate the update. For example, it may menition an Upgradeable=False or missing signature that was overriden via desiredUpdate.force, or an update that was initiated despite not being in the availableUpdates set of recommended update targets.
+                        type: string
+                      completionTime:
+                        description: completionTime, if set, is when the update was fully applied. The update that is currently being applied will have a null completion time. Completion time will always be set for entries that are not the current update (usually to the started time of the next update).
+                        type: string
+                        format: date-time
+                        nullable: true
+                      image:
+                        description: image is a container image location that contains the update. This value is always populated.
+                        type: string
+                      startedTime:
+                        description: startedTime is the time at which the update was started.
+                        type: string
+                        format: date-time
+                      state:
+                        description: state reflects whether the update was fully applied. The Partial state indicates the update is not fully applied, while the Completed state indicates the update was successfully rolled out at least once (all parts of the update successfully applied).
+                        type: string
+                      verified:
+                        description: verified indicates whether the provided update was properly verified before it was installed. If this is false the cluster may not be trusted. Verified does not cover upgradeable checks that depend on the cluster state at the time when the update target was accepted.
+                        type: boolean
+                      version:
+                        description: version is a semantic version identifying the update version. If the requested image does not define a version, or if a failure occurs retrieving the image, this value may be empty.
+                        type: string
+                  x-kubernetes-list-type: atomic
+                observedGeneration:
+                  description: observedGeneration reports which version of the spec is being synced. If this value is not equal to metadata.generation, then the desired and conditions fields may represent a previous version.
+                  type: integer
+                  format: int64
+                versionHash:
+                  description: versionHash is a fingerprint of the content that the cluster will be updated with. It is used by the operator to avoid unnecessary work and is for internal use only.
+                  type: string
+          x-kubernetes-validations:
+            - rule: 'has(self.spec.capabilities) && has(self.spec.capabilities.additionalEnabledCapabilities) && self.spec.capabilities.baselineCapabilitySet == ''None'' && ''baremetal'' in self.spec.capabilities.additionalEnabledCapabilities ? ''MachineAPI'' in self.spec.capabilities.additionalEnabledCapabilities || (has(self.status) && has(self.status.capabilities) && has(self.status.capabilities.enabledCapabilities) && ''MachineAPI'' in self.status.capabilities.enabledCapabilities) : true'
+              message: the `baremetal` capability requires the `MachineAPI` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `MachineAPI` capability
+            - rule: 'has(self.spec.capabilities) && has(self.spec.capabilities.additionalEnabledCapabilities) && self.spec.capabilities.baselineCapabilitySet == ''None'' && ''marketplace'' in self.spec.capabilities.additionalEnabledCapabilities ? ''OperatorLifecycleManager'' in self.spec.capabilities.additionalEnabledCapabilities || (has(self.status) && has(self.status.capabilities) && has(self.status.capabilities.enabledCapabilities) && ''OperatorLifecycleManager'' in self.status.capabilities.enabledCapabilities) : true'
+              message: the `marketplace` capability requires the `OperatorLifecycleManager` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `OperatorLifecycleManager` capability
+      served: true
+      storage: true
+      subresources:
+        status: {}

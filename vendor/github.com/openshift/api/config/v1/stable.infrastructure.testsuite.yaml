@@ -1,0 +1,1092 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] Infrastructure"
+crd: 0000_10_config-operator_01_infrastructure-Default.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Infrastructure
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {} # No spec is required for a Infrastructure
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+  onUpdate:
+    - name: Should be able to change External platformName from unknown to something else
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: Unknown
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+    - name: Should not be able to change External platformName once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: SomeOtherCoolplatformName
+      expectedError: " spec.platformSpec.external.platformName: Invalid value: \"string\": platform name cannot be changed once set"
+    - name: Should not be able to modify an existing Azure ResourceTags Tag
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: "HighlyAvailable"
+          infrastructureTopology: "HighlyAvailable"
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "changed"}
+      expectedStatusError: "status.platformStatus.azure.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+    - name: Should not be able to add a Tag to an existing Azure ResourceTags
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: "HighlyAvailable"
+          infrastructureTopology: "HighlyAvailable"
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+                - {key: "new", value: "entry"}
+      expectedStatusError: "status.platformStatus.azure.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+    - name: Should not be able to remove a Tag from an existing Azure ResourceTags
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+                - {key: "new", value: "entry"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      expectedStatusError: "status.platformStatus.azure.resourceTags: Invalid value: \"array\": resourceTags are immutable and may only be configured during installation"
+    - name: Should not be able to add Azure ResourceTags to an empty platformStatus.azure
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure: {}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      expectedStatusError: "status.platformStatus.azure: Invalid value: \"object\": resourceTags may only be configured during installation"
+    - name: Should not be able to remove Azure ResourceTags from platformStatus.azure
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure: {}
+      expectedStatusError: "status.platformStatus.azure: Invalid value: \"object\": resourceTags may only be configured during installation"
+    - name: Should be able to modify the ResourceGroupName while Azure ResourceTags are present
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            type: Azure
+            azure:
+              resourceGroupName: foo
+              resourceTags:
+                - {key: "key", value: "value"}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: Azure
+          platformStatus:
+            azure:
+              resourceGroupName: bar
+              resourceTags:
+                - {key: "key", value: "value"}
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: "HighlyAvailable"
+          infrastructureTopology: "HighlyAvailable"
+          cpuPartitioning: None
+          platform: Azure
+          platformStatus:
+            azure:
+              resourceGroupName: bar
+              resourceTags:
+                - {key: "key", value: "value"}
+    - name: PowerVS platform status's resourceGroup length should not exceed the max length set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group-should-not-accept-the-string-that-exceeds-max-length-set
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup: Too long: may not be longer than 40"
+    - name: PowerVS platform status's resourceGroup should match the regex configured
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: re$ource-group
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup in body should match '^[a-zA-Z0-9-_ ]+$'"
+    - name: Should not be able to change PowerVS platform status's resourceGroup once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: other-resource-group-name
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup: Invalid value: \"string\": resourceGroup is immutable once set"
+    - name: Should not be able to unset PowerVS platform status's resourceGroup once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              region: some-region
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              region: some-region
+      expectedStatusError: "status.platformStatus.powervs: Invalid value: \"object\": cannot unset resourceGroup once set"
+    - name: Should set load balancer type to OpenShiftManagedDefault if not specified
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          platform: OpenStack
+          platformStatus:
+            openstack: {}
+            type: OpenStack
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          cpuPartitioning: None
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: OpenShiftManagedDefault
+            type: OpenStack
+    - name: Should be able to override the default load balancer with a valid value
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          cpuPartitioning: None
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+    - name: Should not allow changing the immutable load balancer type field
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: OpenShiftManagedDefault
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: OpenStack
+            openstack: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+      expectedStatusError: "status.platformStatus.openstack.loadBalancer.type: Invalid value: \"string\": type is immutable once set"
+    - name: Should not allow removing the immutable load balancer type field that was initially set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: OpenStack
+            openstack: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack: {}
+            type: OpenStack
+      expectedStatusError: "status.platformStatus.openstack.loadBalancer.type: Invalid value: \"string\": type is immutable once set"
+    - name: Should not allow setting the load balancer type to a wrong value
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: FooBar
+            type: OpenStack
+      expectedStatusError: "status.platformStatus.openstack.loadBalancer.type: Unsupported value: \"FooBar\": supported values: \"OpenShiftManagedDefault\", \"UserManaged\""
+    - name: Should not be able to update cloudControllerManager state to empty string when state is already set to None
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platformStatus:
+            external:
+              cloudControllerManager:
+                state: ""
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+    - name: Should not be able to update cloudControllerManager state to External when state is already set to None
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+    - name: Should be able to update cloudControllerManager state to None when state is already set to None
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          cpuPartitioning: None
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+    - name: Should not be able to unset cloudControllerManager state when state is already set to None
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+    - name: Should not be able to update cloudControllerManager state to empty string when state is already set to External
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+    - name: Should not be able to update cloudControllerManager state to None when state is already set to External
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+    - name: Should be able to update cloudControllerManager state to External when state is already set to External
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          cpuPartitioning: None
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+    - name: Should not be able to unset cloudControllerManager state when state is already set to External
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+    - name: Should not be able to update cloudControllerManager state to None when state is already set to empty string
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+    - name: Should not be able to update cloudControllerManager state to External when state is already set to empty string
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+    - name: Should be able to update cloudControllerManager state to empty string when state is already set to empty string
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          cpuPartitioning: None
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+    - name: Should not be able to unset cloudControllerManager state when state is already set to empty string
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+    - name: Should be able to update cloudControllerManager state to None when cloudControllerManager state is unset
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          cpuPartitioning: None
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: None
+    - name: Should be able to update cloudControllerManager state to empty string when cloudControllerManager state is unset
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          cpuPartitioning: None
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: ""
+    - name: Should not be able to update cloudControllerManager state to External when cloudControllerManager state is unset
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+    - name: Should be able to unset cloudControllerManager state when cloudControllerManager state is unset
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          cpuPartitioning: None
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager: {}
+    - name: Should not be able to add cloudControllerManager when cloudControllerManager is unset
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external: {}
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      expectedStatusError: " status.platformStatus.external: Invalid value: \"object\": cloudControllerManager may not be added or removed once set"
+    - name: Should not be able to remove cloudControllerManager when cloudControllerManager is set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external:
+              cloudControllerManager:
+                state: External
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: External
+          platformStatus:
+            type: External
+            external: {}
+      expectedStatusError: " status.platformStatus.external: Invalid value: \"object\": cloudControllerManager may not be added or removed once set"
+    - name: Should be able to add valid (URL) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: VPC
+                url: https://dummy.vpc.com
+              - name: COS
+                url: https://dummy.cos.com
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          cpuPartitioning: None
+          infrastructureTopology: HighlyAvailable
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: VPC
+                url: https://dummy.vpc.com
+              - name: COS
+                url: https://dummy.cos.com
+    - name: Should not be able to add empty (URL) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: COS
+                url: " "
+      expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[0].url: Invalid value: \"string\": url must be a valid absolute URL"
+    - name: Should not be able to add invalid (URL) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: VPC
+                url: https://dummy.vpc.com
+              - name: COS
+                url: dummy-cos-com
+      expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[1].url: Invalid value: \"string\": url must be a valid absolute URL"
+    - name: Should not be able to add invalid (Name) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: VPC
+                url: https://dummy.vpc.com
+              - name: BadService
+                url: https://bad-service.com
+      expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[1].name: Unsupported value: \"BadService\": supported values: \"CIS\", \"COS\", \"DNSServices\", \"GlobalSearch\", \"GlobalTagging\", \"HyperProtect\", \"IAM\", \"KeyProtect\", \"ResourceController\", \"ResourceManager\", \"VPC\""

@@ -1,0 +1,114 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/470
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: CustomNoUpgrade
+  name: dnses.config.openshift.io
+spec:
+  group: config.openshift.io
+  names:
+    kind: DNS
+    listKind: DNSList
+    plural: dnses
+    singular: dns
+  scope: Cluster
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: "DNS holds cluster-wide information about DNS. The canonical name is `cluster` \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec holds user settable values for configuration
+              type: object
+              properties:
+                baseDomain:
+                  description: "baseDomain is the base domain of the cluster. All managed DNS records will be sub-domains of this base. \n For example, given the base domain `openshift.example.com`, an API server DNS record may be created for `cluster-api.openshift.example.com`. \n Once set, this field cannot be changed."
+                  type: string
+                platform:
+                  description: platform holds configuration specific to the underlying infrastructure provider for DNS. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time.
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    aws:
+                      description: aws contains DNS configuration specific to the Amazon Web Services cloud provider.
+                      type: object
+                      properties:
+                        privateZoneIAMRole:
+                          description: privateZoneIAMRole contains the ARN of an IAM role that should be assumed when performing operations on the cluster's private hosted zone specified in the cluster DNS config. When left empty, no role should be assumed.
+                          type: string
+                          pattern: ^arn:(aws|aws-cn|aws-us-gov):iam::[0-9]{12}:role\/.*$
+                    type:
+                      description: "type is the underlying infrastructure provider for the cluster. Allowed values: \"\", \"AWS\". \n Individual components may not support all platforms, and must handle unrecognized platforms with best-effort defaults."
+                      type: string
+                      enum:
+                        - ""
+                        - AWS
+                        - Azure
+                        - BareMetal
+                        - GCP
+                        - Libvirt
+                        - OpenStack
+                        - None
+                        - VSphere
+                        - oVirt
+                        - IBMCloud
+                        - KubeVirt
+                        - EquinixMetal
+                        - PowerVS
+                        - AlibabaCloud
+                        - Nutanix
+                        - External
+                      x-kubernetes-validations:
+                        - rule: self in ['','AWS']
+                          message: allowed values are '' and 'AWS'
+                  x-kubernetes-validations:
+                    - rule: 'has(self.type) && self.type == ''AWS'' ?  has(self.aws) : !has(self.aws)'
+                      message: aws configuration is required when platform is AWS, and forbidden otherwise
+                privateZone:
+                  description: "privateZone is the location where all the DNS records that are only available internally to the cluster exist. \n If this field is nil, no private records should be created. \n Once set, this field cannot be changed."
+                  type: object
+                  properties:
+                    id:
+                      description: "id is the identifier that can be used to find the DNS hosted zone. \n on AWS zone can be fetched using `ID` as id in [1] on Azure zone can be fetched using `ID` as a pre-determined name in [2], on GCP zone can be fetched using `ID` as a pre-determined name in [3]. \n [1]: https://docs.aws.amazon.com/cli/latest/reference/route53/get-hosted-zone.html#options [2]: https://docs.microsoft.com/en-us/cli/azure/network/dns/zone?view=azure-cli-latest#az-network-dns-zone-show [3]: https://cloud.google.com/dns/docs/reference/v1/managedZones/get"
+                      type: string
+                    tags:
+                      description: "tags can be used to query the DNS hosted zone. \n on AWS, resourcegroupstaggingapi [1] can be used to fetch a zone using `Tags` as tag-filters, \n [1]: https://docs.aws.amazon.com/cli/latest/reference/resourcegroupstaggingapi/get-resources.html#options"
+                      type: object
+                      additionalProperties:
+                        type: string
+                publicZone:
+                  description: "publicZone is the location where all the DNS records that are publicly accessible to the internet exist. \n If this field is nil, no public records should be created. \n Once set, this field cannot be changed."
+                  type: object
+                  properties:
+                    id:
+                      description: "id is the identifier that can be used to find the DNS hosted zone. \n on AWS zone can be fetched using `ID` as id in [1] on Azure zone can be fetched using `ID` as a pre-determined name in [2], on GCP zone can be fetched using `ID` as a pre-determined name in [3]. \n [1]: https://docs.aws.amazon.com/cli/latest/reference/route53/get-hosted-zone.html#options [2]: https://docs.microsoft.com/en-us/cli/azure/network/dns/zone?view=azure-cli-latest#az-network-dns-zone-show [3]: https://cloud.google.com/dns/docs/reference/v1/managedZones/get"
+                      type: string
+                    tags:
+                      description: "tags can be used to query the DNS hosted zone. \n on AWS, resourcegroupstaggingapi [1] can be used to fetch a zone using `Tags` as tag-filters, \n [1]: https://docs.aws.amazon.com/cli/latest/reference/resourcegroupstaggingapi/get-resources.html#options"
+                      type: object
+                      additionalProperties:
+                        type: string
+            status:
+              description: status holds observed values from the cluster. They may not be overridden.
+              type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

@@ -1,0 +1,273 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[CustomNoUpgrade] Authentication"
+crd: 0000_10_config-operator_01_authentication.crd-CustomNoUpgrade.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Authentication
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec: {} # No spec is required for a Authentication
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec: {}
+  - name: Cannot set username claim prefix with policy NoPrefix
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          claimMappings:
+            username:
+              claim: "preferred_username"
+              prefixPolicy: NoPrefix
+              prefix:
+                prefixString: "myoidc:"
+    expectedError: "prefix must be set if prefixPolicy is 'Prefix', but must remain unset otherwise"
+  - name: Can set username claim prefix with policy Prefix
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          claimMappings:
+            username:
+              claim: "preferred_username"
+              prefixPolicy: Prefix
+              prefix:
+                prefixString: "myoidc:"
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          claimMappings:
+            username:
+              claim: "preferred_username"
+              prefixPolicy: Prefix
+              prefix:
+                prefixString: "myoidc:"
+  - name: Cannot leave username claim prefix blank with policy Prefix
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          claimMappings:
+            username:
+              claim: "preferred_username"
+              prefixPolicy: Prefix
+    expectedError: "prefix must be set if prefixPolicy is 'Prefix', but must remain unset otherwise"
+  - name: Can set OIDC providers with no username prefixing
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          claimMappings:
+            username:
+              claim: "preferred_username"
+              prefixPolicy: NoPrefix
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          claimMappings:
+            username:
+              claim: "preferred_username"
+              prefixPolicy: NoPrefix
+  onUpdate:
+  - name: Updating OIDC provider with a client that's not in the status
+    initial: &initConfig |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          oidcClients:
+            - componentNamespace: namespace
+              componentName: preexisting
+              clientID: someclient
+            - componentNamespace: namespace
+              componentName: name
+              clientID: legitclient
+      status:
+        oidcClients:
+        - componentNamespace: namespace
+          componentName: name
+        - componentNamespace: namespace2
+          componentName: name2
+        - componentNamespace: namespace2
+          componentName: name3
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          oidcClients:
+          - componentNamespace: namespace
+            componentName: preexisting
+            clientID: someclient
+          - componentNamespace: namespace
+            componentName: name
+            clientID: legitclient
+          - componentNamespace: dif-namespace # new client here
+            componentName: tehName
+            clientID: cool-client
+      status:
+        oidcClients:
+        - componentNamespace: namespace
+          componentName: name
+        - componentNamespace: namespace2
+          componentName: name2
+        - componentNamespace: namespace2
+          componentName: name3
+    expectedError: "all oidcClients in the oidcProviders must match their componentName and componentNamespace to either a previously configured oidcClient or they must exist in the status.oidcClients"
+  - name: Updating OIDC provider with a client that's different from the previous one
+    initial: *initConfig
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          oidcClients:
+          - componentNamespace: dif-namespace
+            componentName: tehName
+            clientID: cool-client
+      status:
+        oidcClients:
+        - componentNamespace: namespace
+          componentName: name
+        - componentNamespace: namespace2
+          componentName: name2
+        - componentNamespace: namespace2
+          componentName: name3
+    expectedError: "all oidcClients in the oidcProviders must match their componentName and componentNamespace to either a previously configured oidcClient or they must exist in the status.oidcClients"
+  - name: Updating previously existing client
+    initial: *initConfig
+    updated: &prevExistingUpdated |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          oidcClients:
+            - componentNamespace: namespace
+              componentName: preexisting
+              clientID: different-client
+      status:
+        oidcClients:
+        - componentNamespace: namespace
+          componentName: name
+        - componentNamespace: namespace2
+          componentName: name2
+        - componentNamespace: namespace2
+          componentName: name3
+    expected: *prevExistingUpdated
+  - name: Removing a configured client from the status (== component unregister)
+    initial: *initConfig
+    updated: &removeFromStatus |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          oidcClients:
+            - componentNamespace: namespace
+              componentName: preexisting
+              clientID: different-client
+            - componentNamespace: namespace
+              componentName: name
+              clientID: legitclient
+      status:
+        oidcClients:
+        - componentNamespace: namespace2
+          componentName: name2
+        - componentNamespace: namespace2
+          componentName: name3
+    expected: *removeFromStatus
+  - name: Simply add a valid client
+    initial: *initConfig
+    updated: &addClient |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+        oidcProviders:
+        - name: myoidc
+          issuer:
+            issuerURL: https://meh.tld
+            audiences: ['openshift-aud']
+          oidcClients:
+            - componentNamespace: namespace
+              componentName: preexisting
+              clientID: different-client
+            - componentNamespace: namespace
+              componentName: name
+              clientID: legitclient
+            - componentNamespace: namespace2
+              componentName: name3
+              clientID: justavalidclient
+      status:
+        oidcClients:
+        - componentNamespace: namespace
+          componentName: name
+        - componentNamespace: namespace2
+          componentName: name2
+        - componentNamespace: namespace2
+          componentName: name3
+    expected: *addClient
