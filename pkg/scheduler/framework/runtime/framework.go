@@ -321,6 +321,14 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		fillEventToPluginMap(p, options.clusterEventMap)
 	}
 
+	if len(f.extenders) > 0 {
+		// Extender doesn't support any kind of requeueing feature like EnqueueExtensions in the scheduling framework.
+		// We register a defaultEnqueueExtension to framework.ExtenderName here.
+		// And, in the scheduling cycle, when Extenders reject some Nodes and the pod ends up being unschedulable,
+		// we put framework.ExtenderName to pInfo.UnschedulablePlugins.
+		registerClusterEvents(framework.ExtenderName, options.clusterEventMap, allClusterEvents)
+	}
+
 	// initialize plugins per individual extension points
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
 		if err := updatePluginList(e.slicePtr, *e.plugins, pluginsMap); err != nil {
