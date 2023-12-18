@@ -19,7 +19,7 @@ package args
 import (
 	"fmt"
 
-	"k8s.io/gengo/args"
+	"k8s.io/gengo/v2/args"
 )
 
 // NewDefaults returns default arguments for the generator.

@@ -21,8 +21,8 @@ import (
 	"path"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2/types"
 
 	codegenutil "k8s.io/code-generator/pkg/util"
 )

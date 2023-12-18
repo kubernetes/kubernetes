@@ -25,9 +25,9 @@ import (
 	_ "github.com/onsi/ginkgo/v2/ginkgo"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
-	_ "k8s.io/gengo/examples/deepcopy-gen/generators"
-	_ "k8s.io/gengo/examples/defaulter-gen/generators"
-	_ "k8s.io/gengo/examples/import-boss/generators"
+	_ "k8s.io/gengo/v2/examples/deepcopy-gen/generators"
+	_ "k8s.io/gengo/v2/examples/defaulter-gen/generators"
+	_ "k8s.io/gengo/v2/examples/import-boss/generators"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
 
 	// submodule test dependencies

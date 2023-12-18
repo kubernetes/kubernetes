@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 // NewImportTrackerForPackage creates a new import tracker which is aware

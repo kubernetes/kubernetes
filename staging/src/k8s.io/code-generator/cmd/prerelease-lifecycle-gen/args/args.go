@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 	statusgenerators "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/prerelease-lifecycle-generators"
-	"k8s.io/gengo/args"
+	"k8s.io/gengo/v2/args"
 )
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
