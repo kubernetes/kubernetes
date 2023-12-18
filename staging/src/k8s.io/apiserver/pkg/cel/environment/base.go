@@ -124,7 +124,7 @@ var baseOpts = []VersionedOptions{
 		},
 	},
 	{
-		IntroducedVersion: version.MajorMinor(1, 30),
+		IntroducedVersion: version.MajorMinor(1, 27),
 		EnvOptions: []cel.EnvOption{
 			library.IP(),
 			library.CIDR(),
