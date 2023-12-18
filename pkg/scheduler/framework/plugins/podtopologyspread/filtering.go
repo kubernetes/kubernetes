@@ -239,24 +239,9 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
 func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod) (*preFilterState, error) {
-	var constraints []topologySpreadConstraint
-	var err error
-	if len(pod.Spec.TopologySpreadConstraints) > 0 {
-		// We have feature gating in APIServer to strip the spec
-		// so don't need to re-check feature gate, just check length of Constraints.
-		constraints, err = pl.filterTopologySpreadConstraints(
-			pod.Spec.TopologySpreadConstraints,
-			pod.Labels,
-			v1.DoNotSchedule,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %w", err)
-		}
-	} else {
-		constraints, err = pl.buildDefaultConstraints(pod, v1.DoNotSchedule)
-		if err != nil {
-			return nil, fmt.Errorf("setting default hard topology spread constraints: %w", err)
-		}
+	constraints, err := pl.getConstraints(pod)
+	if err != nil {
+		return nil, fmt.Errorf("get constraints from pod: %w", err)
 	}
 	if len(constraints) == 0 {
 		return &preFilterState{}, nil
