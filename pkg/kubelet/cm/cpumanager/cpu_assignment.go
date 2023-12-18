@@ -92,13 +92,6 @@ func standardDeviation(xs []int) float64 {
 	return math.Round(s*1000) / 1000
 }
 
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
 type numaOrSocketsFirstFuncs interface {
 	takeFullFirstLevel()
 	takeFullSecondLevel()

@@ -52,7 +52,6 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/integer"
 
 	"k8s.io/klog/v2"
 )
@@ -940,7 +939,7 @@ func podReadyTime(pod *v1.Pod) *metav1.Time {
 func maxContainerRestarts(pod *v1.Pod) int {
 	maxRestarts := 0
 	for _, c := range pod.Status.ContainerStatuses {
-		maxRestarts = integer.IntMax(maxRestarts, int(c.RestartCount))
+		maxRestarts = max(maxRestarts, int(c.RestartCount))
 	}
 	return maxRestarts
 }

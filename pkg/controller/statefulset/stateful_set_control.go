@@ -31,7 +31,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/integer"
 )
 
 // Realistic value for maximum in-flight requests when processing in parallel mode.
@@ -281,7 +280,7 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 func slowStartBatch(initialBatchSize int, remaining int, fn func(int) (bool, error)) (int, error) {
 	successes := 0
 	j := 0
-	for batchSize := integer.IntMin(remaining, initialBatchSize); batchSize > 0; batchSize = integer.IntMin(integer.IntMin(2*batchSize, remaining), MaxBatchSize) {
+	for batchSize := min(remaining, initialBatchSize); batchSize > 0; batchSize = min(min(2*batchSize, remaining), MaxBatchSize) {
 		errCh := make(chan error, batchSize)
 		var wg sync.WaitGroup
 		wg.Add(batchSize)

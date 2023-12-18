@@ -818,13 +818,6 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 	n.Generation = nextGeneration()
 }
 
-func max(a, b int64) int64 {
-	if a >= b {
-		return a
-	}
-	return b
-}
-
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 	var non0InitCPU, non0InitMem int64
 	var non0CPU, non0Mem int64
