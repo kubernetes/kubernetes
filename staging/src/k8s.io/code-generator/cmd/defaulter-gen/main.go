@@ -45,7 +45,7 @@ import (
 	"flag"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/examples/defaulter-gen/generators"
+	"k8s.io/gengo/v2/examples/defaulter-gen/generators"
 	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/defaulter-gen/args"

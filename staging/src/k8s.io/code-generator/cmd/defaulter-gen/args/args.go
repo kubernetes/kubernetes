@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/examples/defaulter-gen/generators"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2/examples/defaulter-gen/generators"
 )
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.

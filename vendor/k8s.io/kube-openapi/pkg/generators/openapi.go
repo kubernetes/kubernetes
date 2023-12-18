@@ -26,10 +26,10 @@ import (
 	"sort"
 	"strings"
 
-	defaultergen "k8s.io/gengo/examples/defaulter-gen/generators"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	defaultergen "k8s.io/gengo/v2/examples/defaulter-gen/generators"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/klog/v2"

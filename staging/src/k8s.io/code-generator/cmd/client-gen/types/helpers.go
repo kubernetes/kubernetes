@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/namer"
+	"k8s.io/gengo/v2/namer"
 )
 
 // ToGroupVersion turns "group/version" string into a GroupVersion struct. It reports error

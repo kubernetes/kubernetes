@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	"k8s.io/gengo/examples/set-gen/sets"
+	"k8s.io/gengo/v2/examples/set-gen/sets"
 )
 
 // Test_Controller validates the garbage collection logic for the apiserverleasegc controller.
