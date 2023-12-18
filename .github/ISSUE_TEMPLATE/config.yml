@@ -2,3 +2,6 @@ contact_links:
   - name: Support Request
     url: https://discuss.kubernetes.io
     about: Support request or question relating to Kubernetes
+  - name: Kubernetes Enhancement Processes (KEP)
+    url: https://github.com/kubernetes/enhancements
+    about: check https://github.com/kubernetes/enhancements#is-my-thing-an-enhancement
