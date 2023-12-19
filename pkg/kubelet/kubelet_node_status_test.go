@@ -2758,8 +2758,12 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 	addNotImplatedReaction(kubeClient)
 
-	// Make node to be unschedulable.
-	kubelet.registerSchedulable = false
+	unschedulableTaint := v1.Taint{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	// Mark node with unschedulable taints
+	kubelet.registerWithTaints = []v1.Taint{unschedulableTaint}
 
 	// Reset kubelet status for each test.
 	kubelet.registrationCompleted = false
@@ -2769,13 +2773,9 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 	// Check the unschedulable taint.
 	got := gotNode.(*v1.Node)
-	unschedulableTaint := &v1.Taint{
-		Key:    v1.TaintNodeUnschedulable,
-		Effect: v1.TaintEffectNoSchedule,
-	}
 
 	require.True(t,
-		taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
+		taintutil.TaintExists(got.Spec.Taints, &unschedulableTaint),
 		"test unschedulable taint for TaintNodesByCondition")
 }
 
