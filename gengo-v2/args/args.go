@@ -180,7 +180,7 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 
 	c.Verify = g.VerifyOnly
 	packages := pkgs(c, g)
-	if err := c.ExecutePackages(g.OutputBase, packages); err != nil {
+	if err := c.ExecutePackages(packages); err != nil {
 		return fmt.Errorf("Failed executing generator: %v", err)
 	}
 
