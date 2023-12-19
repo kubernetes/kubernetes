@@ -3650,17 +3650,17 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "multiprotocol-test"
 		testLabels := map[string]string{"app": "multiport"}
 		ns := f.Namespace.Name
-		containerPort := 80
+		containerPort := 100
 
 		svcTCPport := v1.ServicePort{
 			Name:       "tcp-port",
-			Port:       80,
+			Port:       100,
 			TargetPort: intstr.FromInt(containerPort),
 			Protocol:   v1.ProtocolTCP,
 		}
 		svcUDPport := v1.ServicePort{
 			Name:       "udp-port",
-			Port:       80,
+			Port:       100,
 			TargetPort: intstr.FromInt(containerPort),
 			Protocol:   v1.ProtocolUDP,
 		}
@@ -3697,11 +3697,11 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("Checking if the Service forwards traffic to the TCP and UDP port")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
-		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 30*time.Second)
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 100, v1.ProtocolTCP, execPod, 30*time.Second)
 		if err != nil {
 			framework.Failf("Failed to connect to Service TCP port: %v", err)
 		}
-		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 30*time.Second)
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 100, v1.ProtocolUDP, execPod, 30*time.Second)
 		if err != nil {
 			framework.Failf("Failed to connect to Service UDP port: %v", err)
 		}
@@ -3718,7 +3718,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		// test reachability
-		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 30*time.Second)
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 100, v1.ProtocolTCP, execPod, 30*time.Second)
 		if err != nil {
 			framework.Failf("Failed to connect to Service TCP port: %v", err)
 		}
@@ -3726,7 +3726,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// testEndpointReachability tries 3 times every 3 second
 		// we retry again during 30 seconds to check if the port stops forwarding
 		gomega.Eventually(ctx, func() error {
-			return testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 6*time.Second)
+			return testEndpointReachability(ctx, service.Spec.ClusterIP, 100, v1.ProtocolUDP, execPod, 6*time.Second)
 		}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).ShouldNot(gomega.BeNil())
 
 		ginkgo.By("Checking if the Service forwards traffic to UDP only")
@@ -3741,7 +3741,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		// test reachability
-		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 30*time.Second)
+		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 100, v1.ProtocolUDP, execPod, 30*time.Second)
 		if err != nil {
 			framework.Failf("Failed to connect to Service UDP port: %v", err)
 		}
@@ -3749,7 +3749,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// testEndpointReachability tries 3 times every 3 second
 		// we retry again during 30 seconds to check if the port stops forwarding
 		gomega.Eventually(ctx, func() error {
-			return testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 6*time.Second)
+			return testEndpointReachability(ctx, service.Spec.ClusterIP, 100, v1.ProtocolTCP, execPod, 6*time.Second)
 		}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).ShouldNot(gomega.BeNil())
 	})
 
