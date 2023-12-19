@@ -103,7 +103,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			&generator.DefaultPackage{
 				PackageName: pkg.Name,
 				PackagePath: pkg.Path,
-				HeaderText:  boilerplate,
+				//FIXME: set Source
+				HeaderText: boilerplate,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
 						&registerExternalGenerator{

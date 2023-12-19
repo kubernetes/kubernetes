@@ -223,7 +223,8 @@ func factoryPackage(basePackage string, boilerplate []byte, groupGoNames, plural
 	return &generator.DefaultPackage{
 		PackageName: filepath.Base(basePackage),
 		PackagePath: basePackage,
-		HeaderText:  boilerplate,
+		//FIXME: set Source
+		HeaderText: boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryGenerator{
 				DefaultGen: generator.DefaultGen{
@@ -260,7 +261,8 @@ func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPa
 	return &generator.DefaultPackage{
 		PackageName: filepath.Base(packagePath),
 		PackagePath: packagePath,
-		HeaderText:  boilerplate,
+		//FIXME: set Source
+		HeaderText: boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryInterfaceGenerator{
 				DefaultGen: generator.DefaultGen{
@@ -283,7 +285,8 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 	return &generator.DefaultPackage{
 		PackageName: groupPkgName,
 		PackagePath: packagePath,
-		HeaderText:  boilerplate,
+		//FIXME: set Source
+		HeaderText: boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &groupInterfaceGenerator{
 				DefaultGen: generator.DefaultGen{
@@ -309,7 +312,8 @@ func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.G
 	return &generator.DefaultPackage{
 		PackageName: strings.ToLower(gv.Version.NonEmpty()),
 		PackagePath: packagePath,
-		HeaderText:  boilerplate,
+		//FIXME: set Source
+		HeaderText: boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &versionInterfaceGenerator{
 				DefaultGen: generator.DefaultGen{

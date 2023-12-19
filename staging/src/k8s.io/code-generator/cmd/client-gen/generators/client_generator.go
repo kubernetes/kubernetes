@@ -131,8 +131,9 @@ func DefaultNameSystem() string {
 func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, apiPath string, srcTreePath string, inputPackage string, applyBuilderPackage string, boilerplate []byte) generator.Package {
 	groupVersionClientPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()))
 	return &generator.DefaultPackage{
-		PackageName:          strings.ToLower(gv.Version.NonEmpty()),
-		PackagePath:          groupVersionClientPackage,
+		PackageName: strings.ToLower(gv.Version.NonEmpty()),
+		PackagePath: groupVersionClientPackage,
+		// FIXME: set Source
 		HeaderText:           boilerplate,
 		PackageDocumentation: []byte("// This package has the automatically generated typed clients.\n"),
 		// GeneratorFunc returns a list of generators. Each generator makes a
@@ -197,7 +198,8 @@ func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 	return &generator.DefaultPackage{
 		PackageName: customArgs.ClientsetName,
 		PackagePath: clientsetPackage,
-		HeaderText:  boilerplate,
+		// FIXME: set Source
+		HeaderText: boilerplate,
 		// GeneratorFunc returns a list of generators. Each generator generates a
 		// single file.
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
@@ -234,8 +236,9 @@ NextGroup:
 	}
 
 	return &generator.DefaultPackage{
-		PackageName:          "scheme",
-		PackagePath:          schemePackage,
+		PackageName: "scheme",
+		PackagePath: schemePackage,
+		// FIXME: set Source
 		HeaderText:           boilerplate,
 		PackageDocumentation: []byte("// This package contains the scheme of the automatically generated clientset.\n"),
 		// GeneratorFunc returns a list of generators. Each generator generates a

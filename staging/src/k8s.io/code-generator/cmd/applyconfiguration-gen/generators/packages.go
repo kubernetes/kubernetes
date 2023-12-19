@@ -156,7 +156,8 @@ func generatorForApplyConfigurationsPackage(outputPackagePath string, boilerplat
 	return &generator.DefaultPackage{
 		PackageName: gv.Version.PackageName(),
 		PackagePath: packageName.Package,
-		HeaderText:  boilerplate,
+		// FIXME: set Source
+		HeaderText: boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			for _, toGenerate := range typesToGenerate {
 				var openAPIType *string
@@ -191,7 +192,8 @@ func generatorForUtils(outPackagePath string, boilerplate []byte, groupVersions 
 	return &generator.DefaultPackage{
 		PackageName: filepath.Base(outPackagePath),
 		PackagePath: outPackagePath,
-		HeaderText:  boilerplate,
+		// FIXME: set Source
+		HeaderText: boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &utilGenerator{
 				DefaultGen: generator.DefaultGen{
@@ -212,7 +214,8 @@ func generatorForInternal(outPackagePath string, boilerplate []byte, models *typ
 	return &generator.DefaultPackage{
 		PackageName: filepath.Base(outPackagePath),
 		PackagePath: outPackagePath,
-		HeaderText:  boilerplate,
+		// FIXME: set Source
+		HeaderText: boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &internalGenerator{
 				DefaultGen: generator.DefaultGen{

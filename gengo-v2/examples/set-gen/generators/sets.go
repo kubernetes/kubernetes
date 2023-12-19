@@ -53,7 +53,8 @@ func Packages(_ *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 	return generator.Packages{&generator.DefaultPackage{
 		PackageName: "sets",
 		PackagePath: arguments.OutputPackagePath,
-		HeaderText:  boilerplate,
+		//FIXME: set Source
+		HeaderText: boilerplate,
 		PackageDocumentation: []byte(
 			`// Package sets has auto-generated set types.
 `),

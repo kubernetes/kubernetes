@@ -214,6 +214,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				&generator.DefaultPackage{
 					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
 					PackagePath: path,
+					Source:      pkg.SourcePath, // output pkg is the same as the input
 					HeaderText:  header,
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
@@ -297,9 +298,12 @@ func (g *genDeepCopy) copyableAndInBounds(t *types.Type) bool {
 // if the type does not match. This allows more efficient deep copy
 // implementations to be defined by the type's author.  The correct signature
 // for a type T is:
-//    func (t T) DeepCopy() T
+//
+//	func (t T) DeepCopy() T
+//
 // or:
-//    func (t *T) DeepCopy() *T
+//
+//	func (t *T) DeepCopy() *T
 func deepCopyMethod(t *types.Type) (*types.Signature, error) {
 	f, found := t.Methods["DeepCopy"]
 	if !found {
@@ -346,9 +350,12 @@ func deepCopyMethodOrDie(t *types.Type) *types.Signature {
 // if the type is wrong. DeepCopyInto allows more efficient deep copy
 // implementations to be defined by the type's author.  The correct signature
 // for a type T is:
-//    func (t T) DeepCopyInto(t *T)
+//
+//	func (t T) DeepCopyInto(t *T)
+//
 // or:
-//    func (t *T) DeepCopyInto(t *T)
+//
+//	func (t *T) DeepCopyInto(t *T)
 func deepCopyIntoMethod(t *types.Type) (*types.Signature, error) {
 	f, found := t.Methods["DeepCopyInto"]
 	if !found {

@@ -36,7 +36,8 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	return &generator.DefaultPackage{
 		PackageName: "fake",
 		PackagePath: outputPackage,
-		HeaderText:  boilerplate,
+		// FIXME: set Source
+		HeaderText: boilerplate,
 		PackageDocumentation: []byte(
 			`// Package fake has the automatically generated clients.
 `),
@@ -91,7 +92,8 @@ func PackageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 		// Package name and path are hard coded for now.
 		PackageName: "fake",
 		PackagePath: filepath.Join(clientsetPackage, "fake"),
-		HeaderText:  boilerplate,
+		// FIXME: set Source
+		HeaderText: boilerplate,
 		PackageDocumentation: []byte(
 			`// This package has the automatically generated fake clientset.
 `),

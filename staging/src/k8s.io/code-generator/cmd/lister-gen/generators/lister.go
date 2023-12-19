@@ -123,7 +123,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		packageList = append(packageList, &generator.DefaultPackage{
 			PackageName: strings.ToLower(gv.Version.NonEmpty()),
 			PackagePath: packagePath,
-			HeaderText:  boilerplate,
+			//FIXME: set Source
+			HeaderText: boilerplate,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				generators = append(generators, &expansionGenerator{
 					DefaultGen: generator.DefaultGen{

@@ -217,11 +217,7 @@ func (c *Context) addNameSystems(namers namer.NameSystems) *Context {
 func (c *Context) ExecutePackage(p Package) error {
 	path := p.SourcePath()
 	if path == "" {
-		if pkg := c.Universe[p.Path()]; pkg == nil {
-			return fmt.Errorf("can't find an output path for package %s", p.Path())
-		} else {
-			path = pkg.SourcePath
-		}
+		return fmt.Errorf("no source-path for package %s", p.Path())
 	}
 	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), path)
 	// Filter out any types the *package* doesn't care about.

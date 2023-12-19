@@ -75,7 +75,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		&generator.DefaultPackage{
 			PackageName: filepath.Base(arguments.OutputPackagePath),
 			PackagePath: arguments.OutputPackagePath,
-			HeaderText:  header,
+			//FIXME: set Source
+			HeaderText: header,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newOpenAPIGen(
