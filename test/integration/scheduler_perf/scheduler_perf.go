@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -293,7 +294,7 @@ type runnableOp interface {
 	// before running the operation.
 	requiredNamespaces() []string
 	// run executes the steps provided by the operation.
-	run(context.Context, testing.TB, clientset.Interface)
+	run(context.Context, testing.TB, clientset.Interface, dynamic.Interface, apiextensionsclient.Interface)
 }
 
 func isValidParameterizable(val string) bool {
@@ -704,8 +705,8 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 					for feature, flag := range tc.FeatureGates {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
-					informerFactory, client, dyncClient := setupClusterForWorkload(ctx, b, tc.SchedulerConfigPath, tc.FeatureGates, outOfTreePluginRegistry)
-					results := runWorkload(ctx, b, tc, w, informerFactory, client, dyncClient, false)
+					informerFactory, client, dyncClient, apiClient := setupClusterForWorkload(ctx, b, tc.SchedulerConfigPath, tc.FeatureGates, outOfTreePluginRegistry)
+					results := runWorkload(ctx, b, tc, w, informerFactory, client, dyncClient, apiClient, false)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
 
 					if len(results) > 0 {
@@ -794,7 +795,7 @@ func unrollWorkloadTemplate(tb testing.TB, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(ctx context.Context, tb testing.TB, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func setupClusterForWorkload(ctx context.Context, tb testing.TB, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface, apiextensionsclient.Interface) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {
@@ -809,7 +810,7 @@ func setupClusterForWorkload(ctx context.Context, tb testing.TB, configPath stri
 	return mustSetupCluster(ctx, tb, cfg, featureGates, outOfTreePluginRegistry)
 }
 
-func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory, client clientset.Interface, dynClient dynamic.Interface, cleanup bool) []DataItem {
+func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory, client clientset.Interface, dynClient dynamic.Interface, apiClient apiextensionsclient.Interface, cleanup bool) []DataItem {
 	b, benchmarking := tb.(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -1109,7 +1110,7 @@ func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, 
 			for _, namespace := range runable.requiredNamespaces() {
 				createNamespaceIfNotPresent(ctx, tb, client, namespace, &numPodsScheduledPerNamespace)
 			}
-			runable.run(ctx, tb, client)
+			runable.run(ctx, tb, client, dynClient, apiClient)
 		}
 	}
 

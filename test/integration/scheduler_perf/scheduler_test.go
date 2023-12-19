@@ -79,7 +79,7 @@ func TestScheduling(t *testing.T) {
 			for feature, flag := range config.featureGates {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)()
 			}
-			informerFactory, client, dynClient := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates, nil)
+			informerFactory, client, dynClient, apiClient := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates, nil)
 
 			for _, tc := range testCases {
 				if !config.equals(tc) {
@@ -94,7 +94,7 @@ func TestScheduling(t *testing.T) {
 								t.Skipf("disabled by label filter %q", *testSchedulingLabelFilter)
 							}
 							_, ctx := ktesting.NewTestContext(t)
-							runWorkload(ctx, t, tc, w, informerFactory, client, dynClient, true)
+							runWorkload(ctx, t, tc, w, informerFactory, client, dynClient, apiClient, true)
 						})
 					}
 				})

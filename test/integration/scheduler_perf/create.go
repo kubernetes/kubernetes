@@ -21,7 +21,10 @@ import (
 	"fmt"
 	"testing"
 
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -69,7 +72,7 @@ func (cro *createOp[T, P]) requiredNamespaces() []string {
 	return []string{cro.Namespace}
 }
 
-func (cro *createOp[T, P]) run(ctx context.Context, tb testing.TB, client clientset.Interface) {
+func (cro *createOp[T, P]) run(ctx context.Context, tb testing.TB, client kubernetes.Interface, dynClient dynamic.Interface, apiClient apiextensionsclient.Interface) {
 	var obj *T
 	var p P
 	if err := getSpecFromFile(&cro.TemplatePath, &obj); err != nil {

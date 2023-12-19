@@ -24,7 +24,10 @@ import (
 	"testing"
 
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -82,7 +85,7 @@ func (op *createResourceClaimsOp) requiredNamespaces() []string {
 	return []string{op.Namespace}
 }
 
-func (op *createResourceClaimsOp) run(ctx context.Context, tb testing.TB, clientset clientset.Interface) {
+func (op *createResourceClaimsOp) run(ctx context.Context, tb testing.TB, client kubernetes.Interface, dynClient dynamic.Interface, apiClient apiextensionsclient.Interface) {
 	tb.Logf("creating %d claims in namespace %q", op.Count, op.Namespace)
 
 	var claimTemplate *resourcev1alpha2.ResourceClaim
@@ -93,7 +96,7 @@ func (op *createResourceClaimsOp) run(ctx context.Context, tb testing.TB, client
 	var mutex sync.Mutex
 	create := func(i int) {
 		err := func() error {
-			if _, err := clientset.ResourceV1alpha2().ResourceClaims(op.Namespace).Create(ctx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
+			if _, err := client.ResourceV1alpha2().ResourceClaims(op.Namespace).Create(ctx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create claim: %v", err)
 			}
 			return nil
@@ -186,7 +189,7 @@ func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
 
 func (op *createResourceDriverOp) requiredNamespaces() []string { return nil }
 
-func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, clientset clientset.Interface) {
+func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client kubernetes.Interface, dynClient dynamic.Interface, apiClient apiextensionsclient.Interface) {
 	tb.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
 
 	// Start the controller side of the DRA test driver such that it simulates
@@ -197,7 +200,7 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 		MaxAllocations: op.MaxClaimsPerNode,
 	}
 
-	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		tb.Fatalf("list nodes: %v", err)
 	}
@@ -211,7 +214,7 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 		}
 	}
 
-	controller := draapp.NewController(clientset, resources)
+	controller := draapp.NewController(client, resources)
 	ctx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	wg.Add(1)

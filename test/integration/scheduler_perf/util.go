@@ -26,11 +26,12 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,13 +40,12 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -83,24 +83,26 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupCluster(ctx context.Context, tb testing.TB, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func mustSetupCluster(ctx context.Context, tb testing.TB, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface, apiextensionsclient.Interface) {
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, tb, framework.TestServerSetup{
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
-
-			// Enable DRA API group.
-			if enabledFeatures[features.DynamicResourceAllocation] {
-				opts.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
-					resourcev1alpha2.SchemeGroupVersion.String(): "true",
-				}
-			}
-		},
-	})
-	tb.Cleanup(tearDownFn)
+	// No alpha APIs (overrides api/all=true in https://github.com/kubernetes/kubernetes/blob/d647d19f6aef811bace300eec96a67644ff303d4/staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/testing/testserver.go#L136),
+	// except for DRA API group when needed.
+	runtimeConfig := []string{"api/alpha=false"}
+	if enabledFeatures[features.DynamicResourceAllocation] {
+		runtimeConfig = append(runtimeConfig, "resource.k8s.io/v1alpha2=true")
+	}
+	customFlags := []string{
+		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+		"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition,Priority",
+		"--runtime-config=" + strings.Join(runtimeConfig, ","),
+	}
+	server, err := apiservertesting.StartTestServer(tb, apiservertesting.NewDefaultTestServerOptions(), customFlags, framework.SharedEtcd())
+	if err != nil {
+		tb.Fatalf("start apiserver: %v", err)
+	}
+	tb.Cleanup(server.TearDownFn)
 
 	// Cleanup will be in reverse order: first the clients get cancelled,
 	// then the apiserver is torn down.
@@ -109,7 +111,7 @@ func mustSetupCluster(ctx context.Context, tb testing.TB, config *config.KubeSch
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
-	cfg := restclient.CopyConfig(kubeConfig)
+	cfg := restclient.CopyConfig(server.ClientConfig)
 	cfg.QPS = 5000.0
 	cfg.Burst = 5000
 
@@ -124,6 +126,7 @@ func mustSetupCluster(ctx context.Context, tb testing.TB, config *config.KubeSch
 
 	client := clientset.NewForConfigOrDie(cfg)
 	dynClient := dynamic.NewForConfigOrDie(cfg)
+	apiClient := apiextensionsclient.NewForConfigOrDie(cfg)
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
@@ -145,7 +148,7 @@ func mustSetupCluster(ctx context.Context, tb testing.TB, config *config.KubeSch
 	go runNS()
 	go runResourceClaimController()
 
-	return informerFactory, client, dynClient
+	return informerFactory, client, dynClient, apiClient
 }
 
 // Returns the list of scheduled and unscheduled pods in the specified namespaces.
