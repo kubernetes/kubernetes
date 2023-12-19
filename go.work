@@ -2,6 +2,7 @@ go 1.22
 
 use (
 	.
+	./gengo-v2
 	./staging/src/k8s.io/api
 	./staging/src/k8s.io/apiextensions-apiserver
 	./staging/src/k8s.io/apimachinery
