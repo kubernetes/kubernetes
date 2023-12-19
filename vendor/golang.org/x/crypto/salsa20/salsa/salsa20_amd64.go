@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build amd64 && !purego && gc
-// +build amd64,!purego,gc
 
 package salsa
 
