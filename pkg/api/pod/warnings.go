@@ -257,7 +257,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 						bad = true
 					}
 					if bad {
-						warnings = append(warnings, fmt.Sprintf("%s: hides previous definition of %q", p.Child("env").Index(i), item.Name))
+						warnings = append(warnings, fmt.Sprintf("%s: hides previous definition of %q, which may be dropped when using apply", p.Child("env").Index(i), item.Name))
 					}
 				} else {
 					items.Insert(item.Name)
