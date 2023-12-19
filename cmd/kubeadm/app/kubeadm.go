@@ -41,10 +41,10 @@ func Run() error {
 	pflag.CommandLine.MarkHidden("log-backtrace-at")
 	pflag.CommandLine.MarkHidden("log-dir")
 	pflag.CommandLine.MarkHidden("logtostderr")
-	pflag.CommandLine.MarkHidden("log-file")
-	pflag.CommandLine.MarkHidden("log-file-max-size")
-	pflag.CommandLine.MarkHidden("one-output")
-	pflag.CommandLine.MarkHidden("skip-log-headers")
+	pflag.CommandLine.MarkHidden("log-file")          //nolint:errcheck
+	pflag.CommandLine.MarkHidden("log-file-max-size") //nolint:errcheck
+	pflag.CommandLine.MarkHidden("one-output")        //nolint:errcheck
+	pflag.CommandLine.MarkHidden("skip-log-headers")  //nolint:errcheck
 	pflag.CommandLine.MarkHidden("stderrthreshold")
 	pflag.CommandLine.MarkHidden("vmodule")
 
