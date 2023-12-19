@@ -26,8 +26,9 @@ import (
 )
 
 func TestCleanupErr(t *testing.T) {
-	if !errors.Is(cleanupErr, context.Canceled) {
-		t.Errorf("cleanupErr %T should be a %T", cleanupErr, context.Canceled)
+	actual := cleanupErr(t.Name())
+	if !errors.Is(actual, context.Canceled) {
+		t.Errorf("cleanupErr %T should be a %T", actual, context.Canceled)
 	}
 }
 

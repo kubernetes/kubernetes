@@ -18,12 +18,15 @@ package ktesting
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
-// cleanupErr is used as cause when canceling a context because the test has completed.
+// cleanupErr creates a cause when canceling a context because the test has completed.
 // It is a context.Canceled error.
-var cleanupErr = canceledError("test is cleaning up")
+func cleanupErr(testName string) error {
+	return canceledError(fmt.Sprintf("test %s is cleaning up", testName))
+}
 
 type canceledError string
 
@@ -46,7 +49,7 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 	after := time.NewTimer(timeout)
 	stopCtx, stop := context.WithCancel(ctx) // Only used internally, doesn't need a cause.
 	tb.Cleanup(func() {
-		cancel(cleanupErr)
+		cancel(cleanupErr(tb.Name()))
 		stop()
 	})
 	go func() {
