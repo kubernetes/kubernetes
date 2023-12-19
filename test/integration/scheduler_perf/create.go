@@ -19,10 +19,10 @@ package benchmark
 import (
 	"context"
 	"fmt"
-	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // createOp defines an op where some object gets created from a template.
@@ -69,14 +69,14 @@ func (cro *createOp[T, P]) requiredNamespaces() []string {
 	return []string{cro.Namespace}
 }
 
-func (cro *createOp[T, P]) run(ctx context.Context, tb testing.TB, client clientset.Interface) {
+func (cro *createOp[T, P]) run(tCtx ktesting.TContext) {
 	var obj *T
 	var p P
 	if err := getSpecFromFile(&cro.TemplatePath, &obj); err != nil {
-		tb.Fatalf("parsing %s %q: %v", p.Name(), cro.TemplatePath, err)
+		tCtx.Fatalf("parsing %s %q: %v", p.Name(), cro.TemplatePath, err)
 	}
-	if _, err := p.CreateCall(client, cro.Namespace)(ctx, obj, metav1.CreateOptions{}); err != nil {
-		tb.Fatalf("create %s: %v", p.Name(), err)
+	if _, err := p.CreateCall(tCtx.Client(), cro.Namespace)(tCtx, obj, metav1.CreateOptions{}); err != nil {
+		tCtx.Fatalf("create %s: %v", p.Name(), err)
 	}
 }
 
