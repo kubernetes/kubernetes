@@ -137,18 +137,13 @@ func sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 }
 
 func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
-	var _p0 unsafe.Pointer
+	var bufptr *Statfs_t
 	var bufsize uintptr
 	if len(buf) > 0 {
-		_p0 = unsafe.Pointer(&buf[0])
+		bufptr = &buf[0]
 		bufsize = unsafe.Sizeof(Statfs_t{}) * uintptr(len(buf))
 	}
-	r0, _, e1 := Syscall(SYS_GETFSSTAT, uintptr(_p0), bufsize, uintptr(flags))
-	n = int(r0)
-	if e1 != 0 {
-		err = e1
-	}
-	return
+	return getfsstat(bufptr, bufsize, flags)
 }
 
 //sysnb	getresuid(ruid *_C_int, euid *_C_int, suid *_C_int)
@@ -326,4 +321,7 @@ func Uname(uname *Utsname) error {
 //sys	write(fd int, p []byte) (n int, err error)
 //sys	mmap(addr uintptr, length uintptr, prot int, flag int, fd int, pos int64) (ret uintptr, err error)
 //sys	munmap(addr uintptr, length uintptr) (err error)
+//sys	getfsstat(stat *Statfs_t, bufsize uintptr, flags int) (n int, err error)
 //sys	utimensat(dirfd int, path string, times *[2]Timespec, flags int) (err error)
+//sys	pledge(promises *byte, execpromises *byte) (err error)
+//sys	unveil(path *byte, flags *byte) (err error)
