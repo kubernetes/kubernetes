@@ -19,6 +19,7 @@ limitations under the License.
 package statusupdater
 
 import (
+	"bytes"
 	"fmt"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,6 +50,7 @@ func NewNodeStatusUpdater(
 		actualStateOfWorld: actualStateOfWorld,
 		nodeLister:         nodeLister,
 		kubeClient:         kubeClient,
+		statusUpdatedNodes: make(map[types.NodeName]bool),
 	}
 }
 
@@ -56,6 +58,7 @@ type nodeStatusUpdater struct {
 	kubeClient         clientset.Interface
 	nodeLister         corelisters.NodeLister
 	actualStateOfWorld cache.ActualStateOfWorld
+	statusUpdatedNodes map[types.NodeName]bool
 }
 
 func (nsu *nodeStatusUpdater) UpdateNodeStatuses(logger klog.Logger) error {
@@ -125,6 +128,19 @@ func (nsu *nodeStatusUpdater) updateNodeStatus(logger klog.Logger, nodeName type
 	if err != nil {
 		return err
 	}
+
+	// The nodeLister might not be synchronized with node status in time, which could result in a patch with no diff.
+	// A retry is necessary to avoid inconsistencies between the asw and the node status.
+	if _, ok := nsu.statusUpdatedNodes[nodeName]; ok && bytes.Equal(patchBytes, []byte("{}")) {
+		// The introduction of nsu.statusUpdatedNodes is to prevent entering into an infinite loop
+		// Typically, when the kube-controller-manager starts, the state in asw is consistent with that in nodeLister,
+		// which in reality does not trigger an update to the node status.
+		// Additionally: When a newly joined node in the cluster needs an update, there will be a diff between asw and the nodeLister.
+		// Therefore, it's also acceptable bypassing the diff check for this situation.
+		return fmt.Errorf("expected and current attach volumes has no diff: node %q, expected %v, current %v",
+			nodeName, attachedVolumes, nodeObj.Status.VolumesAttached)
+	}
+	nsu.statusUpdatedNodes[nodeName] = true
 
 	logger.V(4).Info("Updating status for node succeeded", "node", klog.KObj(node), "patchBytes", patchBytes, "attachedVolumes", attachedVolumes)
 	return nil
