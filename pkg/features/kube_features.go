@@ -58,14 +58,6 @@ const (
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
-	// owner: @nabokihms
-	// alpha: v1.26
-	// beta: v1.27
-	// GA: v1.28
-	//
-	// Enables API to get self subject attributes after authentication.
-	APISelfSubjectReview featuregate.Feature = "APISelfSubjectReview"
-
 	// owner: @tallclair
 	// beta: v1.4
 	AppArmor featuregate.Feature = "AppArmor"
@@ -966,8 +958,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowServiceLBStatusOnNonLB: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.29
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
-
-	APISelfSubjectReview: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.28; remove in 1.30
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
