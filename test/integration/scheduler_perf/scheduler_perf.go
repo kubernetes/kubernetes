@@ -33,7 +33,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,17 +65,16 @@ import (
 type operationCode string
 
 const (
-	createNodesOpcode                 operationCode = "createNodes"
-	createNamespacesOpcode            operationCode = "createNamespaces"
-	createPodsOpcode                  operationCode = "createPods"
-	createPodSetsOpcode               operationCode = "createPodSets"
-	createResourceClaimsOpcode        operationCode = "createResourceClaims"
-	createResourceClaimTemplateOpcode operationCode = "createResourceClaimTemplate"
-	createResourceClassOpcode         operationCode = "createResourceClass"
-	createResourceDriverOpcode        operationCode = "createResourceDriver"
-	churnOpcode                       operationCode = "churn"
-	barrierOpcode                     operationCode = "barrier"
-	sleepOpcode                       operationCode = "sleep"
+	createAnyOpcode            operationCode = "createAny"
+	createNodesOpcode          operationCode = "createNodes"
+	createNamespacesOpcode     operationCode = "createNamespaces"
+	createPodsOpcode           operationCode = "createPods"
+	createPodSetsOpcode        operationCode = "createPodSets"
+	createResourceClaimsOpcode operationCode = "createResourceClaims"
+	createResourceDriverOpcode operationCode = "createResourceDriver"
+	churnOpcode                operationCode = "churn"
+	barrierOpcode              operationCode = "barrier"
+	sleepOpcode                operationCode = "sleep"
 )
 
 const (
@@ -239,13 +237,12 @@ type op struct {
 // which op we're decoding at runtime.
 func (op *op) UnmarshalJSON(b []byte) error {
 	possibleOps := []realOp{
+		&createAny{},
 		&createNodesOp{},
 		&createNamespacesOp{},
 		&createPodsOp{},
 		&createPodSetsOp{},
 		&createResourceClaimsOp{},
-		&createOp[resourcev1alpha2.ResourceClaimTemplate, createResourceClaimTemplateOpType]{},
-		&createOp[resourcev1alpha2.ResourceClass, createResourceClassOpType]{},
 		&createResourceDriverOp{},
 		&churnOp{},
 		&barrierOp{},
