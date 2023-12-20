@@ -148,7 +148,7 @@ func ConformanceIt(args ...interface{}) bool {
 
 // It is a wrapper around [ginkgo.It] which supports framework With* labels as
 // optional arguments in addition to those already supported by ginkgo itself,
-// like [ginkgo.Label] and [gingko.Offset].
+// like [ginkgo.Label] and [ginkgo.Offset].
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
@@ -163,7 +163,7 @@ func (f *Framework) It(args ...interface{}) bool {
 
 // Describe is a wrapper around [ginkgo.Describe] which supports framework
 // With* labels as optional arguments in addition to those already supported by
-// ginkgo itself, like [ginkgo.Label] and [gingko.Offset].
+// ginkgo itself, like [ginkgo.Label] and [ginkgo.Offset].
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
@@ -178,7 +178,7 @@ func (f *Framework) Describe(args ...interface{}) bool {
 
 // Context is a wrapper around [ginkgo.Context] which supports framework With*
 // labels as optional arguments in addition to those already supported by
-// ginkgo itself, like [ginkgo.Label] and [gingko.Offset].
+// ginkgo itself, like [ginkgo.Label] and [ginkgo.Offset].
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
