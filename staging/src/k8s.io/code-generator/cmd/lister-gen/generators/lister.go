@@ -22,14 +22,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	listergenargs "k8s.io/code-generator/cmd/lister-gen/args"
 	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-
 	"k8s.io/klog/v2"
 )
 
@@ -65,6 +64,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
+
+	customArgs := arguments.CustomArgs.(*listergenargs.CustomArgs)
 
 	var packageList generator.Packages
 	for _, inputDir := range arguments.InputDirs {
@@ -119,18 +120,21 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
-		packagePath := filepath.Join(arguments.OutputPackagePath, groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
+		subdir := filepath.Join(groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
+		outputDir := filepath.Join(arguments.OutputBase, subdir)
+		outputPkg := filepath.Join(customArgs.OutputPackage, subdir)
 		packageList = append(packageList, &generator.DefaultPackage{
 			PackageName: strings.ToLower(gv.Version.NonEmpty()),
-			PackagePath: packagePath,
+			PackagePath: outputPkg,
+			Source:      outputDir,
 			HeaderText:  boilerplate,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				generators = append(generators, &expansionGenerator{
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "expansion_generated",
 					},
-					packagePath: filepath.Join(arguments.OutputBase, packagePath),
-					types:       typesToGenerate,
+					outputPath: outputDir,
+					types:      typesToGenerate,
 				})
 
 				for _, t := range typesToGenerate {
@@ -138,7 +142,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 						DefaultGen: generator.DefaultGen{
 							OptionalName: strings.ToLower(t.Name.Name),
 						},
-						outputPackage:  arguments.OutputPackagePath,
+						outputPackage:  outputPkg,
 						groupVersion:   gv,
 						internalGVPkg:  internalGVPkg,
 						typeToGenerate: t,
