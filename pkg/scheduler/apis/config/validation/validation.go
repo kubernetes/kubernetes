@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -272,12 +272,12 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 		if profiles[i].Plugins != nil {
 			curr = profiles[i].Plugins.QueueSort
 		}
-		if !cmp.Equal(canon, curr) {
-			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "has to match for all profiles"))
+		if !apiequality.Semantic.DeepEqual(canon, curr) {
+			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "queueSort must be the same for all profiles"))
 		}
 		for _, cfg := range profiles[i].PluginConfig {
-			if cfg.Name == queueSortName && !cmp.Equal(queueSortArgs, cfg.Args) {
-				errs = append(errs, field.Invalid(path.Index(i).Child("pluginConfig", "args"), cfg.Args, "has to match for all profiles"))
+			if cfg.Name == queueSortName && !apiequality.Semantic.DeepEqual(queueSortArgs, cfg.Args) {
+				errs = append(errs, field.Invalid(path.Index(i).Child("pluginConfig", "args"), cfg.Args, "queueSort must be the same for all profiles"))
 			}
 		}
 	}
