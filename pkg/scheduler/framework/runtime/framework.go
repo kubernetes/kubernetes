@@ -679,12 +679,54 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
+	diagnosis, ok := ctx.Value(framework.PrefilterContextKey("diagnosis")).(*framework.Diagnosis)
+	if !ok {
+		return nil, framework.AsStatus(errors.New("can not get diagnosis from context"))
+	}
+	nodes, ok := ctx.Value(framework.PrefilterContextKey("nodes")).([]*framework.NodeInfo)
+	if !ok {
+		return nil, framework.AsStatus(errors.New("can not get nodes from context"))
+	}
+	message := func(plugins []string) string {
+		if len(plugins) == 0 {
+			return ""
+		}
+		msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", plugins)
+		if len(plugins) == 1 {
+			msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", plugins[0])
+		}
+		return msg
+	}
 	defer func() {
 		state.SkipFilterPlugins = skipPlugins
+		pluginsWithNodes := make(map[string]bool)
+		preFilterMsg := ""
+		for _, pluginStatus := range diagnosis.NodeToStatusMap {
+			diagnosis.AddPluginStatus(pluginStatus)
+			if len(pluginStatus.Reasons()) == 0 {
+				pluginStatus.AppendReason(message(pluginStatus.Plugin()))
+			} else {
+				preFilterMsg = pluginStatus.Message()
+			}
+			for _, pluginName := range pluginStatus.Plugin() {
+				pluginsWithNodes[pluginName] = true
+			}
+		}
+		if len(preFilterMsg) == 0 {
+			plugins := []string{}
+			for plugin := range pluginsWithNodes {
+				plugins = append(plugins, plugin)
+			}
+			preFilterMsg = message(plugins)
+		}
+		diagnosis.PreFilterMsg = preFilterMsg
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	allNodes := sets.Set[string]{}
+	for _, node := range nodes {
+		allNodes.Insert(node.Node().Name)
+	}
 	var result *framework.PreFilterResult
-	var pluginsWithNodes []string
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
@@ -707,6 +749,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			if s.Code() == framework.UnschedulableAndUnresolvable {
 				// In this case, the preemption shouldn't happen in this scheduling cycle.
 				// So, no need to execute all PreFilter.
+				f.registerPreFilterPlugins(allNodes, sets.Set[string]{}, diagnosis, pl, s)
 				return nil, s
 			}
 			if s.Code() == framework.Unschedulable {
@@ -719,17 +762,11 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name())
 		}
 		if !r.AllNodes() {
-			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
+			f.registerPreFilterPlugins(allNodes, r.NodeNames, diagnosis, pl, nil)
 		}
 		result = result.Merge(r)
 		if !result.AllNodes() && len(result.NodeNames) == 0 {
-			msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", pluginsWithNodes)
-			if len(pluginsWithNodes) == 1 {
-				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
-			}
-			status := framework.NewStatus(framework.Unschedulable, msg)
-			status.SetPlugin(pluginsWithNodes...)
-			return nil, status
+			return nil, framework.NewStatus(framework.Unschedulable)
 		}
 	}
 	return result, returnStatus
@@ -1633,4 +1670,20 @@ func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 	return f.parallelizer
+}
+
+func (f *frameworkImpl) registerPreFilterPlugins(nodes sets.Set[string], legalNodes sets.Set[string],
+	diagnosis *framework.Diagnosis, pl framework.PreFilterPlugin, pluginStatus *framework.Status) {
+	filteredNodes := nodes.SymmetricDifference(legalNodes)
+	for _, filteredNode := range filteredNodes.UnsortedList() {
+		if status, ok := diagnosis.NodeToStatusMap[filteredNode]; ok {
+			status.AppendPlugin(pl.Name())
+		} else {
+			newStatus := pluginStatus
+			if newStatus == nil {
+				newStatus = framework.NewStatus(framework.Unschedulable).WithPlugin(pl.Name())
+			}
+			diagnosis.NodeToStatusMap[filteredNode] = newStatus
+		}
+	}
 }

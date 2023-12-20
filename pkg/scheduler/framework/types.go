@@ -110,6 +110,8 @@ type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interfa
 
 type QueueingHint int
 
+type PrefilterContextKey string
+
 const (
 	// QueueSkip implies that the cluster event has no impact on
 	// scheduling of the pod.

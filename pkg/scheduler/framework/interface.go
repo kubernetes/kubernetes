@@ -219,6 +219,15 @@ func (s *Status) WithPlugin(plugins ...string) *Status {
 	return s
 }
 
+func (s *Status) AppendPlugin(plugin string) {
+	for _, pluginName := range s.plugins {
+		if pluginName == plugin {
+			return
+		}
+	}
+	s.plugins = append(s.plugins, plugin)
+}
+
 // Plugin returns the plugin name which caused this status.
 func (s *Status) Plugin() []string {
 	return s.plugins

@@ -374,6 +374,15 @@ func TestPostFilter(t *testing.T) {
 				pdbLister: getPDBLister(informerFactory),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
+			diagnosis := framework.Diagnosis{
+				NodeToStatusMap: make(framework.NodeToStatusMap),
+			}
+			allNodes, err := f.SnapshotSharedLister().NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 
 			state := framework.NewCycleState()
 			// Ensure <state> is populated.
@@ -1126,6 +1135,15 @@ func TestDryRunPreemption(t *testing.T) {
 				pdbLister: getPDBLister(informerFactory),
 				args:      *tt.args,
 			}
+			diagnosis := framework.Diagnosis{
+				NodeToStatusMap: make(framework.NodeToStatusMap),
+			}
+			allNodes, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 
 			// Using 4 as a seed source to test getOffsetAndNumCandidates() deterministically.
 			// However, we need to do it after informerFactory.WaitforCacheSync() which might
@@ -1362,7 +1380,15 @@ func TestSelectBestCandidate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
+			diagnosis := framework.Diagnosis{
+				NodeToStatusMap: make(framework.NodeToStatusMap),
+			}
+			allNodes, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
 			if _, status := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
@@ -1706,6 +1732,7 @@ func TestPreempt(t *testing.T) {
 			for _, pod := range test.pods {
 				cache.AddPod(logger, pod)
 			}
+			var allNodes []*framework.NodeInfo
 			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodes := make([]*v1.Node, len(test.nodeNames))
 			for i, name := range test.nodeNames {
@@ -1724,6 +1751,7 @@ func TestPreempt(t *testing.T) {
 				cachedNodeInfo := framework.NewNodeInfo()
 				cachedNodeInfo.SetNode(node)
 				cachedNodeInfoMap[node.Name] = cachedNodeInfo
+				allNodes = append(allNodes, cachedNodeInfo)
 			}
 			var extenders []framework.Extender
 			for _, extender := range test.extenders {
@@ -1750,7 +1778,11 @@ func TestPreempt(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
+			diagnosis := framework.Diagnosis{
+				NodeToStatusMap: make(framework.NodeToStatusMap),
+			}
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
+			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
 			if _, s := fwk.RunPreFilterPlugins(ctx, state, test.pod); !s.IsSuccess() {

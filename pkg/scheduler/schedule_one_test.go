@@ -2266,8 +2266,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously").WithPlugin("FakePreFilter2", "FakePreFilter3"),
-						"node2": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously").WithPlugin("FakePreFilter2", "FakePreFilter3"),
+						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin FakePreFilter2").WithPlugin("FakePreFilter2"),
+						"node2": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin FakePreFilter3").WithPlugin("FakePreFilter3"),
 						"node3": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously").WithPlugin("FakePreFilter2", "FakePreFilter3"),
 					},
 					UnschedulablePlugins: sets.New("FakePreFilter2", "FakePreFilter3"),
