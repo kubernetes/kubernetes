@@ -63,8 +63,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 `)...)
 
+	customArgs := arguments.CustomArgs.(*generatorargs.CustomArgs)
+
 	reportPath := "-"
-	if customArgs, ok := arguments.CustomArgs.(*generatorargs.CustomArgs); ok {
+	if customArgs.ReportFilename != "" {
 		reportPath = customArgs.ReportFilename
 	}
 	context.FileTypes[apiViolationFileType] = apiViolationFile{
@@ -73,14 +75,15 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	return generator.Packages{
 		&generator.DefaultPackage{
-			PackageName: filepath.Base(arguments.OutputPackagePath),
-			PackagePath: arguments.OutputPackagePath,
+			PackageName: filepath.Base(arguments.OutputBase),
+			PackagePath: customArgs.OutputPackage,
+			Source:      arguments.OutputBase,
 			HeaderText:  header,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newOpenAPIGen(
 						arguments.OutputFileBaseName,
-						arguments.OutputPackagePath,
+						customArgs.OutputPackage,
 					),
 					newAPIViolationGen(),
 				}

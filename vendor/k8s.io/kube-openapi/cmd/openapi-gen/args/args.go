@@ -25,6 +25,8 @@ import (
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
+	OutputPackage string // must be a Go import-path
+
 	// ReportFilename is added to CustomArgs for specifying name of report file used
 	// by API linter. If specified, API rule violations will be printed to report file.
 	// Otherwise default value "-" will be used which indicates stdout.
@@ -51,23 +53,30 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 
 // AddFlags add the generator flags to the flag set.
 func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVarP(&c.ReportFilename, "report-filename", "r", c.ReportFilename, "Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
+	fs.StringVar(&c.OutputPackage, "output-package", "",
+		"the base Go import-path under which to generate results")
+	fs.StringVarP(&c.ReportFilename, "report-filename", "r", "-",
+		"Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
 }
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
+	if len(genericArgs.OutputBase) == 0 {
+		return fmt.Errorf("--output-base must be specified")
+	}
+	if len(genericArgs.OutputFileBaseName) == 0 {
+		return fmt.Errorf("--output-file-base cannot be empty")
+	}
+
 	c, ok := genericArgs.CustomArgs.(*CustomArgs)
 	if !ok {
 		return fmt.Errorf("input arguments don't contain valid custom arguments")
 	}
+	if len(c.OutputPackage) == 0 {
+		return fmt.Errorf("--output-package must be specified")
+	}
 	if len(c.ReportFilename) == 0 {
-		return fmt.Errorf("report filename cannot be empty. specify a valid filename or use \"-\" for stdout")
-	}
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
-	}
-	if len(genericArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package cannot be empty")
+		return fmt.Errorf("--report-filename must be specified (use \"-\" for stdout)")
 	}
 	return nil
 }

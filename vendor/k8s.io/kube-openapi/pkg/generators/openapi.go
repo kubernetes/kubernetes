@@ -141,16 +141,6 @@ func (g *openAPIGen) Namers(c *generator.Context) namer.NameSystems {
 	}
 }
 
-func (g *openAPIGen) isOtherPackage(pkg string) bool {
-	if pkg == g.targetPackage {
-		return false
-	}
-	if strings.HasSuffix(pkg, "\""+g.targetPackage+"\"") {
-		return false
-	}
-	return true
-}
-
 func (g *openAPIGen) Imports(c *generator.Context) []string {
 	importLines := []string{}
 	for _, singleImport := range g.imports.ImportLines() {
