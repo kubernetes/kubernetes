@@ -56,18 +56,19 @@ func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
+	if len(genericArgs.OutputBase) == 0 {
+		return fmt.Errorf("--output-base must be specified")
+	}
+	if len(genericArgs.OutputFileBaseName) == 0 {
+		return fmt.Errorf("--output-file-base cannot be empty")
+	}
+
 	c, ok := genericArgs.CustomArgs.(*CustomArgs)
 	if !ok {
 		return fmt.Errorf("input arguments don't contain valid custom arguments")
 	}
 	if len(c.ReportFilename) == 0 {
-		return fmt.Errorf("report filename cannot be empty. specify a valid filename or use \"-\" for stdout")
-	}
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
-	}
-	if len(genericArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package cannot be empty")
+		return fmt.Errorf("--report-filename must be specified (use \"-\" for stdout)")
 	}
 	return nil
 }

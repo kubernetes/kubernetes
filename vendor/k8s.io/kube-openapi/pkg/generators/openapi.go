@@ -111,18 +111,15 @@ const (
 // openApiGen produces a file with auto-generated OpenAPI functions.
 type openAPIGen struct {
 	generator.DefaultGen
-	// TargetPackage is the package that will get GetOpenAPIDefinitions function returns all open API definitions.
-	targetPackage string
-	imports       namer.ImportTracker
+	imports namer.ImportTracker
 }
 
-func newOpenAPIGen(sanitizedName string, targetPackage string) generator.Generator {
+func newOpenAPIGen(sanitizedName string) generator.Generator {
 	return &openAPIGen{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
-		imports:       generator.NewImportTrackerForPackage(targetPackage),
-		targetPackage: targetPackage,
+		imports: generator.NewImportTracker(),
 	}
 }
 
@@ -131,7 +128,7 @@ const nameTmpl = "schema_$.type|private$"
 func (g *openAPIGen) Namers(c *generator.Context) namer.NameSystems {
 	// Have the raw namer for this file track what it imports.
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.targetPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 		"private": &namer.NameStrategy{
 			Join: func(pre string, in []string, post string) string {
 				return strings.Join(in, "_")
@@ -139,16 +136,6 @@ func (g *openAPIGen) Namers(c *generator.Context) namer.NameSystems {
 			PrependPackageNames: 4, // enough to fully qualify from k8s.io/api/...
 		},
 	}
-}
-
-func (g *openAPIGen) isOtherPackage(pkg string) bool {
-	if pkg == g.targetPackage {
-		return false
-	}
-	if strings.HasSuffix(pkg, "\""+g.targetPackage+"\"") {
-		return false
-	}
-	return true
 }
 
 func (g *openAPIGen) Imports(c *generator.Context) []string {
