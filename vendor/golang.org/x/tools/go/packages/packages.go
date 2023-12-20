@@ -16,7 +16,6 @@ import (
 	"go/token"
 	"go/types"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -220,8 +219,10 @@ type driverResponse struct {
 	// lists of multiple drivers, go/packages will fall back to the next driver.
 	NotHandled bool
 
-	// Sizes, if not nil, is the types.Sizes to use when type checking.
-	Sizes *types.StdSizes
+	// Compiler and Arch are the arguments pass of types.SizesFor
+	// to get a types.Sizes to use when type checking.
+	Compiler string
+	Arch     string
 
 	// Roots is the set of package IDs that make up the root packages.
 	// We have to encode this separately because when we encode a single package
@@ -262,7 +263,7 @@ func Load(cfg *Config, patterns ...string) ([]*Package, error) {
 	if err != nil {
 		return nil, err
 	}
-	l.sizes = response.Sizes
+	l.sizes = types.SizesFor(response.Compiler, response.Arch)
 	return l.refine(response)
 }
 
@@ -1125,7 +1126,7 @@ func (ld *loader) parseFile(filename string) (*ast.File, error) {
 		var err error
 		if src == nil {
 			ioLimit <- true // wait
-			src, err = ioutil.ReadFile(filename)
+			src, err = os.ReadFile(filename)
 			<-ioLimit // signal
 		}
 		if err != nil {

@@ -1,3 +1,12 @@
+## 1.30.0
+
+### Features
+- BeTrueBecause and BeFalseBecause allow for better failure messages [4da4c7f]
+
+### Maintenance
+- Bump actions/checkout from 3 to 4 (#694) [6ca6e97]
+- doc: fix type on gleak go doc [f1b8343]
+
 ## 1.29.0
 
 ### Features

@@ -1,6 +1,7 @@
 package gomega
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -52,13 +53,29 @@ func BeNil() types.GomegaMatcher {
 }
 
 // BeTrue succeeds if actual is true
+//
+// In general, it's better to use `BeTrueBecause(reason)` to provide a more useful error message if a true check fails.
 func BeTrue() types.GomegaMatcher {
 	return &matchers.BeTrueMatcher{}
 }
 
 // BeFalse succeeds if actual is false
+//
+// In general, it's better to use `BeFalseBecause(reason)` to provide a more useful error message if a false check fails.
 func BeFalse() types.GomegaMatcher {
 	return &matchers.BeFalseMatcher{}
+}
+
+// BeTrueBecause succeeds if actual is true and displays the provided reason if it is false
+// fmt.Sprintf is used to render the reason
+func BeTrueBecause(format string, args ...any) types.GomegaMatcher {
+	return &matchers.BeTrueMatcher{Reason: fmt.Sprintf(format, args...)}
+}
+
+// BeFalseBecause succeeds if actual is false and displays the provided reason if it is true.
+// fmt.Sprintf is used to render the reason
+func BeFalseBecause(format string, args ...any) types.GomegaMatcher {
+	return &matchers.BeFalseMatcher{Reason: fmt.Sprintf(format, args...)}
 }
 
 // HaveOccurred succeeds if actual is a non-nil error

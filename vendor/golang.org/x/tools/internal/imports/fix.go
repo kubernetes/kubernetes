@@ -13,6 +13,7 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path"
@@ -107,7 +108,7 @@ func parseOtherFiles(fset *token.FileSet, srcDir, filename string) []*ast.File {
 	considerTests := strings.HasSuffix(filename, "_test.go")
 
 	fileBase := filepath.Base(filename)
-	packageFileInfos, err := ioutil.ReadDir(srcDir)
+	packageFileInfos, err := os.ReadDir(srcDir)
 	if err != nil {
 		return nil
 	}
@@ -1469,11 +1470,11 @@ func VendorlessPath(ipath string) string {
 
 func loadExportsFromFiles(ctx context.Context, env *ProcessEnv, dir string, includeTest bool) (string, []string, error) {
 	// Look for non-test, buildable .go files which could provide exports.
-	all, err := ioutil.ReadDir(dir)
+	all, err := os.ReadDir(dir)
 	if err != nil {
 		return "", nil, err
 	}
-	var files []os.FileInfo
+	var files []fs.DirEntry
 	for _, fi := range all {
 		name := fi.Name()
 		if !strings.HasSuffix(name, ".go") || (!includeTest && strings.HasSuffix(name, "_test.go")) {

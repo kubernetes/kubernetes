@@ -1,3 +1,21 @@
+## 2.13.2
+
+### Fixes
+- Fix file handler leak (#1309) [e2e81c8]
+- Avoid allocations with `(*regexp.Regexp).MatchString` (#1302) [3b2a2a7]
+
+## 2.13.1
+
+### Fixes
+- # 1296 fix(precompiled test guite): exec bit check omitted on Windows (#1301) [26eea01]
+
+### Maintenance
+- Bump github.com/go-logr/logr from 1.2.4 to 1.3.0 (#1291) [7161a9d]
+- Bump golang.org/x/sys from 0.13.0 to 0.14.0 (#1295) [7fc7b10]
+- Bump golang.org/x/tools from 0.12.0 to 0.14.0 (#1282) [74bbd65]
+- Bump github.com/onsi/gomega from 1.27.10 to 1.29.0 (#1290) [9373633]
+- Bump golang.org/x/net in /integration/_fixtures/version_mismatch_fixture (#1286) [6e3cf65]
+
 ## 2.13.0
 
 ### Features
