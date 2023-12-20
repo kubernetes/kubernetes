@@ -121,6 +121,19 @@ profiles:
 		t.Fatal(err)
 	}
 
+	// plugin config
+	simplifiedPluginConfigFilev1 := filepath.Join(tmpDir, "simplifiedPluginv1.yaml")
+	if err := os.WriteFile(simplifiedPluginConfigFilev1, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: '%s'
+profiles:
+- schedulerName: simplified-scheduler
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	// out-of-tree plugin config v1
 	outOfTreePluginConfigFilev1 := filepath.Join(tmpDir, "outOfTreePluginv1.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1, []byte(fmt.Sprintf(`
@@ -214,6 +227,16 @@ leaderElection:
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
 				features.VolumeCapacityPriority: false,
+			},
+		},
+		{
+			name: "component configuration v1 with only scheduler name configured",
+			flags: []string{
+				"--config", simplifiedPluginConfigFilev1,
+				"--kubeconfig", configKubeconfig,
+			},
+			wantPlugins: map[string]*config.Plugins{
+				"simplified-scheduler": defaults.ExpandedPluginsV1,
 			},
 		},
 		{
