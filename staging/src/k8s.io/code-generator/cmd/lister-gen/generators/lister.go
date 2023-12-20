@@ -119,18 +119,19 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
-		packagePath := filepath.Join(arguments.OutputPackagePath, groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
+		outputPath := filepath.Join(arguments.OutputBase, groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
 		packageList = append(packageList, &generator.DefaultPackage{
 			PackageName: strings.ToLower(gv.Version.NonEmpty()),
-			PackagePath: packagePath,
-			HeaderText:  boilerplate,
+			//PackagePath: outputPath, //FIXME: why do we need this?
+			Source:     outputPath,
+			HeaderText: boilerplate,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				generators = append(generators, &expansionGenerator{
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "expansion_generated",
 					},
-					packagePath: filepath.Join(arguments.OutputBase, packagePath),
-					types:       typesToGenerate,
+					outputPath: outputPath,
+					types:      typesToGenerate,
 				})
 
 				for _, t := range typesToGenerate {
@@ -138,7 +139,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 						DefaultGen: generator.DefaultGen{
 							OptionalName: strings.ToLower(t.Name.Name),
 						},
-						outputPackage:  arguments.OutputPackagePath,
 						groupVersion:   gv,
 						internalGVPkg:  internalGVPkg,
 						typeToGenerate: t,
@@ -188,7 +188,6 @@ func isInternal(m types.Member) bool {
 // type.
 type listerGenerator struct {
 	generator.DefaultGen
-	outputPackage  string
 	groupVersion   clientgentypes.GroupVersion
 	internalGVPkg  string
 	typeToGenerate *types.Type
@@ -204,7 +203,7 @@ func (g *listerGenerator) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *listerGenerator) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 

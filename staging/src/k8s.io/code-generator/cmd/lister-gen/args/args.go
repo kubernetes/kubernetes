@@ -18,10 +18,8 @@ package args
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/spf13/pflag"
-	codegenutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2/args"
 )
 
@@ -40,10 +38,6 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	}
 	genericArgs.CustomArgs = customArgs
 
-	if pkg := codegenutil.CurrentPackage(); len(pkg) != 0 {
-		genericArgs.OutputPackagePath = path.Join(pkg, "pkg/client/listers")
-	}
-
 	return genericArgs, customArgs
 }
 
@@ -54,11 +48,11 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*CustomArgs)
-
-	if len(genericArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package cannot be empty")
+	if len(genericArgs.OutputBase) == 0 {
+		return fmt.Errorf("--output-base must be specified")
 	}
+
+	_ = genericArgs.CustomArgs.(*CustomArgs)
 
 	return nil
 }
