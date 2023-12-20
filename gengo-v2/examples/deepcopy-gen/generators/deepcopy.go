@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"k8s.io/gengo/v2/args"
-	"k8s.io/gengo/v2/examples/set-gen/sets"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -131,7 +130,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	inputs := sets.NewString(context.Inputs...)
 	packages := generator.Packages{}
 	header := append([]byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag)), boilerplate...)
 
@@ -147,7 +145,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 	}
 
-	for i := range inputs {
+	for _, i := range context.Inputs {
 		klog.V(5).Infof("Considering pkg %q", i)
 		pkg := context.Universe[i]
 		if pkg == nil {
@@ -297,9 +295,12 @@ func (g *genDeepCopy) copyableAndInBounds(t *types.Type) bool {
 // if the type does not match. This allows more efficient deep copy
 // implementations to be defined by the type's author.  The correct signature
 // for a type T is:
-//    func (t T) DeepCopy() T
+//
+//	func (t T) DeepCopy() T
+//
 // or:
-//    func (t *T) DeepCopy() *T
+//
+//	func (t *T) DeepCopy() *T
 func deepCopyMethod(t *types.Type) (*types.Signature, error) {
 	f, found := t.Methods["DeepCopy"]
 	if !found {
@@ -346,9 +347,12 @@ func deepCopyMethodOrDie(t *types.Type) *types.Signature {
 // if the type is wrong. DeepCopyInto allows more efficient deep copy
 // implementations to be defined by the type's author.  The correct signature
 // for a type T is:
-//    func (t T) DeepCopyInto(t *T)
+//
+//	func (t T) DeepCopyInto(t *T)
+//
 // or:
-//    func (t *T) DeepCopyInto(t *T)
+//
+//	func (t *T) DeepCopyInto(t *T)
 func deepCopyIntoMethod(t *types.Type) (*types.Signature, error) {
 	f, found := t.Methods["DeepCopyInto"]
 	if !found {
