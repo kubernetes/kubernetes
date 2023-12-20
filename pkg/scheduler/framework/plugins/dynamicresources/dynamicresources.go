@@ -754,7 +754,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			// would just get allocated again for a random node,
 			// which is unlikely to help the pod.
 			if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
-				state.unavailableClaims.Insert(unavailableClaims...)
+				state.unavailableClaims.Insert(index)
 			}
 		}
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
