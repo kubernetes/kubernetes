@@ -472,6 +472,7 @@ var (
 		27: "3.5.10-0",
 		28: "3.5.10-0",
 		29: "3.5.10-0",
+		30: "3.5.11-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
