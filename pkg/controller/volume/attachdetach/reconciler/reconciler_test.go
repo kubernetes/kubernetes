@@ -207,8 +207,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 			generatedVolumeName,
 			nodeName)
 	}
-	asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, true /* mounted */)
-	asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, false /* mounted */)
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	// Assert
 	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -364,8 +364,8 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 			generatedVolumeName,
 			nodeName)
 	}
-	asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, true /* mounted */)
-	asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, false /* mounted */)
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	// Assert
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
@@ -619,7 +619,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
 	// Without this, the delete operation will be delayed due to mounted status
-	asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName1, false /* mounted */)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName1)
 
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
@@ -832,7 +832,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
 	// Without this, the delete operation will be delayed due to mounted status
-	asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName1, false /* mounted */)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName1)
 
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
