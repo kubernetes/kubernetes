@@ -486,7 +486,6 @@ const (
 	BPF_F_ANY_ALIGNMENT                         = 0x2
 	BPF_F_BEFORE                                = 0x8
 	BPF_F_ID                                    = 0x20
-	BPF_F_LINK                                  = 0x2000
 	BPF_F_NETFILTER_IP_DEFRAG                   = 0x1
 	BPF_F_QUERY_EFFECTIVE                       = 0x1
 	BPF_F_REPLACE                               = 0x4
@@ -1802,6 +1801,7 @@ const (
 	LOCK_SH                                     = 0x1
 	LOCK_UN                                     = 0x8
 	LOOP_CLR_FD                                 = 0x4c01
+	LOOP_CONFIGURE                              = 0x4c0a
 	LOOP_CTL_ADD                                = 0x4c80
 	LOOP_CTL_GET_FREE                           = 0x4c82
 	LOOP_CTL_REMOVE                             = 0x4c81

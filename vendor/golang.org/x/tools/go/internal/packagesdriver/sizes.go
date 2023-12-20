@@ -13,16 +13,17 @@ import (
 	"golang.org/x/tools/internal/gocommand"
 )
 
-var debug = false
-
 func GetSizesForArgsGolist(ctx context.Context, inv gocommand.Invocation, gocmdRunner *gocommand.Runner) (string, string, error) {
 	inv.Verb = "list"
 	inv.Args = []string{"-f", "{{context.GOARCH}} {{context.Compiler}}", "--", "unsafe"}
 	stdout, stderr, friendlyErr, rawErr := gocmdRunner.RunRaw(ctx, inv)
 	var goarch, compiler string
 	if rawErr != nil {
-		if rawErrMsg := rawErr.Error(); strings.Contains(rawErrMsg, "cannot find main module") || strings.Contains(rawErrMsg, "go.mod file not found") {
-			// User's running outside of a module. All bets are off. Get GOARCH and guess compiler is gc.
+		rawErrMsg := rawErr.Error()
+		if strings.Contains(rawErrMsg, "cannot find main module") ||
+			strings.Contains(rawErrMsg, "go.mod file not found") {
+			// User's running outside of a module.
+			// All bets are off. Get GOARCH and guess compiler is gc.
 			// TODO(matloob): Is this a problem in practice?
 			inv.Verb = "env"
 			inv.Args = []string{"GOARCH"}
@@ -32,8 +33,12 @@ func GetSizesForArgsGolist(ctx context.Context, inv gocommand.Invocation, gocmdR
 			}
 			goarch = strings.TrimSpace(envout.String())
 			compiler = "gc"
-		} else {
+		} else if friendlyErr != nil {
 			return "", "", friendlyErr
+		} else {
+			// This should be unreachable, but be defensive
+			// in case RunRaw's error results are inconsistent.
+			return "", "", rawErr
 		}
 	} else {
 		fields := strings.Fields(stdout.String())
