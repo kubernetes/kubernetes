@@ -149,6 +149,12 @@ func TestValidateStorageClass(t *testing.T) {
 			VolumeBindingMode: &immediateMode1,
 			ReclaimPolicy:     &recycleReclaimPolicy,
 		},
+		"empty reclaimpolicy": {
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo",
+			VolumeBindingMode: &immediateMode1,
+			ReclaimPolicy:     &emptyReclaimPolicy,
+		},
 	}
 
 	// Error cases are not expected to pass validation.
