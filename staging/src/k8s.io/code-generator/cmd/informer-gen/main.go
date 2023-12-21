@@ -31,13 +31,6 @@ func main() {
 	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
 
-	// Override defaults.
-	// TODO: move out of informer-gen
-	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/informers/informers_generated"
-	customArgs.VersionedClientSetPackage = "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	customArgs.InternalClientSetPackage = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	customArgs.ListersPackage = "k8s.io/kubernetes/pkg/client/listers"
-
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")

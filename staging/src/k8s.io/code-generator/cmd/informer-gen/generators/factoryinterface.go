@@ -30,7 +30,6 @@ import (
 // informer registration
 type factoryInterfaceGenerator struct {
 	generator.DefaultGen
-	outputPackage    string
 	imports          namer.ImportTracker
 	clientSetPackage string
 	filtered         bool
@@ -48,7 +47,7 @@ func (g *factoryInterfaceGenerator) Filter(c *generator.Context, t *types.Type) 
 
 func (g *factoryInterfaceGenerator) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 

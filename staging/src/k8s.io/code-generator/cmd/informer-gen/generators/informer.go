@@ -35,7 +35,6 @@ import (
 // type.
 type informerGenerator struct {
 	generator.DefaultGen
-	outputPackage             string
 	groupPkgName              string
 	groupVersion              clientgentypes.GroupVersion
 	groupGoName               string
@@ -54,7 +53,7 @@ func (g *informerGenerator) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *informerGenerator) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 

@@ -29,7 +29,6 @@ import (
 // versionInterfaceGenerator generates the per-version interface file.
 type versionInterfaceGenerator struct {
 	generator.DefaultGen
-	outputPackage             string
 	imports                   namer.ImportTracker
 	types                     []*types.Type
 	filtered                  bool
@@ -48,7 +47,7 @@ func (g *versionInterfaceGenerator) Filter(c *generator.Context, t *types.Type) 
 
 func (g *versionInterfaceGenerator) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 
