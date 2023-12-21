@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/tools/internal/typeparams"
+	"golang.org/x/tools/go/types/objectpath"
 )
 
 type intReader struct {
@@ -85,7 +85,7 @@ const (
 // If the export data version is not recognized or the format is otherwise
 // compromised, an error is returned.
 func IImportData(fset *token.FileSet, imports map[string]*types.Package, data []byte, path string) (int, *types.Package, error) {
-	pkgs, err := iimportCommon(fset, GetPackageFromMap(imports), data, false, path, nil)
+	pkgs, err := iimportCommon(fset, GetPackagesFromMap(imports), data, false, path, false, nil)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -94,33 +94,49 @@ func IImportData(fset *token.FileSet, imports map[string]*types.Package, data []
 
 // IImportBundle imports a set of packages from the serialized package bundle.
 func IImportBundle(fset *token.FileSet, imports map[string]*types.Package, data []byte) ([]*types.Package, error) {
-	return iimportCommon(fset, GetPackageFromMap(imports), data, true, "", nil)
+	return iimportCommon(fset, GetPackagesFromMap(imports), data, true, "", false, nil)
 }
 
-// A GetPackageFunc is a function that gets the package with the given path
-// from the importer state, creating it (with the specified name) if necessary.
-// It is an abstraction of the map historically used to memoize package creation.
+// A GetPackagesFunc function obtains the non-nil symbols for a set of
+// packages, creating and recursively importing them as needed. An
+// implementation should store each package symbol is in the Pkg
+// field of the items array.
 //
-// Two calls with the same path must return the same package.
-//
-// If the given getPackage func returns nil, the import will fail.
-type GetPackageFunc = func(path, name string) *types.Package
+// Any error causes importing to fail. This can be used to quickly read
+// the import manifest of an export data file without fully decoding it.
+type GetPackagesFunc = func(items []GetPackagesItem) error
 
-// GetPackageFromMap returns a GetPackageFunc that retrieves packages from the
-// given map of package path -> package.
+// A GetPackagesItem is a request from the importer for the package
+// symbol of the specified name and path.
+type GetPackagesItem struct {
+	Name, Path string
+	Pkg        *types.Package // to be filled in by GetPackagesFunc call
+
+	// private importer state
+	pathOffset uint64
+	nameIndex  map[string]uint64
+}
+
+// GetPackagesFromMap returns a GetPackagesFunc that retrieves
+// packages from the given map of package path to package.
 //
-// The resulting func may mutate m: if a requested package is not found, a new
-// package will be inserted into m.
-func GetPackageFromMap(m map[string]*types.Package) GetPackageFunc {
-	return func(path, name string) *types.Package {
-		if _, ok := m[path]; !ok {
-			m[path] = types.NewPackage(path, name)
+// The returned function may mutate m: each requested package that is not
+// found is created with types.NewPackage and inserted into m.
+func GetPackagesFromMap(m map[string]*types.Package) GetPackagesFunc {
+	return func(items []GetPackagesItem) error {
+		for i, item := range items {
+			pkg, ok := m[item.Path]
+			if !ok {
+				pkg = types.NewPackage(item.Path, item.Name)
+				m[item.Path] = pkg
+			}
+			items[i].Pkg = pkg
 		}
-		return m[path]
+		return nil
 	}
 }
 
-func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, bundle bool, path string, insert InsertType) (pkgs []*types.Package, err error) {
+func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte, bundle bool, path string, shallow bool, reportf ReportFunc) (pkgs []*types.Package, err error) {
 	const currentVersion = iexportVersionCurrent
 	version := int64(-1)
 	if !debug {
@@ -131,7 +147,7 @@ func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, 
 				} else if version > currentVersion {
 					err = fmt.Errorf("cannot import %q (%v), export data is newer version - update tool", path, e)
 				} else {
-					err = fmt.Errorf("cannot import %q (%v), possibly version skew - reinstall package", path, e)
+					err = fmt.Errorf("internal error while importing %q (%v); please report an issue", path, e)
 				}
 			}
 		}()
@@ -140,11 +156,8 @@ func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, 
 	r := &intReader{bytes.NewReader(data), path}
 
 	if bundle {
-		bundleVersion := r.uint64()
-		switch bundleVersion {
-		case bundleVersion:
-		default:
-			errorf("unknown bundle format version %d", bundleVersion)
+		if v := r.uint64(); v != bundleVersion {
+			errorf("unknown bundle format version %d", v)
 		}
 	}
 
@@ -162,7 +175,7 @@ func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, 
 	sLen := int64(r.uint64())
 	var fLen int64
 	var fileOffset []uint64
-	if insert != nil {
+	if shallow {
 		// Shallow mode uses a different position encoding.
 		fLen = int64(r.uint64())
 		fileOffset = make([]uint64, r.uint64())
@@ -181,7 +194,8 @@ func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, 
 	p := iimporter{
 		version: int(version),
 		ipath:   path,
-		insert:  insert,
+		shallow: shallow,
+		reportf: reportf,
 
 		stringData:  stringData,
 		stringCache: make(map[uint64]string),
@@ -208,8 +222,9 @@ func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, 
 		p.typCache[uint64(i)] = pt
 	}
 
-	pkgList := make([]*types.Package, r.uint64())
-	for i := range pkgList {
+	// Gather the relevant packages from the manifest.
+	items := make([]GetPackagesItem, r.uint64())
+	for i := range items {
 		pkgPathOff := r.uint64()
 		pkgPath := p.stringAt(pkgPathOff)
 		pkgName := p.stringAt(r.uint64())
@@ -218,29 +233,42 @@ func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, 
 		if pkgPath == "" {
 			pkgPath = path
 		}
-		pkg := getPackage(pkgPath, pkgName)
-		if pkg == nil {
-			errorf("internal error: getPackage returned nil package for %s", pkgPath)
-		} else if pkg.Name() != pkgName {
-			errorf("conflicting names %s and %s for package %q", pkg.Name(), pkgName, path)
-		}
-		if i == 0 && !bundle {
-			p.localpkg = pkg
-		}
-
-		p.pkgCache[pkgPathOff] = pkg
+		items[i].Name = pkgName
+		items[i].Path = pkgPath
+		items[i].pathOffset = pkgPathOff
 
 		// Read index for package.
 		nameIndex := make(map[string]uint64)
 		nSyms := r.uint64()
-		// In shallow mode we don't expect an index for other packages.
-		assert(nSyms == 0 || p.localpkg == pkg || p.insert == nil)
+		// In shallow mode, only the current package (i=0) has an index.
+		assert(!(shallow && i > 0 && nSyms != 0))
 		for ; nSyms > 0; nSyms-- {
 			name := p.stringAt(r.uint64())
 			nameIndex[name] = r.uint64()
 		}
 
-		p.pkgIndex[pkg] = nameIndex
+		items[i].nameIndex = nameIndex
+	}
+
+	// Request packages all at once from the client,
+	// enabling a parallel implementation.
+	if err := getPackages(items); err != nil {
+		return nil, err // don't wrap this error
+	}
+
+	// Check the results and complete the index.
+	pkgList := make([]*types.Package, len(items))
+	for i, item := range items {
+		pkg := item.Pkg
+		if pkg == nil {
+			errorf("internal error: getPackages returned nil package for %q", item.Path)
+		} else if pkg.Path() != item.Path {
+			errorf("internal error: getPackages returned wrong path %q, want %q", pkg.Path(), item.Path)
+		} else if pkg.Name() != item.Name {
+			errorf("internal error: getPackages returned wrong name %s for package %q, want %s", pkg.Name(), item.Path, item.Name)
+		}
+		p.pkgCache[item.pathOffset] = pkg
+		p.pkgIndex[pkg] = item.nameIndex
 		pkgList[i] = pkg
 	}
 
@@ -292,18 +320,25 @@ func iimportCommon(fset *token.FileSet, getPackage GetPackageFunc, data []byte, 
 	// Therefore, we defer calling SetConstraint there, and call it here instead
 	// after all types are complete.
 	for _, d := range p.later {
-		typeparams.SetTypeParamConstraint(d.t, d.constraint)
+		d.t.SetConstraint(d.constraint)
 	}
 
 	for _, typ := range p.interfaceList {
 		typ.Complete()
 	}
 
+	// Workaround for golang/go#61561. See the doc for instanceList for details.
+	for _, typ := range p.instanceList {
+		if iface, _ := typ.Underlying().(*types.Interface); iface != nil {
+			iface.Complete()
+		}
+	}
+
 	return pkgs, nil
 }
 
 type setConstraintArgs struct {
-	t          *typeparams.TypeParam
+	t          *types.TypeParam
 	constraint types.Type
 }
 
@@ -311,8 +346,8 @@ type iimporter struct {
 	version int
 	ipath   string
 
-	localpkg *types.Package
-	insert   func(pkg *types.Package, name string) // "shallow" mode only
+	shallow bool
+	reportf ReportFunc // if non-nil, used to report bugs
 
 	stringData  []byte
 	stringCache map[uint64]string
@@ -328,6 +363,12 @@ type iimporter struct {
 
 	fake          fakeFileSet
 	interfaceList []*types.Interface
+
+	// Workaround for the go/types bug golang/go#61561: instances produced during
+	// instantiation may contain incomplete interfaces. Here we only complete the
+	// underlying type of the instance, which is the most common case but doesn't
+	// handle parameterized interface literals defined deeper in the type.
+	instanceList []types.Type // instances for later completion (see golang/go#61561)
 
 	// Arguments for calls to SetConstraint that are deferred due to recursive types
 	later []setConstraintArgs
@@ -360,13 +401,9 @@ func (p *iimporter) doDecl(pkg *types.Package, name string) {
 
 	off, ok := p.pkgIndex[pkg][name]
 	if !ok {
-		// In "shallow" mode, call back to the application to
-		// find the object and insert it into the package scope.
-		if p.insert != nil {
-			assert(pkg != p.localpkg)
-			p.insert(pkg, name) // "can't fail"
-			return
-		}
+		// In deep mode, the index should be complete. In shallow
+		// mode, we should have already recursively loaded necessary
+		// dependencies so the above Lookup succeeds.
 		errorf("%v.%v not in index", pkg, name)
 	}
 
@@ -511,7 +548,7 @@ func (r *importReader) obj(name string) {
 		r.declare(types.NewConst(pos, r.currPkg, name, typ, val))
 
 	case 'F', 'G':
-		var tparams []*typeparams.TypeParam
+		var tparams []*types.TypeParam
 		if tag == 'G' {
 			tparams = r.tparamList()
 		}
@@ -528,7 +565,7 @@ func (r *importReader) obj(name string) {
 		r.declare(obj)
 		if tag == 'U' {
 			tparams := r.tparamList()
-			typeparams.SetForNamed(named, tparams)
+			named.SetTypeParams(tparams)
 		}
 
 		underlying := r.p.typAt(r.uint64(), named).Underlying()
@@ -545,12 +582,12 @@ func (r *importReader) obj(name string) {
 				// typeparams being used in the method sig/body).
 				base := baseType(recv.Type())
 				assert(base != nil)
-				targs := typeparams.NamedTypeArgs(base)
-				var rparams []*typeparams.TypeParam
+				targs := base.TypeArgs()
+				var rparams []*types.TypeParam
 				if targs.Len() > 0 {
-					rparams = make([]*typeparams.TypeParam, targs.Len())
+					rparams = make([]*types.TypeParam, targs.Len())
 					for i := range rparams {
-						rparams[i] = targs.At(i).(*typeparams.TypeParam)
+						rparams[i] = targs.At(i).(*types.TypeParam)
 					}
 				}
 				msig := r.signature(recv, rparams, nil)
@@ -568,7 +605,7 @@ func (r *importReader) obj(name string) {
 		}
 		name0 := tparamName(name)
 		tn := types.NewTypeName(pos, r.currPkg, name0, nil)
-		t := typeparams.NewTypeParam(tn, nil)
+		t := types.NewTypeParam(tn, nil)
 
 		// To handle recursive references to the typeparam within its
 		// bound, save the partial type in tparamIndex before reading the bounds.
@@ -584,7 +621,7 @@ func (r *importReader) obj(name string) {
 			if iface == nil {
 				errorf("non-interface constraint marked implicit")
 			}
-			typeparams.MarkImplicit(iface)
+			iface.MarkImplicit()
 		}
 		// The constraint type may not be complete, if we
 		// are in the middle of a type recursion involving type
@@ -733,7 +770,8 @@ func (r *importReader) qualifiedIdent() (*types.Package, string) {
 }
 
 func (r *importReader) pos() token.Pos {
-	if r.p.insert != nil { // shallow mode
+	if r.p.shallow {
+		// precise offsets are encoded only in shallow mode
 		return r.posv2()
 	}
 	if r.p.version >= iexportVersionPosCol {
@@ -834,13 +872,28 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 		fields := make([]*types.Var, r.uint64())
 		tags := make([]string, len(fields))
 		for i := range fields {
+			var field *types.Var
+			if r.p.shallow {
+				field, _ = r.objectPathObject().(*types.Var)
+			}
+
 			fpos := r.pos()
 			fname := r.ident()
 			ftyp := r.typ()
 			emb := r.bool()
 			tag := r.string()
 
-			fields[i] = types.NewField(fpos, r.currPkg, fname, ftyp, emb)
+			// Either this is not a shallow import, the field is local, or the
+			// encoded objectPath failed to produce an object (a bug).
+			//
+			// Even in this last, buggy case, fall back on creating a new field. As
+			// discussed in iexport.go, this is not correct, but mostly works and is
+			// preferable to failing (for now at least).
+			if field == nil {
+				field = types.NewField(fpos, r.currPkg, fname, ftyp, emb)
+			}
+
+			fields[i] = field
 			tags[i] = tag
 		}
 		return types.NewStruct(fields, tags)
@@ -856,6 +909,11 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 
 		methods := make([]*types.Func, r.uint64())
 		for i := range methods {
+			var method *types.Func
+			if r.p.shallow {
+				method, _ = r.objectPathObject().(*types.Func)
+			}
+
 			mpos := r.pos()
 			mname := r.ident()
 
@@ -865,9 +923,12 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 			if base != nil {
 				recv = types.NewVar(token.NoPos, r.currPkg, "", base)
 			}
-
 			msig := r.signature(recv, nil, nil)
-			methods[i] = types.NewFunc(mpos, r.currPkg, mname, msig)
+
+			if method == nil {
+				method = types.NewFunc(mpos, r.currPkg, mname, msig)
+			}
+			methods[i] = method
 		}
 
 		typ := newInterface(methods, embeddeds)
@@ -904,18 +965,21 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 		// The imported instantiated type doesn't include any methods, so
 		// we must always use the methods of the base (orig) type.
 		// TODO provide a non-nil *Environment
-		t, _ := typeparams.Instantiate(nil, baseType, targs, false)
+		t, _ := types.Instantiate(nil, baseType, targs, false)
+
+		// Workaround for golang/go#61561. See the doc for instanceList for details.
+		r.p.instanceList = append(r.p.instanceList, t)
 		return t
 
 	case unionType:
 		if r.p.version < iexportVersionGenerics {
 			errorf("unexpected instantiation type")
 		}
-		terms := make([]*typeparams.Term, r.uint64())
+		terms := make([]*types.Term, r.uint64())
 		for i := range terms {
-			terms[i] = typeparams.NewTerm(r.bool(), r.typ())
+			terms[i] = types.NewTerm(r.bool(), r.typ())
 		}
-		return typeparams.NewUnion(terms)
+		return types.NewUnion(terms)
 	}
 }
 
@@ -923,23 +987,43 @@ func (r *importReader) kind() itag {
 	return itag(r.uint64())
 }
 
-func (r *importReader) signature(recv *types.Var, rparams []*typeparams.TypeParam, tparams []*typeparams.TypeParam) *types.Signature {
+// objectPathObject is the inverse of exportWriter.objectPath.
+//
+// In shallow mode, certain fields and methods may need to be looked up in an
+// imported package. See the doc for exportWriter.objectPath for a full
+// explanation.
+func (r *importReader) objectPathObject() types.Object {
+	objPath := objectpath.Path(r.string())
+	if objPath == "" {
+		return nil
+	}
+	pkg := r.pkg()
+	obj, err := objectpath.Object(pkg, objPath)
+	if err != nil {
+		if r.p.reportf != nil {
+			r.p.reportf("failed to find object for objectPath %q: %v", objPath, err)
+		}
+	}
+	return obj
+}
+
+func (r *importReader) signature(recv *types.Var, rparams []*types.TypeParam, tparams []*types.TypeParam) *types.Signature {
 	params := r.paramList()
 	results := r.paramList()
 	variadic := params.Len() > 0 && r.bool()
-	return typeparams.NewSignatureType(recv, rparams, tparams, params, results, variadic)
+	return types.NewSignatureType(recv, rparams, tparams, params, results, variadic)
 }
 
-func (r *importReader) tparamList() []*typeparams.TypeParam {
+func (r *importReader) tparamList() []*types.TypeParam {
 	n := r.uint64()
 	if n == 0 {
 		return nil
 	}
-	xs := make([]*typeparams.TypeParam, n)
+	xs := make([]*types.TypeParam, n)
 	for i := range xs {
 		// Note: the standard library importer is tolerant of nil types here,
 		// though would panic in SetTypeParams.
-		xs[i] = r.typ().(*typeparams.TypeParam)
+		xs[i] = r.typ().(*types.TypeParam)
 	}
 	return xs
 }
