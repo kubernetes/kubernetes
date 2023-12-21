@@ -48,6 +48,9 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 	// guaranteed to be executed at least once,
 	// if we haven't requested immediate execution, delay once
 	if immediate {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if ok, err := func() (bool, error) {
 			defer runtime.HandleCrash()
 			return condition(ctx)
