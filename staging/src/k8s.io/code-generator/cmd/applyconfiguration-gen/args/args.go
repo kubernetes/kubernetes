@@ -70,10 +70,10 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 }
 
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
-	pflag.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
+	fs.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
-	pflag.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
+	fs.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
 		"path to the openapi schema containing all the types that apply configurations will be generated for")
 }
 
