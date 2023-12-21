@@ -9,10 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go/types"
-	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -22,7 +21,6 @@ import (
 	"sync"
 	"unicode"
 
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/tools/go/internal/packagesdriver"
 	"golang.org/x/tools/internal/gocommand"
 	"golang.org/x/tools/internal/packagesinternal"
@@ -153,10 +151,10 @@ func goListDriver(cfg *Config, patterns ...string) (*driverResponse, error) {
 	if cfg.Mode&NeedTypesSizes != 0 || cfg.Mode&NeedTypes != 0 {
 		sizeswg.Add(1)
 		go func() {
-			var sizes types.Sizes
-			sizes, sizeserr = packagesdriver.GetSizesGolist(ctx, state.cfgInvocation(), cfg.gocmdRunner)
-			// types.SizesFor always returns nil or a *types.StdSizes.
-			response.dr.Sizes, _ = sizes.(*types.StdSizes)
+			compiler, arch, err := packagesdriver.GetSizesForArgsGolist(ctx, state.cfgInvocation(), cfg.gocmdRunner)
+			sizeserr = err
+			response.dr.Compiler = compiler
+			response.dr.Arch = arch
 			sizeswg.Done()
 		}()
 	}
@@ -210,85 +208,11 @@ extractQueries:
 		}
 	}
 
-	// Only use go/packages' overlay processing if we're using a Go version
-	// below 1.16. Otherwise, go list handles it.
-	if goVersion, err := state.getGoVersion(); err == nil && goVersion < 16 {
-		modifiedPkgs, needPkgs, err := state.processGolistOverlay(response)
-		if err != nil {
-			return nil, err
-		}
-
-		var containsCandidates []string
-		if len(containFiles) > 0 {
-			containsCandidates = append(containsCandidates, modifiedPkgs...)
-			containsCandidates = append(containsCandidates, needPkgs...)
-		}
-		if err := state.addNeededOverlayPackages(response, needPkgs); err != nil {
-			return nil, err
-		}
-		// Check candidate packages for containFiles.
-		if len(containFiles) > 0 {
-			for _, id := range containsCandidates {
-				pkg, ok := response.seenPackages[id]
-				if !ok {
-					response.addPackage(&Package{
-						ID: id,
-						Errors: []Error{{
-							Kind: ListError,
-							Msg:  fmt.Sprintf("package %s expected but not seen", id),
-						}},
-					})
-					continue
-				}
-				for _, f := range containFiles {
-					for _, g := range pkg.GoFiles {
-						if sameFile(f, g) {
-							response.addRoot(id)
-						}
-					}
-				}
-			}
-		}
-		// Add root for any package that matches a pattern. This applies only to
-		// packages that are modified by overlays, since they are not added as
-		// roots automatically.
-		for _, pattern := range restPatterns {
-			match := matchPattern(pattern)
-			for _, pkgID := range modifiedPkgs {
-				pkg, ok := response.seenPackages[pkgID]
-				if !ok {
-					continue
-				}
-				if match(pkg.PkgPath) {
-					response.addRoot(pkg.ID)
-				}
-			}
-		}
-	}
-
 	sizeswg.Wait()
 	if sizeserr != nil {
 		return nil, sizeserr
 	}
 	return response.dr, nil
-}
-
-func (state *golistState) addNeededOverlayPackages(response *responseDeduper, pkgs []string) error {
-	if len(pkgs) == 0 {
-		return nil
-	}
-	dr, err := state.createDriverResponse(pkgs...)
-	if err != nil {
-		return err
-	}
-	for _, pkg := range dr.Packages {
-		response.addPackage(pkg)
-	}
-	_, needPkgs, err := state.processGolistOverlay(response)
-	if err != nil {
-		return err
-	}
-	return state.addNeededOverlayPackages(response, needPkgs)
 }
 
 func (state *golistState) runContainsQueries(response *responseDeduper, queries []string) error {
@@ -1110,7 +1034,7 @@ func (state *golistState) writeOverlays() (filename string, cleanup func(), err 
 	if len(state.cfg.Overlay) == 0 {
 		return "", func() {}, nil
 	}
-	dir, err := ioutil.TempDir("", "gopackages-*")
+	dir, err := os.MkdirTemp("", "gopackages-*")
 	if err != nil {
 		return "", nil, err
 	}
@@ -1129,7 +1053,7 @@ func (state *golistState) writeOverlays() (filename string, cleanup func(), err 
 		// Create a unique filename for the overlaid files, to avoid
 		// creating nested directories.
 		noSeparator := strings.Join(strings.Split(filepath.ToSlash(k), "/"), "")
-		f, err := ioutil.TempFile(dir, fmt.Sprintf("*-%s", noSeparator))
+		f, err := os.CreateTemp(dir, fmt.Sprintf("*-%s", noSeparator))
 		if err != nil {
 			return "", func() {}, err
 		}
@@ -1147,7 +1071,7 @@ func (state *golistState) writeOverlays() (filename string, cleanup func(), err 
 	}
 	// Write out the overlay file that contains the filepath mappings.
 	filename = filepath.Join(dir, "overlay.json")
-	if err := ioutil.WriteFile(filename, b, 0665); err != nil {
+	if err := os.WriteFile(filename, b, 0665); err != nil {
 		return "", func() {}, err
 	}
 	return filename, cleanup, nil
