@@ -132,7 +132,7 @@ ERROR: some/relative/path/buggy.go:200: with spaces
 `
 
 	// Used by unittests/list-labels.
-	ListLabelsOutput = `The following labels can be used with 'gingko run --label-filter':
+	ListLabelsOutput = `The following labels can be used with 'ginkgo run --label-filter':
     Alpha
     Beta
     Conformance
