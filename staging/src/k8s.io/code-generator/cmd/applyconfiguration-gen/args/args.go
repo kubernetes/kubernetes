@@ -18,17 +18,16 @@ package args
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/spf13/pflag"
 	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/types"
-
-	codegenutil "k8s.io/code-generator/pkg/util"
 )
 
 // CustomArgs is a wrapper for arguments to applyconfiguration-gen.
 type CustomArgs struct {
+	OutputPackage string // must be a Go import-path
+
 	// ExternalApplyConfigurations provides the locations of externally generated
 	// apply configuration types for types referenced by the go structs provided as input.
 	// Locations are provided as a comma separated list of <package>.<typeName>:<applyconfiguration-package>
@@ -62,14 +61,11 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	}
 	genericArgs.CustomArgs = customArgs
 
-	if pkg := codegenutil.CurrentPackage(); len(pkg) != 0 {
-		genericArgs.OutputPackagePath = path.Join(pkg, "pkg/client/applyconfigurations")
-	}
-
 	return genericArgs, customArgs
 }
 
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
+	fs.StringVar(&ca.OutputPackage, "output-package", ca.OutputPackage, "the Go import-path of the generated results")
 	fs.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
@@ -79,8 +75,15 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	if len(genericArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package cannot be empty")
+	if len(genericArgs.OutputBase) == 0 {
+		return fmt.Errorf("--output-base must be specified")
 	}
+
+	customArgs := genericArgs.CustomArgs.(*CustomArgs)
+
+	if len(customArgs.OutputPackage) == 0 {
+		return fmt.Errorf("--output-package must be specified")
+	}
+
 	return nil
 }

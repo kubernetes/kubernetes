@@ -31,7 +31,6 @@ import (
 // utilGenerator generates the ForKind() utility function.
 type utilGenerator struct {
 	generator.DefaultGen
-	outputPackage        string
 	imports              namer.ImportTracker
 	groupVersions        map[string]clientgentypes.GroupVersions
 	groupGoNames         map[string]string
@@ -52,7 +51,7 @@ func (g *utilGenerator) Filter(*generator.Context, *types.Type) bool {
 
 func (g *utilGenerator) Namers(*generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw":          namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw":          namer.NewRawNamer("", g.imports),
 		"singularKind": namer.NewPublicNamer(0),
 	}
 }
