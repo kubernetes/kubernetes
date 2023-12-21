@@ -18,19 +18,20 @@ package args
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/spf13/pflag"
 	"k8s.io/gengo/v2/args"
 
 	"k8s.io/code-generator/cmd/client-gen/types"
-	codegenutil "k8s.io/code-generator/pkg/util"
 )
 
 var DefaultInputDirs = []string{}
 
 // CustomArgs is a wrapper for arguments to client-gen.
 type CustomArgs struct {
+	// The Go import-path of the generated results.
+	OutputPackage string
+
 	// A sorted list of group versions to generate. For each of them the package path is found
 	// in GroupVersionToInputPath.
 	Groups []types.GroupVersions
@@ -72,15 +73,12 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs.CustomArgs = customArgs
 	genericArgs.InputDirs = DefaultInputDirs
 
-	if pkg := codegenutil.CurrentPackage(); len(pkg) != 0 {
-		genericArgs.OutputPackagePath = path.Join(pkg, "pkg/client/clientset")
-	}
-
 	return genericArgs, customArgs
 }
 
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	gvsBuilder := NewGroupVersionsBuilder(&ca.Groups)
+	fs.StringVar(&ca.OutputPackage, "output-package", ca.OutputPackage, "the Go import-path of the generated results")
 	fs.Var(NewGVPackagesValue(gvsBuilder, nil), "input", "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
 	fs.Var(NewGVTypesValue(&ca.IncludedTypesOverrides, []string{}), "included-types-overrides", "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
 	fs.Var(NewInputBasePathValue(gvsBuilder, inputBase), "input-base", "base path to look for the api group.")
@@ -97,16 +95,20 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 }
 
 func Validate(genericArgs *args.GeneratorArgs) error {
+	if len(genericArgs.OutputBase) == 0 {
+		return fmt.Errorf("--output-base must be specified")
+	}
+
 	customArgs := genericArgs.CustomArgs.(*CustomArgs)
 
-	if len(genericArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package cannot be empty")
+	if len(customArgs.OutputPackage) == 0 {
+		return fmt.Errorf("--output-package must be specified")
 	}
 	if len(customArgs.ClientsetName) == 0 {
-		return fmt.Errorf("clientset name cannot be empty")
+		return fmt.Errorf("--clientset-name must be specified")
 	}
 	if len(customArgs.ClientsetAPIPath) == 0 {
-		return fmt.Errorf("clientset API path cannot be empty")
+		return fmt.Errorf("--clientset-api-path cannot be empty")
 	}
 
 	return nil

@@ -40,7 +40,7 @@ type genGroup struct {
 	types            []*types.Type
 	imports          namer.ImportTracker
 	inputPackage     string
-	clientsetPackage string
+	clientsetPackage string // must be a Go import-path
 	// If the genGroup has been called. This generator should only execute once.
 	called bool
 }

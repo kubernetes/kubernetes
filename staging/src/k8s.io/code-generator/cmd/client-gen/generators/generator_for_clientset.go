@@ -33,8 +33,7 @@ type genClientset struct {
 	generator.DefaultGen
 	groups             []clientgentypes.GroupVersions
 	groupGoNames       map[clientgentypes.GroupVersion]string
-	clientsetPackage   string
-	outputPackage      string
+	clientsetPackage   string // must be a Go import-path
 	imports            namer.ImportTracker
 	clientsetGenerated bool
 }
@@ -43,7 +42,7 @@ var _ generator.Generator = &genClientset{}
 
 func (g *genClientset) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer(g.clientsetPackage, g.imports),
 	}
 }
 

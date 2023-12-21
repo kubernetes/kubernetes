@@ -33,11 +33,11 @@ import (
 // GenScheme produces a package for a clientset with the scheme, codecs and parameter codecs.
 type GenScheme struct {
 	generator.DefaultGen
-	OutputPackage   string
+	OutputPackage   string // Must be a Go import-path
+	OutputPath      string // optional
 	Groups          []clientgentypes.GroupVersions
 	GroupGoNames    map[clientgentypes.GroupVersion]string
 	InputPackages   map[clientgentypes.GroupVersion]string
-	OutputPath      string
 	ImportTracker   namer.ImportTracker
 	PrivateScheme   bool
 	CreateRegistry  bool

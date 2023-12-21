@@ -33,19 +33,18 @@ type genClientset struct {
 	generator.DefaultGen
 	groups               []clientgentypes.GroupVersions
 	groupGoNames         map[clientgentypes.GroupVersion]string
-	fakeClientsetPackage string
-	outputPackage        string
+	fakeClientsetPackage string // must be a Go import-path
 	imports              namer.ImportTracker
 	clientsetGenerated   bool
 	// the import path of the generated real clientset.
-	realClientsetPackage string
+	realClientsetPackage string // must be a Go import-path
 }
 
 var _ generator.Generator = &genClientset{}
 
 func (g *genClientset) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer(g.fakeClientsetPackage, g.imports),
 	}
 }
 

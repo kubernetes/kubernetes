@@ -32,7 +32,7 @@ import (
 // genFakeForType produces a file for each top-level type.
 type genFakeForType struct {
 	generator.DefaultGen
-	outputPackage             string
+	outputPackage             string // Must be a Go import-path
 	group                     string
 	version                   string
 	groupGoName               string
