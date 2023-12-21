@@ -8,22 +8,22 @@ import (
 )
 
 /*
-	If a container marked as focus has a descendant that is also marked as focus, Ginkgo's policy is to
-	unmark the container's focus.  This gives developers a more intuitive experience when debugging specs.
-	It is common to focus a container to just run a subset of specs, then identify the specific specs within the container to focus -
-	this policy allows the developer to simply focus those specific specs and not need to go back and turn the focus off of the container:
+If a container marked as focus has a descendant that is also marked as focus, Ginkgo's policy is to
+unmark the container's focus.  This gives developers a more intuitive experience when debugging specs.
+It is common to focus a container to just run a subset of specs, then identify the specific specs within the container to focus -
+this policy allows the developer to simply focus those specific specs and not need to go back and turn the focus off of the container:
 
-	As a common example, consider:
+As a common example, consider:
 
-		FDescribe("something to debug", function() {
-			It("works", function() {...})
-			It("works", function() {...})
-			FIt("doesn't work", function() {...})
-			It("works", function() {...})
-		})
+	FDescribe("something to debug", function() {
+		It("works", function() {...})
+		It("works", function() {...})
+		FIt("doesn't work", function() {...})
+		It("works", function() {...})
+	})
 
-	here the developer's intent is to focus in on the `"doesn't work"` spec and not to run the adjacent specs in the focused `"something to debug"` container.
-	The nested policy applied by this function enables this behavior.
+here the developer's intent is to focus in on the `"doesn't work"` spec and not to run the adjacent specs in the focused `"something to debug"` container.
+The nested policy applied by this function enables this behavior.
 */
 func ApplyNestedFocusPolicyToTree(tree *TreeNode) {
 	var walkTree func(tree *TreeNode) bool
@@ -44,24 +44,21 @@ func ApplyNestedFocusPolicyToTree(tree *TreeNode) {
 }
 
 /*
-	Ginkgo supports focussing specs using `FIt`, `FDescribe`, etc. - this is called "programmatic focus"
-	It also supports focussing specs using regular expressions on the command line (`-focus=`, `-skip=`) that match against spec text
-	and file filters (`-focus-files=`, `-skip-files=`) that match against code locations for nodes in specs.
+Ginkgo supports focussing specs using `FIt`, `FDescribe`, etc. - this is called "programmatic focus"
+It also supports focussing specs using regular expressions on the command line (`-focus=`, `-skip=`) that match against spec text and file filters (`-focus-files=`, `-skip-files=`) that match against code locations for nodes in specs.
 
-	If any of the CLI flags are provided they take precedence.  The file filters run first followed by the regex filters.
+When both programmatic and file filters are provided their results are ANDed together.  If multiple kinds of filters are provided, the file filters run first followed by the regex filters.
 
-	This function sets the `Skip` property on specs by applying Ginkgo's focus policy:
-	- If there are no CLI arguments and no programmatic focus, do nothing.
-	- If there are no CLI arguments but a spec somewhere has programmatic focus, skip any specs that have no programmatic focus.
-	- If there are CLI arguments parse them and skip any specs that either don't match the focus filters or do match the skip filters.
+This function sets the `Skip` property on specs by applying Ginkgo's focus policy:
+- If there are no CLI arguments and no programmatic focus, do nothing.
+- If a spec somewhere has programmatic focus skip any specs that have no programmatic focus.
+- If there are CLI arguments parse them and skip any specs that either don't match the focus filters or do match the skip filters.
 
-	*Note:* specs with pending nodes are Skipped when created by NewSpec.
+*Note:* specs with pending nodes are Skipped when created by NewSpec.
 */
 func ApplyFocusToSpecs(specs Specs, description string, suiteLabels Labels, suiteConfig types.SuiteConfig) (Specs, bool) {
 	focusString := strings.Join(suiteConfig.FocusStrings, "|")
 	skipString := strings.Join(suiteConfig.SkipStrings, "|")
-
-	hasFocusCLIFlags := focusString != "" || skipString != "" || len(suiteConfig.SkipFiles) > 0 || len(suiteConfig.FocusFiles) > 0 || suiteConfig.LabelFilter != ""
 
 	type SkipCheck func(spec Spec) bool
 
@@ -69,21 +66,21 @@ func ApplyFocusToSpecs(specs Specs, description string, suiteLabels Labels, suit
 	skipChecks := []SkipCheck{func(spec Spec) bool { return spec.Nodes.HasNodeMarkedPending() }}
 	hasProgrammaticFocus := false
 
-	if !hasFocusCLIFlags {
-		// check for programmatic focus
-		for _, spec := range specs {
-			if spec.Nodes.HasNodeMarkedFocus() && !spec.Nodes.HasNodeMarkedPending() {
-				skipChecks = append(skipChecks, func(spec Spec) bool { return !spec.Nodes.HasNodeMarkedFocus() })
-				hasProgrammaticFocus = true
-				break
-			}
+	for _, spec := range specs {
+		if spec.Nodes.HasNodeMarkedFocus() && !spec.Nodes.HasNodeMarkedPending() {
+			hasProgrammaticFocus = true
+			break
 		}
+	}
+
+	if hasProgrammaticFocus {
+		skipChecks = append(skipChecks, func(spec Spec) bool { return !spec.Nodes.HasNodeMarkedFocus() })
 	}
 
 	if suiteConfig.LabelFilter != "" {
 		labelFilter, _ := types.ParseLabelFilter(suiteConfig.LabelFilter)
-		skipChecks = append(skipChecks, func(spec Spec) bool { 
-			return !labelFilter(UnionOfLabels(suiteLabels, spec.Nodes.UnionOfLabels())) 
+		skipChecks = append(skipChecks, func(spec Spec) bool {
+			return !labelFilter(UnionOfLabels(suiteLabels, spec.Nodes.UnionOfLabels()))
 		})
 	}
 

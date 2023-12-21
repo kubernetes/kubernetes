@@ -80,6 +80,162 @@ func (RetentionSizeConfig) SwaggerDoc() map[string]string {
 	return map_RetentionSizeConfig
 }
 
+var map_ClusterImagePolicy = map[string]string{
+	"":         "ClusterImagePolicy holds cluster-wide configuration for image signature verification\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec contains the configuration for the cluster image policy.",
+	"status":   "status contains the observed state of the resource.",
+}
+
+func (ClusterImagePolicy) SwaggerDoc() map[string]string {
+	return map_ClusterImagePolicy
+}
+
+var map_ClusterImagePolicyList = map[string]string{
+	"":         "ClusterImagePolicyList is a list of ClusterImagePolicy resources\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+}
+
+func (ClusterImagePolicyList) SwaggerDoc() map[string]string {
+	return map_ClusterImagePolicyList
+}
+
+var map_ClusterImagePolicySpec = map[string]string{
+	"":       "CLusterImagePolicySpec is the specification of the ClusterImagePolicy custom resource.",
+	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. Please be aware that the scopes should not be nested under the repositories of OpenShift Container Platform images. If configured, the policies for OpenShift Container Platform repositories will not be in effect. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
+	"policy": "policy contains configuration to allow scopes to be verified, and defines how images not matching the verification policy will be treated.",
+}
+
+func (ClusterImagePolicySpec) SwaggerDoc() map[string]string {
+	return map_ClusterImagePolicySpec
+}
+
+var map_ClusterImagePolicyStatus = map[string]string{
+	"conditions": "conditions provide details on the status of this API Resource.",
+}
+
+func (ClusterImagePolicyStatus) SwaggerDoc() map[string]string {
+	return map_ClusterImagePolicyStatus
+}
+
+var map_FulcioCAWithRekor = map[string]string{
+	"":              "FulcioCAWithRekor defines the root of trust based on the Fulcio certificate and the Rekor public key.",
+	"fulcioCAData":  "fulcioCAData contains inline base64-encoded data for the PEM format fulcio CA. fulcioCAData must be at most 8192 characters.",
+	"rekorKeyData":  "rekorKeyData contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters.",
+	"fulcioSubject": "fulcioSubject specifies OIDC issuer and the email of the Fulcio authentication configuration.",
+}
+
+func (FulcioCAWithRekor) SwaggerDoc() map[string]string {
+	return map_FulcioCAWithRekor
+}
+
+var map_ImagePolicy = map[string]string{
+	"":         "ImagePolicy holds namespace-wide configuration for image signature verification\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+	"status":   "status contains the observed state of the resource.",
+}
+
+func (ImagePolicy) SwaggerDoc() map[string]string {
+	return map_ImagePolicy
+}
+
+var map_ImagePolicyList = map[string]string{
+	"":         "ImagePolicyList is a list of ImagePolicy resources\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+}
+
+func (ImagePolicyList) SwaggerDoc() map[string]string {
+	return map_ImagePolicyList
+}
+
+var map_ImagePolicySpec = map[string]string{
+	"":       "ImagePolicySpec is the specification of the ImagePolicy CRD.",
+	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. Please be aware that the scopes should not be nested under the repositories of OpenShift Container Platform images. If configured, the policies for OpenShift Container Platform repositories will not be in effect. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
+	"policy": "policy contains configuration to allow scopes to be verified, and defines how images not matching the verification policy will be treated.",
+}
+
+func (ImagePolicySpec) SwaggerDoc() map[string]string {
+	return map_ImagePolicySpec
+}
+
+var map_ImagePolicyStatus = map[string]string{
+	"conditions": "conditions provide details on the status of this API Resource.",
+}
+
+func (ImagePolicyStatus) SwaggerDoc() map[string]string {
+	return map_ImagePolicyStatus
+}
+
+var map_Policy = map[string]string{
+	"":               "Policy defines the verification policy for the items in the scopes list.",
+	"rootOfTrust":    "rootOfTrust specifies the root of trust for the policy.",
+	"signedIdentity": "signedIdentity specifies what image identity the signature claims about the image. The required matchPolicy field specifies the approach used in the verification process to verify the identity in the signature and the actual image identity, the default matchPolicy is \"MatchRepoDigestOrExact\".",
+}
+
+func (Policy) SwaggerDoc() map[string]string {
+	return map_Policy
+}
+
+var map_PolicyFulcioSubject = map[string]string{
+	"":            "PolicyFulcioSubject defines the OIDC issuer and the email of the Fulcio authentication configuration.",
+	"oidcIssuer":  "oidcIssuer contains the expected OIDC issuer. It will be verified that the Fulcio-issued certificate contains a (Fulcio-defined) certificate extension pointing at this OIDC issuer URL. When Fulcio issues certificates, it includes a value based on an URL inside the client-provided ID token. Example: \"https://expected.OIDC.issuer/\"",
+	"signedEmail": "signedEmail holds the email address the the Fulcio certificate is issued for. Example: \"expected-signing-user@example.com\"",
+}
+
+func (PolicyFulcioSubject) SwaggerDoc() map[string]string {
+	return map_PolicyFulcioSubject
+}
+
+var map_PolicyIdentity = map[string]string{
+	"":                "PolicyIdentity defines image identity the signature claims about the image. When omitted, the default matchPolicy is \"MatchRepoDigestOrExact\".",
+	"matchPolicy":     "matchPolicy sets the type of matching to be used. Valid values are \"MatchRepoDigestOrExact\", \"MatchRepository\", \"ExactRepository\", \"RemapIdentity\". When omitted, the default value is \"MatchRepoDigestOrExact\". If set matchPolicy to ExactRepository, then the exactRepository must be specified. If set matchPolicy to RemapIdentity, then the remapIdentity must be specified. \"MatchRepoDigestOrExact\" means that the identity in the signature must be in the same repository as the image identity if the image identity is referenced by a digest. Otherwise, the identity in the signature must be the same as the image identity. \"MatchRepository\" means that the identity in the signature must be in the same repository as the image identity. \"ExactRepository\" means that the identity in the signature must be in the same repository as a specific identity specified by \"repository\". \"RemapIdentity\" means that the signature must be in the same as the remapped image identity. Remapped image identity is obtained by replacing the \"prefix\" with the specified “signedPrefix” if the the image identity matches the specified remapPrefix.",
+	"exactRepository": "exactRepository is required if matchPolicy is set to \"ExactRepository\".",
+	"remapIdentity":   "remapIdentity is required if matchPolicy is set to \"RemapIdentity\".",
+}
+
+func (PolicyIdentity) SwaggerDoc() map[string]string {
+	return map_PolicyIdentity
+}
+
+var map_PolicyMatchExactRepository = map[string]string{
+	"repository": "repository is the reference of the image identity to be matched. The value should be a repository name (by omitting the tag or digest) in a registry implementing the \"Docker Registry HTTP API V2\". For example, docker.io/library/busybox",
+}
+
+func (PolicyMatchExactRepository) SwaggerDoc() map[string]string {
+	return map_PolicyMatchExactRepository
+}
+
+var map_PolicyMatchRemapIdentity = map[string]string{
+	"prefix":       "prefix is the prefix of the image identity to be matched. If the image identity matches the specified prefix, that prefix is replaced by the specified “signedPrefix” (otherwise it is used as unchanged and no remapping takes place). This useful when verifying signatures for a mirror of some other repository namespace that preserves the vendor’s repository structure. The prefix and signedPrefix values can be either host[:port] values (matching exactly the same host[:port], string), repository namespaces, or repositories (i.e. they must not contain tags/digests), and match as prefixes of the fully expanded form. For example, docker.io/library/busybox (not busybox) to specify that single repository, or docker.io/library (not an empty string) to specify the parent namespace of docker.io/library/busybox.",
+	"signedPrefix": "signedPrefix is the prefix of the image identity to be matched in the signature. The format is the same as \"prefix\". The values can be either host[:port] values (matching exactly the same host[:port], string), repository namespaces, or repositories (i.e. they must not contain tags/digests), and match as prefixes of the fully expanded form. For example, docker.io/library/busybox (not busybox) to specify that single repository, or docker.io/library (not an empty string) to specify the parent namespace of docker.io/library/busybox.",
+}
+
+func (PolicyMatchRemapIdentity) SwaggerDoc() map[string]string {
+	return map_PolicyMatchRemapIdentity
+}
+
+var map_PolicyRootOfTrust = map[string]string{
+	"":                  "PolicyRootOfTrust defines the root of trust based on the selected policyType.",
+	"policyType":        "policyType serves as the union's discriminator. Users are required to assign a value to this field, choosing one of the policy types that define the root of trust. \"PublicKey\" indicates that the policy relies on a sigstore publicKey and may optionally use a Rekor verification. \"FulcioCAWithRekor\" indicates that the policy is based on the Fulcio certification and incorporates a Rekor verification.",
+	"publicKey":         "publicKey defines the root of trust based on a sigstore public key.",
+	"fulcioCAWithRekor": "fulcioCAWithRekor defines the root of trust based on the Fulcio certificate and the Rekor public key. For more information about Fulcio and Rekor, please refer to the document at: https://github.com/sigstore/fulcio and https://github.com/sigstore/rekor",
+}
+
+func (PolicyRootOfTrust) SwaggerDoc() map[string]string {
+	return map_PolicyRootOfTrust
+}
+
+var map_PublicKey = map[string]string{
+	"":             "PublicKey defines the root of trust based on a sigstore public key.",
+	"keyData":      "keyData contains inline base64-encoded data for the PEM format public key. KeyData must be at most 8192 characters.",
+	"rekorKeyData": "rekorKeyData contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters.",
+}
+
+func (PublicKey) SwaggerDoc() map[string]string {
+	return map_PublicKey
+}
+
 var map_GatherConfig = map[string]string{
 	"":                  "gatherConfig provides data gathering configuration options.",
 	"dataPolicy":        "dataPolicy allows user to enable additional global obfuscation of the IP addresses and base domain in the Insights archive data. Valid values are \"None\" and \"ObfuscateNetworking\". When set to None the data is not obfuscated. When set to ObfuscateNetworking the IP addresses and the cluster domain name are obfuscated. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is None.",

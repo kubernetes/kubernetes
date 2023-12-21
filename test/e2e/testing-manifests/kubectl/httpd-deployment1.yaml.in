@@ -11,6 +11,8 @@ spec:
     metadata:
       labels:
         app: httpd
+      annotations:
+        annotations_app: annotations_httpd
     spec:
       containers:
       - name: httpd

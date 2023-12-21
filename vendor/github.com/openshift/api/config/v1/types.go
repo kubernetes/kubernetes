@@ -398,3 +398,33 @@ const (
 	// NoOpinionIncludeSubDomains means HSTS "includeSubDomains" doesn't matter to the RequiredHSTSPolicy
 	NoOpinionIncludeSubDomains IncludeSubDomainsPolicy = "NoOpinion"
 )
+
+// IBMCloudServiceName contains a value specifying the name of an IBM Cloud Service,
+// which are used by MAPI, CIRO, CIO, Installer, etc.
+// +kubebuilder:validation:Enum=CIS;COS;DNSServices;GlobalSearch;GlobalTagging;HyperProtect;IAM;KeyProtect;ResourceController;ResourceManager;VPC
+type IBMCloudServiceName string
+
+const (
+	// IBMCloudServiceCIS is the name for IBM Cloud CIS.
+	IBMCloudServiceCIS IBMCloudServiceName = "CIS"
+	// IBMCloudServiceCOS is the name for IBM Cloud COS.
+	IBMCloudServiceCOS IBMCloudServiceName = "COS"
+	// IBMCloudServiceDNSServices is the name for IBM Cloud DNS Services.
+	IBMCloudServiceDNSServices IBMCloudServiceName = "DNSServices"
+	// IBMCloudServiceGlobalSearch is the name for IBM Cloud Global Search.
+	IBMCloudServiceGlobalSearch IBMCloudServiceName = "GlobalSearch"
+	// IBMCloudServiceGlobalTagging is the name for IBM Cloud Global Tagging.
+	IBMCloudServiceGlobalTagging IBMCloudServiceName = "GlobalTagging"
+	// IBMCloudServiceHyperProtect is the name for IBM Cloud Hyper Protect.
+	IBMCloudServiceHyperProtect IBMCloudServiceName = "HyperProtect"
+	// IBMCloudServiceIAM is the name for IBM Cloud IAM.
+	IBMCloudServiceIAM IBMCloudServiceName = "IAM"
+	// IBMCloudServiceKeyProtect is the name for IBM Cloud Key Protect.
+	IBMCloudServiceKeyProtect IBMCloudServiceName = "KeyProtect"
+	// IBMCloudServiceResourceController is the name for IBM Cloud Resource Controller.
+	IBMCloudServiceResourceController IBMCloudServiceName = "ResourceController"
+	// IBMCloudServiceResourceManager is the name for IBM Cloud Resource Manager.
+	IBMCloudServiceResourceManager IBMCloudServiceName = "ResourceManager"
+	// IBMCloudServiceVPC is the name for IBM Cloud VPC.
+	IBMCloudServiceVPC IBMCloudServiceName = "VPC"
+)

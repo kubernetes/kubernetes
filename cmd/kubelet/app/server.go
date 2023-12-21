@@ -20,6 +20,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,7 +35,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/imdario/mergo"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/codes"
@@ -201,6 +202,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 
 			if cleanFlagSet.Changed("pod-infra-container-image") {
 				klog.InfoS("--pod-infra-container-image will not be pruned by the image garbage collector in kubelet and should also be set in the remote runtime")
+				_ = cmd.Flags().MarkDeprecated("pod-infra-container-image", "--pod-infra-container-image will be removed in 1.30. Image garbage collector will get sandbox image information from CRI.")
 			}
 
 			// load kubelet config file, if provided
@@ -311,30 +313,34 @@ is checked every 20 seconds (also configurable with a flag).`,
 // potentially overriding the previous values.
 func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConfiguration, kubeletDropInConfigDir string) error {
 	const dropinFileExtension = ".conf"
-
+	baseKubeletConfigJSON, err := json.Marshal(kubeletConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal base config: %w", err)
+	}
 	// Walk through the drop-in directory and update the configuration for each file
-	err := filepath.WalkDir(kubeletDropInConfigDir, func(path string, info fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(kubeletDropInConfigDir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() && filepath.Ext(info.Name()) == dropinFileExtension {
-			dropinConfig, err := loadConfigFile(path)
+			dropinConfigJSON, err := loadDropinConfigFileIntoJSON(path)
 			if err != nil {
 				return fmt.Errorf("failed to load kubelet dropin file, path: %s, error: %w", path, err)
 			}
-
-			// Merge dropinConfig with kubeletConfig
-			if err := mergo.Merge(kubeletConfig, dropinConfig, mergo.WithOverride); err != nil {
-				return fmt.Errorf("failed to merge kubelet drop-in config, path: %s, error: %w", path, err)
+			mergedConfigJSON, err := jsonpatch.MergePatch(baseKubeletConfigJSON, dropinConfigJSON)
+			if err != nil {
+				return fmt.Errorf("failed to merge drop-in and current config: %w", err)
 			}
+			baseKubeletConfigJSON = mergedConfigJSON
 		}
 		return nil
-	})
-
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to walk through kubelet dropin directory %q: %w", kubeletDropInConfigDir, err)
 	}
 
+	if err := json.Unmarshal(baseKubeletConfigJSON, kubeletConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal merged JSON into kubelet configuration: %w", err)
+	}
 	return nil
 }
 
@@ -412,6 +418,20 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 		kc.EvictionHard = eviction.DefaultEvictionHard
 	}
 	return kc, err
+}
+
+func loadDropinConfigFileIntoJSON(name string) ([]byte, error) {
+	const errFmt = "failed to load drop-in kubelet config file %s, error %v"
+	// compute absolute path based on current working dir
+	kubeletConfigFile, err := filepath.Abs(name)
+	if err != nil {
+		return nil, fmt.Errorf(errFmt, name, err)
+	}
+	loader, err := configfiles.NewFsLoader(&utilfs.DefaultFs{}, kubeletConfigFile)
+	if err != nil {
+		return nil, fmt.Errorf(errFmt, name, err)
+	}
+	return loader.LoadIntoJSON()
 }
 
 // UnsecuredDependencies returns a Dependencies suitable for being run, or an error if the server setup
@@ -742,7 +762,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 		if reservedSystemCPUs.Size() > 0 {
 			// at cmd option validation phase it is tested either --system-reserved-cgroup or --kube-reserved-cgroup is specified, so overwrite should be ok
-			klog.InfoS("Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved and SystemReserved", "kubeReservedCPUs", s.KubeReserved, "systemReservedCPUs", s.SystemReserved)
+			klog.InfoS("Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved and SystemReserved", "kubeReserved", s.KubeReserved, "systemReserved", s.SystemReserved)
 			if s.KubeReserved != nil {
 				delete(s.KubeReserved, "cpu")
 			}
@@ -750,7 +770,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				s.SystemReserved = make(map[string]string)
 			}
 			s.SystemReserved["cpu"] = strconv.Itoa(reservedSystemCPUs.Size())
-			klog.InfoS("After cpu setting is overwritten", "kubeReservedCPUs", s.KubeReserved, "systemReservedCPUs", s.SystemReserved)
+			klog.InfoS("After cpu setting is overwritten", "kubeReserved", s.KubeReserved, "systemReserved", s.SystemReserved)
 		}
 
 		kubeReserved, err := parseResourceList(s.KubeReserved)
@@ -806,7 +826,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
 					KubeReservedCgroupName:   s.KubeReservedCgroup,
 					SystemReservedCgroupName: s.SystemReservedCgroup,
-					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
+					EnforceNodeAllocatable:   sets.New(s.EnforceNodeAllocatable...),
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
 					ReservedSystemCPUs:       reservedSystemCPUs,
@@ -837,6 +857,10 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.PodStartupLatencyTracker == nil {
 		kubeDeps.PodStartupLatencyTracker = kubeletutil.NewPodStartupLatencyTracker()
+	}
+
+	if kubeDeps.NodeStartupLatencyTracker == nil {
+		kubeDeps.NodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
 	}
 
 	// TODO(vmarmol): Do this through container config.

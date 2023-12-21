@@ -4,26 +4,6 @@
   "kind": "APIResourceList",
   "resources": [
     {
-      "kind": "ClusterCIDR",
-      "name": "clustercidrs",
-      "namespaced": false,
-      "shortNames": [
-        "cc"
-      ],
-      "singularName": "clustercidr",
-      "storageVersionHash": "iC0u25BTSsc=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
       "kind": "IPAddress",
       "name": "ipaddresses",
       "namespaced": false,
@@ -41,6 +21,34 @@
         "patch",
         "update",
         "watch"
+      ]
+    },
+    {
+      "kind": "ServiceCIDR",
+      "name": "servicecidrs",
+      "namespaced": false,
+      "singularName": "servicecidr",
+      "storageVersionHash": "3cDF5hqTkLY=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ServiceCIDR",
+      "name": "servicecidrs/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
       ]
     }
   ]

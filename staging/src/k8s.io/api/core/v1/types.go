@@ -363,6 +363,16 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
+	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+	// is not allowed. When this field is not set, it indicates that this volume does not belong to any
+	// VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
+	// after a volume has been updated successfully to a new class.
+	// For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
+	// PersistentVolumeClaims during the binding process.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,10,opt,name=volumeAttributesClassName"`
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -486,7 +496,7 @@ type PersistentVolumeClaimSpec struct {
 	// status field of the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
 	// +optional
-	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Resources VolumeResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	// volumeName is the binding reference to the PersistentVolume backing this claim.
 	// +optional
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
@@ -533,6 +543,21 @@ type PersistentVolumeClaimSpec struct {
 	// (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
 	// +optional
 	DataSourceRef *TypedObjectReference `json:"dataSourceRef,omitempty" protobuf:"bytes,8,opt,name=dataSourceRef"`
+	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+	// If specified, the CSI driver will create or update the volume with the attributes defined
+	// in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
+	// it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
+	// will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
+	// If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
+	// will be set by the persistentvolume controller if it exists.
+	// If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
+	// set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
+	// exists.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+	// (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,9,opt,name=volumeAttributesClassName"`
 }
 
 type TypedObjectReference struct {
@@ -561,6 +586,11 @@ const (
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
 	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
+
+	// Applying the target VolumeAttributesClass encountered an error
+	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
+	// Volume is being modified
+	PersistentVolumeClaimVolumeModifyingVolume PersistentVolumeClaimConditionType = "ModifyingVolume"
 )
 
 // +enum
@@ -586,6 +616,38 @@ const (
 	// State set when resizing has failed in kubelet with a terminal error. Transient errors don't set NodeResizeFailed
 	PersistentVolumeClaimNodeResizeFailed ClaimResourceStatus = "NodeResizeFailed"
 )
+
+// +enum
+// New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately
+type PersistentVolumeClaimModifyVolumeStatus string
+
+const (
+	// Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+	// the specified VolumeAttributesClass not existing
+	PersistentVolumeClaimModifyVolumePending PersistentVolumeClaimModifyVolumeStatus = "Pending"
+	// InProgress indicates that the volume is being modified
+	PersistentVolumeClaimModifyVolumeInProgress PersistentVolumeClaimModifyVolumeStatus = "InProgress"
+	// Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+	// resolve the error, a valid VolumeAttributesClass needs to be specified
+	PersistentVolumeClaimModifyVolumeInfeasible PersistentVolumeClaimModifyVolumeStatus = "Infeasible"
+)
+
+// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
+type ModifyVolumeStatus struct {
+	// targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+	TargetVolumeAttributesClassName string `json:"targetVolumeAttributesClassName,omitempty" protobuf:"bytes,1,opt,name=targetVolumeAttributesClassName"`
+	// status is the status of the ControllerModifyVolume operation. It can be in any of following states:
+	//  - Pending
+	//    Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+	//    the specified VolumeAttributesClass not existing.
+	//  - InProgress
+	//    InProgress indicates that the volume is being modified.
+	//  - Infeasible
+	//   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+	// 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
+	// Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+	Status PersistentVolumeClaimModifyVolumeStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=PersistentVolumeClaimModifyVolumeStatus"`
+}
 
 // PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimCondition struct {
@@ -693,6 +755,18 @@ type PersistentVolumeClaimStatus struct {
 	// +mapType=granular
 	// +optional
 	AllocatedResourceStatuses map[ResourceName]ClaimResourceStatus `json:"allocatedResourceStatuses,omitempty" protobuf:"bytes,7,rep,name=allocatedResourceStatuses"`
+	// currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
+	// When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	CurrentVolumeAttributesClassName *string `json:"currentVolumeAttributesClassName,omitempty" protobuf:"bytes,8,opt,name=currentVolumeAttributesClassName"`
+	// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
+	// When this is unset, there is no ModifyVolume operation being attempted.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	ModifyVolumeStatus *ModifyVolumeStatus `json:"modifyVolumeStatus,omitempty" protobuf:"bytes,9,opt,name=modifyVolumeStatus"`
 }
 
 // +enum
@@ -1763,6 +1837,40 @@ type ServiceAccountTokenProjection struct {
 	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
 }
 
+// ClusterTrustBundleProjection describes how to select a set of
+// ClusterTrustBundle objects and project their contents into the pod
+// filesystem.
+type ClusterTrustBundleProjection struct {
+	// Select a single ClusterTrustBundle by object name.  Mutually-exclusive
+	// with signerName and labelSelector.
+	// +optional
+	Name *string `json:"name,omitempty" protobuf:"bytes,1,rep,name=name"`
+
+	// Select all ClusterTrustBundles that match this signer name.
+	// Mutually-exclusive with name.  The contents of all selected
+	// ClusterTrustBundles will be unified and deduplicated.
+	// +optional
+	SignerName *string `json:"signerName,omitempty" protobuf:"bytes,2,rep,name=signerName"`
+
+	// Select all ClusterTrustBundles that match this label selector.  Only has
+	// effect if signerName is set.  Mutually-exclusive with name.  If unset,
+	// interpreted as "match nothing".  If set but empty, interpreted as "match
+	// everything".
+	// +optional
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,3,rep,name=labelSelector"`
+
+	// If true, don't block pod startup if the referenced ClusterTrustBundle(s)
+	// aren't available.  If using name, then the named ClusterTrustBundle is
+	// allowed not to exist.  If using signerName, then the combination of
+	// signerName and labelSelector is allowed to match zero
+	// ClusterTrustBundles.
+	// +optional
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,5,opt,name=optional"`
+
+	// Relative path from the volume root to write the bundle.
+	Path string `json:"path" protobuf:"bytes,4,rep,name=path"`
+}
+
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// sources is the list of volume projections
@@ -1794,6 +1902,24 @@ type VolumeProjection struct {
 	// serviceAccountToken is information about the serviceAccountToken data to project
 	// +optional
 	ServiceAccountToken *ServiceAccountTokenProjection `json:"serviceAccountToken,omitempty" protobuf:"bytes,4,opt,name=serviceAccountToken"`
+
+	// ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
+	// of ClusterTrustBundle objects in an auto-updating file.
+	//
+	// Alpha, gated by the ClusterTrustBundleProjection feature gate.
+	//
+	// ClusterTrustBundle objects can either be selected by name, or by the
+	// combination of signer name and a label selector.
+	//
+	// Kubelet performs aggressive normalization of the PEM contents written
+	// into the pod filesystem.  Esoteric PEM features such as inter-block
+	// comments and block headers are stripped.  Certificates are deduplicated.
+	// The ordering of certificates within the file is arbitrary, and Kubelet
+	// may change the order over time.
+	//
+	// +featureGate=ClusterTrustBundleProjection
+	// +optional
+	ClusterTrustBundle *ClusterTrustBundleProjection `json:"clusterTrustBundle,omitempty" protobuf:"bytes,5,opt,name=clusterTrustBundle"`
 }
 
 const (
@@ -1894,10 +2020,8 @@ type CSIPersistentVolumeSource struct {
 	// nodeExpandSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodeExpandVolume call.
-	// This is a beta field which is enabled default by CSINodeExpandSecret feature gate.
 	// This field is optional, may be omitted if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
-	// +featureGate=CSINodeExpandSecret
 	// +optional
 	NodeExpandSecretRef *SecretReference `json:"nodeExpandSecretRef,omitempty" protobuf:"bytes,10,opt,name=nodeExpandSecretRef"`
 }
@@ -2272,6 +2396,12 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
 }
 
+// SleepAction describes a "sleep" action.
+type SleepAction struct {
+	// Seconds is the number of seconds to sleep.
+	Seconds int64 `json:"seconds" protobuf:"bytes,1,opt,name=seconds"`
+}
+
 // Probe describes a health check to be performed against a container to determine whether it is
 // alive or ready to receive traffic.
 type Probe struct {
@@ -2415,6 +2545,27 @@ type ResourceRequirements struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+type VolumeResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Limits ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+
+	// Claims got added by accident when volumes shared the ResourceRequirements struct
+	// with containers. Stripping the field got added in 1.27 and was backported to 1.26.
+	// Starting with Kubernetes 1.28, this field is not part of the volume API anymore.
+	//
+	// Future extensions must not use "claims" or field number 3.
+	// Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
 }
 
 // ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -2646,6 +2797,10 @@ type LifecycleHandler struct {
 	// lifecycle hooks will fail in runtime when tcp handler is specified.
 	// +optional
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
+	// Sleep represents the duration that the container should sleep before being terminated.
+	// +featureGate=PodLifecycleSleepAction
+	// +optional
+	Sleep *SleepAction `json:"sleep,omitempty" protobuf:"bytes,4,opt,name=sleep"`
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
@@ -2845,6 +3000,9 @@ const (
 	// DisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
 	DisruptionTarget PodConditionType = "DisruptionTarget"
+	// PodReadyToStartContainers pod sandbox is successfully configured and
+	// the pod is ready to launch containers.
+	PodReadyToStartContainers PodConditionType = "PodReadyToStartContainers"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -3136,6 +3294,7 @@ type WeightedPodAffinityTerm struct {
 // a pod of the set of pods is running
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
+	// If it's null, this PodAffinityTerm matches with no Pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
 	// namespaces specifies a static list of namespace names that the term applies to.
@@ -3157,6 +3316,30 @@ type PodAffinityTerm struct {
 	// An empty selector ({}) matches all namespaces.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,4,opt,name=namespaceSelector"`
+	// MatchLabelKeys is a set of pod label keys to select which pods will
+	// be taken into consideration. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)`
+	// to select the group of existing pods which pods will be taken into consideration
+	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+	// pod labels will be ignored. The default value is empty.
+	// The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+	// Also, MatchLabelKeys cannot be set when LabelSelector isn't set.
+	// This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+	// +listType=atomic
+	// +optional
+	MatchLabelKeys []string `json:"matchLabelKeys,omitempty" protobuf:"bytes,5,opt,name=matchLabelKeys"`
+	// MismatchLabelKeys is a set of pod label keys to select which pods will
+	// be taken into consideration. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)`
+	// to select the group of existing pods which pods will be taken into consideration
+	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+	// pod labels will be ignored. The default value is empty.
+	// The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector.
+	// Also, MismatchLabelKeys cannot be set when LabelSelector isn't set.
+	// This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+	// +listType=atomic
+	// +optional
+	MismatchLabelKeys []string `json:"mismatchLabelKeys,omitempty" protobuf:"bytes,6,opt,name=mismatchLabelKeys"`
 }
 
 // Node affinity is a group of node affinity scheduling rules.
@@ -4692,6 +4875,15 @@ type LoadBalancerIngress struct {
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 
+	// IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+	// Setting this to "VIP" indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	// Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and node port or the pod's IP and port.
+	// Service implementations may use this information to adjust traffic routing.
+	// +optional
+	IPMode *LoadBalancerIPMode `json:"ipMode,omitempty" protobuf:"bytes,3,opt,name=ipMode"`
+
 	// Ports is a list of records of service ports
 	// If used, every port defined in the service should have an entry in it
 	// +listType=atomic
@@ -4709,6 +4901,8 @@ const (
 	IPv4Protocol IPFamily = "IPv4"
 	// IPv6Protocol indicates that this IP is IPv6 protocol
 	IPv6Protocol IPFamily = "IPv6"
+	// IPFamilyUnknown indicates that this IP is unknown protocol
+	IPFamilyUnknown IPFamily = ""
 )
 
 // IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
@@ -5003,7 +5197,7 @@ type ServicePort struct {
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	//
 	// * Kubernetes-defined prefixed names:
-	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
 	//   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
 	//   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
 	//
@@ -5247,7 +5441,7 @@ type EndpointPort struct {
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	//
 	// * Kubernetes-defined prefixed names:
-	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
 	//   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
 	//   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
 	//
@@ -7054,3 +7248,15 @@ type PortStatus struct {
 	// +kubebuilder:validation:MaxLength=316
 	Error *string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
 }
+
+// LoadBalancerIPMode represents the mode of the LoadBalancer ingress IP
+type LoadBalancerIPMode string
+
+const (
+	// LoadBalancerIPModeVIP indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
+	// LoadBalancerIPModeProxy indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and port or the pod's IP and port.
+	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
+)

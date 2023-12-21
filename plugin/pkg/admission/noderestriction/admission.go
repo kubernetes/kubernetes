@@ -258,6 +258,17 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	if hasConfigMaps {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference configmaps", nodeName))
 	}
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.VolumeSource.Projected != nil {
+			for _, src := range vol.VolumeSource.Projected.Sources {
+				if src.ClusterTrustBundle != nil {
+					return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference clustertrustbundles", nodeName))
+				}
+			}
+		}
+	}
+
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim != nil {
 			return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference persistentvolumeclaims", nodeName))

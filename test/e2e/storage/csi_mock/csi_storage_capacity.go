@@ -151,7 +151,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				if test.lateBinding {
 					bindingMode = storagev1.VolumeBindingWaitForFirstConsumer
 				}
-				framework.ExpectEqual(*sc.VolumeBindingMode, bindingMode, "volume binding mode")
+				gomega.Expect(*sc.VolumeBindingMode).To(gomega.Equal(bindingMode), "volume binding mode")
 
 				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "failed to start pod")
@@ -177,7 +177,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				}
 
 				var calls []drivers.MockCSICall
-				err = wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
+				err = wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
 					c, index, err := compareCSICalls(ctx, deterministicCalls, expected, m.driver.GetCalls)
 					if err != nil {
 						return true, fmt.Errorf("error waiting for expected CSI calls: %w", err)
@@ -354,7 +354,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				time.Sleep(syncDelay)
 
 				sc, _, pod := m.createPod(ctx, pvcReference) // late binding as specified above
-				framework.ExpectEqual(sc.Name, scName, "pre-selected storage class name not used")
+				gomega.Expect(sc.Name).To(gomega.Equal(scName), "pre-selected storage class name not used")
 
 				condition := anyOf(
 					podRunning(ctx, f.ClientSet, pod.Name, pod.Namespace),
@@ -367,7 +367,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				if test.expectFailure {
 					switch {
 					case errors.Is(err, context.DeadlineExceeded),
-						errors.Is(err, wait.ErrWaitTimeout),
+						errors.Is(err, wait.ErrorInterrupted(errors.New("timed out waiting for the condition"))),
 						errors.Is(err, errNotEnoughSpace):
 						// Okay, we expected that.
 					case err == nil:

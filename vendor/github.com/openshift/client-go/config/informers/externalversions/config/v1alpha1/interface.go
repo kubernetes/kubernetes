@@ -10,6 +10,10 @@ import (
 type Interface interface {
 	// Backups returns a BackupInformer.
 	Backups() BackupInformer
+	// ClusterImagePolicies returns a ClusterImagePolicyInformer.
+	ClusterImagePolicies() ClusterImagePolicyInformer
+	// ImagePolicies returns a ImagePolicyInformer.
+	ImagePolicies() ImagePolicyInformer
 	// InsightsDataGathers returns a InsightsDataGatherInformer.
 	InsightsDataGathers() InsightsDataGatherInformer
 }
@@ -28,6 +32,16 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // Backups returns a BackupInformer.
 func (v *version) Backups() BackupInformer {
 	return &backupInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterImagePolicies returns a ClusterImagePolicyInformer.
+func (v *version) ClusterImagePolicies() ClusterImagePolicyInformer {
+	return &clusterImagePolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ImagePolicies returns a ImagePolicyInformer.
+func (v *version) ImagePolicies() ImagePolicyInformer {
+	return &imagePolicyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // InsightsDataGathers returns a InsightsDataGatherInformer.

@@ -9,10 +9,14 @@ import (
 )
 
 type MatchErrorMatcher struct {
-	Expected interface{}
+	Expected           any
+	FuncErrDescription []any
+	isFunc             bool
 }
 
-func (matcher *MatchErrorMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *MatchErrorMatcher) Match(actual any) (success bool, err error) {
+	matcher.isFunc = false
+
 	if isNil(actual) {
 		return false, fmt.Errorf("Expected an error, got nil")
 	}
@@ -42,6 +46,17 @@ func (matcher *MatchErrorMatcher) Match(actual interface{}) (success bool, err e
 		return actualErr.Error() == expected, nil
 	}
 
+	v := reflect.ValueOf(expected)
+	t := v.Type()
+	errorInterface := reflect.TypeOf((*error)(nil)).Elem()
+	if t.Kind() == reflect.Func && t.NumIn() == 1 && t.In(0).Implements(errorInterface) && t.NumOut() == 1 && t.Out(0).Kind() == reflect.Bool {
+		if len(matcher.FuncErrDescription) == 0 {
+			return false, fmt.Errorf("MatchError requires an additional description when passed a function")
+		}
+		matcher.isFunc = true
+		return v.Call([]reflect.Value{reflect.ValueOf(actualErr)})[0].Bool(), nil
+	}
+
 	var subMatcher omegaMatcher
 	var hasSubMatcher bool
 	if expected != nil {
@@ -57,9 +72,15 @@ func (matcher *MatchErrorMatcher) Match(actual interface{}) (success bool, err e
 }
 
 func (matcher *MatchErrorMatcher) FailureMessage(actual interface{}) (message string) {
+	if matcher.isFunc {
+		return format.Message(actual, fmt.Sprintf("to match error function %s", matcher.FuncErrDescription[0]))
+	}
 	return format.Message(actual, "to match error", matcher.Expected)
 }
 
 func (matcher *MatchErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	if matcher.isFunc {
+		return format.Message(actual, fmt.Sprintf("not to match error function %s", matcher.FuncErrDescription[0]))
+	}
 	return format.Message(actual, "not to match error", matcher.Expected)
 }

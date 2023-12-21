@@ -71,8 +71,8 @@ type cacheImpl struct {
 	// head of the linked list.
 	headNode *nodeInfoListItem
 	nodeTree *nodeTree
-	// A map from image name to its imageState.
-	imageStates map[string]*imageState
+	// A map from image name to its ImageStateSummary.
+	imageStates map[string]*framework.ImageStateSummary
 }
 
 type podState struct {
@@ -82,21 +82,6 @@ type podState struct {
 	deadline *time.Time
 	// Used to block cache from expiring assumedPod if binding still runs
 	bindingFinished bool
-}
-
-type imageState struct {
-	// Size of the image
-	size int64
-	// A set of node names for nodes having this image present
-	nodes sets.Set[string]
-}
-
-// createImageStateSummary returns a summarizing snapshot of the given image's state.
-func (cache *cacheImpl) createImageStateSummary(state *imageState) *framework.ImageStateSummary {
-	return &framework.ImageStateSummary{
-		Size:     state.size,
-		NumNodes: len(state.nodes),
-	}
 }
 
 func newCache(ctx context.Context, ttl, period time.Duration) *cacheImpl {
@@ -110,7 +95,7 @@ func newCache(ctx context.Context, ttl, period time.Duration) *cacheImpl {
 		nodeTree:    newNodeTree(logger, nil),
 		assumedPods: sets.New[string](),
 		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*imageState),
+		imageStates: make(map[string]*framework.ImageStateSummary),
 	}
 }
 
@@ -182,7 +167,7 @@ func (cache *cacheImpl) Dump() *Dump {
 
 	nodes := make(map[string]*framework.NodeInfo, len(cache.nodes))
 	for k, v := range cache.nodes {
-		nodes[k] = v.info.Clone()
+		nodes[k] = v.info.Snapshot()
 	}
 
 	return &Dump{
@@ -233,7 +218,7 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 				existing = &framework.NodeInfo{}
 				nodeSnapshot.nodeInfoMap[np.Name] = existing
 			}
-			clone := node.info.Clone()
+			clone := node.info.Snapshot()
 			// We track nodes that have pods with affinity, here we check if this node changed its
 			// status from having pods with affinity to NOT having pods with affinity or the other
 			// way around.
@@ -481,7 +466,7 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod) error {
 	if !ok {
 		logger.Error(nil, "Node not found when trying to remove pod", "node", klog.KRef("", pod.Spec.NodeName), "podKey", key, "pod", klog.KObj(pod))
 	} else {
-		if err := n.info.RemovePod(pod); err != nil {
+		if err := n.info.RemovePod(logger, pod); err != nil {
 			return err
 		}
 		if len(n.info.Pods) == 0 && n.info.Node() == nil {
@@ -629,13 +614,12 @@ func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.No
 	cache.nodeTree.addNode(logger, node)
 	cache.addNodeImageStates(node, n.info)
 	n.info.SetNode(node)
-	return n.info.Clone()
+	return n.info.Snapshot()
 }
 
 func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
-
 	n, ok := cache.nodes[newNode.Name]
 	if !ok {
 		n = newNodeInfoListItem(framework.NewNodeInfo())
@@ -649,7 +633,7 @@ func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node
 	cache.nodeTree.updateNode(logger, oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
 	n.info.SetNode(newNode)
-	return n.info.Clone()
+	return n.info.Snapshot()
 }
 
 // RemoveNode removes a node from the cache's tree.
@@ -693,17 +677,17 @@ func (cache *cacheImpl) addNodeImageStates(node *v1.Node, nodeInfo *framework.No
 			// update the entry in imageStates
 			state, ok := cache.imageStates[name]
 			if !ok {
-				state = &imageState{
-					size:  image.SizeBytes,
-					nodes: sets.New(node.Name),
+				state = &framework.ImageStateSummary{
+					Size:  image.SizeBytes,
+					Nodes: sets.New(node.Name),
 				}
 				cache.imageStates[name] = state
 			} else {
-				state.nodes.Insert(node.Name)
+				state.Nodes.Insert(node.Name)
 			}
-			// create the imageStateSummary for this image
+			// create the ImageStateSummary for this image
 			if _, ok := newSum[name]; !ok {
-				newSum[name] = cache.createImageStateSummary(state)
+				newSum[name] = state
 			}
 		}
 	}
@@ -722,8 +706,8 @@ func (cache *cacheImpl) removeNodeImageStates(node *v1.Node) {
 		for _, name := range image.Names {
 			state, ok := cache.imageStates[name]
 			if ok {
-				state.nodes.Delete(node.Name)
-				if len(state.nodes) == 0 {
+				state.Nodes.Delete(node.Name)
+				if state.Nodes.Len() == 0 {
 					// Remove the unused image to make sure the length of
 					// imageStates represents the total number of different
 					// images on all nodes

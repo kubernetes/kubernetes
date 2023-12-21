@@ -199,7 +199,7 @@ func (opts formatOptions) FormatValue(v reflect.Value, parentKind reflect.Kind, 
 				break
 			}
 			sf := t.Field(i)
-			if supportExporters && !isExported(sf.Name) {
+			if !isExported(sf.Name) {
 				vv = retrieveUnexportedField(v, sf, true)
 			}
 			s := opts.WithTypeMode(autoType).FormatValue(vv, t.Kind(), ptrs)

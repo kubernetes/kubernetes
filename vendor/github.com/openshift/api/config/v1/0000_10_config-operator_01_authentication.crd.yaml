@@ -6,6 +6,7 @@ metadata:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: Default
   name: authentications.config.openshift.io
 spec:
   group: config.openshift.io
@@ -52,7 +53,7 @@ spec:
                   description: type identifies the cluster managed, user facing authentication mode in use. Specifically, it manages the component that responds to login attempts. The default is IntegratedOAuth.
                   type: string
                 webhookTokenAuthenticator:
-                  description: webhookTokenAuthenticator configures a remote token reviewer. These remote authentication webhooks can be used to verify bearer tokens via the tokenreviews.authentication.k8s.io REST API. This is required to honor bearer tokens that are provisioned by an external authentication service.
+                  description: "webhookTokenAuthenticator configures a remote token reviewer. These remote authentication webhooks can be used to verify bearer tokens via the tokenreviews.authentication.k8s.io REST API. This is required to honor bearer tokens that are provisioned by an external authentication service. \n Can only be set if \"Type\" is set to \"None\"."
                   type: object
                   required:
                     - kubeConfig
@@ -82,6 +83,7 @@ spec:
                           name:
                             description: name is the metadata.name of the referenced secret
                             type: string
+                  x-kubernetes-list-type: atomic
             status:
               description: status holds observed values from the cluster. They may not be overridden.
               type: object

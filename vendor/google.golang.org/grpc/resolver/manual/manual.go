@@ -29,10 +29,11 @@ import (
 // NewBuilderWithScheme creates a new test resolver builder with the given scheme.
 func NewBuilderWithScheme(scheme string) *Resolver {
 	return &Resolver{
-		BuildCallback:      func(resolver.Target, resolver.ClientConn, resolver.BuildOptions) {},
-		ResolveNowCallback: func(resolver.ResolveNowOptions) {},
-		CloseCallback:      func() {},
-		scheme:             scheme,
+		BuildCallback:       func(resolver.Target, resolver.ClientConn, resolver.BuildOptions) {},
+		UpdateStateCallback: func(error) {},
+		ResolveNowCallback:  func(resolver.ResolveNowOptions) {},
+		CloseCallback:       func() {},
+		scheme:              scheme,
 	}
 }
 
@@ -42,6 +43,11 @@ type Resolver struct {
 	// BuildCallback is called when the Build method is called.  Must not be
 	// nil.  Must not be changed after the resolver may be built.
 	BuildCallback func(resolver.Target, resolver.ClientConn, resolver.BuildOptions)
+	// UpdateStateCallback is called when the UpdateState method is called on
+	// the resolver.  The value passed as argument to this callback is the value
+	// returned by the resolver.ClientConn.  Must not be nil.  Must not be
+	// changed after the resolver may be built.
+	UpdateStateCallback func(err error)
 	// ResolveNowCallback is called when the ResolveNow method is called on the
 	// resolver.  Must not be nil.  Must not be changed after the resolver may
 	// be built.
@@ -93,8 +99,9 @@ func (r *Resolver) Close() {
 // UpdateState calls CC.UpdateState.
 func (r *Resolver) UpdateState(s resolver.State) {
 	r.mu.Lock()
-	r.CC.UpdateState(s)
+	err := r.CC.UpdateState(s)
 	r.mu.Unlock()
+	r.UpdateStateCallback(err)
 }
 
 // ReportError calls CC.ReportError.

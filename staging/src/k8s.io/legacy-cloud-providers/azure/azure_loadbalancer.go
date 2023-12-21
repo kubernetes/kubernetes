@@ -2091,7 +2091,7 @@ func deduplicate(collection *[]string) *[]string {
 	result := make([]string, 0, len(*collection))
 
 	for _, v := range *collection {
-		if seen[v] == true {
+		if seen[v] {
 			// skip this element
 		} else {
 			seen[v] = true

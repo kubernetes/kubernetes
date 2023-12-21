@@ -35,7 +35,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	clientgoinformers "k8s.io/client-go/informers"
@@ -78,7 +77,27 @@ func BuildGenericConfig(
 	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
+
+	// Use protobufs for self-communication.
+	// Since not every generic apiserver has to support protobufs, we
+	// cannot default to it in generic apiserver and need to explicitly
+	// set it in kube-apiserver.
+	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+	// Disable compression for self-communication, since we are going to be
+	// on a fast local network
+	genericConfig.LoopbackClientConfig.DisableCompression = true
+
+	enablement.SetLoopbackClientConfig(genericConfig.LoopbackClientConfig)
+
+	kubeClientConfig := genericConfig.LoopbackClientConfig
+	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
+	if err != nil {
+		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
+		return
+	}
+	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+
+	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
 	if lastErr = s.APIEnablement.ApplyTo(genericConfig, controlplane.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
@@ -127,46 +146,24 @@ func BuildGenericConfig(
 		return
 	}
 
-	// Use protobufs for self-communication.
-	// Since not every generic apiserver has to support protobufs, we
-	// cannot default to it in generic apiserver and need to explicitly
-	// set it in kube-apiserver.
-	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
-	// Disable compression for self-communication, since we are going to be
-	// on a fast local network
-	genericConfig.LoopbackClientConfig.DisableCompression = true
-
-	enablement.SetLoopbackClientConfig(genericConfig.LoopbackClientConfig)
-
-	kubeClientConfig := genericConfig.LoopbackClientConfig
-	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
-	if err != nil {
-		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
-		return
-	}
-	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
-
 	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
 	if lastErr = s.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
 
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
+	var enablesRBAC bool
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, enablesRBAC, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
 	}
-	if !sets.NewString(s.Authorization.Modes...).Has(modes.ModeRBAC) {
+	if s.Authorization != nil && !enablesRBAC {
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
 	lastErr = s.Audit.ApplyTo(genericConfig)
 	if lastErr != nil {
 		return
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
-		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
@@ -176,32 +173,35 @@ func BuildGenericConfig(
 	return
 }
 
-// BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
+// BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
+func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, egressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
+	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if authorizationConfig == nil {
+		return nil, nil, false, nil
+	}
 
-	if EgressSelector != nil {
-		egressDialer, err := EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
+	if egressSelector != nil {
+		egressDialer, err := egressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		authorizationConfig.CustomDial = egressDialer
 	}
 
-	return authorizationConfig.New()
-}
-
-// BuildPriorityAndFairness constructs the guts of the API Priority and Fairness filter
-func BuildPriorityAndFairness(s controlplaneapiserver.CompletedOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (utilflowcontrol.Interface, error) {
-	if s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight <= 0 {
-		return nil, fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", s.GenericServerRunOptions.MaxRequestsInFlight, s.GenericServerRunOptions.MaxMutatingRequestsInFlight)
+	enablesRBAC := false
+	for _, a := range authorizationConfig.AuthorizationConfiguration.Authorizers {
+		if string(a.Type) == modes.ModeRBAC {
+			enablesRBAC = true
+			break
+		}
 	}
-	return utilflowcontrol.New(
-		versionedInformer,
-		extclient.FlowcontrolV1beta3(),
-		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
-		s.GenericServerRunOptions.RequestTimeout/4,
-	), nil
+
+	authorizer, ruleResolver, err := authorizationConfig.New()
+
+	return authorizer, ruleResolver, enablesRBAC, err
 }
 
 // CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop

@@ -68,6 +68,7 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.SuperAdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
 			},
 			verifyExists: []string{

@@ -148,8 +148,9 @@ type APIAggregator struct {
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
-	// handledGroups are the groups that already have routes
-	handledGroups sets.String
+	// handledGroupVersions contain the groups that already have routes. The key is the name of the group and the value
+	// is the versions for the group.
+	handledGroupVersions map[string]sets.Set[string]
 
 	// handledAlwaysLocalDelegatePaths are the URL paths that already have routes registered
 	handledAlwaysLocalDelegatePaths sets.String
@@ -165,7 +166,7 @@ type APIAggregator struct {
 	openAPIConfig *openapicommon.Config
 
 	// Enable OpenAPI V3 if these configs are non-nil
-	openAPIV3Config *openapicommon.Config
+	openAPIV3Config *openapicommon.OpenAPIV3Config
 
 	// openAPIAggregationController downloads and merges OpenAPI v2 specs.
 	openAPIAggregationController *openapicontroller.AggregationController
@@ -242,7 +243,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		delegateHandler:                 delegationTarget.UnprotectedHandler(),
 		proxyTransportDial:              proxyTransportDial,
 		proxyHandlers:                   map[string]*proxyHandler{},
-		handledGroups:                   sets.String{},
+		handledGroupVersions:            map[string]sets.Set[string]{},
 		handledAlwaysLocalDelegatePaths: sets.String{},
 		lister:                          informerFactory.Apiregistration().V1().APIServices().Lister(),
 		APIRegistrationInformers:        informerFactory,
@@ -442,7 +443,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		})
 	}
 
-	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV3) {
+	if s.openAPIV3Config != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapiv3-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIV3AggregationController.Run(context.StopCh)
 			return nil
@@ -482,13 +483,13 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
 	}
 
-	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV3) {
+	if s.openAPIV3Config != nil {
 		specDownloaderV3 := openapiv3aggregator.NewDownloader()
 		openAPIV3Aggregator, err := openapiv3aggregator.BuildAndRegisterAggregator(
 			specDownloaderV3,
 			s.GenericAPIServer.NextDelegate(),
 			s.GenericAPIServer.Handler.GoRestfulContainer,
-			s.openAPIConfig,
+			s.openAPIV3Config,
 			s.GenericAPIServer.Handler.NonGoRestfulMux)
 		if err != nil {
 			return preparedAPIAggregator{}, err
@@ -567,7 +568,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	}
 
 	// if we've already registered the path with the handler, we don't want to do it again.
-	if s.handledGroups.Has(apiService.Spec.Group) {
+	versions, exist := s.handledGroupVersions[apiService.Spec.Group]
+	if exist {
+		versions.Insert(apiService.Spec.Version)
 		return nil
 	}
 
@@ -594,7 +597,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	// aggregation is protected
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
-	s.handledGroups.Insert(apiService.Spec.Group)
+	s.handledGroupVersions[apiService.Spec.Group] = sets.New[string](apiService.Spec.Version)
 	return nil
 }
 
@@ -623,8 +626,18 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	}
 	delete(s.proxyHandlers, apiServiceName)
 
-	// TODO unregister group level discovery when there are no more versions for the group
-	// We don't need this right away because the handler properly delegates when no versions are present
+	versions, exist := s.handledGroupVersions[version.Group]
+	if !exist {
+		return
+	}
+	versions.Delete(version.Version)
+	if versions.Len() > 0 {
+		return
+	}
+	delete(s.handledGroupVersions, version.Group)
+	groupPath := "/apis/" + version.Group
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(groupPath)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(groupPath + "/")
 }
 
 // DefaultAPIResourceConfigSource returns default configuration for an APIResource.

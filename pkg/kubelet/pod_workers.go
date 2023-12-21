@@ -716,19 +716,17 @@ func (p *podWorkers) IsPodForMirrorPodTerminatingByFullName(podFullName string) 
 }
 
 func isPodStatusCacheTerminal(status *kubecontainer.PodStatus) bool {
-	runningContainers := 0
-	runningSandboxes := 0
 	for _, container := range status.ContainerStatuses {
 		if container.State == kubecontainer.ContainerStateRunning {
-			runningContainers++
+			return false
 		}
 	}
 	for _, sb := range status.SandboxStatuses {
 		if sb.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			runningSandboxes++
+			return false
 		}
 	}
-	return runningContainers == 0 && runningSandboxes == 0
+	return true
 }
 
 // UpdatePod carries a configuration change or termination state to a pod. A pod is either runnable,
@@ -1658,7 +1656,7 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 
 		// we timeout and return an error if we don't get a callback within a reasonable time.
 		// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
-		timeout := int64(gracePeriod + (gracePeriod / 2))
+		timeout := gracePeriod + (gracePeriod / 2)
 		minTimeout := int64(10)
 		if timeout < minTimeout {
 			timeout = minTimeout

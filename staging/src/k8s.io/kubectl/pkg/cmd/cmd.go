@@ -92,15 +92,18 @@ type KubectlOptions struct {
 	genericiooptions.IOStreams
 }
 
-var defaultConfigFlags = genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag().WithDiscoveryBurst(300).WithDiscoveryQPS(50.0)
+func defaultConfigFlags() *genericclioptions.ConfigFlags {
+	return genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag().WithDiscoveryBurst(300).WithDiscoveryQPS(50.0)
+}
 
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
+	ioStreams := genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 	return NewDefaultKubectlCommandWithArgs(KubectlOptions{
 		PluginHandler: NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes),
 		Arguments:     os.Args,
-		ConfigFlags:   defaultConfigFlags,
-		IOStreams:     genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+		ConfigFlags:   defaultConfigFlags().WithWarningPrinter(ioStreams),
+		IOStreams:     ioStreams,
 	})
 }
 
@@ -139,17 +142,12 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 				}
 			}
 		} else if err == nil {
-			if cmdutil.CmdPluginAsSubcommand.IsEnabled() {
+			if !cmdutil.CmdPluginAsSubcommand.IsDisabled() {
 				// Command exists(e.g. kubectl create), but it is not certain that
 				// subcommand also exists (e.g. kubectl create networkpolicy)
-				if IsSubcommandPluginAllowed(foundCmd.Name()) {
-					var subcommand string
-					for _, arg := range foundArgs { // first "non-flag" argument as subcommand
-						if !strings.HasPrefix(arg, "-") {
-							subcommand = arg
-							break
-						}
-					}
+				// we also have to eliminate kubectl create -f
+				if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
+					subcommand := foundArgs[0]
 					builtinSubcmdExist := false
 					for _, subcmd := range foundCmd.Commands() {
 						if subcmd.Name() == subcommand {
@@ -364,7 +362,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
-		kubeConfigFlags = defaultConfigFlags
+		kubeConfigFlags = defaultConfigFlags().WithWarningPrinter(o.IOStreams)
 	}
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
@@ -468,6 +466,12 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
+
+	// Add plugin command group to the list of command groups.
+	// The commands are only injected for the scope of showing help and completion, they are not
+	// invoked directly.
+	pluginCommandGroup := plugin.GetPluginCommandGroup(cmds)
+	groups = append(groups, pluginCommandGroup)
 
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 

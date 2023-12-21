@@ -33,7 +33,7 @@ func NewClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, 
 	if err != nil {
 		return nil, "", err
 	}
-	clientCertSource, endpoint, err := internal.GetClientCertificateSourceAndEndpoint(settings)
+	clientCertSource, dialTLSContext, endpoint, err := internal.GetHTTPTransportConfigAndEndpoint(settings)
 	if err != nil {
 		return nil, "", err
 	}
@@ -41,7 +41,8 @@ func NewClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, 
 	if settings.HTTPClient != nil {
 		return settings.HTTPClient, endpoint, nil
 	}
-	trans, err := newTransport(ctx, defaultBaseTransport(ctx, clientCertSource), settings)
+
+	trans, err := newTransport(ctx, defaultBaseTransport(ctx, clientCertSource, dialTLSContext), settings)
 	if err != nil {
 		return nil, "", err
 	}
@@ -152,7 +153,7 @@ var appengineUrlfetchHook func(context.Context) http.RoundTripper
 // Otherwise, use a default transport, taking most defaults from
 // http.DefaultTransport.
 // If TLSCertificate is available, set TLSClientConfig as well.
-func defaultBaseTransport(ctx context.Context, clientCertSource cert.Source) http.RoundTripper {
+func defaultBaseTransport(ctx context.Context, clientCertSource cert.Source, dialTLSContext func(context.Context, string, string) (net.Conn, error)) http.RoundTripper {
 	if appengineUrlfetchHook != nil {
 		return appengineUrlfetchHook(ctx)
 	}
@@ -170,6 +171,10 @@ func defaultBaseTransport(ctx context.Context, clientCertSource cert.Source) htt
 		trans.TLSClientConfig = &tls.Config{
 			GetClientCertificate: clientCertSource,
 		}
+	}
+	if dialTLSContext != nil {
+		// If DialTLSContext is set, TLSClientConfig wil be ignored
+		trans.DialTLSContext = dialTLSContext
 	}
 
 	configureHTTP2(trans)

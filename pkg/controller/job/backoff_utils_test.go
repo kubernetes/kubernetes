@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestNewBackoffRecord(t *testing.T) {
@@ -287,7 +287,7 @@ func TestGetFinishedTime(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					DeletionTimestamp:          &metav1.Time{Time: defaultTestTime},
-					DeletionGracePeriodSeconds: pointer.Int64(30),
+					DeletionGracePeriodSeconds: ptr.To[int64](30),
 				},
 			},
 			wantFinishTime: defaultTestTimeMinus30s,

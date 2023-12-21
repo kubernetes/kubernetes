@@ -157,7 +157,12 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 	}
 
 	// Validate version
-	newDriverHighestVersion, err := highestSupportedVersion(versions)
+	// CSI currently only has version 0.x and 1.x (see https://github.com/container-storage-interface/spec/releases).
+	// Therefore any driver claiming version 2.x+ is ignored as an unsupported versions.
+	// Future 1.x versions of CSI are supposed to be backwards compatible so this version of Kubernetes will work with any 1.x driver
+	// (or 0.x), but it may not work with 2.x drivers (because 2.x does not have to be backwards compatible with 1.x).
+	// CSI v0.x is no longer supported as of Kubernetes v1.17 in accordance with deprecation policy set out in Kubernetes v1.13.
+	newDriverHighestVersion, err := utilversion.HighestSupportedVersion(versions)
 	if err != nil {
 		return nil, errors.New(log("%s for CSI driver %q failed. None of the versions specified %q are supported. err=%v", callerName, pluginName, versions, err))
 	}
@@ -232,7 +237,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
 		},
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+			return true
 		},
 		csitranslationplugins.PortworxVolumePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
@@ -856,44 +861,6 @@ func unregisterDriver(driverName string) error {
 	}
 
 	return nil
-}
-
-// Return the highest supported version
-func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
-	if len(versions) == 0 {
-		return nil, errors.New(log("CSI driver reporting empty array for supported versions"))
-	}
-
-	var highestSupportedVersion *utilversion.Version
-	var theErr error
-	for i := len(versions) - 1; i >= 0; i-- {
-		currentHighestVer, err := utilversion.ParseGeneric(versions[i])
-		if err != nil {
-			theErr = err
-			continue
-		}
-		if currentHighestVer.Major() > 1 {
-			// CSI currently only has version 0.x and 1.x (see https://github.com/container-storage-interface/spec/releases).
-			// Therefore any driver claiming version 2.x+ is ignored as an unsupported versions.
-			// Future 1.x versions of CSI are supposed to be backwards compatible so this version of Kubernetes will work with any 1.x driver
-			// (or 0.x), but it may not work with 2.x drivers (because 2.x does not have to be backwards compatible with 1.x).
-			continue
-		}
-		if highestSupportedVersion == nil || highestSupportedVersion.LessThan(currentHighestVer) {
-			highestSupportedVersion = currentHighestVer
-		}
-	}
-
-	if highestSupportedVersion == nil {
-		return nil, fmt.Errorf("could not find a highest supported version from versions (%v) reported by this driver: %v", versions, theErr)
-	}
-
-	if highestSupportedVersion.Major() != 1 {
-		// CSI v0.x is no longer supported as of Kubernetes v1.17 in
-		// accordance with deprecation policy set out in Kubernetes v1.13
-		return nil, fmt.Errorf("highest supported version reported by driver is %v, must be v1.x", highestSupportedVersion)
-	}
-	return highestSupportedVersion, nil
 }
 
 // waitForAPIServerForever waits forever to get a CSINode instance as a proxy

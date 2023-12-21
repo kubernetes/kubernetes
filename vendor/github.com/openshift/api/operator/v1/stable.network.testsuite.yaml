@@ -1,6 +1,6 @@
 apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
 name: "[Stable] Network"
-crd: 0000_70_cluster-network-operator_01.crd.yaml
+crd: 0000_70_cluster-network-operator_01-Default.crd.yaml
 tests:
   onCreate:
   - name: Should be able to create a minimal Network
@@ -227,4 +227,40 @@ tests:
               ipv6:
                 internalMasqueradeSubnet: "abcd:ef01:2345:6789:abcd:ef01:2345::/125"
     expectedError: "Invalid value: \"string\": a valid IPv6 address must contain 8 segments unless elided (::), in which case it must contain at most 6 non-empty segments"
-    
+  - name: "Should not be able to pass an invalid IPV6 CIDR with a segment that contains invalid values"
+    initial: | 
+      apiVersion: operator.openshift.io/v1
+      kind: Network
+      spec:
+       defaultNetwork:
+          ovnKubernetesConfig:
+            gatewayConfig:
+              ipv6:
+                internalMasqueradeSubnet: "xbcd:ef01:2345:6789::2345:6789/20"
+    expectedError: "Invalid value: \"string\": each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 1"
+  - name: "Should not be able to pass an invalid IPV6 CIDR with a segment that is 5 characters long"
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Network
+      spec:
+       defaultNetwork:
+          ovnKubernetesConfig:
+            gatewayConfig:
+              ipv6:
+                internalMasqueradeSubnet: "abcd:eff01:2345:6789::2345:6789/20"
+    expectedError: "Invalid value: \"string\": each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 2"
+  - name: Should not be able to create migration mode
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Network
+      spec: 
+        migration:
+          mode: Live
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Network
+      spec:
+        disableNetworkDiagnostics: false
+        logLevel: Normal
+        operatorLogLevel: Normal
+        migration: {}

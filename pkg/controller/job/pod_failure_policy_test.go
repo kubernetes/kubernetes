@@ -27,7 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestMatchPodFailurePolicy(t *testing.T) {
@@ -83,7 +83,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 1"),
+			wantJobFailureMessage: ptr.To("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 1"),
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},
@@ -161,7 +161,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 1"),
+			wantJobFailureMessage: ptr.To("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 1"),
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},
@@ -244,7 +244,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 0"),
+			wantJobFailureMessage: ptr.To("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 0"),
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},
@@ -395,7 +395,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 1 matching FailJob rule at index 0"),
+			wantJobFailureMessage: ptr.To("Container main-container for pod default/mypod failed with exit code 1 matching FailJob rule at index 0"),
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},
@@ -434,7 +434,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 6 matching FailJob rule at index 1"),
+			wantJobFailureMessage: ptr.To("Container main-container for pod default/mypod failed with exit code 6 matching FailJob rule at index 1"),
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},
@@ -736,7 +736,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantJobFailureMessage: pointer.String("Pod default/mypod has condition DisruptionTarget matching FailJob rule at index 0"),
+			wantJobFailureMessage: ptr.To("Pod default/mypod has condition DisruptionTarget matching FailJob rule at index 0"),
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},

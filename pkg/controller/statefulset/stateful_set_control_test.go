@@ -170,6 +170,7 @@ func TestStatefulSetControl(t *testing.T) {
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
 		{RecreatesFailedPod, simpleSetFn},
+		{RecreatesSucceededPod, simpleSetFn},
 		{CreatePodFailure, simpleSetFn},
 		{UpdatePodFailure, simpleSetFn},
 		{UpdateSetStatusFailure, simpleSetFn},
@@ -397,7 +398,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 	}
 }
 
-func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func recreatesPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, phase v1.PodPhase) {
 	client := fake.NewSimpleClientset()
 	om, _, ssc := setupController(client)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -418,7 +419,7 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	if err != nil {
 		t.Error(err)
 	}
-	pods[0].Status.Phase = v1.PodFailed
+	pods[0].Status.Phase = phase
 	om.podsIndexer.Update(pods[0])
 	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
@@ -433,6 +434,15 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	if isCreated(pods[0]) {
 		t.Error("StatefulSet did not recreate failed Pod")
 	}
+
+}
+
+func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	recreatesPod(t, set, invariants, v1.PodFailed)
+}
+
+func RecreatesSucceededPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	recreatesPod(t, set, invariants, v1.PodSucceeded)
 }
 
 func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
@@ -1066,7 +1076,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		// Setup the statefulSet controller
-		totalPods := 6
+		var totalPods int32 = 6
 		var partition int32 = 3
 		var maxUnavailable = intstr.FromInt32(2)
 		set := setupPodManagementPolicy(tc.policyType, newStatefulSet(totalPods))
@@ -1128,7 +1138,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		tc.verifyFn(set, spc, ssc, pods, totalPods, selector)
+		tc.verifyFn(set, spc, ssc, pods, int(totalPods), selector)
 
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
@@ -1151,8 +1161,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 
 }
 
-func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, intstr.IntOrString, int) {
-	totalPods := 6
+func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, intstr.IntOrString, int32) {
+	var totalPods int32 = 6
 	set := newStatefulSet(totalPods)
 	// update all pods >=3(3,4,5)
 	var partition int32 = 3
@@ -1247,7 +1257,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 				expecteddPodsToBeDeleted = 0
 			}
 
-			expectedPodsAfterUpdate := totalPods - expecteddPodsToBeDeleted
+			expectedPodsAfterUpdate := int(totalPods) - expecteddPodsToBeDeleted
 
 			if len(pods) != expectedPodsAfterUpdate {
 				t.Errorf("Expected pods %v, got pods %v", expectedPodsAfterUpdate, len(pods))
@@ -2429,6 +2439,12 @@ func (rt *requestTracker) reset() {
 	rt.delay = 0
 }
 
+func (rt *requestTracker) getErr() error {
+	rt.Lock()
+	defer rt.Unlock()
+	return rt.err
+}
+
 func newRequestTracker(requests int, err error, after int) requestTracker {
 	return requestTracker{
 		requests: requests,
@@ -2474,7 +2490,7 @@ func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	defer om.createPodTracker.inc()
 	if om.createPodTracker.errorReady() {
 		defer om.createPodTracker.reset()
-		return om.createPodTracker.err
+		return om.createPodTracker.getErr()
 	}
 	pod.SetUID(types.UID(pod.Name + "-uid"))
 	return om.podsIndexer.Update(pod)
@@ -2492,7 +2508,7 @@ func (om *fakeObjectManager) DeletePod(pod *v1.Pod) error {
 	defer om.deletePodTracker.inc()
 	if om.deletePodTracker.errorReady() {
 		defer om.deletePodTracker.reset()
-		return om.deletePodTracker.err
+		return om.deletePodTracker.getErr()
 	}
 	if key, err := controller.KeyFunc(pod); err != nil {
 		return err

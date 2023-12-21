@@ -238,7 +238,7 @@ func getVolumeHandle(ctx context.Context, cs clientset.Interface, claimName stri
 
 // WaitForVolumeAttachmentTerminated waits for the VolumeAttachment with the passed in attachmentName to be terminated.
 func WaitForVolumeAttachmentTerminated(ctx context.Context, attachmentName string, cs clientset.Interface, timeout time.Duration) error {
-	waitErr := wait.PollImmediateWithContext(ctx, 10*time.Second, timeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := cs.StorageV1().VolumeAttachments().Get(ctx, attachmentName, metav1.GetOptions{})
 		if err != nil {
 			// if the volumeattachment object is not found, it means it has been terminated.
@@ -697,7 +697,7 @@ func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exi
 	if err != nil {
 		if exiterr, ok := err.(clientexec.ExitError); ok {
 			actualExitCode := exiterr.ExitStatus()
-			framework.ExpectEqual(actualExitCode, exitCode,
+			gomega.Expect(actualExitCode).To(gomega.Equal(exitCode),
 				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
 				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
 		} else {
@@ -706,5 +706,5 @@ func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exi
 				shExec, exitCode, err, stdout, stderr)
 		}
 	}
-	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
+	gomega.Expect(err).To(gomega.HaveOccurred(), "%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }

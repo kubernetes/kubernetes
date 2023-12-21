@@ -73,8 +73,8 @@ type ServicePort interface {
 	StickyMaxAgeSeconds() int
 	// ExternalIPStrings returns service ExternalIPs as a string array.
 	ExternalIPStrings() []string
-	// LoadBalancerIPStrings returns service LoadBalancerIPs as a string array.
-	LoadBalancerIPStrings() []string
+	// LoadBalancerVIPStrings returns service LoadBalancerIPs which are VIP mode as a string array.
+	LoadBalancerVIPStrings() []string
 	// Protocol returns service protocol.
 	Protocol() v1.Protocol
 	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
@@ -108,35 +108,26 @@ type Endpoint interface {
 	// String returns endpoint string.  An example format can be: `IP:Port`.
 	// We take the returned value as ServiceEndpoint.Endpoint.
 	String() string
-	// GetIsLocal returns true if the endpoint is running in same host as kube-proxy, otherwise returns false.
-	GetIsLocal() bool
-	// IsReady returns true if an endpoint is ready and not terminating.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// true since only ready endpoints are read from Endpoints.
-	IsReady() bool
-	// IsServing returns true if an endpoint is ready. It does not account
-	// for terminating state.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// true since only ready endpoints are read from Endpoints.
-	IsServing() bool
-	// IsTerminating returns true if an endpoint is terminating. For pods,
-	// that is any pod with a deletion timestamp.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// false since terminating endpoints are always excluded from Endpoints.
-	IsTerminating() bool
-	// GetZoneHints returns the zone hint for the endpoint. This is based on
-	// endpoint.hints.forZones[0].name in the EndpointSlice API.
-	GetZoneHints() sets.Set[string]
 	// IP returns IP part of the endpoint.
 	IP() string
 	// Port returns the Port part of the endpoint.
-	Port() (int, error)
-	// Equal checks if two endpoints are equal.
-	Equal(Endpoint) bool
-	// GetNodeName returns the node name for the endpoint
-	GetNodeName() string
-	// GetZone returns the zone for the endpoint
-	GetZone() string
+	Port() int
+
+	// IsLocal returns true if the endpoint is running on the same host as kube-proxy.
+	IsLocal() bool
+	// IsReady returns true if an endpoint is ready and not terminating, or
+	// if PublishNotReadyAddresses is set on the service.
+	IsReady() bool
+	// IsServing returns true if an endpoint is ready. It does not account
+	// for terminating state.
+	IsServing() bool
+	// IsTerminating returns true if an endpoint is terminating. For pods,
+	// that is any pod with a deletion timestamp.
+	IsTerminating() bool
+
+	// ZoneHints returns the zone hint for the endpoint. This is based on
+	// endpoint.hints.forZones[0].name in the EndpointSlice API.
+	ZoneHints() sets.Set[string]
 }
 
 // ServiceEndpoint is used to identify a service and one of its endpoint pair.

@@ -97,6 +97,9 @@ var (
 			Type:                 []string{"object"},
 			AdditionalProperties: &spec.SchemaOrBool{Schema: stringSchema},
 		}}
+	emptyObjectSchema = &spec.Schema{
+		SchemaProps: spec.SchemaProps{Type: []string{"object"}},
+	}
 )
 
 func TestEquality(t *testing.T) {
@@ -330,6 +333,12 @@ func TestEquality(t *testing.T) {
 			lhs:   UnstructuredToVal([]interface{}{"a", "b"}, atomicListSchema),
 			rhs:   UnstructuredToVal([]interface{}{"a", "b", "c"}, atomicListSchema),
 			equal: false,
+		},
+		{
+			name:  "empty objects are equal",
+			lhs:   UnstructuredToVal(map[string]interface{}{}, emptyObjectSchema),
+			rhs:   UnstructuredToVal(map[string]interface{}{}, emptyObjectSchema),
+			equal: true,
 		},
 		{
 			name:  "identical objects are equal",

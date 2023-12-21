@@ -32,10 +32,10 @@ import (
 )
 
 // NewDynamicMap returns a traits.Mapper value with dynamic key, value pairs.
-func NewDynamicMap(adapter ref.TypeAdapter, value any) traits.Mapper {
+func NewDynamicMap(adapter Adapter, value any) traits.Mapper {
 	refValue := reflect.ValueOf(value)
 	return &baseMap{
-		TypeAdapter: adapter,
+		Adapter:     adapter,
 		mapAccessor: newReflectMapAccessor(adapter, refValue),
 		value:       value,
 		size:        refValue.Len(),
@@ -46,10 +46,10 @@ func NewDynamicMap(adapter ref.TypeAdapter, value any) traits.Mapper {
 // encoded in protocol buffer form.
 //
 // The `adapter` argument provides type adaptation capabilities from proto to CEL.
-func NewJSONStruct(adapter ref.TypeAdapter, value *structpb.Struct) traits.Mapper {
+func NewJSONStruct(adapter Adapter, value *structpb.Struct) traits.Mapper {
 	fields := value.GetFields()
 	return &baseMap{
-		TypeAdapter: adapter,
+		Adapter:     adapter,
 		mapAccessor: newJSONStructAccessor(adapter, fields),
 		value:       value,
 		size:        len(fields),
@@ -57,9 +57,9 @@ func NewJSONStruct(adapter ref.TypeAdapter, value *structpb.Struct) traits.Mappe
 }
 
 // NewRefValMap returns a specialized traits.Mapper with CEL valued keys and values.
-func NewRefValMap(adapter ref.TypeAdapter, value map[ref.Val]ref.Val) traits.Mapper {
+func NewRefValMap(adapter Adapter, value map[ref.Val]ref.Val) traits.Mapper {
 	return &baseMap{
-		TypeAdapter: adapter,
+		Adapter:     adapter,
 		mapAccessor: newRefValMapAccessor(value),
 		value:       value,
 		size:        len(value),
@@ -67,9 +67,9 @@ func NewRefValMap(adapter ref.TypeAdapter, value map[ref.Val]ref.Val) traits.Map
 }
 
 // NewStringInterfaceMap returns a specialized traits.Mapper with string keys and interface values.
-func NewStringInterfaceMap(adapter ref.TypeAdapter, value map[string]any) traits.Mapper {
+func NewStringInterfaceMap(adapter Adapter, value map[string]any) traits.Mapper {
 	return &baseMap{
-		TypeAdapter: adapter,
+		Adapter:     adapter,
 		mapAccessor: newStringIfaceMapAccessor(adapter, value),
 		value:       value,
 		size:        len(value),
@@ -77,9 +77,9 @@ func NewStringInterfaceMap(adapter ref.TypeAdapter, value map[string]any) traits
 }
 
 // NewStringStringMap returns a specialized traits.Mapper with string keys and values.
-func NewStringStringMap(adapter ref.TypeAdapter, value map[string]string) traits.Mapper {
+func NewStringStringMap(adapter Adapter, value map[string]string) traits.Mapper {
 	return &baseMap{
-		TypeAdapter: adapter,
+		Adapter:     adapter,
 		mapAccessor: newStringMapAccessor(value),
 		value:       value,
 		size:        len(value),
@@ -87,21 +87,12 @@ func NewStringStringMap(adapter ref.TypeAdapter, value map[string]string) traits
 }
 
 // NewProtoMap returns a specialized traits.Mapper for handling protobuf map values.
-func NewProtoMap(adapter ref.TypeAdapter, value *pb.Map) traits.Mapper {
+func NewProtoMap(adapter Adapter, value *pb.Map) traits.Mapper {
 	return &protoMap{
-		TypeAdapter: adapter,
-		value:       value,
+		Adapter: adapter,
+		value:   value,
 	}
 }
-
-var (
-	// MapType singleton.
-	MapType = NewTypeValue("map",
-		traits.ContainerType,
-		traits.IndexerType,
-		traits.IterableType,
-		traits.SizerType)
-)
 
 // mapAccessor is a private interface for finding values within a map and iterating over the keys.
 // This interface implements portions of the API surface area required by the traits.Mapper
@@ -121,7 +112,7 @@ type mapAccessor interface {
 // Since CEL is side-effect free, the base map represents an immutable object.
 type baseMap struct {
 	// TypeAdapter used to convert keys and values accessed within the map.
-	ref.TypeAdapter
+	Adapter
 
 	// mapAccessor interface implementation used to find and iterate over map keys.
 	mapAccessor
@@ -316,15 +307,15 @@ func (m *baseMap) Value() any {
 	return m.value
 }
 
-func newJSONStructAccessor(adapter ref.TypeAdapter, st map[string]*structpb.Value) mapAccessor {
+func newJSONStructAccessor(adapter Adapter, st map[string]*structpb.Value) mapAccessor {
 	return &jsonStructAccessor{
-		TypeAdapter: adapter,
-		st:          st,
+		Adapter: adapter,
+		st:      st,
 	}
 }
 
 type jsonStructAccessor struct {
-	ref.TypeAdapter
+	Adapter
 	st map[string]*structpb.Value
 }
 
@@ -359,17 +350,17 @@ func (a *jsonStructAccessor) Iterator() traits.Iterator {
 	}
 }
 
-func newReflectMapAccessor(adapter ref.TypeAdapter, value reflect.Value) mapAccessor {
+func newReflectMapAccessor(adapter Adapter, value reflect.Value) mapAccessor {
 	keyType := value.Type().Key()
 	return &reflectMapAccessor{
-		TypeAdapter: adapter,
-		refValue:    value,
-		keyType:     keyType,
+		Adapter:  adapter,
+		refValue: value,
+		keyType:  keyType,
 	}
 }
 
 type reflectMapAccessor struct {
-	ref.TypeAdapter
+	Adapter
 	refValue reflect.Value
 	keyType  reflect.Type
 }
@@ -427,9 +418,9 @@ func (m *reflectMapAccessor) findInternal(key ref.Val) (ref.Val, bool) {
 // Iterator creates a Golang reflection based traits.Iterator.
 func (m *reflectMapAccessor) Iterator() traits.Iterator {
 	return &mapIterator{
-		TypeAdapter: m.TypeAdapter,
-		mapKeys:     m.refValue.MapRange(),
-		len:         m.refValue.Len(),
+		Adapter: m.Adapter,
+		mapKeys: m.refValue.MapRange(),
+		len:     m.refValue.Len(),
 	}
 }
 
@@ -480,9 +471,9 @@ func (a *refValMapAccessor) Find(key ref.Val) (ref.Val, bool) {
 // Iterator produces a new traits.Iterator which iterates over the map keys via Golang reflection.
 func (a *refValMapAccessor) Iterator() traits.Iterator {
 	return &mapIterator{
-		TypeAdapter: DefaultTypeAdapter,
-		mapKeys:     reflect.ValueOf(a.mapVal).MapRange(),
-		len:         len(a.mapVal),
+		Adapter: DefaultTypeAdapter,
+		mapKeys: reflect.ValueOf(a.mapVal).MapRange(),
+		len:     len(a.mapVal),
 	}
 }
 
@@ -524,15 +515,15 @@ func (a *stringMapAccessor) Iterator() traits.Iterator {
 	}
 }
 
-func newStringIfaceMapAccessor(adapter ref.TypeAdapter, mapVal map[string]any) mapAccessor {
+func newStringIfaceMapAccessor(adapter Adapter, mapVal map[string]any) mapAccessor {
 	return &stringIfaceMapAccessor{
-		TypeAdapter: adapter,
-		mapVal:      mapVal,
+		Adapter: adapter,
+		mapVal:  mapVal,
 	}
 }
 
 type stringIfaceMapAccessor struct {
-	ref.TypeAdapter
+	Adapter
 	mapVal map[string]any
 }
 
@@ -569,7 +560,7 @@ func (a *stringIfaceMapAccessor) Iterator() traits.Iterator {
 // protoMap is a specialized, separate implementation of the traits.Mapper interfaces tailored to
 // accessing protoreflect.Map values.
 type protoMap struct {
-	ref.TypeAdapter
+	Adapter
 	value *pb.Map
 }
 
@@ -772,9 +763,9 @@ func (m *protoMap) Iterator() traits.Iterator {
 		return true
 	})
 	return &protoMapIterator{
-		TypeAdapter: m.TypeAdapter,
-		mapKeys:     mapKeys,
-		len:         m.value.Len(),
+		Adapter: m.Adapter,
+		mapKeys: mapKeys,
+		len:     m.value.Len(),
 	}
 }
 
@@ -795,7 +786,7 @@ func (m *protoMap) Value() any {
 
 type mapIterator struct {
 	*baseIterator
-	ref.TypeAdapter
+	Adapter
 	mapKeys *reflect.MapIter
 	cursor  int
 	len     int
@@ -818,7 +809,7 @@ func (it *mapIterator) Next() ref.Val {
 
 type protoMapIterator struct {
 	*baseIterator
-	ref.TypeAdapter
+	Adapter
 	mapKeys []protoreflect.MapKey
 	cursor  int
 	len     int

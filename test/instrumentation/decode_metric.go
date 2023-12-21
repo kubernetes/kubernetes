@@ -484,7 +484,9 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 					case "LinearBuckets":
 						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
 					case "ExponentialBuckets":
-						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+						merged = append(merged, metrics.ExponentialBuckets(firstArg, secondArg, thirdArg)...)
+					case "ExponentialBucketsRange":
+						merged = append(merged, metrics.ExponentialBucketsRange(firstArg, secondArg, thirdArg)...)
 					}
 				}
 			}
@@ -513,6 +515,12 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 			return nil, err, true
 		}
 		return metrics.ExponentialBuckets(firstArg, secondArg, thirdArg), nil, true
+	case "ExponentialBucketsRange":
+		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
+		if err != nil {
+			return nil, err, true
+		}
+		return metrics.ExponentialBucketsRange(firstArg, secondArg, thirdArg), nil, true
 	case "MergeBuckets":
 		merged := []float64{}
 		for _, arg := range v.Args {

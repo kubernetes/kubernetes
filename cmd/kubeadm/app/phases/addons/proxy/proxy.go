@@ -189,7 +189,7 @@ func printOrCreateKubeProxyObjects(cmByte []byte, dsByte []byte, client clientse
 }
 
 func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface, printManifest bool) ([]byte, error) {
-	// Generate ControlPlane Enpoint kubeconfig file
+	// Generate ControlPlane Endpoint kubeconfig file
 	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
 	if err != nil {
 		return []byte(""), err

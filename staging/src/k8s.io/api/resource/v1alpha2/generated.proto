@@ -107,7 +107,7 @@ message PodSchedulingContextSpec {
   // that suits all pending resources. This may get increased in the
   // future, but not reduced.
   //
-  // +listType=set
+  // +listType=atomic
   // +optional
   repeated string potentialNodes = 2;
 }
@@ -208,7 +208,7 @@ message ResourceClaimSchedulingStatus {
   // PodSchedulingSpec.PotentialNodes. This may get increased in the
   // future, but not reduced.
   //
-  // +listType=set
+  // +listType=atomic
   // +optional
   repeated string unsuitableNodes = 2;
 }

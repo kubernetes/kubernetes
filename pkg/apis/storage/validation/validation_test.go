@@ -2163,3 +2163,178 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateVolumeAttributesClass(t *testing.T) {
+	successCases := []storage.VolumeAttributesClass{
+		{
+			// driverName without a slash
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "foo",
+			Parameters: map[string]string{
+				"foo-parameter": "free-form-string",
+			},
+		},
+		{
+			// some parameters
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "kubernetes.io/foo",
+			Parameters: map[string]string{
+				"kubernetes.io/foo-parameter": "free/form/string",
+				"foo-parameter":               "free-form-string",
+				"foo-parameter2":              "{\"embedded\": \"json\", \"with\": {\"structures\":\"inside\"}}",
+				"foo-parameter3":              "",
+			},
+		}}
+
+	// Success cases are expected to pass validation.
+	for testName, v := range successCases {
+		if errs := ValidateVolumeAttributesClass(&v); len(errs) != 0 {
+			t.Errorf("Expected success for %d, got %v", testName, errs)
+		}
+	}
+
+	// generate a map longer than maxParameterSize
+	longParameters := make(map[string]string)
+	totalSize := 0
+	for totalSize < maxProvisionerParameterSize {
+		k := fmt.Sprintf("param/%d", totalSize)
+		v := fmt.Sprintf("value-%d", totalSize)
+		longParameters[k] = v
+		totalSize = totalSize + len(k) + len(v)
+	}
+
+	errorCases := map[string]storage.VolumeAttributesClass{
+		"namespace is present": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			DriverName: "kubernetes.io/foo",
+			Parameters: map[string]string{
+				"foo-parameter": "free-form-string",
+			},
+		},
+		"invalid driverName": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "kubernetes.io/invalid/foo",
+			Parameters: map[string]string{
+				"foo-parameter": "free-form-string",
+			},
+		},
+		"invalid driverName with invalid chars": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "^/ ",
+			Parameters: map[string]string{
+				"foo-parameter": "free-form-string",
+			},
+		},
+		"empty parameters": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "kubernetes.io/foo",
+			Parameters: map[string]string{},
+		},
+		"nil parameters": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "kubernetes.io/foo",
+		},
+		"invalid empty parameter name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "kubernetes.io/foo",
+			Parameters: map[string]string{
+				"": "value",
+			},
+		},
+		"driverName: Required value": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "",
+			Parameters: map[string]string{
+				"foo-parameter": "free-form-string",
+			},
+		},
+		"driverName: whitespace": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: " ",
+			Parameters: map[string]string{
+				"foo-parameter": "free-form-string",
+			},
+		},
+		"too long parameters": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			DriverName: "kubernetes.io/foo",
+			Parameters: longParameters,
+		},
+	}
+
+	// Error cases are not expected to pass validation.
+	for testName, v := range errorCases {
+		if errs := ValidateVolumeAttributesClass(&v); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %s", testName)
+		}
+	}
+}
+
+func TestValidateVolumeAttributesClassUpdate(t *testing.T) {
+	cases := map[string]struct {
+		oldClass      *storage.VolumeAttributesClass
+		newClass      *storage.VolumeAttributesClass
+		shouldSucceed bool
+	}{
+		"invalid driverName update": {
+			oldClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/foo",
+			},
+			newClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/bar",
+			},
+			shouldSucceed: false,
+		},
+		"invalid parameter update which changes values": {
+			oldClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/foo",
+				Parameters: map[string]string{
+					"foo": "bar1",
+				},
+			},
+			newClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/foo",
+				Parameters: map[string]string{
+					"foo": "bar2",
+				},
+			},
+			shouldSucceed: false,
+		},
+		"invalid parameter update which add new item": {
+			oldClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/foo",
+				Parameters: map[string]string{},
+			},
+			newClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/foo",
+				Parameters: map[string]string{
+					"foo": "bar",
+				},
+			},
+			shouldSucceed: false,
+		},
+		"invalid parameter update which remove a item": {
+			oldClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/foo",
+				Parameters: map[string]string{
+					"foo": "bar",
+				},
+			},
+			newClass: &storage.VolumeAttributesClass{
+				DriverName: "kubernetes.io/foo",
+				Parameters: map[string]string{},
+			},
+			shouldSucceed: false,
+		},
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateVolumeAttributesClassUpdate(testCase.newClass, testCase.oldClass)
+		if testCase.shouldSucceed && len(errs) != 0 {
+			t.Errorf("Expected success for %v, got %v", testName, errs)
+		}
+		if !testCase.shouldSucceed && len(errs) == 0 {
+			t.Errorf("Expected failure for %v, got success", testName)
+		}
+	}
+}

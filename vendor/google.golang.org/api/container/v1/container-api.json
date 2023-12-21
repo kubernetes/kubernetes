@@ -197,6 +197,31 @@
           "resources": {
             "clusters": {
               "methods": {
+                "checkAutopilotCompatibility": {
+                  "description": "Checks the cluster compatibility with Autopilot mode, and returns a list of compatibility issues.",
+                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/clusters/{clustersId}:checkAutopilotCompatibility",
+                  "httpMethod": "GET",
+                  "id": "container.projects.locations.clusters.checkAutopilotCompatibility",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "parameters": {
+                    "name": {
+                      "description": "The name (project, location, cluster) of the cluster to retrieve. Specified in the format `projects/*/locations/*/clusters/*`.",
+                      "location": "path",
+                      "pattern": "^projects/[^/]+/locations/[^/]+/clusters/[^/]+$",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "path": "v1/{+name}:checkAutopilotCompatibility",
+                  "response": {
+                    "$ref": "CheckAutopilotCompatibilityResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform"
+                  ]
+                },
                 "completeIpRotation": {
                   "description": "Completes master IP rotation.",
                   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/clusters/{clustersId}:completeIpRotation",
@@ -447,6 +472,7 @@
                   ]
                 },
                 "setLocations": {
+                  "deprecated": true,
                   "description": "Sets the locations for a specific cluster. Deprecated. Use [projects.locations.clusters.update](https://cloud.google.com/kubernetes-engine/docs/reference/rest/v1/projects.locations.clusters/update) instead.",
                   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/clusters/{clustersId}:setLocations",
                   "httpMethod": "POST",
@@ -1517,6 +1543,7 @@
                   ]
                 },
                 "locations": {
+                  "deprecated": true,
                   "description": "Sets the locations for a specific cluster. Deprecated. Use [projects.locations.clusters.update](https://cloud.google.com/kubernetes-engine/docs/reference/rest/v1/projects.locations.clusters/update) instead.",
                   "flatPath": "v1/projects/{projectId}/zones/{zone}/clusters/{clusterId}/locations",
                   "httpMethod": "POST",
@@ -2487,7 +2514,7 @@
       }
     }
   },
-  "revision": "20230222",
+  "revision": "20230519",
   "rootUrl": "https://container.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -2510,6 +2537,20 @@
         "gpuSharingConfig": {
           "$ref": "GPUSharingConfig",
           "description": "The configuration for GPU sharing options."
+        }
+      },
+      "type": "object"
+    },
+    "AdditionalPodRangesConfig": {
+      "description": "AdditionalPodRangesConfig is the configuration for additional pod secondary ranges supporting the ClusterUpdate message.",
+      "id": "AdditionalPodRangesConfig",
+      "properties": {
+        "podRangeNames": {
+          "description": "Name for pod secondary ipv4 range which has the actual range defined ahead.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -2614,6 +2655,53 @@
       },
       "type": "object"
     },
+    "AutopilotCompatibilityIssue": {
+      "description": "AutopilotCompatibilityIssue contains information about a specific compatibility issue with Autopilot mode.",
+      "id": "AutopilotCompatibilityIssue",
+      "properties": {
+        "constraintType": {
+          "description": "The constraint type of the issue.",
+          "type": "string"
+        },
+        "description": {
+          "description": "The description of the issue.",
+          "type": "string"
+        },
+        "documentationUrl": {
+          "description": "A URL to a public documnetation, which addresses resolving this issue.",
+          "type": "string"
+        },
+        "incompatibilityType": {
+          "description": "The incompatibility type of this issue.",
+          "enum": [
+            "UNSPECIFIED",
+            "INCOMPATIBILITY",
+            "ADDITIONAL_CONFIG_REQUIRED",
+            "PASSED_WITH_OPTIONAL_CONFIG"
+          ],
+          "enumDescriptions": [
+            "Default value, should not be used.",
+            "Indicates that the issue is a known incompatibility between the cluster and Autopilot mode.",
+            "Indicates the issue is an incompatibility if customers take no further action to resolve.",
+            "Indicates the issue is not an incompatibility, but depending on the workloads business logic, there is a potential that they won't work on Autopilot."
+          ],
+          "type": "string"
+        },
+        "lastObservation": {
+          "description": "The last time when this issue was observed.",
+          "format": "google-datetime",
+          "type": "string"
+        },
+        "subjects": {
+          "description": "The name of the resources which are subject to this issue.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "AutoprovisioningNodePoolDefaults": {
       "description": "AutoprovisioningNodePoolDefaults contains defaults for a node pool created by NAP.",
       "id": "AutoprovisioningNodePoolDefaults",
@@ -2661,6 +2749,22 @@
         "upgradeSettings": {
           "$ref": "UpgradeSettings",
           "description": "Specifies the upgrade settings for NAP created node pools"
+        }
+      },
+      "type": "object"
+    },
+    "BestEffortProvisioning": {
+      "description": "Best effort provisioning.",
+      "id": "BestEffortProvisioning",
+      "properties": {
+        "enabled": {
+          "description": "When this is enabled, cluster/node pool creations will ignore non-fatal errors like stockout to best provision as many nodes as possible right now and eventually bring up all target number of nodes",
+          "type": "boolean"
+        },
+        "minProvisionNodes": {
+          "description": "Minimum number of nodes to be provisioned to be considered as succeeded, and the rest of nodes will be provisioned gradually and eventually when stockout issue has been resolved.",
+          "format": "int32",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -2793,6 +2897,24 @@
       },
       "type": "object"
     },
+    "CheckAutopilotCompatibilityResponse": {
+      "description": "CheckAutopilotCompatibilityResponse has a list of compatibility issues.",
+      "id": "CheckAutopilotCompatibilityResponse",
+      "properties": {
+        "issues": {
+          "description": "The list of issues for the given operation.",
+          "items": {
+            "$ref": "AutopilotCompatibilityIssue"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "description": "The summary of the autopilot compatibility response.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "CidrBlock": {
       "description": "CidrBlock contains an optional name and one CIDR block.",
       "id": "CidrBlock",
@@ -2916,6 +3038,10 @@
           "description": "An optional description of this cluster.",
           "type": "string"
         },
+        "enableK8sBetaApis": {
+          "$ref": "K8sBetaAPIConfig",
+          "description": "Beta APIs Config"
+        },
         "enableKubernetesAlpha": {
           "description": "Kubernetes alpha features are enabled on this cluster. This includes alpha API groups (e.g. v1alpha1) and features that may not be production ready in the kubernetes version of the master and nodes. The cluster has no SLA for uptime and master/node upgrades are disabled. Alpha enabled clusters are automatically deleted thirty days after creation.",
           "type": "boolean"
@@ -2935,6 +3061,10 @@
         "expireTime": {
           "description": "[Output only] The time the cluster will be automatically deleted in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) text format.",
           "type": "string"
+        },
+        "fleet": {
+          "$ref": "Fleet",
+          "description": "Fleet information for the cluster."
         },
         "id": {
           "description": "Output only. Unique id for the cluster.",
@@ -3066,7 +3196,7 @@
         },
         "releaseChannel": {
           "$ref": "ReleaseChannel",
-          "description": "Release channel configuration."
+          "description": "Release channel configuration. If left unspecified on cluster creation and a version is specified, the cluster is enrolled in the most mature release channel where the version is available (first checking STABLE, then REGULAR, and finally RAPID). Otherwise, if no release channel configuration and no version is specified, the cluster is enrolled in the REGULAR channel with its default version."
         },
         "resourceLabels": {
           "additionalProperties": {
@@ -3187,6 +3317,10 @@
       "description": "ClusterUpdate describes an update to the cluster. Exactly one update can be applied to a cluster with each request, so at most one field can be provided.",
       "id": "ClusterUpdate",
       "properties": {
+        "additionalPodRangesConfig": {
+          "$ref": "AdditionalPodRangesConfig",
+          "description": "The additional pod ranges to be added to the cluster. These pod ranges can be used by node pools to allocate pod IPs."
+        },
         "desiredAddonsConfig": {
           "$ref": "AddonsConfig",
           "description": "Configurations for the various addons available to run in the cluster."
@@ -3233,9 +3367,17 @@
           "$ref": "DNSConfig",
           "description": "DNSConfig contains clusterDNS config for this cluster."
         },
+        "desiredEnableFqdnNetworkPolicy": {
+          "description": "Enable/Disable FQDN Network Policy for the cluster.",
+          "type": "boolean"
+        },
         "desiredEnablePrivateEndpoint": {
           "description": "Enable/Disable private endpoint for the cluster's master.",
           "type": "boolean"
+        },
+        "desiredFleet": {
+          "$ref": "Fleet",
+          "description": "The desired fleet configuration for the cluster."
         },
         "desiredGatewayApiConfig": {
           "$ref": "GatewayAPIConfig",
@@ -3256,6 +3398,10 @@
         "desiredIntraNodeVisibilityConfig": {
           "$ref": "IntraNodeVisibilityConfig",
           "description": "The desired config of Intra-node visibility."
+        },
+        "desiredK8sBetaApis": {
+          "$ref": "K8sBetaAPIConfig",
+          "description": "Desired Beta APIs to be enabled for cluster."
         },
         "desiredL4ilbSubsettingConfig": {
           "$ref": "ILBSubsettingConfig",
@@ -3378,9 +3524,17 @@
           "$ref": "WorkloadIdentityConfig",
           "description": "Configuration for Workload Identity."
         },
+        "enableK8sBetaApis": {
+          "$ref": "K8sBetaAPIConfig",
+          "description": "Kubernetes open source beta apis enabled on the cluster. Only beta apis"
+        },
         "etag": {
           "description": "The current etag of the cluster. If an etag is provided and does not match the current etag of the cluster, update will be blocked and an ABORTED error will be returned.",
           "type": "string"
+        },
+        "removedAdditionalPodRangesConfig": {
+          "$ref": "AdditionalPodRangesConfig",
+          "description": "The additional pod ranges that are to be removed from the cluster. The pod ranges specified here must have been specified earlier in the 'additional_pod_ranges_config' argument."
         }
       },
       "type": "object"
@@ -3571,7 +3725,7 @@
           "type": "string"
         },
         "state": {
-          "description": "Denotes the state of etcd encryption.",
+          "description": "The desired state of etcd encryption.",
           "enum": [
             "UNKNOWN",
             "ENCRYPTED",
@@ -3660,6 +3814,25 @@
             "type": "string"
           },
           "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Fleet": {
+      "description": "Fleet is the fleet configuration for the cluster.",
+      "id": "Fleet",
+      "properties": {
+        "membership": {
+          "description": "[Output only] The full resource name of the registered fleet membership of the cluster, in the format `//gkehub.googleapis.com/projects/*/locations/*/memberships/*`.",
+          "type": "string"
+        },
+        "preRegistered": {
+          "description": "[Output only] Whether the cluster has been registered through the fleet API.",
+          "type": "boolean"
+        },
+        "project": {
+          "description": "The Fleet host project(project ID or project number) where this cluster will be registered to. This field cannot be changed after the cluster has been registered.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -3884,6 +4057,11 @@
       "description": "Configuration for controlling how IPs are allocated in the cluster.",
       "id": "IPAllocationPolicy",
       "properties": {
+        "additionalPodRangesConfig": {
+          "$ref": "AdditionalPodRangesConfig",
+          "description": "Output only. [Output only] The additional pod ranges that are added to the cluster. These pod ranges can be used by new node pools to allocate pod IPs automatically. Once the range is removed it will not show up in IPAllocationPolicy.",
+          "readOnly": true
+        },
         "clusterIpv4Cidr": {
           "description": "This field is deprecated, use cluster_ipv4_cidr_block.",
           "type": "string"
@@ -3921,6 +4099,10 @@
         "nodeIpv4CidrBlock": {
           "description": "The IP address range of the instance IPs in this cluster. This is applicable only if `create_subnetwork` is true. Set to blank to have a range chosen with the default size. Set to /netmask (e.g. `/14`) to have a range chosen with a specific netmask. Set to a [CIDR](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) notation (e.g. `10.96.0.0/14`) from the RFC-1918 private networks (e.g. `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) to pick a specific range to use.",
           "type": "string"
+        },
+        "podCidrOverprovisionConfig": {
+          "$ref": "PodCIDROverprovisionConfig",
+          "description": "[PRIVATE FIELD] Pod CIDR size overprovisioning config for the cluster. Pod CIDR size per node depends on max_pods_per_node. By default, the value of max_pods_per_node is doubled and then rounded off to next power of 2 to get the size of pod CIDR block per node. Example: max_pods_per_node of 30 would result in 64 IPs (/26). This config can disable the doubling of IPs (we still round off to next power of 2) Example: max_pods_per_node of 30 will result in 32 IPs (/27) when overprovisioning is disabled."
         },
         "servicesIpv4Cidr": {
           "description": "This field is deprecated, use services_ipv4_cidr_block.",
@@ -4038,6 +4220,20 @@
         "y": {
           "description": "Used for ECDSA keys.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "K8sBetaAPIConfig": {
+      "description": "K8sBetaAPIConfig , configuration for beta APIs",
+      "id": "K8sBetaAPIConfig",
+      "properties": {
+        "enabledApis": {
+          "description": "Enabled k8s beta APIs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -4479,6 +4675,10 @@
           "$ref": "DNSConfig",
           "description": "DNSConfig contains clusterDNS config for this cluster."
         },
+        "enableFqdnNetworkPolicy": {
+          "description": "Whether FQDN Network Policy is enabled on this cluster.",
+          "type": "boolean"
+        },
         "enableIntraNodeVisibility": {
           "description": "Whether Intra-node visibility is enabled for this cluster. This makes same node pod to pod traffic visible for VPC network.",
           "type": "boolean"
@@ -4581,6 +4781,38 @@
       "properties": {
         "tags": {
           "description": "List of network tags.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "NodeAffinity": {
+      "description": "Specifies the NodeAffinity key, values, and affinity operator according to [shared sole tenant node group affinities](https://cloud.google.com/compute/docs/nodes/sole-tenant-nodes#node_affinity_and_anti-affinity).",
+      "id": "NodeAffinity",
+      "properties": {
+        "key": {
+          "description": "Key for NodeAffinity.",
+          "type": "string"
+        },
+        "operator": {
+          "description": "Operator for NodeAffinity.",
+          "enum": [
+            "OPERATOR_UNSPECIFIED",
+            "IN",
+            "NOT_IN"
+          ],
+          "enumDescriptions": [
+            "Invalid or unspecified affinity operator.",
+            "Affinity operator.",
+            "Anti-affinity operator."
+          ],
+          "type": "string"
+        },
+        "values": {
+          "description": "Values for NodeAffinity.",
           "items": {
             "type": "string"
           },
@@ -4722,6 +4954,10 @@
           "$ref": "ShieldedInstanceConfig",
           "description": "Shielded Instance options."
         },
+        "soleTenantConfig": {
+          "$ref": "SoleTenantConfig",
+          "description": "Parameters for node pools to be backed by shared sole tenant node groups."
+        },
         "spot": {
           "description": "Spot flag for enabling Spot VM, which is a rebrand of the existing preemptible flag.",
           "type": "boolean"
@@ -4839,6 +5075,10 @@
           "$ref": "NetworkPerformanceConfig",
           "description": "Network bandwidth tier configuration."
         },
+        "podCidrOverprovisionConfig": {
+          "$ref": "PodCIDROverprovisionConfig",
+          "description": "[PRIVATE FIELD] Pod CIDR size overprovisioning config for the nodepool. Pod CIDR size per node depends on max_pods_per_node. By default, the value of max_pods_per_node is rounded off to next power of 2 and we then double that to get the size of pod CIDR block per node. Example: max_pods_per_node of 30 would result in 64 IPs (/26). This config can disable the doubling of IPs (we still round off to next power of 2) Example: max_pods_per_node of 30 will result in 32 IPs (/27) when overprovisioning is disabled."
+        },
         "podIpv4CidrBlock": {
           "description": "The IP address range for pod IPs in this node pool. Only applicable if `create_pod_range` is true. Set to blank to have a range chosen with the default size. Set to /netmask (e.g. `/14`) to have a range chosen with a specific netmask. Set to a [CIDR](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) notation (e.g. `10.96.0.0/14`) to pick a specific range to use. Only applicable if `ip_allocation_policy.use_ip_aliases` is true. This field cannot be changed after the node pool has been created.",
           "type": "string"
@@ -4857,6 +5097,10 @@
         "autoscaling": {
           "$ref": "NodePoolAutoscaling",
           "description": "Autoscaler configuration for this NodePool. Autoscaler is enabled only if a valid configuration is present."
+        },
+        "bestEffortProvisioning": {
+          "$ref": "BestEffortProvisioning",
+          "description": "Enable best effort provisioning for nodes"
         },
         "conditions": {
           "description": "Which conditions caused the current node pool state.",
@@ -5158,26 +5402,28 @@
             "SET_MASTER_AUTH",
             "SET_NODE_POOL_SIZE",
             "SET_NETWORK_POLICY",
-            "SET_MAINTENANCE_POLICY"
+            "SET_MAINTENANCE_POLICY",
+            "RESIZE_CLUSTER"
           ],
           "enumDescriptions": [
             "Not set.",
-            "Cluster create.",
-            "Cluster delete.",
-            "A master upgrade.",
-            "A node upgrade.",
-            "Cluster repair.",
-            "Cluster update.",
-            "Node pool create.",
-            "Node pool delete.",
-            "Set node pool management.",
-            "Automatic node pool repair.",
-            "Automatic node upgrade.",
-            "Set labels.",
-            "Set/generate master auth materials",
-            "Set node pool size.",
-            "Updates network policy for a cluster.",
-            "Set the maintenance policy."
+            "The cluster is being created. The cluster should be assumed to be unusable until the operation finishes. In the event of the operation failing, the cluster will enter the ERROR state and eventually be deleted.",
+            "The cluster is being deleted. The cluster should be assumed to be unusable as soon as this operation starts. In the event of the operation failing, the cluster will enter the ERROR state and the deletion will be automatically retried until completed.",
+            "The cluster version is being updated. Note that this includes \"upgrades\" to the same version, which are simply a recreation. This also includes [auto-upgrades](https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-upgrades#upgrading_automatically). For more details, see [documentation on cluster upgrades](https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-upgrades#cluster_upgrades).",
+            "A node pool is being updated. Despite calling this an \"upgrade\", this includes most forms of updates to node pools. This also includes [auto-upgrades](https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-upgrades). This operation sets the progress field and may be canceled. The upgrade strategy depends on [node pool configuration](https://cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies). The nodes are generally still usable during this operation.",
+            "A problem has been detected with the control plane and is being repaired. This operation type is initiated by GKE. For more details, see [documentation on repairs](https://cloud.google.com/kubernetes-engine/docs/concepts/maintenance-windows-and-exclusions#repairs).",
+            "The cluster is being updated. This is a broad category of operations and includes operations that only change metadata as well as those that must recreate the entire cluster. If the control plane must be recreated, this will cause temporary downtime for zonal clusters. Some features require recreating the nodes as well. Those will be recreated as separate operations and the update may not be completely functional until the node pools recreations finish. Node recreations will generally follow [maintenance policies](https://cloud.google.com/kubernetes-engine/docs/concepts/maintenance-windows-and-exclusions). Some GKE-initiated operations use this type. This includes certain types of auto-upgrades and incident mitigations.",
+            "A node pool is being created. The node pool should be assumed to be unusable until this operation finishes. In the event of an error, the node pool may be partially created. If enabled, [node autoprovisioning](https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-provisioning) may have automatically initiated such operations.",
+            "The node pool is being deleted. The node pool should be assumed to be unusable as soon as this operation starts.",
+            "The node pool's manamagent field is being updated. These operations only update metadata and may be concurrent with most other operations.",
+            "A problem has been detected with nodes and [they are being repaired](https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-repair). This operation type is initiated by GKE, typically automatically. This operation may be concurrent with other operations and there may be multiple repairs occurring on the same node pool.",
+            "Unused. Automatic node upgrade uses UPGRADE_NODES.",
+            "Unused. Updating labels uses UPDATE_CLUSTER.",
+            "Unused. Updating master auth uses UPDATE_CLUSTER.",
+            "The node pool is being resized. With the exception of resizing to or from size zero, the node pool is generally usable during this operation.",
+            "Unused. Updating network policy uses UPDATE_CLUSTER.",
+            "Unused. Updating maintenance policy uses UPDATE_CLUSTER.",
+            "The control plane is being resized. This operation type is initiated by GKE. These operations are often performed preemptively to ensure that the control plane has sufficient resources and is not typically an indication of issues. For more details, see [documentation on resizes](https://cloud.google.com/kubernetes-engine/docs/concepts/maintenance-windows-and-exclusions#repairs)."
           ],
           "type": "string"
         },
@@ -5187,7 +5433,7 @@
           "readOnly": true
         },
         "selfLink": {
-          "description": "Server-defined URL for the resource.",
+          "description": "Server-defined URI for the operation. Example: `https://container.googleapis.com/v1alpha1/projects/123/locations/us-central1/operations/operation-123`.",
           "type": "string"
         },
         "startTime": {
@@ -5218,7 +5464,7 @@
           "type": "string"
         },
         "targetLink": {
-          "description": "Server-defined URL for the target of the operation.",
+          "description": "Server-defined URI for the target of the operation. The format of this is a URI to the resource being modified (such as a cluster, node pool, or node). For node pool repairs, there may be multiple nodes being repaired, but only one will be the target. Examples: - ## `https://container.googleapis.com/v1/projects/123/locations/us-central1/clusters/my-cluster` ## `https://container.googleapis.com/v1/projects/123/zones/us-central1-c/clusters/my-cluster/nodePools/my-np` `https://container.googleapis.com/v1/projects/123/zones/us-central1-c/clusters/my-cluster/nodePools/my-np/node/my-node`",
           "type": "string"
         },
         "zone": {
@@ -5286,6 +5532,17 @@
             "COMPACT specifies node placement in the same availability domain to ensure low communication latency."
           ],
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PodCIDROverprovisionConfig": {
+      "description": "[PRIVATE FIELD] Config for pod CIDR size overprovisioning.",
+      "id": "PodCIDROverprovisionConfig",
+      "properties": {
+        "disable": {
+          "description": "Whether Pod CIDR overprovisioning is disabled. Note: Pod CIDR overprovisioning is enabled by default.",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -6068,6 +6325,20 @@
       },
       "type": "object"
     },
+    "SoleTenantConfig": {
+      "description": "SoleTenantConfig contains the NodeAffinities to specify what shared sole tenant node groups should back the node pool.",
+      "id": "SoleTenantConfig",
+      "properties": {
+        "nodeAffinities": {
+          "description": "NodeAffinities used to match to a shared sole tenant node group.",
+          "items": {
+            "$ref": "NodeAffinity"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "StandardRolloutPolicy": {
       "description": "Standard rollout policy is the default policy for blue-green.",
       "id": "StandardRolloutPolicy",
@@ -6575,7 +6846,7 @@
           "enumDescriptions": [
             "UNKNOWN is the zero value of the Status enum. It's not a valid status.",
             "UNUSED denotes that this range is unclaimed by any cluster.",
-            "IN_USE_SERVICE denotes that this range is claimed by a cluster for services. It cannot be used for other clusters.",
+            "IN_USE_SERVICE denotes that this range is claimed by cluster(s) for services. User-managed services range can be shared between clusters within the same subnetwork.",
             "IN_USE_SHAREABLE_POD denotes this range was created by the network admin and is currently claimed by a cluster for pods. It can only be used by other clusters as a pod range.",
             "IN_USE_MANAGED_POD denotes this range was created by GKE and is claimed for pods. It cannot be used for other clusters."
           ],

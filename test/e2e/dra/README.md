@@ -26,7 +26,7 @@ release 0.20, build kind from latest main branch sources or use Kind release bin
 
 ### Build kind node image
 
-After building Kubernetes, in Kubernetes source code tree biuld new node image:
+After building Kubernetes, in Kubernetes source code tree build new node image:
 ```bash
 $ kind build node-image --image dra/node:latest $(pwd)
 ```

@@ -201,11 +201,11 @@ type StaticPodOperatorStatus struct {
 
 	// latestAvailableRevision is the deploymentID of the most recent deployment
 	// +optional
-	LatestAvailableRevision int32 `json:"latestAvailableRevision,omitEmpty"`
+	LatestAvailableRevision int32 `json:"latestAvailableRevision,omitempty"`
 
 	// latestAvailableRevisionReason describe the detailed reason for the most recent deployment
 	// +optional
-	LatestAvailableRevisionReason string `json:"latestAvailableRevisionReason,omitEmpty"`
+	LatestAvailableRevisionReason string `json:"latestAvailableRevisionReason,omitempty"`
 
 	// nodeStatuses track the deployment values and errors across individual nodes
 	// +optional

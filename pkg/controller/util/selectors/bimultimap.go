@@ -194,8 +194,8 @@ func (m *BiMultimap) delete(key Key) {
 
 // Exists returns true if the labeled object is present in the map.
 func (m *BiMultimap) Exists(key Key) bool {
-	m.mux.Lock()
-	defer m.mux.Unlock()
+	m.mux.RLock()
+	defer m.mux.RUnlock()
 
 	_, exists := m.labeledObjects[key]
 	return exists
@@ -289,8 +289,8 @@ func (m *BiMultimap) deleteSelector(key Key) {
 
 // SelectorExists returns true if the selecting object is present in the map.
 func (m *BiMultimap) SelectorExists(key Key) bool {
-	m.mux.Lock()
-	defer m.mux.Unlock()
+	m.mux.RLock()
+	defer m.mux.RUnlock()
 
 	_, exists := m.selectingObjects[key]
 	return exists

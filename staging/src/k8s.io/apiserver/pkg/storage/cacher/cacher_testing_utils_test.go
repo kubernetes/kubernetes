@@ -55,16 +55,17 @@ func init() {
 func newPod() runtime.Object     { return &example.Pod{} }
 func newPodList() runtime.Object { return &example.PodList{} }
 
-func newEtcdTestStorage(t *testing.T, prefix string, pagingEnabled bool) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	storage := etcd3.New(
 		server.V3Client,
 		apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion),
 		newPod,
+		newPodList,
 		prefix,
+		"/pods",
 		schema.GroupResource{Resource: "pods"},
 		identity.NewEncryptCheckTransformer(),
-		pagingEnabled,
 		etcd3.NewDefaultLeaseManagerConfig())
 	return server, storage
 }

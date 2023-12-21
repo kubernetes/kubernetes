@@ -91,7 +91,7 @@ const (
 )
 
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
-const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
+const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal"
 
 // internal struct for string service information
 type servicePortInfo struct {
@@ -122,41 +122,31 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 }
 
 // internal struct for endpoints information
-type endpointsInfo struct {
+type endpointInfo struct {
 	*proxy.BaseEndpointInfo
 
 	ChainName utiliptables.Chain
 }
 
-// returns a new proxy.Endpoint which abstracts a endpointsInfo
+// returns a new proxy.Endpoint which abstracts a endpointInfo
 func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
-	return &endpointsInfo{
+	return &endpointInfo{
 		BaseEndpointInfo: baseInfo,
-		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.Endpoint),
+		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.String()),
 	}
-}
-
-// Equal overrides the Equal() function implemented by proxy.BaseEndpointInfo.
-func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
-	o, ok := other.(*endpointsInfo)
-	if !ok {
-		klog.ErrorS(nil, "Failed to cast endpointsInfo")
-		return false
-	}
-	return e.Endpoint == o.Endpoint &&
-		e.IsLocal == o.IsLocal &&
-		e.ChainName == o.ChainName &&
-		e.Ready == o.Ready
 }
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
+	// ipFamily defines the IP family which this proxier is tracking.
+	ipFamily v1.IPFamily
+
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since iptables was synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointChangeTracker
+	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
 	mu           sync.Mutex // protects the following fields
@@ -185,7 +175,7 @@ type Proxier struct {
 	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
-	healthzServer       healthcheck.ProxierHealthUpdater
+	healthzServer       *healthcheck.ProxierHealthServer
 
 	// Since converting probabilities (floats) to strings is expensive
 	// and we are using only probabilities in the format of 1/n, we are
@@ -209,6 +199,10 @@ type Proxier struct {
 	// localhostNodePorts indicates whether we allow NodePort services to be accessed
 	// via localhost.
 	localhostNodePorts bool
+
+	// conntrackTCPLiberal indicates whether the system sets the kernel nf_conntrack_tcp_be_liberal
+	conntrackTCPLiberal bool
+
 	// nodePortAddresses selects the interfaces where nodePort works.
 	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
@@ -237,8 +231,9 @@ func NewProxier(ipFamily v1.IPFamily,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	nodePortAddressStrings []string,
+	initOnly bool,
 ) (*Proxier, error) {
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
@@ -254,11 +249,18 @@ func NewProxier(ipFamily v1.IPFamily,
 		}
 	}
 
-	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
-	// are connected to a Linux bridge (but not SDN bridges).  Until most
-	// plugins handle this, log when config is missing
-	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
-		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables, proxy may not work as intended")
+	// Be conservative in what you do, be liberal in what you accept from others.
+	// If it's non-zero, we mark only out of window RST segments as INVALID.
+	// Ref: https://docs.kernel.org/networking/nf_conntrack-sysctl.html
+	conntrackTCPLiberal := false
+	if val, err := sysctl.GetSysctl(sysctlNFConntrackTCPBeLiberal); err == nil && val != 0 {
+		conntrackTCPLiberal = true
+		klog.InfoS("nf_conntrack_tcp_be_liberal set, not installing DROP rules for INVALID packets")
+	}
+
+	if initOnly {
+		klog.InfoS("System initialized and --init-only specified")
+		return nil, nil
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -269,10 +271,11 @@ func NewProxier(ipFamily v1.IPFamily,
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	proxier := &Proxier{
+		ipFamily:                 ipFamily,
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
+		endpointsChanges:         proxy.NewEndpointsChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		needFullSync:             true,
 		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
@@ -295,6 +298,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		localhostNodePorts:       localhostNodePorts,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        proxyutil.RealNetwork{},
+		conntrackTCPLiberal:      conntrackTCPLiberal,
 	}
 
 	burstSyncs := 2
@@ -330,22 +334,26 @@ func NewDualStackProxier(
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	nodePortAddresses []string,
+	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses)
+		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses)
+		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
 	}
 	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
@@ -492,7 +500,7 @@ func (proxier *Proxier) probability(n int) string {
 // Sync is called to synchronize the proxier state to iptables as soon as possible.
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.QueuedUpdate()
+		proxier.healthzServer.QueuedUpdate(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	proxier.syncRunner.Run()
@@ -502,7 +510,7 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 
 	// synthesize "last change queued" time as the informers are syncing.
@@ -958,7 +966,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Note the endpoint chains that will be used
 		for _, ep := range allLocallyReachableEndpoints {
-			if epInfo, ok := ep.(*endpointsInfo); ok {
+			if epInfo, ok := ep.(*endpointInfo); ok {
 				activeNATChains[epInfo.ChainName] = true
 			}
 		}
@@ -1024,7 +1032,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// create a firewall chain.
 		loadBalancerTrafficChain := externalTrafficChain
 		fwChain := svcInfo.firewallChainName
-		usesFWChain := hasEndpoints && len(svcInfo.LoadBalancerIPStrings()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
+		usesFWChain := hasEndpoints && len(svcInfo.LoadBalancerVIPStrings()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
 		if usesFWChain {
 			activeNATChains[fwChain] = true
 			loadBalancerTrafficChain = fwChain
@@ -1116,7 +1124,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, lbip := range svcInfo.LoadBalancerIPStrings() {
+		for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
 			if hasEndpoints {
 				natRules.Write(
 					"-A", string(kubeServicesChain),
@@ -1141,7 +1149,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Either no endpoints at all (REJECT) or no endpoints for
 			// external traffic (DROP anything that didn't get short-circuited
 			// by the EXT chain.)
-			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
+			for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
 				filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", externalTrafficFilterComment,
@@ -1319,7 +1327,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// will loop back with the source IP set to the VIP.  We
 			// need the following rules to allow requests from this node.
 			if allowFromNode {
-				for _, lbip := range svcInfo.LoadBalancerIPStrings() {
+				for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
 					natRules.Write(
 						args,
 						"-s", lbip,
@@ -1351,9 +1359,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Generate the per-endpoint chains.
 		for _, ep := range allLocallyReachableEndpoints {
-			epInfo, ok := ep.(*endpointsInfo)
+			epInfo, ok := ep.(*endpointInfo)
 			if !ok {
-				klog.ErrorS(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
+				klog.ErrorS(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
 				continue
 			}
 
@@ -1375,7 +1383,7 @@ func (proxier *Proxier) syncProxyRules() {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
 			}
 			// DNAT to final destination.
-			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", epInfo.Endpoint)
+			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", epInfo.String())
 			natRules.Write(args)
 		}
 	}
@@ -1456,14 +1464,17 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Drop the packets in INVALID state, which would potentially cause
-	// unexpected connection reset.
-	// https://github.com/kubernetes/kubernetes/issues/74839
-	proxier.filterRules.Write(
-		"-A", string(kubeForwardChain),
-		"-m", "conntrack",
-		"--ctstate", "INVALID",
-		"-j", "DROP",
-	)
+	// unexpected connection reset if nf_conntrack_tcp_be_liberal is not set.
+	// Ref: https://github.com/kubernetes/kubernetes/issues/74839
+	// Ref: https://github.com/kubernetes/kubernetes/issues/117924
+	if !proxier.conntrackTCPLiberal {
+		proxier.filterRules.Write(
+			"-A", string(kubeForwardChain),
+			"-m", "conntrack",
+			"--ctstate", "INVALID",
+			"-j", "DROP",
+		)
+	}
 
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default
@@ -1537,7 +1548,7 @@ func (proxier *Proxier) syncProxyRules() {
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal").Set(float64(serviceNoLocalEndpointsTotalInternal))
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(serviceNoLocalEndpointsTotalExternal))
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
 
@@ -1559,11 +1570,11 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 		for _, ep := range endpoints {
-			epInfo, ok := ep.(*endpointsInfo)
+			epInfo, ok := ep.(*endpointInfo)
 			if !ok {
 				continue
 			}
-			comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.Endpoint)
+			comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
 			args = append(args[:0],
 				"-A", string(svcChain),
@@ -1581,11 +1592,11 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 	// Now write loadbalancing rules.
 	numEndpoints := len(endpoints)
 	for i, ep := range endpoints {
-		epInfo, ok := ep.(*endpointsInfo)
+		epInfo, ok := ep.(*endpointInfo)
 		if !ok {
 			continue
 		}
-		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.Endpoint)
+		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
 		args = append(args[:0], "-A", string(svcChain))
 		args = proxier.appendServiceCommentLocked(args, comment)

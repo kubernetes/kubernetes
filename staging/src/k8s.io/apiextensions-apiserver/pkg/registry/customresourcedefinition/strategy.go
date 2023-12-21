@@ -24,13 +24,13 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -80,8 +80,6 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 			break
 		}
 	}
-
-	dropDisabledFields(crd, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -110,8 +108,6 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 			break
 		}
 	}
-
-	dropDisabledFields(newCRD, oldCRD)
 }
 
 // Validate validates a new CustomResourceDefinition.
@@ -233,50 +229,56 @@ func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourc
 // dropDisabledFields drops disabled fields that are not used if their associated feature gates
 // are not enabled.
 func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) && (oldCRD == nil || (oldCRD != nil && !specHasXValidations(&oldCRD.Spec))) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || (oldCRD != nil && !specHasOptionalOldSelf(&oldCRD.Spec))) {
 		if newCRD.Spec.Validation != nil {
-			dropXValidationsField(newCRD.Spec.Validation.OpenAPIV3Schema)
+			dropOptionalOldSelfField(newCRD.Spec.Validation.OpenAPIV3Schema)
 		}
+
 		for _, v := range newCRD.Spec.Versions {
 			if v.Schema != nil {
-				dropXValidationsField(v.Schema.OpenAPIV3Schema)
+				dropOptionalOldSelfField(v.Schema.OpenAPIV3Schema)
 			}
 		}
 	}
 }
 
-// dropXValidationsField drops field XValidations from CRD schema
-func dropXValidationsField(schema *apiextensions.JSONSchemaProps) {
+// dropOptionalOldSelfField drops field optionalOldSelf from CRD schema
+func dropOptionalOldSelfField(schema *apiextensions.JSONSchemaProps) {
 	if schema == nil {
 		return
 	}
-	schema.XValidations = nil
+	for i := range schema.XValidations {
+		schema.XValidations[i].OptionalOldSelf = nil
+	}
+
 	if schema.AdditionalProperties != nil {
-		dropXValidationsField(schema.AdditionalProperties.Schema)
+		dropOptionalOldSelfField(schema.AdditionalProperties.Schema)
 	}
 	for def, jsonSchema := range schema.Properties {
-		dropXValidationsField(&jsonSchema)
+		dropOptionalOldSelfField(&jsonSchema)
 		schema.Properties[def] = jsonSchema
 	}
 	if schema.Items != nil {
-		dropXValidationsField(schema.Items.Schema)
+		dropOptionalOldSelfField(schema.Items.Schema)
 		for i, jsonSchema := range schema.Items.JSONSchemas {
-			dropXValidationsField(&jsonSchema)
+			dropOptionalOldSelfField(&jsonSchema)
 			schema.Items.JSONSchemas[i] = jsonSchema
 		}
 	}
-	for def, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-		dropXValidationsField(jsonSchemaPropsOrStringArray.Schema)
-		schema.Dependencies[def] = jsonSchemaPropsOrStringArray
-	}
 }
 
-func specHasXValidations(spec *apiextensions.CustomResourceDefinitionSpec) bool {
-	return validation.HasSchemaWith(spec, schemaHasXValidations)
+func specHasOptionalOldSelf(spec *apiextensions.CustomResourceDefinitionSpec) bool {
+	return validation.HasSchemaWith(spec, schemaHasOptionalOldSelf)
 }
 
-func schemaHasXValidations(s *apiextensions.JSONSchemaProps) bool {
+func schemaHasOptionalOldSelf(s *apiextensions.JSONSchemaProps) bool {
 	return validation.SchemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
-		return s.XValidations != nil
+		for _, v := range s.XValidations {
+			if v.OptionalOldSelf != nil {
+				return true
+			}
+
+		}
+		return false
 	})
 }

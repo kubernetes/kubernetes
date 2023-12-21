@@ -22,8 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
@@ -48,8 +50,32 @@ const (
 // failed by this plugin schedulable.
 func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}
+}
+
+// isSchedulableAfterNodeChange is invoked for all node events reported by
+// an informer. It checks whether that change made a previously unschedulable
+// pod schedulable.
+func (pl *NodeUnschedulable) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	if err != nil {
+		logger.Error(err, "unexpected objects in isSchedulableAfterNodeChange", "oldObj", oldObj, "newObj", newObj)
+		return framework.Queue, err
+	}
+
+	originalNodeSchedulable, modifiedNodeSchedulable := false, !modifiedNode.Spec.Unschedulable
+	if originalNode != nil {
+		originalNodeSchedulable = !originalNode.Spec.Unschedulable
+	}
+
+	if !originalNodeSchedulable && modifiedNodeSchedulable {
+		logger.V(4).Info("node was created or updated, pod may be schedulable now", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.Queue, nil
+	}
+
+	logger.V(4).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return framework.QueueSkip, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -61,18 +87,23 @@ func (pl *NodeUnschedulable) Name() string {
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
 
+	if !node.Spec.Unschedulable {
+		return nil
+	}
+
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
 	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
-	if node.Spec.Unschedulable && !podToleratesUnschedulable {
+	if !podToleratesUnschedulable {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
 	}
+
 	return nil
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &NodeUnschedulable{}, nil
 }

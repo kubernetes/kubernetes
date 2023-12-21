@@ -50,7 +50,7 @@ func New(c codes.Code, msg string) *Status {
 }
 
 // Newf returns New(c, fmt.Sprintf(format, a...)).
-func Newf(c codes.Code, format string, a ...interface{}) *Status {
+func Newf(c codes.Code, format string, a ...any) *Status {
 	return New(c, fmt.Sprintf(format, a...))
 }
 
@@ -60,7 +60,7 @@ func Error(c codes.Code, msg string) error {
 }
 
 // Errorf returns Error(c, fmt.Sprintf(format, a...)).
-func Errorf(c codes.Code, format string, a ...interface{}) error {
+func Errorf(c codes.Code, format string, a ...any) error {
 	return Error(c, fmt.Sprintf(format, a...))
 }
 
@@ -99,25 +99,27 @@ func FromError(err error) (s *Status, ok bool) {
 	}
 	type grpcstatus interface{ GRPCStatus() *Status }
 	if gs, ok := err.(grpcstatus); ok {
-		if gs.GRPCStatus() == nil {
+		grpcStatus := gs.GRPCStatus()
+		if grpcStatus == nil {
 			// Error has status nil, which maps to codes.OK. There
 			// is no sensible behavior for this, so we turn it into
 			// an error with codes.Unknown and discard the existing
 			// status.
 			return New(codes.Unknown, err.Error()), false
 		}
-		return gs.GRPCStatus(), true
+		return grpcStatus, true
 	}
 	var gs grpcstatus
 	if errors.As(err, &gs) {
-		if gs.GRPCStatus() == nil {
+		grpcStatus := gs.GRPCStatus()
+		if grpcStatus == nil {
 			// Error wraps an error that has status nil, which maps
 			// to codes.OK.  There is no sensible behavior for this,
 			// so we turn it into an error with codes.Unknown and
 			// discard the existing status.
 			return New(codes.Unknown, err.Error()), false
 		}
-		p := gs.GRPCStatus().Proto()
+		p := grpcStatus.Proto()
 		p.Message = err.Error()
 		return status.FromProto(p), true
 	}

@@ -15,11 +15,6 @@ limitations under the License.
 */
 
 // Package test contains a reusable unit test for logging output and behavior.
-//
-// # Experimental
-//
-// Notice: This package is EXPERIMENTAL and may be changed or removed in a
-// later release.
 package test
 
 import (
@@ -48,11 +43,6 @@ import (
 //
 // The returned flag set has the klog flags registered. It can
 // be used to make further changes to the klog configuration.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func InitKlog(tb testing.TB) *flag.FlagSet {
 	state := klog.CaptureState()
 	tb.Cleanup(state.Restore)
@@ -77,11 +67,6 @@ func InitKlog(tb testing.TB) *flag.FlagSet {
 }
 
 // OutputConfig contains optional settings for Output.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type OutputConfig struct {
 	// NewLogger is called to create a new logger. If nil, output via klog
 	// is tested. Support for -vmodule is optional.  ClearLogger is called
@@ -180,14 +165,14 @@ var tests = map[string]testcase{
 		withNames: []string{"me"},
 		text:      "test",
 		values:    []interface{}{"akey", "avalue"},
-		expectedOutput: `I output.go:<LINE>] "me: test" akey="avalue"
+		expectedOutput: `I output.go:<LINE>] "test" logger="me" akey="avalue"
 `,
 	},
 	"log with multiple names and values": {
 		withNames: []string{"hello", "world"},
 		text:      "test",
 		values:    []interface{}{"akey", "avalue"},
-		expectedOutput: `I output.go:<LINE>] "hello/world: test" akey="avalue"
+		expectedOutput: `I output.go:<LINE>] "test" logger="hello.world" akey="avalue"
 `,
 	},
 	"override single value": {
@@ -501,7 +486,7 @@ func printWithKlog(test testcase) {
 		}
 		return false
 	}
-	appendKV := func(withValues []interface{}) {
+	appendKV := func(withValues ...interface{}) {
 		if len(withValues)%2 != 0 {
 			withValues = append(withValues, "(MISSING)")
 		}
@@ -512,15 +497,18 @@ func printWithKlog(test testcase) {
 		}
 	}
 	// Here we need to emulate the handling of WithValues above.
-	appendKV(test.withValues)
+	if len(test.withNames) > 0 {
+		appendKV("logger", strings.Join(test.withNames, "."))
+	}
+	appendKV(test.withValues...)
 	kvs := [][]interface{}{copySlice(kv)}
 	if test.moreValues != nil {
-		appendKV(test.moreValues)
+		appendKV(test.moreValues...)
 		kvs = append(kvs, copySlice(kv), copySlice(kvs[0]))
 	}
 	if test.evenMoreValues != nil {
 		kv = copySlice(kvs[0])
-		appendKV(test.evenMoreValues)
+		appendKV(test.evenMoreValues...)
 		kvs = append(kvs, copySlice(kv))
 	}
 	for _, kv := range kvs {
@@ -528,9 +516,6 @@ func printWithKlog(test testcase) {
 			kv = append(kv, test.values...)
 		}
 		text := test.text
-		if len(test.withNames) > 0 {
-			text = strings.Join(test.withNames, "/") + ": " + text
-		}
 		if test.withHelper {
 			klogHelper(klog.Level(test.v), text, kv)
 		} else if test.err != nil {
@@ -553,12 +538,6 @@ var _, _, printWithKlogLine, _ = runtime.Caller(0) // anchor for finding the lin
 //
 // Loggers will be tested with direct calls to Info or
 // as backend for klog.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release. The test cases and thus the expected output also may
-// change.
 func Output(t *testing.T, config OutputConfig) {
 	for n, test := range tests {
 		t.Run(n, func(t *testing.T) {
@@ -879,12 +858,6 @@ func Output(t *testing.T, config OutputConfig) {
 //
 // Loggers will be tested with direct calls to Info or
 // as backend for klog.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release. The test cases and thus the expected output also may
-// change.
 func Benchmark(b *testing.B, config OutputConfig) {
 	for n, test := range tests {
 		b.Run(n, func(b *testing.B) {

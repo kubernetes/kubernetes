@@ -54,6 +54,7 @@ const (
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9
+	// stable: 1.29
 	//
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
@@ -62,6 +63,7 @@ const (
 	// owner: @MikeSpreitzer @yue9944882
 	// alpha: v1.18
 	// beta: v1.20
+	// stable: 1.29
 	//
 	// Enables managing request concurrency with prioritization and fairness at each server.
 	// The FeatureGate was introduced in release 1.15 but the feature
@@ -99,6 +101,7 @@ const (
 	// kep: https://kep.k8s.io/2876
 	// alpha: v1.23
 	// beta: v1.25
+	// stable: v1.29
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
@@ -121,6 +124,7 @@ const (
 	// kep: https://kep.k8s.io/3299
 	// alpha: v1.25
 	// beta: v1.27
+	// stable: v1.29
 	//
 	// Enables KMS v2 API for encryption at rest.
 	KMSv2 featuregate.Feature = "KMSv2"
@@ -128,6 +132,7 @@ const (
 	// owner: @enj
 	// kep: https://kep.k8s.io/3299
 	// beta: v1.28
+	// stable: v1.29
 	//
 	// Enables the use of derived encryption keys with KMS v2.
 	KMSv2KDF featuregate.Feature = "KMSv2KDF"
@@ -141,18 +146,10 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
-	// owner: @jefftree
-	// kep: https://kep.k8s.io/2896
-	// alpha: v1.23
-	// beta: v1.24
-	// stable: v1.27
-	//
-	// Enables kubernetes to publish OpenAPI v3
-	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
-
 	// owner: @caesarxuchao
 	// alpha: v1.15
 	// beta: v1.16
+	// stable: 1.29
 	//
 	// Allow apiservers to show a count of remaining items in the response
 	// to a chunking list request.
@@ -214,6 +211,20 @@ const (
 	// document.
 	StorageVersionHash featuregate.Feature = "StorageVersionHash"
 
+	// owner: @aramase, @enj, @nabokihms
+	// kep: https://kep.k8s.io/3331
+	// alpha: v1.29
+	//
+	// Enables Structured Authentication Configuration
+	StructuredAuthenticationConfiguration featuregate.Feature = "StructuredAuthenticationConfiguration"
+
+	// owner: @palnabarun
+	// kep: https://kep.k8s.io/3221
+	// alpha: v1.29
+	//
+	// Enables Structured Authorization Configuration
+	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
+
 	// owner: @wojtek-t
 	// alpha: v1.15
 	// beta: v1.16
@@ -241,6 +252,14 @@ const (
 	//
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
+
+	// owner: @tkashem
+	// beta: v1.29
+	//
+	// Allow Priority & Fairness in the API server to use a zero value for
+	// the 'nominalConcurrencyShares' field of the 'limited' section of a
+	// priority level.
+	ZeroLimitedNominalConcurrencyShares featuregate.Feature = "ZeroLimitedNominalConcurrencyShares"
 )
 
 func init() {
@@ -256,9 +275,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.Beta},
 
-	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
+	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
+	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
@@ -268,21 +287,19 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
-	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	KMSv1: {Default: true, PreRelease: featuregate.Deprecated},
+	KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
 
-	KMSv2: {Default: true, PreRelease: featuregate.Beta},
+	KMSv2: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
-	KMSv2KDF: {Default: false, PreRelease: featuregate.Beta}, // default and lock to true in 1.29, remove in 1.31
+	KMSv2KDF: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
-	OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	RemainingItemCount: {Default: true, PreRelease: featuregate.Beta},
+	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
@@ -294,6 +311,10 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
 
+	StructuredAuthenticationConfiguration: {Default: false, PreRelease: featuregate.Alpha},
+
+	StructuredAuthorizationConfiguration: {Default: false, PreRelease: featuregate.Alpha},
+
 	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
@@ -303,4 +324,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
 	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
+
+	ZeroLimitedNominalConcurrencyShares: {Default: false, PreRelease: featuregate.Beta},
 }

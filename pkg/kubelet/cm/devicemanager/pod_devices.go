@@ -52,10 +52,10 @@ func newPodDevices() *podDevices {
 	return &podDevices{devs: make(map[string]containerDevices)}
 }
 
-func (pdev *podDevices) pods() sets.String {
+func (pdev *podDevices) pods() sets.Set[string] {
 	pdev.RLock()
 	defer pdev.RUnlock()
-	ret := sets.NewString()
+	ret := sets.New[string]()
 	for k := range pdev.devs {
 		ret.Insert(k)
 	}
@@ -100,11 +100,11 @@ func (pdev *podDevices) delete(pods []string) {
 
 // Returns list of device Ids allocated to the given pod for the given resource.
 // Returns nil if we don't have cached state for the given <podUID, resource>.
-func (pdev *podDevices) podDevices(podUID, resource string) sets.String {
+func (pdev *podDevices) podDevices(podUID, resource string) sets.Set[string] {
 	pdev.RLock()
 	defer pdev.RUnlock()
 
-	ret := sets.NewString()
+	ret := sets.New[string]()
 	for contName := range pdev.devs[podUID] {
 		ret = ret.Union(pdev.containerDevices(podUID, contName, resource))
 	}
@@ -113,7 +113,7 @@ func (pdev *podDevices) podDevices(podUID, resource string) sets.String {
 
 // Returns list of device Ids allocated to the given container for the given resource.
 // Returns nil if we don't have cached state for the given <podUID, contName, resource>.
-func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.String {
+func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.Set[string] {
 	pdev.RLock()
 	defer pdev.RUnlock()
 	if _, podExists := pdev.devs[podUID]; !podExists {
@@ -130,7 +130,7 @@ func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets
 }
 
 // Populates allocatedResources with the device resources allocated to the specified <podUID, contName>.
-func (pdev *podDevices) addContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+func (pdev *podDevices) addContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.Set[string]) {
 	pdev.RLock()
 	defer pdev.RUnlock()
 	containers, exists := pdev.devs[podUID]
@@ -147,7 +147,7 @@ func (pdev *podDevices) addContainerAllocatedResources(podUID, contName string, 
 }
 
 // Removes the device resources allocated to the specified <podUID, contName> from allocatedResources.
-func (pdev *podDevices) removeContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+func (pdev *podDevices) removeContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.Set[string]) {
 	pdev.RLock()
 	defer pdev.RUnlock()
 	containers, exists := pdev.devs[podUID]
@@ -164,15 +164,15 @@ func (pdev *podDevices) removeContainerAllocatedResources(podUID, contName strin
 }
 
 // Returns all of devices allocated to the pods being tracked, keyed by resourceName.
-func (pdev *podDevices) devices() map[string]sets.String {
-	ret := make(map[string]sets.String)
+func (pdev *podDevices) devices() map[string]sets.Set[string] {
+	ret := make(map[string]sets.Set[string])
 	pdev.RLock()
 	defer pdev.RUnlock()
 	for _, containerDevices := range pdev.devs {
 		for _, resources := range containerDevices {
 			for resource, devices := range resources {
 				if _, exists := ret[resource]; !exists {
-					ret[resource] = sets.NewString()
+					ret[resource] = sets.New[string]()
 				}
 				if devices.allocResp != nil {
 					ret[resource] = ret[resource].Union(devices.deviceIds.Devices())
@@ -464,9 +464,9 @@ func (rdev ResourceDeviceInstances) Clone() ResourceDeviceInstances {
 	return clone
 }
 
-// Filter takes a condition set expressed as map[string]sets.String and returns a new
+// Filter takes a condition set expressed as map[string]sets.Set[string] and returns a new
 // ResourceDeviceInstances with only the devices matching the condition set.
-func (rdev ResourceDeviceInstances) Filter(cond map[string]sets.String) ResourceDeviceInstances {
+func (rdev ResourceDeviceInstances) Filter(cond map[string]sets.Set[string]) ResourceDeviceInstances {
 	filtered := NewResourceDeviceInstances()
 	for resourceName, filterIDs := range cond {
 		if _, exists := rdev[resourceName]; !exists {

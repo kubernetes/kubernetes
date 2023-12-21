@@ -35,7 +35,7 @@ import (
 // Pod sigkill test will cover pods with graceful termination period set but failed
 // to terminate and forcefully killed by kubelet. This test examine pod's container's
 // exit code is 137 and the exit reason is `Error`
-var _ = SIGDescribe("Pod SIGKILL [LinuxOnly] [NodeConformance]", func() {
+var _ = SIGDescribe("Pod SIGKILL [LinuxOnly]", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("sigkill-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -79,7 +79,7 @@ var _ = SIGDescribe("Pod SIGKILL [LinuxOnly] [NodeConformance]", func() {
 			gomega.Expect(containerStatus.State.Terminated.ExitCode).Should(gomega.Equal(int32(137)))
 
 			ginkgo.By(fmt.Sprintf("Verify exit reason of the pod (%v/%v) container", f.Namespace.Name, podSpec.Name))
-			framework.ExpectEqual(containerStatus.State.Terminated.Reason, "Error", fmt.Sprintf("Container terminated by sigkill expect Error but got %v", containerStatus.State.Terminated.Reason))
+			gomega.Expect(containerStatus.State.Terminated.Reason).Should(gomega.Equal("Error"), "Container terminated by sigkill expect Error but got %v", containerStatus.State.Terminated.Reason)
 		})
 
 		ginkgo.AfterEach(func() {
@@ -109,13 +109,13 @@ func getSigkillTargetPod(podName string, ctnName string) *v1.Pod {
 					Image: busyboxImage,
 					// In the main container, SIGTERM was trapped and later /tmp/healthy
 					// will be created for readiness probe to verify if the trap was
-					// excucuted successfully
+					// executed successfully
 					Command: []string{
 						"sh",
 						"-c",
-						"trap \"echo SIGTERM caught\" SIGTERM SIGINT; touch /tmp/healthy; sleep 1000",
+						"trap \"echo SIGTERM caught\" SIGTERM SIGINT; touch /tmp/healthy; /bin/sleep 1000",
 					},
-					// Using readinessprobe to guarantee signal handler registering finished
+					// Using readiness probe to guarantee signal handler registering finished
 					ReadinessProbe: &v1.Probe{
 						InitialDelaySeconds: 1,
 						TimeoutSeconds:      2,

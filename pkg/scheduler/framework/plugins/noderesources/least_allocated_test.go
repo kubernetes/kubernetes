@@ -395,6 +395,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
 			p, err := NewFit(
+				ctx,
 				&config.NodeResourcesFitArgs{
 					ScoringStrategy: &config.ScoringStrategy{
 						Type:      config.LeastAllocated,

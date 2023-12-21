@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	v1 "github.com/openshift/api/network/v1"
+	v1alpha1 "github.com/openshift/api/network/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -45,6 +46,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Network().V1().HostSubnets().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("netnamespaces"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Network().V1().NetNamespaces().Informer()}, nil
+
+		// Group=network.openshift.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("dnsnameresolvers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Network().V1alpha1().DNSNameResolvers().Informer()}, nil
 
 	}
 

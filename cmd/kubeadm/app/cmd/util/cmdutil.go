@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -101,17 +100,6 @@ func AddCRISocketFlag(flagSet *pflag.FlagSet, criSocket *string) {
 		criSocket, options.NodeCRISocket, *criSocket,
 		"Path to the CRI socket to connect. If empty kubeadm will try to auto-detect this value; use this option only if you have more than one CRI installed or if you have non-standard CRI socket.",
 	)
-}
-
-// DefaultInitConfiguration return default InitConfiguration. Avoid running the CRI auto-detection
-// code as we don't need it.
-func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
-	initCfg := &kubeadmapiv1.InitConfiguration{
-		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: kubeadmconstants.UnknownCRISocket, // avoid CRI detection
-		},
-	}
-	return initCfg
 }
 
 // InteractivelyConfirmAction asks the user whether they _really_ want to take the action.

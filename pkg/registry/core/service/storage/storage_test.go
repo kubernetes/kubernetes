@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,9 +40,12 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -11667,7 +11671,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			if tc.err == false && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if tc.err == true && err == nil {
+			if tc.err && err == nil {
 				t.Fatalf("unexpected success")
 			}
 			if !tc.err {
@@ -11680,4 +11684,289 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
+	storage, statusStorage, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	defer statusStorage.store.DestroyFunc()
+
+	ipModeVIP := api.LoadBalancerIPModeVIP
+	ipModeProxy := api.LoadBalancerIPModeProxy
+	ipModeDummy := api.LoadBalancerIPMode("dummy")
+
+	testCases := []struct {
+		name                   string
+		ipModeEnabled          bool
+		statusBeforeUpdate     api.ServiceStatus
+		newStatus              api.ServiceStatus
+		expectedStatus         api.ServiceStatus
+		expectErr              bool
+		expectedReasonForError metav1.StatusReason
+	}{
+		/*LoadBalancerIPMode disabled*/
+		{
+			name:               "LoadBalancerIPMode disabled, ipMode not used in old, not used in new",
+			ipModeEnabled:      false,
+			statusBeforeUpdate: api.ServiceStatus{},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			expectedStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			expectErr: false,
+		}, {
+			name:          "LoadBalancerIPMode disabled, ipMode used in old and in new",
+			ipModeEnabled: false,
+			statusBeforeUpdate: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				},
+			},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				},
+			},
+			expectedStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				},
+			},
+			expectErr: false,
+		}, {
+			name:          "LoadBalancerIPMode disabled, ipMode not used in old, used in new",
+			ipModeEnabled: false,
+			statusBeforeUpdate: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				},
+			},
+			expectedStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			expectErr: false,
+		}, {
+			name:          "LoadBalancerIPMode disabled, ipMode used in old, not used in new",
+			ipModeEnabled: false,
+			statusBeforeUpdate: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				},
+			},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			expectedStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			expectErr: false,
+		},
+		/*LoadBalancerIPMode enabled*/
+		{
+			name:               "LoadBalancerIPMode enabled, ipMode not used in old, not used in new",
+			ipModeEnabled:      true,
+			statusBeforeUpdate: api.ServiceStatus{},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			expectedStatus:         api.ServiceStatus{},
+			expectErr:              true,
+			expectedReasonForError: metav1.StatusReasonInvalid,
+		}, {
+			name:          "LoadBalancerIPMode enabled, ipMode used in old and in new",
+			ipModeEnabled: true,
+			statusBeforeUpdate: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				},
+			},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				},
+			},
+			expectedStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				},
+			},
+			expectErr: false,
+		}, {
+			name:          "LoadBalancerIPMode enabled, ipMode not used in old, used in new",
+			ipModeEnabled: true,
+			statusBeforeUpdate: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				},
+			},
+			expectedStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				},
+			},
+			expectErr: false,
+		}, {
+			name:          "LoadBalancerIPMode enabled, ipMode used in old, not used in new",
+			ipModeEnabled: true,
+			statusBeforeUpdate: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				},
+			},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			expectedStatus:         api.ServiceStatus{},
+			expectErr:              true,
+			expectedReasonForError: metav1.StatusReasonInvalid,
+		}, {
+			name:          "LoadBalancerIPMode enabled, ipMode not used in old, invalid value used in new",
+			ipModeEnabled: true,
+			statusBeforeUpdate: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				},
+			},
+			newStatus: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeDummy,
+					}},
+				},
+			},
+			expectedStatus:         api.ServiceStatus{},
+			expectErr:              true,
+			expectedReasonForError: metav1.StatusReasonInvalid,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
+			ctx := genericapirequest.NewDefaultContext()
+			obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Errorf("created svc: %s", err)
+			}
+			defer storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+
+			// prepare status
+			if loadbalancerIPModeInUse(tc.statusBeforeUpdate) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+			}
+			oldSvc := obj.(*api.Service).DeepCopy()
+			oldSvc.Status = tc.statusBeforeUpdate
+			obj, _, err = statusStorage.Update(ctx, oldSvc.Name, rest.DefaultUpdatedObjectInfo(oldSvc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if err != nil {
+				t.Errorf("updated status: %s", err)
+			}
+
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			newSvc := obj.(*api.Service).DeepCopy()
+			newSvc.Status = tc.newStatus
+			obj, _, err = statusStorage.Update(ctx, newSvc.Name, rest.DefaultUpdatedObjectInfo(newSvc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if err != nil {
+				if tc.expectErr && tc.expectedReasonForError == errors.ReasonForError(err) {
+					return
+				}
+				t.Errorf("updated status: %s", err)
+			}
+
+			updated := obj.(*api.Service)
+			if !reflect.DeepEqual(tc.expectedStatus, updated.Status) {
+				t.Errorf("%v: unexpected svc status: %v", tc.name, cmp.Diff(tc.expectedStatus, updated.Status))
+			}
+		})
+	}
+}
+
+func loadbalancerIPModeInUse(status api.ServiceStatus) bool {
+	for _, ing := range status.LoadBalancer.Ingress {
+		if ing.IPMode != nil {
+			return true
+		}
+	}
+	return false
 }

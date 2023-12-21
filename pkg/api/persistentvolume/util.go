@@ -34,9 +34,9 @@ const (
 // DropDisabledSpecFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
 func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSINodeExpandSecret) && !hasNodeExpansionSecrets(oldPVSpec) {
-		if pvSpec.CSI != nil {
-			pvSpec.CSI.NodeExpandSecretRef = nil
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if oldPVSpec == nil || oldPVSpec.VolumeAttributesClassName == nil {
+			pvSpec.VolumeAttributesClassName = nil
 		}
 	}
 }
@@ -47,17 +47,6 @@ func DropDisabledStatusFields(oldStatus, newStatus *api.PersistentVolumeStatus) 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeLastPhaseTransitionTime) && oldStatus.LastPhaseTransitionTime.IsZero() {
 		newStatus.LastPhaseTransitionTime = nil
 	}
-}
-
-func hasNodeExpansionSecrets(oldPVSpec *api.PersistentVolumeSpec) bool {
-	if oldPVSpec == nil || oldPVSpec.CSI == nil {
-		return false
-	}
-
-	if oldPVSpec.CSI.NodeExpandSecretRef != nil {
-		return true
-	}
-	return false
 }
 
 func GetWarningsForPersistentVolume(pv *api.PersistentVolume) []string {

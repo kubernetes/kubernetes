@@ -594,7 +594,7 @@ func newService(name string, svcType v1.ServiceType, allocateNodePort bool) *v1.
 			AllocateLoadBalancerNodePorts: allocateNPs,
 			Ports: []v1.ServicePort{{
 				Port:       int32(80),
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}

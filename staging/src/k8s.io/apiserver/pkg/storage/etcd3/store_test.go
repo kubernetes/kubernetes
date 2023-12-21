@@ -64,6 +64,10 @@ func newPod() runtime.Object {
 	return &example.Pod{}
 }
 
+func newPodList() runtime.Object {
+	return &example.PodList{}
+}
+
 func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
 	return func(ctx context.Context, t *testing.T, key string) {
 		getResp, err := etcdClient.KV.Get(ctx, key)
@@ -137,9 +141,24 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, store)
 }
 
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, store)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, store)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, store)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -155,8 +174,10 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	originalTransformer := s.transformer.(*storagetesting.PrefixTransformer)
 	transformer := *originalTransformer
 	s.transformer = modifier(&transformer)
+	s.watcher.transformer = modifier(&transformer)
 	return func() {
 		s.transformer = originalTransformer
+		s.watcher.transformer = originalTransformer
 	}
 }
 
@@ -193,11 +214,6 @@ func TestTransformationFailure(t *testing.T) {
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	storagetesting.RunTestList(ctx, t, store, compactStorage(client), false)
-}
-
-func TestListWithoutPaging(t *testing.T) {
-	ctx, store, _ := testSetup(t, withoutPaging())
-	storagetesting.RunTestListWithoutPaging(ctx, t, store)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -466,14 +482,15 @@ func (r *clientRecorder) GetReadsAndReset() uint64 {
 }
 
 type setupOptions struct {
-	client        func(testing.TB) *clientv3.Client
-	codec         runtime.Codec
-	newFunc       func() runtime.Object
-	prefix        string
-	groupResource schema.GroupResource
-	transformer   value.Transformer
-	pagingEnabled bool
-	leaseConfig   LeaseManagerConfig
+	client         func(testing.TB) *clientv3.Client
+	codec          runtime.Codec
+	newFunc        func() runtime.Object
+	newListFunc    func() runtime.Object
+	prefix         string
+	resourcePrefix string
+	groupResource  schema.GroupResource
+	transformer    value.Transformer
+	leaseConfig    LeaseManagerConfig
 
 	recorderEnabled bool
 }
@@ -491,12 +508,6 @@ func withClientConfig(config *embed.Config) setupOption {
 func withPrefix(prefix string) setupOption {
 	return func(options *setupOptions) {
 		options.prefix = prefix
-	}
-}
-
-func withoutPaging() setupOption {
-	return func(options *setupOptions) {
-		options.pagingEnabled = false
 	}
 }
 
@@ -518,10 +529,11 @@ func withDefaults(options *setupOptions) {
 	}
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
+	options.newListFunc = newPodList
 	options.prefix = ""
+	options.resourcePrefix = "/pods"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
 	options.transformer = newTestTransformer()
-	options.pagingEnabled = true
 	options.leaseConfig = newTestLeaseManagerConfig()
 }
 
@@ -541,10 +553,11 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 		client,
 		setupOpts.codec,
 		setupOpts.newFunc,
+		setupOpts.newListFunc,
 		setupOpts.prefix,
+		setupOpts.resourcePrefix,
 		setupOpts.groupResource,
 		setupOpts.transformer,
-		setupOpts.pagingEnabled,
 		setupOpts.leaseConfig,
 	)
 	ctx := context.Background()

@@ -64,6 +64,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Patches = nil
+	obj.DryRun = false
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -90,10 +91,13 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Scheduler.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
+	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
+	obj.Proxy.Disabled = false
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
+	obj.Disabled = false
 }
 
 func fuzzComponentConfigMap(obj *kubeadm.ComponentConfigMap, c fuzz.Continue) {
@@ -129,6 +133,7 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Patches = nil
+	obj.DryRun = false
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {

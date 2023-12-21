@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/openshift-kube-controller-manager/servicecacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
@@ -33,7 +34,15 @@ import (
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 )
 
-func startCSRSigningController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.CertificateSigningRequestSigningController,
+		aliases:  []string{"csrsigning"},
+		initFunc: startCertificateSigningRequestSigningController,
+	}
+}
+
+func startCertificateSigningRequestSigningController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	missingSingleSigningFile := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || controllerContext.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
 	if missingSingleSigningFile && !anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
@@ -149,7 +158,14 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
-func startCSRApprovingController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.CertificateSigningRequestApprovingController,
+		aliases:  []string{"csrapproving"},
+		initFunc: startCertificateSigningRequestApprovingController,
+	}
+}
+func startCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	approver := approver.NewCSRApprovingController(
 		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("certificate-controller"),
@@ -160,7 +176,14 @@ func startCSRApprovingController(ctx context.Context, controllerContext Controll
 	return nil, true, nil
 }
 
-func startCSRCleanerController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.CertificateSigningRequestCleanerController,
+		aliases:  []string{"csrcleaner"},
+		initFunc: startCertificateSigningRequestCleanerController,
+	}
+}
+func startCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
 		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
@@ -169,7 +192,15 @@ func startCSRCleanerController(ctx context.Context, controllerContext Controller
 	return nil, true, nil
 }
 
-func startRootCACertPublisher(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.RootCACertificatePublisherController,
+		aliases:  []string{"root-ca-cert-publisher"},
+		initFunc: startRootCACertificatePublisherController,
+	}
+}
+
+func startRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	var (
 		rootCA []byte
 		err    error
@@ -195,7 +226,15 @@ func startRootCACertPublisher(ctx context.Context, controllerContext ControllerC
 	return nil, true, nil
 }
 
-func startServiceCACertPublisher(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newServiceCACertPublisher() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.ServiceCACertificatePublisherController,
+		aliases:  []string{"service-ca-cert-publisher"},
+		initFunc: startServiceCACertPublisher,
+	}
+}
+
+func startServiceCACertPublisher(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	sac, err := servicecacertpublisher.NewPublisher(
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),

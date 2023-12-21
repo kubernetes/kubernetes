@@ -25,7 +25,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/armon/go-socks5"
@@ -324,7 +326,10 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				t.Fatalf("error creating request: %s", err)
 			}
 
-			spdyTransport := NewRoundTripper(testCase.clientTLS)
+			spdyTransport, err := NewRoundTripper(testCase.clientTLS)
+			if err != nil {
+				t.Fatalf("error creating SpdyRoundTripper: %v", err)
+			}
 
 			var proxierCalled bool
 			var proxyCalledWithHost string
@@ -423,6 +428,74 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				}
 			} else if proxyCalledWithAuth {
 				t.Fatalf("proxy authorization unexpected, got %q", proxyCalledWithAuthHeader)
+			}
+		})
+	}
+}
+
+// Tests SpdyRoundTripper constructors
+func TestRoundTripConstuctor(t *testing.T) {
+	testCases := map[string]struct {
+		tlsConfig         *tls.Config
+		proxier           func(req *http.Request) (*url.URL, error)
+		upgradeTransport  http.RoundTripper
+		expectedTLSConfig *tls.Config
+		errMsg            string
+	}{
+		"Basic TLSConfig; no error": {
+			tlsConfig:         &tls.Config{InsecureSkipVerify: true},
+			expectedTLSConfig: &tls.Config{InsecureSkipVerify: true},
+			upgradeTransport:  nil,
+		},
+		"Basic TLSConfig and Proxier: no error": {
+			tlsConfig:         &tls.Config{InsecureSkipVerify: true},
+			proxier:           func(req *http.Request) (*url.URL, error) { return nil, nil },
+			expectedTLSConfig: &tls.Config{InsecureSkipVerify: true},
+			upgradeTransport:  nil,
+		},
+		"TLSConfig with UpgradeTransport: error": {
+			tlsConfig:         &tls.Config{InsecureSkipVerify: true},
+			upgradeTransport:  &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+			expectedTLSConfig: &tls.Config{InsecureSkipVerify: true},
+			errMsg:            "SpdyRoundTripper: UpgradeTransport is mutually exclusive to TLSConfig or Proxier",
+		},
+		"Proxier with UpgradeTransport: error": {
+			proxier:           func(req *http.Request) (*url.URL, error) { return nil, nil },
+			upgradeTransport:  &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+			expectedTLSConfig: &tls.Config{InsecureSkipVerify: true},
+			errMsg:            "SpdyRoundTripper: UpgradeTransport is mutually exclusive to TLSConfig or Proxier",
+		},
+		"Only UpgradeTransport: no error": {
+			upgradeTransport:  &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+			expectedTLSConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			spdyRoundTripper, err := NewRoundTripperWithConfig(
+				RoundTripperConfig{
+					TLS:              testCase.tlsConfig,
+					Proxier:          testCase.proxier,
+					UpgradeTransport: testCase.upgradeTransport,
+				},
+			)
+			if testCase.errMsg != "" {
+				if err == nil {
+					t.Fatalf("expected error but received none")
+				}
+				if !strings.Contains(err.Error(), testCase.errMsg) {
+					t.Fatalf("expected error message (%s), got (%s)", err.Error(), testCase.errMsg)
+				}
+			}
+			if testCase.errMsg == "" {
+				if err != nil {
+					t.Fatalf("unexpected error received: %v", err)
+				}
+				actualTLSConfig := spdyRoundTripper.TLSClientConfig()
+				if !reflect.DeepEqual(testCase.expectedTLSConfig, actualTLSConfig) {
+					t.Errorf("expected TLSConfig (%v), got (%v)",
+						testCase.expectedTLSConfig, actualTLSConfig)
+				}
 			}
 		})
 	}
@@ -544,7 +617,10 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 				t.Fatalf("error creating request: %s", err)
 			}
 
-			spdyTransport := NewRoundTripper(testCase.clientTLS)
+			spdyTransport, err := NewRoundTripper(testCase.clientTLS)
+			if err != nil {
+				t.Fatalf("error creating SpdyRoundTripper: %v", err)
+			}
 			var proxierCalled bool
 			var proxyCalledWithHost string
 
@@ -704,7 +780,10 @@ func TestRoundTripPassesContextToDialer(t *testing.T) {
 			cancel()
 			req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 			require.NoError(t, err)
-			spdyTransport := NewRoundTripper(&tls.Config{})
+			spdyTransport, err := NewRoundTripper(&tls.Config{})
+			if err != nil {
+				t.Fatalf("error creating SpdyRoundTripper: %v", err)
+			}
 			_, err = spdyTransport.Dial(req)
 			assert.EqualError(t, err, "dial tcp 127.0.0.1:1233: operation was canceled")
 		})

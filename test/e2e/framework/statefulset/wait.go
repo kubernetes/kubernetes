@@ -32,7 +32,7 @@ import (
 // WaitForRunning waits for numPodsRunning in ss to be Running and for the first
 // numPodsReady ordinals to be Ready.
 func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, numPodsReady int32, ss *appsv1.StatefulSet) {
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			podList := GetPodList(ctx, c, ss)
 			SortStatefulPods(podList)
@@ -61,7 +61,7 @@ func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, 
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
 func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ctx, ss.Name, metav1.GetOptions{})
 			if err != nil {
@@ -101,7 +101,7 @@ func WaitForStatusReadyReplicas(ctx context.Context, c clientset.Interface, ss *
 	framework.Logf("Waiting for statefulset status.readyReplicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
@@ -126,7 +126,7 @@ func WaitForStatusAvailableReplicas(ctx context.Context, c clientset.Interface, 
 	framework.Logf("Waiting for statefulset status.AvailableReplicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
@@ -151,7 +151,7 @@ func WaitForStatusReplicas(ctx context.Context, c clientset.Interface, ss *appsv
 	framework.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout,
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {

@@ -244,9 +244,7 @@ func labelFromCallExpr(ce *ast.CallExpr) []string {
 			}
 			if id.Name == "Label" {
 				ls := extractLabels(expr)
-				for _, label := range ls {
-					labels = append(labels, label)
-				}
+				labels = append(labels, ls...)
 			}
 		}
 	}

@@ -120,7 +120,7 @@ service RuntimeService {
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 
     // GetContainerEvents gets container events from the CRI runtime
-    rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
+    rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
 
     // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
     // This list should be static at startup: either the client and server restart together when
@@ -782,6 +782,10 @@ message ImageSpec {
     // The container image reference specified by the user (e.g. image[:tag] or digest).
     // Only set if available within the RPC context.
     string user_specified_image = 18;
+    // Runtime handler to use for pulling the image.
+    // If the runtime handler is unknown, the request should be rejected.
+    // An empty string would select the default runtime handler.
+    string runtime_handler = 19;
 }
 
 message KeyValue {
@@ -1579,6 +1583,11 @@ message WindowsFilesystemUsage {
 message ImageFsInfoResponse {
     // Information of image filesystem(s).
     repeated FilesystemUsage image_filesystems = 1;
+    // Information of container filesystem(s).
+    // This is an optional field, may be used for example if container and image
+    // storage are separated.
+    // Default will be to return this as empty.
+    repeated FilesystemUsage container_filesystems = 2;
 }
 
 message ContainerStatsRequest{

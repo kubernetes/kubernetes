@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -53,14 +53,20 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Burst:       10,
 				},
 				IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
-					MasqueradeBit:      pointer.Int32(14),
+					MasqueradeBit:      ptr.To[int32](14),
 					MasqueradeAll:      false,
-					LocalhostNodePorts: pointer.Bool(true),
+					LocalhostNodePorts: ptr.To(true),
 					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
 					MinSyncPeriod:      metav1.Duration{Duration: 1 * time.Second},
 				},
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+				},
+				NFTables: kubeproxyconfigv1alpha1.KubeProxyNFTablesConfiguration{
+					MasqueradeBit: ptr.To[int32](14),
+					MasqueradeAll: false,
+					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
 				},
 				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
@@ -93,14 +99,20 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Burst:       10,
 				},
 				IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
-					MasqueradeBit:      pointer.Int32(14),
+					MasqueradeBit:      ptr.To[int32](14),
 					MasqueradeAll:      false,
-					LocalhostNodePorts: pointer.Bool(true),
+					LocalhostNodePorts: ptr.To(true),
 					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
 					MinSyncPeriod:      metav1.Duration{Duration: 1 * time.Second},
 				},
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+				},
+				NFTables: kubeproxyconfigv1alpha1.KubeProxyNFTablesConfiguration{
+					MasqueradeBit: ptr.To[int32](14),
+					MasqueradeAll: false,
+					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
 				},
 				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{

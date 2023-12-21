@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	"k8s.io/kubernetes/pkg/features"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TestPodGcOrphanedPodsWithFinalizer tests deletion of orphaned pods
@@ -148,7 +148,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to delete node: %v, err: %v", pod.Spec.NodeName, err)
 			}
-			err = wait.PollImmediate(time.Second, time.Second*15, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}
@@ -256,12 +256,12 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			}
 
 			// trigger termination of the pod, but with long grace period so that it is not removed immediately
-			err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: pointer.Int64(300)})
+			err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](300)})
 			if err != nil {
 				t.Fatalf("Error: '%v' while deleting pod: '%v'", err, klog.KObj(pod))
 			}
 			// wait until the pod is terminating
-			err = wait.PollImmediate(time.Second, time.Second*15, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}
@@ -398,7 +398,7 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 			defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
 
 			// getting evicted due to NodeName being "non-existing-node"
-			err = wait.PollImmediate(time.Second, time.Second*15, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*15, true, testutils.PodIsGettingEvicted(cs, pod.Namespace, pod.Name))
 			if err != nil {
 				t.Fatalf("Error '%v' while waiting for the pod '%v' to be terminating", err, klog.KObj(pod))
 			}

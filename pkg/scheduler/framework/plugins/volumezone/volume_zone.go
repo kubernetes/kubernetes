@@ -83,6 +83,16 @@ var topologyLabels = []string{
 	v1.LabelTopologyRegion,
 }
 
+func translateToGALabel(label string) string {
+	if label == v1.LabelFailureDomainBetaRegion {
+		return v1.LabelTopologyRegion
+	}
+	if label == v1.LabelFailureDomainBetaZone {
+		return v1.LabelTopologyZone
+	}
+	return label
+}
+
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeZone) Name() string {
 	return Name
@@ -227,6 +237,10 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 
 	for _, pvTopology := range podPVTopologies {
 		v, ok := node.Labels[pvTopology.key]
+		if !ok {
+			// if we can't match the beta label, try to match pv's beta label with node's ga label
+			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
+		}
 		if !ok || !pvTopology.values.Has(v) {
 			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
@@ -276,7 +290,7 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()

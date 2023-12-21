@@ -264,7 +264,7 @@ func makePVC(conditions []v1.PersistentVolumeClaimCondition) pvcModifier {
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
 			},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
 				},

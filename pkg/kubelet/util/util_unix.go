@@ -136,18 +136,6 @@ func LocalEndpoint(path, file string) (string, error) {
 	return filepath.Join(u.String(), file+".sock"), nil
 }
 
-// IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
-func IsUnixDomainSocket(filePath string) (bool, error) {
-	fi, err := os.Stat(filePath)
-	if err != nil {
-		return false, fmt.Errorf("stat file %s failed: %v", filePath, err)
-	}
-	if fi.Mode()&os.ModeSocket == 0 {
-		return false, nil
-	}
-	return true, nil
-}
-
 // NormalizePath is a no-op for Linux for now
 func NormalizePath(path string) string {
 	return path

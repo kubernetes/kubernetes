@@ -35,7 +35,7 @@ type Err struct {
 
 var (
 	// ErrType singleton.
-	ErrType = NewTypeValue("error")
+	ErrType = NewOpaqueType("error")
 
 	// errDivideByZero is an error indicating a division by zero of an integer value.
 	errDivideByZero = errors.New("division by zero")
@@ -127,6 +127,11 @@ func (e *Err) Value() any {
 // Is implements errors.Is.
 func (e *Err) Is(target error) bool {
 	return e.error.Error() == target.Error()
+}
+
+// Unwrap implements errors.Unwrap.
+func (e *Err) Unwrap() error {
+	return e.error
 }
 
 // IsError returns whether the input element ref.Type or ref.Val is equal to

@@ -215,7 +215,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                          &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
-		{Group: networkingv1alpha1.GroupName, Kind: "ClusterCIDR"}:                &ClusterCIDRDescriber{c},
+		{Group: networkingv1alpha1.GroupName, Kind: "ServiceCIDR"}:                &ServiceCIDRDescriber{c},
 		{Group: networkingv1alpha1.GroupName, Kind: "IPAddress"}:                  &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
@@ -871,11 +871,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, w, "")
-		if pod.Status.QOSClass != "" {
-			w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
-		} else {
-			w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
-		}
+		w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")
@@ -1645,17 +1641,20 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 
 	pc := d.CoreV1().Pods(namespace)
 
-	pods, err := getPodsForPVC(pc, pvc.Name, describerSettings)
+	pods, err := getPodsForPVC(pc, pvc, describerSettings)
 	if err != nil {
 		return "", err
 	}
 
-	events, _ := searchEvents(d.CoreV1(), pvc, describerSettings.ChunkSize)
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(d.CoreV1(), pvc, describerSettings.ChunkSize)
+	}
 
 	return describePersistentVolumeClaim(pvc, events, pods)
 }
 
-func getPodsForPVC(c corev1client.PodInterface, pvcName string, settings DescriberSettings) ([]corev1.Pod, error) {
+func getPodsForPVC(c corev1client.PodInterface, pvc *corev1.PersistentVolumeClaim, settings DescriberSettings) ([]corev1.Pod, error) {
 	nsPods, err := getPodsInChunks(c, metav1.ListOptions{Limit: settings.ChunkSize})
 	if err != nil {
 		return []corev1.Pod{}, err
@@ -1665,10 +1664,38 @@ func getPodsForPVC(c corev1client.PodInterface, pvcName string, settings Describ
 
 	for _, pod := range nsPods.Items {
 		for _, volume := range pod.Spec.Volumes {
-			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvcName {
+			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvc.Name {
 				pods = append(pods, pod)
 			}
 		}
+	}
+
+ownersLoop:
+	for _, ownerRef := range pvc.ObjectMeta.OwnerReferences {
+		if ownerRef.Kind != "Pod" {
+			continue
+		}
+
+		podIndex := -1
+		for i, pod := range nsPods.Items {
+			if pod.UID == ownerRef.UID {
+				podIndex = i
+				break
+			}
+		}
+		if podIndex == -1 {
+			// Maybe the pod has been deleted
+			continue
+		}
+
+		for _, pod := range pods {
+			if pod.UID == nsPods.Items[podIndex].UID {
+				// This owner pod is already recorded, look for pods between other owners
+				continue ownersLoop
+			}
+		}
+
+		pods = append(pods, nsPods.Items[podIndex])
 	}
 
 	return pods, nil
@@ -2818,54 +2845,46 @@ func (i *IngressClassDescriber) describeIngressClassV1(ic *networkingv1.IngressC
 	})
 }
 
-// ClusterCIDRDescriber generates information about a ClusterCIDR.
-type ClusterCIDRDescriber struct {
+// ServiceCIDRDescriber generates information about a ServiceCIDR.
+type ServiceCIDRDescriber struct {
 	client clientset.Interface
 }
 
-func (c *ClusterCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	ccV1alpha1, err := c.client.NetworkingV1alpha1().ClusterCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	svcV1alpha1, err := c.client.NetworkingV1alpha1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), ccV1alpha1, describerSettings.ChunkSize)
+			events, _ = searchEvents(c.client.CoreV1(), svcV1alpha1, describerSettings.ChunkSize)
 		}
-		return c.describeClusterCIDRV1alpha1(ccV1alpha1, events)
+		return c.describeServiceCIDRV1alpha1(svcV1alpha1, events)
 	}
 	return "", err
 }
 
-func (c *ClusterCIDRDescriber) describeClusterCIDRV1alpha1(cc *networkingv1alpha1.ClusterCIDR, events *corev1.EventList) (string, error) {
+func (c *ServiceCIDRDescriber) describeServiceCIDRV1alpha1(svc *networkingv1alpha1.ServiceCIDR, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%v\n", cc.Name)
-		printLabelsMultiline(w, "Labels", cc.Labels)
-		printAnnotationsMultiline(w, "Annotations", cc.Annotations)
+		w.Write(LEVEL_0, "Name:\t%v\n", svc.Name)
+		printLabelsMultiline(w, "Labels", svc.Labels)
+		printAnnotationsMultiline(w, "Annotations", svc.Annotations)
 
-		w.Write(LEVEL_0, "NodeSelector:\n")
-		if cc.Spec.NodeSelector != nil {
-			w.Write(LEVEL_1, "NodeSelector Terms:")
-			if len(cc.Spec.NodeSelector.NodeSelectorTerms) == 0 {
-				w.WriteLine("<none>")
-			} else {
-				w.WriteLine("")
-				for i, term := range cc.Spec.NodeSelector.NodeSelectorTerms {
-					printNodeSelectorTermsMultilineWithIndent(w, LEVEL_2, fmt.Sprintf("Term %v", i), "\t", term.MatchExpressions)
-				}
+		w.Write(LEVEL_0, "CIDRs:\t%v\n", strings.Join(svc.Spec.CIDRs, ", "))
+
+		if len(svc.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Status:\n")
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t------------------\t------\t-------\n")
+			for _, c := range svc.Status.Conditions {
+				w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
+					c.Type,
+					c.Status,
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
 			}
-		}
-
-		if cc.Spec.PerNodeHostBits != 0 {
-			w.Write(LEVEL_0, "PerNodeHostBits:\t%s\n", fmt.Sprint(cc.Spec.PerNodeHostBits))
-		}
-
-		if cc.Spec.IPv4 != "" {
-			w.Write(LEVEL_0, "IPv4:\t%s\n", cc.Spec.IPv4)
-		}
-
-		if cc.Spec.IPv6 != "" {
-			w.Write(LEVEL_0, "IPv6:\t%s\n", cc.Spec.IPv6)
 		}
 
 		if events != nil {

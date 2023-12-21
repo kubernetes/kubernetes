@@ -125,7 +125,7 @@ func (sysd SystemdInitSystem) ServiceExists(service string) bool {
 	args := []string{"status", service}
 	outBytes, _ := exec.Command("systemctl", args...).Output()
 	output := string(outBytes)
-	return !strings.Contains(output, "Loaded: not-found")
+	return !strings.Contains(output, "Loaded: not-found") && !strings.Contains(output, "could not be found")
 }
 
 // ServiceIsEnabled ensures the service is enabled to start on each boot.

@@ -2,6 +2,10 @@
 
 package v1
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // NetworkStatusApplyConfiguration represents an declarative configuration of the NetworkStatus type for use
 // with apply.
 type NetworkStatusApplyConfiguration struct {
@@ -10,6 +14,7 @@ type NetworkStatusApplyConfiguration struct {
 	NetworkType       *string                                 `json:"networkType,omitempty"`
 	ClusterNetworkMTU *int                                    `json:"clusterNetworkMTU,omitempty"`
 	Migration         *NetworkMigrationApplyConfiguration     `json:"migration,omitempty"`
+	Conditions        []metav1.Condition                      `json:"conditions,omitempty"`
 }
 
 // NetworkStatusApplyConfiguration constructs an declarative configuration of the NetworkStatus type for use with
@@ -62,5 +67,15 @@ func (b *NetworkStatusApplyConfiguration) WithClusterNetworkMTU(value int) *Netw
 // If called multiple times, the Migration field is set to the value of the last call.
 func (b *NetworkStatusApplyConfiguration) WithMigration(value *NetworkMigrationApplyConfiguration) *NetworkStatusApplyConfiguration {
 	b.Migration = value
+	return b
+}
+
+// WithConditions adds the given value to the Conditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Conditions field.
+func (b *NetworkStatusApplyConfiguration) WithConditions(values ...metav1.Condition) *NetworkStatusApplyConfiguration {
+	for i := range values {
+		b.Conditions = append(b.Conditions, values[i])
+	}
 	return b
 }

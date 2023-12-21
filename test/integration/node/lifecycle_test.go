@@ -32,8 +32,10 @@ import (
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -49,13 +51,34 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 	nodeIndex := 1 // the exact node doesn't matter, pick one
 
 	tests := map[string]struct {
-		enablePodDisruptionConditions bool
+		enablePodDisruptionConditions          bool
+		enableSeparateTaintEvictionController  bool
+		startStandaloneTaintEvictionController bool
+		wantPodEvicted                         bool
 	}{
-		"Test eviciton for NoExecute taint added by user; pod condition added when PodDisruptionConditions enabled": {
-			enablePodDisruptionConditions: true,
+		"Test eviction for NoExecute taint added by user; pod condition added when PodDisruptionConditions enabled; separate taint eviction controller disabled": {
+			enablePodDisruptionConditions:          true,
+			enableSeparateTaintEvictionController:  false,
+			startStandaloneTaintEvictionController: false,
+			wantPodEvicted:                         true,
 		},
-		"Test eviciton for NoExecute taint added by user; no pod condition added when PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: false,
+		"Test eviction for NoExecute taint added by user; no pod condition added when PodDisruptionConditions disabled; separate taint eviction controller disabled": {
+			enablePodDisruptionConditions:          false,
+			enableSeparateTaintEvictionController:  false,
+			startStandaloneTaintEvictionController: false,
+			wantPodEvicted:                         true,
+		},
+		"Test eviction for NoExecute taint added by user; separate taint eviction controller enabled but not started": {
+			enablePodDisruptionConditions:          false,
+			enableSeparateTaintEvictionController:  true,
+			startStandaloneTaintEvictionController: false,
+			wantPodEvicted:                         false,
+		},
+		"Test eviction for NoExecute taint added by user; separate taint eviction controller enabled and started": {
+			enablePodDisruptionConditions:          false,
+			enableSeparateTaintEvictionController:  true,
+			startStandaloneTaintEvictionController: true,
+			wantPodEvicted:                         true,
 		},
 	}
 
@@ -102,6 +125,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			}
 
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
 			cs := testCtx.ClientSet
 
@@ -138,6 +162,18 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			// Run all controllers
 			go nc.Run(testCtx.Ctx)
 
+			// Start TaintManager
+			if test.startStandaloneTaintEvictionController {
+				tm, _ := tainteviction.New(
+					testCtx.Ctx,
+					testCtx.ClientSet,
+					externalInformers.Core().V1().Pods(),
+					externalInformers.Core().V1().Nodes(),
+					names.TaintEvictionController,
+				)
+				go tm.Run(testCtx.Ctx)
+			}
+
 			for index := range nodes {
 				nodes[index], err = cs.CoreV1().Nodes().Create(testCtx.Ctx, nodes[index], metav1.CreateOptions{})
 				if err != nil {
@@ -154,18 +190,21 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				t.Errorf("Failed to taint node in test %s <%s>, err: %v", name, nodes[nodeIndex].Name, err)
 			}
 
-			err = wait.PollImmediate(time.Second, time.Second*20, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
-			if err != nil {
-				t.Fatalf("Error %q in test %q when waiting for terminating pod: %q", err, name, klog.KObj(testPod))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*20, true, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
+			if err != nil && test.wantPodEvicted {
+				t.Fatalf("Test Failed: error %v while waiting for pod %q to be evicted", err, klog.KObj(testPod))
+			} else if !wait.Interrupted(err) && !test.wantPodEvicted {
+				t.Fatalf("Test Failed: unexpected eviction of pod %q", klog.KObj(testPod))
 			}
+
 			testPod, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, testPod.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Test Failed: error: %q, while getting updated pod", err)
 			}
 			_, cond := podutil.GetPodCondition(&testPod.Status, v1.DisruptionTarget)
-			if test.enablePodDisruptionConditions == true && cond == nil {
+			if test.enablePodDisruptionConditions && cond == nil {
 				t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(testPod), v1.DisruptionTarget)
-			} else if test.enablePodDisruptionConditions == false && cond != nil {
+			} else if !test.enablePodDisruptionConditions && cond != nil {
 				t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(testPod), v1.DisruptionTarget)
 			}
 		})
@@ -196,23 +235,34 @@ func TestTaintBasedEvictions(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		name                        string
-		nodeTaints                  []v1.Taint
-		nodeConditions              []v1.NodeCondition
-		pod                         *v1.Pod
-		tolerationSeconds           int64
-		expectedWaitForPodCondition string
+		name                                  string
+		nodeTaints                            []v1.Taint
+		nodeConditions                        []v1.NodeCondition
+		pod                                   *v1.Pod
+		tolerationSeconds                     int64
+		expectedWaitForPodCondition           string
+		enableSeparateTaintEvictionController bool
 	}{
 		{
-			name:                        "Taint based evictions for NodeNotReady and 200 tolerationseconds",
-			nodeTaints:                  []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
-			nodeConditions:              []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			pod:                         testPod.DeepCopy(),
-			tolerationSeconds:           200,
-			expectedWaitForPodCondition: "updated with tolerationSeconds of 200",
+			name:                                  "Taint based evictions for NodeNotReady and 200 tolerationseconds; separate taint eviction controller disabled",
+			nodeTaints:                            []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:                        []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                                   testPod.DeepCopy(),
+			tolerationSeconds:                     200,
+			expectedWaitForPodCondition:           "updated with tolerationSeconds of 200",
+			enableSeparateTaintEvictionController: false,
 		},
 		{
-			name:           "Taint based evictions for NodeNotReady with no pod tolerations",
+			name:                                  "Taint based evictions for NodeNotReady and 200 tolerationseconds; separate taint eviction controller enabled",
+			nodeTaints:                            []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:                        []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                                   testPod.DeepCopy(),
+			tolerationSeconds:                     200,
+			expectedWaitForPodCondition:           "updated with tolerationSeconds of 200",
+			enableSeparateTaintEvictionController: true,
+		},
+		{
+			name:           "Taint based evictions for NodeNotReady with no pod tolerations; separate taint eviction controller disabled",
 			nodeTaints:     []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
 			nodeConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
 			pod: &v1.Pod{
@@ -223,21 +273,55 @@ func TestTaintBasedEvictions(t *testing.T) {
 					},
 				},
 			},
-			tolerationSeconds:           300,
-			expectedWaitForPodCondition: "updated with tolerationSeconds=300",
+			tolerationSeconds:                     300,
+			expectedWaitForPodCondition:           "updated with tolerationSeconds=300",
+			enableSeparateTaintEvictionController: false,
 		},
 		{
-			name:                        "Taint based evictions for NodeNotReady and 0 tolerationseconds",
-			nodeTaints:                  []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
-			nodeConditions:              []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			pod:                         testPod.DeepCopy(),
-			tolerationSeconds:           0,
-			expectedWaitForPodCondition: "terminating",
+			name:           "Taint based evictions for NodeNotReady with no pod tolerations; separate taint eviction controller enabled",
+			nodeTaints:     []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "testpod1"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container", Image: imageutils.GetPauseImageName()},
+					},
+				},
+			},
+			tolerationSeconds:                     300,
+			expectedWaitForPodCondition:           "updated with tolerationSeconds=300",
+			enableSeparateTaintEvictionController: true,
 		},
 		{
-			name:           "Taint based evictions for NodeUnreachable",
-			nodeTaints:     []v1.Taint{{Key: v1.TaintNodeUnreachable, Effect: v1.TaintEffectNoExecute}},
-			nodeConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionUnknown}},
+			name:                                  "Taint based evictions for NodeNotReady and 0 tolerationseconds; separate taint eviction controller disabled",
+			nodeTaints:                            []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:                        []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                                   testPod.DeepCopy(),
+			tolerationSeconds:                     0,
+			expectedWaitForPodCondition:           "terminating",
+			enableSeparateTaintEvictionController: false,
+		},
+		{
+			name:                                  "Taint based evictions for NodeNotReady and 0 tolerationseconds; separate taint eviction controller enabled",
+			nodeTaints:                            []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:                        []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                                   testPod.DeepCopy(),
+			tolerationSeconds:                     0,
+			expectedWaitForPodCondition:           "terminating",
+			enableSeparateTaintEvictionController: true,
+		},
+		{
+			name:                                  "Taint based evictions for NodeUnreachable; separate taint eviction controller disabled",
+			nodeTaints:                            []v1.Taint{{Key: v1.TaintNodeUnreachable, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:                        []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionUnknown}},
+			enableSeparateTaintEvictionController: false,
+		},
+		{
+			name:                                  "Taint based evictions for NodeUnreachable; separate taint eviction controller enabled",
+			nodeTaints:                            []v1.Taint{{Key: v1.TaintNodeUnreachable, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:                        []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionUnknown}},
+			enableSeparateTaintEvictionController: true,
 		},
 	}
 
@@ -249,6 +333,8 @@ func TestTaintBasedEvictions(t *testing.T) {
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
+
 			testCtx := testutils.InitTestAPIServer(t, "taint-based-evictions", admission)
 
 			// Build clientset and informers for controllers.
@@ -287,6 +373,18 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 			// Run the controller
 			go nc.Run(testCtx.Ctx)
+
+			// Start TaintEvictionController
+			if test.enableSeparateTaintEvictionController {
+				tm, _ := tainteviction.New(
+					testCtx.Ctx,
+					testCtx.ClientSet,
+					externalInformers.Core().V1().Pods(),
+					externalInformers.Core().V1().Nodes(),
+					names.TaintEvictionController,
+				)
+				go tm.Run(testCtx.Ctx)
+			}
 
 			nodeRes := v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4000m"),

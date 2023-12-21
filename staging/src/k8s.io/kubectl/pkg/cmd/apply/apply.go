@@ -39,6 +39,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/openapi3"
 	"k8s.io/client-go/util/csaupgrade"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -105,7 +106,8 @@ type ApplyOptions struct {
 	Builder             *resource.Builder
 	Mapper              meta.RESTMapper
 	DynamicClient       dynamic.Interface
-	OpenAPISchema       openapi.Resources
+	OpenAPIGetter       openapi.OpenAPIResourcesGetter
+	OpenAPIV3Root       openapi3.Root
 
 	Namespace        string
 	EnforceNamespace bool
@@ -282,7 +284,15 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		return nil, err
 	}
 
-	openAPISchema, _ := f.OpenAPISchema()
+	var openAPIV3Root openapi3.Root
+	if !cmdutil.OpenAPIV3Patch.IsDisabled() {
+		openAPIV3Client, err := f.OpenAPIV3Client()
+		if err == nil {
+			openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
+		} else {
+			klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
+		}
+	}
 
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)
 	if err != nil {
@@ -360,7 +370,8 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		Builder:             builder,
 		Mapper:              mapper,
 		DynamicClient:       dynamicClient,
-		OpenAPISchema:       openAPISchema,
+		OpenAPIGetter:       f,
+		OpenAPIV3Root:       openAPIV3Root,
 
 		IOStreams: flags.IOStreams,
 

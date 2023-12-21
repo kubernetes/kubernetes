@@ -20,12 +20,14 @@ limitations under the License.
 package winkernel
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Microsoft/hcsshim/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,26 +35,57 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	fakehcn "k8s.io/kubernetes/pkg/proxy/winkernel/testing"
 	netutils "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
 	testHostName      = "test-hostname"
+	testNetwork       = "TestNetwork"
+	ipAddress         = "10.0.0.1"
+	prefixLen         = 24
 	macAddress        = "00-11-22-33-44-55"
 	clusterCIDR       = "192.168.1.0/24"
 	destinationPrefix = "192.168.2.0/24"
 	providerAddress   = "10.0.0.3"
 	guid              = "123ABC"
+	endpointGuid1     = "EPID-1"
+	loadbalancerGuid1 = "LBID-1"
+	endpointLocal     = "EP-LOCAL"
+	endpointGw        = "EP-GW"
+	epIpAddressGw     = "192.168.2.1"
+	epMacAddressGw    = "00-11-22-33-44-66"
 )
 
-type fakeHNS struct{}
+func newHnsNetwork(networkInfo *hnsNetworkInfo) *hcn.HostComputeNetwork {
+	var policies []hcn.NetworkPolicy
+	for _, remoteSubnet := range networkInfo.remoteSubnets {
+		policySettings := hcn.RemoteSubnetRoutePolicySetting{
+			DestinationPrefix:           remoteSubnet.destinationPrefix,
+			IsolationId:                 remoteSubnet.isolationID,
+			ProviderAddress:             remoteSubnet.providerAddress,
+			DistributedRouterMacAddress: remoteSubnet.drMacAddress,
+		}
+		settings, _ := json.Marshal(policySettings)
+		policy := hcn.NetworkPolicy{
+			Type:     hcn.RemoteSubnetRoute,
+			Settings: settings,
+		}
+		policies = append(policies, policy)
+	}
 
-func newFakeHNS() *fakeHNS {
-	return &fakeHNS{}
+	network := &hcn.HostComputeNetwork{
+		Id:       networkInfo.id,
+		Name:     networkInfo.name,
+		Type:     hcn.NetworkType(networkInfo.networkType),
+		Policies: policies,
+	}
+	return network
 }
 
-func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
+func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string) *Proxier {
+	sourceVip := "192.168.1.2"
 	var remoteSubnets []*remoteSubnetInfo
 	rs := &remoteSubnetInfo{
 		destinationPrefix: destinationPrefix,
@@ -61,101 +94,37 @@ func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 		drMacAddress:      macAddress,
 	}
 	remoteSubnets = append(remoteSubnets, rs)
-	return &hnsNetworkInfo{
-		id:            strings.ToUpper(guid),
-		name:          name,
-		networkType:   NETWORK_TYPE_OVERLAY,
-		remoteSubnets: remoteSubnets,
-	}, nil
-}
-
-func (hns fakeHNS) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
-	return nil, nil
-}
-
-func (hns fakeHNS) getEndpointByID(id string) (*endpointsInfo, error) {
-	return nil, nil
-}
-
-func (hns fakeHNS) getEndpointByName(name string) (*endpointsInfo, error) {
-	return &endpointsInfo{
-		isLocal:    true,
-		macAddress: macAddress,
-		hnsID:      guid,
-		hns:        hns,
-	}, nil
-}
-
-func (hns fakeHNS) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
-	return nil, nil
-}
-
-func (hns fakeHNS) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
-	_, ipNet, _ := netutils.ParseCIDRSloppy(destinationPrefix)
-
-	if ipNet.Contains(netutils.ParseIPSloppy(ip)) {
-		return &endpointsInfo{
-			ip:         ip,
-			isLocal:    false,
-			macAddress: macAddress,
-			hnsID:      guid,
-			hns:        hns,
-		}, nil
-	}
-	return nil, nil
-
-}
-
-func (hns fakeHNS) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
-	return &endpointsInfo{
-		ip:         ep.ip,
-		isLocal:    ep.isLocal,
-		macAddress: ep.macAddress,
-		hnsID:      guid,
-		hns:        hns,
-	}, nil
-}
-
-func (hns fakeHNS) deleteEndpoint(hnsID string) error {
-	return nil
-}
-
-func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
-	return &loadBalancerInfo{
-		hnsID: guid,
-	}, nil
-}
-
-func (hns fakeHNS) deleteLoadBalancer(hnsID string) error {
-	return nil
-}
-
-func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string) *Proxier {
-	sourceVip := "192.168.1.2"
 	hnsNetworkInfo := &hnsNetworkInfo{
-		id:          strings.ToUpper(guid),
-		name:        "TestNetwork",
-		networkType: networkType,
+		id:            strings.ToUpper(guid),
+		name:          testNetwork,
+		networkType:   networkType,
+		remoteSubnets: remoteSubnets,
 	}
+	hnsNetwork := newHnsNetwork(hnsNetworkInfo)
+	hcnMock := fakehcn.NewHcnMock(hnsNetwork)
 	proxier := &Proxier{
-		svcPortMap:            make(proxy.ServicePortMap),
-		endpointsMap:          make(proxy.EndpointsMap),
-		clusterCIDR:           clusterCIDR,
-		hostname:              testHostName,
-		nodeIP:                nodeIP,
-		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
-		network:               *hnsNetworkInfo,
-		sourceVip:             sourceVip,
-		hostMac:               macAddress,
-		isDSR:                 false,
-		hns:                   newFakeHNS(),
+		svcPortMap:          make(proxy.ServicePortMap),
+		endpointsMap:        make(proxy.EndpointsMap),
+		clusterCIDR:         clusterCIDR,
+		hostname:            testHostName,
+		nodeIP:              nodeIP,
+		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
+		network:             *hnsNetworkInfo,
+		sourceVip:           sourceVip,
+		hostMac:             macAddress,
+		isDSR:               false,
+		hns: &hns{
+			hcn: hcnMock,
+		},
+		hcn:                   hcnMock,
 		endPointsRefCount:     make(endPointsReferenceCountMap),
 		forwardHealthCheckVip: true,
+		mapStaleLoadbalancers: make(map[string]bool),
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
-	endpointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, v1.IPv4Protocol, nil, proxier.endpointsMapChange)
-	proxier.endpointsChanges = endpointChangeTracker
+	endpointsChangeTracker := proxy.NewEndpointsChangeTracker(hostname, proxier.newEndpointInfo, v1.IPv4Protocol, nil, proxier.endpointsMapChange)
+	proxier.endpointsChanges = endpointsChangeTracker
 	proxier.serviceChanges = serviceChanges
 
 	return proxier
@@ -177,7 +146,6 @@ func TestCreateServiceVip(t *testing.T) {
 		Port:           "p80",
 		Protocol:       v1.ProtocolTCP,
 	}
-	timeoutSeconds := v1.DefaultClientIPServiceAffinitySeconds
 
 	makeServiceMap(proxier,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
@@ -187,7 +155,7 @@ func TestCreateServiceVip(t *testing.T) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 				ClientIP: &v1.ClientIPConfig{
-					TimeoutSeconds: &timeoutSeconds,
+					TimeoutSeconds: ptr.To[int32](v1.DefaultClientIPServiceAffinitySeconds),
 				},
 			}
 			svc.Spec.Ports = []v1.ServicePort{{
@@ -231,7 +199,6 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 		Port:           "p80",
 		Protocol:       v1.ProtocolTCP,
 	}
-	tcpProtocol := v1.ProtocolTCP
 
 	makeServiceMap(proxier,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
@@ -252,32 +219,33 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
+
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
 	ep := proxier.endpointsMap[svcPortName][0]
-	epInfo, ok := ep.(*endpointsInfo)
+	epInfo, ok := ep.(*endpointInfo)
 	if !ok {
-		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
 
 	} else {
-		if epInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		if epInfo.hnsID != "EPID-3" {
+			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 		}
 	}
 
-	if *proxier.endPointsRefCount[guid] <= 0 {
-		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	if *proxier.endPointsRefCount["EPID-3"] <= 0 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[endpointGuid1])
 	}
 
-	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
-		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
+	if *proxier.endPointsRefCount["EPID-3"] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 }
 
@@ -288,14 +256,13 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 		t.Error()
 	}
 
-	tcpProtocol := v1.ProtocolTCP
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
-		Protocol:       tcpProtocol,
+		Protocol:       v1.ProtocolTCP,
 	}
 
 	makeServiceMap(proxier,
@@ -305,7 +272,7 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
 				Port:     int32(svcPort),
-				Protocol: tcpProtocol,
+				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
 		}),
@@ -317,36 +284,35 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 	ep := proxier.endpointsMap[svcPortName][0]
-	epInfo, ok := ep.(*endpointsInfo)
+	epInfo, ok := ep.(*endpointInfo)
 	if !ok {
-		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
 
 	} else {
-		if epInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		if epInfo.hnsID != endpointGuid1 {
+			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 		}
 	}
 
-	if *proxier.endPointsRefCount[guid] <= 0 {
-		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	if *proxier.endPointsRefCount[endpointGuid1] <= 0 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[endpointGuid1])
 	}
 
-	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
-		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
+	if *proxier.endPointsRefCount[endpointGuid1] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 }
 func TestSharedRemoteEndpointDelete(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	tcpProtocol := v1.ProtocolTCP
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
 	if proxier == nil {
 		t.Error()
@@ -399,9 +365,9 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -410,31 +376,31 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName2.Port),
-				Port:     pointer.Int32(int32(svcPort2)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName2.Port),
+				Port:     ptr.To(int32(svcPort2)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 	ep := proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok := ep.(*endpointsInfo)
+	epInfo, ok := ep.(*endpointInfo)
 	if !ok {
-		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
 
 	} else {
-		if epInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		if epInfo.hnsID != endpointGuid1 {
+			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 		}
 	}
 
-	if *proxier.endPointsRefCount[guid] != 2 {
-		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	if *proxier.endPointsRefCount[endpointGuid1] != 2 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[endpointGuid1])
 	}
 
-	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
-		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
+	if *proxier.endPointsRefCount[endpointGuid1] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 
 	proxier.setInitialized(false)
@@ -458,9 +424,9 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName2.Port),
-				Port:     pointer.Int32(int32(svcPort2)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName2.Port),
+				Port:     ptr.To(int32(svcPort2)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -469,13 +435,13 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	proxier.syncProxyRules()
 
 	ep = proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok = ep.(*endpointsInfo)
+	epInfo, ok = ep.(*endpointInfo)
 	if !ok {
-		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
 
 	} else {
-		if epInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		if epInfo.hnsID != endpointGuid1 {
+			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 		}
 	}
 
@@ -483,8 +449,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 		t.Errorf("Incorrect Refcount. Current value: %v", *epInfo.refCount)
 	}
 
-	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
-		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
+	if *proxier.endPointsRefCount[endpointGuid1] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 }
 func TestSharedRemoteEndpointUpdate(t *testing.T) {
@@ -535,7 +501,6 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 		}),
 	)
 
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(proxier,
 		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -543,9 +508,9 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -554,31 +519,32 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName2.Port),
-				Port:     pointer.Int32(int32(svcPort2)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName2.Port),
+				Port:     ptr.To(int32(svcPort2)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
+
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 	ep := proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok := ep.(*endpointsInfo)
+	epInfo, ok := ep.(*endpointInfo)
 	if !ok {
-		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
 
 	} else {
-		if epInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		if epInfo.hnsID != endpointGuid1 {
+			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 		}
 	}
 
-	if *proxier.endPointsRefCount[guid] != 2 {
-		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	if *proxier.endPointsRefCount[endpointGuid1] != 2 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[endpointGuid1])
 	}
 
-	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
-		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
+	if *proxier.endPointsRefCount[endpointGuid1] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 
 	proxier.setInitialized(false)
@@ -612,9 +578,9 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -623,14 +589,14 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName1.Port),
-				Port:     pointer.Int32(int32(svcPort1)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			},
 				{
-					Name:     pointer.String("p443"),
-					Port:     pointer.Int32(int32(443)),
-					Protocol: &tcpProtocol,
+					Name:     ptr.To("p443"),
+					Port:     ptr.To[int32](443),
+					Protocol: ptr.To(v1.ProtocolTCP),
 				}}
 		}))
 
@@ -642,14 +608,14 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 	proxier.syncProxyRules()
 
 	ep = proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok = ep.(*endpointsInfo)
+	epInfo, ok = ep.(*endpointInfo)
 
 	if !ok {
-		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
 
 	} else {
-		if epInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		if epInfo.hnsID != endpointGuid1 {
+			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 		}
 	}
 
@@ -657,13 +623,12 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 		t.Errorf("Incorrect refcount. Current value: %v", *epInfo.refCount)
 	}
 
-	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
-		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
+	if *proxier.endPointsRefCount[endpointGuid1] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 }
 func TestCreateLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	tcpProtocol := v1.ProtocolTCP
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
 	if proxier == nil {
 		t.Error()
@@ -697,9 +662,9 @@ func TestCreateLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -713,8 +678,8 @@ func TestCreateLoadBalancer(t *testing.T) {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
 
 	} else {
-		if svcInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
+		if svcInfo.hnsID != loadbalancerGuid1 {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
 		}
 	}
 }
@@ -752,21 +717,25 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			}}
 		}),
 	)
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(proxier,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIpAddressRemote},
+				NodeName:  ptr.To("testhost"),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
 
+	hcn := (proxier.hcn).(*fakehcn.HcnMock)
+	proxier.rootHnsEndpointName = endpointGw
+	hcn.PopulateQueriedEndpoints(endpointLocal, guid, epIpAddressRemote, macAddress, prefixLen)
+	hcn.PopulateQueriedEndpoints(endpointGw, guid, epIpAddressGw, epMacAddressGw, prefixLen)
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
@@ -776,16 +745,16 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
 
 	} else {
-		if svcInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
+		if svcInfo.hnsID != loadbalancerGuid1 {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
 		}
 		if svcInfo.localTrafficDSR != true {
 			t.Errorf("Failed to create DSR loadbalancer with local traffic policy")
 		}
 		if len(svcInfo.loadBalancerIngressIPs) == 0 {
 			t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
-		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != guid {
-			t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, guid, svcPortName.String())
+		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != "LBID-4" {
+			t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, loadbalancerGuid1, svcPortName.String())
 		}
 	}
 }
@@ -796,6 +765,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+
 	if proxier == nil {
 		t.Error()
 	}
@@ -826,18 +796,17 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 			}}
 		}),
 	)
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(proxier,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIpAddressRemote},
-				NodeName:  pointer.StringPtr("testhost2"), // This will make this endpoint as a remote endpoint
+				NodeName:  ptr.To("testhost2"), // This will make this endpoint as a remote endpoint
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.StringPtr(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
 	)
@@ -852,8 +821,8 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 
 	} else {
 		// Checking ClusterIP Loadbalancer is created
-		if svcInfo.hnsID != guid {
-			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
+		if svcInfo.hnsID != loadbalancerGuid1 {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
 		}
 		// Verifying NodePort Loadbalancer is not created
 		if svcInfo.nodePorthnsID != "" {
@@ -900,7 +869,6 @@ func TestEndpointSlice(t *testing.T) {
 	})
 
 	// Add initial endpoint slice
-	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-1", svcPortName.Name),
@@ -909,14 +877,14 @@ func TestEndpointSlice(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     &svcPortName.Port,
-			Port:     pointer.Int32(80),
-			Protocol: &tcpProtocol,
+			Port:     ptr.To[int32](80),
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"192.168.2.3"},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-			NodeName:   pointer.String("testhost2"),
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+			NodeName:   ptr.To("testhost2"),
 		}},
 	}
 
@@ -930,19 +898,19 @@ func TestEndpointSlice(t *testing.T) {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
 
 	} else {
-		if svcInfo.hnsID != guid {
-			t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, guid, svcPortName.String())
+		if svcInfo.hnsID != loadbalancerGuid1 {
+			t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, loadbalancerGuid1, svcPortName.String())
 		}
 	}
 
 	ep := proxier.endpointsMap[svcPortName][0]
-	epInfo, ok := ep.(*endpointsInfo)
+	epInfo, ok := ep.(*endpointInfo)
 	if !ok {
-		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
 
 	} else {
-		if epInfo.hnsID != guid {
-			t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, guid, svcPortName.String())
+		if epInfo.hnsID != "EPID-3" {
+			t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, endpointGuid1, svcPortName.String())
 		}
 	}
 }
@@ -956,7 +924,13 @@ func TestNoopEndpointSlice(t *testing.T) {
 }
 
 func TestFindRemoteSubnetProviderAddress(t *testing.T) {
-	networkInfo, _ := newFakeHNS().getNetworkByName("TestNetwork")
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	if proxier == nil {
+		t.Error()
+	}
+
+	networkInfo, _ := proxier.hns.getNetworkByName(testNetwork)
 	pa := networkInfo.findRemoteSubnetProviderAddress(providerAddress)
 
 	if pa != providerAddress {

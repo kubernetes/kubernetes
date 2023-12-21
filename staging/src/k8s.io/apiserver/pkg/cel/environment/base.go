@@ -22,7 +22,9 @@ import (
 	"sync"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/ext"
+	"github.com/google/cel-go/interpreter"
 	"golang.org/x/sync/singleflight"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -41,7 +43,7 @@ import (
 // desirable because it means that CEL expressions are portable across a wider range
 // of Kubernetes versions.
 func DefaultCompatibilityVersion() *version.Version {
-	return version.MajorMinor(1, 27)
+	return version.MajorMinor(1, 28)
 }
 
 var baseOpts = []VersionedOptions{
@@ -57,7 +59,6 @@ var baseOpts = []VersionedOptions{
 			cel.EagerlyValidateDeclarations(true),
 			cel.DefaultUTCTimeZone(true),
 
-			ext.Strings(ext.StringsVersion(0)),
 			library.URLs(),
 			library.Regex(),
 			library.Lists(),
@@ -81,7 +82,47 @@ var baseOpts = []VersionedOptions{
 			library.Quantity(),
 		},
 	},
-	// TODO: switch to ext.Strings version 2 once format() is fixed to work with HomogeneousAggregateLiterals.
+	// add the new validator in 1.29
+	{
+		IntroducedVersion: version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			cel.ASTValidators(
+				cel.ValidateDurationLiterals(),
+				cel.ValidateTimestampLiterals(),
+				cel.ValidateRegexLiterals(),
+				cel.ValidateHomogeneousAggregateLiterals(),
+			),
+		},
+	},
+	// String library
+	{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		RemovedVersion:    version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Strings(ext.StringsVersion(0)),
+		},
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Strings(ext.StringsVersion(2)),
+		},
+	},
+	// Set library
+	{
+		IntroducedVersion: version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Sets(),
+			// cel-go v0.17.7 introduced CostEstimatorOptions.
+			// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
+			cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
+		},
+		ProgramOptions: []cel.ProgramOption{
+			// cel-go v0.17.7 introduced CostTrackerOptions.
+			// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
+			cel.CostTrackerOptions(interpreter.PresenceTestHasCost(false)),
+		},
+	},
 }
 
 // MustBaseEnvSet returns the common CEL base environments for Kubernetes for Version, or panics

@@ -113,14 +113,29 @@ var (
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"operation"})
+
+	// PodSchedulingDuration is deprecated as of Kubernetes v1.28, and will be removed
+	// in v1.31. Please use PodSchedulingSLIDuration instead.
 	PodSchedulingDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "pod_scheduling_duration_seconds",
 			Help:      "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
 			// Start with 10ms with the last bucket being [~88m, Inf).
+			Buckets:           metrics.ExponentialBuckets(0.01, 2, 20),
+			StabilityLevel:    metrics.STABLE,
+			DeprecatedVersion: "1.28.0",
+		},
+		[]string{"attempts"})
+
+	PodSchedulingSLIDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "pod_scheduling_sli_duration_seconds",
+			Help:      "E2e latency for a pod being scheduled, from the time the pod enters the scheduling queue an d might involve multiple scheduling attempts.",
+			// Start with 10ms with the last bucket being [~88m, Inf).
 			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
-			StabilityLevel: metrics.STABLE,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"attempts"})
 
@@ -206,6 +221,7 @@ var (
 		PreemptionAttempts,
 		pendingPods,
 		PodSchedulingDuration,
+		PodSchedulingSLIDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
 		PluginExecutionDuration,

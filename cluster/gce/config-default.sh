@@ -256,16 +256,11 @@ if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
   export RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
 fi
 
-# If feature gates includes AllAlpha or EndpointSlice, and EndpointSlice has not been disabled, add EndpointSlice controller to list of controllers to run.
-if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GATES:-}" == *"EndpointSlice=true"* )) && "${KUBE_FEATURE_GATES:-}" != *"EndpointSlice=false"* ]]; then
-  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
-fi
-
 # By default disable gkenetworkparamset controller in CCM
 RUN_CCM_CONTROLLERS="${RUN_CCM_CONTROLLERS:-*,-gkenetworkparamset}"
 
 # List of the set of feature gates recognized by the GCP CCM
-export CCM_FEATURE_GATES="APIListChunking,APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,RemainingItemCount,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
+export CCM_FEATURE_GATES="APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
 
 # Optional: set feature gates
 # shellcheck disable=SC2034 # Variables sourced in other scripts.
@@ -292,12 +287,7 @@ export ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER
 #   none           - Not run node problem detector.
 #   daemonset      - Run node problem detector as daemonset.
 #   standalone     - Run node problem detector as standalone system daemon.
-if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
-  # Enable standalone mode by default for gci.
-  ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-standalone}"
-else
-  export ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-daemonset}"
-fi
+export ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-daemonset}"
 NODE_PROBLEM_DETECTOR_VERSION="${NODE_PROBLEM_DETECTOR_VERSION:-}"
 NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
 NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
@@ -372,7 +362,7 @@ fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
 
 # MutatingAdmissionWebhook should be the last controller that modifies the
 # request object, otherwise users will be confused if the mutating webhooks'
@@ -556,7 +546,12 @@ export TLS_CIPHER_SUITES=""
 
 # CLOUD_PROVIDER_FLAG defines the cloud-provider value presented to KCM, apiserver,
 # and kubelet
-export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"
+export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-external}"
+
+# Don't run the node-ipam-controller on the KCM if cloud-provider external
+if [[ "${CLOUD_PROVIDER_FLAG}" ==  "external" ]]; then
+  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,-node-ipam-controller}"
+fi
 
 # When ENABLE_AUTH_PROVIDER_GCP is set, following flags for out-of-tree credential provider for GCP
 # are presented to kubelet:
@@ -564,4 +559,4 @@ export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"
 # --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
 # Also, it is required that DisableKubeletCloudCredentialProviders
 # feature gates are set to true for kubelet to use external credential provider.
-ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-false}"
+export ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-true}"

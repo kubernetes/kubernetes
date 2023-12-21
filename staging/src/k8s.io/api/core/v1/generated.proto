@@ -228,10 +228,8 @@ message CSIPersistentVolumeSource {
   // nodeExpandSecretRef is a reference to the secret object containing
   // sensitive information to pass to the CSI driver to complete the CSI
   // NodeExpandVolume call.
-  // This is a beta field which is enabled default by CSINodeExpandSecret feature gate.
   // This field is optional, may be omitted if no secret is required. If the
   // secret object contains more than one secret, all secrets are passed.
-  // +featureGate=CSINodeExpandSecret
   // +optional
   optional SecretReference nodeExpandSecretRef = 10;
 }
@@ -431,6 +429,40 @@ message ClientIPConfig {
   // Default value is 10800(for 3 hours).
   // +optional
   optional int32 timeoutSeconds = 1;
+}
+
+// ClusterTrustBundleProjection describes how to select a set of
+// ClusterTrustBundle objects and project their contents into the pod
+// filesystem.
+message ClusterTrustBundleProjection {
+  // Select a single ClusterTrustBundle by object name.  Mutually-exclusive
+  // with signerName and labelSelector.
+  // +optional
+  optional string name = 1;
+
+  // Select all ClusterTrustBundles that match this signer name.
+  // Mutually-exclusive with name.  The contents of all selected
+  // ClusterTrustBundles will be unified and deduplicated.
+  // +optional
+  optional string signerName = 2;
+
+  // Select all ClusterTrustBundles that match this label selector.  Only has
+  // effect if signerName is set.  Mutually-exclusive with name.  If unset,
+  // interpreted as "match nothing".  If set but empty, interpreted as "match
+  // everything".
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 3;
+
+  // If true, don't block pod startup if the referenced ClusterTrustBundle(s)
+  // aren't available.  If using name, then the named ClusterTrustBundle is
+  // allowed not to exist.  If using signerName, then the combination of
+  // signerName and labelSelector is allowed to match zero
+  // ClusterTrustBundles.
+  // +optional
+  optional bool optional = 5;
+
+  // Relative path from the volume root to write the bundle.
+  optional string path = 4;
 }
 
 // Information about the condition of a component.
@@ -1159,7 +1191,7 @@ message EndpointPort {
   // RFC-6335 and https://www.iana.org/assignments/service-names).
   //
   // * Kubernetes-defined prefixed names:
-  //   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+  //   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
   //   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
   //   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
   //
@@ -2088,6 +2120,11 @@ message LifecycleHandler {
   // lifecycle hooks will fail in runtime when tcp handler is specified.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
+
+  // Sleep represents the duration that the container should sleep before being terminated.
+  // +featureGate=PodLifecycleSleepAction
+  // +optional
+  optional SleepAction sleep = 4;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -2171,6 +2208,15 @@ message LoadBalancerIngress {
   // +optional
   optional string hostname = 2;
 
+  // IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+  // Setting this to "VIP" indicates that traffic is delivered to the node with
+  // the destination set to the load-balancer's IP and port.
+  // Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+  // the destination set to the node's IP and node port or the pod's IP and port.
+  // Service implementations may use this information to adjust traffic routing.
+  // +optional
+  optional string ipMode = 3;
+
   // Ports is a list of records of service ports
   // If used, every port defined in the service should have an entry in it
   // +listType=atomic
@@ -2209,6 +2255,24 @@ message LocalVolumeSource {
   // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a filesystem if unspecified.
   // +optional
   optional string fsType = 2;
+}
+
+// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
+message ModifyVolumeStatus {
+  // targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+  optional string targetVolumeAttributesClassName = 1;
+
+  // status is the status of the ControllerModifyVolume operation. It can be in any of following states:
+  //  - Pending
+  //    Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+  //    the specified VolumeAttributesClass not existing.
+  //  - InProgress
+  //    InProgress indicates that the volume is being modified.
+  //  - Infeasible
+  //   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+  // 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
+  // Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+  optional string status = 2;
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -2816,7 +2880,7 @@ message PersistentVolumeClaimSpec {
   // status field of the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
   // +optional
-  optional ResourceRequirements resources = 2;
+  optional VolumeResourceRequirements resources = 2;
 
   // volumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
@@ -2868,6 +2932,22 @@ message PersistentVolumeClaimSpec {
   // (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
   // +optional
   optional TypedObjectReference dataSourceRef = 8;
+
+  // volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+  // If specified, the CSI driver will create or update the volume with the attributes defined
+  // in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
+  // it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
+  // will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
+  // If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
+  // will be set by the persistentvolume controller if it exists.
+  // If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
+  // set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
+  // exists.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+  // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string volumeAttributesClassName = 9;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2957,6 +3037,20 @@ message PersistentVolumeClaimStatus {
   // +mapType=granular
   // +optional
   map<string, string> allocatedResourceStatuses = 7;
+
+  // currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
+  // When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string currentVolumeAttributesClassName = 8;
+
+  // ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
+  // When this is unset, there is no ModifyVolume operation being attempted.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional ModifyVolumeStatus modifyVolumeStatus = 9;
 }
 
 // PersistentVolumeClaimTemplate is used to produce
@@ -3161,6 +3255,17 @@ message PersistentVolumeSpec {
   // This field influences the scheduling of pods that use this volume.
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
+
+  // Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+  // is not allowed. When this field is not set, it indicates that this volume does not belong to any
+  // VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
+  // after a volume has been updated successfully to a new class.
+  // For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
+  // PersistentVolumeClaims during the binding process.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string volumeAttributesClassName = 10;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -3253,6 +3358,7 @@ message PodAffinity {
 // a pod of the set of pods is running
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
+  // If it's null, this PodAffinityTerm matches with no Pods.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
@@ -3277,6 +3383,32 @@ message PodAffinityTerm {
   // An empty selector ({}) matches all namespaces.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
+
+  // MatchLabelKeys is a set of pod label keys to select which pods will
+  // be taken into consideration. The keys are used to lookup values from the
+  // incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)`
+  // to select the group of existing pods which pods will be taken into consideration
+  // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+  // pod labels will be ignored. The default value is empty.
+  // The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+  // Also, MatchLabelKeys cannot be set when LabelSelector isn't set.
+  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // +listType=atomic
+  // +optional
+  repeated string matchLabelKeys = 5;
+
+  // MismatchLabelKeys is a set of pod label keys to select which pods will
+  // be taken into consideration. The keys are used to lookup values from the
+  // incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)`
+  // to select the group of existing pods which pods will be taken into consideration
+  // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+  // pod labels will be ignored. The default value is empty.
+  // The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector.
+  // Also, MismatchLabelKeys cannot be set when LabelSelector isn't set.
+  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // +listType=atomic
+  // +optional
+  repeated string mismatchLabelKeys = 6;
 }
 
 // Pod anti affinity is a group of inter pod anti affinity scheduling rules.
@@ -5250,7 +5382,7 @@ message ServicePort {
   // RFC-6335 and https://www.iana.org/assignments/service-names).
   //
   // * Kubernetes-defined prefixed names:
-  //   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+  //   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
   //   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
   //   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
   //
@@ -5551,6 +5683,12 @@ message SessionAffinityConfig {
   // clientIP contains the configurations of Client IP based session affinity.
   // +optional
   optional ClientIPConfig clientIP = 1;
+}
+
+// SleepAction describes a "sleep" action.
+message SleepAction {
+  // Seconds is the number of seconds to sleep.
+  optional int64 seconds = 1;
 }
 
 // Represents a StorageOS persistent volume resource.
@@ -5960,6 +6098,39 @@ message VolumeProjection {
   // serviceAccountToken is information about the serviceAccountToken data to project
   // +optional
   optional ServiceAccountTokenProjection serviceAccountToken = 4;
+
+  // ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
+  // of ClusterTrustBundle objects in an auto-updating file.
+  //
+  // Alpha, gated by the ClusterTrustBundleProjection feature gate.
+  //
+  // ClusterTrustBundle objects can either be selected by name, or by the
+  // combination of signer name and a label selector.
+  //
+  // Kubelet performs aggressive normalization of the PEM contents written
+  // into the pod filesystem.  Esoteric PEM features such as inter-block
+  // comments and block headers are stripped.  Certificates are deduplicated.
+  // The ordering of certificates within the file is arbitrary, and Kubelet
+  // may change the order over time.
+  //
+  // +featureGate=ClusterTrustBundleProjection
+  // +optional
+  optional ClusterTrustBundleProjection clusterTrustBundle = 5;
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+message VolumeResourceRequirements {
+  // Limits describes the maximum amount of compute resources allowed.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
+
+  // Requests describes the minimum amount of compute resources required.
+  // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+  // otherwise to an implementation-defined value. Requests cannot exceed Limits.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 }
 
 // Represents the source of a volume to mount.

@@ -37,6 +37,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -53,16 +54,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -381,8 +379,6 @@ func TestListOptions(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
-
 			var storageTransport *storagebackend.TransportConfig
 			clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
@@ -531,12 +527,6 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 		}
 		return
 	}
-	if opts.ResourceVersion == invalidResourceVersion {
-		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
-			t.Fatalf("expecting invalid value error, but got: %v", err)
-		}
-		return
-	}
 	if opts.Continue == invalidContinueToken {
 		if err == nil || !strings.Contains(err.Error(), "continue key is not valid") {
 			t.Fatalf("expected continue key not valid error, but got: %v", err)
@@ -547,6 +537,12 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	if opts.Continue != "" && !(opts.ResourceVersion == "" || opts.ResourceVersion == "0") {
 		if err == nil || !strings.Contains(err.Error(), "specifying resource version is not allowed when using continue") {
 			t.Fatalf("expected not allowed error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersion == invalidResourceVersion {
+		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
+			t.Fatalf("expecting invalid value error, but got: %v", err)
 		}
 		return
 	}
@@ -576,9 +572,8 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 
 	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
 	// the limit is respected when testing here.
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
-	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
+	hasContinuation := len(opts.Continue) > 0
+	hasLimit := opts.Limit > 0 && opts.ResourceVersion != "0"
 	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
 	usingWatchCache := watchCacheEnabled && !skipWatchCache
 
@@ -626,8 +621,6 @@ func TestListResourceVersion0(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 
 			clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
@@ -685,7 +678,6 @@ func TestListResourceVersion0(t *testing.T) {
 }
 
 func TestAPIListChunking(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 
@@ -753,7 +745,6 @@ func TestAPIListChunking(t *testing.T) {
 }
 
 func TestAPIListChunkingWithLabelSelector(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 
@@ -2317,16 +2308,227 @@ func TestTransform(t *testing.T) {
 	}
 }
 
+func TestWatchTransformCaching(t *testing.T) {
+	ctx, clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "watch-transform", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+	list, err := clientSet.CoreV1().ConfigMaps(ns.Name).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list objects: %v", err)
+	}
+
+	timeout := 30 * time.Second
+	listOptions := &metav1.ListOptions{
+		ResourceVersion: list.ResourceVersion,
+		Watch:           true,
+	}
+
+	wMeta, err := clientSet.CoreV1().RESTClient().Get().
+		AbsPath("/api/v1/namespaces/watch-transform/configmaps").
+		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1").
+		VersionedParams(listOptions, metav1.ParameterCodec).
+		Timeout(timeout).
+		Stream(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start meta watch: %v", err)
+	}
+	defer wMeta.Close()
+
+	wTableIncludeMeta, err := clientSet.CoreV1().RESTClient().Get().
+		AbsPath("/api/v1/namespaces/watch-transform/configmaps").
+		SetHeader("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1beta1").
+		VersionedParams(listOptions, metav1.ParameterCodec).
+		Param("includeObject", string(metav1.IncludeMetadata)).
+		Timeout(timeout).
+		Stream(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start table meta watch: %v", err)
+	}
+	defer wTableIncludeMeta.Close()
+
+	wTableIncludeObject, err := clientSet.CoreV1().RESTClient().Get().
+		AbsPath("/api/v1/namespaces/watch-transform/configmaps").
+		SetHeader("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1beta1").
+		VersionedParams(listOptions, metav1.ParameterCodec).
+		Param("includeObject", string(metav1.IncludeObject)).
+		Timeout(timeout).
+		Stream(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start table object watch: %v", err)
+	}
+	defer wTableIncludeObject.Close()
+
+	wTableIncludeObjectFiltered, err := clientSet.CoreV1().RESTClient().Get().
+		AbsPath("/api/v1/namespaces/watch-transform/configmaps").
+		SetHeader("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1beta1").
+		VersionedParams(listOptions, metav1.ParameterCodec).
+		Param("includeObject", string(metav1.IncludeObject)).
+		Param("labelSelector", "foo=bar").
+		Timeout(timeout).
+		Stream(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start table object watch: %v", err)
+	}
+	defer wTableIncludeObjectFiltered.Close()
+
+	configMap, err := clientSet.CoreV1().ConfigMaps("watch-transform").Create(ctx, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create a configMap: %v", err)
+	}
+
+	listOptionsDelayed := &metav1.ListOptions{
+		ResourceVersion: configMap.ResourceVersion,
+		Watch:           true,
+	}
+	wTableIncludeObjectDelayed, err := clientSet.CoreV1().RESTClient().Get().
+		AbsPath("/api/v1/namespaces/watch-transform/configmaps").
+		SetHeader("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1beta1").
+		VersionedParams(listOptionsDelayed, metav1.ParameterCodec).
+		Param("includeObject", string(metav1.IncludeObject)).
+		Timeout(timeout).
+		Stream(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start table object watch: %v", err)
+	}
+	defer wTableIncludeObjectDelayed.Close()
+
+	configMap2, err := clientSet.CoreV1().ConfigMaps("watch-transform").Create(ctx, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "test2"},
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create a second configMap: %v", err)
+	}
+
+	// Now update both configmaps so that filtering watch can observe them.
+	// This is needed to validate whether events caching done by apiserver
+	// distinguished objects by type.
+
+	configMapUpdated, err := clientSet.CoreV1().ConfigMaps("watch-transform").Update(ctx, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "test1", Labels: map[string]string{"foo": "bar"}},
+		Data: map[string]string{
+			"foo": "baz",
+		},
+	}, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update a configMap: %v", err)
+	}
+
+	configMap2Updated, err := clientSet.CoreV1().ConfigMaps("watch-transform").Update(ctx, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "test2", Labels: map[string]string{"foo": "bar"}},
+		Data: map[string]string{
+			"foo": "baz",
+		},
+	}, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update a second configMap: %v", err)
+	}
+
+	metaChecks := []partialObjectMetadataCheck{
+		func(res *metav1beta1.PartialObjectMetadata) {
+			if !apiequality.Semantic.DeepEqual(configMap.ObjectMeta, res.ObjectMeta) {
+				t.Errorf("expected object: %#v, got: %#v", configMap.ObjectMeta, res.ObjectMeta)
+			}
+		},
+		func(res *metav1beta1.PartialObjectMetadata) {
+			if !apiequality.Semantic.DeepEqual(configMap2.ObjectMeta, res.ObjectMeta) {
+				t.Errorf("expected object: %#v, got: %#v", configMap2.ObjectMeta, res.ObjectMeta)
+			}
+		},
+		func(res *metav1beta1.PartialObjectMetadata) {
+			if !apiequality.Semantic.DeepEqual(configMapUpdated.ObjectMeta, res.ObjectMeta) {
+				t.Errorf("expected object: %#v, got: %#v", configMapUpdated.ObjectMeta, res.ObjectMeta)
+			}
+		},
+		func(res *metav1beta1.PartialObjectMetadata) {
+			if !apiequality.Semantic.DeepEqual(configMap2Updated.ObjectMeta, res.ObjectMeta) {
+				t.Errorf("expected object: %#v, got: %#v", configMap2Updated.ObjectMeta, res.ObjectMeta)
+			}
+		},
+	}
+	expectPartialObjectMetaEventsProtobufChecks(t, wMeta, metaChecks)
+
+	tableMetaCheck := func(expected *v1.ConfigMap, got []byte) {
+		var obj metav1.PartialObjectMetadata
+		if err := json.Unmarshal(got, &obj); err != nil {
+			t.Fatal(err)
+		}
+		if !apiequality.Semantic.DeepEqual(expected.ObjectMeta, obj.ObjectMeta) {
+			t.Errorf("expected object: %#v, got: %#v", expected, obj)
+		}
+	}
+
+	objectMetas := expectTableWatchEvents(t, 4, 3, metav1.IncludeMetadata, json.NewDecoder(wTableIncludeMeta))
+	tableMetaCheck(configMap, objectMetas[0])
+	tableMetaCheck(configMap2, objectMetas[1])
+	tableMetaCheck(configMapUpdated, objectMetas[2])
+	tableMetaCheck(configMap2Updated, objectMetas[3])
+
+	tableObjectCheck := func(expectedType watch.EventType, expectedObj *v1.ConfigMap, got streamedEvent) {
+		var obj *v1.ConfigMap
+		if err := json.Unmarshal(got.rawObject, &obj); err != nil {
+			t.Fatal(err)
+		}
+		if expectedType != watch.EventType(got.eventType) {
+			t.Errorf("expected type: %#v, got: %#v", expectedType, got.eventType)
+		}
+		obj.TypeMeta = metav1.TypeMeta{}
+		if !apiequality.Semantic.DeepEqual(expectedObj, obj) {
+			t.Errorf("expected object: %#v, got: %#v", expectedObj, obj)
+		}
+	}
+
+	objects := expectTableWatchEventsWithTypes(t, 4, 3, metav1.IncludeObject, json.NewDecoder(wTableIncludeObject))
+	tableObjectCheck(watch.Added, configMap, objects[0])
+	tableObjectCheck(watch.Added, configMap2, objects[1])
+	tableObjectCheck(watch.Modified, configMapUpdated, objects[2])
+	tableObjectCheck(watch.Modified, configMap2Updated, objects[3])
+
+	filteredObjects := expectTableWatchEventsWithTypes(t, 2, 3, metav1.IncludeObject, json.NewDecoder(wTableIncludeObjectFiltered))
+	tableObjectCheck(watch.Added, configMapUpdated, filteredObjects[0])
+	tableObjectCheck(watch.Added, configMap2Updated, filteredObjects[1])
+
+	delayedObjects := expectTableWatchEventsWithTypes(t, 3, 3, metav1.IncludeObject, json.NewDecoder(wTableIncludeObjectDelayed))
+	tableObjectCheck(watch.Added, configMap2, delayedObjects[0])
+	tableObjectCheck(watch.Modified, configMapUpdated, delayedObjects[1])
+	tableObjectCheck(watch.Modified, configMap2Updated, delayedObjects[2])
+}
+
 func expectTableWatchEvents(t *testing.T, count, columns int, policy metav1.IncludeObjectPolicy, d *json.Decoder) [][]byte {
+	events := expectTableWatchEventsWithTypes(t, count, columns, policy, d)
+	var objects [][]byte
+	for _, event := range events {
+		objects = append(objects, event.rawObject)
+	}
+	return objects
+}
+
+type streamedEvent struct {
+	eventType string
+	rawObject []byte
+}
+
+func expectTableWatchEventsWithTypes(t *testing.T, count, columns int, policy metav1.IncludeObjectPolicy, d *json.Decoder) []streamedEvent {
 	t.Helper()
 
-	var objects [][]byte
+	var events []streamedEvent
 
 	for i := 0; i < count; i++ {
 		var evt metav1.WatchEvent
 		if err := d.Decode(&evt); err != nil {
 			t.Fatal(err)
 		}
+
 		var table metav1beta1.Table
 		if err := json.Unmarshal(evt.Object.Raw, &table); err != nil {
 			t.Fatal(err)
@@ -2357,6 +2559,7 @@ func expectTableWatchEvents(t *testing.T, count, columns int, policy metav1.Incl
 			if meta.TypeMeta != partialObj {
 				t.Fatalf("expected partial object: %#v", meta)
 			}
+			events = append(events, streamedEvent{eventType: evt.Type, rawObject: row.Object.Raw})
 		case metav1.IncludeNone:
 			if len(row.Object.Raw) != 0 {
 				t.Fatalf("Expected no object: %s", string(row.Object.Raw))
@@ -2365,10 +2568,10 @@ func expectTableWatchEvents(t *testing.T, count, columns int, policy metav1.Incl
 			if len(row.Object.Raw) == 0 {
 				t.Fatalf("Expected object: %s", string(row.Object.Raw))
 			}
-			objects = append(objects, row.Object.Raw)
+			events = append(events, streamedEvent{eventType: evt.Type, rawObject: row.Object.Raw})
 		}
 	}
-	return objects
+	return events
 }
 
 func expectPartialObjectMetaEvents(t *testing.T, d *json.Decoder, values ...string) {
@@ -2393,7 +2596,22 @@ func expectPartialObjectMetaEvents(t *testing.T, d *json.Decoder, values ...stri
 	}
 }
 
+type partialObjectMetadataCheck func(*metav1beta1.PartialObjectMetadata)
+
 func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...string) {
+	checks := []partialObjectMetadataCheck{}
+	for i, value := range values {
+		i, value := i, value
+		checks = append(checks, func(meta *metav1beta1.PartialObjectMetadata) {
+			if meta.Annotations["test"] != value {
+				t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
+			}
+		})
+	}
+	expectPartialObjectMetaEventsProtobufChecks(t, r, checks)
+}
+
+func expectPartialObjectMetaEventsProtobufChecks(t *testing.T, r io.Reader, checks []partialObjectMetadataCheck) {
 	scheme := runtime.NewScheme()
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	rs := protobuf.NewRawSerializer(scheme, scheme)
@@ -2403,7 +2621,7 @@ func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...
 	)
 	ds := metainternalversionscheme.Codecs.UniversalDeserializer()
 
-	for i, value := range values {
+	for _, check := range checks {
 		var evt metav1.WatchEvent
 		if _, _, err := d.Decode(nil, &evt); err != nil {
 			t.Fatal(err)
@@ -2420,9 +2638,7 @@ func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...
 		if !reflect.DeepEqual(expected, gvk) {
 			t.Fatalf("expected partial object: %#v", meta)
 		}
-		if meta.Annotations["test"] != value {
-			t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
-		}
+		check(meta)
 	}
 }
 

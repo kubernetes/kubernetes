@@ -112,7 +112,7 @@ func TestNonRacyShutdown(t *testing.T) {
 
 	caster := NewBroadcasterForTests(0)
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, caster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, caster, clock)
 
 	var wg sync.WaitGroup
 	wg.Add(100)
@@ -381,7 +381,7 @@ func TestEventf(t *testing.T) {
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
 		clock.Step(1 * time.Second)
 		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
@@ -407,7 +407,7 @@ func TestEventf(t *testing.T) {
 	sinkWatcher.Stop()
 }
 
-func recorderWithFakeClock(eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
+func recorderWithFakeClock(t *testing.T, eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
 	return &recorderImpl{scheme.Scheme, eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
 }
 
@@ -662,7 +662,7 @@ func TestEventfNoNamespace(t *testing.T) {
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	for index, item := range table {
 		clock.Step(1 * time.Second)
@@ -955,7 +955,7 @@ func TestMultiSinkCache(t *testing.T) {
 
 	eventBroadcaster := NewBroadcasterForTests(0)
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 	for index, item := range table {

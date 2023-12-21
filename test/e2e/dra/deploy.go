@@ -136,6 +136,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
 	d.Nodes = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
+	resources.DriverName = d.Name
 
 	ctx, cancel := context.WithCancel(context.Background())
 	if d.NameSuffix != "" {
@@ -147,7 +148,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.cleanup = append(d.cleanup, cancel)
 
 	// The controller is easy: we simply connect to the API server.
-	d.Controller = app.NewController(d.f.ClientSet, d.Name, resources)
+	d.Controller = app.NewController(d.f.ClientSet, resources)
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
@@ -208,7 +209,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	selector := labels.NewSelector().Add(*requirement)
 	pods, err := d.f.ClientSet.CoreV1().Pods(d.f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "list proxy pods")
-	framework.ExpectEqual(numNodes, int32(len(pods.Items)), "number of proxy pods")
+	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
 
 	// Run registar and plugin for each of the pods.
 	for _, pod := range pods.Items {

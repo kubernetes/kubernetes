@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -294,6 +295,7 @@ func TestGCOrphaned(t *testing.T) {
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString("a"),
+			patchedPodNames: sets.NewString("a"),
 		},
 		{
 			name:                 "some nodes missing",
@@ -307,6 +309,7 @@ func TestGCOrphaned(t *testing.T) {
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString("a", "c", "d"),
+			patchedPodNames: sets.NewString("d"),
 		},
 		{
 			name:             "node added to client after quarantine",
@@ -456,6 +459,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
 			},
 			deletedPodNames: sets.NewString("a", "b", "c"),
+			patchedPodNames: sets.NewString("c"),
 		},
 		{
 			name: "Scheduled pod in any phase must not be deleted",
@@ -606,6 +610,7 @@ func TestGCTerminating(t *testing.T) {
 				{name: "e6", phase: v1.PodUnknown, nodeName: "worker-5"},
 			},
 			deletedPodNames: sets.NewString("b1", "b4", "b5", "b6"),
+			patchedPodNames: sets.NewString("b1", "b4", "b5", "b6"),
 		},
 		{
 			name: "pods deleted from node tained out-of-service; PodDisruptionConditions enabled",

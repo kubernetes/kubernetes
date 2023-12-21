@@ -15,6 +15,8 @@
 package checker
 
 import (
+	"sort"
+
 	"github.com/google/cel-go/common/debug"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
@@ -47,6 +49,7 @@ func (a *semanticAdorner) GetMetadata(elem any) string {
 			if len(ref.GetOverloadId()) == 0 {
 				result += "^" + ref.Name
 			} else {
+				sort.Strings(ref.GetOverloadId())
 				for i, overload := range ref.GetOverloadId() {
 					if i == 0 {
 						result += "^"

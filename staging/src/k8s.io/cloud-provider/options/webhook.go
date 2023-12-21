@@ -122,7 +122,7 @@ func (o *WebhookServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
 		fmt.Sprintf("clients. If set to an unspecified address (0.0.0.0 or ::), all interfaces will be used. If unset, defaults to %v.", o.BindAddress))
 
-	fs.IntVar(&o.BindPort, "webhook-secure-port", o.BindPort, fmt.Sprintf("Secure port to serve cloud provider webhooks. If unset, defaults to %d.", o.BindPort))
+	fs.IntVar(&o.BindPort, "webhook-secure-port", o.BindPort, "Secure port to serve cloud provider webhooks. If 0, don't serve webhooks at all.")
 
 	fs.StringVar(&o.ServerCert.CertDirectory, "webhook-cert-dir", o.ServerCert.CertDirectory, ""+
 		"The directory where the TLS certs are located. "+

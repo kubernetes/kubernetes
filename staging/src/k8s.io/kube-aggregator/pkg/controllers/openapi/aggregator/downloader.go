@@ -25,13 +25,12 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type CacheableDownloader interface {
 	UpdateHandler(http.Handler)
-	Get() cached.Result[*spec.Swagger]
+	Get() (*spec.Swagger, string, error)
 }
 
 // cacheableDownloader is a downloader that will always return the data
@@ -58,19 +57,19 @@ func (d *cacheableDownloader) UpdateHandler(handler http.Handler) {
 	d.handler.Store(&handler)
 }
 
-func (d *cacheableDownloader) Get() cached.Result[*spec.Swagger] {
-	r := d.get()
-	if r.Err != nil {
-		return cached.NewResultErr[*spec.Swagger](fmt.Errorf("failed to download %v: %v", d.name, r.Err))
+func (d *cacheableDownloader) Get() (*spec.Swagger, string, error) {
+	spec, etag, err := d.get()
+	if err != nil {
+		return spec, etag, fmt.Errorf("failed to download %v: %v", d.name, err)
 	}
-	return r
+	return spec, etag, err
 }
 
-func (d *cacheableDownloader) get() cached.Result[*spec.Swagger] {
+func (d *cacheableDownloader) get() (*spec.Swagger, string, error) {
 	h := *d.handler.Load()
 	swagger, etag, status, err := d.downloader.Download(h, d.etag)
 	if err != nil {
-		return cached.NewResultErr[*spec.Swagger](err)
+		return nil, "", err
 	}
 	switch status {
 	case http.StatusNotModified:
@@ -83,11 +82,11 @@ func (d *cacheableDownloader) get() cached.Result[*spec.Swagger] {
 		}
 		fallthrough
 	case http.StatusNotFound:
-		return cached.NewResultErr[*spec.Swagger](ErrAPIServiceNotFound)
+		return nil, "", ErrAPIServiceNotFound
 	default:
-		return cached.NewResultErr[*spec.Swagger](fmt.Errorf("invalid status code: %v", status))
+		return nil, "", fmt.Errorf("invalid status code: %v", status)
 	}
-	return cached.NewResultOK(d.spec, d.etag)
+	return d.spec, d.etag, nil
 }
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.

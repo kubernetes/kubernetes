@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	networkv1 "github.com/openshift/client-go/network/clientset/versioned/typed/network/v1"
+	networkv1alpha1 "github.com/openshift/client-go/network/clientset/versioned/typed/network/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -15,17 +16,24 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	NetworkV1() networkv1.NetworkV1Interface
+	NetworkV1alpha1() networkv1alpha1.NetworkV1alpha1Interface
 }
 
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	networkV1 *networkv1.NetworkV1Client
+	networkV1       *networkv1.NetworkV1Client
+	networkV1alpha1 *networkv1alpha1.NetworkV1alpha1Client
 }
 
 // NetworkV1 retrieves the NetworkV1Client
 func (c *Clientset) NetworkV1() networkv1.NetworkV1Interface {
 	return c.networkV1
+}
+
+// NetworkV1alpha1 retrieves the NetworkV1alpha1Client
+func (c *Clientset) NetworkV1alpha1() networkv1alpha1.NetworkV1alpha1Interface {
+	return c.networkV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -76,6 +84,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.networkV1alpha1, err = networkv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
@@ -98,6 +110,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.networkV1 = networkv1.New(c)
+	cs.networkV1alpha1 = networkv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

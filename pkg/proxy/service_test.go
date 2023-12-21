@@ -27,6 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -67,7 +70,7 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 		Protocol:   protocol,
 		Port:       port,
 		NodePort:   nodeport,
-		TargetPort: intstr.FromInt(targetPort),
+		TargetPort: intstr.FromInt32(int32(targetPort)),
 	}
 	return append(array, svcPort)
 }
@@ -91,12 +94,15 @@ func TestServiceToServiceMap(t *testing.T) {
 	testClusterIPv6 := "2001:db8:85a3:0:0:8a2e:370:7334"
 	testExternalIPv6 := "2001:db8:85a3:0:0:8a2e:370:7335"
 	testSourceRangeIPv6 := "2001:db8::/32"
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+	ipModeProxy := v1.LoadBalancerIPModeProxy
 
 	testCases := []struct {
-		desc     string
-		service  *v1.Service
-		expected map[ServicePortName]*BaseServicePortInfo
-		ipFamily v1.IPFamily
+		desc          string
+		service       *v1.Service
+		expected      map[ServicePortName]*BaseServicePortInfo
+		ipFamily      v1.IPFamily
+		ipModeEnabled bool
 	}{
 		{
 			desc:     "nothing",
@@ -181,10 +187,94 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4"}}
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
 				}),
 				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4"}}
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+				}),
+			},
+		},
+		{
+			desc:     "load balancer service ipMode VIP feature gate disable",
+			ipFamily: v1.IPv4Protocol,
+
+			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeLoadBalancer
+				svc.Spec.ClusterIP = "172.16.55.11"
+				svc.Spec.LoadBalancerIP = "5.6.7.8"
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 8675, 30061, 7000)
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4", IPMode: &ipModeVIP}}
+			}),
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+				}),
+				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+				}),
+			},
+		},
+		{
+			desc:     "load balancer service ipMode Proxy feature gate disable",
+			ipFamily: v1.IPv4Protocol,
+
+			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeLoadBalancer
+				svc.Spec.ClusterIP = "172.16.55.11"
+				svc.Spec.LoadBalancerIP = "5.6.7.8"
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 8675, 30061, 7000)
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4", IPMode: &ipModeProxy}}
+			}),
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+				}),
+				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+				}),
+			},
+		},
+		{
+			desc:          "load balancer service ipMode VIP feature gate enabled",
+			ipFamily:      v1.IPv4Protocol,
+			ipModeEnabled: true,
+
+			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeLoadBalancer
+				svc.Spec.ClusterIP = "172.16.55.11"
+				svc.Spec.LoadBalancerIP = "5.6.7.8"
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 8675, 30061, 7000)
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4", IPMode: &ipModeVIP}}
+			}),
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+				}),
+				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+				}),
+			},
+		},
+		{
+			desc:          "load balancer service ipMode Proxy feature gate enabled",
+			ipFamily:      v1.IPv4Protocol,
+			ipModeEnabled: true,
+
+			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeLoadBalancer
+				svc.Spec.ClusterIP = "172.16.55.11"
+				svc.Spec.LoadBalancerIP = "5.6.7.8"
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 8675, 30061, 7000)
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4", IPMode: &ipModeProxy}}
+			}),
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+				}),
+				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 				}),
 			},
 		},
@@ -204,10 +294,10 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns1", "only-local-load-balancer", "portx", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8677, "UDP", 345, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.3"}}
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.3"}
 				}),
 				makeServicePortName("ns1", "only-local-load-balancer", "porty", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8678, "UDP", 345, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.3"}}
+					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.3"}
 				}),
 			},
 		},
@@ -315,7 +405,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "validIPv4", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv4}}
+					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv4}
 				}),
 			},
 		},
@@ -353,7 +443,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "validIPv6", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv6}}
+					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv6}
 				}),
 			},
 		},
@@ -391,7 +481,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv4}}
+					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv4}
 				}),
 			},
 		},
@@ -429,7 +519,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
-					bsvcPortInfo.loadBalancerStatus.Ingress = []v1.LoadBalancerIngress{{IP: testExternalIPv6}}
+					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv6}
 				}),
 			},
 		},
@@ -464,6 +554,7 @@ func TestServiceToServiceMap(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
 			svcTracker := NewServiceChangeTracker(nil, tc.ipFamily, nil, nil)
 			// outputs
 			newServices := svcTracker.serviceToServiceMap(tc.service)
@@ -483,7 +574,7 @@ func TestServiceToServiceMap(t *testing.T) {
 					svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 					!sets.New[string](svcInfo.externalIPs...).Equal(sets.New[string](expectedInfo.externalIPs...)) ||
 					!sets.New[string](svcInfo.loadBalancerSourceRanges...).Equal(sets.New[string](expectedInfo.loadBalancerSourceRanges...)) ||
-					!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
+					!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) {
 					t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 				}
 				for svcKey, expectedInfo := range tc.expected {
@@ -494,7 +585,7 @@ func TestServiceToServiceMap(t *testing.T) {
 						svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 						!sets.New[string](svcInfo.externalIPs...).Equal(sets.New[string](expectedInfo.externalIPs...)) ||
 						!sets.New[string](svcInfo.loadBalancerSourceRanges...).Equal(sets.New[string](expectedInfo.loadBalancerSourceRanges...)) ||
-						!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
+						!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) {
 						t.Errorf("expected new[%v]to be %v, got %v", svcKey, expectedInfo, *svcInfo)
 					}
 				}
@@ -504,7 +595,7 @@ func TestServiceToServiceMap(t *testing.T) {
 }
 
 type FakeProxier struct {
-	endpointsChanges *EndpointChangeTracker
+	endpointsChanges *EndpointsChangeTracker
 	serviceChanges   *ServiceChangeTracker
 	svcPortMap       ServicePortMap
 	endpointsMap     EndpointsMap
@@ -516,7 +607,7 @@ func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
 		svcPortMap:     make(ServicePortMap),
 		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
 		endpointsMap:   make(EndpointsMap),
-		endpointsChanges: &EndpointChangeTracker{
+		endpointsChanges: &EndpointsChangeTracker{
 			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 			trackerStartTime:          t,
 			processEndpointsMapChange: nil,

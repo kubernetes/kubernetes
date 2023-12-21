@@ -161,6 +161,7 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // immediate PVCs bound. If not all immediate PVCs are bound, an
 // UnschedulableAndUnresolvable is returned.
 func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	logger := klog.FromContext(ctx)
 	// If pod does not reference any PVC, we don't need to do anything.
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
 		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
@@ -168,7 +169,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		state.Write(stateKey, &stateData{})
 		return nil, framework.NewStatus(framework.Skip)
 	}
-	podVolumeClaims, err := pl.Binder.GetPodVolumeClaims(pod)
+	podVolumeClaims, err := pl.Binder.GetPodVolumeClaims(logger, pod)
 	if err != nil {
 		return nil, framework.AsStatus(err)
 	}
@@ -182,7 +183,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 	}
 	// Attempt to reduce down the number of nodes to consider in subsequent scheduling stages if pod has bound claims.
 	var result *framework.PreFilterResult
-	if eligibleNodes := pl.Binder.GetEligibleNodes(podVolumeClaims.boundClaims); eligibleNodes != nil {
+	if eligibleNodes := pl.Binder.GetEligibleNodes(logger, podVolumeClaims.boundClaims); eligibleNodes != nil {
 		result = &framework.PreFilterResult{
 			NodeNames: eligibleNodes,
 		}
@@ -232,6 +233,7 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
 	state, err := getStateData(cs)
@@ -239,7 +241,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return framework.AsStatus(err)
 	}
 
-	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.podVolumeClaims, node)
+	podVolumes, reasons, err := pl.Binder.FindPodVolumes(logger, pod, state.podVolumeClaims, node)
 
 	if err != nil {
 		return framework.AsStatus(err)
@@ -304,7 +306,7 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, 
 	// we don't need to hold the lock as only one node will be reserved for the given pod
 	podVolumes, ok := state.podVolumesByNode[nodeName]
 	if ok {
-		allBound, err := pl.Binder.AssumePodVolumes(pod, nodeName, podVolumes)
+		allBound, err := pl.Binder.AssumePodVolumes(klog.FromContext(ctx), pod, nodeName, podVolumes)
 		if err != nil {
 			return framework.AsStatus(err)
 		}
@@ -335,13 +337,14 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 	if !ok {
 		return framework.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
 	}
-	klog.V(5).InfoS("Trying to bind volumes for pod", "pod", klog.KObj(pod))
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Trying to bind volumes for pod", "pod", klog.KObj(pod))
 	err = pl.Binder.BindPodVolumes(ctx, pod, podVolumes)
 	if err != nil {
-		klog.V(1).InfoS("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
+		logger.V(5).Info("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
 		return framework.AsStatus(err)
 	}
-	klog.V(5).InfoS("Success binding volumes for pod", "pod", klog.KObj(pod))
+	logger.V(5).Info("Success binding volumes for pod", "pod", klog.KObj(pod))
 	return nil
 }
 
@@ -361,7 +364,7 @@ func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := plArgs.(*config.VolumeBindingArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
@@ -381,7 +384,7 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
 		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1().CSIStorageCapacities(),
 	}
-	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	binder := NewVolumeBinder(klog.FromContext(ctx), fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 	// build score function
 	var scorer volumeCapacityScorer

@@ -9,12 +9,13 @@ import (
 // ClusterVersionSpecApplyConfiguration represents an declarative configuration of the ClusterVersionSpec type for use
 // with apply.
 type ClusterVersionSpecApplyConfiguration struct {
-	ClusterID     *v1.ClusterID                                     `json:"clusterID,omitempty"`
-	DesiredUpdate *UpdateApplyConfiguration                         `json:"desiredUpdate,omitempty"`
-	Upstream      *v1.URL                                           `json:"upstream,omitempty"`
-	Channel       *string                                           `json:"channel,omitempty"`
-	Capabilities  *ClusterVersionCapabilitiesSpecApplyConfiguration `json:"capabilities,omitempty"`
-	Overrides     []ComponentOverrideApplyConfiguration             `json:"overrides,omitempty"`
+	ClusterID       *v1.ClusterID                                     `json:"clusterID,omitempty"`
+	DesiredUpdate   *UpdateApplyConfiguration                         `json:"desiredUpdate,omitempty"`
+	Upstream        *v1.URL                                           `json:"upstream,omitempty"`
+	Channel         *string                                           `json:"channel,omitempty"`
+	Capabilities    *ClusterVersionCapabilitiesSpecApplyConfiguration `json:"capabilities,omitempty"`
+	SignatureStores []SignatureStoreApplyConfiguration                `json:"signatureStores,omitempty"`
+	Overrides       []ComponentOverrideApplyConfiguration             `json:"overrides,omitempty"`
 }
 
 // ClusterVersionSpecApplyConfiguration constructs an declarative configuration of the ClusterVersionSpec type for use with
@@ -60,6 +61,19 @@ func (b *ClusterVersionSpecApplyConfiguration) WithChannel(value string) *Cluste
 // If called multiple times, the Capabilities field is set to the value of the last call.
 func (b *ClusterVersionSpecApplyConfiguration) WithCapabilities(value *ClusterVersionCapabilitiesSpecApplyConfiguration) *ClusterVersionSpecApplyConfiguration {
 	b.Capabilities = value
+	return b
+}
+
+// WithSignatureStores adds the given value to the SignatureStores field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SignatureStores field.
+func (b *ClusterVersionSpecApplyConfiguration) WithSignatureStores(values ...*SignatureStoreApplyConfiguration) *ClusterVersionSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSignatureStores")
+		}
+		b.SignatureStores = append(b.SignatureStores, *values[i])
+	}
 	return b
 }
 

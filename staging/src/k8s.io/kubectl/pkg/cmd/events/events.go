@@ -121,7 +121,7 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--event=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
+		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--types=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("List events"),
 		Long:                  eventsLong,
@@ -229,6 +229,7 @@ func (o *EventsOptions) Run() error {
 	if o.forName != "" {
 		listOptions.FieldSelector = fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
+			fields.OneTermEqualSelector("involvedObject.apiVersion", o.forGVK.GroupVersion().String()),
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
 	if o.Watch {

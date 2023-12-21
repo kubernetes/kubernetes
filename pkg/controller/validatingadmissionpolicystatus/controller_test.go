@@ -103,7 +103,7 @@ func TestTypeChecking(t *testing.T) {
 			client := fake.NewSimpleClientset(policy)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			typeChecker := &validatingadmissionpolicy.TypeChecker{
-				SchemaResolver: resolver.NewDefinitionsSchemaResolver(scheme.Scheme, openapi.GetOpenAPIDefinitions),
+				SchemaResolver: resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, scheme.Scheme),
 				RestMapper:     testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
 			}
 			controller, err := NewController(

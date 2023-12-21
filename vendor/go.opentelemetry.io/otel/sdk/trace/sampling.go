@@ -81,7 +81,7 @@ type traceIDRatioSampler struct {
 
 func (ts traceIDRatioSampler) ShouldSample(p SamplingParameters) SamplingResult {
 	psc := trace.SpanContextFromContext(p.ParentContext)
-	x := binary.BigEndian.Uint64(p.TraceID[0:8]) >> 1
+	x := binary.BigEndian.Uint64(p.TraceID[8:16]) >> 1
 	if x < ts.traceIDUpperBound {
 		return SamplingResult{
 			Decision:   RecordAndSample,
@@ -163,10 +163,10 @@ func NeverSample() Sampler {
 // the root(Sampler) is used to make sampling decision. If the span has
 // a parent, depending on whether the parent is remote and whether it
 // is sampled, one of the following samplers will apply:
-// - remoteParentSampled(Sampler) (default: AlwaysOn)
-// - remoteParentNotSampled(Sampler) (default: AlwaysOff)
-// - localParentSampled(Sampler) (default: AlwaysOn)
-// - localParentNotSampled(Sampler) (default: AlwaysOff)
+//   - remoteParentSampled(Sampler) (default: AlwaysOn)
+//   - remoteParentNotSampled(Sampler) (default: AlwaysOff)
+//   - localParentSampled(Sampler) (default: AlwaysOn)
+//   - localParentNotSampled(Sampler) (default: AlwaysOff)
 func ParentBased(root Sampler, samplers ...ParentBasedSamplerOption) Sampler {
 	return parentBased{
 		root:   root,

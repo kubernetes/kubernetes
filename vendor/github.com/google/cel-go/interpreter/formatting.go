@@ -25,7 +25,7 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 )
 
-type typeVerifier func(int64, ...*types.TypeValue) (bool, error)
+type typeVerifier func(int64, ...ref.Type) (bool, error)
 
 // InterpolateFormattedString checks the syntax and cardinality of any string.format calls present in the expression and reports
 // any errors at compile time.

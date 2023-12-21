@@ -2041,7 +2041,11 @@ func TestStoreDeleteCollection(t *testing.T) {
 	// and reduce the default page size to 2.
 	storeWithCounter := &storageWithCounter{Interface: registry.Storage.Storage}
 	registry.Storage.Storage = storeWithCounter
+	originalDeleteCollectionPageSize := deleteCollectionPageSize
 	deleteCollectionPageSize = 2
+	defer func() {
+		deleteCollectionPageSize = originalDeleteCollectionPageSize
+	}()
 
 	numPods := 10
 	for i := 0; i < numPods; i++ {
@@ -2325,7 +2329,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}

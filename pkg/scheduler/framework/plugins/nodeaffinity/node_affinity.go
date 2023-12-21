@@ -25,11 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // NodeAffinity is a plugin that checks if a pod node selector matches the node label.
@@ -83,8 +85,49 @@ func (s *preFilterState) Clone() framework.StateData {
 // failed by this plugin schedulable.
 func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}
+}
+
+// isSchedulableAfterNodeChange is invoked whenever a node changed. It checks whether
+// that change made a previously unschedulable pod schedulable.
+func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(modifiedNode) {
+		logger.V(4).Info("added or modified node didn't match scheduler-enforced node affinity and this event won't make the Pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.QueueSkip, nil
+	}
+
+	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
+	isMatched, err := requiredNodeAffinity.Match(modifiedNode)
+	if err != nil {
+		return framework.Queue, err
+	}
+	if !isMatched {
+		logger.V(4).Info("node was created or updated, but doesn't matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.QueueSkip, nil
+	}
+
+	wasMatched := false
+	if originalNode != nil {
+		wasMatched, err = requiredNodeAffinity.Match(originalNode)
+		if err != nil {
+			return framework.Queue, err
+		}
+	}
+
+	if !wasMatched {
+		// This modification makes this Node match with Pod's NodeAffinity.
+		logger.V(4).Info("node was created or updated, and matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.Queue, nil
+	}
+
+	logger.V(4).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return framework.QueueSkip, nil
 }
 
 // PreFilter builds and writes cycle state used by Filter.
@@ -243,7 +286,7 @@ func (pl *NodeAffinity) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	args, err := getArgs(plArgs)
 	if err != nil {
 		return nil, err

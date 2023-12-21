@@ -18,3 +18,24 @@ tests:
       spec:
         logLevel: Normal
         operatorLogLevel: Normal
+  - name: IBM Cloud CSIDriverType must have a defined IBM Cloud spec
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: ClusterCSIDriver
+      metadata:
+        name: csi.sharedresource.openshift.io
+      spec:
+        driverConfig:
+          driverType: IBMCloud
+    expectedError: "Invalid value: \"object\": ibmcloud must be set if driverType is 'IBMCloud', but remain unset otherwise"
+  - name: IBM Cloud spec must have an EncryptionKeyCRN defined
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: ClusterCSIDriver
+      metadata:
+        name: csi.sharedresource.openshift.io
+      spec:
+        driverConfig:
+          driverType: IBMCloud
+          ibmcloud: {}
+    expectedError: "spec.driverConfig.ibmcloud.encryptionKeyCRN: Required value, <nil>: Invalid value: \"null\": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation"

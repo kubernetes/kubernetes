@@ -26,13 +26,22 @@ message EncryptedObject {
   bytes encryptedData = 1;
 
   // KeyID is the KMS key ID used for encryption operations.
+  // keyID must satisfy the following constraints:
+  // 1. The keyID is not empty.
+  // 2. The size of keyID is less than 1 kB.
   string keyID = 2;
 
   // EncryptedDEKSource is the ciphertext of the source of the DEK used to encrypt the data stored in encryptedData.
   // encryptedDEKSourceType defines the process of using the plaintext of this field to determine the aforementioned DEK.
+  // encryptedDEKSource must satisfy the following constraints:
+  // 1. The encrypted DEK source is not empty.
+  // 2. The size of encrypted DEK source is less than 1 kB.
   bytes encryptedDEKSource = 3;
 
   // Annotations is additional metadata that was provided by the KMS plugin.
+  // Annotations must satisfy the following constraints:
+  //  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+  //  2. The size of annotations keys + values is less than 32 kB.
   map<string, bytes> annotations = 4;
 
   // encryptedDEKSourceType defines the process of using the plaintext of encryptedDEKSource to determine the DEK.

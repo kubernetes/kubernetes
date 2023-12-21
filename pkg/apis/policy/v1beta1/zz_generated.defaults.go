@@ -22,7 +22,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/policy/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,18 +29,5 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.PodSecurityPolicy{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicy(obj.(*v1beta1.PodSecurityPolicy)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.PodSecurityPolicyList{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicyList(obj.(*v1beta1.PodSecurityPolicyList)) })
 	return nil
-}
-
-func SetObjectDefaults_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy) {
-	SetDefaults_PodSecurityPolicySpec(&in.Spec)
-}
-
-func SetObjectDefaults_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_PodSecurityPolicy(a)
-	}
 }

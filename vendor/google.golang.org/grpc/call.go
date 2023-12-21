@@ -26,12 +26,7 @@ import (
 // received.  This is typically called by generated code.
 //
 // All errors returned by Invoke are compatible with the status package.
-func (cc *ClientConn) Invoke(ctx context.Context, method string, args, reply interface{}, opts ...CallOption) error {
-	if err := cc.idlenessMgr.onCallBegin(); err != nil {
-		return err
-	}
-	defer cc.idlenessMgr.onCallEnd()
-
+func (cc *ClientConn) Invoke(ctx context.Context, method string, args, reply any, opts ...CallOption) error {
 	// allow interceptor to see all applicable call options, which means those
 	// configured as defaults from dial option as well as per-call options
 	opts = combine(cc.dopts.callOptions, opts)
@@ -61,13 +56,13 @@ func combine(o1 []CallOption, o2 []CallOption) []CallOption {
 // received.  This is typically called by generated code.
 //
 // DEPRECATED: Use ClientConn.Invoke instead.
-func Invoke(ctx context.Context, method string, args, reply interface{}, cc *ClientConn, opts ...CallOption) error {
+func Invoke(ctx context.Context, method string, args, reply any, cc *ClientConn, opts ...CallOption) error {
 	return cc.Invoke(ctx, method, args, reply, opts...)
 }
 
 var unaryStreamDesc = &StreamDesc{ServerStreams: false, ClientStreams: false}
 
-func invoke(ctx context.Context, method string, req, reply interface{}, cc *ClientConn, opts ...CallOption) error {
+func invoke(ctx context.Context, method string, req, reply any, cc *ClientConn, opts ...CallOption) error {
 	cs, err := newClientStream(ctx, unaryStreamDesc, cc, method, opts...)
 	if err != nil {
 		return err

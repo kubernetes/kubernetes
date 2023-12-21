@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -436,4 +437,31 @@ func (f *fakeKubeletVolumeHost) WaitForCacheSync() error {
 
 func (f *fakeKubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
 	return f.hostUtil
+}
+
+func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
+	ctb, err := f.kubeClient.CertificatesV1alpha1().ClusterTrustBundles().Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("while getting ClusterTrustBundle %s: %w", name, err)
+	}
+
+	return []byte(ctb.Spec.TrustBundle), nil
+}
+
+// Note: we do none of the deduplication and sorting that the real deal should do.
+func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+	ctbList, err := f.kubeClient.CertificatesV1alpha1().ClusterTrustBundles().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("while listing all ClusterTrustBundles: %w", err)
+	}
+
+	fullSet := bytes.Buffer{}
+	for i, ctb := range ctbList.Items {
+		fullSet.WriteString(ctb.Spec.TrustBundle)
+		if i != len(ctbList.Items)-1 {
+			fullSet.WriteString("\n")
+		}
+	}
+
+	return fullSet.Bytes(), nil
 }

@@ -44,7 +44,6 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 		Transport: storagebackend.TransportConfig{
 			ServerList: server.V3Client.Endpoints(),
 		},
-		Paging: true,
 	}
 	return server, config
 }

@@ -19,6 +19,7 @@ package persistentvolume
 import (
 	"context"
 	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
@@ -71,11 +72,9 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeLastPhaseTransitionTime) {
 		pv.Status.Phase = api.VolumePending
-		now := nowFunc()
+		now := NowFunc()
 		pv.Status.LastPhaseTransitionTime = &now
 	}
-
-	pvutil.DropDisabledSpecFields(&pv.Spec, nil)
 }
 
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -103,8 +102,6 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
-
-	pvutil.DropDisabledSpecFields(&newPv.Spec, &oldPv.Spec)
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -143,7 +140,7 @@ func (persistentvolumeStatusStrategy) GetResetFields() map[fieldpath.APIVersion]
 	return fields
 }
 
-var nowFunc = metav1.Now
+var NowFunc = metav1.Now
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
 func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -159,7 +156,7 @@ func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 		case oldPv.Status.Phase != newPv.Status.Phase && (newPv.Status.LastPhaseTransitionTime == nil || newPv.Status.LastPhaseTransitionTime.Equal(oldPv.Status.LastPhaseTransitionTime)):
 			// phase changed and client didn't set or didn't change the transition time
-			now := nowFunc()
+			now := NowFunc()
 			newPv.Status.LastPhaseTransitionTime = &now
 		}
 	}

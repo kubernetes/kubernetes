@@ -35,7 +35,7 @@ var _ traits.Mapper = (*MapValue)(nil)
 // MapValue is a map that lazily evaluate its value when a field is first accessed.
 // The map value is not designed to be thread-safe.
 type MapValue struct {
-	typeValue *types.TypeValue
+	typeValue *types.Type
 
 	// values are previously evaluated values obtained from callbacks
 	values map[string]ref.Val

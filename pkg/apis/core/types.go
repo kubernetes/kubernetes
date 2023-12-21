@@ -335,6 +335,16 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity
+	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+	// is not allowed. When this field is not set, it indicates that this volume does not belong to any
+	// VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
+	// after a volume has been updated successfully to a new class.
+	// For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
+	// PersistentVolumeClaims during the binding process.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	VolumeAttributesClassName *string
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -440,7 +450,7 @@ type PersistentVolumeClaimSpec struct {
 	// that are lower than previous value but must still be higher than capacity recorded in the
 	// status field of the claim.
 	// +optional
-	Resources ResourceRequirements
+	Resources VolumeResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
 	// claim. When set to non-empty value Selector is not evaluated
 	// +optional
@@ -488,6 +498,21 @@ type PersistentVolumeClaimSpec struct {
 	// (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
 	// +optional
 	DataSourceRef *TypedObjectReference
+	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+	// If specified, the CSI driver will create or update the volume with the attributes defined
+	// in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
+	// it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
+	// will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
+	// If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
+	// will be set by the persistentvolume controller if it exists.
+	// If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
+	// set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
+	// exists.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+	// (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	VolumeAttributesClassName *string
 }
 
 type TypedObjectReference struct {
@@ -518,6 +543,11 @@ const (
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
 	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
+
+	// Applying the target VolumeAttributesClass encountered an error
+	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
+	// Volume is being modified
+	PersistentVolumeClaimVolumeModifyingVolume PersistentVolumeClaimConditionType = "ModifyingVolume"
 )
 
 // +enum
@@ -543,6 +573,38 @@ const (
 	// State set when resizing has failed in kubelet with a terminal error. Transient errors don't set NodeResizeFailed
 	PersistentVolumeClaimNodeResizeFailed ClaimResourceStatus = "NodeResizeFailed"
 )
+
+// +enum
+// New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately
+type PersistentVolumeClaimModifyVolumeStatus string
+
+const (
+	// Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+	// the specified VolumeAttributesClass not existing
+	PersistentVolumeClaimModifyVolumePending PersistentVolumeClaimModifyVolumeStatus = "Pending"
+	// InProgress indicates that the volume is being modified
+	PersistentVolumeClaimModifyVolumeInProgress PersistentVolumeClaimModifyVolumeStatus = "InProgress"
+	// Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+	// resolve the error, a valid VolumeAttributesClass needs to be specified
+	PersistentVolumeClaimModifyVolumeInfeasible PersistentVolumeClaimModifyVolumeStatus = "Infeasible"
+)
+
+// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
+type ModifyVolumeStatus struct {
+	// targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+	TargetVolumeAttributesClassName string
+	// status is the status of the ControllerModifyVolume operation. It can be in any of following states:
+	//  - Pending
+	//    Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+	//    the specified VolumeAttributesClass not existing.
+	//  - InProgress
+	//    InProgress indicates that the volume is being modified.
+	//  - Infeasible
+	//   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+	// 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
+	// Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+	Status PersistentVolumeClaimModifyVolumeStatus
+}
 
 // PersistentVolumeClaimCondition represents the current condition of PV claim
 type PersistentVolumeClaimCondition struct {
@@ -635,6 +697,18 @@ type PersistentVolumeClaimStatus struct {
 	// +mapType=granular
 	// +optional
 	AllocatedResourceStatuses map[ResourceName]ClaimResourceStatus
+	// currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
+	// When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	CurrentVolumeAttributesClassName *string
+	// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
+	// When this is unset, there is no ModifyVolume operation being attempted.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	ModifyVolumeStatus *ModifyVolumeStatus
 }
 
 // PersistentVolumeAccessMode defines various access modes for PV.
@@ -1685,6 +1759,29 @@ type ServiceAccountTokenProjection struct {
 	Path string
 }
 
+// ClusterTrustBundleProjection allows a pod to access the
+// `.spec.trustBundle` field of a ClusterTrustBundle object in an auto-updating
+// file.
+type ClusterTrustBundleProjection struct {
+	// Select a single ClusterTrustBundle by object name.   Mutually-exclusive
+	// with SignerName and LabelSelector.
+	Name *string
+
+	// Select all ClusterTrustBundles for this signer that match LabelSelector.
+	// Mutually-exclusive with Name.
+	SignerName *string
+
+	// Select all ClusterTrustBundles that match this LabelSelecotr.
+	// Mutually-exclusive with Name.
+	LabelSelector *metav1.LabelSelector
+
+	// Block pod startup if the selected ClusterTrustBundle(s) aren't available?
+	Optional *bool
+
+	// Relative path from the volume root to write the bundle.
+	Path string
+}
+
 // ProjectedVolumeSource represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1710,6 +1807,8 @@ type VolumeProjection struct {
 	ConfigMap *ConfigMapProjection
 	// information about the serviceAccountToken data to project
 	ServiceAccountToken *ServiceAccountTokenProjection
+	// information about the ClusterTrustBundle data to project
+	ClusterTrustBundle *ClusterTrustBundleProjection
 }
 
 // KeyToPath maps a string key to a path within a volume.
@@ -1805,10 +1904,8 @@ type CSIPersistentVolumeSource struct {
 	// NodeExpandSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodeExpandVolume call.
-	// This is a beta field which is enabled default by CSINodeExpandSecret feature gate.
 	// This field is optional, may be omitted if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
-	// +featureGate=CSINodeExpandSecret
 	// +optional
 	NodeExpandSecretRef *SecretReference
 }
@@ -2150,6 +2247,12 @@ type ExecAction struct {
 	Command []string
 }
 
+// SleepAction describes a "sleep" action.
+type SleepAction struct {
+	// Seconds is the number of seconds to sleep.
+	Seconds int64
+}
+
 // Probe describes a health check to be performed against a container to determine whether it is
 // alive or ready to receive traffic.
 type Probe struct {
@@ -2280,6 +2383,18 @@ type ResourceRequirements struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	Claims []ResourceClaim
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+type VolumeResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// +optional
+	Limits ResourceList
+	// Requests describes the minimum amount of compute resources required.
+	// If Request is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value
+	// +optional
+	Requests ResourceList
 }
 
 // ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -2420,6 +2535,10 @@ type LifecycleHandler struct {
 	// lifecycle hooks will fail in runtime when tcp handler is specified.
 	// +optional
 	TCPSocket *TCPSocketAction
+	// Sleep represents the duration that the container should sleep before being terminated.
+	// +featureGate=PodLifecycleSleepAction
+	// +optional
+	Sleep *SleepAction
 }
 
 type GRPCAction struct {
@@ -2617,12 +2736,6 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodInitialized means that all init containers in the pod have started successfully.
 	PodInitialized PodConditionType = "Initialized"
-	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
-	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
-	PodReasonUnschedulable = "Unschedulable"
-	// PodReasonSchedulingGated reason in PodScheduled PodCondition means that the scheduler
-	// skips scheduling the pod because one or more scheduling gates are still present.
-	PodReasonSchedulingGated = "SchedulingGated"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
 	// DisruptionTarget indicates the pod is about to be terminated due to a
@@ -2886,6 +2999,7 @@ type WeightedPodAffinityTerm struct {
 // a pod of the set of pods is running.
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
+	// If it's null, this PodAffinityTerm matches with no Pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector
 	// namespaces specifies a static list of namespace names that the term applies to.
@@ -2907,6 +3021,24 @@ type PodAffinityTerm struct {
 	// An empty selector ({}) matches all namespaces.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
+	// MatchLabelKeys is a set of pod label keys to select which pods will
+	// be taken into consideration. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)`
+	// to select the group of existing pods which pods will be taken into consideration
+	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+	// pod labels will be ignored. The default value is empty.
+	// +listType=atomic
+	// +optional
+	MatchLabelKeys []string
+	// MismatchLabelKeys is a set of pod label keys to select which pods will
+	// be taken into consideration. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)`
+	// to select the group of existing pods which pods will be taken into consideration
+	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+	// pod labels will be ignored. The default value is empty.
+	// +listType=atomic
+	// +optional
+	MismatchLabelKeys []string
 }
 
 // NodeAffinity is a group of node affinity scheduling rules.
@@ -4074,6 +4206,15 @@ type LoadBalancerIngress struct {
 	// +optional
 	Hostname string
 
+	// IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+	// Setting this to "VIP" indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	// Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and node port or the pod's IP and port.
+	// Service implementations may use this information to adjust traffic routing.
+	// +optional
+	IPMode *LoadBalancerIPMode
+
 	// Ports is a list of records of service ports
 	// If used, every port defined in the service should have an entry in it
 	// +optional
@@ -4310,7 +4451,7 @@ type ServicePort struct {
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	//
 	// * Kubernetes-defined prefixed names:
-	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
 	//   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
 	//   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
 	//
@@ -4475,7 +4616,7 @@ type EndpointPort struct {
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	//
 	// * Kubernetes-defined prefixed names:
-	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
 	//   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
 	//   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
 	//
@@ -4596,7 +4737,7 @@ type NodeSystemInfo struct {
 	ContainerRuntimeVersion string
 	// Kubelet Version reported by the node.
 	KubeletVersion string
-	// KubeProxy Version reported by the node.
+	// Deprecated: KubeProxy Version reported by the node.
 	KubeProxyVersion string
 	// The Operating System reported by the node
 	OperatingSystem string
@@ -6146,3 +6287,15 @@ type PortStatus struct {
 	// +kubebuilder:validation:MaxLength=316
 	Error *string
 }
+
+// LoadBalancerIPMode represents the mode of the LoadBalancer ingress IP
+type LoadBalancerIPMode string
+
+const (
+	// LoadBalancerIPModeVIP indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
+	// LoadBalancerIPModeProxy indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and port or the pod's IP and port.
+	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
+)

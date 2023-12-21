@@ -18,6 +18,7 @@ package version
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -83,6 +84,47 @@ func parse(str string, semver bool) (*Version, error) {
 	}
 
 	return v, nil
+}
+
+// HighestSupportedVersion returns the highest supported version
+// This function assumes that the highest supported version must be v1.x.
+func HighestSupportedVersion(versions []string) (*Version, error) {
+	if len(versions) == 0 {
+		return nil, errors.New("empty array for supported versions")
+	}
+
+	var (
+		highestSupportedVersion *Version
+		theErr                  error
+	)
+
+	for i := len(versions) - 1; i >= 0; i-- {
+		currentHighestVer, err := ParseGeneric(versions[i])
+		if err != nil {
+			theErr = err
+			continue
+		}
+
+		if currentHighestVer.Major() > 1 {
+			continue
+		}
+
+		if highestSupportedVersion == nil || highestSupportedVersion.LessThan(currentHighestVer) {
+			highestSupportedVersion = currentHighestVer
+		}
+	}
+
+	if highestSupportedVersion == nil {
+		return nil, fmt.Errorf(
+			"could not find a highest supported version from versions (%v) reported: %+v",
+			versions, theErr)
+	}
+
+	if highestSupportedVersion.Major() != 1 {
+		return nil, fmt.Errorf("highest supported version reported is %v, must be v1.x", highestSupportedVersion)
+	}
+
+	return highestSupportedVersion, nil
 }
 
 // ParseGeneric parses a "generic" version string. The version string must consist of two

@@ -134,6 +134,7 @@ func TestRunRenewCommands(t *testing.T) {
 	// Generate all the kubeconfig files with embedded certs
 	for _, kubeConfig := range []string{
 		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.SuperAdminKubeConfigFileName,
 		kubeadmconstants.SchedulerKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 	} {
@@ -162,6 +163,7 @@ func TestRunRenewCommands(t *testing.T) {
 			},
 			KubeconfigFiles: []string{
 				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.SuperAdminKubeConfigFileName,
 				kubeadmconstants.SchedulerKubeConfigFileName,
 				kubeadmconstants.ControllerManagerKubeConfigFileName,
 			},
@@ -212,6 +214,12 @@ func TestRunRenewCommands(t *testing.T) {
 			command: "admin.conf",
 			KubeconfigFiles: []string{
 				kubeadmconstants.AdminKubeConfigFileName,
+			},
+		},
+		{
+			command: "super-admin.conf",
+			KubeconfigFiles: []string{
+				kubeadmconstants.SuperAdminKubeConfigFileName,
 			},
 		},
 		{

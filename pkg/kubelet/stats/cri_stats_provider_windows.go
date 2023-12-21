@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -86,16 +87,22 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo,
-	updateCPUNanoCoreUsage bool) {
+	updateCPUNanoCoreUsage bool) error {
 	for _, criContainerStat := range criSandboxStat.Windows.Containers {
 		container, found := containerMap[criContainerStat.Attributes.Id]
 		if !found {
 			continue
 		}
 		// Fill available stats for full set of required pod stats
-		cs := p.makeWinContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata())
+		cs, err := p.makeWinContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata())
+		if err != nil {
+			return fmt.Errorf("make container stats: %w", err)
+
+		}
 		ps.Containers = append(ps.Containers, *cs)
 	}
+
+	return nil
 }
 
 func (p *criStatsProvider) makeWinContainerStats(
@@ -103,7 +110,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 	container *runtimeapi.Container,
 	rootFsInfo *cadvisorapiv2.FsInfo,
 	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
-	meta *runtimeapi.PodSandboxMetadata) *statsapi.ContainerStats {
+	meta *runtimeapi.PodSandboxMetadata) (*statsapi.ContainerStats, error) {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
 		// The StartTime in the summary API is the container creation time.
@@ -149,11 +156,15 @@ func (p *criStatsProvider) makeWinContainerStats(
 			result.Rootfs.UsedBytes = &stats.WritableLayer.UsedBytes.Value
 		}
 	}
+	var err error
 	fsID := stats.GetWritableLayer().GetFsId()
 	if fsID != nil {
 		imageFsInfo, found := fsIDtoInfo[*fsID]
 		if !found {
-			imageFsInfo = p.getFsInfo(fsID)
+			imageFsInfo, err = p.getFsInfo(fsID)
+			if err != nil {
+				return nil, fmt.Errorf("get filesystem info: %w", err)
+			}
 			fsIDtoInfo[*fsID] = imageFsInfo
 		}
 		if imageFsInfo != nil {
@@ -168,12 +179,11 @@ func (p *criStatsProvider) makeWinContainerStats(
 	// NOTE: This doesn't support the old pod log path, `/var/log/pods/UID`. For containers
 	// using old log path, empty log stats are returned. This is fine, because we don't
 	// officially support in-place upgrade anyway.
-	var err error
 	result.Logs, err = p.hostStatsProvider.getPodContainerLogStats(meta.GetNamespace(), meta.GetName(), types.UID(meta.GetUid()), container.GetMetadata().GetName(), rootFsInfo)
 	if err != nil {
 		klog.ErrorS(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
 	}
-	return result
+	return result, nil
 }
 
 // hcsStatsToNetworkStats converts hcsshim.Statistics.Network to statsapi.NetworkStats

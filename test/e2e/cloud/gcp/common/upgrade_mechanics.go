@@ -122,7 +122,7 @@ func checkControlPlaneVersion(ctx context.Context, c clientset.Interface, want s
 	framework.Logf("Checking control plane version")
 	var err error
 	var v *version.Info
-	waitErr := wait.PollImmediateWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		v, err = c.Discovery().ServerVersion()
 		if err != nil {
 			traceRouteToControlPlane()

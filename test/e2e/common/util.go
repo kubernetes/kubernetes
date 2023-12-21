@@ -132,7 +132,7 @@ func svcByName(name string, port int) *v1.Service {
 			},
 			Ports: []v1.ServicePort{{
 				Port:       int32(port),
-				TargetPort: intstr.FromInt(port),
+				TargetPort: intstr.FromInt32(int32(port)),
 			}},
 		},
 	}

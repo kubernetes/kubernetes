@@ -61,6 +61,7 @@ import (
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/util/async"
+	netutils "k8s.io/utils/net"
 )
 
 // Config provides information needed to build RESTStorage for core.
@@ -137,9 +138,8 @@ func New(c Config) (*legacyProvider, error) {
 		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepairIPAddress(
 			c.Services.IPRepairInterval,
 			client,
-			&c.Services.ClusterIPRange,
-			&c.Services.SecondaryClusterIPRange,
 			c.Informers.Core().V1().Services(),
+			c.Informers.Networking().V1alpha1().ServiceCIDRs(),
 			c.Informers.Networking().V1alpha1().IPAddresses(),
 		).RunUntil
 	}
@@ -147,13 +147,13 @@ func New(c Config) (*legacyProvider, error) {
 	return p, nil
 }
 
-func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
-	apiGroupInfo, err := c.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
+	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	podDisruptionClient, err := policyclient.NewForConfig(c.LoopbackClientConfig)
+	podDisruptionClient, err := policyclient.NewForConfig(p.LoopbackClientConfig)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -182,7 +182,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.Proxy.KubeletClientConfig, c.Proxy.Transport)
+	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, p.Proxy.KubeletClientConfig, p.Proxy.Transport)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -190,7 +190,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	podStorage, err := podstore.NewStorage(
 		restOptionsGetter,
 		nodeStorage.KubeletConnectionInfo,
-		c.Proxy.Transport,
+		p.Proxy.Transport,
 		podDisruptionClient,
 	)
 	if err != nil {
@@ -199,12 +199,12 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 
 	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
-		c.primaryServiceClusterIPAllocator.IPFamily(),
-		c.serviceClusterIPAllocators,
-		c.serviceNodePortAllocator,
+		p.primaryServiceClusterIPAllocator.IPFamily(),
+		p.serviceClusterIPAllocators,
+		p.serviceNodePortAllocator,
 		endpointsStorage,
 		podStorage.Pod,
-		c.Proxy.Transport)
+		p.Proxy.Transport)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -216,8 +216,13 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 
 	// potentially override the generic serviceaccount storage with one that supports pods
 	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), c.ExtendExpiration)
+	if p.ServiceAccountIssuer != nil {
+		var nodeGetter rest.Getter
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) ||
+			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+			nodeGetter = nodeStorage.Node.Store
+		}
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}
@@ -303,7 +308,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	}
 
 	if resource := "componentstatuses"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate)
+		storage[resource] = componentstatus.NewStorage(componentStatusStorage{p.StorageFactory}.serversToValidate)
 	}
 
 	if len(storage) > 0 {
@@ -346,7 +351,16 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, err
 		}
-		primaryClusterIPAllocator, err = ipallocator.NewIPAllocator(&serviceClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
+		// TODO(aojea) Revisit the initialization of the allocators
+		// since right now it depends on the service-cidr flags and
+		// sets the default IPFamily that may not be coherent with the
+		// existing default ServiceCIDR
+		primaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+			networkingv1alphaClient,
+			c.Informers.Networking().V1alpha1().ServiceCIDRs(),
+			c.Informers.Networking().V1alpha1().IPAddresses(),
+			netutils.IsIPv6CIDR(&serviceClusterIPRange),
+		)
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 		}
@@ -377,7 +391,16 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, err
 			}
-			secondaryClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.Services.SecondaryClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
+			// TODO(aojea) Revisit the initialization of the allocators
+			// since right now it depends on the service-cidr flags and
+			// sets the default IPFamily that may not be coherent with the
+			// existing default ServiceCIDR
+			secondaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
+				networkingv1alphaClient,
+				c.Informers.Networking().V1alpha1().ServiceCIDRs(),
+				c.Informers.Networking().V1alpha1().IPAddresses(),
+				netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
+			)
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}

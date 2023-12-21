@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/cel-go/common/overloads"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	dpb "google.golang.org/protobuf/types/known/durationpb"
@@ -41,13 +40,14 @@ func durationOf(d time.Duration) Duration {
 }
 
 var (
-	// DurationType singleton.
-	DurationType = NewTypeValue("google.protobuf.Duration",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.NegatorType,
-		traits.ReceiverType,
-		traits.SubtractorType)
+	durationValueType = reflect.TypeOf(&dpb.Duration{})
+
+	durationZeroArgOverloads = map[string]func(ref.Val) ref.Val{
+		overloads.TimeGetHours:        DurationGetHours,
+		overloads.TimeGetMinutes:      DurationGetMinutes,
+		overloads.TimeGetSeconds:      DurationGetSeconds,
+		overloads.TimeGetMilliseconds: DurationGetMilliseconds,
+	}
 )
 
 // Add implements traits.Adder.Add.
@@ -156,7 +156,7 @@ func (d Duration) Negate() ref.Val {
 func (d Duration) Receive(function string, overload string, args []ref.Val) ref.Val {
 	if len(args) == 0 {
 		if f, found := durationZeroArgOverloads[function]; found {
-			return f(d.Duration)
+			return f(d)
 		}
 	}
 	return NoSuchOverloadErr()
@@ -185,20 +185,38 @@ func (d Duration) Value() any {
 	return d.Duration
 }
 
-var (
-	durationValueType = reflect.TypeOf(&dpb.Duration{})
+// DurationGetHours returns the duration in hours.
+func DurationGetHours(val ref.Val) ref.Val {
+	dur, ok := val.(Duration)
+	if !ok {
+		return MaybeNoSuchOverloadErr(val)
+	}
+	return Int(dur.Hours())
+}
 
-	durationZeroArgOverloads = map[string]func(time.Duration) ref.Val{
-		overloads.TimeGetHours: func(dur time.Duration) ref.Val {
-			return Int(dur.Hours())
-		},
-		overloads.TimeGetMinutes: func(dur time.Duration) ref.Val {
-			return Int(dur.Minutes())
-		},
-		overloads.TimeGetSeconds: func(dur time.Duration) ref.Val {
-			return Int(dur.Seconds())
-		},
-		overloads.TimeGetMilliseconds: func(dur time.Duration) ref.Val {
-			return Int(dur.Milliseconds())
-		}}
-)
+// DurationGetMinutes returns duration in minutes.
+func DurationGetMinutes(val ref.Val) ref.Val {
+	dur, ok := val.(Duration)
+	if !ok {
+		return MaybeNoSuchOverloadErr(val)
+	}
+	return Int(dur.Minutes())
+}
+
+// DurationGetSeconds returns duration in seconds.
+func DurationGetSeconds(val ref.Val) ref.Val {
+	dur, ok := val.(Duration)
+	if !ok {
+		return MaybeNoSuchOverloadErr(val)
+	}
+	return Int(dur.Seconds())
+}
+
+// DurationGetMilliseconds returns duration in milliseconds.
+func DurationGetMilliseconds(val ref.Val) ref.Val {
+	dur, ok := val.(Duration)
+	if !ok {
+		return MaybeNoSuchOverloadErr(val)
+	}
+	return Int(dur.Milliseconds())
+}

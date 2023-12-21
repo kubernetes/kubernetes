@@ -34,7 +34,7 @@ func TestPodConditionByKubelet(t *testing.T) {
 		v1.PodReady,
 		v1.PodInitialized,
 		v1.ContainersReady,
-		PodReadyToStartContainers,
+		v1.PodReadyToStartContainers,
 	}
 
 	for _, tc := range trueCases {

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -53,7 +54,7 @@ type externalMetricTarget struct {
 	isAverage bool
 }
 
-var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver)", func() {
+var _ = SIGDescribe("[HPA]", feature.CustomMetricsAutoscaling, "Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver)", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
@@ -594,7 +595,7 @@ func hpa(name, namespace, deploymentName string, minReplicas, maxReplicas int32,
 
 func waitForReplicas(ctx context.Context, deploymentName, namespace string, cs clientset.Interface, timeout time.Duration, desiredReplicas int) {
 	interval := 20 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
@@ -610,7 +611,7 @@ func waitForReplicas(ctx context.Context, deploymentName, namespace string, cs c
 
 func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace string, cs clientset.Interface, minDesiredReplicas, maxDesiredReplicas int, timeout time.Duration) {
 	interval := 60 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
@@ -626,7 +627,7 @@ func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace
 		}
 	})
 	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		framework.Logf("Number of replicas was stable over %v", timeout)
 		return
 	}

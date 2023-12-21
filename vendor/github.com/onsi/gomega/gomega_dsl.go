@@ -22,7 +22,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.27.6"
+const GOMEGA_VERSION = "1.29.0"
 
 const nilGomegaPanic = `You are trying to make an assertion, but haven't registered Gomega's fail handler.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -242,7 +242,7 @@ func ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) Asse
 Eventually enables making assertions on asynchronous behavior.
 
 Eventually checks that an assertion *eventually* passes.  Eventually blocks when called and attempts an assertion periodically until it passes or a timeout occurs.  Both the timeout and polling interval are configurable as optional arguments.
-The first optional argument is the timeout (which defaults to 1s), the second is the polling interval (which defaults to 10ms).  Both intervals can be specified as time.Duration, parsable duration strings or floats/integers (in which case they are interpreted as seconds).  In addition an optional context.Context can be passed in - Eventually will keep trying until either the timeout epxires or the context is cancelled, whichever comes first.
+The first optional argument is the timeout (which defaults to 1s), the second is the polling interval (which defaults to 10ms).  Both intervals can be specified as time.Duration, parsable duration strings or floats/integers (in which case they are interpreted as seconds).  In addition an optional context.Context can be passed in - Eventually will keep trying until either the timeout expires or the context is cancelled, whichever comes first.
 
 Eventually works with any Gomega compatible matcher and supports making assertions against three categories of actual value:
 
@@ -313,13 +313,13 @@ It is important to note that the function passed into Eventually is invoked *syn
 		}).Should(BeNumerically(">=", 17))
 	}, SpecTimeout(time.Second))
 
-you an also use Eventually().WithContext(ctx) to pass in the context.  Passed-in contexts play nicely with paseed-in arguments as long as the context appears first.  You can rewrite the above example as:
+you an also use Eventually().WithContext(ctx) to pass in the context.  Passed-in contexts play nicely with passed-in arguments as long as the context appears first.  You can rewrite the above example as:
 
 	It("fetches the correct count", func(ctx SpecContext) {
 		Eventually(client.FetchCount).WithContext(ctx).WithArguments("/users").Should(BeNumerically(">=", 17))
 	}, SpecTimeout(time.Second))
 
-Either way the context passd to Eventually is also passed to the underlying funciton.  Now, when Ginkgo cancels the context both the FetchCount client and Gomega will be informed and can exit.
+Either way the context passd to Eventually is also passed to the underlying function.  Now, when Ginkgo cancels the context both the FetchCount client and Gomega will be informed and can exit.
 
 **Category 3: Making assertions _in_ the function passed into Eventually**
 
@@ -349,7 +349,7 @@ For example:
 
 will rerun the function until all assertions pass.
 
-You can also pass additional arugments to functions that take a Gomega.  The only rule is that the Gomega argument must be first.  If you also want to pass the context attached to Eventually you must ensure that is the second argument.  For example:
+You can also pass additional arguments to functions that take a Gomega.  The only rule is that the Gomega argument must be first.  If you also want to pass the context attached to Eventually you must ensure that is the second argument.  For example:
 
 	Eventually(func(g Gomega, ctx context.Context, path string, expected ...string){
 		tok, err := client.GetToken(ctx)

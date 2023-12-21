@@ -17,12 +17,15 @@ limitations under the License.
 package storage
 
 import (
+	"errors"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+
+var ErrResourceVersionSetOnCreate = errors.New("resourceVersion should not be set on objects to be created")
 
 const (
 	ErrCodeKeyNotFound int = iota + 1
@@ -176,7 +179,7 @@ var tooLargeResourceVersionCauseMsg = "Too large resource version"
 // NewTooLargeResourceVersionError returns a timeout error with the given retrySeconds for a request for
 // a minimum resource version that is larger than the largest currently available resource version for a requested resource.
 func NewTooLargeResourceVersionError(minimumResourceVersion, currentRevision uint64, retrySeconds int) error {
-	err := errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %d, current: %d", minimumResourceVersion, currentRevision), retrySeconds)
+	err := apierrors.NewTimeoutError(fmt.Sprintf("Too large resource version: %d, current: %d", minimumResourceVersion, currentRevision), retrySeconds)
 	err.ErrStatus.Details.Causes = []metav1.StatusCause{
 		{
 			Type:    metav1.CauseTypeResourceVersionTooLarge,
@@ -188,8 +191,8 @@ func NewTooLargeResourceVersionError(minimumResourceVersion, currentRevision uin
 
 // IsTooLargeResourceVersion returns true if the error is a TooLargeResourceVersion error.
 func IsTooLargeResourceVersion(err error) bool {
-	if !errors.IsTimeout(err) {
+	if !apierrors.IsTimeout(err) {
 		return false
 	}
-	return errors.HasStatusCause(err, metav1.CauseTypeResourceVersionTooLarge)
+	return apierrors.HasStatusCause(err, metav1.CauseTypeResourceVersionTooLarge)
 }

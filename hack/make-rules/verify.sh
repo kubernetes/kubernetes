@@ -33,7 +33,8 @@ source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
-  "verify-golangci-lint-pr.sh"   # Don't run this as part of the block pull-kubernetes-verify yet. TODO(pohly): try this in a non-blocking job and then reconsider this.
+  "verify-golangci-lint-pr.sh"       # Runs in a separate job for PRs.
+  "verify-golangci-lint-pr-hints.sh" # Runs in a separate job for PRs.
   "verify-licenses.sh"           # runs in a separate job to monitor availability of the dependencies periodically
   "verify-openapi-docs-urls.sh"  # Spams docs URLs, don't run in CI.
   )
@@ -71,6 +72,7 @@ EXCLUDED_PATTERNS+=(
   "verify-vendor-licenses.sh"               # TODO(marun) Fix inconsistent behavior between local and ci execution
   "verify-structured-logging.sh"            # TODO(soltysh) I don't expect us needed it now
   "verify-mocks.sh"                         # TODO(soltysh) I don't expect us needed mocks re-generation
+  "verify-govulncheck.sh"                   # TODO(sairameshv) Newly added check, needs a go package to be installed on the fly
 )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.

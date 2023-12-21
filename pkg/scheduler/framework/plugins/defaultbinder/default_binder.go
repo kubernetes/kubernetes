@@ -38,7 +38,7 @@ type DefaultBinder struct {
 var _ framework.BindPlugin = &DefaultBinder{}
 
 // New creates a DefaultBinder.
-func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	return &DefaultBinder{handle: handle}, nil
 }
 

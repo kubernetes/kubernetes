@@ -257,14 +257,14 @@ func (f *fakePod) probeHandler() v1.ProbeHandler {
 		handler = v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Host: "127.0.0.1",
-				Port: intstr.FromInt(port),
+				Port: intstr.FromInt32(int32(port)),
 			},
 		}
 	} else {
 		handler = v1.ProbeHandler{
 			TCPSocket: &v1.TCPSocketAction{
 				Host: "127.0.0.1",
-				Port: intstr.FromInt(port),
+				Port: intstr.FromInt32(int32(port)),
 			},
 		}
 	}

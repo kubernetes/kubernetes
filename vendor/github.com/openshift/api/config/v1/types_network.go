@@ -85,6 +85,18 @@ type NetworkStatus struct {
 
 	// Migration contains the cluster network migration configuration.
 	Migration *NetworkMigration `json:"migration,omitempty"`
+
+	// conditions represents the observations of a network.config current state.
+	// Known .status.conditions.type are: "NetworkTypeMigrationInProgress", "NetworkTypeMigrationMTUReady",
+	// "NetworkTypeMigrationTargetCNIAvailable", "NetworkTypeMigrationTargetCNIInUse"
+	// and "NetworkTypeMigrationOriginalCNIPurged"
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ClusterNetworkEntry is a contiguous block of IP addresses from which pod IPs

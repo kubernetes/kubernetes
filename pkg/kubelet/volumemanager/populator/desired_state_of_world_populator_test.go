@@ -1189,7 +1189,6 @@ func TestCheckVolumeFSResize(t *testing.T) {
 }
 
 func TestCheckVolumeSELinux(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	fullOpts := &v1.SELinuxOptions{
 		User:  "system_u",
@@ -1295,7 +1294,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 			pvc := &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
 					VolumeName: pv.Name,
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: pv.Spec.Capacity,
 					},
 					AccessModes: tc.accessModes,
@@ -1392,7 +1391,7 @@ func createResizeRelatedVolumes(volumeMode *v1.PersistentVolumeMode) (pv *v1.Per
 	pvc = &v1.PersistentVolumeClaim{
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: pv.Name,
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: pv.Spec.Capacity,
 			},
 		},
@@ -1561,7 +1560,7 @@ func createEphemeralVolumeObjects(podName, volumeName string, owned bool, volume
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: volumeName,
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: pv.Spec.Capacity,
 			},
 		},

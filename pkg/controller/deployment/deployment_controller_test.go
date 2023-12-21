@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/testutil"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -57,7 +57,7 @@ var (
 	noTimestamp = metav1.Time{}
 )
 
-func rs(name string, replicas int, selector map[string]string, timestamp metav1.Time) *apps.ReplicaSet {
+func rs(name string, replicas int32, selector map[string]string, timestamp metav1.Time) *apps.ReplicaSet {
 	return &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
@@ -65,22 +65,22 @@ func rs(name string, replicas int, selector map[string]string, timestamp metav1.
 			Namespace:         metav1.NamespaceDefault,
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To(replicas),
 			Selector: &metav1.LabelSelector{MatchLabels: selector},
 			Template: v1.PodTemplateSpec{},
 		},
 	}
 }
 
-func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map[string]string) *apps.ReplicaSet {
+func newRSWithStatus(name string, specReplicas, statusReplicas int32, selector map[string]string) *apps.ReplicaSet {
 	rs := rs(name, specReplicas, selector, noTimestamp)
 	rs.Status = apps.ReplicaSetStatus{
-		Replicas: int32(statusReplicas),
+		Replicas: statusReplicas,
 	}
 	return rs
 }
 
-func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *apps.Deployment {
+func newDeployment(name string, replicas int32, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *apps.Deployment {
 	d := apps.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -93,11 +93,11 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt32(0); return &i }(),
-					MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt32(0); return &i }(),
+					MaxUnavailable: ptr.To(intstr.FromInt32(0)),
+					MaxSurge:       ptr.To(intstr.FromInt32(0)),
 				},
 			},
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To(replicas),
 			Selector: &metav1.LabelSelector{MatchLabels: selector},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -123,7 +123,7 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 	return &d
 }
 
-func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaSet {
+func newReplicaSet(d *apps.Deployment, name string, replicas int32) *apps.ReplicaSet {
 	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{Kind: "ReplicaSet"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -135,7 +135,7 @@ func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaS
 		},
 		Spec: apps.ReplicaSetSpec{
 			Selector: d.Spec.Selector,
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To(replicas),
 			Template: d.Spec.Template,
 		},
 	}

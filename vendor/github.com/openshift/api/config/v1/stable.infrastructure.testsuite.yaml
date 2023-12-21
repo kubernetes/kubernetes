@@ -993,9 +993,9 @@ tests:
             type: IBMCloud
             ibmcloud:
               serviceEndpoints:
-              - name: DummyVPC
+              - name: VPC
                 url: https://dummy.vpc.com
-              - name: DummyCOS
+              - name: COS
                 url: https://dummy.cos.com
       expected: |
         apiVersion: config.openshift.io/v1
@@ -1010,9 +1010,9 @@ tests:
             type: IBMCloud
             ibmcloud:
               serviceEndpoints:
-              - name: DummyVPC
+              - name: VPC
                 url: https://dummy.vpc.com
-              - name: DummyCOS
+              - name: COS
                 url: https://dummy.cos.com
     - name: Should not be able to add empty (URL) ServiceEndpoints to IBMCloud PlatformStatus
       initial: |
@@ -1035,7 +1035,7 @@ tests:
             type: IBMCloud
             ibmcloud:
               serviceEndpoints:
-              - name: EmptyCOS
+              - name: COS
                 url: " "
       expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[0].url: Invalid value: \"string\": url must be a valid absolute URL"
     - name: Should not be able to add invalid (URL) ServiceEndpoints to IBMCloud PlatformStatus
@@ -1059,8 +1059,34 @@ tests:
             type: IBMCloud
             ibmcloud:
               serviceEndpoints:
-              - name: DummyVPC
+              - name: VPC
                 url: https://dummy.vpc.com
-              - name: BadCOS
+              - name: COS
                 url: dummy-cos-com
       expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[1].url: Invalid value: \"string\": url must be a valid absolute URL"
+    - name: Should not be able to add invalid (Name) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: VPC
+                url: https://dummy.vpc.com
+              - name: BadService
+                url: https://bad-service.com
+      expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[1].name: Unsupported value: \"BadService\": supported values: \"CIS\", \"COS\", \"DNSServices\", \"GlobalSearch\", \"GlobalTagging\", \"HyperProtect\", \"IAM\", \"KeyProtect\", \"ResourceController\", \"ResourceManager\", \"VPC\""

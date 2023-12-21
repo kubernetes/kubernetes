@@ -18,27 +18,29 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-
-	clientv3 "go.etcd.io/etcd/client/v3"
-
 	"k8s.io/klog/v2"
 )
 
@@ -47,6 +49,9 @@ const (
 	incomingBufSize = 100
 	outgoingBufSize = 100
 )
+
+// defaultWatcherMaxLimit is used to facilitate construction tests
+var defaultWatcherMaxLimit int64 = maxLimit
 
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
 var fatalOnDecodeError = false
@@ -63,18 +68,19 @@ func TestOnlySetFatalOnDecodeError(b bool) {
 }
 
 type watcher struct {
-	client        *clientv3.Client
-	codec         runtime.Codec
-	newFunc       func() runtime.Object
-	objectType    string
-	groupResource schema.GroupResource
-	versioner     storage.Versioner
+	client              *clientv3.Client
+	codec               runtime.Codec
+	newFunc             func() runtime.Object
+	objectType          string
+	groupResource       schema.GroupResource
+	versioner           storage.Versioner
+	transformer         value.Transformer
+	getCurrentStorageRV func(context.Context) (uint64, error)
 }
 
 // watchChan implements watch.Interface.
 type watchChan struct {
 	watcher           *watcher
-	transformer       value.Transformer
 	key               string
 	initialRev        int64
 	recursive         bool
@@ -87,35 +93,26 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource schema.GroupResource, newFunc func() runtime.Object, versioner storage.Versioner) *watcher {
-	res := &watcher{
-		client:        client,
-		codec:         codec,
-		groupResource: groupResource,
-		newFunc:       newFunc,
-		versioner:     versioner,
-	}
-	if newFunc == nil {
-		res.objectType = "<unknown>"
-	} else {
-		res.objectType = reflect.TypeOf(newFunc()).String()
-	}
-	return res
-}
-
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
 // If rev is zero, it will return the existing object(s) and then start watching from
 // the maximum revision+1 from returned objects.
 // If rev is non-zero, it will watch events happened after given revision.
-// If recursive is false, it watches on given key.
-// If recursive is true, it watches any children and directories under the key, excluding the root key itself.
-// pred must be non-nil. Only if pred matches the change, it will be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) (watch.Interface, error) {
-	if recursive && !strings.HasSuffix(key, "/") {
+// If opts.Recursive is false, it watches on given key.
+// If opts.Recursive is true, it watches any children and directories under the key, excluding the root key itself.
+// pred must be non-nil. Only if opts.Predicate matches the change, it will be returned.
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
+	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	wc := w.createWatchChan(ctx, key, rev, recursive, progressNotify, transformer, pred)
-	go wc.run()
+	if opts.ProgressNotify && w.newFunc == nil {
+		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
+	}
+	startWatchRV, err := w.getStartWatchResourceVersion(ctx, rev, opts)
+	if err != nil {
+		return nil, err
+	}
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
 	// has already caught up. So in the initial version (given that watchcache
@@ -127,10 +124,9 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, p
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
-		transformer:       transformer,
 		key:               key,
 		initialRev:        rev,
 		recursive:         recursive,
@@ -146,6 +142,62 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 	}
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
 	return wc
+}
+
+// getStartWatchResourceVersion returns a ResourceVersion
+// the watch will be started from.
+// Depending on the input parameters the semantics of the returned ResourceVersion are:
+//   - start at Exact (return resourceVersion)
+//   - start at Most Recent (return an RV from etcd)
+func (w *watcher) getStartWatchResourceVersion(ctx context.Context, resourceVersion int64, opts storage.ListOptions) (int64, error) {
+	if resourceVersion > 0 {
+		return resourceVersion, nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+		return 0, nil
+	}
+	if opts.SendInitialEvents == nil || *opts.SendInitialEvents {
+		// note that when opts.SendInitialEvents=true
+		// we will be issuing a consistent LIST request
+		// against etcd followed by the special bookmark event
+		return 0, nil
+	}
+	// at this point the clients is interested
+	// only in getting a stream of events
+	// starting at the MostRecent point in time (RV)
+	currentStorageRV, err := w.getCurrentStorageRV(ctx)
+	if err != nil {
+		return 0, err
+	}
+	// currentStorageRV is taken from resp.Header.Revision (int64)
+	// and cast to uint64, so it is safe to do reverse
+	// at some point we should unify the interface but that
+	// would require changing  Versioner.UpdateList
+	return int64(currentStorageRV), nil
+}
+
+// isInitialEventsEndBookmarkRequired since there is no way to directly set
+// opts.ProgressNotify from the API and the etcd3 impl doesn't support
+// notification for external clients we simply return initialEventsEndBookmarkRequired
+// to only send the bookmark event after the initial list call.
+//
+// see: https://github.com/kubernetes/kubernetes/issues/120348
+func isInitialEventsEndBookmarkRequired(opts storage.ListOptions) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+		return false
+	}
+	return opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks
+}
+
+// areInitialEventsRequired returns true if all events from the etcd should be returned.
+func areInitialEventsRequired(resourceVersion int64, opts storage.ListOptions) bool {
+	if opts.SendInitialEvents == nil && resourceVersion == 0 {
+		return true // legacy case
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+		return false
+	}
+	return opts.SendInitialEvents != nil && *opts.SendInitialEvents
 }
 
 type etcdError interface {
@@ -173,9 +225,9 @@ func isCancelError(err error) bool {
 	return false
 }
 
-func (wc *watchChan) run() {
+func (wc *watchChan) run(initialEventsEndBookmarkRequired, forceInitialEvents bool) {
 	watchClosedCh := make(chan struct{})
-	go wc.startWatching(watchClosedCh)
+	go wc.startWatching(watchClosedCh, initialEventsEndBookmarkRequired, forceInitialEvents)
 
 	var resultChanWG sync.WaitGroup
 	resultChanWG.Add(1)
@@ -225,17 +277,58 @@ func (wc *watchChan) RequestWatchProgress() error {
 func (wc *watchChan) sync() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
-		opts = append(opts, clientv3.WithPrefix())
+		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
+		rangeEnd := clientv3.GetPrefixRangeEnd(wc.key)
+		opts = append(opts, clientv3.WithRange(rangeEnd))
 	}
-	getResp, err := wc.watcher.client.Get(wc.ctx, wc.key, opts...)
-	if err != nil {
-		return err
+
+	var err error
+	var lastKey []byte
+	var withRev int64
+	var getResp *clientv3.GetResponse
+
+	metricsOp := "get"
+	if wc.recursive {
+		metricsOp = "list"
 	}
-	wc.initialRev = getResp.Header.Revision
-	for _, kv := range getResp.Kvs {
-		wc.sendEvent(parseKV(kv))
+
+	preparedKey := wc.key
+
+	for {
+		startTime := time.Now()
+		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
+		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource.String(), err, startTime)
+		if err != nil {
+			return interpretListError(err, true, preparedKey, wc.key)
+		}
+
+		if len(getResp.Kvs) == 0 && getResp.More {
+			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+		}
+
+		// send items from the response until no more results
+		for i, kv := range getResp.Kvs {
+			lastKey = kv.Key
+			wc.sendEvent(parseKV(kv))
+			// free kv early. Long lists can take O(seconds) to decode.
+			getResp.Kvs[i] = nil
+		}
+
+		if withRev == 0 {
+			wc.initialRev = getResp.Header.Revision
+		}
+
+		// no more results remain
+		if !getResp.More {
+			return nil
+		}
+
+		preparedKey = string(lastKey) + "\x00"
+		if withRev == 0 {
+			withRev = getResp.Header.Revision
+			opts = append(opts, clientv3.WithRev(withRev))
+		}
 	}
-	return nil
 }
 
 func logWatchChannelErr(err error) {
@@ -253,13 +346,43 @@ func logWatchChannelErr(err error) {
 // startWatching does:
 // - get current objects if initialRev=0; set initialRev to current rev
 // - watch on given key and send events to process.
-func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
-	if wc.initialRev == 0 {
+//
+// initialEventsEndBookmarkSent helps us keep track
+// of whether we have sent an annotated bookmark event.
+//
+// it's important to note that we don't
+// need to track the actual RV because
+// we only send the bookmark event
+// after the initial list call.
+//
+// when this variable is set to false,
+// it means we don't have any specific
+// preferences for delivering bookmark events.
+func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEndBookmarkRequired, forceInitialEvents bool) {
+	if wc.initialRev > 0 && forceInitialEvents {
+		currentStorageRV, err := wc.watcher.getCurrentStorageRV(wc.ctx)
+		if err != nil {
+			wc.sendError(err)
+			return
+		}
+		if uint64(wc.initialRev) > currentStorageRV {
+			wc.sendError(storage.NewTooLargeResourceVersionError(uint64(wc.initialRev), currentStorageRV, int(wait.Jitter(1*time.Second, 3).Seconds())))
+			return
+		}
+	}
+	if forceInitialEvents {
 		if err := wc.sync(); err != nil {
 			klog.Errorf("failed to sync with latest state: %v", err)
 			wc.sendError(err)
 			return
 		}
+	}
+	if initialEventsEndBookmarkRequired {
+		wc.sendEvent(func() *event {
+			e := progressNotifyEvent(wc.initialRev)
+			e.isInitialEventsEndBookmark = true
+			return e
+		}())
 	}
 	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
 	if wc.recursive {
@@ -352,13 +475,16 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 	switch {
 	case e.isProgressNotify:
-		if wc.watcher.newFunc == nil {
-			return nil
-		}
 		object := wc.watcher.newFunc()
 		if err := wc.watcher.versioner.UpdateObject(object, uint64(e.rev)); err != nil {
 			klog.Errorf("failed to propagate object version: %v", err)
 			return nil
+		}
+		if e.isInitialEventsEndBookmark {
+			if err := storage.AnnotateInitialEventsEndBookmark(object); err != nil {
+				wc.sendError(fmt.Errorf("error while accessing object's metadata gr: %v, type: %v, obj: %#v, err: %v", wc.watcher.groupResource, wc.watcher.objectType, object, err))
+				return nil
+			}
 		}
 		res = &watch.Event{
 			Type:   watch.Bookmark,
@@ -447,7 +573,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	}
 
 	if !e.isDeleted {
-		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -462,7 +588,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}

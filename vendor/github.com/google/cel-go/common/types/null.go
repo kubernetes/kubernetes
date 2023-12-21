@@ -30,8 +30,6 @@ import (
 type Null structpb.NullValue
 
 var (
-	// NullType singleton.
-	NullType = NewTypeValue("null_type")
 	// NullValue singleton.
 	NullValue = Null(structpb.NullValue_NULL_VALUE)
 

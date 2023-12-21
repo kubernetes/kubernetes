@@ -15,7 +15,7 @@
 package gce
 
 import (
-	"io/ioutil"
+	"os"
 	"strings"
 
 	info "github.com/google/cadvisor/info/v1"
@@ -39,7 +39,7 @@ type provider struct{}
 var _ cloudinfo.CloudProvider = provider{}
 
 func (provider) IsActiveProvider() bool {
-	data, err := ioutil.ReadFile(gceProductName)
+	data, err := os.ReadFile(gceProductName)
 	if err != nil {
 		klog.V(2).Infof("Error while reading product_name: %v", err)
 		return false

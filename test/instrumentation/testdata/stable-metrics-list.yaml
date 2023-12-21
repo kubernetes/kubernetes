@@ -96,23 +96,6 @@
   labels:
   - name
   - stage
-- name: healthcheck
-  namespace: kubernetes
-  help: This metric records the result of a single healthcheck.
-  type: Gauge
-  stabilityLevel: BETA
-  labels:
-  - name
-  - type
-- name: healthchecks_total
-  namespace: kubernetes
-  help: This metric records the results of all healthcheck.
-  type: Counter
-  stabilityLevel: BETA
-  labels:
-  - name
-  - status
-  - type
 - name: registered_metrics_total
   help: The count of registered metrics broken by stability level and deprecation
     version.
@@ -121,6 +104,35 @@
   labels:
   - deprecated_version
   - stability_level
+- name: pod_scheduling_sli_duration_seconds
+  subsystem: scheduler
+  help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
+    queue an d might involve multiple scheduling attempts.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - attempts
+  buckets:
+  - 0.01
+  - 0.02
+  - 0.04
+  - 0.08
+  - 0.16
+  - 0.32
+  - 0.64
+  - 1.28
+  - 2.56
+  - 5.12
+  - 10.24
+  - 20.48
+  - 40.96
+  - 81.92
+  - 163.84
+  - 327.68
+  - 655.36
+  - 1310.72
+  - 2621.44
+  - 5242.88
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
@@ -292,11 +304,36 @@
   - 1e+08
   - 1e+09
 - name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind.
+  help: Number of stored objects at the time of last check split by kind. In case
+    of a fetching error, the value will be -1.
   type: Gauge
   stabilityLevel: STABLE
   labels:
   - resource
+- name: container_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the container in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_memory_working_set_bytes
+  help: Current working set of the container in bytes
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_start_time_seconds
+  help: Start time of the container since unix epoch in seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
 - name: job_creation_skew_duration_seconds
   subsystem: cronjob_controller
   help: Time between when a cronjob is scheduled to be run, and when the corresponding
@@ -393,6 +430,23 @@
   - priority
   - resource
   - unit
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - status
+  - type
 - name: evictions_total
   subsystem: node_collector
   help: Number of Node evictions that happened since current instance of NodeController
@@ -401,6 +455,32 @@
   stabilityLevel: STABLE
   labels:
   - zone
+- name: node_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the node in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+- name: node_memory_working_set_bytes
+  help: Current working set of the node in bytes
+  type: Custom
+  stabilityLevel: STABLE
+- name: pod_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the pod in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - pod
+  - namespace
+- name: pod_memory_working_set_bytes
+  help: Current working set of the pod in bytes
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - pod
+  - namespace
+- name: resource_scrape_error
+  help: 1 if there was an error while getting container metrics, 0 otherwise
+  type: Custom
+  stabilityLevel: STABLE
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
   help: Latency for running all plugins of a specific extension point.
@@ -450,6 +530,7 @@
   help: E2e latency for a pod being scheduled which may include multiple scheduling
     attempts.
   type: Histogram
+  deprecatedVersion: 1.28.0
   stabilityLevel: STABLE
   labels:
   - attempts

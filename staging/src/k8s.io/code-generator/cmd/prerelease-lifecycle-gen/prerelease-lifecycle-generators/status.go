@@ -204,7 +204,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		if ptag != nil {
 			pkgNeedsGeneration, err = strconv.ParseBool(ptag.value)
 			if err != nil {
-				klog.Fatalf("Package %v: unsupported %s value: %q :%w", i, tagEnabledName, ptag.value, err)
+				klog.Fatalf("Package %v: unsupported %s value: %q :%v", i, tagEnabledName, ptag.value, err)
 			}
 		}
 		if !pkgNeedsGeneration {

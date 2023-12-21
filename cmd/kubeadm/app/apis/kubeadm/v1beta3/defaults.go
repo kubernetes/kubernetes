@@ -135,6 +135,7 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
 }
 
+// SetDefaults_JoinControlPlane assigns default values for a joining control plane node
 func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
 	if obj != nil {
 		SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)

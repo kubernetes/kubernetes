@@ -2,11 +2,15 @@
 
 package v1
 
+import (
+	v1 "github.com/openshift/api/config/v1"
+)
+
 // IBMCloudServiceEndpointApplyConfiguration represents an declarative configuration of the IBMCloudServiceEndpoint type for use
 // with apply.
 type IBMCloudServiceEndpointApplyConfiguration struct {
-	Name *string `json:"name,omitempty"`
-	URL  *string `json:"url,omitempty"`
+	Name *v1.IBMCloudServiceName `json:"name,omitempty"`
+	URL  *string                 `json:"url,omitempty"`
 }
 
 // IBMCloudServiceEndpointApplyConfiguration constructs an declarative configuration of the IBMCloudServiceEndpoint type for use with
@@ -18,7 +22,7 @@ func IBMCloudServiceEndpoint() *IBMCloudServiceEndpointApplyConfiguration {
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *IBMCloudServiceEndpointApplyConfiguration) WithName(value string) *IBMCloudServiceEndpointApplyConfiguration {
+func (b *IBMCloudServiceEndpointApplyConfiguration) WithName(value v1.IBMCloudServiceName) *IBMCloudServiceEndpointApplyConfiguration {
 	b.Name = &value
 	return b
 }

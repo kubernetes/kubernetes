@@ -23,12 +23,13 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/google/cel-go/checker/decls"
+	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/containers"
+	"github.com/google/cel-go/common/functions"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/pb"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
-	"github.com/google/cel-go/interpreter/functions"
 	"github.com/google/cel-go/parser"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
@@ -40,13 +41,6 @@ import (
 // effects, compatibility restrictions, and standard conformance.
 const (
 	_ = iota
-
-	// Disallow heterogeneous aggregate (list, map) literals.
-	// Note, it is still possible to have heterogeneous aggregates when
-	// provided as variables to the expression, as well as via conversion
-	// of well-known dynamic types, or with unchecked expressions.
-	// Affects checking.  Provides a subset of standard behavior.
-	featureDisableDynamicAggregateLiterals
 
 	// Enable the tracking of function call expressions replaced by macros.
 	featureEnableMacroCallTracking
@@ -63,9 +57,10 @@ const (
 	// is not already in UTC.
 	featureDefaultUTCTimeZone
 
-	// Enable the use of optional types in the syntax, type-system, type-checking,
-	// and runtime.
-	featureOptionalTypes
+	// Enable the serialization of logical operator ASTs as variadic calls, thus
+	// compressing the logic graph to a single call when multiple like-operator
+	// expressions occur: e.g. a && b && c && d -> call(_&&_, [a, b, c, d])
+	featureVariadicLogicalASTs
 )
 
 // EnvOption is a functional interface for configuring the environment.
@@ -82,23 +77,26 @@ func ClearMacros() EnvOption {
 	}
 }
 
-// CustomTypeAdapter swaps the default ref.TypeAdapter implementation with a custom one.
+// CustomTypeAdapter swaps the default types.Adapter implementation with a custom one.
 //
 // Note: This option must be specified before the Types and TypeDescs options when used together.
-func CustomTypeAdapter(adapter ref.TypeAdapter) EnvOption {
+func CustomTypeAdapter(adapter types.Adapter) EnvOption {
 	return func(e *Env) (*Env, error) {
 		e.adapter = adapter
 		return e, nil
 	}
 }
 
-// CustomTypeProvider swaps the default ref.TypeProvider implementation with a custom one.
+// CustomTypeProvider replaces the types.Provider implementation with a custom one.
+//
+// The `provider` variable type may either be types.Provider or ref.TypeProvider (deprecated)
 //
 // Note: This option must be specified before the Types and TypeDescs options when used together.
-func CustomTypeProvider(provider ref.TypeProvider) EnvOption {
+func CustomTypeProvider(provider any) EnvOption {
 	return func(e *Env) (*Env, error) {
-		e.provider = provider
-		return e, nil
+		var err error
+		e.provider, err = maybeInteropProvider(provider)
+		return e, err
 	}
 }
 
@@ -108,8 +106,28 @@ func CustomTypeProvider(provider ref.TypeProvider) EnvOption {
 // for the environment. The NewEnv call builds on top of the standard CEL declarations. For a
 // purely custom set of declarations use NewCustomEnv.
 func Declarations(decls ...*exprpb.Decl) EnvOption {
+	declOpts := []EnvOption{}
+	var err error
+	var opt EnvOption
+	// Convert the declarations to `EnvOption` values ahead of time.
+	// Surface any errors in conversion when the options are applied.
+	for _, d := range decls {
+		opt, err = ExprDeclToDeclaration(d)
+		if err != nil {
+			break
+		}
+		declOpts = append(declOpts, opt)
+	}
 	return func(e *Env) (*Env, error) {
-		e.declarations = append(e.declarations, decls...)
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range declOpts {
+			e, err = o(e)
+			if err != nil {
+				return nil, err
+			}
+		}
 		return e, nil
 	}
 }
@@ -126,14 +144,25 @@ func EagerlyValidateDeclarations(enabled bool) EnvOption {
 	return features(featureEagerlyValidateDeclarations, enabled)
 }
 
-// HomogeneousAggregateLiterals option ensures that list and map literal entry types must agree
-// during type-checking.
+// HomogeneousAggregateLiterals disables mixed type list and map literal values.
 //
 // Note, it is still possible to have heterogeneous aggregates when provided as variables to the
 // expression, as well as via conversion of well-known dynamic types, or with unchecked
 // expressions.
 func HomogeneousAggregateLiterals() EnvOption {
-	return features(featureDisableDynamicAggregateLiterals, true)
+	return ASTValidators(ValidateHomogeneousAggregateLiterals())
+}
+
+// variadicLogicalOperatorASTs flatten like-operator chained logical expressions into a single
+// variadic call with N-terms. This behavior is useful when serializing to a protocol buffer as
+// it will reduce the number of recursive calls needed to deserialize the AST later.
+//
+// For example, given the following expression the call graph will be rendered accordingly:
+//
+//	expression: a && b && c && (d || e)
+//	ast: call(_&&_, [a, b, c, call(_||_, [d, e])])
+func variadicLogicalOperatorASTs() EnvOption {
+	return features(featureVariadicLogicalASTs, true)
 }
 
 // Macros option extends the macro set configured in the environment.
@@ -226,7 +255,12 @@ func Abbrevs(qualifiedNames ...string) EnvOption {
 // Note: This option must be specified after the CustomTypeProvider option when used together.
 func Types(addTypes ...any) EnvOption {
 	return func(e *Env) (*Env, error) {
-		reg, isReg := e.provider.(ref.TypeRegistry)
+		var reg ref.TypeRegistry
+		var isReg bool
+		reg, isReg = e.provider.(*types.Registry)
+		if !isReg {
+			reg, isReg = e.provider.(ref.TypeRegistry)
+		}
 		if !isReg {
 			return nil, fmt.Errorf("custom types not supported by provider: %T", e.provider)
 		}
@@ -436,6 +470,24 @@ func InterruptCheckFrequency(checkFrequency uint) ProgramOption {
 	}
 }
 
+// CostEstimatorOptions configure type-check time options for estimating expression cost.
+func CostEstimatorOptions(costOpts ...checker.CostOption) EnvOption {
+	return func(e *Env) (*Env, error) {
+		e.costOptions = append(e.costOptions, costOpts...)
+		return e, nil
+	}
+}
+
+// CostTrackerOptions configures a set of options for cost-tracking.
+//
+// Note, CostTrackerOptions is a no-op unless CostTracking is also enabled.
+func CostTrackerOptions(costOpts ...interpreter.CostTrackerOption) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.costOptions = append(p.costOptions, costOpts...)
+		return p, nil
+	}
+}
+
 // CostTracking enables cost tracking and registers a ActualCostEstimator that can optionally provide a runtime cost estimate for any function calls.
 func CostTracking(costEstimator interpreter.ActualCostEstimator) ProgramOption {
 	return func(p *prog) (*prog, error) {
@@ -457,25 +509,21 @@ func CostLimit(costLimit uint64) ProgramOption {
 	}
 }
 
-func fieldToCELType(field protoreflect.FieldDescriptor) (*exprpb.Type, error) {
+func fieldToCELType(field protoreflect.FieldDescriptor) (*Type, error) {
 	if field.Kind() == protoreflect.MessageKind || field.Kind() == protoreflect.GroupKind {
 		msgName := (string)(field.Message().FullName())
-		wellKnownType, found := pb.CheckedWellKnowns[msgName]
-		if found {
-			return wellKnownType, nil
-		}
-		return decls.NewObjectType(msgName), nil
+		return ObjectType(msgName), nil
 	}
-	if primitiveType, found := pb.CheckedPrimitives[field.Kind()]; found {
+	if primitiveType, found := types.ProtoCELPrimitives[field.Kind()]; found {
 		return primitiveType, nil
 	}
 	if field.Kind() == protoreflect.EnumKind {
-		return decls.Int, nil
+		return IntType, nil
 	}
 	return nil, fmt.Errorf("field %s type %s not implemented", field.FullName(), field.Kind().String())
 }
 
-func fieldToDecl(field protoreflect.FieldDescriptor) (*exprpb.Decl, error) {
+func fieldToVariable(field protoreflect.FieldDescriptor) (EnvOption, error) {
 	name := string(field.Name())
 	if field.IsMap() {
 		mapKey := field.MapKey()
@@ -488,20 +536,20 @@ func fieldToDecl(field protoreflect.FieldDescriptor) (*exprpb.Decl, error) {
 		if err != nil {
 			return nil, err
 		}
-		return decls.NewVar(name, decls.NewMapType(keyType, valueType)), nil
+		return Variable(name, MapType(keyType, valueType)), nil
 	}
 	if field.IsList() {
 		elemType, err := fieldToCELType(field)
 		if err != nil {
 			return nil, err
 		}
-		return decls.NewVar(name, decls.NewListType(elemType)), nil
+		return Variable(name, ListType(elemType)), nil
 	}
 	celType, err := fieldToCELType(field)
 	if err != nil {
 		return nil, err
 	}
-	return decls.NewVar(name, celType), nil
+	return Variable(name, celType), nil
 }
 
 // DeclareContextProto returns an option to extend CEL environment with declarations from the given context proto.
@@ -509,23 +557,51 @@ func fieldToDecl(field protoreflect.FieldDescriptor) (*exprpb.Decl, error) {
 // https://github.com/google/cel-spec/blob/master/doc/langdef.md#evaluation-environment
 func DeclareContextProto(descriptor protoreflect.MessageDescriptor) EnvOption {
 	return func(e *Env) (*Env, error) {
-		var decls []*exprpb.Decl
 		fields := descriptor.Fields()
 		for i := 0; i < fields.Len(); i++ {
 			field := fields.Get(i)
-			decl, err := fieldToDecl(field)
+			variable, err := fieldToVariable(field)
 			if err != nil {
 				return nil, err
 			}
-			decls = append(decls, decl)
-		}
-		var err error
-		e, err = Declarations(decls...)(e)
-		if err != nil {
-			return nil, err
+			e, err = variable(e)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return Types(dynamicpb.NewMessage(descriptor))(e)
 	}
+}
+
+// ContextProtoVars uses the fields of the input proto.Messages as top-level variables within an Activation.
+//
+// Consider using with `DeclareContextProto` to simplify variable type declarations and publishing when using
+// protocol buffers.
+func ContextProtoVars(ctx proto.Message) (interpreter.Activation, error) {
+	if ctx == nil || !ctx.ProtoReflect().IsValid() {
+		return interpreter.EmptyActivation(), nil
+	}
+	reg, err := types.NewRegistry(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pbRef := ctx.ProtoReflect()
+	typeName := string(pbRef.Descriptor().FullName())
+	fields := pbRef.Descriptor().Fields()
+	vars := make(map[string]any, fields.Len())
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		sft, found := reg.FindStructFieldType(typeName, field.TextName())
+		if !found {
+			return nil, fmt.Errorf("no such field: %s", field.TextName())
+		}
+		fieldVal, err := sft.GetFrom(ctx)
+		if err != nil {
+			return nil, err
+		}
+		vars[field.TextName()] = fieldVal
+	}
+	return interpreter.NewActivation(vars)
 }
 
 // EnableMacroCallTracking ensures that call expressions which are replaced by macros
@@ -543,13 +619,6 @@ func CrossTypeNumericComparisons(enabled bool) EnvOption {
 // input time's local timezone.
 func DefaultUTCTimeZone(enabled bool) EnvOption {
 	return features(featureDefaultUTCTimeZone, enabled)
-}
-
-// OptionalTypes enable support for optional syntax and types in CEL. The optional value type makes
-// it possible to express whether variables have been provided, whether a result has been computed,
-// and in the future whether an object field path, map key value, or list index has a value.
-func OptionalTypes() EnvOption {
-	return Lib(optionalLibrary{})
 }
 
 // features sets the given feature flags.  See list of Feature constants above.
@@ -575,5 +644,16 @@ func ParserExpressionSizeLimit(limit int) EnvOption {
 	return func(e *Env) (*Env, error) {
 		e.prsrOpts = append(e.prsrOpts, parser.ExpressionSizeCodePointLimit(limit))
 		return e, nil
+	}
+}
+
+func maybeInteropProvider(provider any) (types.Provider, error) {
+	switch p := provider.(type) {
+	case types.Provider:
+		return p, nil
+	case ref.TypeProvider:
+		return &interopCELTypeProvider{TypeProvider: p}, nil
+	default:
+		return nil, fmt.Errorf("unsupported type provider: %T", provider)
 	}
 }

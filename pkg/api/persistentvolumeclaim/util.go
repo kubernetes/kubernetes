@@ -35,6 +35,14 @@ const (
 // DropDisabledFields removes disabled fields from the pvc spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pvc spec.
 func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
+	// Drop the contents of the volumeAttributesClassName if the VolumeAttributesClass
+	// feature gate is disabled.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if oldPVCSpec == nil || oldPVCSpec.VolumeAttributesClassName == nil {
+			pvcSpec.VolumeAttributesClassName = nil
+		}
+	}
+
 	// Drop the contents of the dataSourceRef field if the AnyVolumeDataSource
 	// feature gate is disabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
@@ -51,10 +59,6 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 			pvcSpec.DataSourceRef = nil
 		}
 	}
-
-	// Setting VolumeClaimTemplate.Resources.Claims should have been caught by validation when
-	// extending ResourceRequirements in 1.26. Now we can only accept it and drop the field.
-	pvcSpec.Resources.Claims = nil
 }
 
 // EnforceDataSourceBackwardsCompatibility drops the data source field under certain conditions
@@ -95,6 +99,15 @@ func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.Persisten
 }
 
 func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if oldPVC == nil || oldPVC.Status.CurrentVolumeAttributesClassName == nil {
+			pvc.Status.CurrentVolumeAttributesClassName = nil
+		}
+		if oldPVC == nil || oldPVC.Status.ModifyVolumeStatus == nil {
+			pvc.Status.ModifyVolumeStatus = nil
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
 		if !helper.ClaimContainsAllocatedResources(oldPVC) {
 			pvc.Status.AllocatedResources = nil

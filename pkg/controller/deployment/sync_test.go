@@ -32,19 +32,15 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/utils/ptr"
 )
-
-func intOrStrP(val int) *intstr.IntOrString {
-	intOrStr := intstr.FromInt(val)
-	return &intOrStr
-}
 
 func TestScale(t *testing.T) {
 	newTimestamp := metav1.Date(2016, 5, 20, 2, 0, 0, 0, time.UTC)
 	oldTimestamp := metav1.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
 	olderTimestamp := metav1.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
 
-	var updatedTemplate = func(replicas int) *apps.Deployment {
+	var updatedTemplate = func(replicas int32) *apps.Deployment {
 		d := newDeployment("foo", replicas, nil, nil, nil, map[string]string{"foo": "bar"})
 		d.Spec.Template.Labels["another"] = "label"
 		return d
@@ -221,8 +217,8 @@ func TestScale(t *testing.T) {
 		},
 		{
 			name:          "deployment with surge pods",
-			deployment:    newDeployment("foo", 20, nil, intOrStrP(2), nil, nil),
-			oldDeployment: newDeployment("foo", 10, nil, intOrStrP(2), nil, nil),
+			deployment:    newDeployment("foo", 20, nil, ptr.To(intstr.FromInt32(2)), nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, ptr.To(intstr.FromInt32(2)), nil, nil),
 
 			newRS:  rs("foo-v2", 6, nil, newTimestamp),
 			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
@@ -232,8 +228,8 @@ func TestScale(t *testing.T) {
 		},
 		{
 			name:          "change both surge and size",
-			deployment:    newDeployment("foo", 50, nil, intOrStrP(6), nil, nil),
-			oldDeployment: newDeployment("foo", 10, nil, intOrStrP(3), nil, nil),
+			deployment:    newDeployment("foo", 50, nil, ptr.To(intstr.FromInt32(6)), nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, ptr.To(intstr.FromInt32(3)), nil, nil),
 
 			newRS:  rs("foo-v2", 5, nil, newTimestamp),
 			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 8, nil, oldTimestamp)},
@@ -254,8 +250,8 @@ func TestScale(t *testing.T) {
 		},
 		{
 			name:          "saturated but broken new replica set does not affect old pods",
-			deployment:    newDeployment("foo", 2, nil, intOrStrP(1), intOrStrP(1), nil),
-			oldDeployment: newDeployment("foo", 2, nil, intOrStrP(1), intOrStrP(1), nil),
+			deployment:    newDeployment("foo", 2, nil, ptr.To(intstr.FromInt32(1)), ptr.To(intstr.FromInt32(1)), nil),
+			oldDeployment: newDeployment("foo", 2, nil, ptr.To(intstr.FromInt32(1)), ptr.To(intstr.FromInt32(1)), nil),
 
 			newRS: func() *apps.ReplicaSet {
 				rs := rs("foo-v2", 2, nil, newTimestamp)
@@ -458,7 +454,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 	now := metav1.Now()
 	duration := time.Minute
 
-	newRSWithRevisionAndCreationTimestamp := func(name string, replicas int, selector map[string]string, timestamp time.Time, revision string) *apps.ReplicaSet {
+	newRSWithRevisionAndCreationTimestamp := func(name string, replicas int32, selector map[string]string, timestamp time.Time, revision string) *apps.ReplicaSet {
 		rs := rs(name, replicas, selector, metav1.NewTime(timestamp))
 		if revision != "" {
 			rs.Annotations = map[string]string{

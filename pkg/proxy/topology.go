@@ -84,12 +84,12 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 	for _, ep := range endpoints {
 		if ep.IsReady() {
 			hasAnyEndpoints = true
-			if ep.GetIsLocal() {
+			if ep.IsLocal() {
 				hasLocalReadyEndpoints = true
 			}
 		} else if ep.IsServing() && ep.IsTerminating() {
 			hasAnyEndpoints = true
-			if ep.GetIsLocal() {
+			if ep.IsLocal() {
 				hasLocalServingTerminatingEndpoints = true
 			}
 		}
@@ -97,12 +97,12 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 
 	if hasLocalReadyEndpoints {
 		localEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
-			return ep.GetIsLocal() && ep.IsReady()
+			return ep.IsLocal() && ep.IsReady()
 		})
 	} else if hasLocalServingTerminatingEndpoints {
 		useServingTerminatingEndpoints = true
 		localEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
-			return ep.GetIsLocal() && ep.IsServing() && ep.IsTerminating()
+			return ep.IsLocal() && ep.IsServing() && ep.IsTerminating()
 		})
 	}
 
@@ -165,12 +165,12 @@ func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[st
 		if !endpoint.IsReady() {
 			continue
 		}
-		if endpoint.GetZoneHints().Len() == 0 {
-			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
+		if endpoint.ZoneHints().Len() == 0 {
+			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint", "endpoint", endpoint)
 			return false
 		}
 
-		if endpoint.GetZoneHints().Has(zone) {
+		if endpoint.ZoneHints().Has(zone) {
 			hasEndpointForZone = true
 		}
 	}
@@ -187,7 +187,7 @@ func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[st
 // topology constraints. (It assumes that canUseTopology() returned true.)
 func availableForTopology(endpoint Endpoint, nodeLabels map[string]string) bool {
 	zone := nodeLabels[v1.LabelTopologyZone]
-	return endpoint.GetZoneHints().Has(zone)
+	return endpoint.ZoneHints().Has(zone)
 }
 
 // filterEndpoints filters endpoints according to predicate

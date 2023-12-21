@@ -60,6 +60,11 @@ func CheckRunAsUser() Check {
 }
 
 func runAsUser_1_23(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	// See KEP-127: https://github.com/kubernetes/enhancements/blob/308ba8d/keps/sig-node/127-user-namespaces/README.md?plain=1#L411-L447
+	if relaxPolicyForUserNamespacePod(podSpec) {
+		return CheckResult{Allowed: true}
+	}
+
 	// things that explicitly set runAsUser=0
 	var badSetters []string
 

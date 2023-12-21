@@ -109,23 +109,25 @@ type ClusterCSIDriverSpec struct {
 }
 
 // CSIDriverType indicates type of CSI driver being configured.
-// +kubebuilder:validation:Enum="";AWS;Azure;GCP;vSphere
+// +kubebuilder:validation:Enum="";AWS;Azure;GCP;IBMCloud;vSphere
 type CSIDriverType string
 
 const (
-	AWSDriverType     CSIDriverType = "AWS"
-	AzureDriverType   CSIDriverType = "Azure"
-	GCPDriverType     CSIDriverType = "GCP"
-	VSphereDriverType CSIDriverType = "vSphere"
+	AWSDriverType      CSIDriverType = "AWS"
+	AzureDriverType    CSIDriverType = "Azure"
+	GCPDriverType      CSIDriverType = "GCP"
+	IBMCloudDriverType CSIDriverType = "IBMCloud"
+	VSphereDriverType  CSIDriverType = "vSphere"
 )
 
 // CSIDriverConfigSpec defines configuration spec that can be
 // used to optionally configure a specific CSI Driver.
+// +kubebuilder:validation:XValidation:rule="has(self.driverType) && self.driverType == 'IBMCloud' ? has(self.ibmcloud) : !has(self.ibmcloud)",message="ibmcloud must be set if driverType is 'IBMCloud', but remain unset otherwise"
 // +union
 type CSIDriverConfigSpec struct {
 	// driverType indicates type of CSI driver for which the
 	// driverConfig is being applied to.
-	// Valid values are: AWS, Azure, GCP, vSphere and omitted.
+	// Valid values are: AWS, Azure, GCP, IBMCloud, vSphere and omitted.
 	// Consumers should treat unknown values as a NO-OP.
 	// +kubebuilder:validation:Required
 	// +unionDiscriminator
@@ -142,6 +144,10 @@ type CSIDriverConfigSpec struct {
 	// gcp is used to configure the GCP CSI driver.
 	// +optional
 	GCP *GCPCSIDriverConfigSpec `json:"gcp,omitempty"`
+
+	// ibmcloud is used to configure the IBM Cloud CSI driver.
+	// +optional
+	IBMCloud *IBMCloudCSIDriverConfigSpec `json:"ibmcloud,omitempty"`
 
 	// vsphere is used to configure the vsphere CSI driver.
 	// +optional
@@ -246,6 +252,17 @@ type GCPCSIDriverConfigSpec struct {
 	// encryption keys, rather than the default keys managed by GCP.
 	// +optional
 	KMSKey *GCPKMSKeyReference `json:"kmsKey,omitempty"`
+}
+
+// IBMCloudCSIDriverConfigSpec defines the properties that can be configured for the IBM Cloud CSI driver.
+type IBMCloudCSIDriverConfigSpec struct {
+	// encryptionKeyCRN is the IBM Cloud CRN of the customer-managed root key to use
+	// for disk encryption of volumes for the default storage classes.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength:=154
+	// +kubebuilder:validation:MinLength:=144
+	// +kubebuilder:validation:Pattern:=`^crn:v[0-9]+:bluemix:(public|private):(kms|hs-crypto):[a-z-]+:a/[0-9a-f]+:[0-9a-f-]{36}:key:[0-9a-f-]{36}$`
+	EncryptionKeyCRN string `json:"encryptionKeyCRN"`
 }
 
 // VSphereCSIDriverConfigSpec defines properties that

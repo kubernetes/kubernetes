@@ -94,7 +94,19 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	images = append(images, GetKubernetesImage(constants.KubeAPIServer, cfg))
 	images = append(images, GetKubernetesImage(constants.KubeControllerManager, cfg))
 	images = append(images, GetKubernetesImage(constants.KubeScheduler, cfg))
-	images = append(images, GetKubernetesImage(constants.KubeProxy, cfg))
+
+	// if Proxy addon is not disable then add the image
+	if cfg.Proxy.Disabled {
+		klog.V(1).Infof("skipping the kube-proxy image pull since the bundled addon is disabled")
+	} else {
+		images = append(images, GetKubernetesImage(constants.KubeProxy, cfg))
+	}
+	// if DNS addon is not disable then add the image
+	if cfg.DNS.Disabled {
+		klog.V(1).Infof("skipping the CoreDNS image pull since the bundled addon is disabled")
+	} else {
+		images = append(images, GetDNSImage(cfg))
+	}
 
 	// pause is not available on the ci image repository so use the default image repository.
 	images = append(images, GetPauseImage(cfg))
@@ -103,9 +115,6 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	if cfg.Etcd.Local != nil {
 		images = append(images, GetEtcdImage(cfg))
 	}
-
-	// Append the appropriate DNS images
-	images = append(images, GetDNSImage(cfg))
 
 	return images
 }

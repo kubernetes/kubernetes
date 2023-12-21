@@ -1765,9 +1765,11 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	now := time.Now()
 	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	snapshotAPIGroup := "snapshot.storage.k8s.io"
+	defaultDescriberSettings := &DescriberSettings{ShowEvents: true}
 	testCases := []struct {
 		name               string
 		pvc                *corev1.PersistentVolumeClaim
+		describerSettings  *DescriberSettings
 		expectedElements   []string
 		unexpectedElements []string
 	}{
@@ -1783,6 +1785,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 					Phase: corev1.ClaimBound,
 				},
 			},
+			expectedElements:   []string{"Events"},
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
@@ -1967,13 +1970,36 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 			},
 			expectedElements: []string{"DataSource:\n  APIGroup:  snapshot.storage.k8s.io\n  Kind:      VolumeSnapshot\n  Name:      src-snapshot\n"},
 		},
+		{
+			name: "no-show-events",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			unexpectedElements: []string{"Events"},
+			describerSettings:  &DescriberSettings{ShowEvents: false},
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			fake := fake.NewSimpleClientset(test.pvc)
 			c := PersistentVolumeClaimDescriber{fake}
-			str, err := c.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+
+			var describerSettings DescriberSettings
+			if test.describerSettings != nil {
+				describerSettings = *test.describerSettings
+			} else {
+				describerSettings = *defaultDescriberSettings
+			}
+
+			str, err := c.Describe("foo", "bar", describerSettings)
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", test.name, err)
 			}
@@ -1989,6 +2015,123 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				if strings.Contains(str, unexpected) {
 					t.Errorf("unexpected to find %q in output: %q", unexpected, str)
 				}
+			}
+		})
+	}
+}
+
+func TestGetPodsForPVC(t *testing.T) {
+	goldClassName := "gold"
+	testCases := []struct {
+		name            string
+		pvc             *corev1.PersistentVolumeClaim
+		requiredObjects []runtime.Object
+		expectedPods    []string
+	}{
+		{
+			name: "pvc-unused",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pvc-name"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			expectedPods: []string{},
+		},
+		{
+			name: "pvc-in-pods-volumes-list",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pvc-name"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			requiredObjects: []runtime.Object{
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-name"},
+					Spec: corev1.PodSpec{
+						Volumes: []corev1.Volume{
+							{
+								Name: "volume",
+								VolumeSource: corev1.VolumeSource{
+									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc-name",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPods: []string{"pod-name"},
+		},
+		{
+			name: "pvc-owned-by-pod",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pvc-name",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Kind: "Pod",
+							Name: "pod-name",
+							UID:  "pod-uid",
+						},
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			requiredObjects: []runtime.Object{
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-name", UID: "pod-uid"},
+				},
+			},
+			expectedPods: []string{"pod-name"},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			var objects []runtime.Object
+			objects = append(objects, test.requiredObjects...)
+			objects = append(objects, test.pvc)
+			fake := fake.NewSimpleClientset(objects...)
+
+			pods, err := getPodsForPVC(fake.CoreV1().Pods(test.pvc.ObjectMeta.Namespace), test.pvc, DescriberSettings{})
+			if err != nil {
+				t.Errorf("Unexpected error for test %s: %v", test.name, err)
+			}
+
+			for _, expectedPod := range test.expectedPods {
+				foundPod := false
+				for _, pod := range pods {
+					if pod.Name == expectedPod {
+						foundPod = true
+						break
+					}
+				}
+
+				if !foundPod {
+					t.Errorf("Expected pod %s, but it was not returned: %v", expectedPod, pods)
+				}
+			}
+
+			if len(test.expectedPods) != len(pods) {
+				t.Errorf("Expected %d pods, but got %d pods", len(test.expectedPods), len(pods))
 			}
 		})
 	}
@@ -5456,6 +5599,156 @@ func TestDescribeNode(t *testing.T) {
 	}
 }
 
+func TestDescribeNodeWithSidecar(t *testing.T) {
+	holderIdentity := "holder"
+	nodeCapacity := mergeResourceLists(
+		getHugePageResourceList("2Mi", "4Gi"),
+		getResourceList("8", "24Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+	nodeAllocatable := mergeResourceLists(
+		getHugePageResourceList("2Mi", "2Gi"),
+		getResourceList("4", "12Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+
+	restartPolicy := corev1.ContainerRestartPolicyAlways
+	fake := fake.NewSimpleClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
+			},
+		},
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: &holderIdentity,
+				AcquireTime:    &metav1.MicroTime{Time: time.Now().Add(-time.Hour)},
+				RenewTime:      &metav1.MicroTime{Time: time.Now()},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-with-resources",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					// sidecar, should sum into the total resources
+					{
+						Name:          "init-container-1",
+						RestartPolicy: &restartPolicy,
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+						},
+					},
+					// non-sidecar
+					{
+						Name: "init-container-2",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+						},
+					},
+				},
+				Containers: []corev1.Container{
+					{
+						Name:  "cpu-mem",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+							Limits:   getResourceList("2", "2Gi"),
+						},
+					},
+					{
+						Name:  "hugepages",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getHugePageResourceList("2Mi", "512Mi"),
+							Limits:   getHugePageResourceList("2Mi", "512Mi"),
+						},
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
+		&corev1.EventList{
+			Items: []corev1.Event{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-1",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "bar",
+					},
+					Message:        "Node bar status is now: NodeHasNoDiskPressure",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           corev1.EventTypeNormal,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-2",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "0ceac5fb-a393-49d7-b04f-9ea5f18de5e9",
+					},
+					Message:        "Node bar status is now: NodeReady",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          2,
+					Type:           corev1.EventTypeNormal,
+				},
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := []string{"Unschedulable", "true", "holder",
+		`Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests     Limits
+  --------           --------     ------
+  cpu                2 (50%)      2 (50%)
+  memory             2Gi (16%)    2Gi (16%)
+  ephemeral-storage  0 (0%)       0 (0%)
+  hugepages-1Gi      0 (0%)       0 (0%)
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
+		`Node bar status is now: NodeHasNoDiskPressure`,
+		`Node bar status is now: NodeReady`}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %s in output: %s", expected, out)
+		}
+	}
+}
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
@@ -5639,53 +5932,66 @@ Events:         <none>` + "\n",
 	}
 }
 
-func TestDescribeClusterCIDR(t *testing.T) {
+func TestDescribeServiceCIDR(t *testing.T) {
 
 	testcases := map[string]struct {
 		input  *fake.Clientset
 		output string
 	}{
-		"ClusterCIDR v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ClusterCIDR{
+		"ServiceCIDR v1alpha1": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ClusterCIDRSpec{
-					PerNodeHostBits: int32(8),
-					IPv4:            "10.1.0.0/16",
-					IPv6:            "fd00:1:1::/64",
-					NodeSelector: &corev1.NodeSelector{
-						NodeSelectorTerms: []corev1.NodeSelectorTerm{
-							{
-								MatchExpressions: []corev1.NodeSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: "In",
-										Values:   []string{"bar"}},
-								},
-							},
-						},
-					},
+				Spec: networkingv1alpha1.ServiceCIDRSpec{
+					CIDRs: []string{"10.1.0.0/16", "fd00:1:1::/64"},
 				},
 			}),
 
 			output: `Name:         foo.123
 Labels:       <none>
 Annotations:  <none>
-NodeSelector:
-  NodeSelector Terms:
-    Term 0:       foo in [bar]
-PerNodeHostBits:  8
-IPv4:             10.1.0.0/16
-IPv6:             fd00:1:1::/64
-Events:           <none>` + "\n",
+CIDRs:        10.1.0.0/16, fd00:1:1::/64
+Events:       <none>` + "\n",
+		},
+		"ServiceCIDR v1alpha1 IPv4": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ServiceCIDRSpec{
+					CIDRs: []string{"10.1.0.0/16"},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+CIDRs:        10.1.0.0/16
+Events:       <none>` + "\n",
+		},
+		"ServiceCIDR v1alpha1 IPv6": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ServiceCIDRSpec{
+					CIDRs: []string{"fd00:1:1::/64"},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+CIDRs:        fd00:1:1::/64
+Events:       <none>` + "\n",
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
-			d := ClusterCIDRDescriber{c}
+			d := ServiceCIDRDescriber{c}
 			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

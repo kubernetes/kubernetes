@@ -39,14 +39,15 @@ var (
 	saKeyLongDesc = fmt.Sprintf(cmdutil.LongDesc(`
 		Generate the private key for signing service account tokens along with its public key, and save them into
 		%s and %s files.
+		
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
-		`+cmdutil.AlphaDisclaimer), kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName)
+		`), kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName)
 
 	genericLongDesc = cmdutil.LongDesc(`
 		Generate the %[1]s, and save them into %[2]s.crt and %[2]s.key files.%[3]s
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
-		` + cmdutil.AlphaDisclaimer)
+		`)
 )
 
 // NewCertsPhase returns the phase for the certs
@@ -138,11 +139,12 @@ func getCertPhaseFlags(name string) []string {
 }
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
-	//Defaulted config we will use to get SAN certs
-	defaultConfig := cmdutil.DefaultInitConfiguration()
-	// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
-	defaultConfig.LocalAPIEndpoint = kubeadmapiv1.APIEndpoint{
-		AdvertiseAddress: "127.0.0.1",
+	// Defaulted config we will use to get SAN certs
+	defaultConfig := &kubeadmapiv1.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{
+			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
+			AdvertiseAddress: "127.0.0.1",
+		},
 	}
 
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
@@ -188,7 +190,7 @@ func runCertsSa(c workflow.RunData) error {
 	}
 
 	// create the new service account key (or use existing)
-	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.PublicKeyAlgorithm())
+	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.EncryptionAlgorithmType())
 }
 
 func runCerts(c workflow.RunData) error {

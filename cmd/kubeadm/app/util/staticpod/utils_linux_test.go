@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -40,8 +40,8 @@ type ownerAndPermissions struct {
 func verifyPodSecurityContext(t *testing.T, pod *v1.Pod, wantRunAsUser, wantRunAsGroup int64, wantSupGroup []int64) {
 	t.Helper()
 	wantPodSecurityContext := &v1.PodSecurityContext{
-		RunAsUser:          pointer.Int64(wantRunAsUser),
-		RunAsGroup:         pointer.Int64(wantRunAsGroup),
+		RunAsUser:          ptr.To(wantRunAsUser),
+		RunAsGroup:         ptr.To(wantRunAsGroup),
 		SupplementalGroups: wantSupGroup,
 		SeccompProfile: &v1.SeccompProfile{
 			Type: v1.SeccompProfileTypeRuntimeDefault,
@@ -109,7 +109,7 @@ func TestRunKubeControllerManagerAsNonRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifyPodSecurityContext(t, &pod, runAsUser, runAsGroup, []int64{supGroup})
-	verifyContainerSecurityContext(t, pod.Spec.Containers[0], nil, []v1.Capability{"ALL"}, pointer.Bool(false))
+	verifyContainerSecurityContext(t, pod.Spec.Containers[0], nil, []v1.Capability{"ALL"}, ptr.To(false))
 	wantUpdateFiles := map[string]ownerAndPermissions{
 		filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName): {uid: runAsUser, gid: runAsGroup, permissions: 0600},
 		filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName):                   {uid: 0, gid: supGroup, permissions: 0640},
@@ -129,7 +129,7 @@ func TestRunKubeSchedulerAsNonRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifyPodSecurityContext(t, &pod, runAsUser, runAsGroup, nil)
-	verifyContainerSecurityContext(t, pod.Spec.Containers[0], nil, []v1.Capability{"ALL"}, pointer.Bool(false))
+	verifyContainerSecurityContext(t, pod.Spec.Containers[0], nil, []v1.Capability{"ALL"}, ptr.To(false))
 	wantUpdateFiles := map[string]ownerAndPermissions{
 		filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName): {uid: runAsUser, gid: runAsGroup, permissions: 0600},
 	}
@@ -158,7 +158,7 @@ func TestRunEtcdAsNonRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifyPodSecurityContext(t, &pod, runAsUser, runAsGroup, nil)
-	verifyContainerSecurityContext(t, pod.Spec.Containers[0], nil, []v1.Capability{"ALL"}, pointer.Bool(false))
+	verifyContainerSecurityContext(t, pod.Spec.Containers[0], nil, []v1.Capability{"ALL"}, ptr.To(false))
 	wantUpdateFiles := map[string]ownerAndPermissions{
 		cfg.Etcd.Local.DataDir: {uid: runAsUser, gid: runAsGroup, permissions: 0700},
 		filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName): {uid: runAsUser, gid: runAsGroup, permissions: 0600},

@@ -333,6 +333,13 @@ type KubeletVolumeHost interface {
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
+
+	// Returns trust anchors from the named ClusterTrustBundle.
+	GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error)
+
+	// Returns trust anchors from the ClusterTrustBundles selected by signer
+	// name and label selector.
+	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
@@ -1057,7 +1064,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "pv-recycler",
-					Image:   "registry.k8s.io/debian-base:v2.0.0",
+					Image:   "registry.k8s.io/build-image/debian-base:bookworm-v1.0.0",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "test -e /scrub && find /scrub -mindepth 1 -delete && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []v1.VolumeMount{

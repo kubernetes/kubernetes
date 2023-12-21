@@ -5,6 +5,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -170,19 +171,26 @@ func newInformerFactory(clientConfig *rest.Config) (informers.SharedInformerFact
 	// before then we should try to eliminate our direct to storage access.  It's making us do weird things.
 	const defaultInformerResyncPeriod = 10 * time.Minute
 
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			accessor.SetManagedFields(nil)
+		}
+		return obj, nil
+	}
+
 	ci := &combinedInformers{
-		externalKubeInformers:  informers.NewSharedInformerFactory(kubeClient, defaultInformerResyncPeriod),
-		appInformers:           appinformer.NewSharedInformerFactory(appClient, defaultInformerResyncPeriod),
-		authorizationInformers: authorizationinformer.NewSharedInformerFactory(authorizationClient, defaultInformerResyncPeriod),
-		buildInformers:         buildinformer.NewSharedInformerFactory(buildClient, defaultInformerResyncPeriod),
-		imageInformers:         imageinformer.NewSharedInformerFactory(imageClient, defaultInformerResyncPeriod),
-		networkInformers:       networkinformer.NewSharedInformerFactory(networkClient, defaultInformerResyncPeriod),
-		oauthInformers:         oauthinformer.NewSharedInformerFactory(oauthClient, defaultInformerResyncPeriod),
-		quotaInformers:         quotainformer.NewSharedInformerFactory(quotaClient, defaultInformerResyncPeriod),
-		routeInformers:         routeinformer.NewSharedInformerFactory(routerClient, defaultInformerResyncPeriod),
-		securityInformers:      securityinformer.NewSharedInformerFactory(securityClient, defaultInformerResyncPeriod),
-		templateInformers:      templateinformer.NewSharedInformerFactory(templateClient, defaultInformerResyncPeriod),
-		userInformers:          userinformer.NewSharedInformerFactory(userClient, defaultInformerResyncPeriod),
+		externalKubeInformers:  informers.NewSharedInformerFactoryWithOptions(kubeClient, defaultInformerResyncPeriod, informers.WithTransform(trim)),
+		appInformers:           appinformer.NewSharedInformerFactoryWithOptions(appClient, defaultInformerResyncPeriod, appinformer.WithTransform(trim)),
+		authorizationInformers: authorizationinformer.NewSharedInformerFactoryWithOptions(authorizationClient, defaultInformerResyncPeriod, authorizationinformer.WithTransform(trim)),
+		buildInformers:         buildinformer.NewSharedInformerFactoryWithOptions(buildClient, defaultInformerResyncPeriod, buildinformer.WithTransform(trim)),
+		imageInformers:         imageinformer.NewSharedInformerFactoryWithOptions(imageClient, defaultInformerResyncPeriod, imageinformer.WithTransform(trim)),
+		networkInformers:       networkinformer.NewSharedInformerFactoryWithOptions(networkClient, defaultInformerResyncPeriod, networkinformer.WithTransform(trim)),
+		oauthInformers:         oauthinformer.NewSharedInformerFactoryWithOptions(oauthClient, defaultInformerResyncPeriod, oauthinformer.WithTransform(trim)),
+		quotaInformers:         quotainformer.NewSharedInformerFactoryWithOptions(quotaClient, defaultInformerResyncPeriod, quotainformer.WithTransform(trim)),
+		routeInformers:         routeinformer.NewSharedInformerFactoryWithOptions(routerClient, defaultInformerResyncPeriod, routeinformer.WithTransform(trim)),
+		securityInformers:      securityinformer.NewSharedInformerFactoryWithOptions(securityClient, defaultInformerResyncPeriod, securityinformer.WithTransform(trim)),
+		templateInformers:      templateinformer.NewSharedInformerFactoryWithOptions(templateClient, defaultInformerResyncPeriod, templateinformer.WithTransform(trim)),
+		userInformers:          userinformer.NewSharedInformerFactoryWithOptions(userClient, defaultInformerResyncPeriod, userinformer.WithTransform(trim)),
 	}
 
 	return externalKubeInformersWithExtraGenerics{

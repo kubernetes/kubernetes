@@ -66,6 +66,7 @@ spec:
                                 type: string
                             type: object
                           type: array
+                          x-kubernetes-list-type: atomic
                       type: object
                     azure:
                       description: Azure contains settings specific to the Azure infrastructure provider.
@@ -99,6 +100,80 @@ spec:
                     nutanix:
                       description: Nutanix contains settings specific to the Nutanix infrastructure provider.
                       properties:
+                        failureDomains:
+                          description: failureDomains configures failure domains information for the Nutanix platform. When set, the failure domains defined here may be used to spread Machines across prism element clusters to improve fault tolerance of the cluster.
+                          items:
+                            description: NutanixFailureDomain configures failure domain information for the Nutanix platform.
+                            properties:
+                              cluster:
+                                description: cluster is to identify the cluster (the Prism Element under management of the Prism Central), in which the Machine's VM will be created. The cluster identifier (uuid or name) can be obtained from the Prism Central console or using the prism_central API.
+                                properties:
+                                  name:
+                                    description: name is the resource name in the PC. It cannot be empty if the type is Name.
+                                    type: string
+                                  type:
+                                    description: type is the identifier type to use for this resource.
+                                    enum:
+                                      - UUID
+                                      - Name
+                                    type: string
+                                  uuid:
+                                    description: uuid is the UUID of the resource in the PC. It cannot be empty if the type is UUID.
+                                    type: string
+                                required:
+                                  - type
+                                type: object
+                                x-kubernetes-validations:
+                                  - message: uuid configuration is required when type is UUID, and forbidden otherwise
+                                    rule: 'has(self.type) && self.type == ''UUID'' ?  has(self.uuid) : !has(self.uuid)'
+                                  - message: name configuration is required when type is Name, and forbidden otherwise
+                                    rule: 'has(self.type) && self.type == ''Name'' ?  has(self.name) : !has(self.name)'
+                              name:
+                                description: name defines the unique name of a failure domain. Name is required and must be at most 64 characters in length. It must consist of only lower case alphanumeric characters and hyphens (-). It must start and end with an alphanumeric character. This value is arbitrary and is used to identify the failure domain within the platform.
+                                maxLength: 64
+                                minLength: 1
+                                pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
+                                type: string
+                              subnets:
+                                description: subnets holds a list of identifiers (one or more) of the cluster's network subnets for the Machine's VM to connect to. The subnet identifiers (uuid or name) can be obtained from the Prism Central console or using the prism_central API.
+                                items:
+                                  description: NutanixResourceIdentifier holds the identity of a Nutanix PC resource (cluster, image, subnet, etc.)
+                                  properties:
+                                    name:
+                                      description: name is the resource name in the PC. It cannot be empty if the type is Name.
+                                      type: string
+                                    type:
+                                      description: type is the identifier type to use for this resource.
+                                      enum:
+                                        - UUID
+                                        - Name
+                                      type: string
+                                    uuid:
+                                      description: uuid is the UUID of the resource in the PC. It cannot be empty if the type is UUID.
+                                      type: string
+                                  required:
+                                    - type
+                                  type: object
+                                  x-kubernetes-validations:
+                                    - message: uuid configuration is required when type is UUID, and forbidden otherwise
+                                      rule: 'has(self.type) && self.type == ''UUID'' ?  has(self.uuid) : !has(self.uuid)'
+                                    - message: name configuration is required when type is Name, and forbidden otherwise
+                                      rule: 'has(self.type) && self.type == ''Name'' ?  has(self.name) : !has(self.name)'
+                                maxItems: 1
+                                minItems: 1
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                  - type
+                                x-kubernetes-list-type: map
+                            required:
+                              - cluster
+                              - name
+                              - subnets
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                         prismCentral:
                           description: prismCentral holds the endpoint address and port to access the Nutanix Prism Central. When a cluster-wide proxy is installed, by default, this endpoint will be accessed via the proxy. Should you wish for communication with this endpoint not to be proxied, please add the endpoint to the proxy spec.noProxy list.
                           properties:
@@ -263,6 +338,7 @@ spec:
                                     maxItems: 1
                                     minItems: 1
                                     type: array
+                                    x-kubernetes-list-type: atomic
                                   resourcePool:
                                     description: resourcePool is the absolute path of the resource pool where virtual machines will be created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>. The maximum length of the path is 2048 characters.
                                     maxLength: 2048
@@ -287,6 +363,9 @@ spec:
                               - zone
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                         nodeNetworking:
                           description: nodeNetworking contains the definition of internal and external network constraints for assigning the node's networking. If this field is omitted, networking defaults to the legacy address selection behavior which is to only support a single address and return the first one found.
                           properties:
@@ -299,6 +378,7 @@ spec:
                                     format: cidr
                                     type: string
                                   type: array
+                                  x-kubernetes-list-type: atomic
                                 network:
                                   description: network VirtualMachine's VM Network names that will be used to when searching for status.addresses fields. Note that if internal.networkSubnetCIDR and external.networkSubnetCIDR are not set, then the vNIC associated to this network must only have a single IP address assigned to it. The available networks (port groups) can be listed using `govc ls 'network/*'`
                                   type: string
@@ -308,6 +388,7 @@ spec:
                                     format: cidr
                                     type: string
                                   type: array
+                                  x-kubernetes-list-type: set
                               type: object
                             internal:
                               description: internal represents the network configuration of the node that is routable only within the cluster.
@@ -318,6 +399,7 @@ spec:
                                     format: cidr
                                     type: string
                                   type: array
+                                  x-kubernetes-list-type: atomic
                                 network:
                                   description: network VirtualMachine's VM Network names that will be used to when searching for status.addresses fields. Note that if internal.networkSubnetCIDR and external.networkSubnetCIDR are not set, then the vNIC associated to this network must only have a single IP address assigned to it. The available networks (port groups) can be listed using `govc ls 'network/*'`
                                   type: string
@@ -327,6 +409,7 @@ spec:
                                     format: cidr
                                     type: string
                                   type: array
+                                  x-kubernetes-list-type: set
                               type: object
                           type: object
                         vcenters:
@@ -340,6 +423,7 @@ spec:
                                   type: string
                                 minItems: 1
                                 type: array
+                                x-kubernetes-list-type: set
                               port:
                                 description: port is the TCP port that will be used to communicate to the vCenter endpoint. When omitted, this means the user has no opinion and it is up to the platform to choose a sensible default, which is subject to change over time.
                                 format: int32
@@ -361,6 +445,7 @@ spec:
                           maxItems: 1
                           minItems: 0
                           type: array
+                          x-kubernetes-list-type: atomic
                       type: object
                   type: object
               type: object
@@ -492,6 +577,7 @@ spec:
                             type: object
                           maxItems: 25
                           type: array
+                          x-kubernetes-list-type: atomic
                         serviceEndpoints:
                           description: ServiceEndpoints list contains custom endpoints which will override default service endpoint of AWS Services. There must be only one ServiceEndpoint for a service.
                           items:
@@ -507,6 +593,7 @@ spec:
                                 type: string
                             type: object
                           type: array
+                          x-kubernetes-list-type: atomic
                       type: object
                     azure:
                       description: Azure contains settings specific to the Azure infrastructure provider.
@@ -553,6 +640,7 @@ spec:
                             type: object
                           maxItems: 10
                           type: array
+                          x-kubernetes-list-type: atomic
                           x-kubernetes-validations:
                             - message: resourceTags are immutable and may only be configured during installation
                               rule: self.all(x, x in oldSelf) && oldSelf.all(x, x in self)
@@ -573,6 +661,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         ingressIP:
                           description: "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names. \n Deprecated: Use IngressIPs instead."
                           type: string
@@ -583,6 +672,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         nodeDNSIP:
                           description: nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for BareMetal deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.
                           type: string
@@ -655,9 +745,19 @@ spec:
                             description: IBMCloudServiceEndpoint stores the configuration of a custom url to override existing defaults of IBM Cloud Services.
                             properties:
                               name:
-                                description: name is the name of the IBM Cloud service. For example, the IBM Cloud Private IAM service could be configured with the service `name` of `IAM` and `url` of `https://private.iam.cloud.ibm.com` Whereas the IBM Cloud Private VPC service for US South (Dallas) could be configured with the service `name` of `VPC` and `url` of `https://us.south.private.iaas.cloud.ibm.com`
-                                maxLength: 32
-                                pattern: ^[a-zA-Z0-9-]+$
+                                description: 'name is the name of the IBM Cloud service. Possible values are: CIS, COS, DNSServices, GlobalSearch, GlobalTagging, HyperProtect, IAM, KeyProtect, ResourceController, ResourceManager, or VPC. For example, the IBM Cloud Private IAM service could be configured with the service `name` of `IAM` and `url` of `https://private.iam.cloud.ibm.com` Whereas the IBM Cloud Private VPC service for US South (Dallas) could be configured with the service `name` of `VPC` and `url` of `https://us.south.private.iaas.cloud.ibm.com`'
+                                enum:
+                                  - CIS
+                                  - COS
+                                  - DNSServices
+                                  - GlobalSearch
+                                  - GlobalTagging
+                                  - HyperProtect
+                                  - IAM
+                                  - KeyProtect
+                                  - ResourceController
+                                  - ResourceManager
+                                  - VPC
                                 type: string
                               url:
                                 description: url is fully qualified URI with scheme https, that overrides the default generated endpoint for a client. This must be provided and cannot be empty.
@@ -697,6 +797,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         ingressIP:
                           description: "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names. \n Deprecated: Use IngressIPs instead."
                           type: string
@@ -707,6 +808,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                       type: object
                     openstack:
                       description: OpenStack contains settings specific to the OpenStack infrastructure provider.
@@ -721,6 +823,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         cloudName:
                           description: cloudName is the name of the desired OpenStack cloud in the client configuration file (`clouds.yaml`).
                           type: string
@@ -734,6 +837,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         loadBalancer:
                           default:
                             type: OpenShiftManagedDefault
@@ -767,6 +871,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         ingressIP:
                           description: "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names. \n Deprecated: Use IngressIPs instead."
                           type: string
@@ -777,6 +882,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         nodeDNSIP:
                           description: 'deprecated: as of 4.6, this field is no longer set or honored.  It will be removed in a future release.'
                           type: string
@@ -820,6 +926,9 @@ spec:
                               - url
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                         zone:
                           description: 'zone holds the default zone for the new Power VS resources created by the cluster. Note: Currently only single-zone OCP clusters are supported'
                           type: string
@@ -861,6 +970,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         ingressIP:
                           description: "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names. \n Deprecated: Use IngressIPs instead."
                           type: string
@@ -871,6 +981,7 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                          x-kubernetes-list-type: set
                         nodeDNSIP:
                           description: nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for vSphere deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.
                           type: string

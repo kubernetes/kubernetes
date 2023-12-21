@@ -21,7 +21,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -251,7 +250,7 @@ func readWebSocket(r *Reader, t *testing.T, fn func(*websocket.Conn), protocols 
 		fn(client)
 	}
 
-	data, err := ioutil.ReadAll(client)
+	data, err := io.ReadAll(client)
 	if err != nil {
 		return data, err
 	}

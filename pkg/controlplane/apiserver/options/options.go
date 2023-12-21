@@ -42,6 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+// Options define the flags and validation for a generic controlplane. If the
+// structs are nil, the options are not added to the command line and not validated.
 type Options struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
@@ -220,6 +222,9 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 		klog.Infof("external host was not specified, using %v", completed.GenericServerRunOptions.ExternalHost)
 	}
 
+	// put authorization options in final state
+	completed.Authorization.Complete()
+	// adjust authentication for completed authorization
 	completed.Authentication.ApplyAuthorization(completed.Authorization)
 
 	// Use (ServiceAccountSigningKeyFile != "") as a proxy to the user enabling

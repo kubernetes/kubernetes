@@ -132,7 +132,9 @@ func (s *storageLeases) Destroy() {
 
 // NewLeases creates a new etcd-based Leases implementation.
 func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTime time.Duration) (Leases, error) {
-	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil)
+	// note that newFunc, newListFunc and resourcePrefix
+	// can be left blank unless the storage.Watch method is used
+	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error creating storage factory: %v", err)
 	}

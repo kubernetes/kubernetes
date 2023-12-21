@@ -34,7 +34,7 @@ import (
 	. "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetDefaultDeployment(t *testing.T) {
@@ -58,7 +58,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			original: &appsv1beta1.Deployment{},
 			expected: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(1),
+					Replicas: ptr.To[int32](1),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateDeployment{
@@ -66,8 +66,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(2),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](2),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -75,7 +75,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						RollingUpdate: &appsv1beta1.RollingUpdateDeployment{
 							MaxSurge: &differentIntOrString,
@@ -85,7 +85,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateDeployment{
@@ -93,8 +93,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(2),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](2),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -102,7 +102,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(3),
+					Replicas: ptr.To[int32](3),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type:          appsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: nil,
@@ -111,7 +111,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(3),
+					Replicas: ptr.To[int32](3),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateDeployment{
@@ -119,8 +119,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(2),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](2),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -128,21 +128,21 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type: appsv1beta1.RecreateDeploymentStrategyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(0),
+					RevisionHistoryLimit: ptr.To[int32](0),
 				},
 			},
 			expected: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type: appsv1beta1.RecreateDeploymentStrategyType,
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(0),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](0),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -150,22 +150,22 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type: appsv1beta1.RecreateDeploymentStrategyType,
 					},
-					ProgressDeadlineSeconds: utilpointer.Int32(30),
-					RevisionHistoryLimit:    utilpointer.Int32(2),
+					ProgressDeadlineSeconds: ptr.To[int32](30),
+					RevisionHistoryLimit:    ptr.To[int32](2),
 				},
 			},
 			expected: &appsv1beta1.Deployment{
 				Spec: appsv1beta1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1beta1.DeploymentStrategy{
 						Type: appsv1beta1.RecreateDeploymentStrategyType,
 					},
-					ProgressDeadlineSeconds: utilpointer.Int32(30),
-					RevisionHistoryLimit:    utilpointer.Int32(2),
+					ProgressDeadlineSeconds: ptr.To[int32](30),
+					RevisionHistoryLimit:    ptr.To[int32](2),
 					Template:                defaultTemplate,
 				},
 			},
@@ -244,7 +244,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: nil,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -272,7 +272,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						Type:          appsv1beta1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: nil,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -298,7 +298,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: nil,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -322,7 +322,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: nil,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -339,7 +339,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
 						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
 							Partition:      &defaultPartition,
-							MaxUnavailable: getMaxUnavailable(1),
+							MaxUnavailable: ptr.To(intstr.FromInt32(1)),
 						},
 					},
 				},
@@ -352,11 +352,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
 						Type: appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
-							Partition:      getPartition(0),
-							MaxUnavailable: getMaxUnavailable(1),
+							Partition:      ptr.To[int32](0),
+							MaxUnavailable: ptr.To(intstr.FromInt32(1)),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -373,7 +373,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
 						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
 							Partition:      &notTheDefaultPartition,
-							MaxUnavailable: getMaxUnavailable(3),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
 				},
@@ -386,11 +386,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
 						Type: appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
-							Partition:      getPartition(42),
-							MaxUnavailable: getMaxUnavailable(3),
+							Partition:      ptr.To[int32](42),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -415,7 +415,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: nil,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -432,7 +432,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
 						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
 							Partition:      &notTheDefaultPartition,
-							MaxUnavailable: getMaxUnavailable(3),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
 				},
@@ -445,11 +445,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
 						Type: appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
-							Partition:      getPartition(42),
-							MaxUnavailable: getMaxUnavailable(3),
+							Partition:      ptr.To[int32](42),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -474,7 +474,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
 						RollingUpdate: nil,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -525,13 +525,4 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
-}
-
-func getPartition(partition int32) *int32 {
-	return &partition
-}
-
-func getMaxUnavailable(maxUnavailable int) *intstr.IntOrString {
-	maxUnavailableIntOrStr := intstr.FromInt(maxUnavailable)
-	return &maxUnavailableIntOrStr
 }

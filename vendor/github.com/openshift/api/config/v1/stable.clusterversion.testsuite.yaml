@@ -1,6 +1,6 @@
 apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
 name: "[Stable] ClusterVersion"
-crd: 0000_00_cluster-version-operator_01_clusterversion.crd.yaml
+crd: 0000_00_cluster-version-operator_01_clusterversion-Default.crd.yaml
 tests:
   onCreate:
   - name: Should be able to create a minimal ClusterVersion
@@ -130,6 +130,38 @@ tests:
           additionalEnabledCapabilities:
           - baremetal
     expectedError: the `baremetal` capability requires the `MachineAPI` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `MachineAPI` capability
+  - name: Should be able to create a ClusterVersion with base capability None, and additional capabilities marketplace and OperatorLifecycleManager
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+          - OperatorLifecycleManager
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+          - OperatorLifecycleManager
+  - name: Should not be able to create a ClusterVersion with base capability None, and additional capabilities marketplace without OperatorLifecycleManager
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+    expectedError: the `marketplace` capability requires the `OperatorLifecycleManager` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `OperatorLifecycleManager` capability
   onUpdate:
   - name: Should not allow image to be set if architecture set
     initial: |
@@ -276,3 +308,111 @@ tests:
           additionalEnabledCapabilities:
           - baremetal
     expectedError: the `baremetal` capability requires the `MachineAPI` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `MachineAPI` capability
+  - name: Should be able to add the marketplace capability with a ClusterVersion with base capability None, and implicitly enabled OperatorLifecycleManager
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+      status:
+        desired:
+          version: foo
+          image: foo
+        observedGeneration: 1
+        versionHash: foo
+        availableUpdates:
+        - version: foo
+          image: foo
+        capabilities:
+          enabledCapabilities:
+          - OperatorLifecycleManager
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+      status:
+        desired:
+          version: foo
+          image: foo
+        observedGeneration: 1
+        versionHash: foo
+        availableUpdates:
+        - version: foo
+          image: foo
+        capabilities:
+          enabledCapabilities:
+          - OperatorLifecycleManager
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+      status:
+        desired:
+          version: foo
+          image: foo
+        observedGeneration: 1
+        versionHash: foo
+        availableUpdates:
+        - version: foo
+          image: foo
+        capabilities:
+          enabledCapabilities:
+          - OperatorLifecycleManager
+  - name: Should be able to add the marketplace capability with a ClusterVersion with base capability None, with the OperatorLifecycleManager capability
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+          - OperatorLifecycleManager
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+          - OperatorLifecycleManager
+  - name: Should not be able to add the marketplace capability with a ClusterVersion with base capability None, and without OperatorLifecycleManager
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - marketplace
+    expectedError: the `marketplace` capability requires the `OperatorLifecycleManager` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `OperatorLifecycleManager` capability

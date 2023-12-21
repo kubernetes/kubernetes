@@ -59,7 +59,8 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	}
 
 	// Apply dynamic defaults
-	if err := SetInitDynamicDefaults(cfg); err != nil {
+	// NB. skip CRI detection here because it won't be used at all and will be overridden later
+	if err := SetInitDynamicDefaults(cfg, true); err != nil {
 		return nil, err
 	}
 
@@ -116,15 +117,6 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		if err := getAPIEndpoint(client, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
 			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
-	} else {
-		// In the case where newControlPlane is true we don't go through getNodeRegistration() and initcfg.NodeRegistration.CRISocket is empty.
-		// This forces DetectCRISocket() to be called later on, and if there is more than one CRI installed on the system, it will error out,
-		// while asking for the user to provide an override for the CRI socket. Even if the user provides an override, the call to
-		// DetectCRISocket() can happen too early and thus ignore it (while still erroring out).
-		// However, if newControlPlane == true, initcfg.NodeRegistration is not used at all and it's overwritten later on.
-		// Thus it's necessary to supply some default value, that will avoid the call to DetectCRISocket() and as
-		// initcfg.NodeRegistration is discarded, setting whatever value here is harmless.
-		initcfg.NodeRegistration.CRISocket = constants.UnknownCRISocket
 	}
 	return initcfg, nil
 }

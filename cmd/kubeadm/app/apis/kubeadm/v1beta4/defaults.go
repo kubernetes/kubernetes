@@ -60,6 +60,9 @@ const (
 
 	// DefaultImagePullPolicy is the default image pull policy in kubeadm
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
+
+	// DefaultEncryptionAlgorithm is the default encryption algorithm.
+	DefaultEncryptionAlgorithm = EncryptionAlgorithmRSA
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -99,6 +102,10 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
+	if obj.EncryptionAlgorithm == "" {
+		obj.EncryptionAlgorithm = DefaultEncryptionAlgorithm
+	}
+
 	SetDefaults_Etcd(obj)
 	SetDefaults_APIServer(&obj.APIServer)
 }
@@ -135,6 +142,7 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
 }
 
+// SetDefaults_JoinControlPlane assigns default values for a joining control plane node
 func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
 	if obj != nil {
 		SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)

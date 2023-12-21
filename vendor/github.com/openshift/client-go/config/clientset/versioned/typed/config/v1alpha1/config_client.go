@@ -13,6 +13,8 @@ import (
 type ConfigV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	BackupsGetter
+	ClusterImagePoliciesGetter
+	ImagePoliciesGetter
 	InsightsDataGathersGetter
 }
 
@@ -23,6 +25,14 @@ type ConfigV1alpha1Client struct {
 
 func (c *ConfigV1alpha1Client) Backups() BackupInterface {
 	return newBackups(c)
+}
+
+func (c *ConfigV1alpha1Client) ClusterImagePolicies() ClusterImagePolicyInterface {
+	return newClusterImagePolicies(c)
+}
+
+func (c *ConfigV1alpha1Client) ImagePolicies(namespace string) ImagePolicyInterface {
+	return newImagePolicies(c, namespace)
 }
 
 func (c *ConfigV1alpha1Client) InsightsDataGathers() InsightsDataGatherInterface {

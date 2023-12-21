@@ -17,7 +17,6 @@ limitations under the License.
 package nodeports
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -25,7 +24,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -143,9 +145,13 @@ func TestNodePorts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p, _ := New(nil, nil)
+			_, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
 			cycleState := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("preFilter status does not match (-want,+got): %s", diff)
 			}
@@ -155,7 +161,7 @@ func TestNodePorts(t *testing.T) {
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.wantFilterStatus, gotStatus); diff != "" {
 				t.Errorf("filter status does not match (-want, +got): %s", diff)
 			}
@@ -164,13 +170,17 @@ func TestNodePorts(t *testing.T) {
 }
 
 func TestPreFilterDisabled(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	pod := &v1.Pod{}
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p, _ := New(nil, nil)
+	p, err := New(ctx, nil, nil)
+	if err != nil {
+		t.Fatalf("creating plugin: %v", err)
+	}
 	cycleState := framework.NewCycleState()
-	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
+	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
@@ -287,6 +297,61 @@ func TestGetContainerPorts(t *testing.T) {
 			if diff := cmp.Diff(test.expected, result); diff != "" {
 				t.Errorf("container ports: container ports does not match (-want,+got): %s", diff)
 			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodDeleted(t *testing.T) {
+	podWithHostPort := st.MakePod().HostPort(8080)
+
+	testcases := map[string]struct {
+		pod          *v1.Pod
+		oldObj       interface{}
+		expectedHint framework.QueueingHint
+		expectedErr  bool
+	}{
+		"backoff-wrong-old-object": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       "not-a-pod",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"skip-queue-on-unscheduled": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-queue-on-non-hostport": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Node("fake-node").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-queue-on-unrelated-hostport": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Node("fake-node").HostPort(8081).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-released-hostport": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Node("fake-node").HostPort(8080).Obj(),
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("Creating plugin: %v", err)
+			}
+			actualHint, err := p.(*NodePorts).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}
 }

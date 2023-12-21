@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -42,7 +43,7 @@ const (
 	checkServicePercent          = 0.05
 )
 
-var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
+var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("performancedns")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

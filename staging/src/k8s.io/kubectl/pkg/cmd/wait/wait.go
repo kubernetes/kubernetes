@@ -74,6 +74,9 @@ var (
 		# Wait for the pod "busybox1" to contain the status phase to be "Running"
 		kubectl wait --for=jsonpath='{.status.phase}'=Running pod/busybox1
 
+		# Wait for pod "busybox1" to be Ready
+		kubectl wait --for='jsonpath={.status.conditions[?(@.type=="Ready")].status}=True' pod/busybox1
+
 		# Wait for the service "loadbalancer" to have ingress.
 		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
 
@@ -209,8 +212,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 		}.IsConditionMet, nil
 	}
 	if strings.HasPrefix(condition, "jsonpath=") {
-		splitStr := strings.Split(condition, "=")
-		jsonPathExp, jsonPathValue, err := processJSONPathInput(splitStr[1:])
+		jsonPathInput := strings.TrimPrefix(condition, "jsonpath=")
+		jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
 		if err != nil {
 			return nil, err
 		}
@@ -241,8 +244,10 @@ func newJSONPathParser(jsonPathExpression string) (*jsonpath.JSONPath, error) {
 	return j, nil
 }
 
-// processJSONPathInput will parses the user's JSONPath input containing JSON expression and, optionally, JSON value for matching condition and process it
-func processJSONPathInput(jsonPathInput []string) (string, string, error) {
+// processJSONPathInput will parse and process the provided JSONPath input containing a JSON expression and optionally
+// a value for the matching condition.
+func processJSONPathInput(input string) (string, string, error) {
+	jsonPathInput := splitJSONPathInput(input)
 	if numOfArgs := len(jsonPathInput); numOfArgs < 1 || numOfArgs > 2 {
 		return "", "", fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3 or --for=jsonpath='{.status.readyReplicas}'")
 	}
@@ -258,6 +263,27 @@ func processJSONPathInput(jsonPathInput []string) (string, string, error) {
 		return "", "", errors.New("jsonpath wait has to have a value after equal sign, like --for=jsonpath='{.status.readyReplicas}'=3")
 	}
 	return relaxedJSONPathExp, jsonPathValue, nil
+}
+
+// splitJSONPathInput splits the provided input string on single '='. Double '==' will not cause the string to be
+// split. E.g., "a.b.c====d.e.f===g.h.i===" will split to ["a.b.c====d.e.f==","g.h.i==",""].
+func splitJSONPathInput(input string) []string {
+	var output []string
+	var element strings.Builder
+	for i := 0; i < len(input); i++ {
+		if input[i] == '=' {
+			if i < len(input)-1 && input[i+1] == '=' {
+				element.WriteString("==")
+				i++
+				continue
+			}
+			output = append(output, element.String())
+			element.Reset()
+			continue
+		}
+		element.WriteByte(input[i])
+	}
+	return append(output, element.String())
 }
 
 // ResourceLocation holds the location of a resource

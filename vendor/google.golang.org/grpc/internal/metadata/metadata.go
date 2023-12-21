@@ -35,7 +35,7 @@ const mdKey = mdKeyType("grpc.internal.address.metadata")
 
 type mdValue metadata.MD
 
-func (m mdValue) Equal(o interface{}) bool {
+func (m mdValue) Equal(o any) bool {
 	om, ok := o.(mdValue)
 	if !ok {
 		return false

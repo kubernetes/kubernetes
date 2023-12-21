@@ -52,17 +52,17 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.2.0"}
-CNI_TARGETARCH=${CNI_TARGETARCH:-amd64}
-CNI_PLUGINS_TARBALL="${CNI_PLUGINS_VERSION}/cni-plugins-linux-${CNI_TARGETARCH}-${CNI_PLUGINS_VERSION}.tgz"
-CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_TARBALL}"
-CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"f3a841324845ca6bf0d4091b4fc7f97e18a623172158b72fc3fdcdb9d42d2d37"}
-CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"525e2b62ba92a1b6f3dc9612449a84aa61652e680f7ebf4eff579795fe464b57"}
-CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"4960283b88d53b8c45ff7a938a6b398724005313e0388e0a36bd6d0b2bb5acdc"}
-CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"1524d1e6cc237ef756040ec1b4c397659bc14df25865bfcc5ea647357ef974f2"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.3.0"}
+# The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
+CNI_TARGETARCH=${CNI_TARGETARCH:-""}
+CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
+CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"754a71ed60a4bd08726c3af705a7d55ee3df03122b12e389fdba4bea35d7dd7e"}
+CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"de7a666fd6ad83a228086bd55756db62ef335a193d1b143d910b69f079e30598"}
+CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"8ceff026f4eccf33c261b4153af6911e10784ac169d08c1d86cf6887b9f4e99b"}
+CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"2f1f65ac33e961bcdc633e14c376656455824e22cc45d3ca7e31eb2750a7ebc4"}
 
 # enables testing eviction scenarios locally.
-EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
+EVICTION_HARD=${EVICTION_HARD:-"imagefs.available<15%,memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
 EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 
@@ -99,8 +99,6 @@ ENABLE_TRACING=${ENABLE_TRACING:-false}
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
 
-# RBAC Mode options
-AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
@@ -263,20 +261,8 @@ function test_apiserver_off {
     fi
 }
 
-function detect_binary {
-    # Detect the OS name/arch so that we can find our binary
-    case "$(uname -s)" in
-      Darwin)
-        host_os=darwin
-        ;;
-      Linux)
-        host_os=linux
-        ;;
-      *)
-        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
-        exit 1
-        ;;
-    esac
+function detect_arch {
+    local host_arch
 
     case "$(uname -m)" in
       x86_64*)
@@ -312,7 +298,39 @@ function detect_binary {
         ;;
     esac
 
-   GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
+  if [[ -z "${host_arch}" ]]; then
+    return
+  fi
+  echo -n "${host_arch}"
+}
+
+function detect_os {
+    local host_os
+
+    case "$(uname -s)" in
+      Darwin)
+        host_os=darwin
+        ;;
+      Linux)
+        host_os=linux
+        ;;
+      *)
+        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+        exit 1
+        ;;
+    esac
+
+  if [[ -z "${host_os}" ]]; then
+    return
+  fi
+  echo -n "${host_os}"
+}
+
+function detect_binary {
+    host_arch=$(detect_arch)
+    host_os=$(detect_os)
+
+    GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 }
 
 cleanup()
@@ -474,10 +492,19 @@ function start_apiserver {
     # Append security_admission plugin
     ENABLE_ADMISSION_PLUGINS="${ENABLE_ADMISSION_PLUGINS}${security_admission}"
 
-    authorizer_arg=""
-    if [[ -n "${AUTHORIZATION_MODE}" ]]; then
-      authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE}"
+    authorizer_args=()
+    if [[ -n "${AUTHORIZATION_CONFIG:-}" ]]; then
+      authorizer_args+=("--authorization-config=${AUTHORIZATION_CONFIG}")
+    else
+      if [[ -n "${AUTHORIZATION_MODE:-Node,RBAC}" ]]; then
+        authorizer_args+=("--authorization-mode=${AUTHORIZATION_MODE:-Node,RBAC}")
+      fi
+      authorizer_args+=(
+        "--authorization-webhook-config-file=${AUTHORIZATION_WEBHOOK_CONFIG_FILE}"
+        "--authentication-token-webhook-config-file=${AUTHENTICATION_WEBHOOK_CONFIG_FILE}"
+      )
     fi
+
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged=${ALLOW_PRIVILEGED}"
@@ -550,7 +577,7 @@ EOF
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     # shellcheck disable=SC2086
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-apiserver" "${authorizer_arg}" "${priv_arg}" ${runtime_config} \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-apiserver" "${authorizer_args[@]}" "${priv_arg}" ${runtime_config} \
       ${cloud_config_arg} \
       "${advertise_address}" \
       "${node_port_range}" \
@@ -558,8 +585,6 @@ EOF
       --vmodule="${LOG_SPEC}" \
       --audit-policy-file="${AUDIT_POLICY_FILE}" \
       --audit-log-path="${LOG_DIR}/kube-apiserver-audit.log" \
-      --authorization-webhook-config-file="${AUTHORIZATION_WEBHOOK_CONFIG_FILE}" \
-      --authentication-token-webhook-config-file="${AUTHENTICATION_WEBHOOK_CONFIG_FILE}" \
       --cert-dir="${CERT_DIR}" \
       --egress-selector-config-file="${EGRESS_SELECTOR_CONFIG_FILE:-}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
@@ -593,14 +618,15 @@ EOF
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
+    # Create kubeconfigs for all components, using client certs
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
+    ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
+
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
     kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 "${WAIT_FOR_URL_API_SERVER}" "${MAX_TIME_FOR_URL_API_SERVER}" \
         || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
-    # Create kubeconfigs for all components, using client certs
-    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
-    ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
@@ -1146,15 +1172,24 @@ function tolerate_cgroups_v2 {
 }
 
 function install_cni {
-  cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
+  if [[ -n "${CNI_TARGETARCH}" ]]; then
+    host_arch="${CNI_TARGETARCH}"
+  else
+    host_arch=$(detect_arch)
+  fi
+
+  cni_plugin_sha=CNI_PLUGINS_${host_arch^^}_SHA256SUM
+  cni_plugin_tarball="${CNI_PLUGINS_VERSION}/cni-plugins-linux-${host_arch}-${CNI_PLUGINS_VERSION}.tgz"
+  cni_plugins_url="${CNI_PLUGINS_URL}/${cni_plugin_tarball}"
+
   echo "Installing CNI plugin binaries ..." \
-    && curl -sSL --retry 5 --output "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${!cni_plugin_sha} ${TMP_DIR}/cni.${CNI_TARGETARCH}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
+    && curl -sSL --retry 5 --output "${TMP_DIR}"/cni."${host_arch}".tgz "${cni_plugins_url}" \
+    && echo "${!cni_plugin_sha} ${TMP_DIR}/cni.${host_arch}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
     && sha256sum --ignore-missing -c "${TMP_DIR}"/cni.sha256 \
     && rm -f "${TMP_DIR}"/cni.sha256 \
     && sudo mkdir -p /opt/cni/bin \
-    && sudo tar -C /opt/cni/bin -xzvf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
-    && rm -rf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
+    && sudo tar -C /opt/cni/bin -xzvf "${TMP_DIR}"/cni."${host_arch}".tgz \
+    && rm -rf "${TMP_DIR}"/cni."${host_arch}".tgz \
     && sudo find /opt/cni/bin -type f -not \( \
          -iname host-local \
          -o -iname bridge \

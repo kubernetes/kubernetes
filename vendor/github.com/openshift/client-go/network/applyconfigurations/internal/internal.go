@@ -182,6 +182,111 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: com.github.openshift.api.network.v1alpha1.DNSNameResolver
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.network.v1alpha1.DNSNameResolverSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.network.v1alpha1.DNSNameResolverStatus
+      default: {}
+- name: com.github.openshift.api.network.v1alpha1.DNSNameResolverResolvedAddress
+  map:
+    fields:
+    - name: ip
+      type:
+        scalar: string
+      default: ""
+    - name: lastLookupTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: ttlSeconds
+      type:
+        scalar: numeric
+      default: 0
+- name: com.github.openshift.api.network.v1alpha1.DNSNameResolverResolvedName
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: dnsName
+      type:
+        scalar: string
+      default: ""
+    - name: resolutionFailures
+      type:
+        scalar: numeric
+    - name: resolvedAddresses
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.network.v1alpha1.DNSNameResolverResolvedAddress
+          elementRelationship: associative
+          keys:
+          - ip
+- name: com.github.openshift.api.network.v1alpha1.DNSNameResolverSpec
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: com.github.openshift.api.network.v1alpha1.DNSNameResolverStatus
+  map:
+    fields:
+    - name: resolvedNames
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.network.v1alpha1.DNSNameResolverResolvedName
+          elementRelationship: associative
+          keys:
+          - dnsName
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
+    - name: message
+      type:
+        scalar: string
+      default: ""
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: reason
+      type:
+        scalar: string
+      default: ""
+    - name: status
+      type:
+        scalar: string
+      default: ""
+    - name: type
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
   map:
     elementType:

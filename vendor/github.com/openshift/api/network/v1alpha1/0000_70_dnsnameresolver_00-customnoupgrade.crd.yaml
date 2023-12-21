@@ -1,0 +1,154 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/1524
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: CustomNoUpgrade
+  name: dnsnameresolvers.network.openshift.io
+spec:
+  group: network.openshift.io
+  names:
+    kind: DNSNameResolver
+    listKind: DNSNameResolverList
+    plural: dnsnameresolvers
+    singular: dnsnameresolver
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: "DNSNameResolver stores the DNS name resolution information of a DNS name. It can be enabled by the TechPreviewNoUpgrade feature set. It can also be enabled by the feature gate DNSNameResolver when using CustomNoUpgrade feature set. \n Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support."
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec is the specification of the desired behavior of the DNSNameResolver.
+              properties:
+                name:
+                  description: name is the DNS name for which the DNS name resolution information will be stored. For a regular DNS name, only the DNS name resolution information of the regular DNS name will be stored. For a wildcard DNS name, the DNS name resolution information of all the DNS names that match the wildcard DNS name will be stored. For a wildcard DNS name, the '*' will match only one label. Additionally, only a single '*' can be used at the beginning of the wildcard DNS name. For example, '*.example.com.' will match 'sub1.example.com.' but won't match 'sub2.sub1.example.com.'
+                  maxLength: 254
+                  pattern: ^(\*\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.){2,}$
+                  type: string
+                  x-kubernetes-validations:
+                    - message: spec.name is immutable
+                      rule: self == oldSelf
+              required:
+                - name
+              type: object
+            status:
+              description: status is the most recently observed status of the DNSNameResolver.
+              properties:
+                resolvedNames:
+                  description: resolvedNames contains a list of matching DNS names and their corresponding IP addresses along with their TTL and last DNS lookup times.
+                  items:
+                    description: DNSNameResolverResolvedName describes the details of a resolved DNS name.
+                    properties:
+                      conditions:
+                        description: 'conditions provide information about the state of the DNS name. Known .status.conditions.type is: "Degraded". "Degraded" is true when the last resolution failed for the DNS name, and false otherwise.'
+                        items:
+                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                          properties:
+                            lastTransitionTime:
+                              description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                              format: date-time
+                              type: string
+                            message:
+                              description: message is a human readable message indicating details about the transition. This may be an empty string.
+                              maxLength: 32768
+                              type: string
+                            observedGeneration:
+                              description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                              format: int64
+                              minimum: 0
+                              type: integer
+                            reason:
+                              description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                              maxLength: 1024
+                              minLength: 1
+                              pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                              type: string
+                            status:
+                              description: status of the condition, one of True, False, Unknown.
+                              enum:
+                                - "True"
+                                - "False"
+                                - Unknown
+                              type: string
+                            type:
+                              description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                              maxLength: 316
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                              type: string
+                          required:
+                            - lastTransitionTime
+                            - message
+                            - reason
+                            - status
+                            - type
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                          - type
+                        x-kubernetes-list-type: map
+                      dnsName:
+                        description: dnsName is the resolved DNS name matching the name field of DNSNameResolverSpec. This field can store both regular and wildcard DNS names which match the spec.name field. When the spec.name field contains a regular DNS name, this field will store the same regular DNS name after it is successfully resolved. When the spec.name field contains a wildcard DNS name, each resolvedName.dnsName will store the regular DNS names which match the wildcard DNS name and have been successfully resolved. If the wildcard DNS name can also be successfully resolved, then this field will store the wildcard DNS name as well.
+                        maxLength: 254
+                        pattern: ^(\*\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.){2,}$
+                        type: string
+                      resolutionFailures:
+                        description: resolutionFailures keeps the count of how many consecutive times the DNS resolution failed for the dnsName. If the DNS resolution succeeds then the field will be set to zero. Upon every failure, the value of the field will be incremented by one. The details about the DNS name will be removed, if the value of resolutionFailures reaches 5 and the TTL of all the associated IP addresses have expired.
+                        format: int32
+                        type: integer
+                      resolvedAddresses:
+                        description: resolvedAddresses gives the list of associated IP addresses and their corresponding TTLs and last lookup times for the dnsName.
+                        items:
+                          description: DNSNameResolverResolvedAddress describes the details of an IP address for a resolved DNS name.
+                          properties:
+                            ip:
+                              anyOf:
+                                - format: ipv4
+                                - format: ipv6
+                              description: ip is an IP address associated with the dnsName. The validity of the IP address expires after lastLookupTime + ttlSeconds. To refresh the information, a DNS lookup will be performed upon the expiration of the IP address's validity. If the information is not refreshed then it will be removed with a grace period after the expiration of the IP address's validity.
+                              type: string
+                            lastLookupTime:
+                              description: lastLookupTime is the timestamp when the last DNS lookup was completed successfully. The validity of the IP address expires after lastLookupTime + ttlSeconds. The value of this field will be updated to the current time on a successful DNS lookup. If the information is not refreshed then it will be removed with a grace period after the expiration of the IP address's validity.
+                              format: date-time
+                              type: string
+                            ttlSeconds:
+                              description: ttlSeconds is the time-to-live value of the IP address. The validity of the IP address expires after lastLookupTime + ttlSeconds. On a successful DNS lookup the value of this field will be updated with the current time-to-live value. If the information is not refreshed then it will be removed with a grace period after the expiration of the IP address's validity.
+                              format: int32
+                              type: integer
+                          required:
+                            - ip
+                            - lastLookupTime
+                            - ttlSeconds
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                          - ip
+                        x-kubernetes-list-type: map
+                    required:
+                      - dnsName
+                      - resolvedAddresses
+                    type: object
+                  type: array
+                  x-kubernetes-list-map-keys:
+                    - dnsName
+                  x-kubernetes-list-type: map
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

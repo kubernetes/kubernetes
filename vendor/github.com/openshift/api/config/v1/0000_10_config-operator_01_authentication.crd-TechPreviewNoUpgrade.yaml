@@ -1,0 +1,374 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/470
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: TechPreviewNoUpgrade
+  name: authentications.config.openshift.io
+spec:
+  group: config.openshift.io
+  names:
+    kind: Authentication
+    listKind: AuthenticationList
+    plural: authentications
+    singular: authentication
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      "schema":
+        "openAPIV3Schema":
+          description: "Authentication specifies cluster-wide settings for authentication (like OAuth and webhook token authenticators). The canonical name of an instance is `cluster`. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec holds user settable values for configuration
+              type: object
+              properties:
+                oauthMetadata:
+                  description: 'oauthMetadata contains the discovery endpoint data for OAuth 2.0 Authorization Server Metadata for an external OAuth server. This discovery document can be viewed from its served location: oc get --raw ''/.well-known/oauth-authorization-server'' For further details, see the IETF Draft: https://tools.ietf.org/html/draft-ietf-oauth-discovery-04#section-2 If oauthMetadata.name is non-empty, this value has precedence over any metadata reference stored in status. The key "oauthMetadata" is used to locate the data. If specified and the config map or expected key is not found, no metadata is served. If the specified metadata is not valid, no metadata is served. The namespace for this config map is openshift-config.'
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      description: name is the metadata.name of the referenced config map
+                      type: string
+                oidcProviders:
+                  description: "OIDCProviders are OIDC identity providers that can issue tokens for this cluster Can only be set if \"Type\" is set to \"OIDC\". \n At most one provider can be configured."
+                  type: array
+                  maxItems: 1
+                  items:
+                    type: object
+                    required:
+                      - issuer
+                      - name
+                    properties:
+                      claimMappings:
+                        description: ClaimMappings describes rules on how to transform information from an ID token into a cluster identity
+                        type: object
+                        properties:
+                          groups:
+                            description: Groups is a name of the claim that should be used to construct groups for the cluster identity. The referenced claim must use array of strings values.
+                            type: object
+                            required:
+                              - claim
+                            properties:
+                              claim:
+                                description: Claim is a JWT token claim to be used in the mapping
+                                type: string
+                              prefix:
+                                description: "Prefix is a string to prefix the value from the token in the result of the claim mapping. \n By default, no prefixing occurs. \n Example: if `prefix` is set to \"myoidc:\"\" and the `claim` in JWT contains an array of strings \"a\", \"b\" and  \"c\", the mapping will result in an array of string \"myoidc:a\", \"myoidc:b\" and \"myoidc:c\"."
+                                type: string
+                          username:
+                            description: "Username is a name of the claim that should be used to construct usernames for the cluster identity. \n Default value: \"sub\""
+                            type: object
+                            required:
+                              - claim
+                            properties:
+                              claim:
+                                description: Claim is a JWT token claim to be used in the mapping
+                                type: string
+                              prefix:
+                                type: object
+                                required:
+                                  - prefixString
+                                properties:
+                                  prefixString:
+                                    type: string
+                                    minLength: 1
+                              prefixPolicy:
+                                description: "PrefixPolicy specifies how a prefix should apply. \n By default, claims other than `email` will be prefixed with the issuer URL to prevent naming clashes with other plugins. \n Set to \"NoPrefix\" to disable prefixing. \n Example: (1) `prefix` is set to \"myoidc:\" and `claim` is set to \"username\". If the JWT claim `username` contains value `userA`, the resulting mapped value will be \"myoidc:userA\". (2) `prefix` is set to \"myoidc:\" and `claim` is set to \"email\". If the JWT `email` claim contains value \"userA@myoidc.tld\", the resulting mapped value will be \"myoidc:userA@myoidc.tld\". (3) `prefix` is unset, `issuerURL` is set to `https://myoidc.tld`, the JWT claims include \"username\":\"userA\" and \"email\":\"userA@myoidc.tld\", and `claim` is set to: (a) \"username\": the mapped value will be \"https://myoidc.tld#userA\" (b) \"email\": the mapped value will be \"userA@myoidc.tld\""
+                                type: string
+                                enum:
+                                  - ""
+                                  - NoPrefix
+                                  - Prefix
+                            x-kubernetes-validations:
+                              - rule: 'has(self.prefixPolicy) && self.prefixPolicy == ''Prefix'' ? (has(self.prefix) && size(self.prefix.prefixString) > 0) : !has(self.prefix)'
+                                message: prefix must be set if prefixPolicy is 'Prefix', but must remain unset otherwise
+                      claimValidationRules:
+                        description: ClaimValidationRules are rules that are applied to validate token claims to authenticate users.
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            requiredClaim:
+                              description: RequiredClaim allows configuring a required claim name and its expected value
+                              type: object
+                              required:
+                                - claim
+                                - requiredValue
+                              properties:
+                                claim:
+                                  description: Claim is a name of a required claim. Only claims with string values are supported.
+                                  type: string
+                                  minLength: 1
+                                requiredValue:
+                                  description: RequiredValue is the required value for the claim.
+                                  type: string
+                                  minLength: 1
+                            type:
+                              description: Type sets the type of the validation rule
+                              type: string
+                              default: RequiredClaim
+                              enum:
+                                - RequiredClaim
+                        x-kubernetes-list-type: atomic
+                      issuer:
+                        description: Issuer describes atributes of the OIDC token issuer
+                        type: object
+                        required:
+                          - audiences
+                          - issuerURL
+                        properties:
+                          audiences:
+                            description: Audiences is an array of audiences that the token was issued for. Valid tokens must include at least one of these values in their "aud" claim. Must be set to exactly one value.
+                            type: array
+                            maxItems: 1
+                            items:
+                              type: string
+                              minLength: 1
+                            x-kubernetes-list-type: set
+                          issuerCertificateAuthority:
+                            description: CertificateAuthority is a reference to a config map in the configuration namespace. The .data of the configMap must contain the "ca-bundle.crt" key. If unset, system trust is used instead.
+                            type: object
+                            required:
+                              - name
+                            properties:
+                              name:
+                                description: name is the metadata.name of the referenced config map
+                                type: string
+                          issuerURL:
+                            description: URL is the serving URL of the token issuer. Must use the https:// scheme.
+                            type: string
+                            pattern: ^https:\/\/[^\s]
+                      name:
+                        description: Name of the OIDC provider
+                        type: string
+                        minLength: 1
+                      oidcClients:
+                        description: OIDCClients contains configuration for the platform's clients that need to request tokens from the issuer
+                        type: array
+                        maxItems: 20
+                        items:
+                          type: object
+                          required:
+                            - clientID
+                            - componentName
+                            - componentNamespace
+                          properties:
+                            clientID:
+                              description: ClientID is the identifier of the OIDC client from the OIDC provider
+                              type: string
+                              minLength: 1
+                            clientSecret:
+                              description: ClientSecret refers to a secret in the `openshift-config` namespace that contains the client secret in the `clientSecret` key of the `.data` field
+                              type: object
+                              required:
+                                - name
+                              properties:
+                                name:
+                                  description: name is the metadata.name of the referenced secret
+                                  type: string
+                            componentName:
+                              description: ComponentName is the name of the component that is supposed to consume this client configuration
+                              type: string
+                              maxLength: 256
+                              minLength: 1
+                            componentNamespace:
+                              description: ComponentNamespace is the namespace of the component that is supposed to consume this client configuration
+                              type: string
+                              maxLength: 63
+                              minLength: 1
+                            extraScopes:
+                              description: ExtraScopes is an optional set of scopes to request tokens with.
+                              type: array
+                              items:
+                                type: string
+                              x-kubernetes-list-type: set
+                        x-kubernetes-list-map-keys:
+                          - componentNamespace
+                          - componentName
+                        x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - name
+                  x-kubernetes-list-type: map
+                serviceAccountIssuer:
+                  description: 'serviceAccountIssuer is the identifier of the bound service account token issuer. The default is https://kubernetes.default.svc WARNING: Updating this field will not result in immediate invalidation of all bound tokens with the previous issuer value. Instead, the tokens issued by previous service account issuer will continue to be trusted for a time period chosen by the platform (currently set to 24h). This time period is subject to change over time. This allows internal components to transition to use new service account issuer without service distruption.'
+                  type: string
+                type:
+                  description: type identifies the cluster managed, user facing authentication mode in use. Specifically, it manages the component that responds to login attempts. The default is IntegratedOAuth.
+                  type: string
+                webhookTokenAuthenticator:
+                  description: "webhookTokenAuthenticator configures a remote token reviewer. These remote authentication webhooks can be used to verify bearer tokens via the tokenreviews.authentication.k8s.io REST API. This is required to honor bearer tokens that are provisioned by an external authentication service. \n Can only be set if \"Type\" is set to \"None\"."
+                  type: object
+                  required:
+                    - kubeConfig
+                  properties:
+                    kubeConfig:
+                      description: "kubeConfig references a secret that contains kube config file data which describes how to access the remote webhook service. The namespace for the referenced secret is openshift-config. \n For further details, see: \n https://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication \n The key \"kubeConfig\" is used to locate the data. If the secret or expected key is not found, the webhook is not honored. If the specified kube config data is not valid, the webhook is not honored."
+                      type: object
+                      required:
+                        - name
+                      properties:
+                        name:
+                          description: name is the metadata.name of the referenced secret
+                          type: string
+                webhookTokenAuthenticators:
+                  description: webhookTokenAuthenticators is DEPRECATED, setting it has no effect.
+                  type: array
+                  items:
+                    description: deprecatedWebhookTokenAuthenticator holds the necessary configuration options for a remote token authenticator. It's the same as WebhookTokenAuthenticator but it's missing the 'required' validation on KubeConfig field.
+                    type: object
+                    properties:
+                      kubeConfig:
+                        description: 'kubeConfig contains kube config file data which describes how to access the remote webhook service. For further details, see: https://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication The key "kubeConfig" is used to locate the data. If the secret or expected key is not found, the webhook is not honored. If the specified kube config data is not valid, the webhook is not honored. The namespace for this secret is determined by the point of use.'
+                        type: object
+                        required:
+                          - name
+                        properties:
+                          name:
+                            description: name is the metadata.name of the referenced secret
+                            type: string
+                  x-kubernetes-list-type: atomic
+            status:
+              description: status holds observed values from the cluster. They may not be overridden.
+              type: object
+              properties:
+                integratedOAuthMetadata:
+                  description: 'integratedOAuthMetadata contains the discovery endpoint data for OAuth 2.0 Authorization Server Metadata for the in-cluster integrated OAuth server. This discovery document can be viewed from its served location: oc get --raw ''/.well-known/oauth-authorization-server'' For further details, see the IETF Draft: https://tools.ietf.org/html/draft-ietf-oauth-discovery-04#section-2 This contains the observed value based on cluster state. An explicitly set value in spec.oauthMetadata has precedence over this field. This field has no meaning if authentication spec.type is not set to IntegratedOAuth. The key "oauthMetadata" is used to locate the data. If the config map or expected key is not found, no metadata is served. If the specified metadata is not valid, no metadata is served. The namespace for this config map is openshift-config-managed.'
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      description: name is the metadata.name of the referenced config map
+                      type: string
+                oidcClients:
+                  description: OIDCClients is where participating operators place the current OIDC client status for OIDC clients that can be customized by the cluster-admin.
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    required:
+                      - componentName
+                      - componentNamespace
+                    properties:
+                      componentName:
+                        description: ComponentName is the name of the component that will consume a client configuration.
+                        type: string
+                        maxLength: 256
+                        minLength: 1
+                      componentNamespace:
+                        description: ComponentNamespace is the namespace of the component that will consume a client configuration.
+                        type: string
+                        maxLength: 63
+                        minLength: 1
+                      conditions:
+                        description: "Conditions are used to communicate the state of the `oidcClients` entry. \n Supported conditions include Available, Degraded and Progressing. \n If Available is true, the component is successfully using the configured client. If Degraded is true, that means something has gone wrong trying to handle the client configuration. If Progressing is true, that means the component is taking some action related to the `oidcClients` entry."
+                        type: array
+                        items:
+                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                          type: object
+                          required:
+                            - lastTransitionTime
+                            - message
+                            - reason
+                            - status
+                            - type
+                          properties:
+                            lastTransitionTime:
+                              description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                              type: string
+                              format: date-time
+                            message:
+                              description: message is a human readable message indicating details about the transition. This may be an empty string.
+                              type: string
+                              maxLength: 32768
+                            observedGeneration:
+                              description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                              type: integer
+                              format: int64
+                              minimum: 0
+                            reason:
+                              description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                              type: string
+                              maxLength: 1024
+                              minLength: 1
+                              pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                            status:
+                              description: status of the condition, one of True, False, Unknown.
+                              type: string
+                              enum:
+                                - "True"
+                                - "False"
+                                - Unknown
+                            type:
+                              description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                              type: string
+                              maxLength: 316
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                        x-kubernetes-list-map-keys:
+                          - type
+                        x-kubernetes-list-type: map
+                      consumingUsers:
+                        description: ConsumingUsers is a slice of ServiceAccounts that need to have read permission on the `clientSecret` secret.
+                        type: array
+                        maxItems: 5
+                        items:
+                          description: ConsumingUser is an alias for string which we add validation to. Currently only service accounts are supported.
+                          type: string
+                          maxLength: 512
+                          minLength: 1
+                          pattern: ^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                        x-kubernetes-list-type: set
+                      currentOIDCClients:
+                        description: CurrentOIDCClients is a list of clients that the component is currently using.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - clientID
+                            - issuerURL
+                            - oidcProviderName
+                          properties:
+                            clientID:
+                              description: ClientID is the identifier of the OIDC client from the OIDC provider
+                              type: string
+                              minLength: 1
+                            issuerURL:
+                              description: URL is the serving URL of the token issuer. Must use the https:// scheme.
+                              type: string
+                              pattern: ^https:\/\/[^\s]
+                            oidcProviderName:
+                              description: OIDCName refers to the `name` of the provider from `oidcProviders`
+                              type: string
+                              minLength: 1
+                        x-kubernetes-list-map-keys:
+                          - issuerURL
+                          - clientID
+                        x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - componentNamespace
+                    - componentName
+                  x-kubernetes-list-type: map
+          x-kubernetes-validations:
+            - rule: '!has(self.spec.oidcProviders) || self.spec.oidcProviders.all(p, !has(p.oidcClients) || p.oidcClients.all(specC, self.status.oidcClients.exists(statusC, statusC.componentNamespace == specC.componentNamespace && statusC.componentName == specC.componentName) || (has(oldSelf.spec.oidcProviders) && oldSelf.spec.oidcProviders.exists(oldP, oldP.name == p.name && has(oldP.oidcClients) && oldP.oidcClients.exists(oldC, oldC.componentNamespace == specC.componentNamespace && oldC.componentName == specC.componentName)))))'
+              message: all oidcClients in the oidcProviders must match their componentName and componentNamespace to either a previously configured oidcClient or they must exist in the status.oidcClients

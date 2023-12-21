@@ -54,7 +54,7 @@ type APIServerSpec struct {
 	//
 	// If unset, a default (which may change between releases) is chosen. Note that only Old,
 	// Intermediate and Custom profiles are currently supported, and the maximum available
-	// MinTLSVersions is VersionTLS12.
+	// minTLSVersion is VersionTLS12.
 	// +optional
 	TLSSecurityProfile *TLSSecurityProfile `json:"tlsSecurityProfile,omitempty"`
 	// audit specifies the settings for audit configuration to be applied to all OpenShift-provided

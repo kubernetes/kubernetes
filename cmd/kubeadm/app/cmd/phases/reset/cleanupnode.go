@@ -169,6 +169,7 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 
 	filesToClean := []string{
 		filepath.Join(configPathDir, kubeadmconstants.AdminKubeConfigFileName),
+		filepath.Join(configPathDir, kubeadmconstants.SuperAdminKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.KubeletKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
@@ -212,6 +213,7 @@ func CleanDir(filePath string) error {
 	return nil
 }
 
+// IsDirEmpty returns true if a directory is empty
 func IsDirEmpty(dir string) (bool, error) {
 	d, err := os.Open(dir)
 	if err != nil {

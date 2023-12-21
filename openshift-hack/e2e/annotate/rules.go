@@ -10,18 +10,13 @@ var (
 		// alpha features that are not gated
 		"[Disabled:Alpha]": {
 			`\[Feature:StorageVersionAPI\]`,
-			`\[Feature:StatefulSetAutoDeletePVC\]`,
-			`\[Feature:ProxyTerminatingEndpoints\]`,
 			`\[Feature:UserNamespacesSupport\]`,
-			`\[Feature:ReadWriteOncePod\]`,
-			`\[Feature:SELinuxMountReadWriteOncePod\]`,
-			`\[Feature:PodSchedulingReadiness\]`,
 			`\[Feature:InPlacePodVerticalScaling\]`,
 			`\[Feature:RecoverVolumeExpansionFailure\]`,
-			`\[Feature:SELinux\]`,
-			`\[Feature:SidecarContainers\]`,
-			`\[Feature: PersistentVolumeLastPhaseTransitionTime\]`,
 			`\[Feature:WatchList\]`,
+			`\[Feature:ServiceCIDRs\]`,
+			`\[Feature:PodLifecycleSleepAction\]`,
+			`\[Feature:ClusterTrustBundle\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -155,6 +150,9 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-17202
 			`\[sig-apps\] StatefulSet Scaling StatefulSetStartOrdinal \[Feature:StatefulSetStartOrdinal\] Removing \.start\.ordinal`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-24481
+			`\[Feature:SELinux\]`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

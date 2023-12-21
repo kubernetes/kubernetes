@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -35,7 +36,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
+var _ = sigDescribe(feature.Windows, "Cpu Resources", framework.WithSerial(), skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -100,7 +101,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 			}
 		})
 	})
-})
+}))
 
 // newCPUBurnPods creates a list of pods (specification) with a workload that will consume all available CPU resources up to container limit
 func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memoryLimit string) []*v1.Pod {

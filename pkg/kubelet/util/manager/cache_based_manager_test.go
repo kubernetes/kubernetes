@@ -336,7 +336,7 @@ type secretsToAttach struct {
 }
 
 func podWithSecrets(ns, podName string, toAttach secretsToAttach) *v1.Pod {
-	return podWithSecretsAndUID(ns, podName, "", toAttach)
+	return podWithSecretsAndUID(ns, podName, fmt.Sprintf("%s/%s", ns, podName), toAttach)
 }
 
 func podWithSecretsAndUID(ns, podName, podUID string, toAttach secretsToAttach) *v1.Pod {
@@ -415,13 +415,13 @@ func TestCacheInvalidation(t *testing.T) {
 		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s2))
-	// All secrets should be invalidated - this should trigger get operations.
+	// Fetch only s3 and s20 secrets - this should trigger get operations.
 	store.Get("ns1", "s1")
 	store.Get("ns1", "s2")
 	store.Get("ns1", "s20")
 	store.Get("ns1", "s3")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 4, len(actions), "unexpected actions: %#v", actions)
+	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
 
 	// Create a new pod that is refencing the first three secrets - those should

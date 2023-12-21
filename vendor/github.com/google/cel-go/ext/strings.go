@@ -173,7 +173,7 @@ const (
 //	'TacoCat'.lowerAscii()      // returns 'tacocat'
 //	'TacoCÆt Xii'.lowerAscii()  // returns 'tacocÆt xii'
 //
-// # Quote
+// # Strings.Quote
 //
 // Introduced in version: 1
 //
@@ -301,26 +301,28 @@ func StringsLocale(locale string) StringsOption {
 	}
 }
 
-// StringsVersion configures the version of the string library. The version limits which
-// functions are available. Only functions introduced below or equal to the given
-// version included in the library. See the library documentation to determine
-// which version a function was introduced at. If the documentation does not
-// state which version a function was introduced at, it can be assumed to be
-// introduced at version 0, when the library was first created.
-// If this option is not set, all functions are available.
-func StringsVersion(version uint32) func(lib *stringLib) *stringLib {
-	return func(sl *stringLib) *stringLib {
-		sl.version = version
-		return sl
+// StringsVersion configures the version of the string library.
+//
+// The version limits which functions are available. Only functions introduced
+// below or equal to the given version included in the library. If this option
+// is not set, all functions are available.
+//
+// See the library documentation to determine which version a function was introduced.
+// If the documentation does not state which version a function was introduced, it can
+// be assumed to be introduced at version 0, when the library was first created.
+func StringsVersion(version uint32) StringsOption {
+	return func(lib *stringLib) *stringLib {
+		lib.version = version
+		return lib
 	}
 }
 
 // CompileOptions implements the Library interface method.
-func (sl *stringLib) CompileOptions() []cel.EnvOption {
+func (lib *stringLib) CompileOptions() []cel.EnvOption {
 	formatLocale := "en_US"
-	if sl.locale != "" {
+	if lib.locale != "" {
 		// ensure locale is properly-formed if set
-		_, err := language.Parse(sl.locale)
+		_, err := language.Parse(lib.locale)
 		if err != nil {
 			return []cel.EnvOption{
 				func(e *cel.Env) (*cel.Env, error) {
@@ -328,7 +330,7 @@ func (sl *stringLib) CompileOptions() []cel.EnvOption {
 				},
 			}
 		}
-		formatLocale = sl.locale
+		formatLocale = lib.locale
 	}
 
 	opts := []cel.EnvOption{
@@ -432,7 +434,7 @@ func (sl *stringLib) CompileOptions() []cel.EnvOption {
 					return stringOrError(upperASCII(string(s)))
 				}))),
 	}
-	if sl.version >= 1 {
+	if lib.version >= 1 {
 		opts = append(opts, cel.Function("format",
 			cel.MemberOverload("string_format", []*cel.Type{cel.StringType, cel.ListType(cel.DynType)}, cel.StringType,
 				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
@@ -447,7 +449,7 @@ func (sl *stringLib) CompileOptions() []cel.EnvOption {
 				}))))
 
 	}
-	if sl.version >= 2 {
+	if lib.version >= 2 {
 		opts = append(opts,
 			cel.Function("join",
 				cel.MemberOverload("list_join", []*cel.Type{cel.ListType(cel.StringType)}, cel.StringType,

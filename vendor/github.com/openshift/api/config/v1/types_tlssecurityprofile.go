@@ -56,7 +56,7 @@ type TLSSecurityProfile struct {
 	//     - AES128-SHA
 	//     - AES256-SHA
 	//     - DES-CBC3-SHA
-	//   minTLSVersion: TLSv1.0
+	//   minTLSVersion: VersionTLS10
 	//
 	// +optional
 	// +nullable
@@ -79,7 +79,7 @@ type TLSSecurityProfile struct {
 	//     - ECDHE-RSA-CHACHA20-POLY1305
 	//     - DHE-RSA-AES128-GCM-SHA256
 	//     - DHE-RSA-AES256-GCM-SHA384
-	//   minTLSVersion: TLSv1.2
+	//   minTLSVersion: VersionTLS12
 	//
 	// +optional
 	// +nullable
@@ -94,7 +94,7 @@ type TLSSecurityProfile struct {
 	//     - TLS_AES_128_GCM_SHA256
 	//     - TLS_AES_256_GCM_SHA384
 	//     - TLS_CHACHA20_POLY1305_SHA256
-	//   minTLSVersion: TLSv1.3
+	//   minTLSVersion: VersionTLS13
 	//
 	// NOTE: Currently unsupported.
 	//
@@ -110,7 +110,7 @@ type TLSSecurityProfile struct {
 	//     - ECDHE-RSA-CHACHA20-POLY1305
 	//     - ECDHE-RSA-AES128-GCM-SHA256
 	//     - ECDHE-ECDSA-AES128-GCM-SHA256
-	//   minTLSVersion: TLSv1.1
+	//   minTLSVersion: VersionTLS11
 	//
 	// +optional
 	// +nullable
@@ -167,7 +167,7 @@ type TLSProfileSpec struct {
 	// that is negotiated during the TLS handshake. For example, to use TLS
 	// versions 1.1, 1.2 and 1.3 (yaml):
 	//
-	//   minTLSVersion: TLSv1.1
+	//   minTLSVersion: VersionTLS11
 	//
 	// NOTE: currently the highest minTLSVersion allowed is VersionTLS12
 	//

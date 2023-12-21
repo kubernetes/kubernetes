@@ -18,7 +18,6 @@ package egressselector
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -279,12 +278,12 @@ spec:
 		t.Run(tc.name, func(t *testing.T) {
 			proxyConfig := fmt.Sprintf("test-egress-selector-config-%s", tc.name)
 			if tc.createFile {
-				f, err := ioutil.TempFile("", proxyConfig)
+				f, err := os.CreateTemp("", proxyConfig)
 				if err != nil {
 					t.Fatal(err)
 				}
 				defer utiltesting.CloseAndRemove(t, f)
-				if err := ioutil.WriteFile(f.Name(), []byte(tc.contents), os.FileMode(0755)); err != nil {
+				if err := os.WriteFile(f.Name(), []byte(tc.contents), os.FileMode(0755)); err != nil {
 					t.Fatal(err)
 				}
 				proxyConfig = f.Name()
@@ -542,9 +541,9 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := ValidateEgressSelectorConfiguration(tc.contents)
-			if tc.expectError == false && len(errs) != 0 {
+			if !tc.expectError && len(errs) != 0 {
 				t.Errorf("Calling ValidateEgressSelectorConfiguration expected no error, got %v", errs)
-			} else if tc.expectError == true && len(errs) == 0 {
+			} else if tc.expectError && len(errs) == 0 {
 				t.Errorf("Calling ValidateEgressSelectorConfiguration expected error, got no error")
 			}
 		})

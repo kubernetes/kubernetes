@@ -27,6 +27,7 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/prometheus/common/model"
@@ -43,7 +44,7 @@ const (
 	maxStatsAge = time.Minute
 )
 
-var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
+var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, func() {
 	f := framework.NewDefaultFramework("resource-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {
@@ -74,7 +75,7 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 			memoryLimit := memoryCapacity.Value()
 
 			matchResourceMetrics := gomega.And(gstruct.MatchKeys(gstruct.IgnoreMissing, gstruct.Keys{
-				"scrape_error": gstruct.Ignore(),
+				"resource_scrape_error": gstruct.Ignore(),
 				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": boundedSample(1, 1e6),
 				}),
@@ -112,7 +113,7 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
 			}),
-				haveKeys("scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes", "container_cpu_usage_seconds_total",
+				haveKeys("resource_scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes", "container_cpu_usage_seconds_total",
 					"container_memory_working_set_bytes", "container_start_time_seconds", "pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes"),
 			)
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
@@ -162,6 +163,10 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 		"Metric": gstruct.Ignore(),
 		"Value":  gomega.And(gomega.BeNumerically(">=", lower), gomega.BeNumerically("<=", upper)),
 		"Timestamp": gomega.WithTransform(func(t model.Time) time.Time {
+			if t.Unix() <= 0 {
+				return time.Now()
+			}
+
 			// model.Time is in Milliseconds since epoch
 			return time.Unix(0, int64(t)*int64(time.Millisecond))
 		},

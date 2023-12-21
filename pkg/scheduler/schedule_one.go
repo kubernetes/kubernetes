@@ -66,7 +66,7 @@ const (
 // scheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	podInfo, err := sched.NextPod()
+	podInfo, err := sched.NextPod(logger)
 	if err != nil {
 		logger.Error(err, "Error while retrieving next pod from scheduling queue")
 		return
@@ -77,6 +77,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	}
 
 	pod := podInfo.Pod
+	// TODO(knelasevero): Remove duplicated keys from log entry calls
+	// When contextualized logging hits GA
+	// https://github.com/kubernetes/kubernetes/issues/111672
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
 
 	fwk, err := sched.frameworkForPod(pod)
@@ -206,15 +211,15 @@ func (sched *Scheduler) schedulingCycle(
 			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		if sts.IsUnschedulable() {
+		if sts.IsRejected() {
 			fitErr := &framework.FitError{
 				NumAllNodes: 1,
 				Pod:         pod,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: sts},
-					UnschedulablePlugins: sets.New(sts.FailedPlugin()),
+					NodeToStatusMap: framework.NodeToStatusMap{scheduleResult.SuggestedHost: sts},
 				},
 			}
+			fitErr.Diagnosis.AddPluginStatus(sts)
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, framework.NewStatus(sts.Code()).WithError(fitErr)
 		}
 		return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, sts
@@ -229,15 +234,15 @@ func (sched *Scheduler) schedulingCycle(
 			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		if runPermitStatus.IsUnschedulable() {
+		if runPermitStatus.IsRejected() {
 			fitErr := &framework.FitError{
 				NumAllNodes: 1,
 				Pod:         pod,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: runPermitStatus},
-					UnschedulablePlugins: sets.New(runPermitStatus.FailedPlugin()),
+					NodeToStatusMap: framework.NodeToStatusMap{scheduleResult.SuggestedHost: runPermitStatus},
 				},
 			}
+			fitErr.Diagnosis.AddPluginStatus(runPermitStatus)
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, framework.NewStatus(runPermitStatus.Code()).WithError(fitErr)
 		}
 
@@ -269,6 +274,17 @@ func (sched *Scheduler) bindingCycle(
 
 	// Run "permit" plugins.
 	if status := fwk.WaitOnPermit(ctx, assumedPod); !status.IsSuccess() {
+		if status.IsRejected() {
+			fitErr := &framework.FitError{
+				NumAllNodes: 1,
+				Pod:         assumedPodInfo.Pod,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: status},
+					UnschedulablePlugins: sets.New(status.Plugin()),
+				},
+			}
+			return framework.NewStatus(status.Code()).WithError(fitErr)
+		}
 		return status
 	}
 
@@ -288,6 +304,7 @@ func (sched *Scheduler) bindingCycle(
 	metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
 	if assumedPodInfo.InitialAttemptTimestamp != nil {
 		metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
+		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
 	}
 	// Run "postbind" plugins.
 	fwk.RunPostBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
@@ -324,7 +341,7 @@ func (sched *Scheduler) handleBindingCycleError(
 		// Avoid moving the assumed Pod itself as it's always Unschedulable.
 		// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
 		// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
-		if status.IsUnschedulable() {
+		if status.IsRejected() {
 			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, internalqueue.AssignedPodDelete, assumedPod, nil, func(pod *v1.Pod) bool {
 				return assumedPod.UID != pod.UID
 			})
@@ -423,8 +440,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
 	logger := klog.FromContext(ctx)
 	diagnosis := framework.Diagnosis{
-		NodeToStatusMap:      make(framework.NodeToStatusMap),
-		UnschedulablePlugins: sets.New[string](),
+		NodeToStatusMap: make(framework.NodeToStatusMap),
 	}
 
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
@@ -434,7 +450,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 	// Run "prefilter" plugins.
 	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
 	if !s.IsSuccess() {
-		if !s.IsUnschedulable() {
+		if !s.IsRejected() {
 			return nil, diagnosis, s.AsError()
 		}
 		// All nodes in NodeToStatusMap will have the same status so that they can be handled in the preemption.
@@ -447,10 +463,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		msg := s.Message()
 		diagnosis.PreFilterMsg = msg
 		logger.V(5).Info("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
-		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
-		if s.FailedPlugin() != "" {
-			diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
-		}
+		diagnosis.AddPluginStatus(s)
 		return nil, diagnosis, nil
 	}
 
@@ -478,7 +491,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 			nodes = append(nodes, nInfo)
 		}
 	}
-	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, nodes)
+	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, &diagnosis, nodes)
 	// always try to update the sched.nextStartNodeIndex regardless of whether an error has occurred
 	// this is helpful to make sure that all the nodes have a chance to be searched
 	processedNodes := len(feasibleNodes) + len(diagnosis.NodeToStatusMap)
@@ -501,7 +514,7 @@ func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, 
 		return nil, err
 	}
 	node := []*framework.NodeInfo{nodeInfo}
-	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, node)
+	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, &diagnosis, node)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +533,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	fwk framework.Framework,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	diagnosis framework.Diagnosis,
+	diagnosis *framework.Diagnosis,
 	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
 	numAllNodes := len(nodes)
 	numNodesToFind := sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes))
@@ -561,7 +574,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		} else {
 			statusesLock.Lock()
 			diagnosis.NodeToStatusMap[nodeInfo.Node().Name] = status
-			diagnosis.UnschedulablePlugins.Insert(status.FailedPlugin())
+			diagnosis.AddPluginStatus(status)
 			statusesLock.Unlock()
 		}
 	}
@@ -951,7 +964,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 
 	logger := klog.FromContext(ctx)
 	reason := v1.PodReasonSchedulerError
-	if status.IsUnschedulable() {
+	if status.IsRejected() {
 		reason = v1.PodReasonUnschedulable
 	}
 
@@ -970,6 +983,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
 	} else if fitError, ok := err.(*framework.FitError); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
+		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else if apierrors.IsNotFound(err) {
 		logger.V(2).Info("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", errMsg)

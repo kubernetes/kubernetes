@@ -1037,7 +1037,7 @@ func TestForgetPod(t *testing.T) {
 }
 
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
-func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *framework.NodeInfo {
+func buildNodeInfo(node *v1.Node, pods []*v1.Pod, imageStates map[string]*framework.ImageStateSummary) *framework.NodeInfo {
 	expected := framework.NewNodeInfo()
 	expected.SetNode(node)
 	expected.Allocatable = framework.NewResource(node.Status.Allocatable)
@@ -1045,48 +1045,83 @@ func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *framework.NodeInfo {
 	for _, pod := range pods {
 		expected.AddPod(pod)
 	}
+	for _, image := range node.Status.Images {
+		for _, name := range image.Names {
+			if state, ok := imageStates[name]; ok {
+				expected.ImageStates[name] = state
+			}
+		}
+	}
 	return expected
+}
+
+// buildImageStates creates ImageStateSummary of image from nodes that will be added in cache.
+func buildImageStates(nodes []*v1.Node) map[string]*framework.ImageStateSummary {
+	imageStates := make(map[string]*framework.ImageStateSummary)
+	for _, item := range nodes {
+		for _, image := range item.Status.Images {
+			for _, name := range image.Names {
+				if state, ok := imageStates[name]; !ok {
+					state = &framework.ImageStateSummary{
+						Size:  image.SizeBytes,
+						Nodes: sets.New[string](item.Name),
+					}
+					imageStates[name] = state
+				} else {
+					state.Nodes.Insert(item.Name)
+				}
+			}
+		}
+	}
+	return imageStates
 }
 
 // TestNodeOperators tests node operations of cache, including add, update
 // and remove.
 func TestNodeOperators(t *testing.T) {
 	// Test data
-	nodeName := "test-node"
-	cpu1 := resource.MustParse("1000m")
-	mem100m := resource.MustParse("100m")
 	cpuHalf := resource.MustParse("500m")
 	mem50m := resource.MustParse("50m")
-	resourceFooName := "example.com/foo"
-	resourceFoo := resource.MustParse("1")
-
+	resourceList1 := map[v1.ResourceName]string{
+		v1.ResourceCPU:                     "1000m",
+		v1.ResourceMemory:                  "100m",
+		v1.ResourceName("example.com/foo"): "1",
+	}
+	resourceList2 := map[v1.ResourceName]string{
+		v1.ResourceCPU:                     "500m",
+		v1.ResourceMemory:                  "50m",
+		v1.ResourceName("example.com/foo"): "2",
+	}
+	taints := []v1.Taint{
+		{
+			Key:    "test-key",
+			Value:  "test-value",
+			Effect: v1.TaintEffectPreferNoSchedule,
+		},
+	}
+	imageStatus1 := map[string]int64{
+		"gcr.io/80:latest":  80 * mb,
+		"gcr.io/80:v1":      80 * mb,
+		"gcr.io/300:latest": 300 * mb,
+		"gcr.io/300:v1":     300 * mb,
+	}
+	imageStatus2 := map[string]int64{
+		"gcr.io/600:latest": 600 * mb,
+		"gcr.io/80:latest":  80 * mb,
+		"gcr.io/900:latest": 900 * mb,
+	}
 	tests := []struct {
-		name string
-		node *v1.Node
-		pods []*v1.Pod
+		name  string
+		nodes []*v1.Node
+		pods  []*v1.Pod
 	}{
 		{
 			name: "operate the node with one pod",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: nodeName,
-				},
-				Status: v1.NodeStatus{
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:                   cpu1,
-						v1.ResourceMemory:                mem100m,
-						v1.ResourceName(resourceFooName): resourceFoo,
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key:    "test-key",
-							Value:  "test-value",
-							Effect: v1.TaintEffectPreferNoSchedule,
-						},
-					},
-				},
+			nodes: []*v1.Node{
+				&st.MakeNode().Name("test-node-1").Capacity(resourceList1).Taints(taints).Images(imageStatus1).Node,
+				&st.MakeNode().Name("test-node-2").Capacity(resourceList2).Taints(taints).Images(imageStatus2).Node,
+				&st.MakeNode().Name("test-node-3").Capacity(resourceList1).Taints(taints).Images(imageStatus1).Node,
+				&st.MakeNode().Name("test-node-4").Capacity(resourceList2).Taints(taints).Images(imageStatus2).Node,
 			},
 			pods: []*v1.Pod{
 				{
@@ -1095,7 +1130,7 @@ func TestNodeOperators(t *testing.T) {
 						UID:  types.UID("pod1"),
 					},
 					Spec: v1.PodSpec{
-						NodeName: nodeName,
+						NodeName: "test-node-1",
 						Containers: []v1.Container{
 							{
 								Resources: v1.ResourceRequirements{
@@ -1119,26 +1154,10 @@ func TestNodeOperators(t *testing.T) {
 		},
 		{
 			name: "operate the node with two pods",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: nodeName,
-				},
-				Status: v1.NodeStatus{
-					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:                   cpu1,
-						v1.ResourceMemory:                mem100m,
-						v1.ResourceName(resourceFooName): resourceFoo,
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						{
-							Key:    "test-key",
-							Value:  "test-value",
-							Effect: v1.TaintEffectPreferNoSchedule,
-						},
-					},
-				},
+			nodes: []*v1.Node{
+				&st.MakeNode().Name("test-node-1").Capacity(resourceList1).Taints(taints).Images(imageStatus1).Node,
+				&st.MakeNode().Name("test-node-2").Capacity(resourceList2).Taints(taints).Images(imageStatus2).Node,
+				&st.MakeNode().Name("test-node-3").Capacity(resourceList1).Taints(taints).Images(imageStatus1).Node,
 			},
 			pods: []*v1.Pod{
 				{
@@ -1147,7 +1166,7 @@ func TestNodeOperators(t *testing.T) {
 						UID:  types.UID("pod1"),
 					},
 					Spec: v1.PodSpec{
-						NodeName: nodeName,
+						NodeName: "test-node-1",
 						Containers: []v1.Container{
 							{
 								Resources: v1.ResourceRequirements{
@@ -1166,7 +1185,7 @@ func TestNodeOperators(t *testing.T) {
 						UID:  types.UID("pod2"),
 					},
 					Spec: v1.PodSpec{
-						NodeName: nodeName,
+						NodeName: "test-node-1",
 						Containers: []v1.Container{
 							{
 								Resources: v1.ResourceRequirements{
@@ -1188,15 +1207,23 @@ func TestNodeOperators(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			expected := buildNodeInfo(tc.node, tc.pods)
-			node := tc.node
+			node := tc.nodes[0]
+
+			imageStates := buildImageStates(tc.nodes)
+			expected := buildNodeInfo(node, tc.pods, imageStates)
 
 			cache := newCache(ctx, time.Second, time.Second)
-			cache.AddNode(logger, node)
+			for _, nodeItem := range tc.nodes {
+				cache.AddNode(logger, nodeItem)
+			}
 			for _, pod := range tc.pods {
 				if err := cache.AddPod(logger, pod); err != nil {
 					t.Fatal(err)
 				}
+			}
+			nodes := map[string]*framework.NodeInfo{}
+			for nodeItem := cache.headNode; nodeItem != nil; nodeItem = nodeItem.next {
+				nodes[nodeItem.info.Node().Name] = nodeItem.info
 			}
 
 			// Step 1: the node was added into cache successfully.
@@ -1208,14 +1235,20 @@ func TestNodeOperators(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if cache.nodeTree.numNodes != 1 || nodesList[len(nodesList)-1] != node.Name {
-				t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)
+			if cache.nodeTree.numNodes != len(tc.nodes) || len(nodesList) != len(tc.nodes) {
+				t.Errorf("cache.nodeTree is not updated correctly after adding node got: %d, expected: %d",
+					cache.nodeTree.numNodes, len(tc.nodes))
 			}
 
 			// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 			expected.Generation = got.info.Generation
 			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
-				t.Errorf("Unexpected node info from cache (-want, +got):\n%s", diff)
+				t.Errorf("Failed to add node into scheduler cache (-want,+got):\n%s", diff)
+			}
+
+			// check imageState of NodeInfo with specific image when node added
+			if !checkImageStateSummary(nodes, "gcr.io/80:latest", "gcr.io/300:latest") {
+				t.Error("image have different ImageStateSummary")
 			}
 
 			// Step 2: dump cached nodes successfully.
@@ -1224,12 +1257,16 @@ func TestNodeOperators(t *testing.T) {
 				t.Error(err)
 			}
 			newNode, found := cachedNodes.nodeInfoMap[node.Name]
-			if !found || len(cachedNodes.nodeInfoMap) != 1 {
-				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
+			if !found || len(cachedNodes.nodeInfoMap) != len(tc.nodes) {
+				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes.nodeInfoMap, tc.nodes)
 			}
 			expected.Generation = newNode.Generation
-			if diff := cmp.Diff(expected, newNode, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
-				t.Errorf("Unexpected clone node info (-want, +got):\n%s", diff)
+			if diff := cmp.Diff(newNode, expected.Snapshot(), cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+				t.Errorf("Failed to clone node:\n%s", diff)
+			}
+			// check imageState of NodeInfo with specific image when update snapshot
+			if !checkImageStateSummary(cachedNodes.nodeInfoMap, "gcr.io/80:latest", "gcr.io/300:latest") {
+				t.Error("image have different ImageStateSummary")
 			}
 
 			// Step 3: update node attribute successfully.
@@ -1249,13 +1286,17 @@ func TestNodeOperators(t *testing.T) {
 			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
 				t.Errorf("Unexpected schedulertypes after updating node (-want, +got):\n%s", diff)
 			}
+			// check imageState of NodeInfo with specific image when update node
+			if !checkImageStateSummary(nodes, "gcr.io/80:latest", "gcr.io/300:latest") {
+				t.Error("image have different ImageStateSummary")
+			}
 			// Check nodeTree after update
 			nodesList, err = cache.nodeTree.list()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if cache.nodeTree.numNodes != 1 || nodesList[len(nodesList)-1] != node.Name {
-				t.Errorf("unexpected cache.nodeTree after updating node: %v", node.Name)
+			if cache.nodeTree.numNodes != len(tc.nodes) || len(nodesList) != len(tc.nodes) {
+				t.Errorf("unexpected cache.nodeTree after updating node")
 			}
 
 			// Step 4: the node can be removed even if it still has pods.
@@ -1278,8 +1319,12 @@ func TestNodeOperators(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if cache.nodeTree.numNodes != 0 || len(nodesList) != 0 {
+			if cache.nodeTree.numNodes != len(tc.nodes)-1 || len(nodesList) != len(tc.nodes)-1 {
 				t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
+			}
+			// check imageState of NodeInfo with specific image when delete node
+			if !checkImageStateSummary(nodes, "gcr.io/80:latest", "gcr.io/300:latest") {
+				t.Error("image have different ImageStateSummary after removing node")
 			}
 			// Pods are still in the pods cache.
 			for _, p := range tc.pods {
@@ -1974,6 +2019,28 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 		st.MakeContainer().Name("container").Image("pause").Resources(req).ContainerPort(ports).Obj(),
 	})
 	return podWrapper.Obj()
+}
+
+// checkImageStateSummary collect ImageStateSummary of image traverse nodes,
+// the collected ImageStateSummary should be equal
+func checkImageStateSummary(nodes map[string]*framework.NodeInfo, imageNames ...string) bool {
+	for _, imageName := range imageNames {
+		var imageState *framework.ImageStateSummary
+		for _, node := range nodes {
+			state, ok := node.ImageStates[imageName]
+			if !ok {
+				continue
+			}
+			if imageState == nil {
+				imageState = state
+				continue
+			}
+			if diff := cmp.Diff(imageState, state); diff != "" {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func setupCacheOf1kNodes30kPods(b *testing.B) Cache {

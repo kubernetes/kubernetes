@@ -504,7 +504,7 @@ func TestWarnings(t *testing.T) {
 				Spec: api.PodSpec{Volumes: []api.Volume{
 					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
 						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
-							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.VolumeResourceRequirements{
 								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200Mi")}}},
 						},
 					}}}}},
@@ -518,7 +518,7 @@ func TestWarnings(t *testing.T) {
 				Spec: api.PodSpec{Volumes: []api.Volume{
 					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
 						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
-							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.VolumeResourceRequirements{
 								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200m")}}},
 						},
 					}}}}},

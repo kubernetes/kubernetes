@@ -123,8 +123,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                                          {},
 		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:                                           {},
 		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicyList"}:                                       {},
-		{Group: "policy", Version: "v1beta1", Kind: "PodSecurityPolicy"}:                                           {},
-		{Group: "policy", Version: "v1beta1", Kind: "PodSecurityPolicyList"}:                                       {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:                      {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}:                  {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:                             {},
@@ -190,6 +188,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2", Kind: "PriorityLevelConfigurationList"}:        {},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3", Kind: "PriorityLevelConfiguration"}:            {},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3", Kind: "PriorityLevelConfigurationList"}:        {},
+		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1", Kind: "PriorityLevelConfiguration"}:                 {},
+		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1", Kind: "PriorityLevelConfigurationList"}:             {},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))

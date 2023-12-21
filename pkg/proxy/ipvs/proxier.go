@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -53,6 +52,7 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 )
 
 const (
@@ -84,16 +84,15 @@ const (
 	// https://github.com/kubernetes/kubernetes/issues/72236
 	kubeIPVSFilterChain utiliptables.Chain = "KUBE-IPVS-FILTER"
 
+	// kubeIPVSOutFilterChain filters access to load balancer services from node.
+	// https://github.com/kubernetes/kubernetes/issues/119656
+	kubeIPVSOutFilterChain utiliptables.Chain = "KUBE-IPVS-OUT-FILTER"
+
 	// defaultScheduler is the default ipvs scheduler algorithm - round robin.
 	defaultScheduler = "rr"
 
 	// defaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
 	defaultDummyDevice = "kube-ipvs0"
-
-	connReuseMinSupportedKernelVersion = "4.1"
-
-	// https://github.com/torvalds/linux/commit/35dfb013149f74c2be1ff9c78f14e6a3cd1539d1
-	connReuseFixedKernelVersion = "5.9"
 )
 
 // iptablesJumpChain is tables of iptables chains that ipvs proxier used to install iptables or cleanup iptables.
@@ -113,6 +112,7 @@ var iptablesJumpChain = []struct {
 	{utiliptables.TableFilter, utiliptables.ChainInput, kubeProxyFirewallChain, "kube-proxy firewall rules"},
 	{utiliptables.TableFilter, utiliptables.ChainForward, kubeProxyFirewallChain, "kube-proxy firewall rules"},
 	{utiliptables.TableFilter, utiliptables.ChainInput, kubeIPVSFilterChain, "kubernetes ipvs access filter"},
+	{utiliptables.TableFilter, utiliptables.ChainOutput, kubeIPVSOutFilterChain, "kubernetes ipvs access filter"},
 }
 
 var iptablesChains = []struct {
@@ -129,6 +129,7 @@ var iptablesChains = []struct {
 	{utiliptables.TableFilter, kubeProxyFirewallChain},
 	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
 	{utiliptables.TableFilter, kubeIPVSFilterChain},
+	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
 }
 
 var iptablesCleanupChains = []struct {
@@ -144,6 +145,7 @@ var iptablesCleanupChains = []struct {
 	{utiliptables.TableFilter, kubeProxyFirewallChain},
 	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
 	{utiliptables.TableFilter, kubeIPVSFilterChain},
+	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
 }
 
 // ipsetInfo is all ipset we needed in ipvs proxier
@@ -201,7 +203,6 @@ var ipsetWithIptablesChain = []struct {
 
 // In IPVS proxy mode, the following flags need to be set
 const (
-	sysctlBridgeCallIPTables      = "net/bridge/bridge-nf-call-iptables"
 	sysctlVSConnTrack             = "net/ipv4/vs/conntrack"
 	sysctlConnReuse               = "net/ipv4/vs/conn_reuse_mode"
 	sysctlExpireNoDestConn        = "net/ipv4/vs/expire_nodest_conn"
@@ -220,7 +221,7 @@ type Proxier struct {
 	// services that happened since last syncProxyRules call. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointChangeTracker
+	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
 	mu           sync.Mutex // protects the following fields
@@ -261,7 +262,7 @@ type Proxier struct {
 	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
-	healthzServer       healthcheck.ProxierHealthUpdater
+	healthzServer       *healthcheck.ProxierHealthServer
 
 	ipvsScheduler string
 	// The following buffers are used to reuse memory and avoid allocations
@@ -296,6 +297,11 @@ type Proxier struct {
 	// A Set is used here since we end up calculating endpoint topology multiple times for the same Service
 	// if it has multiple ports but each Service should only be counted once.
 	serviceNoLocalEndpointsExternal sets.Set[string]
+	// lbNoNodeAccessIPPortProtocolEntries represents the set of loadBalancers IP + Port + Protocol that should not be accessible from K8s nodes
+	// We cannot directly restrict LB access from node using LoadBalancerSourceRanges, we need to install
+	// additional iptables rules.
+	// (ref: https://github.com/kubernetes/kubernetes/issues/119656)
+	lbNoNodeAccessIPPortProtocolEntries []*utilipset.Entry
 }
 
 // Proxier implements proxy.Provider
@@ -325,34 +331,24 @@ func NewProxier(ipFamily v1.IPFamily,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	scheduler string,
 	nodePortAddressStrings []string,
-	kernelHandler KernelHandler,
+	initOnly bool,
 ) (*Proxier, error) {
-	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
-	// are connected to a Linux bridge (but not SDN bridges).  Until most
-	// plugins handle this, log when config is missing
-	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
-		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables, proxy may not work as intended")
-	}
-
 	// Set the conntrack sysctl we need for
 	if err := proxyutil.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
 		return nil, err
 	}
 
-	kernelVersionStr, err := kernelHandler.GetKernelVersion()
+	kernelVersion, err := utilkernel.GetVersion()
 	if err != nil {
-		return nil, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+		return nil, fmt.Errorf("failed to get kernel version: %w", err)
 	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	if kernelVersion.LessThan(version.MustParseGeneric(connReuseMinSupportedKernelVersion)) {
-		klog.ErrorS(nil, "Can't set sysctl, kernel version doesn't satisfy minimum version requirements", "sysctl", sysctlConnReuse, "minimumKernelVersion", connReuseMinSupportedKernelVersion)
-	} else if kernelVersion.AtLeast(version.MustParseGeneric(connReuseFixedKernelVersion)) {
+
+	if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.IPVSConnReuseModeMinSupportedKernelVersion)) {
+		klog.ErrorS(nil, "Can't set sysctl, kernel version doesn't satisfy minimum version requirements", "sysctl", sysctlConnReuse, "minimumKernelVersion", utilkernel.IPVSConnReuseModeMinSupportedKernelVersion)
+	} else if kernelVersion.AtLeast(version.MustParseGeneric(utilkernel.IPVSConnReuseModeFixedKernelVersion)) {
 		// https://github.com/kubernetes/kubernetes/issues/93297
 		klog.V(2).InfoS("Left as-is", "sysctl", sysctlConnReuse)
 	} else {
@@ -398,6 +394,11 @@ func NewProxier(ipFamily v1.IPFamily,
 		}
 	}
 
+	if initOnly {
+		klog.InfoS("System initialized and --init-only specified")
+		return nil, nil
+	}
+
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
@@ -421,7 +422,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		svcPortMap:            make(proxy.ServicePortMap),
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, nil),
+		endpointsChanges:      proxy.NewEndpointsChangeTracker(hostname, nil, ipFamily, recorder, nil),
 		initialSync:           true,
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
@@ -482,10 +483,10 @@ func NewDualStackProxier(
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
-	healthzServer healthcheck.ProxierHealthUpdater,
+	healthzServer *healthcheck.ProxierHealthServer,
 	scheduler string,
 	nodePortAddresses []string,
-	kernelHandler KernelHandler,
+	initOnly bool,
 ) (proxy.Provider, error) {
 
 	safeIpset := newSafeIpset(ipset)
@@ -494,8 +495,8 @@ func NewDualStackProxier(
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
+		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol], recorder,
+		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -503,10 +504,13 @@ func NewDualStackProxier(
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol],
-		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
+		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol], recorder,
+		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
 	}
 
 	// Return a meta-proxier that dispatch calls between the two
@@ -543,23 +547,6 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 	return svcPort
 }
 
-// KernelHandler can handle the current installed kernel modules.
-type KernelHandler interface {
-	GetKernelVersion() (string, error)
-}
-
-// LinuxKernelHandler implements KernelHandler interface.
-type LinuxKernelHandler struct {
-	executor utilexec.Interface
-}
-
-// NewLinuxKernelHandler initializes LinuxKernelHandler with exec.
-func NewLinuxKernelHandler() *LinuxKernelHandler {
-	return &LinuxKernelHandler{
-		executor: utilexec.New(),
-	}
-}
-
 // getFirstColumn reads all the content from r into memory and return a
 // slice which consists of the first word from each line.
 func getFirstColumn(r io.Reader) ([]string, error) {
@@ -577,17 +564,6 @@ func getFirstColumn(r io.Reader) ([]string, error) {
 		}
 	}
 	return words, nil
-}
-
-// GetKernelVersion returns currently running kernel version.
-func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
-	kernelVersionFile := "/proc/sys/kernel/osrelease"
-	fileContent, err := os.ReadFile(kernelVersionFile)
-	if err != nil {
-		return "", fmt.Errorf("error reading osrelease file %q: %v", kernelVersionFile, err)
-	}
-
-	return strings.TrimSpace(string(fileContent)), nil
 }
 
 // CanUseIPVSProxier checks if we can use the ipvs Proxier.
@@ -756,7 +732,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 // Sync is called to synchronize the proxier state to iptables and ipvs as soon as possible.
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.QueuedUpdate()
+		proxier.healthzServer.QueuedUpdate(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	proxier.syncRunner.Run()
@@ -766,7 +742,7 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 	// synthesize "last change queued" time as the informers are syncing.
 	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
@@ -949,6 +925,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 	proxier.serviceNoLocalEndpointsInternal = sets.New[string]()
 	proxier.serviceNoLocalEndpointsExternal = sets.New[string]()
+
+	proxier.lbNoNodeAccessIPPortProtocolEntries = make([]*utilipset.Entry, 0)
+
 	// Begin install iptables
 
 	// Reset all buffers used later.
@@ -1045,13 +1024,13 @@ func (proxier *Proxier) syncProxyRules() {
 				klog.ErrorS(nil, "Failed to cast BaseEndpointInfo", "endpoint", e)
 				continue
 			}
-			if !ep.IsLocal {
+			if !ep.IsLocal() {
 				continue
 			}
 			epIP := ep.IP()
-			epPort, err := ep.Port()
+			epPort := ep.Port()
 			// Error parsing this endpoint has been logged. Skip to next endpoint.
-			if epIP == "" || err != nil {
+			if epIP == "" || epPort == 0 {
 				continue
 			}
 			entry := &utilipset.Entry{
@@ -1172,7 +1151,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
+		for _, ingress := range svcInfo.LoadBalancerVIPStrings() {
 			// ipset call
 			entry = &utilipset.Entry{
 				IP:       ingress,
@@ -1246,6 +1225,10 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 					proxier.ipsetList[kubeLoadBalancerSourceIPSet].activeEntries.Insert(entry.String())
+				} else {
+					// since nodeIP is not covered in any of SourceRange we need to explicitly block the lbIP access from k8s nodes.
+					proxier.lbNoNodeAccessIPPortProtocolEntries = append(proxier.lbNoNodeAccessIPPortProtocolEntries, entry)
+
 				}
 			}
 			// ipvs call
@@ -1482,7 +1465,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.cleanLegacyService(activeIPVSServices, currentIPVSServices)
 
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.Updated()
+		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
 
@@ -1636,6 +1619,17 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-A", string(kubeSourceRangesFirewallChain),
 		"-j", "DROP",
 	)
+
+	// disable LB access from node
+	// for IPVS src and dst both would be lbIP
+	for _, entry := range proxier.lbNoNodeAccessIPPortProtocolEntries {
+		proxier.filterRules.Write(
+			"-A", string(kubeIPVSOutFilterChain),
+			"-s", entry.IP,
+			"-m", "ipvs", "--vaddr", entry.IP, "--vproto", entry.Protocol, "--vport", strconv.Itoa(entry.Port),
+			"-j", "DROP",
+		)
+	}
 
 	// Accept all traffic with destination of ipvs virtual service, in case other iptables rules
 	// block the traffic, that may result in ipvs rules invalid.

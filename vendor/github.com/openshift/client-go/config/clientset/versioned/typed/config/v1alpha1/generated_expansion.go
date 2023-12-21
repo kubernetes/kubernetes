@@ -4,4 +4,8 @@ package v1alpha1
 
 type BackupExpansion interface{}
 
+type ClusterImagePolicyExpansion interface{}
+
+type ImagePolicyExpansion interface{}
+
 type InsightsDataGatherExpansion interface{}

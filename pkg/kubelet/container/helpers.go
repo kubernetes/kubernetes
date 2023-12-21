@@ -273,6 +273,7 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			Name:                 containerStatus.Name,
 			Image:                containerStatus.Image,
 			ImageID:              containerStatus.ImageID,
+			ImageRuntimeHandler:  containerStatus.ImageRuntimeHandler,
 			Hash:                 containerStatus.Hash,
 			HashWithoutResources: containerStatus.HashWithoutResources,
 			State:                containerStatus.State,

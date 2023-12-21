@@ -1502,7 +1502,7 @@ func makeUnboundPersistentVolumeClaim(storageClass string) *v1.PersistentVolumeC
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
 			StorageClassName: &storageClass,
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
 				},

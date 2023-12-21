@@ -193,8 +193,8 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           CgroupManagerOperationsKey,
 			Help:           "Duration in seconds for cgroup manager operations. Broken down by method.",
-			Buckets:        metrics.DefBuckets,
-			StabilityLevel: metrics.ALPHA,
+			Buckets:        metrics.ExponentialBucketsRange(0.01, 10, 10),
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"operation_type"},
 	)

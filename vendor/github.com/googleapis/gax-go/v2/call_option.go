@@ -218,6 +218,14 @@ func (p pathOpt) Resolve(s *CallSettings) {
 	s.Path = p.p
 }
 
+type timeoutOpt struct {
+	t time.Duration
+}
+
+func (t timeoutOpt) Resolve(s *CallSettings) {
+	s.timeout = t.t
+}
+
 // WithPath applies a Path override to the HTTP-based APICall.
 //
 // This is for internal use only.
@@ -228,6 +236,15 @@ func WithPath(p string) CallOption {
 // WithGRPCOptions allows passing gRPC call options during client creation.
 func WithGRPCOptions(opt ...grpc.CallOption) CallOption {
 	return grpcOpt(append([]grpc.CallOption(nil), opt...))
+}
+
+// WithTimeout is a convenience option for setting a context.WithTimeout on the
+// singular context.Context used for **all** APICall attempts. Calculated from
+// the start of the first APICall attempt.
+// If the context.Context provided to Invoke already has a Deadline set, that
+// will always be respected over the deadline calculated using this option.
+func WithTimeout(t time.Duration) CallOption {
+	return &timeoutOpt{t: t}
 }
 
 // CallSettings allow fine-grained control over how calls are made.
@@ -241,4 +258,8 @@ type CallSettings struct {
 
 	// Path is an HTTP override for an APICall.
 	Path string
+
+	// Timeout defines the amount of time that Invoke has to complete.
+	// Unexported so it cannot be changed by the code in an APICall.
+	timeout time.Duration
 }

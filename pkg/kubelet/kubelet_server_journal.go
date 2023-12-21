@@ -53,7 +53,7 @@ var (
 	// The set of known safe characters to pass to journalctl / GetWinEvent flags - only add to this list if the
 	// character cannot be used to create invalid sequences. This is intended as a broad defense against malformed
 	// input that could cause an escape.
-	reServiceNameUnsafeCharacters = regexp.MustCompile(`[^a-zA-Z\-_0-9@]+`)
+	reServiceNameUnsafeCharacters = regexp.MustCompile(`[^a-zA-Z\-_.:0-9@]+`)
 	reRelativeDate                = regexp.MustCompile(`^(\+|\-)?[\d]+(s|m|h|d)$`)
 )
 
@@ -334,7 +334,7 @@ func (n *nodeLogQuery) Copy(w io.Writer) {
 	// set the deadline to the maximum across both runs
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
 	defer cancel()
-	boot := int(0)
+	boot := 0
 	if n.Boot != nil {
 		boot = *n.Boot
 	}
@@ -422,7 +422,7 @@ func copyFileLogs(ctx context.Context, w io.Writer, services []string) {
 // in that order stopping on first success.
 func heuristicsCopyFileLogs(ctx context.Context, w io.Writer, service string) {
 	logFileNames := [3]string{
-		fmt.Sprintf("%s", service),
+		service,
 		fmt.Sprintf("%s.log", service),
 		fmt.Sprintf("%s/%s.log", service, service),
 	}

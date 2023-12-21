@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,6 +74,14 @@ var supportedLimitResponseType = sets.NewString(
 	string(flowcontrol.LimitResponseTypeQueue),
 	string(flowcontrol.LimitResponseTypeReject),
 )
+
+// PriorityLevelValidationOptions holds the validation options for a priority level object
+type PriorityLevelValidationOptions struct {
+	// AllowZeroLimitedNominalConcurrencyShares, if true, indicates that we allow
+	// a zero value for the 'nominalConcurrencyShares' field of the 'limited'
+	// section of a priority level.
+	AllowZeroLimitedNominalConcurrencyShares bool
+}
 
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
@@ -341,10 +349,18 @@ func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fld
 }
 
 // ValidatePriorityLevelConfiguration validates priority-level-configuration.
-func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration, requestGV schema.GroupVersion, opts PriorityLevelValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
+
+	// the roundtrip annotation is only for use in v1beta3, and after
+	// conversion, the internal object should not have the roundtrip
+	// annotation, so we should forbid it, if it's set.
+	if _, ok := pl.ObjectMeta.Annotations[flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey]; ok {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations"), fmt.Sprintf("annotation '%s' is forbidden", flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)))
+	}
+
 	specPath := field.NewPath("spec")
-	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, requestGV, pl.Name, specPath)...)
+	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, requestGV, pl.Name, specPath, opts)...)
 	allErrs = append(allErrs, ValidateIfMandatoryPriorityLevelConfigurationObject(pl, specPath)...)
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))...)
 	return allErrs
@@ -381,7 +397,7 @@ func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.Priorit
 }
 
 // ValidatePriorityLevelConfigurationSpec validates priority-level-configuration's spec.
-func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, requestGV schema.GroupVersion, name string, fldPath *field.Path) field.ErrorList {
+func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, requestGV schema.GroupVersion, name string, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if (name == flowcontrol.PriorityLevelConfigurationNameExempt) != (spec.Type == flowcontrol.PriorityLevelEnablementExempt) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "type must be 'Exempt' if and only if name is 'exempt'"))
@@ -402,7 +418,7 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		if spec.Limited == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited"))
 		} else {
-			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"))...)
+			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"), opts)...)
 		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
@@ -411,10 +427,16 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 }
 
 // ValidateLimitedPriorityLevelConfiguration validates the configuration for an execution-limited priority level
-func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, requestGV schema.GroupVersion, fldPath *field.Path) field.ErrorList {
+func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, requestGV schema.GroupVersion, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
-	if lplc.NominalConcurrencyShares <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be positive"))
+	if opts.AllowZeroLimitedNominalConcurrencyShares {
+		if lplc.NominalConcurrencyShares < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be a non-negative integer"))
+		}
+	} else {
+		if lplc.NominalConcurrencyShares <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be positive"))
+		}
 	}
 	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
 
@@ -441,8 +463,7 @@ func ValidateExemptPriorityLevelConfiguration(eplc *flowcontrol.ExemptPriorityLe
 
 func getVersionedFieldNameForConcurrencyShares(requestGV schema.GroupVersion) string {
 	switch {
-	case requestGV == flowcontrolv1alpha1.SchemeGroupVersion ||
-		requestGV == flowcontrolv1beta1.SchemeGroupVersion ||
+	case requestGV == flowcontrolv1beta1.SchemeGroupVersion ||
 		requestGV == flowcontrolv1beta2.SchemeGroupVersion:
 		return "assuredConcurrencyShares"
 	default:

@@ -40,7 +40,7 @@ import (
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	netutils "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func Test_platformApplyDefaults(t *testing.T) {
@@ -672,8 +672,8 @@ func TestGetConntrackMax(t *testing.T) {
 
 	for i, tc := range testCases {
 		cfg := proxyconfigapi.KubeProxyConntrackConfiguration{
-			Min:        pointer.Int32(tc.min),
-			MaxPerCore: pointer.Int32(tc.maxPerCore),
+			Min:        ptr.To(tc.min),
+			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
 		x, e := getConntrackMax(cfg)
 		if e != nil {

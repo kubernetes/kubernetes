@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func getForegroundOptions() metav1.DeleteOptions {
@@ -355,7 +355,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 	}
 	for i := 0; i < validChildrenCount; i++ {
 		_, err := clientSet.CoreV1().Secrets(namespaceB).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "child-", OwnerReferences: []metav1.OwnerReference{
-			{Name: "parent", Kind: "ConfigMap", APIVersion: "v1", UID: parent.UID, Controller: pointer.BoolPtr(false)},
+			{Name: "parent", Kind: "ConfigMap", APIVersion: "v1", UID: parent.UID, Controller: ptr.To(false)},
 		}}}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
@@ -369,7 +369,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 	for i := 0; i < 25; i++ {
 		invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: types.UID(fmt.Sprintf("invalid-%d", i)), APIVersion: "test/v1", Kind: fmt.Sprintf("invalid%d", i)})
 	}
-	invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: pointer.BoolPtr(false)})
+	invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: ptr.To(false)})
 
 	for i := 0; i < workers; i++ {
 		_, err := clientSet.CoreV1().ConfigMaps(namespaceA).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
@@ -384,7 +384,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels:          map[string]string{"single-bad-reference": "true"},
 				GenerateName:    "invalid-child-b-",
-				OwnerReferences: []metav1.OwnerReference{{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: pointer.BoolPtr(false)}},
+				OwnerReferences: []metav1.OwnerReference{{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: ptr.To(false)}},
 			},
 		}, metav1.CreateOptions{})
 		if err != nil {
@@ -434,7 +434,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 	invalidChild, err := clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName:    "invalid-child-c-",
-			OwnerReferences: []metav1.OwnerReference{{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: pointer.BoolPtr(false)}},
+			OwnerReferences: []metav1.OwnerReference{{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: ptr.To(false)}},
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {

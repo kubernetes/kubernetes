@@ -18,6 +18,7 @@ package serviceaccount
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
@@ -183,7 +185,28 @@ func (tc *LegacySATokenCleaner) evaluateSATokens(ctx context.Context) {
 			continue
 		}
 
-		logger.Info("Delete auto-generated service account token", "secret", klog.KRef(secret.Namespace, secret.Name), "creationTime", secret.CreationTimestamp, "lastUsed", lastUsed)
+		invalidSince := secret.Labels[serviceaccount.InvalidSinceLabelKey]
+		// If the secret has not been labeled with invalid since date or the label value has invalid format, update the invalidSince label with the current date value.
+		_, err = time.Parse(dateFormat, invalidSince)
+		if err != nil {
+			invalidSince = now.Format(dateFormat)
+			logger.Info("Mark the auto-generated service account token as invalid", "invalidSince", invalidSince, "secret", klog.KRef(secret.Namespace, secret.Name))
+			patchContent, err := json.Marshal(applyv1.Secret(secret.Name, secret.Namespace).WithUID(secret.UID).WithLabels(map[string]string{serviceaccount.InvalidSinceLabelKey: invalidSince}))
+			if err != nil {
+				logger.Error(err, "Failed to marshal invalid since label")
+			} else {
+				if _, err := tc.client.CoreV1().Secrets(secret.Namespace).Patch(ctx, secret.Name, types.MergePatchType, patchContent, metav1.PatchOptions{}); err != nil {
+					logger.Error(err, "Failed to label legacy service account token secret with invalid since date")
+				}
+			}
+			continue
+		}
+
+		if invalidSince >= preserveUsedOnOrAfter {
+			continue
+		}
+
+		logger.Info("Delete auto-generated service account token", "secret", klog.KRef(secret.Namespace, secret.Name), "creationTime", secret.CreationTimestamp, "lastUsed", lastUsed, "invalidSince", invalidSince)
 		if err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(ctx, secret.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &secret.ResourceVersion}}); err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 			logger.Error(err, "Deleting legacy service account token", "secret", klog.KRef(secret.Namespace, secret.Name), "serviceaccount", sa.Name)
 		}

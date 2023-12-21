@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/google/cel-go/common"
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
@@ -33,7 +34,8 @@ import (
 
 // CheckedExprToAst converts a checked expression proto message to an Ast.
 func CheckedExprToAst(checkedExpr *exprpb.CheckedExpr) *Ast {
-	return CheckedExprToAstWithSource(checkedExpr, nil)
+	checked, _ := CheckedExprToAstWithSource(checkedExpr, nil)
+	return checked
 }
 
 // CheckedExprToAstWithSource converts a checked expression proto message to an Ast,
@@ -44,29 +46,18 @@ func CheckedExprToAst(checkedExpr *exprpb.CheckedExpr) *Ast {
 // through future calls.
 //
 // Prefer CheckedExprToAst if loading expressions from storage.
-func CheckedExprToAstWithSource(checkedExpr *exprpb.CheckedExpr, src Source) *Ast {
-	refMap := checkedExpr.GetReferenceMap()
-	if refMap == nil {
-		refMap = map[int64]*exprpb.Reference{}
-	}
-	typeMap := checkedExpr.GetTypeMap()
-	if typeMap == nil {
-		typeMap = map[int64]*exprpb.Type{}
-	}
-	si := checkedExpr.GetSourceInfo()
-	if si == nil {
-		si = &exprpb.SourceInfo{}
-	}
-	if src == nil {
-		src = common.NewInfoSource(si)
+func CheckedExprToAstWithSource(checkedExpr *exprpb.CheckedExpr, src Source) (*Ast, error) {
+	checkedAST, err := ast.CheckedExprToCheckedAST(checkedExpr)
+	if err != nil {
+		return nil, err
 	}
 	return &Ast{
-		expr:    checkedExpr.GetExpr(),
-		info:    si,
+		expr:    checkedAST.Expr,
+		info:    checkedAST.SourceInfo,
 		source:  src,
-		refMap:  refMap,
-		typeMap: typeMap,
-	}
+		refMap:  checkedAST.ReferenceMap,
+		typeMap: checkedAST.TypeMap,
+	}, nil
 }
 
 // AstToCheckedExpr converts an Ast to an protobuf CheckedExpr value.
@@ -76,12 +67,13 @@ func AstToCheckedExpr(a *Ast) (*exprpb.CheckedExpr, error) {
 	if !a.IsChecked() {
 		return nil, fmt.Errorf("cannot convert unchecked ast")
 	}
-	return &exprpb.CheckedExpr{
-		Expr:         a.Expr(),
-		SourceInfo:   a.SourceInfo(),
+	cAst := &ast.CheckedAST{
+		Expr:         a.expr,
+		SourceInfo:   a.info,
 		ReferenceMap: a.refMap,
 		TypeMap:      a.typeMap,
-	}, nil
+	}
+	return ast.CheckedASTToCheckedExpr(cAst)
 }
 
 // ParsedExprToAst converts a parsed expression proto message to an Ast.
@@ -202,7 +194,7 @@ func RefValueToValue(res ref.Val) (*exprpb.Value, error) {
 }
 
 var (
-	typeNameToTypeValue = map[string]*types.TypeValue{
+	typeNameToTypeValue = map[string]ref.Val{
 		"bool":      types.BoolType,
 		"bytes":     types.BytesType,
 		"double":    types.DoubleType,
@@ -219,7 +211,7 @@ var (
 )
 
 // ValueToRefValue converts between exprpb.Value and ref.Val.
-func ValueToRefValue(adapter ref.TypeAdapter, v *exprpb.Value) (ref.Val, error) {
+func ValueToRefValue(adapter types.Adapter, v *exprpb.Value) (ref.Val, error) {
 	switch v.Kind.(type) {
 	case *exprpb.Value_NullValue:
 		return types.NullValue, nil

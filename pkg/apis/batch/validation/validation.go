@@ -78,7 +78,7 @@ var (
 		string(api.ConditionTrue),
 		string(api.ConditionUnknown))
 
-	supportedPodRecreationPolicy = sets.New(
+	supportedPodReplacementPolicy = sets.New(
 		string(batch.Failed),
 		string(batch.TerminatingOrFailed))
 )
@@ -295,9 +295,9 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 			if *spec.PodReplacementPolicy != batch.Failed {
 				allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, []string{string(batch.Failed)}))
 			}
-			// If PodFailurePolicy not specified we allow values in supportedPodRecreationPolicy.
-		} else if !supportedPodRecreationPolicy.Has(string(*spec.PodReplacementPolicy)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, sets.List(supportedPodRecreationPolicy)))
+			// If PodFailurePolicy not specified we allow values in supportedPodReplacementPolicy.
+		} else if !supportedPodReplacementPolicy.Has(string(*spec.PodReplacementPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, sets.List(supportedPodReplacementPolicy)))
 		}
 	}
 	return allErrs
@@ -523,7 +523,11 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	if len(spec.Schedule) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), ""))
 	} else {
-		allErrs = append(allErrs, validateScheduleFormat(spec.Schedule, spec.TimeZone, fldPath.Child("schedule"))...)
+		allowTZInSchedule := false
+		if oldSpec != nil {
+			allowTZInSchedule = strings.Contains(oldSpec.Schedule, "TZ")
+		}
+		allErrs = append(allErrs, validateScheduleFormat(spec.Schedule, allowTZInSchedule, spec.TimeZone, fldPath.Child("schedule"))...)
 	}
 
 	if spec.StartingDeadlineSeconds != nil {
@@ -564,13 +568,16 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 	return allErrs
 }
 
-func validateScheduleFormat(schedule string, timeZone *string, fldPath *field.Path) field.ErrorList {
+func validateScheduleFormat(schedule string, allowTZInSchedule bool, timeZone *string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if _, err := cron.ParseStandard(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
-	if strings.Contains(schedule, "TZ") && timeZone != nil {
+	switch {
+	case allowTZInSchedule && strings.Contains(schedule, "TZ") && timeZone != nil:
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, "cannot use both timeZone field and TZ or CRON_TZ in schedule"))
+	case !allowTZInSchedule && strings.Contains(schedule, "TZ"):
+		allErrs = append(allErrs, field.Invalid(fldPath, schedule, "cannot use TZ or CRON_TZ in schedule, use timeZone field instead"))
 	}
 
 	return allErrs

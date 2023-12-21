@@ -50,6 +50,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -495,7 +496,7 @@ func (rc *ResourceConsumer) GetHpa(ctx context.Context, name string) (*autoscali
 // WaitForReplicas wait for the desired replicas
 func (rc *ResourceConsumer) WaitForReplicas(ctx context.Context, desiredReplicas int, duration time.Duration) {
 	interval := 20 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
 		replicas := rc.GetReplicas(ctx)
 		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
@@ -506,29 +507,18 @@ func (rc *ResourceConsumer) WaitForReplicas(ctx context.Context, desiredReplicas
 // EnsureDesiredReplicasInRange ensure the replicas is in a desired range
 func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
-		replicas := rc.GetReplicas(ctx)
-		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
-		as, err := rc.GetHpa(ctx, hpaName)
-		if err != nil {
-			framework.Logf("Error getting HPA: %s", err)
-		} else {
-			framework.Logf("HPA status: %+v", as.Status)
-		}
-		if replicas < minDesiredReplicas {
-			return false, fmt.Errorf("number of replicas below target")
-		} else if replicas > maxDesiredReplicas {
-			return false, fmt.Errorf("number of replicas above target")
-		} else {
-			return false, nil // Expected number of replicas found. Continue polling until timeout.
-		}
-	})
-	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
-	if err == wait.ErrWaitTimeout {
-		framework.Logf("Number of replicas was stable over %v", duration)
-		return
+	desiredReplicasErr := framework.Gomega().Consistently(ctx, func(ctx context.Context) int {
+		return rc.GetReplicas(ctx)
+	}).WithTimeout(duration).WithPolling(interval).Should(gomega.And(gomega.BeNumerically(">=", minDesiredReplicas), gomega.BeNumerically("<=", maxDesiredReplicas)))
+
+	// dump HPA for debugging
+	as, err := rc.GetHpa(ctx, hpaName)
+	if err != nil {
+		framework.Logf("Error getting HPA: %s", err)
+	} else {
+		framework.Logf("HPA status: %+v", as.Status)
 	}
-	framework.ExpectNoErrorWithOffset(1, err)
+	framework.ExpectNoError(desiredReplicasErr)
 }
 
 // Pause stops background goroutines responsible for consuming resources.
@@ -585,7 +575,7 @@ func createService(ctx context.Context, c clientset.Interface, name, ns string, 
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				Port:       port,
-				TargetPort: intstr.FromInt(targetPort),
+				TargetPort: intstr.FromInt32(int32(targetPort)),
 			}},
 			Selector: selectors,
 		},
@@ -964,7 +954,7 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 		crd, err = c.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crdSchema, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		// Wait until just created CRD appears in discovery.
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			return ExistsInDiscovery(crd, c, "v1")
 		})
 		framework.ExpectNoError(err)

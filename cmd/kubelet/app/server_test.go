@@ -21,8 +21,11 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -71,7 +74,7 @@ func TestValueOfAllocatableResources(t *testing.T) {
 
 func TestMergeKubeletConfigurations(t *testing.T) {
 	testCases := []struct {
-		kubeletConfig           string
+		kubeletConfig           *kubeletconfiginternal.KubeletConfiguration
 		dropin1                 string
 		dropin2                 string
 		overwrittenConfigFields map[string]interface{}
@@ -79,12 +82,14 @@ func TestMergeKubeletConfigurations(t *testing.T) {
 		name                    string
 	}{
 		{
-			kubeletConfig: `
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-port: 9080
-readOnlyPort: 10257
-`,
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				Port:         int32(9090),
+				ReadOnlyPort: int32(10257),
+			},
 			dropin1: `
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -103,13 +108,15 @@ readOnlyPort: 10255
 			name: "kubelet.conf.d overrides kubelet.conf",
 		},
 		{
-			kubeletConfig: `
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-readOnlyPort: 10256
-kubeReserved:
-	memory: 70Mi
-`,
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				ReadOnlyPort:  int32(10256),
+				KubeReserved:  map[string]string{"memory": "100Mi"},
+				SyncFrequency: metav1.Duration{Duration: 5 * time.Minute},
+			},
 			dropin1: `
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -131,18 +138,19 @@ kubeReserved:
 					"cpu":    "200m",
 					"memory": "100Mi",
 				},
+				"SyncFrequency": metav1.Duration{Duration: 5 * time.Minute},
 			},
 			name: "kubelet.conf.d overrides kubelet.conf with subfield override",
 		},
 		{
-			kubeletConfig: `
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-port: 9090
-clusterDNS:
-	- 192.168.1.3
-	- 192.168.1.4
-`,
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				Port:       int32(9090),
+				ClusterDNS: []string{"192.168.1.3", "192.168.1.4"},
+			},
 			dropin1: `
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -173,6 +181,7 @@ clusterDNS:
 			name: "kubelet.conf.d overrides kubelet.conf with slices/lists",
 		},
 		{
+			kubeletConfig: nil,
 			dropin1: `
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -195,13 +204,14 @@ readOnlyPort: 10255
 			name: "cli args override kubelet.conf.d",
 		},
 		{
-			kubeletConfig: `
-apiVersion: kubelet.config.k8s.io/v1beta1
-kind: KubeletConfiguration
-port: 9090
-clusterDNS:
-	- 192.168.1.3
-`,
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "KubeletConfiguration",
+					APIVersion: "kubelet.config.k8s.io/v1beta1",
+				},
+				Port:       int32(9090),
+				ClusterDNS: []string{"192.168.1.3"},
+			},
 			overwrittenConfigFields: map[string]interface{}{
 				"Port":       int32(9090),
 				"ClusterDNS": []string{"192.168.1.2"},
@@ -222,12 +232,15 @@ clusterDNS:
 			kubeletConfig := &kubeletconfiginternal.KubeletConfiguration{}
 			kubeletFlags := &options.KubeletFlags{}
 
-			if len(test.kubeletConfig) > 0 {
+			if test.kubeletConfig != nil {
 				// Create the Kubeletconfig
 				kubeletConfFile := filepath.Join(tempDir, "kubelet.conf")
-				err := os.WriteFile(kubeletConfFile, []byte(test.kubeletConfig), 0644)
-				require.NoError(t, err, "failed to create config from a yaml file")
+				yamlData, err := yaml.Marshal(test.kubeletConfig) // Convert struct to YAML
+				require.NoError(t, err, "failed to convert kubelet config to YAML")
+				err = os.WriteFile(kubeletConfFile, yamlData, 0644)
+				require.NoError(t, err, "failed to create config from YAML data")
 				kubeletFlags.KubeletConfigFile = kubeletConfFile
+				kubeletConfig = test.kubeletConfig
 			}
 			if len(test.dropin1) > 0 || len(test.dropin2) > 0 {
 				// Create kubelet.conf.d directory and drop-in configuration files

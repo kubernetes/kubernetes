@@ -38,7 +38,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )
@@ -109,6 +109,7 @@ func NewHollowProxyOrDie(
 			recorder,
 			nil,
 			[]string{},
+			false,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -129,7 +130,7 @@ func NewHollowProxyOrDie(
 			Config: &proxyconfigapi.KubeProxyConfiguration{
 				Mode:             proxyconfigapi.ProxyMode("fake"),
 				ConfigSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-				OOMScoreAdj:      utilpointer.Int32Ptr(0),
+				OOMScoreAdj:      ptr.To[int32](0),
 			},
 
 			Client:      client,

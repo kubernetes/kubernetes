@@ -32,7 +32,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
+var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-os-rejection")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {

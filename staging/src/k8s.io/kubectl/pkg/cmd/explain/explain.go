@@ -73,8 +73,8 @@ type ExplainOptions struct {
 
 	args []string
 
-	Mapper meta.RESTMapper
-	Schema openapi.Resources
+	Mapper        meta.RESTMapper
+	openAPIGetter openapi.OpenAPIResourcesGetter
 
 	// Name of the template to use with the openapiv3 template renderer.
 	OutputFormat string
@@ -123,17 +123,14 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	o.Schema, err = f.OpenAPISchema()
-	if err != nil {
-		return err
-	}
-
 	// Only openapi v3 needs the discovery client.
 	o.OpenAPIV3Client, err = f.OpenAPIV3Client()
 	if err != nil {
 		return err
 	}
 
+	// Lazy-load the OpenAPI V2 Resources, so they're not loaded when using OpenAPI V3.
+	o.openAPIGetter = f
 	o.args = args
 	return nil
 }
@@ -224,7 +221,11 @@ func (o *ExplainOptions) renderOpenAPIV2(
 		gvk = apiVersion.WithKind(gvk.Kind)
 	}
 
-	schema := o.Schema.LookupResource(gvk)
+	resources, err := o.openAPIGetter.OpenAPISchema()
+	if err != nil {
+		return err
+	}
+	schema := resources.LookupResource(gvk)
 	if schema == nil {
 		return fmt.Errorf("couldn't find resource for %q", gvk)
 	}

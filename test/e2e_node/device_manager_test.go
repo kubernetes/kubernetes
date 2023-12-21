@@ -40,11 +40,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo/v2"
@@ -59,7 +61,7 @@ const (
 )
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", func() {
+var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceManager, nodefeature.DeviceManager, func() {
 	checkpointFullPath := filepath.Join(devicePluginDir, checkpointName)
 	f := framework.NewDefaultFramework("devicemanager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -319,7 +321,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 		   12. Delete the sample device plugin pod.
 		   13. Remove `/var/lib/kubelet/device-plugins/sample/` and its content, the directory created to control registration
 	*/
-	ginkgo.Context("With sample device plugin [Serial] [Disruptive]", func() {
+	f.Context("With sample device plugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var deviceCount int = 2
 		var devicePluginPod *v1.Pod
 		var triggerPathFile, triggerPathDir string

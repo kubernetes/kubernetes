@@ -17,28 +17,28 @@ limitations under the License.
 package ensurer
 
 import (
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
-	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
-	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
+	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1"
+	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 )
 
-func NewPriorityLevelConfigurationOps(client flowcontrolclient.PriorityLevelConfigurationInterface, lister flowcontrollisters.PriorityLevelConfigurationLister) ObjectOps[*flowcontrolv1beta3.PriorityLevelConfiguration] {
-	return NewObjectOps[*flowcontrolv1beta3.PriorityLevelConfiguration](client, lister, (*flowcontrolv1beta3.PriorityLevelConfiguration).DeepCopy,
+func NewPriorityLevelConfigurationOps(client flowcontrolclient.PriorityLevelConfigurationInterface, lister flowcontrollisters.PriorityLevelConfigurationLister) ObjectOps[*flowcontrolv1.PriorityLevelConfiguration] {
+	return NewObjectOps[*flowcontrolv1.PriorityLevelConfiguration](client, lister, (*flowcontrolv1.PriorityLevelConfiguration).DeepCopy,
 		plcReplaceSpec, plcSpecEqualish)
 }
 
-func plcReplaceSpec(into, from *flowcontrolv1beta3.PriorityLevelConfiguration) *flowcontrolv1beta3.PriorityLevelConfiguration {
+func plcReplaceSpec(into, from *flowcontrolv1.PriorityLevelConfiguration) *flowcontrolv1.PriorityLevelConfiguration {
 	copy := into.DeepCopy()
 	copy.Spec = *from.Spec.DeepCopy()
 	return copy
 }
 
-func plcSpecEqualish(expected, actual *flowcontrolv1beta3.PriorityLevelConfiguration) bool {
+func plcSpecEqualish(expected, actual *flowcontrolv1.PriorityLevelConfiguration) bool {
 	copiedExpected := expected.DeepCopy()
-	flowcontrolapisv1beta3.SetObjectDefaults_PriorityLevelConfiguration(copiedExpected)
-	if expected.Name == flowcontrolv1beta3.PriorityLevelConfigurationNameExempt {
+	flowcontrolapisv1.SetObjectDefaults_PriorityLevelConfiguration(copiedExpected)
+	if expected.Name == flowcontrolv1.PriorityLevelConfigurationNameExempt {
 		if actual.Spec.Exempt == nil {
 			return false
 		}

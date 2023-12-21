@@ -19,6 +19,9 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strconv"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -32,8 +35,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"path/filepath"
-	"strconv"
 )
 
 const (
@@ -43,7 +44,7 @@ const (
 	cgroupV1MemLimitFile  = "/memory/memory.limit_in_bytes"
 )
 
-var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
+var _ = SIGDescribe("Swap", framework.WithNodeConformance(), "[LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("swap-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 

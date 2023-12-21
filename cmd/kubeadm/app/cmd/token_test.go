@@ -36,7 +36,6 @@ import (
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -172,9 +171,6 @@ func TestRunCreateToken(t *testing.T) {
 						Usages: tc.usages,
 						Groups: tc.extraGroups,
 					},
-				},
-				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-					CRISocket: constants.UnknownCRISocket,
 				},
 			}
 

@@ -29,10 +29,12 @@ import (
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -42,7 +44,7 @@ const (
 	bestEffortPodName = "best-effort"
 )
 
-var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]", func() {
+var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisruptive(), nodefeature.CriticalPod, func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {
@@ -82,14 +84,14 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
-					framework.ExpectEqual(p.Status.Phase, v1.PodRunning, fmt.Sprintf("pod: %v should not be preempted with status: %#v", p.Name, p.Status))
+					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod: %v should not be preempted with status: %#v", p.Name, p.Status)
 				} else {
-					framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded, fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
+					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
 				}
 			}
 		})
 
-		ginkgo.It("should add DisruptionTarget condition to the preempted pod [NodeFeature:PodDisruptionConditions]", func(ctx context.Context) {
+		f.It("should add DisruptionTarget condition to the preempted pod", nodefeature.PodDisruptionConditions, func(ctx context.Context) {
 			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(ctx, f)
 			nonCriticalGuaranteed := getTestPod(false, guaranteedPodName, v1.ResourceRequirements{
@@ -125,7 +127,7 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				ginkgo.By(fmt.Sprintf("verify that the non-critical pod %q is preempted and has the DisruptionTarget condition", klog.KObj(&p)))
-				framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded, fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
+				gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
 				if condition := e2epod.FindPodConditionByType(&p.Status, v1.DisruptionTarget); condition == nil {
 					framework.Failf("pod %q should have the condition: %q, pod status: %v", klog.KObj(&p), v1.DisruptionTarget, p.Status)
 				}
@@ -149,7 +151,7 @@ func getNodeCPUAndMemoryCapacity(ctx context.Context, f *framework.Framework) v1
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	framework.ExpectEqual(len(nodeList.Items), 1)
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	capacity := nodeList.Items[0].Status.Allocatable
 	return v1.ResourceList{
 		v1.ResourceCPU:    capacity[v1.ResourceCPU],
@@ -161,7 +163,7 @@ func getNodeName(ctx context.Context, f *framework.Framework) string {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	framework.ExpectEqual(len(nodeList.Items), 1)
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	return nodeList.Items[0].GetName()
 }
 
@@ -190,9 +192,13 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements, n
 		}
 		pod.Spec.PriorityClassName = scheduling.SystemNodeCritical
 
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
+		if !kubelettypes.IsCriticalPod(pod) {
+			framework.Failf("pod %q should be a critical pod", pod.Name)
+		}
 	} else {
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
+		if kubelettypes.IsCriticalPod(pod) {
+			framework.Failf("pod %q should not be a critical pod", pod.Name)
+		}
 	}
 	return pod
 }

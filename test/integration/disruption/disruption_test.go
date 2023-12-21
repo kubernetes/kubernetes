@@ -59,7 +59,7 @@ import (
 	"k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const stalePodDisruptionTimeout = 3 * time.Second
@@ -262,7 +262,7 @@ func TestEmptySelector(t *testing.T) {
 			go pdbc.Run(ctx)
 
 			replicas := 4
-			minAvailable := intstr.FromInt(2)
+			minAvailable := intstr.FromInt32(2)
 
 			for j := 0; j < replicas; j++ {
 				createPod(ctx, t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
@@ -377,7 +377,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			informers.Start(ctx.Done())
 			go pdbc.Run(ctx)
 
-			minAvailable := intstr.FromInt(1)
+			minAvailable := intstr.FromInt32(1)
 
 			// Create the PDB first and wait for it to settle.
 			pdbName := "test-pdb"
@@ -585,7 +585,7 @@ func TestPatchCompatibility(t *testing.T) {
 			version:      "v1",
 			patchType:    types.ApplyPatchType,
 			patch:        `{"apiVersion":"policy/v1","kind":"PodDisruptionBudget","spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
-			force:        pointer.Bool(true),
+			force:        ptr.To(true),
 			fieldManager: "test",
 			// entire selector is replaced (because structType=atomic)
 			expectSelector: &metav1.LabelSelector{

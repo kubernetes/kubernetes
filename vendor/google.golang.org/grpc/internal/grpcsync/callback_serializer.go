@@ -32,10 +32,10 @@ import (
 //
 // This type is safe for concurrent access.
 type CallbackSerializer struct {
-	// Done is closed once the serializer is shut down completely, i.e all
+	// done is closed once the serializer is shut down completely, i.e all
 	// scheduled callbacks are executed and the serializer has deallocated all
 	// its resources.
-	Done chan struct{}
+	done chan struct{}
 
 	callbacks *buffer.Unbounded
 	closedMu  sync.Mutex
@@ -48,12 +48,12 @@ type CallbackSerializer struct {
 // callbacks will be added once this context is canceled, and any pending un-run
 // callbacks will be executed before the serializer is shut down.
 func NewCallbackSerializer(ctx context.Context) *CallbackSerializer {
-	t := &CallbackSerializer{
-		Done:      make(chan struct{}),
+	cs := &CallbackSerializer{
+		done:      make(chan struct{}),
 		callbacks: buffer.NewUnbounded(),
 	}
-	go t.run(ctx)
-	return t
+	go cs.run(ctx)
+	return cs
 }
 
 // Schedule adds a callback to be scheduled after existing callbacks are run.
@@ -64,56 +64,62 @@ func NewCallbackSerializer(ctx context.Context) *CallbackSerializer {
 // Return value indicates if the callback was successfully added to the list of
 // callbacks to be executed by the serializer. It is not possible to add
 // callbacks once the context passed to NewCallbackSerializer is cancelled.
-func (t *CallbackSerializer) Schedule(f func(ctx context.Context)) bool {
-	t.closedMu.Lock()
-	defer t.closedMu.Unlock()
+func (cs *CallbackSerializer) Schedule(f func(ctx context.Context)) bool {
+	cs.closedMu.Lock()
+	defer cs.closedMu.Unlock()
 
-	if t.closed {
+	if cs.closed {
 		return false
 	}
-	t.callbacks.Put(f)
+	cs.callbacks.Put(f)
 	return true
 }
 
-func (t *CallbackSerializer) run(ctx context.Context) {
+func (cs *CallbackSerializer) run(ctx context.Context) {
 	var backlog []func(context.Context)
 
-	defer close(t.Done)
+	defer close(cs.done)
 	for ctx.Err() == nil {
 		select {
 		case <-ctx.Done():
 			// Do nothing here. Next iteration of the for loop will not happen,
 			// since ctx.Err() would be non-nil.
-		case callback, ok := <-t.callbacks.Get():
+		case callback, ok := <-cs.callbacks.Get():
 			if !ok {
 				return
 			}
-			t.callbacks.Load()
+			cs.callbacks.Load()
 			callback.(func(ctx context.Context))(ctx)
 		}
 	}
 
 	// Fetch pending callbacks if any, and execute them before returning from
-	// this method and closing t.Done.
-	t.closedMu.Lock()
-	t.closed = true
-	backlog = t.fetchPendingCallbacks()
-	t.callbacks.Close()
-	t.closedMu.Unlock()
+	// this method and closing cs.done.
+	cs.closedMu.Lock()
+	cs.closed = true
+	backlog = cs.fetchPendingCallbacks()
+	cs.callbacks.Close()
+	cs.closedMu.Unlock()
 	for _, b := range backlog {
 		b(ctx)
 	}
 }
 
-func (t *CallbackSerializer) fetchPendingCallbacks() []func(context.Context) {
+func (cs *CallbackSerializer) fetchPendingCallbacks() []func(context.Context) {
 	var backlog []func(context.Context)
 	for {
 		select {
-		case b := <-t.callbacks.Get():
+		case b := <-cs.callbacks.Get():
 			backlog = append(backlog, b.(func(context.Context)))
-			t.callbacks.Load()
+			cs.callbacks.Load()
 		default:
 			return backlog
 		}
 	}
+}
+
+// Done returns a channel that is closed after the context passed to
+// NewCallbackSerializer is canceled and all callbacks have been executed.
+func (cs *CallbackSerializer) Done() <-chan struct{} {
+	return cs.done
 }

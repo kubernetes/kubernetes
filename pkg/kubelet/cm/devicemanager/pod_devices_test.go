@@ -65,7 +65,7 @@ func TestGetContainerDevices(t *testing.T) {
 
 func TestResourceDeviceInstanceFilter(t *testing.T) {
 	var expected string
-	var cond map[string]sets.String
+	var cond map[string]sets.Set[string]
 	var resp ResourceDeviceInstances
 	devs := ResourceDeviceInstances{
 		"foo": DeviceInstances{
@@ -103,40 +103,40 @@ func TestResourceDeviceInstanceFilter(t *testing.T) {
 		},
 	}
 
-	resp = devs.Filter(map[string]sets.String{})
+	resp = devs.Filter(map[string]sets.Set[string]{})
 	expected = `{}`
 	expectResourceDeviceInstances(t, resp, expected)
 
-	cond = map[string]sets.String{
-		"foo": sets.NewString("dev-foo1", "dev-foo2"),
-		"bar": sets.NewString("dev-bar1"),
+	cond = map[string]sets.Set[string]{
+		"foo": sets.New[string]("dev-foo1", "dev-foo2"),
+		"bar": sets.New[string]("dev-bar1"),
 	}
 	resp = devs.Filter(cond)
 	expected = `{"bar":{"dev-bar1":{"ID":"bar1"}},"foo":{"dev-foo1":{"ID":"foo1"},"dev-foo2":{"ID":"foo2"}}}`
 	expectResourceDeviceInstances(t, resp, expected)
 
-	cond = map[string]sets.String{
-		"foo": sets.NewString("dev-foo1", "dev-foo2", "dev-foo3"),
-		"bar": sets.NewString("dev-bar1", "dev-bar2", "dev-bar3"),
-		"baz": sets.NewString("dev-baz1", "dev-baz2", "dev-baz3"),
+	cond = map[string]sets.Set[string]{
+		"foo": sets.New[string]("dev-foo1", "dev-foo2", "dev-foo3"),
+		"bar": sets.New[string]("dev-bar1", "dev-bar2", "dev-bar3"),
+		"baz": sets.New[string]("dev-baz1", "dev-baz2", "dev-baz3"),
 	}
 	resp = devs.Filter(cond)
 	expected = `{"bar":{"dev-bar1":{"ID":"bar1"},"dev-bar2":{"ID":"bar2"},"dev-bar3":{"ID":"bar3"}},"baz":{"dev-baz1":{"ID":"baz1"},"dev-baz2":{"ID":"baz2"},"dev-baz3":{"ID":"baz3"}},"foo":{"dev-foo1":{"ID":"foo1"},"dev-foo2":{"ID":"foo2"},"dev-foo3":{"ID":"foo3"}}}`
 	expectResourceDeviceInstances(t, resp, expected)
 
-	cond = map[string]sets.String{
-		"foo": sets.NewString("dev-foo1", "dev-foo2", "dev-foo3", "dev-foo4"),
-		"bar": sets.NewString("dev-bar1", "dev-bar2", "dev-bar3", "dev-bar4"),
-		"baz": sets.NewString("dev-baz1", "dev-baz2", "dev-baz3", "dev-bar4"),
+	cond = map[string]sets.Set[string]{
+		"foo": sets.New[string]("dev-foo1", "dev-foo2", "dev-foo3", "dev-foo4"),
+		"bar": sets.New[string]("dev-bar1", "dev-bar2", "dev-bar3", "dev-bar4"),
+		"baz": sets.New[string]("dev-baz1", "dev-baz2", "dev-baz3", "dev-bar4"),
 	}
 	resp = devs.Filter(cond)
 	expected = `{"bar":{"dev-bar1":{"ID":"bar1"},"dev-bar2":{"ID":"bar2"},"dev-bar3":{"ID":"bar3"}},"baz":{"dev-baz1":{"ID":"baz1"},"dev-baz2":{"ID":"baz2"},"dev-baz3":{"ID":"baz3"}},"foo":{"dev-foo1":{"ID":"foo1"},"dev-foo2":{"ID":"foo2"},"dev-foo3":{"ID":"foo3"}}}`
 	expectResourceDeviceInstances(t, resp, expected)
 
-	cond = map[string]sets.String{
-		"foo": sets.NewString("dev-foo1", "dev-foo4", "dev-foo7"),
-		"bar": sets.NewString("dev-bar1", "dev-bar4", "dev-bar7"),
-		"baz": sets.NewString("dev-baz1", "dev-baz4", "dev-baz7"),
+	cond = map[string]sets.Set[string]{
+		"foo": sets.New[string]("dev-foo1", "dev-foo4", "dev-foo7"),
+		"bar": sets.New[string]("dev-bar1", "dev-bar4", "dev-bar7"),
+		"baz": sets.New[string]("dev-baz1", "dev-baz4", "dev-baz7"),
 	}
 	resp = devs.Filter(cond)
 	expected = `{"bar":{"dev-bar1":{"ID":"bar1"}},"baz":{"dev-baz1":{"ID":"baz1"}},"foo":{"dev-foo1":{"ID":"foo1"}}}`

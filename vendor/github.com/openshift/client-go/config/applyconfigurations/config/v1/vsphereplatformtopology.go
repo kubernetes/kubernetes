@@ -11,6 +11,7 @@ type VSpherePlatformTopologyApplyConfiguration struct {
 	Datastore      *string  `json:"datastore,omitempty"`
 	ResourcePool   *string  `json:"resourcePool,omitempty"`
 	Folder         *string  `json:"folder,omitempty"`
+	Template       *string  `json:"template,omitempty"`
 }
 
 // VSpherePlatformTopologyApplyConfiguration constructs an declarative configuration of the VSpherePlatformTopology type for use with
@@ -66,5 +67,13 @@ func (b *VSpherePlatformTopologyApplyConfiguration) WithResourcePool(value strin
 // If called multiple times, the Folder field is set to the value of the last call.
 func (b *VSpherePlatformTopologyApplyConfiguration) WithFolder(value string) *VSpherePlatformTopologyApplyConfiguration {
 	b.Folder = &value
+	return b
+}
+
+// WithTemplate sets the Template field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Template field is set to the value of the last call.
+func (b *VSpherePlatformTopologyApplyConfiguration) WithTemplate(value string) *VSpherePlatformTopologyApplyConfiguration {
+	b.Template = &value
 	return b
 }

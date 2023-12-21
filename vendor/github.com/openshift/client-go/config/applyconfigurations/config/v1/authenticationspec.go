@@ -14,6 +14,7 @@ type AuthenticationSpecApplyConfiguration struct {
 	WebhookTokenAuthenticators []DeprecatedWebhookTokenAuthenticatorApplyConfiguration `json:"webhookTokenAuthenticators,omitempty"`
 	WebhookTokenAuthenticator  *WebhookTokenAuthenticatorApplyConfiguration            `json:"webhookTokenAuthenticator,omitempty"`
 	ServiceAccountIssuer       *string                                                 `json:"serviceAccountIssuer,omitempty"`
+	OIDCProviders              []OIDCProviderApplyConfiguration                        `json:"oidcProviders,omitempty"`
 }
 
 // AuthenticationSpecApplyConfiguration constructs an declarative configuration of the AuthenticationSpec type for use with
@@ -64,5 +65,18 @@ func (b *AuthenticationSpecApplyConfiguration) WithWebhookTokenAuthenticator(val
 // If called multiple times, the ServiceAccountIssuer field is set to the value of the last call.
 func (b *AuthenticationSpecApplyConfiguration) WithServiceAccountIssuer(value string) *AuthenticationSpecApplyConfiguration {
 	b.ServiceAccountIssuer = &value
+	return b
+}
+
+// WithOIDCProviders adds the given value to the OIDCProviders field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the OIDCProviders field.
+func (b *AuthenticationSpecApplyConfiguration) WithOIDCProviders(values ...*OIDCProviderApplyConfiguration) *AuthenticationSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithOIDCProviders")
+		}
+		b.OIDCProviders = append(b.OIDCProviders, *values[i])
+	}
 	return b
 }

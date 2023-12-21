@@ -112,7 +112,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 	}
 
 	betaOptions.Insert(fancyBetaOption)
-	alphaOptions = sets.NewString(fancyAlphaOption)
+	alphaOptions = sets.New[string](fancyAlphaOption)
 
 	for _, tcase := range testCases {
 		t.Run(tcase.description, func(t *testing.T) {

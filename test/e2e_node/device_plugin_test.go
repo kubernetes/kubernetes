@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -47,10 +48,14 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 )
 
 var (
@@ -59,7 +64,7 @@ var (
 )
 
 // Serial because the test restarts Kubelet
-var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
+var _ = SIGDescribe("Device Plugin", feature.DevicePluginProbe, nodefeature.DevicePluginProbe, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
@@ -90,7 +95,7 @@ const (
 
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
-	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", func() {
+	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var devicePluginPod, dptemplate *v1.Pod
 		var v1alphaPodResources *kubeletpodresourcesv1alpha1.ListPodResourcesResponse
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
@@ -197,8 +202,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.Logf("len(v1alphaPodResources.PodResources):%+v", len(v1alphaPodResources.PodResources))
 			framework.Logf("len(v1PodResources.PodResources):%+v", len(v1PodResources.PodResources))
 
-			framework.ExpectEqual(len(v1alphaPodResources.PodResources), 2)
-			framework.ExpectEqual(len(v1PodResources.PodResources), 2)
+			gomega.Expect(v1alphaPodResources.PodResources).To(gomega.HaveLen(2))
+			gomega.Expect(v1PodResources.PodResources).To(gomega.HaveLen(2))
 
 			var v1alphaResourcesForOurPod *kubeletpodresourcesv1alpha1.PodResources
 			for _, res := range v1alphaPodResources.GetPodResources() {
@@ -217,26 +222,36 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(v1alphaResourcesForOurPod).NotTo(gomega.BeNil())
 			gomega.Expect(v1ResourcesForOurPod).NotTo(gomega.BeNil())
 
-			framework.ExpectEqual(v1alphaResourcesForOurPod.Name, pod1.Name)
-			framework.ExpectEqual(v1ResourcesForOurPod.Name, pod1.Name)
+			gomega.Expect(v1alphaResourcesForOurPod.Name).To(gomega.Equal(pod1.Name))
+			gomega.Expect(v1ResourcesForOurPod.Name).To(gomega.Equal(pod1.Name))
 
-			framework.ExpectEqual(v1alphaResourcesForOurPod.Namespace, pod1.Namespace)
-			framework.ExpectEqual(v1ResourcesForOurPod.Namespace, pod1.Namespace)
+			gomega.Expect(v1alphaResourcesForOurPod.Namespace).To(gomega.Equal(pod1.Namespace))
+			gomega.Expect(v1ResourcesForOurPod.Namespace).To(gomega.Equal(pod1.Namespace))
 
-			framework.ExpectEqual(len(v1alphaResourcesForOurPod.Containers), 1)
-			framework.ExpectEqual(len(v1ResourcesForOurPod.Containers), 1)
+			gomega.Expect(v1alphaResourcesForOurPod.Containers).To(gomega.HaveLen(1))
+			gomega.Expect(v1ResourcesForOurPod.Containers).To(gomega.HaveLen(1))
 
-			framework.ExpectEqual(v1alphaResourcesForOurPod.Containers[0].Name, pod1.Spec.Containers[0].Name)
-			framework.ExpectEqual(v1ResourcesForOurPod.Containers[0].Name, pod1.Spec.Containers[0].Name)
+			gomega.Expect(v1alphaResourcesForOurPod.Containers[0].Name).To(gomega.Equal(pod1.Spec.Containers[0].Name))
+			gomega.Expect(v1ResourcesForOurPod.Containers[0].Name).To(gomega.Equal(pod1.Spec.Containers[0].Name))
 
-			framework.ExpectEqual(len(v1alphaResourcesForOurPod.Containers[0].Devices), 1)
-			framework.ExpectEqual(len(v1ResourcesForOurPod.Containers[0].Devices), 1)
+			gomega.Expect(v1alphaResourcesForOurPod.Containers[0].Devices).To(gomega.HaveLen(1))
+			gomega.Expect(v1ResourcesForOurPod.Containers[0].Devices).To(gomega.HaveLen(1))
 
-			framework.ExpectEqual(v1alphaResourcesForOurPod.Containers[0].Devices[0].ResourceName, SampleDeviceResourceName)
-			framework.ExpectEqual(v1ResourcesForOurPod.Containers[0].Devices[0].ResourceName, SampleDeviceResourceName)
+			gomega.Expect(v1alphaResourcesForOurPod.Containers[0].Devices[0].ResourceName).To(gomega.Equal(SampleDeviceResourceName))
+			gomega.Expect(v1ResourcesForOurPod.Containers[0].Devices[0].ResourceName).To(gomega.Equal(SampleDeviceResourceName))
 
-			framework.ExpectEqual(len(v1alphaResourcesForOurPod.Containers[0].Devices[0].DeviceIds), 1)
-			framework.ExpectEqual(len(v1ResourcesForOurPod.Containers[0].Devices[0].DeviceIds), 1)
+			gomega.Expect(v1alphaResourcesForOurPod.Containers[0].Devices[0].DeviceIds).To(gomega.HaveLen(1))
+			gomega.Expect(v1ResourcesForOurPod.Containers[0].Devices[0].DeviceIds).To(gomega.HaveLen(1))
+		})
+
+		ginkgo.It("[NodeSpecialFeature:CDI] can make a CDI device accessible in a container", func(ctx context.Context) {
+			e2eskipper.SkipUnlessFeatureGateEnabled(features.DevicePluginCDIDevices)
+			// check if CDI_DEVICE env variable is set
+			// and only one correspondent device node /tmp/<CDI_DEVICE> is available inside a container
+			podObj := makeBusyboxPod(SampleDeviceResourceName, "[ $(ls /tmp/CDI-Dev-[1,2] | wc -l) -eq 1 -a -b /tmp/$CDI_DEVICE ]")
+			podObj.Spec.RestartPolicy = v1.RestartPolicyNever
+			pod := e2epod.NewPodClient(f).Create(ctx, podObj)
+			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
 		})
 
 		// simulate container restart, while all other involved components (kubelet, device plugin) stay stable. To do so, in the container
@@ -260,7 +275,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Confirming that after a container restart, fake-device assignment is kept")
 			devIDRestart1, err := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
-			framework.ExpectEqual(devIDRestart1, devID1)
+			gomega.Expect(devIDRestart1).To(gomega.Equal(devID1))
 
 			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
 			// needs to match the container perspective.
@@ -373,7 +388,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Confirming that after a container restart, fake-device assignment is kept")
 			devIDRestart1, err := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
-			framework.ExpectEqual(devIDRestart1, devID1)
+			gomega.Expect(devIDRestart1).To(gomega.Equal(devID1))
 
 			ginkgo.By("Restarting Kubelet")
 			restartKubelet(true)
@@ -384,7 +399,9 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Checking an instance of the pod is running")
 			gomega.Eventually(ctx, getPodByName).
 				WithArguments(f, pod1.Name).
-				WithTimeout(time.Minute).
+				// The kubelet restarts pod with an exponential back-off delay, with a maximum cap of 5 minutes.
+				// Allow 5 minutes and 10 seconds for the pod to start in a slow environment.
+				WithTimeout(5*time.Minute+10*time.Second).
 				Should(gomega.And(
 					BeAPodInPhase(v1.PodRunning),
 					BeAPodReady(),
@@ -589,11 +606,108 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				framework.Fail(fmt.Sprintf("stale device assignment after pod deletion while kubelet was down allocated=%v error=%v", allocated, err))
 			}
 		})
+
+		ginkgo.It("Can schedule a pod with a restartable init container [NodeAlphaFeature:SidecarContainers]", func(ctx context.Context) {
+			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s"
+			sleepOneSecond := "1s"
+			rl := v1.ResourceList{v1.ResourceName(SampleDeviceResourceName): *resource.NewQuantity(1, resource.DecimalSI)}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "device-plugin-test-" + string(uuid.NewUUID())},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					InitContainers: []v1.Container{
+						{
+							Image:   busyboxImage,
+							Name:    "init-1",
+							Command: []string{"sh", "-c", fmt.Sprintf(podRECMD, sleepOneSecond)},
+							Resources: v1.ResourceRequirements{
+								Limits:   rl,
+								Requests: rl,
+							},
+						},
+						{
+							Image:   busyboxImage,
+							Name:    "restartable-init-2",
+							Command: []string{"sh", "-c", fmt.Sprintf(podRECMD, sleepIntervalForever)},
+							Resources: v1.ResourceRequirements{
+								Limits:   rl,
+								Requests: rl,
+							},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: []v1.Container{{
+						Image:   busyboxImage,
+						Name:    "regular-1",
+						Command: []string{"sh", "-c", fmt.Sprintf(podRECMD, sleepIntervalForever)},
+						Resources: v1.ResourceRequirements{
+							Limits:   rl,
+							Requests: rl,
+						},
+					}},
+				},
+			}
+
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			deviceIDRE := "stub devices: (Dev-[0-9]+)"
+
+			devID1, err := parseLog(ctx, f, pod1.Name, pod1.Spec.InitContainers[0].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod1.Name, pod1.Spec.InitContainers[0].Name)
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1's init container requested a device but started successfully without")
+
+			devID2, err := parseLog(ctx, f, pod1.Name, pod1.Spec.InitContainers[1].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod1.Name, pod1.Spec.InitContainers[1].Name)
+			gomega.Expect(devID2).To(gomega.Not(gomega.Equal("")), "pod1's restartable init container requested a device but started successfully without")
+
+			gomega.Expect(devID2).To(gomega.Equal(devID1), "pod1's init container and restartable init container should share the same device")
+
+			devID3, err := parseLog(ctx, f, pod1.Name, pod1.Spec.Containers[0].Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q/%q", pod1.Name, pod1.Spec.Containers[0].Name)
+			gomega.Expect(devID3).To(gomega.Not(gomega.Equal("")), "pod1's regular container requested a device but started successfully without")
+
+			gomega.Expect(devID3).NotTo(gomega.Equal(devID2), "pod1's restartable init container and regular container should not share the same device")
+
+			podResources, err := getV1NodeDevices(ctx)
+			framework.ExpectNoError(err)
+
+			framework.Logf("PodResources.PodResources:%+v\n", podResources.PodResources)
+			framework.Logf("len(PodResources.PodResources):%+v", len(podResources.PodResources))
+
+			gomega.Expect(podResources.PodResources).To(gomega.HaveLen(2))
+
+			var resourcesForOurPod *kubeletpodresourcesv1.PodResources
+			for _, res := range podResources.GetPodResources() {
+				if res.Name == pod1.Name {
+					resourcesForOurPod = res
+				}
+			}
+
+			gomega.Expect(resourcesForOurPod).NotTo(gomega.BeNil())
+
+			gomega.Expect(resourcesForOurPod.Name).To(gomega.Equal(pod1.Name))
+			gomega.Expect(resourcesForOurPod.Namespace).To(gomega.Equal(pod1.Namespace))
+
+			// Note that the kubelet does not report resources for restartable
+			// init containers for now.
+			// See https://github.com/kubernetes/kubernetes/issues/120501.
+			// TODO: Fix this test to check the resources allocated to the
+			// restartable init container once the kubelet reports resources
+			// for restartable init containers.
+			gomega.Expect(resourcesForOurPod.Containers).To(gomega.HaveLen(1))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Name).To(gomega.Equal(pod1.Spec.Containers[0].Name))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Devices).To(gomega.HaveLen(1))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Devices[0].ResourceName).To(gomega.Equal(SampleDeviceResourceName))
+
+			gomega.Expect(resourcesForOurPod.Containers[0].Devices[0].DeviceIds).To(gomega.HaveLen(1))
+		})
 	})
 }
 
 func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
-	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", func() {
+	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var devicePluginPod *v1.Pod
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
 		var triggerPathFile, triggerPathDir string
@@ -902,6 +1016,10 @@ func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
 		if dp.Spec.Containers[0].Env[i].Name == SampleDeviceEnvVarNamePluginSockDir {
 			dp.Spec.Containers[0].Env[i].Value = pluginSockDir
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePluginCDIDevices) {
+		dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "CDI_ENABLED", Value: "1"})
 	}
 
 	return dp

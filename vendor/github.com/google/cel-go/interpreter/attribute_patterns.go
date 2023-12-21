@@ -15,6 +15,8 @@
 package interpreter
 
 import (
+	"fmt"
+
 	"github.com/google/cel-go/common/containers"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -177,8 +179,8 @@ func numericValueEquals(value any, celValue ref.Val) bool {
 // NewPartialAttributeFactory returns an AttributeFactory implementation capable of performing
 // AttributePattern matches with PartialActivation inputs.
 func NewPartialAttributeFactory(container *containers.Container,
-	adapter ref.TypeAdapter,
-	provider ref.TypeProvider) AttributeFactory {
+	adapter types.Adapter,
+	provider types.Provider) AttributeFactory {
 	fac := NewAttributeFactory(container, adapter, provider)
 	return &partialAttributeFactory{
 		AttributeFactory: fac,
@@ -191,8 +193,8 @@ func NewPartialAttributeFactory(container *containers.Container,
 type partialAttributeFactory struct {
 	AttributeFactory
 	container *containers.Container
-	adapter   ref.TypeAdapter
-	provider  ref.TypeProvider
+	adapter   types.Adapter
+	provider  types.Provider
 }
 
 // AbsoluteAttribute implementation of the AttributeFactory interface which wraps the
@@ -241,12 +243,15 @@ func (fac *partialAttributeFactory) matchesUnknownPatterns(
 	vars PartialActivation,
 	attrID int64,
 	variableNames []string,
-	qualifiers []Qualifier) (types.Unknown, error) {
+	qualifiers []Qualifier) (*types.Unknown, error) {
 	patterns := vars.UnknownAttributePatterns()
 	candidateIndices := map[int]struct{}{}
 	for _, variable := range variableNames {
 		for i, pat := range patterns {
 			if pat.VariableMatches(variable) {
+				if len(qualifiers) == 0 {
+					return types.NewUnknown(attrID, types.NewAttributeTrail(variable)), nil
+				}
 				candidateIndices[i] = struct{}{}
 			}
 		}
@@ -254,10 +259,6 @@ func (fac *partialAttributeFactory) matchesUnknownPatterns(
 	// Determine whether to return early if there are no candidate unknown patterns.
 	if len(candidateIndices) == 0 {
 		return nil, nil
-	}
-	// Determine whether to return early if there are no qualifiers.
-	if len(qualifiers) == 0 {
-		return types.Unknown{attrID}, nil
 	}
 	// Resolve the attribute qualifiers into a static set. This prevents more dynamic
 	// Attribute resolutions than necessary when there are multiple unknown patterns
@@ -300,7 +301,28 @@ func (fac *partialAttributeFactory) matchesUnknownPatterns(
 			}
 		}
 		if isUnk {
-			return types.Unknown{matchExprID}, nil
+			attr := types.NewAttributeTrail(pat.variable)
+			for i := 0; i < len(qualPats) && i < len(newQuals); i++ {
+				if qual, ok := newQuals[i].(ConstantQualifier); ok {
+					switch v := qual.Value().Value().(type) {
+					case bool:
+						types.QualifyAttribute[bool](attr, v)
+					case float64:
+						types.QualifyAttribute[int64](attr, int64(v))
+					case int64:
+						types.QualifyAttribute[int64](attr, v)
+					case string:
+						types.QualifyAttribute[string](attr, v)
+					case uint64:
+						types.QualifyAttribute[uint64](attr, v)
+					default:
+						types.QualifyAttribute[string](attr, fmt.Sprintf("%v", v))
+					}
+				} else {
+					types.QualifyAttribute[string](attr, "*")
+				}
+			}
+			return types.NewUnknown(matchExprID, attr), nil
 		}
 	}
 	return nil, nil

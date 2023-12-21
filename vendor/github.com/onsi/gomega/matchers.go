@@ -88,19 +88,44 @@ func Succeed() types.GomegaMatcher {
 }
 
 // MatchError succeeds if actual is a non-nil error that matches the passed in
-// string, error, or matcher.
+// string, error, function, or matcher.
 //
 // These are valid use-cases:
 //
-//  Expect(err).Should(MatchError("an error")) //asserts that err.Error() == "an error"
-//  Expect(err).Should(MatchError(SomeError)) //asserts that err == SomeError (via reflect.DeepEqual)
-//  Expect(err).Should(MatchError(ContainsSubstring("sprocket not found"))) // asserts that edrr.Error() contains substring "sprocket not found"
+// When passed a string:
+//
+//	Expect(err).To(MatchError("an error"))
+//
+// asserts that err.Error() == "an error"
+//
+// When passed an error:
+//
+//	Expect(err).To(MatchError(SomeError))
+//
+// First checks if errors.Is(err, SomeError).
+// If that fails then it checks if reflect.DeepEqual(err, SomeError) repeatedly for err and any errors wrapped by err
+//
+// When passed a matcher:
+//
+//	Expect(err).To(MatchError(ContainSubstring("sprocket not found")))
+//
+// the matcher is passed err.Error().  In this case it asserts that err.Error() contains substring "sprocket not found"
+//
+// When passed a func(err) bool and a description:
+//
+//	Expect(err).To(MatchError(os.IsNotExist, "IsNotExist"))
+//
+// the function is passed err and matches if the return value is true.  The description is required to allow Gomega
+// to print a useful error message.
 //
 // It is an error for err to be nil or an object that does not implement the
 // Error interface
-func MatchError(expected interface{}) types.GomegaMatcher {
+//
+// The optional second argument is a description of the error function, if used.  This is required when passing a function but is ignored in all other cases.
+func MatchError(expected interface{}, functionErrorDescription ...any) types.GomegaMatcher {
 	return &matchers.MatchErrorMatcher{
-		Expected: expected,
+		Expected:           expected,
+		FuncErrDescription: functionErrorDescription,
 	}
 }
 
@@ -381,7 +406,7 @@ func ContainElements(elements ...interface{}) types.GomegaMatcher {
 }
 
 // HaveEach succeeds if actual solely contains elements that match the passed in element.
-// Please note that if actual is empty, HaveEach always will succeed.
+// Please note that if actual is empty, HaveEach always will fail.
 // By default HaveEach() uses Equal() to perform the match, however a
 // matcher can be passed in instead:
 //

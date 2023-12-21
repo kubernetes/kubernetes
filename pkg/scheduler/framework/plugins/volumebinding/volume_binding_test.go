@@ -806,7 +806,7 @@ func TestVolumeBinding(t *testing.T) {
 				}
 			}
 
-			pl, err := New(args, fh, item.fts)
+			pl, err := New(ctx, args, fh, item.fts)
 			if err != nil {
 				t.Fatal(err)
 			}

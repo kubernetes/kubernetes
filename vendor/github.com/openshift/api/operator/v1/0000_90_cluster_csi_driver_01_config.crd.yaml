@@ -90,12 +90,13 @@ spec:
                           type: object
                       type: object
                     driverType:
-                      description: 'driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, vSphere and omitted. Consumers should treat unknown values as a NO-OP.'
+                      description: 'driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, IBMCloud, vSphere and omitted. Consumers should treat unknown values as a NO-OP.'
                       enum:
                         - ""
                         - AWS
                         - Azure
                         - GCP
+                        - IBMCloud
                         - vSphere
                       type: string
                     gcp:
@@ -132,6 +133,18 @@ spec:
                             - projectID
                           type: object
                       type: object
+                    ibmcloud:
+                      description: ibmcloud is used to configure the IBM Cloud CSI driver.
+                      properties:
+                        encryptionKeyCRN:
+                          description: encryptionKeyCRN is the IBM Cloud CRN of the customer-managed root key to use for disk encryption of volumes for the default storage classes.
+                          maxLength: 154
+                          minLength: 144
+                          pattern: ^crn:v[0-9]+:bluemix:(public|private):(kms|hs-crypto):[a-z-]+:a/[0-9a-f]+:[0-9a-f-]{36}:key:[0-9a-f-]{36}$
+                          type: string
+                      required:
+                        - encryptionKeyCRN
+                      type: object
                     vSphere:
                       description: vsphere is used to configure the vsphere CSI driver.
                       properties:
@@ -144,6 +157,9 @@ spec:
                   required:
                     - driverType
                   type: object
+                  x-kubernetes-validations:
+                    - message: ibmcloud must be set if driverType is 'IBMCloud', but remain unset otherwise
+                      rule: 'has(self.driverType) && self.driverType == ''IBMCloud'' ? has(self.ibmcloud) : !has(self.ibmcloud)'
                 logLevel:
                   default: Normal
                   description: "logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for their operands. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."

@@ -27,6 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -56,7 +57,7 @@ type NodeSelector struct {
 	labelValue string
 }
 
-var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
+var _ = utils.SIGDescribe("vcp at scale", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("vcp-at-scale")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

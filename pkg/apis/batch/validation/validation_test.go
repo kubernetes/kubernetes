@@ -2284,23 +2284,6 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.schedule: cannot use both timeZone field and TZ or CRON_TZ in schedule": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "TZ=UTC 0 * * * *",
-				TimeZone:          &timeZoneUTC,
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
-					},
-				},
-			},
-		},
 		"spec.timeZone: timeZone must be nil or non-empty string": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
@@ -2668,6 +2651,125 @@ func TestValidateCronJob(t *testing.T) {
 				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 					t.Errorf("unexpected error: %v, expected: %s", err, k)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateCronJobScheduleTZ(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+	validSchedule := "0 * * * *"
+	invalidSchedule := "TZ=UTC 0 * * * *"
+	invalidCronJob := &batch.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mycronjob",
+			Namespace: metav1.NamespaceDefault,
+			UID:       types.UID("1a2b3c"),
+		},
+		Spec: batch.CronJobSpec{
+			Schedule:          invalidSchedule,
+			ConcurrencyPolicy: batch.AllowConcurrent,
+			JobTemplate: batch.JobTemplateSpec{
+				Spec: batch.JobSpec{
+					Template: validPodTemplateSpec,
+				},
+			},
+		},
+	}
+	validCronJob := &batch.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mycronjob",
+			Namespace: metav1.NamespaceDefault,
+			UID:       types.UID("1a2b3c"),
+		},
+		Spec: batch.CronJobSpec{
+			Schedule:          validSchedule,
+			ConcurrencyPolicy: batch.AllowConcurrent,
+			JobTemplate: batch.JobTemplateSpec{
+				Spec: batch.JobSpec{
+					Template: validPodTemplateSpec,
+				},
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		cronJob   *batch.CronJob
+		createErr string
+		update    func(*batch.CronJob)
+		updateErr string
+	}{
+		"update removing TZ should work": {
+			cronJob:   invalidCronJob,
+			createErr: "cannot use TZ or CRON_TZ in schedule",
+			update: func(cj *batch.CronJob) {
+				cj.Spec.Schedule = validSchedule
+			},
+		},
+		"update not modifying TZ should work": {
+			cronJob:   invalidCronJob,
+			createErr: "cannot use TZ or CRON_TZ in schedule, use timeZone field instead",
+			update: func(cj *batch.CronJob) {
+				cj.Spec.Schedule = invalidSchedule
+			},
+		},
+		"update not modifying TZ but adding .spec.timeZone should fail": {
+			cronJob:   invalidCronJob,
+			createErr: "cannot use TZ or CRON_TZ in schedule, use timeZone field instead",
+			update: func(cj *batch.CronJob) {
+				cj.Spec.TimeZone = &timeZoneUTC
+			},
+			updateErr: "cannot use both timeZone field and TZ or CRON_TZ in schedule",
+		},
+		"update adding TZ should fail": {
+			cronJob: validCronJob,
+			update: func(cj *batch.CronJob) {
+				cj.Spec.Schedule = invalidSchedule
+			},
+			updateErr: "cannot use TZ or CRON_TZ in schedule",
+		},
+	}
+
+	for k, v := range testCases {
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateCronJobCreate(v.cronJob, corevalidation.PodValidationOptions{})
+			if len(errs) > 0 {
+				err := errs[0]
+				if len(v.createErr) == 0 {
+					t.Errorf("unexpected error: %#v, none expected", err)
+					return
+				}
+				if !strings.Contains(err.Error(), v.createErr) {
+					t.Errorf("unexpected error: %v, expected: %s", err, v.createErr)
+				}
+			} else if len(v.createErr) != 0 {
+				t.Errorf("no error, expected %v", v.createErr)
+				return
+			}
+
+			oldSpec := v.cronJob.DeepCopy()
+			oldSpec.ResourceVersion = "1"
+
+			newSpec := v.cronJob.DeepCopy()
+			newSpec.ResourceVersion = "2"
+			if v.update != nil {
+				v.update(newSpec)
+			}
+
+			errs = ValidateCronJobUpdate(newSpec, oldSpec, corevalidation.PodValidationOptions{})
+			if len(errs) > 0 {
+				err := errs[0]
+				if len(v.updateErr) == 0 {
+					t.Errorf("unexpected error: %#v, none expected", err)
+					return
+				}
+				if !strings.Contains(err.Error(), v.updateErr) {
+					t.Errorf("unexpected error: %v, expected: %s", err, v.updateErr)
+				}
+			} else if len(v.updateErr) != 0 {
+				t.Errorf("no error, expected %v", v.updateErr)
+				return
 			}
 		})
 	}

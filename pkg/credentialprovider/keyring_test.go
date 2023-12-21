@@ -88,6 +88,22 @@ func TestURLsMatch(t *testing.T) {
 			targetURL:     "kubernetes.io",
 			matchExpected: false,
 		},
+		{
+			globURL:       "*kubernetes.io",
+			targetURL:     "a.kubernetes.io",
+			matchExpected: false,
+		},
+		// match when number of parts match
+		{
+			globURL:       "*kubernetes.io",
+			targetURL:     "kubernetes.io",
+			matchExpected: true,
+		},
+		{
+			globURL:       "*.*.*.kubernetes.io",
+			targetURL:     "a.b.c.kubernetes.io",
+			matchExpected: true,
+		},
 		// no match when some parts mismatch
 		{
 			globURL:       "kubernetes.io",

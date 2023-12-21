@@ -17,28 +17,41 @@ limitations under the License.
 package integration_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 var stringSchema *apiextensionsv1.JSONSchemaProps = &apiextensionsv1.JSONSchemaProps{
@@ -95,11 +108,50 @@ var fakeRESTMapper map[schema.GroupVersionResource]string = map[schema.GroupVers
 	myCRDV1Beta1: "MyCoolCRD",
 }
 
+// FixTabsOrDie counts the number of tab characters preceding the first
+// line in the given yaml object. It removes that many tabs from every
+// line. It panics (it's a test function) if some line has fewer tabs
+// than the first line.
+//
+// The purpose of this is to make it easier to read tests.
+func FixTabsOrDie(in string) string {
+	lines := bytes.Split([]byte(in), []byte{'\n'})
+	if len(lines[0]) == 0 && len(lines) > 1 {
+		lines = lines[1:]
+	}
+	// Create prefix made of tabs that we want to remove.
+	var prefix []byte
+	for _, c := range lines[0] {
+		if c != '\t' {
+			break
+		}
+		prefix = append(prefix, byte('\t'))
+	}
+	// Remove prefix from all tabs, fail otherwise.
+	for i := range lines {
+		line := lines[i]
+		// It's OK for the last line to be blank (trailing \n)
+		if i == len(lines)-1 && len(line) <= len(prefix) && bytes.TrimSpace(line) == nil {
+			lines[i] = []byte{}
+			break
+		}
+		if !bytes.HasPrefix(line, prefix) {
+			panic(fmt.Errorf("line %d doesn't start with expected number (%d) of tabs: %v", i, len(prefix), string(line)))
+		}
+		lines[i] = line[len(prefix):]
+	}
+	joined := string(bytes.Join(lines, []byte{'\n'}))
+
+	// Convert rest of tabs to spaces since yaml doesnt like yabs
+	// (assuming 2 space alignment)
+	return strings.ReplaceAll(joined, "\t", "  ")
+}
+
 type applyPatchOperation struct {
 	description string
 	gvr         schema.GroupVersionResource
 	name        string
-	patch       map[string]interface{}
+	patch       interface{}
 }
 
 func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
@@ -109,25 +161,33 @@ func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
 		return fmt.Errorf("no mapping found for Gvr %v, add entry to fakeRESTMapper", a.gvr)
 	}
 
-	a.patch["kind"] = kind
-	a.patch["apiVersion"] = a.gvr.GroupVersion().String()
-
-	if meta, ok := a.patch["metadata"]; ok {
-		mObj := meta.(map[string]interface{})
-		mObj["name"] = a.name
-		mObj["namespace"] = "default"
-	} else {
-		a.patch["metadata"] = map[string]interface{}{
-			"name":      a.name,
-			"namespace": "default",
+	patch := &unstructured.Unstructured{}
+	if obj, ok := a.patch.(map[string]interface{}); ok {
+		patch.Object = obj
+	} else if str, ok := a.patch.(string); ok {
+		str = FixTabsOrDie(str)
+		if err := utilyaml.NewYAMLOrJSONDecoder(strings.NewReader(str), len(str)).Decode(&patch.Object); err != nil {
+			return err
 		}
+	} else {
+		return fmt.Errorf("invalid patch type: %T", a.patch)
 	}
 
-	_, err := ctx.DynamicClient.Resource(a.gvr).Namespace("default").Apply(context.TODO(), a.name, &unstructured.Unstructured{
-		Object: a.patch,
-	}, metav1.ApplyOptions{
-		FieldManager: "manager",
-	})
+	patch.SetKind(kind)
+	patch.SetAPIVersion(a.gvr.GroupVersion().String())
+	patch.SetName(a.name)
+	patch.SetNamespace("default")
+
+	_, err := ctx.DynamicClient.
+		Resource(a.gvr).
+		Namespace(patch.GetNamespace()).
+		Apply(
+			context.TODO(),
+			patch.GetName(),
+			patch,
+			metav1.ApplyOptions{
+				FieldManager: "manager",
+			})
 
 	return err
 
@@ -1175,7 +1235,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 			},
 		},
 		{
-			Name: "ArrayItems correlate by index",
+			Name: "ArrayItems do not correlate by index",
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type: "object",
@@ -1246,9 +1306,9 @@ func TestRatchetingFunctionality(t *testing.T) {
 						},
 						"otherField": "hello world",
 					}},
-				// (This test shows an array can be correlated by index with its old value)
-				applyPatchOperation{
-					"add new, valid fields to elements of the array, ratcheting unchanged old fields within the array elements by correlating by index",
+				// (This test shows an array cannpt be correlated by index with its old value)
+				expectError{applyPatchOperation{
+					"add new, valid fields to elements of the array, failing to ratchet unchanged old fields within the array elements by correlating by index due to atomic list",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": []interface{}{
 							map[string]interface{}{
@@ -1261,7 +1321,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 								"key2": "valid value",
 							},
 						},
-					}},
+					}}},
 				expectError{
 					applyPatchOperation{
 						"reorder the array, preventing index correlation",
@@ -1280,6 +1340,50 @@ func TestRatchetingFunctionality(t *testing.T) {
 						}}},
 			},
 		},
+		{
+			Name: "CEL Optional OldSelf",
+			Operations: []ratchetingTestOperation{
+				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"field": {
+							Type: "string",
+							XValidations: []apiextensionsv1.ValidationRule{
+								{
+									Rule:            "!oldSelf.hasValue()",
+									Message:         "oldSelf must be null",
+									OptionalOldSelf: ptr(true),
+								},
+							},
+						},
+					},
+				}},
+
+				applyPatchOperation{
+					"create instance passes since oldself is null",
+					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
+						"field": "value",
+					}},
+
+				expectError{
+					applyPatchOperation{
+						"update field fails, since oldself is not null",
+						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
+							"field": "value2",
+						},
+					},
+				},
+
+				expectError{
+					applyPatchOperation{
+						"noop update field fails, since oldself is not null and transition rules are not ratcheted",
+						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
+							"field": "value",
+						},
+					},
+				},
+			},
+		},
 		// Features that should not ratchet
 		{
 			Name: "AllOf_should_not_ratchet",
@@ -1295,13 +1399,54 @@ func TestRatchetingFunctionality(t *testing.T) {
 		},
 		{
 			Name: "CEL_transition_rules_should_not_ratchet",
+			Operations: []ratchetingTestOperation{
+				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
+					Type:                   "object",
+					XPreserveUnknownFields: ptr(true),
+				}},
+				applyPatchOperation{
+					"create instance with strings that do not start with k8s",
+					myCRDV1Beta1, myCRDInstanceName,
+					`
+						myStringField: myStringValue
+						myOtherField: myOtherField
+					`,
+				},
+				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
+					Type:                   "object",
+					XPreserveUnknownFields: ptr(true),
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"myStringField": {
+							Type: "string",
+							XValidations: apiextensionsv1.ValidationRules{
+								{
+									Rule: "oldSelf != 'myStringValue' || self == 'validstring'",
+								},
+							},
+						},
+					},
+				}},
+				expectError{applyPatchOperation{
+					"try to change one field to valid value, but unchanged field fails to be ratcheted by transition rule",
+					myCRDV1Beta1, myCRDInstanceName,
+					`
+						myOtherField: myNewOtherField
+						myStringField: myStringValue
+					`,
+				}},
+				applyPatchOperation{
+					"change both fields to valid values",
+					myCRDV1Beta1, myCRDInstanceName,
+					`
+						myStringField: validstring
+						myOtherField: myNewOtherField
+					`,
+				},
+			},
 		},
 		// Future Functionality, disabled tests
 		{
 			Name: "CEL Add Change Rule",
-			// Planned future test. CEL Rules are not yet ratcheted in alpha
-			// implementation of CRD Validation Ratcheting
-			Disabled: true,
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type: "object",
@@ -1573,4 +1718,234 @@ func TestRatchetingFunctionality(t *testing.T) {
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+type validator func(new, old *unstructured.Unstructured)
+
+func newValidator(customResourceValidation *apiextensionsinternal.JSONSchemaProps, kind schema.GroupVersionKind, namespaceScoped bool) (validator, error) {
+	// Replicate customResourceStrategy validation
+	openapiSchema := &spec.Schema{}
+	if customResourceValidation != nil {
+		// TODO: replace with NewStructural(...).ToGoOpenAPI
+		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
+			return nil, err
+		}
+	}
+
+	schemaValidator := apiservervalidation.NewRatchetingSchemaValidator(
+		openapiSchema,
+		nil,
+		"",
+		strfmt.Default)
+	sts, err := structuralschema.NewStructural(customResourceValidation)
+	if err != nil {
+		return nil, err
+	}
+
+	strategy := customresource.NewStrategy(
+		nil, // No need for typer, since only using validation
+		namespaceScoped,
+		kind,
+		schemaValidator,
+		nil, // No status schema validator
+		sts,
+		nil, // No need for status
+		nil, // No need for scale
+	)
+
+	return func(new, old *unstructured.Unstructured) {
+		_ = strategy.ValidateUpdate(context.TODO(), new, old)
+	}, nil
+}
+
+// Recursively walks the provided directory and parses the YAML files into
+// unstructured objects. If there are more than one object in a single file,
+// they are all added to the returned slice.
+func loadObjects(dir string) []*unstructured.Unstructured {
+	result := []*unstructured.Unstructured{}
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		} else if d.IsDir() {
+			return nil
+		} else if filepath.Ext(d.Name()) != ".yaml" {
+			return nil
+		}
+		// Read the file in as []byte
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		decoder := utilyaml.NewYAMLOrJSONDecoder(bytes.NewReader(data), 4096)
+
+		// Split the data by YAML drame
+		for {
+			parsed := &unstructured.Unstructured{}
+			if err := decoder.Decode(parsed); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return err
+			}
+
+			result = append(result, parsed)
+		}
+
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func BenchmarkRatcheting(b *testing.B) {
+	// Walk directory with CRDs, for each file parse YAML with multiple CRDs in it.
+	// Keep track in a map a validator for each unique gvk
+	crdObjects := loadObjects("ratcheting_test_cases/crds")
+	invalidFiles := loadObjects("ratcheting_test_cases/invalid")
+	validFiles := loadObjects("ratcheting_test_cases/valid")
+
+	// Create a validator for each GVK.
+	validators := map[schema.GroupVersionKind]validator{}
+	for _, crd := range crdObjects {
+		parsed := apiextensionsv1.CustomResourceDefinition{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(crd.Object, &parsed); err != nil {
+			b.Fatalf("Failed to parse CRD %v", err)
+			return
+		}
+
+		for _, v := range parsed.Spec.Versions {
+			gvk := schema.GroupVersionKind{
+				Group:   parsed.Spec.Group,
+				Version: v.Name,
+				Kind:    parsed.Spec.Names.Kind,
+			}
+
+			// Create structural schema from v.Schema.OpenAPIV3Schema
+			internalValidation := &apiextensionsinternal.CustomResourceValidation{}
+			if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalValidation, nil); err != nil {
+				b.Fatal(fmt.Errorf("failed converting CRD validation to internal version: %v", err))
+				return
+			}
+
+			validator, err := newValidator(internalValidation.OpenAPIV3Schema, gvk, parsed.Spec.Scope == apiextensionsv1.NamespaceScoped)
+			if err != nil {
+				b.Fatal(err)
+				return
+			}
+			validators[gvk] = validator
+		}
+
+	}
+
+	// Organize all the files by GVK.
+	gvksToValidFiles := map[schema.GroupVersionKind][]*unstructured.Unstructured{}
+	gvksToInvalidFiles := map[schema.GroupVersionKind][]*unstructured.Unstructured{}
+
+	for _, valid := range validFiles {
+		gvk := valid.GroupVersionKind()
+		gvksToValidFiles[gvk] = append(gvksToValidFiles[gvk], valid)
+	}
+
+	for _, invalid := range invalidFiles {
+		gvk := invalid.GroupVersionKind()
+		gvksToInvalidFiles[gvk] = append(gvksToInvalidFiles[gvk], invalid)
+	}
+
+	// Remove any GVKs for which we dont have both valid and invalid files.
+	for gvk := range gvksToValidFiles {
+		if _, ok := gvksToInvalidFiles[gvk]; !ok {
+			delete(gvksToValidFiles, gvk)
+		}
+	}
+
+	for gvk := range gvksToInvalidFiles {
+		if _, ok := gvksToValidFiles[gvk]; !ok {
+			delete(gvksToInvalidFiles, gvk)
+		}
+	}
+
+	type pair struct {
+		old *unstructured.Unstructured
+		new *unstructured.Unstructured
+	}
+
+	// For each valid file, match it with every invalid file of the same GVK
+	validXValidPairs := []pair{}
+	validXInvalidPairs := []pair{}
+	invalidXInvalidPairs := []pair{}
+
+	for gvk, valids := range gvksToValidFiles {
+		for _, validOld := range valids {
+			for _, validNew := range gvksToValidFiles[gvk] {
+				validXValidPairs = append(validXValidPairs, pair{old: validOld, new: validNew})
+			}
+		}
+	}
+
+	for gvk, valids := range gvksToValidFiles {
+		for _, valid := range valids {
+			for _, invalid := range gvksToInvalidFiles[gvk] {
+				validXInvalidPairs = append(validXInvalidPairs, pair{old: valid, new: invalid})
+			}
+		}
+	}
+
+	// For each invalid file, add pair with every other invalid file of the same
+	// GVK including itself
+	for gvk, invalids := range gvksToInvalidFiles {
+		for _, invalid := range invalids {
+			for _, invalid2 := range gvksToInvalidFiles[gvk] {
+				invalidXInvalidPairs = append(invalidXInvalidPairs, pair{old: invalid, new: invalid2})
+			}
+		}
+	}
+
+	// For each pair, run the ratcheting algorithm on the update.
+	//
+	for _, ratchetingEnabled := range []bool{true, false} {
+		name := "RatchetingEnabled"
+		if !ratchetingEnabled {
+			name = "RatchetingDisabled"
+		}
+		b.Run(name, func(b *testing.B) {
+			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)()
+			b.ResetTimer()
+
+			do := func(pairs []pair) {
+				for _, pair := range pairs {
+					// Create a validator for the GVK of the valid object.
+					validator, ok := validators[pair.old.GroupVersionKind()]
+					if !ok {
+						b.Log("No validator for GVK", pair.old.GroupVersionKind())
+						continue
+					}
+
+					// Run the ratcheting algorithm on the update.
+					// Don't care about result for benchmark
+					validator(pair.old, pair.new)
+				}
+			}
+
+			b.Run("ValidXValid", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					do(validXValidPairs)
+				}
+			})
+
+			b.Run("ValidXInvalid", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					do(validXInvalidPairs)
+				}
+			})
+
+			b.Run("InvalidXInvalid", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					do(invalidXInvalidPairs)
+				}
+			})
+		})
+	}
 }

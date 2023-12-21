@@ -27,30 +27,30 @@ import (
 
 // CleanStaleEntries takes care of flushing stale conntrack entries for services and endpoints.
 func CleanStaleEntries(isIPv6 bool, exec utilexec.Interface, svcPortMap proxy.ServicePortMap,
-	serviceUpdateResult proxy.UpdateServiceMapResult, endpointUpdateResult proxy.UpdateEndpointMapResult) {
+	serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
 
-	deleteStaleServiceConntrackEntries(isIPv6, exec, svcPortMap, serviceUpdateResult, endpointUpdateResult)
-	deleteStaleEndpointConntrackEntries(exec, svcPortMap, endpointUpdateResult)
+	deleteStaleServiceConntrackEntries(isIPv6, exec, svcPortMap, serviceUpdateResult, endpointsUpdateResult)
+	deleteStaleEndpointConntrackEntries(exec, svcPortMap, endpointsUpdateResult)
 }
 
 // deleteStaleServiceConntrackEntries takes care of flushing stale conntrack entries related
 // to UDP Service IPs. When a service has no endpoints and we drop traffic to it, conntrack
 // may create "black hole" entries for that IP+port. When the service gets endpoints we
 // need to delete those entries so further traffic doesn't get dropped.
-func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, svcPortMap proxy.ServicePortMap, serviceUpdateResult proxy.UpdateServiceMapResult, endpointUpdateResult proxy.UpdateEndpointMapResult) {
+func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, svcPortMap proxy.ServicePortMap, serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
 	conntrackCleanupServiceIPs := serviceUpdateResult.DeletedUDPClusterIPs
 	conntrackCleanupServiceNodePorts := sets.New[int]()
 
-	// merge newly active services gathered from updateEndpointsMap
+	// merge newly active services gathered from endpointsUpdateResult
 	// a UDP service that changes from 0 to non-0 endpoints is newly active.
-	for _, svcPortName := range endpointUpdateResult.NewlyActiveUDPServices {
+	for _, svcPortName := range endpointsUpdateResult.NewlyActiveUDPServices {
 		if svcInfo, ok := svcPortMap[svcPortName]; ok {
 			klog.V(4).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
 			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				conntrackCleanupServiceIPs.Insert(extIP)
 			}
-			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+			for _, lbIP := range svcInfo.LoadBalancerVIPStrings() {
 				conntrackCleanupServiceIPs.Insert(lbIP)
 			}
 			nodePort := svcInfo.NodePort()
@@ -78,8 +78,8 @@ func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, sv
 // deleteStaleEndpointConntrackEntries takes care of flushing stale conntrack entries related
 // to UDP endpoints. After a UDP endpoint is removed we must flush any conntrack entries
 // for it so that if the same client keeps sending, the packets will get routed to a new endpoint.
-func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap proxy.ServicePortMap, endpointUpdateResult proxy.UpdateEndpointMapResult) {
-	for _, epSvcPair := range endpointUpdateResult.DeletedUDPEndpoints {
+func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap proxy.ServicePortMap, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
+	for _, epSvcPair := range endpointsUpdateResult.DeletedUDPEndpoints {
 		if svcInfo, ok := svcPortMap[epSvcPair.ServicePortName]; ok {
 			endpointIP := proxyutil.IPPart(epSvcPair.Endpoint)
 			nodePort := svcInfo.NodePort()
@@ -100,7 +100,7 @@ func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap pro
 					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
 				}
 			}
-			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+			for _, lbIP := range svcInfo.LoadBalancerVIPStrings() {
 				err := ClearEntriesForNAT(exec, lbIP, endpointIP, v1.ProtocolUDP)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "loadBalancerIP", lbIP)

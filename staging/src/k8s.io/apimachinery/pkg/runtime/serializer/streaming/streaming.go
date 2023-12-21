@@ -134,23 +134,3 @@ func (e *encoder) Encode(obj runtime.Object) error {
 	e.buf.Reset()
 	return err
 }
-
-type encoderWithAllocator struct {
-	writer       io.Writer
-	encoder      runtime.EncoderWithAllocator
-	memAllocator runtime.MemoryAllocator
-}
-
-// NewEncoderWithAllocator returns a new streaming encoder
-func NewEncoderWithAllocator(w io.Writer, e runtime.EncoderWithAllocator, a runtime.MemoryAllocator) Encoder {
-	return &encoderWithAllocator{
-		writer:       w,
-		encoder:      e,
-		memAllocator: a,
-	}
-}
-
-// Encode writes the provided object to the nested writer
-func (e *encoderWithAllocator) Encode(obj runtime.Object) error {
-	return e.encoder.EncodeWithAllocator(obj, e.writer, e.memAllocator)
-}

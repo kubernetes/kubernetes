@@ -35,15 +35,41 @@ type Paths struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Paths as JSON
 func (p *Paths) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(p.Paths)
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(p)
+	}
+	b1, err := json.Marshal(p.VendorExtensible)
 	if err != nil {
 		return nil, err
 	}
-	b2, err := json.Marshal(p.VendorExtensible)
+
+	pths := make(map[string]*Path)
+	for k, v := range p.Paths {
+		if strings.HasPrefix(k, "/") {
+			pths[k] = v
+		}
+	}
+	b2, err := json.Marshal(pths)
 	if err != nil {
 		return nil, err
 	}
-	return swag.ConcatJSON(b1, b2), nil
+	concated := swag.ConcatJSON(b1, b2)
+	return concated, nil
+}
+
+func (p *Paths) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	m := make(map[string]any, len(p.Extensions)+len(p.Paths))
+	for k, v := range p.Extensions {
+		if internal.IsExtensionKey(k) {
+			m[k] = v
+		}
+	}
+	for k, v := range p.Paths {
+		if strings.HasPrefix(k, "/") {
+			m[k] = v
+		}
+	}
+	return opts.MarshalNext(enc, m)
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
@@ -144,6 +170,9 @@ type Path struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Path as JSON
 func (p *Path) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(p)
+	}
 	b1, err := json.Marshal(p.Refable)
 	if err != nil {
 		return nil, err
@@ -157,6 +186,18 @@ func (p *Path) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
+}
+
+func (p *Path) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref string `json:"$ref,omitempty"`
+		spec.Extensions
+		PathProps
+	}
+	x.Ref = p.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(p.Extensions)
+	x.PathProps = p.PathProps
+	return opts.MarshalNext(enc, x)
 }
 
 func (p *Path) UnmarshalJSON(data []byte) error {

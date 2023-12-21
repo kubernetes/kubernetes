@@ -1,0 +1,402 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[CustomNoUpgrade] DNSNameResolver"
+crd: 0000_70_dnsnameresolver_00-techpreview.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal DNSNameResolver with a regular DNS name
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      spec:
+        name: www.example.com.
+    expected: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      spec:
+        name: www.example.com.
+  - name: Should be able to create a minimal DNSNameResolver with a wildcard DNS name
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      spec:
+        name: "*.example.com."
+    expected: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      spec:
+        name: "*.example.com."
+  - name: Should be able to specify DNS name with a '-' in a label
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      spec:
+        name: www.example-domain.com.
+    expected: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      spec:
+        name: www.example-domain.com.
+  - name: Should not be able to specify invalid DNS name
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www_example_com
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"www_example_com\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should not be able to specify DNS name with a label starting with '-'
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: -example.com.
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"-example.com.\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should not be able to specify DNS name with a label ending with '-'
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: example-.com.
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"example-.com.\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should not be able to specify DNS name without a trailing period
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"www.example.com\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should not be able to specify just the TLD in a DNS name
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: com.
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"com.\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should not be able to specify a wildcard before TLD in DNS name
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: "*.com."
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"*.com.\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should not be able to specify a DNS name with a label containing uppercase letters
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: ABCD.com.
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"ABCD.com.\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should not be able to specify a DNS name with a label containing more than 63 characters
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz123456789012.com.
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz123456789012.com.\": spec.name in body should match '^(\\*\\.)?([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\\.){2,}$'"
+  - name: Should be able to specify a DNS name with a label containing 63 characters
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz12345678901.com.
+    expected: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      spec:
+        name: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz12345678901.com.
+  onUpdate:
+  - name: Should not be able to update spec.name field
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.newexample.com.
+    expectedError: "DNSNameResolver.network.openshift.io \"example\" is invalid: spec.name: Invalid value: \"string\": spec.name is immutable"
+  - name: Should be able to add valid IPv4 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "192.168.1.1"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expected:  |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "192.168.1.1"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+  - name: Should be able to add lowest valid IPv4 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "0.0.0.0"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expected:  |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "0.0.0.0"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+  - name: Should be able to add highest valid IPv4 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "255.255.255.255"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expected:  |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "255.255.255.255"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+  - name: Should not be able to add invalid IPv4 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "256.256.256.256"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expectedStatusError: "DNSNameResolver.network.openshift.io \"example\" is invalid: [<nil>: Invalid value: \"\": \"status.resolvedNames[0].resolvedAddresses[0].ip\" must validate at least one schema (anyOf), status.resolvedNames[0].resolvedAddresses[0].ip: Invalid value: \"256.256.256.256\": status.resolvedNames[0].resolvedAddresses[0].ip in body must be of type ipv4: \"256.256.256.256\", <nil>: Invalid value: \"null\": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]"
+  - name: Should be able to add valid IPv6 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "2001:db8:3333:4444:5555:6666:7777:8888"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expected:  |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "2001:db8:3333:4444:5555:6666:7777:8888"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+  - name: Should be able to add lowest valid IPv6 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "::"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expected:  |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "::"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+  - name: Should be able to add highest valid IPv6 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expected:  |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+  - name: Should not be able to add invalid IPv6 address
+    initial: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+    updated: |
+      apiVersion: network.openshift.io/v1alpha1
+      kind: DNSNameResolver
+      metadata:
+        name: example
+      spec:
+        name: www.example.com.
+      status:
+        resolvedNames:
+        - dnsName: www.example.com.
+          resolvedAddresses:
+          - ip: "10000:10000:10000:10000:10000:10000:10000:10000"
+            ttlSeconds: 60
+            lastLookupTime: "2023-08-08T15:07:04Z"
+    expectedStatusError: "DNSNameResolver.network.openshift.io \"example\" is invalid: [<nil>: Invalid value: \"\": \"status.resolvedNames[0].resolvedAddresses[0].ip\" must validate at least one schema (anyOf), status.resolvedNames[0].resolvedAddresses[0].ip: Invalid value: \"10000:10000:10000:10000:10000:10000:10000:10000\": status.resolvedNames[0].resolvedAddresses[0].ip in body must be of type ipv4: \"10000:10000:10000:10000:10000:10000:10000:10000\", <nil>: Invalid value: \"null\": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]"
