@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -52,6 +53,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -1216,6 +1218,77 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			framework.Failf("Error waiting for ResourceQuota %q to reset its Status: %v", patchedResourceQuota.Name, err)
 		}
 
+	})
+})
+
+var _ = SIGDescribe("ResourceQuota", framework.WithFeatureGate(features.VolumeAttributesClass), func() {
+	f := framework.NewDefaultFramework("volume-attributes-class")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	/*
+		Release: v1.30
+		Testname: ResourceQuota, object count quota, volumeAttributesClass
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create PersistentVolumeClaim (PVC) with specified volumeAttributesClass and storage capacity of 1G. PVC creation MUST be successful and resource usage count against PVC, volumeAttributesClass and storage object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Create another PVC with specified volumeAttributesClass and storage capacity of 1G. PVC creation MUST fail due to exceeding the quota.
+		Delete the PVC. Deletion MUST succeed and resource usage count against  PVC, volumeAttributesClass and storage object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+	*/
+	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim with a volume attributes class", func(ctx context.Context) {
+		ginkgo.By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(ctx, f.ClientSet, f.Namespace.Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuota(quotaName)
+		resourceQuota.Spec.Hard[core.V1ResourceByVolumeAttributesClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("1")
+		_, err = createResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuota)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
+		usedResources[core.V1ResourceByVolumeAttributesClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
+
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a PersistentVolumeClaim with volume attributes class")
+		pvc1 := newTestPersistentVolumeClaimForQuota("test-claim-1")
+		pvc1.Spec.StorageClassName = ptr.To("")
+		pvc1.Spec.VolumeAttributesClassName = &classGold
+		pvc1, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc1, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status captures persistent volume claim creation")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("1Gi")
+		usedResources[core.V1ResourceByVolumeAttributesClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("1")
+
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Not allowing a PersistentVolumeClaim to be created that exceeds remaining quota")
+		pvc2 := newTestPersistentVolumeClaimForQuota("test-claim-2")
+		pvc2.Spec.StorageClassName = ptr.To("")
+		pvc2.Spec.VolumeAttributesClassName = &classGold
+		_, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc2, metav1.CreateOptions{})
+		gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "expect a forbidden error when creating a PVC that exceeds quota"))
+
+		ginkgo.By("Deleting a PersistentVolumeClaim")
+		err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(ctx, pvc1.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status released usage")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
+		usedResources[core.V1ResourceByVolumeAttributesClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
+
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
 	})
 })
 

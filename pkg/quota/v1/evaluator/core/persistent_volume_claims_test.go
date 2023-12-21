@@ -30,6 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func testVolumeClaim(name string, namespace string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
@@ -89,6 +90,9 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 
 	validClaimByVolumeAttributesClass := validClaimByStorageClass.DeepCopy()
 	validClaimByVolumeAttributesClass.Spec.VolumeAttributesClassName = &classGold
+
+	validClaimByEmptyVolumeAttributesClass := validClaimByStorageClass.DeepCopy()
+	validClaimByEmptyVolumeAttributesClass.Spec.VolumeAttributesClassName = ptr.To("")
 
 	evaluator := NewPersistentVolumeClaimEvaluator(nil)
 	testCases := map[string]struct {
@@ -155,6 +159,17 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
 			enableRecoverFromExpansion: true,
+		},
+		"pvc-usage-by-empty-volume-attributes-class": {
+			pvc: validClaimByEmptyVolumeAttributesClass,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("10Gi"),
+				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
+				V1ResourceByStorageClass(classGold, corev1.ResourceRequestsStorage):                               resource.MustParse("10Gi"),
+				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+			enableVolumeAttributesClass: true,
 		},
 		"pvc-usage-by-volume-attributes-class": {
 			pvc: validClaimByVolumeAttributesClass,

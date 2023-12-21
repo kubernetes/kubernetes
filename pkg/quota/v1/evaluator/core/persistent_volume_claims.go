@@ -32,6 +32,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	k8sfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // the name used for object count quota
@@ -197,8 +198,9 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) && pvc.Spec.VolumeAttributesClassName != nil {
-		volumeAttributesClassClaim := corev1.ResourceName(*pvc.Spec.VolumeAttributesClassName + volumeAttributesClassSuffix + string(corev1.ResourcePersistentVolumeClaims))
+	vacName := ptr.Deref(pvc.Spec.VolumeAttributesClassName, "")
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) && vacName != "" {
+		volumeAttributesClassClaim := corev1.ResourceName(vacName + volumeAttributesClassSuffix + string(corev1.ResourcePersistentVolumeClaims))
 		result[volumeAttributesClassClaim] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 
