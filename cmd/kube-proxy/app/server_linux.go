@@ -361,9 +361,11 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 }
 
 func (s *ProxyServer) setupConntrack() error {
-	ct := &realConntracker{}
+	ct := &realConntracker{
+		logger: s.logger,
+	}
 
-	max, err := getConntrackMax(s.Config.Conntrack)
+	max, err := getConntrackMax(s.logger, s.Config.Conntrack)
 	if err != nil {
 		return err
 	}
@@ -423,7 +425,7 @@ func (s *ProxyServer) setupConntrack() error {
 	return nil
 }
 
-func getConntrackMax(config proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
+func getConntrackMax(logger klog.Logger, config proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0
 		if config.Min != nil {
@@ -431,10 +433,10 @@ func getConntrackMax(config proxyconfigapi.KubeProxyConntrackConfiguration) (int
 		}
 		scaled := int(*config.MaxPerCore) * detectNumCPU()
 		if scaled > floor {
-			klog.V(3).InfoS("GetConntrackMax: using scaled conntrack-max-per-core")
+			logger.V(3).Info("GetConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil
 		}
-		klog.V(3).InfoS("GetConntrackMax: using conntrack-min")
+		logger.V(3).Info("GetConntrackMax: using conntrack-min")
 		return floor, nil
 	}
 	return 0, nil

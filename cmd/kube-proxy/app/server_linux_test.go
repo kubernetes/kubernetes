@@ -678,7 +678,8 @@ func TestGetConntrackMax(t *testing.T) {
 			Min:        ptr.To(tc.min),
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
-		x, e := getConntrackMax(cfg)
+		logger, _ := ktesting.NewTestContext(t)
+		x, e := getConntrackMax(logger, cfg)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
