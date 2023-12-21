@@ -251,6 +251,7 @@ func TestControllerSyncJob(t *testing.T) {
 		wasSuspended         bool
 		suspend              bool
 		podReplacementPolicy *batch.PodReplacementPolicy
+		podFailurePolicy     *batch.PodFailurePolicy
 		initialStatus        *jobInitialStatus
 		backoffRecord        *backoffRecord
 		controllerTime       *time.Time
@@ -289,6 +290,7 @@ func TestControllerSyncJob(t *testing.T) {
 		jobReadyPodsEnabled     bool
 		podIndexLabelDisabled   bool
 		jobPodReplacementPolicy bool
+		jobPodFailurePolicy     bool
 	}{
 		"job start": {
 			parallelism:       2,
@@ -389,6 +391,21 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:          1,
 			expectedDeletions:       1,
 			expectedPodPatches:      1,
+		},
+		"more terminating pods than parallelism; PodFailurePolicy used": {
+			// Repro for https://github.com/kubernetes/kubernetes/issues/122235
+			parallelism:         1,
+			completions:         1,
+			backoffLimit:        6,
+			activePods:          2,
+			failedPods:          0,
+			terminatingPods:     4,
+			jobPodFailurePolicy: true,
+			podFailurePolicy:    &batch.PodFailurePolicy{},
+			expectedTerminating: nil,
+			expectedActive:      1,
+			expectedDeletions:   1,
+			expectedPodPatches:  1,
 		},
 		"too few active pods and active back-off": {
 			parallelism:  1,
@@ -883,6 +900,7 @@ func TestControllerSyncJob(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobPodFailurePolicy)()
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -904,6 +922,9 @@ func TestControllerSyncJob(t *testing.T) {
 			job.Spec.Suspend = pointer.Bool(tc.suspend)
 			if tc.jobPodReplacementPolicy {
 				job.Spec.PodReplacementPolicy = tc.podReplacementPolicy
+			}
+			if tc.jobPodFailurePolicy {
+				job.Spec.PodFailurePolicy = tc.podFailurePolicy
 			}
 			if tc.initialStatus != nil {
 				startTime := metav1.Now()
