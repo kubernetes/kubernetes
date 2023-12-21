@@ -32,10 +32,10 @@ import (
 // genClientForType produces a file for each top-level type.
 type genClientForType struct {
 	generator.DefaultGen
-	outputPackage             string
+	outputPackage             string // must be a Go import-path
 	inputPackage              string
-	clientsetPackage          string
-	applyConfigurationPackage string
+	clientsetPackage          string // must be a Go import-path
+	applyConfigurationPackage string // must be a Go import-path
 	group                     string
 	version                   string
 	groupGoName               string
