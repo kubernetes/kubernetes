@@ -383,6 +383,11 @@ func (h *HTTPExtender) IsBinder() bool {
 	return h.bindVerb != ""
 }
 
+// IsPrioritizer returns whether this extender is configured for the Prioritize method.
+func (h *HTTPExtender) IsPrioritizer() bool {
+	return h.prioritizeVerb != ""
+}
+
 // Helper function to send messages to the extender
 func (h *HTTPExtender) send(action string, args interface{}, result interface{}) error {
 	out, err := json.Marshal(args)
