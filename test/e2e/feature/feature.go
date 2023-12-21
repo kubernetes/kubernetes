@@ -86,6 +86,7 @@ var (
 	NodeAuthorizer                          = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthorizer"))
 	NodeLogQuery                            = framework.WithFeature(framework.ValidFeatures.Add("NodeLogQuery"))
 	NodeOutOfServiceVolumeDetach            = framework.WithFeature(framework.ValidFeatures.Add("NodeOutOfServiceVolumeDetach"))
+	NodeProblemDetector                     = framework.WithFeature(framework.ValidFeatures.Add("NodeProblemDetector"))
 	NoSNAT                                  = framework.WithFeature(framework.ValidFeatures.Add("NoSNAT"))
 	PersistentVolumeLastPhaseTransitionTime = framework.WithFeature(framework.ValidFeatures.Add("PersistentVolumeLastPhaseTransitionTime"))
 	PerformanceDNS                          = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
