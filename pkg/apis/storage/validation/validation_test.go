@@ -58,6 +58,7 @@ func TestValidateStorageClass(t *testing.T) {
 	deleteReclaimPolicy := api.PersistentVolumeReclaimPolicy("Delete")
 	retainReclaimPolicy := api.PersistentVolumeReclaimPolicy("Retain")
 	recycleReclaimPolicy := api.PersistentVolumeReclaimPolicy("Recycle")
+	emptyReclaimPolicy := api.PersistentVolumeReclaimPolicy("")
 	successCases := []storage.StorageClass{{
 		// empty parameters
 		ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
@@ -109,45 +110,51 @@ func TestValidateStorageClass(t *testing.T) {
 
 	errorCases := map[string]storage.StorageClass{
 		"namespace is present": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Provisioner:   "kubernetes.io/foo-provisioner",
-			ReclaimPolicy: &deleteReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Provisioner:       "kubernetes.io/foo-provisioner",
+			VolumeBindingMode: &immediateMode1,
+			ReclaimPolicy:     &deleteReclaimPolicy,
 		},
 		"invalid provisioner": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "kubernetes.io/invalid/provisioner",
-			ReclaimPolicy: &deleteReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/invalid/provisioner",
+			VolumeBindingMode: &immediateMode1,
+			ReclaimPolicy:     &deleteReclaimPolicy,
 		},
 		"invalid empty parameter name": {
-			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
-			Provisioner: "kubernetes.io/foo",
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo",
+			VolumeBindingMode: &immediateMode1,
 			Parameters: map[string]string{
 				"": "value",
 			},
 			ReclaimPolicy: &deleteReclaimPolicy,
 		},
 		"provisioner: Required value": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "",
-			ReclaimPolicy: &deleteReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "",
+			VolumeBindingMode: &immediateMode1,
+			ReclaimPolicy:     &deleteReclaimPolicy,
 		},
 		"too long parameters": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "kubernetes.io/foo",
-			Parameters:    longParameters,
-			ReclaimPolicy: &deleteReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo",
+			VolumeBindingMode: &immediateMode1,
+			Parameters:        longParameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
 		},
 		"invalid reclaimpolicy": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "kubernetes.io/foo",
-			ReclaimPolicy: &recycleReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo",
+			VolumeBindingMode: &immediateMode1,
+			ReclaimPolicy:     &recycleReclaimPolicy,
 		},
 	}
 
 	// Error cases are not expected to pass validation.
 	for testName, storageClass := range errorCases {
-		if errs := ValidateStorageClass(&storageClass); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %s", testName)
+		if errs := ValidateStorageClass(&storageClass); len(errs) == 0 || len(errs) != 1 {
+			t.Errorf("Expected exactly one failure for test: %s, got: %v", testName, errs)
 		}
 	}
 }
