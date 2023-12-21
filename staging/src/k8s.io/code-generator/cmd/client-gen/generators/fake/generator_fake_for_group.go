@@ -32,8 +32,7 @@ import (
 // genFakeForGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genFakeForGroup struct {
 	generator.DefaultGen
-	outputPackage     string
-	realClientPackage string
+	realClientPackage string // must be a Go import-path
 	group             string
 	version           string
 	groupGoName       string
@@ -57,7 +56,7 @@ func (g *genFakeForGroup) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *genFakeForGroup) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 

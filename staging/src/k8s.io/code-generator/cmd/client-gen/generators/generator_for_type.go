@@ -32,10 +32,9 @@ import (
 // genClientForType produces a file for each top-level type.
 type genClientForType struct {
 	generator.DefaultGen
-	outputPackage             string
 	inputPackage              string
-	clientsetPackage          string
-	applyConfigurationPackage string
+	clientsetPackage          string // must be a Go import-path
+	applyConfigurationPackage string // must be a Go import-path
 	group                     string
 	version                   string
 	groupGoName               string
@@ -52,7 +51,7 @@ func (g *genClientForType) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *genClientForType) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 

@@ -32,7 +32,6 @@ import (
 // genFakeForType produces a file for each top-level type.
 type genFakeForType struct {
 	generator.DefaultGen
-	outputPackage             string
 	group                     string
 	version                   string
 	groupGoName               string
@@ -49,7 +48,7 @@ func (g *genFakeForType) Filter(c *generator.Context, t *types.Type) bool { retu
 
 func (g *genFakeForType) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 

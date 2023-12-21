@@ -31,16 +31,15 @@ import (
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genGroup struct {
 	generator.DefaultGen
-	outputPackage string
-	group         string
-	version       string
-	groupGoName   string
-	apiPath       string
+	group       string
+	version     string
+	groupGoName string
+	apiPath     string
 	// types in this group
 	types            []*types.Type
 	imports          namer.ImportTracker
 	inputPackage     string
-	clientsetPackage string
+	clientsetPackage string // must be a Go import-path
 	// If the genGroup has been called. This generator should only execute once.
 	called bool
 }
@@ -58,7 +57,7 @@ func (g *genGroup) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer("", g.imports),
 	}
 }
 
