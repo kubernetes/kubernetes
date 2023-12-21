@@ -98,7 +98,7 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	isWatchRequest := watchVerbs.Has(requestInfo.Verb)
+	isWatchRequest := requestInfo.IsWatch()
 
 	// Skip tracking long running non-watch requests.
 	if h.longRunningRequestCheck != nil && h.longRunningRequestCheck(r, requestInfo) && !isWatchRequest {

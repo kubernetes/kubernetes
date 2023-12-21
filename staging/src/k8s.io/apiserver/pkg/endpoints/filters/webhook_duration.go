@@ -22,13 +22,8 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
-)
-
-var (
-	watchVerbs = sets.NewString("watch")
 )
 
 // WithLatencyTrackers adds a LatencyTrackers instance to the
@@ -43,7 +38,7 @@ func WithLatencyTrackers(handler http.Handler) http.Handler {
 			return
 		}
 
-		if watchVerbs.Has(requestInfo.Verb) {
+		if requestInfo.IsWatch() {
 			handler.ServeHTTP(w, req)
 			return
 		}
