@@ -61,8 +61,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, arguments.OutputPackagePath)
 	customArgs := arguments.CustomArgs.(*applygenargs.CustomArgs)
+
+	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, customArgs.OutputPackage)
 	initialTypes := customArgs.ExternalApplyConfigurations
 	refs := refGraphForReachableTypes(context.Universe, pkgTypes, initialTypes)
 	typeModels, err := newTypeModels(customArgs.OpenAPISchemaFilePath, pkgTypes)
@@ -77,8 +78,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var packageList generator.Packages
 	for pkg, p := range pkgTypes {
 		gv := groupVersion(p)
-
-		pkgType := types.Name{Name: gv.Group.PackageName(), Package: pkg}
 
 		var toGenerate []applyConfig
 		for _, t := range p.Types {
@@ -101,8 +100,17 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 		sort.Sort(applyConfigSort(toGenerate))
 
+		// Apparently we allow the groupName to be overridden in a way that it
+		// no longer maps to a Go package by name.  So we have to figure out
+		// the offset of this particular output package (pkg) from the base
+		// output package (customArgs.OutputPackage).
+		pkgSubdir := strings.TrimPrefix(pkg, customArgs.OutputPackage+"/")
+
 		// generate the apply configurations
-		packageList = append(packageList, generatorForApplyConfigurationsPackage(arguments.OutputPackagePath, boilerplate, pkgType, gv, toGenerate, refs, typeModels))
+		packageList = append(packageList,
+			generatorForApplyConfigurationsPackage(
+				arguments.OutputBase, customArgs.OutputPackage, pkgSubdir,
+				boilerplate, gv, toGenerate, refs, typeModels))
 
 		// group all the generated apply configurations by gv so ForKind() can be generated
 		groupPackageName := gv.Group.NonEmpty()
@@ -124,9 +132,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	// generate ForKind() utility function
-	packageList = append(packageList, generatorForUtils(arguments.OutputPackagePath, boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames))
+	packageList = append(packageList,
+		generatorForUtils(arguments.OutputBase, customArgs.OutputPackage,
+			boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames))
 	// generate internal embedded schema, required for generated Extract functions
-	packageList = append(packageList, generatorForInternal(filepath.Join(arguments.OutputPackagePath, "internal"), boilerplate, typeModels))
+	packageList = append(packageList,
+		generatorForInternal(arguments.OutputBase, customArgs.OutputPackage,
+			boilerplate, typeModels))
 
 	return packageList
 }
@@ -152,10 +164,14 @@ func typeName(t *types.Type) string {
 	return fmt.Sprintf("%s.%s", typePackage, t.Name.Name)
 }
 
-func generatorForApplyConfigurationsPackage(outputPackagePath string, boilerplate []byte, packageName types.Name, gv clientgentypes.GroupVersion, typesToGenerate []applyConfig, refs refGraph, models *typeModels) *generator.DefaultPackage {
+func generatorForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir string, boilerplate []byte, gv clientgentypes.GroupVersion, typesToGenerate []applyConfig, refs refGraph, models *typeModels) *generator.DefaultPackage {
+	outputDir := filepath.Join(outputDirBase, pkgSubdir)
+	outputPkg := filepath.Join(outputPkgBase, pkgSubdir)
+
 	return &generator.DefaultPackage{
 		PackageName: gv.Version.PackageName(),
-		PackagePath: packageName.Package,
+		PackagePath: outputPkg,
+		Source:      outputDir,
 		HeaderText:  boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			for _, toGenerate := range typesToGenerate {
@@ -173,13 +189,12 @@ func generatorForApplyConfigurationsPackage(outputPackagePath string, boilerplat
 					DefaultGen: generator.DefaultGen{
 						OptionalName: strings.ToLower(toGenerate.Type.Name.Name),
 					},
-					outputPackage: outputPackagePath,
-					localPackage:  packageName,
-					groupVersion:  gv,
-					applyConfig:   toGenerate,
-					imports:       generator.NewImportTracker(),
-					refGraph:      refs,
-					openAPIType:   openAPIType,
+					outPkgBase:   outputPkgBase,
+					groupVersion: gv,
+					applyConfig:  toGenerate,
+					imports:      generator.NewImportTracker(),
+					refGraph:     refs,
+					openAPIType:  openAPIType,
 				})
 			}
 			return generators
@@ -187,17 +202,18 @@ func generatorForApplyConfigurationsPackage(outputPackagePath string, boilerplat
 	}
 }
 
-func generatorForUtils(outPackagePath string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, applyConfigsForGroupVersion map[clientgentypes.GroupVersion][]applyConfig, groupGoNames map[string]string) *generator.DefaultPackage {
+func generatorForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, applyConfigsForGroupVersion map[clientgentypes.GroupVersion][]applyConfig, groupGoNames map[string]string) *generator.DefaultPackage {
 	return &generator.DefaultPackage{
-		PackageName: filepath.Base(outPackagePath),
-		PackagePath: outPackagePath,
+		PackageName: filepath.Base(outputPkgBase),
+		PackagePath: outputPkgBase,
+		Source:      outputDirBase,
 		HeaderText:  boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &utilGenerator{
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "utils",
 				},
-				outputPackage:        outPackagePath,
+				outputPackage:        outputPkgBase,
 				imports:              generator.NewImportTracker(),
 				groupVersions:        groupVersions,
 				typesForGroupVersion: applyConfigsForGroupVersion,
@@ -208,17 +224,20 @@ func generatorForUtils(outPackagePath string, boilerplate []byte, groupVersions 
 	}
 }
 
-func generatorForInternal(outPackagePath string, boilerplate []byte, models *typeModels) *generator.DefaultPackage {
+func generatorForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, models *typeModels) *generator.DefaultPackage {
+	outputDir := filepath.Join(outputDirBase, "internal")
+	outputPkg := filepath.Join(outputPkgBase, "internal")
 	return &generator.DefaultPackage{
-		PackageName: filepath.Base(outPackagePath),
-		PackagePath: outPackagePath,
+		PackageName: filepath.Base(outputPkg),
+		PackagePath: outputPkg,
+		Source:      outputDir,
 		HeaderText:  boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &internalGenerator{
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "internal",
 				},
-				outputPackage: outPackagePath,
+				outputPackage: outputPkgBase,
 				imports:       generator.NewImportTracker(),
 				typeModels:    models,
 			})
@@ -235,7 +254,7 @@ func goName(gv clientgentypes.GroupVersion, p *types.Package) string {
 	return goName
 }
 
-func packageTypesForInputDirs(context *generator.Context, inputDirs []string, outputPath string) map[string]*types.Package {
+func packageTypesForInputDirs(context *generator.Context, inputDirs []string, outPkgBase string) map[string]*types.Package {
 	pkgTypes := map[string]*types.Package{}
 	for _, inputDir := range inputDirs {
 		p := context.Universe.Package(inputDir)
@@ -249,7 +268,7 @@ func packageTypesForInputDirs(context *generator.Context, inputDirs []string, ou
 		// For example, if openshift/api/cloudnetwork/v1 contains an apigroup cloud.network.openshift.io, the client-gen
 		// builds a package called cloudnetwork/v1 to contain it. This change makes the applyconfiguration-gen use the same.
 		_, gvPackageString := util.ParsePathGroupVersion(p.Path)
-		pkg := filepath.Join(outputPath, strings.ToLower(gvPackageString))
+		pkg := filepath.Join(outPkgBase, strings.ToLower(gvPackageString))
 		pkgTypes[pkg] = p
 	}
 	return pkgTypes
