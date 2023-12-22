@@ -35,22 +35,6 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
-	// owner: @ivelichkovich, @tallclair
-	// alpha: v1.27
-	// beta: v1.28
-	// kep: https://kep.k8s.io/3716
-	//
-	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
-	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
-
-	// owner: @jefftree @alexzielenski
-	// alpha: v1.26
-	// beta: v1.27
-	//
-	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
-	// caching with ETags containing all APIResources known to the apiserver.
-	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
-
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9
@@ -79,6 +63,7 @@ const (
 
 	// owner: @roycaihw
 	// alpha: v1.20
+	// beta: v1.26
 	//
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
@@ -90,12 +75,28 @@ const (
 	// Add support for distributed tracing in the API Server
 	APIServerTracing featuregate.Feature = "APIServerTracing"
 
-	// owner: @cici37 @jpbetz
-	// kep: http://kep.k8s.io/3488
-	// alpha: v1.26
+	// owner: @ivelichkovich, @tallclair
+	// alpha: v1.27
+	// beta: v1.28
+	// kep: https://kep.k8s.io/3716
 	//
-	// Enables expression validation in Admission Control
-	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
+	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
+	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
+
+	// owner: @jefftree @alexzielenski
+	// alpha: v1.26
+	// beta: v1.27
+	//
+	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
+	// caching with ETags containing all APIResources known to the apiserver.
+	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
+
+	// owner: @serathius
+	// kep: http://kep.k8s.io/2340
+	// alpha: v1.28
+	//
+	// Allow the API server to serve consistent lists from cache
+	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
 
 	// owner: @cici37
 	// kep: https://kep.k8s.io/2876
@@ -113,9 +114,17 @@ const (
 	// Allows for updating watchcache resource version with progress notify events.
 	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
 
+	// owner: @vinaykul
+	// kep: http://kep.k8s.io/1287
+	// alpha: v1.27
+	//
+	// Enables In-Place Pod Vertical Scaling
+	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
-	// deprecated: v1.28
+	// deprecated: v1.28 (true)
+	// deprecated: v1.29 (false)
 	//
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"
@@ -175,27 +184,10 @@ const (
 	// kep: https://kep.k8s.io/2885
 	// alpha: v1.23
 	// beta: v1.24
+	// stable: v1.27
 	//
 	// Enables server-side field validation.
 	ServerSideFieldValidation featuregate.Feature = "ServerSideFieldValidation"
-
-	// owner: @enj
-	// beta: v1.29
-	//
-	// Enables http2 DOS mitigations for unauthenticated clients.
-	//
-	// Some known reasons to disable these mitigations:
-	//
-	// An API server that is fronted by an L7 load balancer that is set up
-	// to mitigate http2 attacks may opt to disable this protection to prevent
-	// unauthenticated clients from disabling connection reuse between the load
-	// balancer and the API server (many incoming connections could share the
-	// same backend connection).
-	//
-	// An API server that is on a private network may opt to disable this
-	// protection to prevent performance regressions for unauthenticated
-	// clients.
-	UnauthenticatedHTTP2DOSMitigation featuregate.Feature = "UnauthenticatedHTTP2DOSMitigation"
 
 	// owner: @caesarxuchao @roycaihw
 	// alpha: v1.20
@@ -225,6 +217,33 @@ const (
 	// Enables Structured Authorization Configuration
 	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
 
+	// owner: @enj
+	// beta: v1.28 (false)
+	// beta: v1.29 (true)
+	//
+	// Enables http2 DOS mitigations for unauthenticated clients.
+	//
+	// Some known reasons to disable these mitigations:
+	//
+	// An API server that is fronted by an L7 load balancer that is set up
+	// to mitigate http2 attacks may opt to disable this protection to prevent
+	// unauthenticated clients from disabling connection reuse between the load
+	// balancer and the API server (many incoming connections could share the
+	// same backend connection).
+	//
+	// An API server that is on a private network may opt to disable this
+	// protection to prevent performance regressions for unauthenticated
+	// clients.
+	UnauthenticatedHTTP2DOSMitigation featuregate.Feature = "UnauthenticatedHTTP2DOSMitigation"
+
+	// owner: @cici37 @jpbetz
+	// kep: http://kep.k8s.io/3488
+	// alpha: v1.26
+	// beta: v1.28 (false)
+	//
+	// Enables expression validation in Admission Control
+	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
+
 	// owner: @wojtek-t
 	// alpha: v1.15
 	// beta: v1.16
@@ -233,25 +252,11 @@ const (
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
 
-	// owner: @vinaykul
-	// kep: http://kep.k8s.io/1287
-	// alpha: v1.27
-	//
-	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
 	// owner: @p0lyn0mial
 	// alpha: v1.27
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
-
-	// owner: @serathius
-	// kep: http://kep.k8s.io/2340
-	// alpha: v1.28
-	//
-	// Allow the API server to serve consistent lists from cache
-	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
 
 	// owner: @tkashem
 	// beta: v1.29
@@ -271,9 +276,9 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 
-	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
-
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.Beta},
+
+	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
 
 	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
@@ -285,11 +290,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
-	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
+	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
 	KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
 
@@ -317,13 +324,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
 
+	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
+
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
-
 	WatchList: {Default: false, PreRelease: featuregate.Alpha},
-
-	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 
 	ZeroLimitedNominalConcurrencyShares: {Default: false, PreRelease: featuregate.Beta},
 }

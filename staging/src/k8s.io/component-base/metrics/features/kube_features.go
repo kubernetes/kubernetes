@@ -24,6 +24,7 @@ const (
 	// owner: @logicalhan
 	// kep: https://kep.k8s.io/3466
 	// alpha: v1.26
+	// beta: v1.27
 	ComponentSLIs featuregate.Feature = "ComponentSLIs"
 )
 
