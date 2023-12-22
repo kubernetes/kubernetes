@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	g "github.com/onsi/ginkgo/v2"
-	o "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -72,7 +71,9 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 			defer w.Stop()
 
 			evt, ok := <-w.ResultChan()
-			o.Expect(ok).To(o.BeTrue())
+			if !ok {
+				framework.Failf("unexpected closed channel for watching configmap in the namespace %q", ns)
+			}
 			switch evt.Type {
 			case watch.Added, watch.Modified:
 				// this is allowed

@@ -308,7 +308,9 @@ var _ = SIGDescribe("Discovery", func() {
 					break
 				}
 			}
-			gomega.Expect(foundResource).To(gomega.BeTrue(), "Resource %q was not found inside of resourceList\n%#v", t.validResource, resourceList.APIResources)
+			if !foundResource {
+				framework.Failf("Resource %q was not found inside of resourceList\n%#v", t.validResource, resourceList.APIResources)
+			}
 		}
 	})
 })
