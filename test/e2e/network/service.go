@@ -91,6 +91,10 @@ const (
 	// affinity is enabled.
 	AffinityConfirmCount = 15
 
+	// SessionAffinityTimeout is the number of seconds to wait between requests for
+	// session affinity to timeout before trying a load-balancer request again
+	SessionAffinityTimeout = 125
+
 	// label define which is used to find kube-proxy and kube-apiserver pod
 	kubeProxyLabelName     = "kube-proxy"
 	clusterAddonLabelKey   = "k8s-app"
@@ -3892,19 +3896,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 	ginkgo.By("creating service in namespace " + ns)
 	serviceType := svc.Spec.Type
 	// set an affinity timeout equal to the number of connection requests
-	svcSessionAffinityTimeout := int32(AffinityConfirmCount)
-	if proxyMode, err := proxyMode(ctx, f); err == nil {
-		if proxyMode == "ipvs" {
-			// session affinity timeout must be greater than 120 in ipvs mode,
-			// because IPVS module has a hardcoded TIME_WAIT timeout of 120s,
-			// and that value can't be sysctl'ed now.
-			// Ref: https://github.com/torvalds/linux/blob/master/net/netfilter/ipvs/ip_vs_proto_tcp.c
-			// TODO: remove this to speed up testing when IPVS does really respect session affinity timeout
-			svcSessionAffinityTimeout = int32(125)
-		}
-	} else {
-		framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-	}
+	svcSessionAffinityTimeout := int32(SessionAffinityTimeout)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 		ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -4170,22 +4162,6 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		return true, nil
 	})
 	framework.ExpectNoError(err)
-}
-
-// proxyMode returns a proxyMode of a kube-proxy.
-func proxyMode(ctx context.Context, f *framework.Framework) (string, error) {
-	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "kube-proxy-mode-detector", nil, nil, nil)
-	pod.Spec.HostNetwork = true
-	e2epod.NewPodClient(f).CreateSync(ctx, pod)
-	ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, pod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
-
-	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := e2eoutput.RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
-		return "", err
-	}
-	framework.Logf("proxyMode: %s", stdout)
-	return stdout, nil
 }
 
 // enableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
