@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -598,7 +599,8 @@ func waitForReplicas(ctx context.Context, deploymentName, namespace string, cs c
 	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
+			framework.Logf("Failed to get replication controller %s: %v", deployment, err)
+			return false, err
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
 		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
@@ -614,7 +616,12 @@ func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace
 	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
+			framework.Logf("Failed to get replication controller %s: %v", deployment, err)
+			// retry when receive a rate limiter error
+			if strings.Contains(err.Error(), "client rate limiter Wait returned an error") {
+				return false, nil
+			}
+			return false, err
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
 		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
