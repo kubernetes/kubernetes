@@ -2825,10 +2825,10 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 	}
 
 	resetMetrics := func() {
-		metrics.ActivePods().Set(0)
-		metrics.BackoffPods().Set(0)
-		metrics.UnschedulablePods().Set(0)
-		metrics.GatedPods().Set(0)
+		metrics.ActivePendingPods().Set(0)
+		metrics.BackoffPendingPods().Set(0)
+		metrics.UnschedulablePendingPods().Set(0)
+		metrics.GatedPendingPods().Set(0)
 		metrics.PluginExecutionDuration.Reset()
 	}
 

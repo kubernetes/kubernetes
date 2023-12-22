@@ -258,23 +258,23 @@ func GetGather() metrics.Gatherer {
 	return legacyregistry.DefaultGatherer
 }
 
-// ActivePods returns the pending pods metrics with the label active
-func ActivePods() metrics.GaugeMetric {
+// ActivePendingPods returns the pending pods metrics with the label active
+func ActivePendingPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "active"})
 }
 
-// BackoffPods returns the pending pods metrics with the label backoff
-func BackoffPods() metrics.GaugeMetric {
+// BackoffPendingPods returns the pending pods metrics with the label backoff
+func BackoffPendingPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "backoff"})
 }
 
-// UnschedulablePods returns the pending pods metrics with the label unschedulable
-func UnschedulablePods() metrics.GaugeMetric {
+// UnschedulablePendingPods returns the pending pods metrics with the label unschedulable
+func UnschedulablePendingPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "unschedulable"})
 }
 
-// GatedPods returns the pending pods metrics with the label gated
-func GatedPods() metrics.GaugeMetric {
+// GatedPendingPods returns the pending pods metrics with the label gated
+func GatedPendingPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "gated"})
 }
 

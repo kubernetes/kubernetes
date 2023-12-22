@@ -40,28 +40,28 @@ type PendingPodsRecorder struct {
 // NewActivePodsRecorder returns ActivePods in a Prometheus metric fashion
 func NewActivePodsRecorder() *PendingPodsRecorder {
 	return &PendingPodsRecorder{
-		recorder: ActivePods(),
+		recorder: ActivePendingPods(),
 	}
 }
 
 // NewUnschedulablePodsRecorder returns UnschedulablePods in a Prometheus metric fashion
 func NewUnschedulablePodsRecorder() *PendingPodsRecorder {
 	return &PendingPodsRecorder{
-		recorder: UnschedulablePods(),
+		recorder: UnschedulablePendingPods(),
 	}
 }
 
 // NewBackoffPodsRecorder returns BackoffPods in a Prometheus metric fashion
 func NewBackoffPodsRecorder() *PendingPodsRecorder {
 	return &PendingPodsRecorder{
-		recorder: BackoffPods(),
+		recorder: BackoffPendingPods(),
 	}
 }
 
 // NewGatedPodsRecorder returns GatedPods in a Prometheus metric fashion
 func NewGatedPodsRecorder() *PendingPodsRecorder {
 	return &PendingPodsRecorder{
-		recorder: GatedPods(),
+		recorder: GatedPendingPods(),
 	}
 }
 
