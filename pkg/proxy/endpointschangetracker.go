@@ -17,118 +17,22 @@ limitations under the License.
 package proxy
 
 import (
-	"net"
-	"strconv"
 	"sync"
 	"time"
-
-	"k8s.io/client-go/tools/events"
-	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 )
 
-var supportedEndpointSliceAddressTypes = sets.New[string](
-	string(discovery.AddressTypeIPv4),
-	string(discovery.AddressTypeIPv6),
+var supportedEndpointSliceAddressTypes = sets.New[discovery.AddressType](
+	discovery.AddressTypeIPv4,
+	discovery.AddressTypeIPv6,
 )
-
-// BaseEndpointInfo contains base information that defines an endpoint.
-// This could be used directly by proxier while processing endpoints,
-// or can be used for constructing a more specific EndpointInfo struct
-// defined by the proxier if needed.
-type BaseEndpointInfo struct {
-	// Cache this values to improve performance
-	ip   string
-	port int
-	// endpoint is the same as net.JoinHostPort(ip,port)
-	endpoint string
-
-	// isLocal indicates whether the endpoint is running on same host as kube-proxy.
-	isLocal bool
-
-	// ready indicates whether this endpoint is ready and NOT terminating, unless
-	// PublishNotReadyAddresses is set on the service, in which case it will just
-	// always be true.
-	ready bool
-	// serving indicates whether this endpoint is ready regardless of its terminating state.
-	// For pods this is true if it has a ready status regardless of its deletion timestamp.
-	serving bool
-	// terminating indicates whether this endpoint is terminating.
-	// For pods this is true if it has a non-nil deletion timestamp.
-	terminating bool
-
-	// zoneHints represent the zone hints for the endpoint. This is based on
-	// endpoint.hints.forZones[*].name in the EndpointSlice API.
-	zoneHints sets.Set[string]
-}
-
-var _ Endpoint = &BaseEndpointInfo{}
-
-// String is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) String() string {
-	return info.endpoint
-}
-
-// IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) IP() string {
-	return info.ip
-}
-
-// Port returns just the Port part of the endpoint.
-func (info *BaseEndpointInfo) Port() int {
-	return info.port
-}
-
-// IsLocal is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) IsLocal() bool {
-	return info.isLocal
-}
-
-// IsReady returns true if an endpoint is ready and not terminating.
-func (info *BaseEndpointInfo) IsReady() bool {
-	return info.ready
-}
-
-// IsServing returns true if an endpoint is ready, regardless of if the
-// endpoint is terminating.
-func (info *BaseEndpointInfo) IsServing() bool {
-	return info.serving
-}
-
-// IsTerminating retruns true if an endpoint is terminating. For pods,
-// that is any pod with a deletion timestamp.
-func (info *BaseEndpointInfo) IsTerminating() bool {
-	return info.terminating
-}
-
-// ZoneHints returns the zone hint for the endpoint.
-func (info *BaseEndpointInfo) ZoneHints() sets.Set[string] {
-	return info.zoneHints
-}
-
-func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
-	return &BaseEndpointInfo{
-		ip:          ip,
-		port:        port,
-		endpoint:    net.JoinHostPort(ip, strconv.Itoa(port)),
-		isLocal:     isLocal,
-		ready:       ready,
-		serving:     serving,
-		terminating: terminating,
-		zoneHints:   zoneHints,
-	}
-}
-
-type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName) Endpoint
-
-// This handler is invoked by the apply function on every change. This function should not modify the
-// EndpointsMap's but just use the changes for any Proxier specific cleanup.
-type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
 // EndpointsChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
@@ -136,18 +40,26 @@ type EndpointsChangeTracker struct {
 	// lock protects lastChangeTriggerTimes
 	lock sync.Mutex
 
+	// processEndpointsMapChange is invoked by the apply function on every change.
+	// This function should not modify the EndpointsMaps, but just use the changes for
+	// any Proxier-specific cleanup.
 	processEndpointsMapChange processEndpointsMapChangeFunc
+
 	// endpointSliceCache holds a simplified version of endpoint slices.
 	endpointSliceCache *EndpointSliceCache
-	// Map from the Endpoints namespaced-name to the times of the triggers that caused the endpoints
-	// object to change. Used to calculate the network-programming-latency.
+
+	// lastChangeTriggerTimes maps from the Service's NamespacedName to the times of
+	// the triggers that caused its EndpointSlice objects to change. Used to calculate
+	// the network-programming-latency metric.
 	lastChangeTriggerTimes map[types.NamespacedName][]time.Time
-	// record the time when the endpointsChangeTracker was created so we can ignore the endpoints
-	// that were generated before, because we can't estimate the network-programming-latency on those.
-	// This is specially problematic on restarts, because we process all the endpoints that may have been
-	// created hours or days before.
+	// trackerStartTime is the time when the EndpointsChangeTracker was created, so
+	// we can avoid generating network-programming-latency metrics for changes that
+	// occurred before that.
 	trackerStartTime time.Time
 }
+
+type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName) Endpoint
+type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
 // NewEndpointsChangeTracker initializes an EndpointsChangeTracker
 func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
@@ -159,11 +71,12 @@ func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFun
 	}
 }
 
-// EndpointSliceUpdate updates given service's endpoints change map based on the <previous, current> endpoints pair.
-// It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeTracker.
-// If removeSlice is true, slice will be removed, otherwise it will be added or updated.
+// EndpointSliceUpdate updates the EndpointsChangeTracker by adding/updating or removing
+// endpointSlice (depending on removeSlice). It returns true if this update contained a
+// change that needs to be synced; note that this is different from the return value of
+// ServiceChangeTracker.Update().
 func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
-	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
+	if !supportedEndpointSliceAddressTypes.Has(endpointSlice.AddressType) {
 		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "addressType", endpointSlice.AddressType)
 		return false
 	}
