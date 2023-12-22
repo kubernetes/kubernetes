@@ -644,6 +644,7 @@ func defaultDialOptions() dialOptions {
 			UseProxy:        true,
 		},
 		recvBufferPool: nopBufferPool{},
+		idleTimeout:    30 * time.Minute,
 	}
 }
 
@@ -680,8 +681,8 @@ func WithResolvers(rs ...resolver.Builder) DialOption {
 // channel will exit idle mode when the Connect() method is called or when an
 // RPC is initiated.
 //
-// By default this feature is disabled, which can also be explicitly configured
-// by passing zero to this function.
+// A default timeout of 30 minutes will be used if this dial option is not set
+// at dial time and idleness can be disabled by passing a timeout of zero.
 //
 // # Experimental
 //

@@ -25,14 +25,16 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
-type pidProvider func() int
-type executablePathProvider func() (string, error)
-type commandArgsProvider func() []string
-type ownerProvider func() (*user.User, error)
-type runtimeNameProvider func() string
-type runtimeVersionProvider func() string
-type runtimeOSProvider func() string
-type runtimeArchProvider func() string
+type (
+	pidProvider            func() int
+	executablePathProvider func() (string, error)
+	commandArgsProvider    func() []string
+	ownerProvider          func() (*user.User, error)
+	runtimeNameProvider    func() string
+	runtimeVersionProvider func() string
+	runtimeOSProvider      func() string
+	runtimeArchProvider    func() string
+)
 
 var (
 	defaultPidProvider            pidProvider            = os.Getpid
@@ -108,14 +110,16 @@ func setUserProviders(ownerProvider ownerProvider) {
 	owner = ownerProvider
 }
 
-type processPIDDetector struct{}
-type processExecutableNameDetector struct{}
-type processExecutablePathDetector struct{}
-type processCommandArgsDetector struct{}
-type processOwnerDetector struct{}
-type processRuntimeNameDetector struct{}
-type processRuntimeVersionDetector struct{}
-type processRuntimeDescriptionDetector struct{}
+type (
+	processPIDDetector                struct{}
+	processExecutableNameDetector     struct{}
+	processExecutablePathDetector     struct{}
+	processCommandArgsDetector        struct{}
+	processOwnerDetector              struct{}
+	processRuntimeNameDetector        struct{}
+	processRuntimeVersionDetector     struct{}
+	processRuntimeDescriptionDetector struct{}
+)
 
 // Detect returns a *Resource that describes the process identifier (PID) of the
 // executing process.

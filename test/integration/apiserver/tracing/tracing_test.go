@@ -1100,7 +1100,6 @@ func (t traceExpectation) updateForSpan(span *tracev1.Span) {
 		}
 		t[i].metTraceIDs = append(spanExpectation.metTraceIDs, hex.EncodeToString(span.TraceId[:]))
 	}
-
 }
 
 // spanExpectation is the expectation for a single span
