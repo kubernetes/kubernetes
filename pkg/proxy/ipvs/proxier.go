@@ -256,7 +256,7 @@ type Proxier struct {
 	iptables       utiliptables.Interface
 	ipvs           utilipvs.Interface
 	ipset          utilipset.Interface
-	exec           utilexec.Interface
+	conntrack      conntrack.Interface
 	masqueradeAll  bool
 	masqueradeMark string
 	localDetector  proxyutiliptables.LocalTrafficDetector
@@ -433,7 +433,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		iptables:              ipt,
 		masqueradeAll:         masqueradeAll,
 		masqueradeMark:        masqueradeMark,
-		exec:                  exec,
+		conntrack:             conntrack.NewExec(exec),
 		localDetector:         localDetector,
 		hostname:              hostname,
 		nodeIP:                nodeIP,
@@ -1482,7 +1482,7 @@ func (proxier *Proxier) syncProxyRules() {
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
 
 	// Finish housekeeping, clear stale conntrack entries for UDP Services
-	conntrack.CleanStaleEntries(proxier.ipFamily == v1.IPv6Protocol, proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
+	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed

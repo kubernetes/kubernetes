@@ -48,6 +48,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -57,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	fakeexec "k8s.io/utils/exec/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -113,7 +113,6 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
 
 	p := &Proxier{
-		exec:                     &fakeexec.FakeExec{},
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
@@ -121,6 +120,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		needFullSync:             true,
 		iptables:                 ipt,
 		masqueradeMark:           "0x4000",
+		conntrack:                conntrack.NewFake(),
 		localDetector:            detectLocal,
 		hostname:                 testHostname,
 		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
@@ -1915,21 +1915,22 @@ func TestClusterIPGeneral(t *testing.T) {
 					TargetPort: intstr.FromInt32(8443),
 				},
 				{
-					// Of course this should really be UDP, but if we
-					// create a service with UDP ports, the Proxier will
-					// try to do conntrack cleanup and we'd have to set
-					// the FakeExec up to be able to deal with that...
-					Name:     "dns-sctp",
+					Name:     "dns-udp",
 					Port:     53,
-					Protocol: v1.ProtocolSCTP,
+					Protocol: v1.ProtocolUDP,
 				},
 				{
 					Name:     "dns-tcp",
 					Port:     53,
 					Protocol: v1.ProtocolTCP,
-					// We use TargetPort on TCP but not SCTP to help
-					// disambiguate the output.
+					// We use TargetPort on TCP but not UDP/SCTP to
+					// help disambiguate the output.
 					TargetPort: intstr.FromInt32(5353),
+				},
+				{
+					Name:     "dns-sctp",
+					Port:     53,
+					Protocol: v1.ProtocolSCTP,
 				},
 			}
 		}),
@@ -1972,14 +1973,19 @@ func TestClusterIPGeneral(t *testing.T) {
 					Protocol: ptr.To(v1.ProtocolTCP),
 				},
 				{
-					Name:     ptr.To("dns-sctp"),
+					Name:     ptr.To("dns-udp"),
 					Port:     ptr.To[int32](53),
-					Protocol: ptr.To(v1.ProtocolSCTP),
+					Protocol: ptr.To(v1.ProtocolUDP),
 				},
 				{
 					Name:     ptr.To("dns-tcp"),
 					Port:     ptr.To[int32](5353),
 					Protocol: ptr.To(v1.ProtocolTCP),
+				},
+				{
+					Name:     ptr.To("dns-sctp"),
+					Port:     ptr.To[int32](53),
+					Protocol: ptr.To(v1.ProtocolSCTP),
 				},
 			}
 		}),
@@ -2021,7 +2027,7 @@ func TestClusterIPGeneral(t *testing.T) {
 			masq:     false,
 		},
 		{
-			name:     "clusterIP with TCP and SCTP on same port (TCP)",
+			name:     "clusterIP with TCP, UDP, and SCTP on same port (TCP)",
 			sourceIP: "10.180.0.2",
 			protocol: v1.ProtocolTCP,
 			destIP:   "172.30.0.42",
@@ -2030,7 +2036,16 @@ func TestClusterIPGeneral(t *testing.T) {
 			masq:     false,
 		},
 		{
-			name:     "clusterIP with TCP and SCTP on same port (SCTP)",
+			name:     "clusterIP with TCP, UDP, and SCTP on same port (UDP)",
+			sourceIP: "10.180.0.2",
+			protocol: v1.ProtocolUDP,
+			destIP:   "172.30.0.42",
+			destPort: 53,
+			output:   "10.180.0.1:53, 10.180.2.1:53",
+			masq:     false,
+		},
+		{
+			name:     "clusterIP with TCP, UDP, and SCTP on same port (SCTP)",
 			sourceIP: "10.180.0.2",
 			protocol: v1.ProtocolSCTP,
 			destIP:   "172.30.0.42",

@@ -56,6 +56,10 @@ type execCT struct {
 
 var _ Interface = &execCT{}
 
+func NewExec(execer exec.Interface) Interface {
+	return &execCT{execer: execer}
+}
+
 // noConnectionToDelete is the error string returned by conntrack when no matching connections are found
 const noConnectionToDelete = "0 flow entries have been deleted"
 

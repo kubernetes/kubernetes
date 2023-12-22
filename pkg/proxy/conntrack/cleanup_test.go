@@ -245,7 +245,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			fake := NewFake()
-			cleanStaleEntries(fake, false, svcPortMap, tc.serviceUpdates, tc.endpointsUpdates)
+			CleanStaleEntries(fake, svcPortMap, tc.serviceUpdates, tc.endpointsUpdates)
 			if !fake.ClearedIPs.Equal(tc.result.ClearedIPs) {
 				t.Errorf("Expected ClearedIPs=%v, got %v", tc.result.ClearedIPs, fake.ClearedIPs)
 			}

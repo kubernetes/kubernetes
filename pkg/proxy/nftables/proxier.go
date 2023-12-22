@@ -162,7 +162,7 @@ type Proxier struct {
 	nftables       knftables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
-	exec           utilexec.Interface
+	conntrack      conntrack.Interface
 	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
@@ -236,7 +236,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		nftables:            nft,
 		masqueradeAll:       masqueradeAll,
 		masqueradeMark:      masqueradeMark,
-		exec:                utilexec.New(),
+		conntrack:           conntrack.NewExec(utilexec.New()),
 		localDetector:       localDetector,
 		hostname:            hostname,
 		nodeIP:              nodeIP,
@@ -1548,7 +1548,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Finish housekeeping, clear stale conntrack entries for UDP Services
-	conntrack.CleanStaleEntries(proxier.ipFamily == v1.IPv6Protocol, proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
+	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
 func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcPortNameString string, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {

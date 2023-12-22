@@ -25,19 +25,13 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 )
 
 // CleanStaleEntries takes care of flushing stale conntrack entries for services and endpoints.
-func CleanStaleEntries(isIPv6 bool, exec utilexec.Interface, svcPortMap proxy.ServicePortMap,
+func CleanStaleEntries(ct Interface, svcPortMap proxy.ServicePortMap,
 	serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
-	ct := &execCT{exec}
-	cleanStaleEntries(ct, isIPv6, svcPortMap, serviceUpdateResult, endpointsUpdateResult)
-}
-
-func cleanStaleEntries(ct Interface, isIPv6 bool, svcPortMap proxy.ServicePortMap,
-	serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
-	deleteStaleServiceConntrackEntries(ct, isIPv6, svcPortMap, serviceUpdateResult, endpointsUpdateResult)
+	deleteStaleServiceConntrackEntries(ct, svcPortMap, serviceUpdateResult, endpointsUpdateResult)
 	deleteStaleEndpointConntrackEntries(ct, svcPortMap, endpointsUpdateResult)
 }
 
@@ -45,9 +39,10 @@ func cleanStaleEntries(ct Interface, isIPv6 bool, svcPortMap proxy.ServicePortMa
 // to UDP Service IPs. When a service has no endpoints and we drop traffic to it, conntrack
 // may create "black hole" entries for that IP+port. When the service gets endpoints we
 // need to delete those entries so further traffic doesn't get dropped.
-func deleteStaleServiceConntrackEntries(ct Interface, isIPv6 bool, svcPortMap proxy.ServicePortMap, serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
+func deleteStaleServiceConntrackEntries(ct Interface, svcPortMap proxy.ServicePortMap, serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
 	conntrackCleanupServiceIPs := serviceUpdateResult.DeletedUDPClusterIPs
 	conntrackCleanupServiceNodePorts := sets.New[int]()
+	isIPv6 := false
 
 	// merge newly active services gathered from endpointsUpdateResult
 	// a UDP service that changes from 0 to non-0 endpoints is newly active.
@@ -64,6 +59,7 @@ func deleteStaleServiceConntrackEntries(ct Interface, isIPv6 bool, svcPortMap pr
 			nodePort := svcInfo.NodePort()
 			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
 				conntrackCleanupServiceNodePorts.Insert(nodePort)
+				isIPv6 = netutils.IsIPv6(svcInfo.ClusterIP())
 			}
 		}
 	}
