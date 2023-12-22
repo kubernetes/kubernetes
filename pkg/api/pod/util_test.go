@@ -3472,3 +3472,236 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 		})
 	}
 }
+
+func TestDropPodLifecycleSleepAction(t *testing.T) {
+	makeSleepHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			Sleep: &api.SleepAction{Seconds: 1},
+		}
+	}
+
+	makeExecHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			Exec: &api.ExecAction{Command: []string{"foo"}},
+		}
+	}
+
+	makeHTTPGetHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			HTTPGet: &api.HTTPGetAction{Host: "foo"},
+		}
+	}
+
+	makeContainer := func(preStop, postStart *api.LifecycleHandler) api.Container {
+		container := api.Container{Name: "foo"}
+		if preStop != nil || postStart != nil {
+			container.Lifecycle = &api.Lifecycle{
+				PostStart: postStart,
+				PreStop:   preStop,
+			}
+		}
+		return container
+	}
+
+	makeEphemeralContainer := func(preStop, postStart *api.LifecycleHandler) api.EphemeralContainer {
+		container := api.EphemeralContainer{
+			EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "foo"},
+		}
+		if preStop != nil || postStart != nil {
+			container.Lifecycle = &api.Lifecycle{
+				PostStart: postStart,
+				PreStop:   preStop,
+			}
+		}
+		return container
+	}
+
+	makePod := func(containers []api.Container, initContainers []api.Container, ephemeralContainers []api.EphemeralContainer) *api.PodSpec {
+		return &api.PodSpec{
+			Containers:          containers,
+			InitContainers:      initContainers,
+			EphemeralContainers: ephemeralContainers,
+		}
+	}
+
+	testCases := []struct {
+		gateEnabled            bool
+		oldLifecycleHandler    *api.LifecycleHandler
+		newLifecycleHandler    *api.LifecycleHandler
+		expectLifecycleHandler *api.LifecycleHandler
+	}{
+		// nil -> nil
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    nil,
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    nil,
+			expectLifecycleHandler: nil,
+		},
+		// nil -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// nil -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		// exec -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// exec -> http
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeHTTPGetHandler(),
+			expectLifecycleHandler: makeHTTPGetHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeHTTPGetHandler(),
+			expectLifecycleHandler: makeHTTPGetHandler(),
+		},
+		// exec -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		// sleep -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// sleep -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)()
+
+			// preStop
+			// container
+			{
+				oldPod := makePod([]api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				newPod := makePod([]api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				expectPod := makePod([]api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// InitContainer
+			{
+				oldPod := makePod(nil, []api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil)
+				newPod := makePod(nil, []api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil)
+				expectPod := makePod(nil, []api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// EphemeralContainer
+			{
+				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.oldLifecycleHandler.DeepCopy(), nil)})
+				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.newLifecycleHandler.DeepCopy(), nil)})
+				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.expectLifecycleHandler.DeepCopy(), nil)})
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// postStart
+			// container
+			{
+				oldPod := makePod([]api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil, nil)
+				newPod := makePod([]api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil, nil)
+				expectPod := makePod([]api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// InitContainer
+			{
+				oldPod := makePod(nil, []api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil)
+				newPod := makePod(nil, []api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil)
+				expectPod := makePod(nil, []api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// EphemeralContainer
+			{
+				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.oldLifecycleHandler.DeepCopy())})
+				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.newLifecycleHandler.DeepCopy())})
+				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.expectLifecycleHandler.DeepCopy())})
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+		})
+	}
+}

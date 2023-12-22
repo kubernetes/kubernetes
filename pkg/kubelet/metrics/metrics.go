@@ -859,6 +859,15 @@ var (
 		},
 		[]string{"image_size_in_bytes"},
 	)
+
+	LifecycleHandlerSleepTerminated = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "sleep_action_terminated_early_total",
+			Help:           "The number of times lifecycle sleep handler got terminated before it finishes",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -942,6 +951,7 @@ func Register(collectors ...metrics.StableCollector) {
 		}
 
 		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
+		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 	})
 }
 

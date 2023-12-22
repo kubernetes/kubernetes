@@ -594,39 +594,56 @@ func dropDisabledFields(
 		// For other types of containers, validateContainers will handle them.
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) && !podLifecycleSleepActionInUse(oldPodSpec) {
-		for i := range podSpec.Containers {
-			if podSpec.Containers[i].Lifecycle == nil {
-				continue
-			}
-			if podSpec.Containers[i].Lifecycle.PreStop != nil {
-				podSpec.Containers[i].Lifecycle.PreStop.Sleep = nil
-			}
-			if podSpec.Containers[i].Lifecycle.PostStart != nil {
-				podSpec.Containers[i].Lifecycle.PostStart.Sleep = nil
-			}
-		}
-		for i := range podSpec.InitContainers {
-			if podSpec.InitContainers[i].Lifecycle == nil {
-				continue
-			}
-			if podSpec.InitContainers[i].Lifecycle.PreStop != nil {
-				podSpec.InitContainers[i].Lifecycle.PreStop.Sleep = nil
-			}
-			if podSpec.InitContainers[i].Lifecycle.PostStart != nil {
-				podSpec.InitContainers[i].Lifecycle.PostStart.Sleep = nil
+	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
+}
+
+func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) || podLifecycleSleepActionInUse(oldPodSpec) {
+		return
+	}
+
+	adjustLifecycle := func(lifecycle *api.Lifecycle) {
+		if lifecycle.PreStop != nil && lifecycle.PreStop.Sleep != nil {
+			lifecycle.PreStop.Sleep = nil
+			if lifecycle.PreStop.Exec == nil && lifecycle.PreStop.HTTPGet == nil && lifecycle.PreStop.TCPSocket == nil {
+				lifecycle.PreStop = nil
 			}
 		}
-		for i := range podSpec.EphemeralContainers {
-			if podSpec.EphemeralContainers[i].Lifecycle == nil {
-				continue
+		if lifecycle.PostStart != nil && lifecycle.PostStart.Sleep != nil {
+			lifecycle.PostStart.Sleep = nil
+			if lifecycle.PostStart.Exec == nil && lifecycle.PostStart.HTTPGet == nil && lifecycle.PostStart.TCPSocket == nil {
+				lifecycle.PostStart = nil
 			}
-			if podSpec.EphemeralContainers[i].Lifecycle.PreStop != nil {
-				podSpec.EphemeralContainers[i].Lifecycle.PreStop.Sleep = nil
-			}
-			if podSpec.EphemeralContainers[i].Lifecycle.PostStart != nil {
-				podSpec.EphemeralContainers[i].Lifecycle.PostStart.Sleep = nil
-			}
+		}
+	}
+
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.Containers[i].Lifecycle)
+		if podSpec.Containers[i].Lifecycle.PreStop == nil && podSpec.Containers[i].Lifecycle.PostStart == nil {
+			podSpec.Containers[i].Lifecycle = nil
+		}
+	}
+
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.InitContainers[i].Lifecycle)
+		if podSpec.InitContainers[i].Lifecycle.PreStop == nil && podSpec.InitContainers[i].Lifecycle.PostStart == nil {
+			podSpec.InitContainers[i].Lifecycle = nil
+		}
+	}
+
+	for i := range podSpec.EphemeralContainers {
+		if podSpec.EphemeralContainers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.EphemeralContainers[i].Lifecycle)
+		if podSpec.EphemeralContainers[i].Lifecycle.PreStop == nil && podSpec.EphemeralContainers[i].Lifecycle.PostStart == nil {
+			podSpec.EphemeralContainers[i].Lifecycle = nil
 		}
 	}
 }
