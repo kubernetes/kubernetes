@@ -598,5 +598,6 @@ func ValidateVolumeAttributesClassUpdate(volumeAttributesClass, oldVolumeAttribu
 	if !reflect.DeepEqual(oldVolumeAttributesClass.Parameters, volumeAttributesClass.Parameters) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
 	}
+	allErrs = append(allErrs, ValidateVolumeAttributesClass(volumeAttributesClass)...)
 	return allErrs
 }
