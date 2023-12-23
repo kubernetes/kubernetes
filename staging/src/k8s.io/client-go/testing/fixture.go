@@ -19,14 +19,13 @@ package testing
 import (
 	"fmt"
 	"reflect"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
-	"sigs.k8s.io/yaml"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
-
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
@@ -40,6 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/utils/clock"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	"sigs.k8s.io/yaml"
 )
 
 // ObjectTracker keeps track of objects. It is intended to be used to
@@ -187,18 +189,11 @@ func (o objectTrackerReact) Create(action CreateActionImpl) (runtime.Object, err
 func (o objectTrackerReact) Update(action UpdateActionImpl) (runtime.Object, error) {
 	ns := action.GetNamespace()
 	gvr := action.GetResource()
-	objMeta, err := meta.Accessor(action.GetObject())
+	err := o.tracker.Update(gvr, action.GetObject(), ns, action.UpdateOptions)
 	if err != nil {
 		return nil, err
 	}
-
-	err = o.tracker.Update(gvr, action.GetObject(), ns, action.UpdateOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	obj, err := o.tracker.Get(gvr, ns, objMeta.GetName(), metav1.GetOptions{})
-	return obj, err
+	return action.GetObject(), err
 }
 
 func (o objectTrackerReact) Delete(action DeleteActionImpl) (runtime.Object, error) {
@@ -287,6 +282,7 @@ type tracker struct {
 	scheme  ObjectScheme
 	decoder runtime.Decoder
 	lock    sync.RWMutex
+	clk     clock.PassiveClock
 	objects map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object
 	// The value type of watchers is a map of which the key is either a namespace or
 	// all/non namespace aka "" and its value is list of fake watchers.
@@ -304,6 +300,7 @@ func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracke
 	return &tracker{
 		scheme:   scheme,
 		decoder:  decoder,
+		clk:      clock.RealClock{},
 		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
 		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 	}
@@ -559,12 +556,11 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	namespacedName := types.NamespacedName{Namespace: newMeta.GetNamespace(), Name: newMeta.GetName()}
 	if _, ok = t.objects[gvr][namespacedName]; ok {
 		if replaceExisting {
-			for _, w := range t.getWatches(gvr, ns) {
-				// To avoid the object from being accidentally modified by watcher
-				w.Modify(obj.DeepCopyObject())
+			if shouldDeleteDuringUpdate(obj) {
+				return t.doDeleteLocked(gvr, namespacedName)
+			} else {
+				return t.doUpdateLocked(gvr, obj)
 			}
-			t.objects[gvr][namespacedName] = obj
-			return nil
 		}
 		return apierrors.NewAlreadyExists(gr, newMeta.GetName())
 	}
@@ -581,6 +577,37 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		w.Add(obj.DeepCopyObject())
 	}
 
+	return nil
+}
+
+func shouldDeleteDuringUpdate(newObj runtime.Object) bool {
+	newMeta, err := meta.Accessor(newObj)
+	if err != nil {
+		panic(err)
+	}
+	if len(newMeta.GetFinalizers()) > 0 {
+		// don't delete with finalizers remaining in the new object
+		return false
+	}
+	if ns, ok := newObj.(*v1.Namespace); ok && len(ns.Spec.Finalizers) > 0 {
+		// don't delete namespaces with finalizers remaining in the new object
+		return false
+	}
+	return newMeta.GetDeletionTimestamp() != nil
+}
+
+func (t *tracker) doUpdateLocked(gvr schema.GroupVersionResource, obj runtime.Object) error {
+	newMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	namespacedName := types.NamespacedName{Namespace: newMeta.GetNamespace(), Name: newMeta.GetName()}
+
+	for _, w := range t.getWatches(gvr, newMeta.GetNamespace()) {
+		// To avoid the object from being accidentally modified by watcher
+		w.Modify(obj.DeepCopyObject())
+	}
+	t.objects[gvr][namespacedName] = obj
 	return nil
 }
 
@@ -620,12 +647,30 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string, opts 
 		return apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
-	delete(objs, namespacedName)
-	for _, w := range t.getWatches(gvr, ns) {
+	if objMeta, err := meta.Accessor(obj); err == nil {
+		if len(objMeta.GetFinalizers()) != 0 {
+			dt := metav1.Time{Time: t.clk.Now()}.Rfc3339Copy()
+			objMeta.SetDeletionTimestamp(&dt)
+			return t.doUpdateLocked(gvr, obj)
+		}
+	}
+
+	return t.doDeleteLocked(gvr, namespacedName)
+}
+
+func (t *tracker) doDeleteLocked(gvr schema.GroupVersionResource, name types.NamespacedName) error {
+	objs := t.objects[gvr]
+	obj := objs[name]
+	delete(objs, name)
+	for _, w := range t.getWatches(gvr, name.Namespace) {
 		w.Delete(obj.DeepCopyObject())
 	}
 	return nil
 }
+
+// AncientTime is a non-zero time far back in the past.
+// Can be used to set the deletion timestamp.
+var AncientTime = metav1.Date(1600, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type managedFieldObjectTracker struct {
 	ObjectTracker

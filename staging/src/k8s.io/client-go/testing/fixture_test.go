@@ -19,12 +19,12 @@ package testing
 import (
 	"fmt"
 	"math/rand"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
 func getArbitraryResource(s schema.GroupVersionResource, name, namespace string) *unstructured.Unstructured {
@@ -640,3 +641,35 @@ var configMapTypedSchema = typed.YAMLObject(`types:
       namedType: __untyped_deduced_
     elementRelationship: separable
 `)
+
+func TestDeleteWithFinalizer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "PersistentVolumeClaim"}
+	pvc := getArbitraryResource(gvr, "pvc", "test-ns")
+	require.NoError(t, o.Add(pvc))
+
+	// Add finalizer
+	pvc.SetFinalizers([]string{"test-finalizer"})
+	require.NoError(t, o.Create(gvr, pvc, "test-ns"))
+
+	// Delete with finalizer
+	require.NoError(t, o.Delete(gvr, "test-ns", "pvc"))
+
+	// Verify PVC is still present
+	obj, err := o.Get(gvr, "test-ns", "pvc")
+	pvc = obj.(*unstructured.Unstructured)
+	require.NoError(t, err)
+	require.NotNil(t, pvc.GetDeletionTimestamp())
+
+	// Clear finalizer
+	pvc.SetFinalizers([]string{})
+	err = o.Update(gvr, pvc, "test-ns")
+	require.NoError(t, err)
+
+	// Verify PVC is deleted
+	_, err = o.Get(gvr, "test-ns", "pvc")
+	require.True(t, errors.IsNotFound(err))
+}
