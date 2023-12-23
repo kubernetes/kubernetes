@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
@@ -70,9 +71,8 @@ func TestController(t *testing.T) {
 		maxNodes[i] = fmt.Sprintf("node-%d", i)
 	}
 	withDeletionTimestamp := func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
-		var deleted metav1.Time
 		claim = claim.DeepCopy()
-		claim.DeletionTimestamp = &deleted
+		claim.DeletionTimestamp = &clienttesting.AncientTime
 		return claim
 	}
 	withReservedFor := func(claim *resourcev1alpha2.ResourceClaim, pod *corev1.Pod) *resourcev1alpha2.ResourceClaim {
@@ -157,7 +157,7 @@ func TestController(t *testing.T) {
 			classes:       classes,
 			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(claim),
+			expectedClaim: nil,
 		},
 		// deletion time stamp set, our finalizer set, not allocated, stopping fails  -> requeue
 		"immediate-deleted-finalizer-stop-failure": {
@@ -181,7 +181,7 @@ func TestController(t *testing.T) {
 			classes:       classes,
 			claim:         withAllocate(withDeletionTimestamp(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(claim),
+			expectedClaim: nil,
 		},
 		// deletion time stamp set, finalizer set, allocated, deallocation fails  -> requeue
 		"immediate-deleted-deallocate-failure": {
@@ -265,7 +265,7 @@ func TestController(t *testing.T) {
 			classes:       classes,
 			claim:         withFinalizer(withDeletionTimestamp(delayedClaim), ourFinalizer),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(delayedClaim),
+			expectedClaim: nil,
 		},
 		// deletion time stamp set, our finalizer set, not allocated, stopping fails  -> requeue
 		"delayed-deleted-finalizer-stop-failure": {
@@ -289,7 +289,7 @@ func TestController(t *testing.T) {
 			classes:       classes,
 			claim:         withAllocate(withDeletionTimestamp(delayedClaim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(delayedClaim),
+			expectedClaim: nil,
 		},
 		// deletion time stamp set, finalizer set, allocated, deallocation fails  -> requeue
 		"delayed-deleted-deallocate-failure": {

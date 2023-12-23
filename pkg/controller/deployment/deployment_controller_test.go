@@ -295,6 +295,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 	now := metav1.Now()
 	d.DeletionTimestamp = &now
+	d.Finalizers = []string{"kubernetes.io/testing"}
 	f.dLister = append(f.dLister, d)
 	f.objects = append(f.objects, d)
 
