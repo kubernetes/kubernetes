@@ -55,6 +55,9 @@ func Now() Time {
 	return Time{time.Now()}
 }
 
+// Ancient is a non-zero time far back in the past.
+var AncientTime = Date(1600, 1, 1, 0, 0, 0, 0, time.UTC)
+
 // IsZero returns true if the value is nil or time is zero.
 func (t *Time) IsZero() bool {
 	if t == nil {
