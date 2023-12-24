@@ -212,6 +212,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				&generator.DefaultPackage{
 					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
 					PackagePath: path,
+					Source:      pkg.SourcePath, // output pkg is the same as the input
 					HeaderText:  header,
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
@@ -540,7 +541,7 @@ func (g *genDeepCopy) deepCopyableInterfacesInner(c *generator.Context, t *types
 	var ts []*types.Type
 	for _, intf := range intfs {
 		t := types.ParseFullyQualifiedName(intf)
-		err := c.AddDir(t.Package)
+		_, err := c.LoadPackages(t.Package)
 		if err != nil {
 			return nil, err
 		}
