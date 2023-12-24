@@ -567,7 +567,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 }
 
 // Creates a volume with accessMode ReadWriteOnce
-// First create a pod which will try to attach the volume to the a node named "uncertain-node". The attach call for this node will
+// First create a pod which will try to attach the volume to a node named "uncertain-node". The attach call for this node will
 // fail for timeout, but the volume will be actually attached to the node after the call.
 // Secondly, delete this pod.
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
@@ -773,7 +773,7 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 }
 
 // Creates a volume with accessMode ReadWriteOnce
-// First create a pod which will try to attach the volume to the a node named "timeout-node". The attach call for this node will
+// First create a pod which will try to attach the volume to a node named "timeout-node". The attach call for this node will
 // fail for timeout, but the volume will be actually attached to the node after the call.
 // Secondly, delete the this pod.
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.

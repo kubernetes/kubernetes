@@ -272,7 +272,7 @@ func addGVKToEtcdBucket(cohabitatingResources map[string]map[schema.GroupVersion
 
 // getEtcdBucket assumes the last segment of the given etcd path is the name of the object.
 // Thus it strips that segment to extract the object's storage "bucket" in etcd. We expect
-// all objects that share the a bucket (cohabitating resources) to be stored as the same GVK.
+// all objects that share a bucket (cohabitating resources) to be stored as the same GVK.
 func getEtcdBucket(path string) string {
 	idx := strings.LastIndex(path, "/")
 	if idx == -1 {

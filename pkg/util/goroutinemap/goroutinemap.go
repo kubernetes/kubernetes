@@ -32,7 +32,7 @@ import (
 
 // GoRoutineMap defines a type that can run named goroutines and track their
 // state.  It prevents the creation of multiple goroutines with the same name
-// and may prevent recreation of a goroutine until after the a backoff time
+// and may prevent recreation of a goroutine until after a backoff time
 // has elapsed after the last goroutine with that name finished.
 type GoRoutineMap interface {
 	// Run adds operation name to the list of running operations and spawns a

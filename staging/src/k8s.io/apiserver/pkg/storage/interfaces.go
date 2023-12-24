@@ -237,7 +237,7 @@ type Interface interface {
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
 
-	// RequestWatchProgress requests the a watch stream progress status be sent in the
+	// RequestWatchProgress requests a watch stream progress status be sent in the
 	// watch response stream as soon as possible.
 	// Used for monitor watch progress even if watching resources with no changes.
 	//

@@ -525,7 +525,7 @@ func (cont *IngressController) verifyBackendMode(svcPorts map[string]v1.ServiceP
 	for svcName, sp := range svcPorts {
 		match := false
 		bsMatch := &compute.BackendService{}
-		// NEG BackendServices' names contain the a sha256 hash of a string.
+		// NEG BackendServices' names contain a sha256 hash of a string.
 		// This logic is copied from the ingress-gce namer.
 		// WARNING: This needs to adapt if the naming convention changed.
 		negString := strings.Join([]string{uid, cont.Ns, svcName, fmt.Sprintf("%v", sp.Port)}, ";")
@@ -539,7 +539,7 @@ func (cont *IngressController) verifyBackendMode(svcPorts map[string]v1.ServiceP
 				break
 			}
 
-			// NEG BackendServices' names contain the a sha256 hash of a string.
+			// NEG BackendServices' names contain a sha256 hash of a string.
 			if backendType == negBackend && strings.Contains(bs.Name, negHash) {
 				match = true
 				bsMatch = bs
