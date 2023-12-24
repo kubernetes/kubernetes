@@ -40,7 +40,7 @@ import (
 
 var (
 	// The default dns opt strings.
-	defaultDNSOptions = []string{"ndots:5"}
+	defaultDNSOptions = []string{"ndots:5", "single-request"}
 )
 
 type podDNSType int
