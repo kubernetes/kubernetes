@@ -41,7 +41,8 @@ func (n localNamer) Name(t *types.Type) string {
 }
 
 type protobufNamer struct {
-	packages       []*protobufPackage
+	packages []*protobufPackage
+	// The key here is a Go import-path.
 	packagesByPath map[string]*protobufPackage
 }
 
@@ -56,14 +57,6 @@ func (n *protobufNamer) Name(t *types.Type) string {
 		return fmt.Sprintf("map<%s, %s>", n.Name(t.Key), n.Name(t.Elem))
 	}
 	return t.Name.String()
-}
-
-func (n *protobufNamer) List() []generator.Package {
-	packages := make([]generator.Package, 0, len(n.packages))
-	for i := range n.packages {
-		packages = append(packages, n.packages[i])
-	}
-	return packages
 }
 
 func (n *protobufNamer) Add(p *protobufPackage) {
