@@ -359,6 +359,9 @@ type Type struct {
 
 // String returns the name of the type.
 func (t *Type) String() string {
+	if t == nil {
+		return "" // makes tests easier
+	}
 	return t.Name.String()
 }
 

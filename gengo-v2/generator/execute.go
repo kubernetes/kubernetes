@@ -39,15 +39,11 @@ func errs2strings(errors []error) []string {
 	return strs
 }
 
-// ExecutePackages runs the generators for every package in 'packages'. 'outDir'
-// is the base directory in which to place all the generated packages; it
-// should be a physical path on disk, not an import path. e.g.:
-// /path/to/home/path/to/gopath/src/
-// Each package has its import path already, this will be appended to 'outDir'.
-func (c *Context) ExecutePackages(outDir string, packages Packages) error {
+// ExecutePackages runs the generators for the provided packages.
+func (c *Context) ExecutePackages(packages Packages) error {
 	var errors []error
 	for _, p := range packages {
-		if err := c.ExecutePackage(outDir, p); err != nil {
+		if err := c.ExecutePackage(p); err != nil {
 			errors = append(errors, err)
 		}
 	}
@@ -207,26 +203,11 @@ func (c *Context) addNameSystems(namers namer.NameSystems) *Context {
 	return &c2
 }
 
-// ExecutePackage executes a single package. 'outDir' is the base directory in
-// which to place the package; it should be a physical path on disk, not an
-// import path. e.g.: '/path/to/home/path/to/gopath/src/' The package knows its
-// import path already, this will be appended to 'outDir'.
-func (c *Context) ExecutePackage(outDir string, p Package) error {
-	path := filepath.Join(outDir, p.Path())
-
-	// When working outside of GOPATH, we typically won't want to generate the
-	// full path for a package. For example, if our current project's root/base
-	// package is github.com/foo/bar, outDir=., p.Path()=github.com/foo/bar/generated,
-	// then we really want to be writing files to ./generated, not ./github.com/foo/bar/generated.
-	// The following will trim a path prefix (github.com/foo/bar) from p.Path() to arrive at
-	// a relative path that works with projects not in GOPATH.
-	if c.TrimPathPrefix != "" {
-		separator := string(filepath.Separator)
-		if !strings.HasSuffix(c.TrimPathPrefix, separator) {
-			c.TrimPathPrefix += separator
-		}
-
-		path = strings.TrimPrefix(path, c.TrimPathPrefix)
+// ExecutePackages runs the generators for a single package.
+func (c *Context) ExecutePackage(p Package) error {
+	path := p.SourcePath()
+	if path == "" {
+		return fmt.Errorf("no source-path for package %s", p.Path())
 	}
 	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), path)
 	// Filter out any types the *package* doesn't care about.

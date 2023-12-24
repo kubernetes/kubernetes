@@ -1,0 +1,3 @@
+package doesnotparse
+
+THIS_PKG_DOES_NOT_PARSE

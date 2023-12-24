@@ -191,7 +191,7 @@ type Context struct {
 // NewContext generates a context from the given builder, naming systems, and
 // the naming system you wish to construct the canonical ordering from.
 func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrderName string) (*Context, error) {
-	universe, err := b.FindTypes()
+	universe, err := b.NewUniverse()
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 	c := &Context{
 		Namers:   namer.NameSystems{},
 		Universe: universe,
-		Inputs:   b.FindPackages(),
+		Inputs:   b.UserRequestedPackages(),
 		FileTypes: map[string]FileType{
 			GolangFileType: NewGolangFile(),
 		},
@@ -239,6 +239,19 @@ func (ctxt *Context) TransitiveIncomingImports() map[string][]string {
 	return ctxt.incomingTransitiveImports
 }
 
+// LoadPackages adds Go packages to the context.
+func (ctxt *Context) LoadPackages(patterns ...string) ([]*types.Package, error) {
+	ctxt.incomingImports = nil
+	ctxt.incomingTransitiveImports = nil
+	return ctxt.builder.LoadPackagesTo(&ctxt.Universe, patterns...)
+}
+
+// FindPackages expands Go package patterns into a list of package import
+// paths, akin to `go list -find`.
+func (ctxt *Context) FindPackages(patterns ...string) ([]string, error) {
+	return ctxt.builder.FindPackages(patterns...)
+}
+
 // AddDir adds a Go package to the context. The specified path must be a single
 // go package import path.  GOPATH, GOROOT, and the location of your go binary
 // (`which go`) will all be searched, in the normal Go fashion.
@@ -246,7 +259,8 @@ func (ctxt *Context) TransitiveIncomingImports() map[string][]string {
 func (ctxt *Context) AddDir(path string) error {
 	ctxt.incomingImports = nil
 	ctxt.incomingTransitiveImports = nil
-	return ctxt.builder.AddDirTo(path, &ctxt.Universe)
+	_, err := ctxt.builder.LoadPackagesTo(&ctxt.Universe, path)
+	return err
 }
 
 // AddDirectory adds a Go package to the context. The specified path must be a
@@ -255,5 +269,9 @@ func (ctxt *Context) AddDir(path string) error {
 func (ctxt *Context) AddDirectory(path string) (*types.Package, error) {
 	ctxt.incomingImports = nil
 	ctxt.incomingTransitiveImports = nil
-	return ctxt.builder.AddDirectoryTo(path, &ctxt.Universe)
+	pkgs, err := ctxt.builder.LoadPackagesTo(&ctxt.Universe, path)
+	if err != nil {
+		return nil, err
+	}
+	return pkgs[0], nil
 }

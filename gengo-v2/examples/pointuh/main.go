@@ -81,11 +81,11 @@ func (ta *toolArgs) AddFlags(fs *pflag.FlagSet) {
 
 // validateArgs checks the given arguments.
 func validateArgs(stdArgs *args.GeneratorArgs) error {
-	if len(stdArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package must be specified")
+	if len(stdArgs.OutputBase) == 0 {
+		return fmt.Errorf("--output-base must be specified")
 	}
 	if len(stdArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name must be specified")
+		return fmt.Errorf("--output-file-base must be specified")
 	}
 
 	_ = stdArgs.CustomArgs.(*toolArgs)
@@ -123,8 +123,9 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 
 		pkgs = append(pkgs, &generator.DefaultPackage{
 			PackageName: pkg.Name,
-			PackagePath: filepath.Join(arguments.OutputPackagePath, pkg.Name),
-			HeaderText:  header,
+			//PackagePath: filepath.Join(arguments.OutputPackagePath, pkg.Name), //FIXME: why do we need this?
+			Source:     filepath.Join(arguments.OutputBase, filepath.Base(pkg.Path)),
+			HeaderText: header,
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked
 			// subsequently.  This will be called for every type in every
