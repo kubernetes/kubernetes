@@ -1,0 +1,27 @@
+dist: xenial
+language: go
+
+go:
+ - "1.13.x"
+
+# Xenial comes with v2.0.0 SoftHSM2, which seems to have issues with ECDSA
+# code points
+addons:
+ apt:
+  sources:
+   - sourceline: 'ppa:pkg-opendnssec/ppa'
+  packages:
+   - softhsm2
+
+env:
+ - GO111MODULE=on
+
+
+script:
+ - echo directories.tokendir = `pwd`/tokens > softhsm2.conf
+ - echo objecstore.backend = file >> softhsm2.conf
+ - cat softhsm2.conf
+ - mkdir tokens
+ - export SOFTHSM2_CONF=`pwd`/softhsm2.conf
+ - softhsm2-util --init-token --slot 0 --label token1 --so-pin sopassword --pin password
+ - go test -mod readonly -v -bench .
