@@ -50,8 +50,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	packages := generator.Packages{}
-	for _, inputDir := range arguments.InputDirs {
-		pkg := context.Universe.Package(inputDir)
+	for _, input := range context.Inputs {
+		pkg := context.Universe.Package(input)
 		internal, err := isInternal(pkg)
 		if err != nil {
 			klog.V(5).Infof("skipping the generation of %s file, due to err %v", arguments.OutputFileBaseName, err)
@@ -62,7 +62,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			continue
 		}
 		registerFileName := "register.go"
-		searchPath := path.Join(args.DefaultSourceTree(), inputDir, registerFileName)
+		searchPath := path.Join(pkg.SourcePath, registerFileName)
 		if _, err := os.Stat(path.Join(searchPath)); err == nil {
 			klog.V(5).Infof("skipping the generation of %s file because %s already exists in the path %s", arguments.OutputFileBaseName, registerFileName, searchPath)
 			continue
@@ -102,7 +102,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		packages = append(packages,
 			&generator.DefaultPackage{
 				PackageName: pkg.Name,
-				PackagePath: pkg.Path,
+				PackagePath: pkg.Path,       // output to same pkg as input
+				Source:      pkg.SourcePath, // output to same pkg as input
 				HeaderText:  boilerplate,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
