@@ -64,6 +64,7 @@ func main() {
 
 // toolArgs is used by the gengo framework to pass args specific to this generator.
 type toolArgs struct {
+	OutputPackage string // must be a Go import-path
 }
 
 // getArgs returns default arguments for the generator.
@@ -77,18 +78,24 @@ func getArgs() (*args.GeneratorArgs, *toolArgs) {
 
 // AddFlags add the generator flags to the flag set.
 func (ta *toolArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&ta.OutputPackage, "output-package", "",
+		"the base Go import-path under which to generate results")
 }
 
 // validateArgs checks the given arguments.
 func validateArgs(stdArgs *args.GeneratorArgs) error {
-	if len(stdArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package must be specified")
+	if len(stdArgs.OutputBase) == 0 {
+		return fmt.Errorf("--output-base must be specified")
 	}
 	if len(stdArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name must be specified")
+		return fmt.Errorf("--output-file-base must be specified")
 	}
 
-	_ = stdArgs.CustomArgs.(*toolArgs)
+	toolArgs := stdArgs.CustomArgs.(*toolArgs)
+
+	if len(toolArgs.OutputPackage) == 0 {
+		return fmt.Errorf("--output-package must be specified")
+	}
 
 	return nil
 }
@@ -111,6 +118,7 @@ func getDefaultNameSystem() string {
 // executed further.
 func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	header := []byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag))
+	toolArgs := arguments.CustomArgs.(*toolArgs)
 
 	var pkgs generator.Packages
 	for _, input := range c.Inputs {
@@ -123,7 +131,8 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 
 		pkgs = append(pkgs, &generator.DefaultPackage{
 			PackageName: pkg.Name,
-			PackagePath: filepath.Join(arguments.OutputPackagePath, pkg.Name),
+			PackagePath: filepath.Join(toolArgs.OutputPackage, pkg.Name),
+			Source:      filepath.Join(arguments.OutputBase, filepath.Base(pkg.Path)),
 			HeaderText:  header,
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked

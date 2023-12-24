@@ -17,21 +17,17 @@ limitations under the License.
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/constant"
-	"go/parser"
 	"go/token"
 	tc "go/types"
-	"os"
-	"os/exec"
-	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
+	"golang.org/x/tools/go/packages"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
@@ -42,43 +38,32 @@ type importPathString string
 // Builder lets you add all the go files in all the packages that you care
 // about, then constructs the type source data.
 type Builder struct {
-	context *build.Context
-
 	// If true, include *_test.go
 	IncludeTestFiles bool
 
-	// Map of package names to more canonical information about the package.
-	// This might hold the same value for multiple names, e.g. if someone
-	// referenced ./pkg/name or in the case of vendoring, which canonicalizes
-	// differently that what humans would type.
-	//
-	// This must only be accessed via getLoadedBuildPackage and setLoadedBuildPackage
-	buildPackages map[importPathString]*build.Package
+	// Map of package paths to definitions.  These keys should be canonical
+	// Go import paths (example.com/foo/bar) and not local paths (./foo/bar).
+	goPkgs map[importPathString]*packages.Package
 
-	fset *token.FileSet
-	// map of package path to list of parsed files
-	parsed map[importPathString][]parsedFile
-	// map of package path to absolute path (to prevent overlap)
-	absPaths map[importPathString]string
-
-	// Set by typeCheckPackage(), used by importPackage() and friends.
-	typeCheckedPackages map[importPathString]*tc.Package
-
-	// Map of package path to whether the user requested it or it was from
-	// an import.
+	// Keep track of which packages were directly requested (as opposed to
+	// those which are transitively loaded).
 	userRequested map[importPathString]bool
 
-	// All comments from everywhere in every parsed file.
+	// Keep track of which packages have already been scanned for types.
+	fullyProcessed map[importPathString]bool
+
+	// Build tags to set when loading packages.
+	buildTags []string
+
+	// Tracks accumulated parsed files, so we can do position lookups later.
+	fset *token.FileSet
+
+	// All comments from everywhere in every parsed file.  This map is keyed by
+	// the file-line on which the comment block ends, which makes it easy to
+	// look up comments which immediately precede a given obect (e.g. a type or
+	// function definition), which is what we almost always want.  We need this
+	// because Go's own ast package does a very poor job of handling comments.
 	endLineToCommentGroup map[fileLine]*ast.CommentGroup
-
-	// map of package to list of packages it imports.
-	importGraph map[importPathString]map[string]struct{}
-}
-
-// parsedFile is for tracking files with name
-type parsedFile struct {
-	name string
-	file *ast.File
 }
 
 // key type for finding comments.
@@ -89,445 +74,266 @@ type fileLine struct {
 
 // New constructs a new builder.
 func New() *Builder {
-	c := build.Default
-	if c.GOROOT == "" {
-		if p, err := exec.Command("which", "go").CombinedOutput(); err == nil {
-			// The returned string will have some/path/bin/go, so remove the last two elements.
-			c.GOROOT = filepath.Dir(filepath.Dir(strings.Trim(string(p), "\n")))
-		} else {
-			klog.Warningf("Warning: $GOROOT not set, and unable to run `which go` to find it: %v\n", err)
-		}
-	}
-	// Force this to off, since we don't properly parse CGo.  All symbols must
-	// have non-CGo equivalents.
-	c.CgoEnabled = false
 	return &Builder{
-		context:               &c,
-		buildPackages:         map[importPathString]*build.Package{},
-		typeCheckedPackages:   map[importPathString]*tc.Package{},
-		fset:                  token.NewFileSet(),
-		parsed:                map[importPathString][]parsedFile{},
-		absPaths:              map[importPathString]string{},
+		goPkgs:                map[importPathString]*packages.Package{},
 		userRequested:         map[importPathString]bool{},
+		fullyProcessed:        map[importPathString]bool{},
+		fset:                  token.NewFileSet(),
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
-		importGraph:           map[importPathString]map[string]struct{}{},
 	}
 }
 
-// AddBuildTags adds the specified build tags to the parse context.
+// AddBuildTags adds the specified build tags for subsequent package loads.
 func (b *Builder) AddBuildTags(tags ...string) {
-	b.context.BuildTags = append(b.context.BuildTags, tags...)
+	b.buildTags = append(b.buildTags, tags...)
 }
 
-func (b *Builder) getLoadedBuildPackage(importPath string) (*build.Package, bool) {
-	canonicalized := canonicalizeImportPath(importPath)
-	if string(canonicalized) != importPath {
-		klog.V(5).Infof("getLoadedBuildPackage: %s normalized to %s", importPath, canonicalized)
+// FindPackages expands the provided patterns into a list of Go import-paths,
+// much like `go list -find`.
+func (b *Builder) FindPackages(patterns ...string) ([]string, error) {
+	toFind := make([]string, 0, len(patterns))
+	results := make([]string, 0, len(patterns))
+	for _, pat := range patterns {
+		ip := importPathString(pat)
+		if pkg := b.goPkgs[ip]; pkg != nil {
+			results = append(results, pkg.PkgPath)
+		} else {
+			toFind = append(toFind, pat)
+		}
 	}
-	buildPkg, ok := b.buildPackages[canonicalized]
-	return buildPkg, ok
-}
-func (b *Builder) setLoadedBuildPackage(importPath string, buildPkg *build.Package) {
-	canonicalizedImportPath := canonicalizeImportPath(importPath)
-	if string(canonicalizedImportPath) != importPath {
-		klog.V(5).Infof("setLoadedBuildPackage: importPath %s normalized to %s", importPath, canonicalizedImportPath)
-	}
-
-	canonicalizedBuildPkgImportPath := canonicalizeImportPath(buildPkg.ImportPath)
-	if string(canonicalizedBuildPkgImportPath) != buildPkg.ImportPath {
-		klog.V(5).Infof("setLoadedBuildPackage: buildPkg.ImportPath %s normalized to %s", buildPkg.ImportPath, canonicalizedBuildPkgImportPath)
+	if len(toFind) == 0 {
+		return results, nil
 	}
 
-	if canonicalizedImportPath != canonicalizedBuildPkgImportPath {
-		klog.V(5).Infof("setLoadedBuildPackage: normalized importPath (%s) differs from buildPkg.ImportPath (%s)", canonicalizedImportPath, canonicalizedBuildPkgImportPath)
+	cfg := packages.Config{
+		Mode:       packages.NeedName | packages.NeedFiles,
+		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
 	}
-	b.buildPackages[canonicalizedImportPath] = buildPkg
-	b.buildPackages[canonicalizedBuildPkgImportPath] = buildPkg
-}
-
-// Get package information from the go/build package. Automatically excludes
-// e.g. test files and files for other platforms-- there is quite a bit of
-// logic of that nature in the build package.
-func (b *Builder) importBuildPackage(dir string) (*build.Package, error) {
-	if buildPkg, ok := b.getLoadedBuildPackage(dir); ok {
-		return buildPkg, nil
-	}
-	// This validates the `package foo // github.com/bar/foo` comments.
-	buildPkg, err := b.importWithMode(dir, build.ImportComment)
+	pkgs, err := packages.Load(&cfg, toFind...)
 	if err != nil {
-		if _, ok := err.(*build.NoGoError); !ok {
-			return nil, fmt.Errorf("unable to import %q: %v", dir, err)
+		return nil, fmt.Errorf("error loading packages: %w", err)
+	}
+	var allErrs []error
+	for _, pkg := range pkgs {
+		results = append(results, pkg.PkgPath)
+
+		// pkg.Errors is not a slice of `error`, but concrete types.  We have
+		// to iteratively convert each one into `error`.
+		var errs []error
+		for _, e := range pkg.Errors {
+			errs = append(errs, e)
+		}
+		if len(errs) > 0 {
+			allErrs = append(allErrs, fmt.Errorf("error(s) in %q:\n%w", pkg.PkgPath, errors.Join(errs...)))
 		}
 	}
-	if buildPkg == nil {
-		// Might be an empty directory. Try to just find the dir.
-		buildPkg, err = b.importWithMode(dir, build.FindOnly)
-		if err != nil {
-			return nil, err
-		}
+	if len(allErrs) != 0 {
+		return nil, errors.Join(allErrs...)
 	}
-
-	// Remember it under the user-provided name.
-	klog.V(5).Infof("saving buildPackage %s", dir)
-	b.setLoadedBuildPackage(dir, buildPkg)
-
-	return buildPkg, nil
+	return results, nil
 }
 
-// AddFileForTest adds a file to the set, without verifying that the provided
-// pkg actually exists on disk. The pkg must be of the form "canonical/pkg/path"
-// and the path must be the absolute path to the file.  Because this bypasses
-// the normal recursive finding of package dependencies (on disk), test should
-// sort their test files topologically first, so all deps are resolved by the
-// time we need them.
-func (b *Builder) AddFileForTest(pkg string, path string, src []byte) error {
-	if err := b.addFile(importPathString(pkg), path, src, true); err != nil {
-		return err
-	}
-	if _, err := b.typeCheckPackage(importPathString(pkg), true); err != nil {
-		return err
-	}
-	return nil
-}
-
-// addFile adds a file to the set. The pkgPath must be of the form
-// "canonical/pkg/path" and the path must be the absolute path to the file. A
-// flag indicates whether this file was user-requested or just from following
-// the import graph.
-func (b *Builder) addFile(pkgPath importPathString, path string, src []byte, userRequested bool) error {
-	for _, p := range b.parsed[pkgPath] {
-		if path == p.name {
-			klog.V(5).Infof("addFile %s %s already parsed, skipping", pkgPath, path)
-			return nil
-		}
-	}
-	klog.V(6).Infof("addFile %s %s", pkgPath, path)
-	p, err := parser.ParseFile(b.fset, path, src, parser.DeclarationErrors|parser.ParseComments)
-	if err != nil {
-		return err
-	}
-
-	// This is redundant with addDir, but some tests call AddFileForTest, which
-	// call into here without calling addDir.
-	b.userRequested[pkgPath] = userRequested || b.userRequested[pkgPath]
-
-	b.parsed[pkgPath] = append(b.parsed[pkgPath], parsedFile{path, p})
-	for _, c := range p.Comments {
-		position := b.fset.Position(c.End())
-		b.endLineToCommentGroup[fileLine{position.Filename, position.Line}] = c
-	}
-
-	// We have to get the packages from this specific file, in case the
-	// user added individual files instead of entire directories.
-	if b.importGraph[pkgPath] == nil {
-		b.importGraph[pkgPath] = map[string]struct{}{}
-	}
-	for _, im := range p.Imports {
-		importedPath := strings.Trim(im.Path.Value, `"`)
-		b.importGraph[pkgPath][importedPath] = struct{}{}
-	}
-	return nil
-}
-
-// AddDir adds an entire directory, scanning it for go files. 'dir' should have
-// a single go package in it. GOPATH, GOROOT, and the location of your go
-// binary (`which go`) will all be searched if dir doesn't literally resolve.
-func (b *Builder) AddDir(dir string) error {
-	_, err := b.importPackage(dir, true)
+// LoadPackages loads and parses the specified Go packages.  Specifically
+// named packages (without a trailing "/...") which do not exist or have no Go
+// files are an error.
+func (b *Builder) LoadPackages(patterns ...string) error {
+	_, err := b.loadPackages(patterns...)
 	return err
 }
 
-// AddDirRecursive is just like AddDir, but it also recursively adds
-// subdirectories; it returns an error only if the path couldn't be resolved;
-// any directories recursed into without go source are ignored.
-func (b *Builder) AddDirRecursive(dir string) error {
-	// Add the root.
-	if _, err := b.importPackage(dir, true); err != nil {
-		klog.Warningf("Ignoring directory %v: %v", dir, err)
-	}
-
-	// filepath.Walk does not follow symlinks. We therefore evaluate symlinks and use that with
-	// filepath.Walk.
-	buildPkg, ok := b.getLoadedBuildPackage(dir)
-	if !ok {
-		return fmt.Errorf("no loaded build package for %s", dir)
-	}
-	realPath, err := filepath.EvalSymlinks(buildPkg.Dir)
+// LoadPackagesTo loads and parses the specified Go packages, and inserts them
+// into the specified Universe. It returns the packages which match the
+// patterns, but loads all packages and their imports, recursively, into the
+// universe.  See NewUniverse for more.
+func (b *Builder) LoadPackagesTo(u *types.Universe, patterns ...string) ([]*types.Package, error) {
+	// Load Packages.
+	pkgs, err := b.loadPackages(patterns...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fn := func(filePath string, info os.FileInfo, err error) error {
-		if info != nil && info.IsDir() {
-			rel := filepath.ToSlash(strings.TrimPrefix(filePath, realPath))
-			if rel != "" {
-				// Make a pkg path.
-				buildPkg, ok := b.getLoadedBuildPackage(dir)
-				if !ok {
-					return fmt.Errorf("no loaded build package for %s", dir)
-				}
-				pkg := path.Join(string(canonicalizeImportPath(buildPkg.ImportPath)), rel)
+	// Load types in all packages (it will internally filter).
+	if err := b.addPkgsToUniverse(pkgs, u); err != nil {
+		return nil, err
+	}
 
-				// Add it.
-				if _, err := b.importPackage(pkg, true); err != nil {
-					klog.Warningf("Ignoring child directory %v: %v", pkg, err)
-				}
+	// Return the results as gengo types.Packages.
+	ret := make([]*types.Package, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		ret = append(ret, u.Package(pkg.PkgPath))
+	}
+
+	return ret, nil
+}
+
+func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) {
+	// Loading packages is slow - only do ones we know we have not already done
+	// (e.g. if a tool calls LoadPackages itself).
+	existingPkgs, netNewPkgs, err := b.alreadyLoaded(patterns...)
+	if err != nil {
+		return nil, err
+	}
+
+	// If these were not user-requested before, they are now.
+	for _, pkg := range existingPkgs {
+		ip := importPathString(pkg.PkgPath)
+		if !b.userRequested[ip] {
+			b.userRequested[ip] = true
+		}
+	}
+	for _, pkgPath := range netNewPkgs {
+		ip := importPathString(pkgPath)
+		if !b.userRequested[ip] {
+			b.userRequested[ip] = true
+		}
+	}
+
+	if len(netNewPkgs) == 0 {
+		return existingPkgs, nil
+	}
+
+	cfg := packages.Config{
+		Mode: packages.NeedName |
+			packages.NeedFiles | packages.NeedImports | packages.NeedDeps |
+			packages.NeedModule | packages.NeedTypes | packages.NeedSyntax,
+		Tests:      b.IncludeTestFiles,
+		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
+		Fset:       b.fset,
+	}
+
+	pkgs, err := packages.Load(&cfg, netNewPkgs...)
+	if err != nil {
+		return nil, fmt.Errorf("error loading packages: %w", err)
+	}
+
+	// Handle any errors.
+	collectErrors := func(pkg *packages.Package) error {
+		var errs []error
+		for _, e := range pkg.Errors {
+			if e.Kind == packages.ListError || e.Kind == packages.ParseError {
+				errs = append(errs, e)
 			}
+		}
+		if len(errs) > 0 {
+			return fmt.Errorf("error(s) in %q:\n%w", pkg.PkgPath, errors.Join(errs...))
 		}
 		return nil
 	}
-	if err := filepath.Walk(realPath, fn); err != nil {
-		return err
-	}
-	return nil
-}
-
-// AddDirTo adds an entire directory to a given Universe. Unlike AddDir, this
-// processes the package immediately, which makes it safe to use from within a
-// generator (rather than just at init time. 'dir' must be a single go package.
-// GOPATH, GOROOT, and the location of your go binary (`which go`) will all be
-// searched if dir doesn't literally resolve.
-// Deprecated. Please use AddDirectoryTo.
-func (b *Builder) AddDirTo(dir string, u *types.Universe) error {
-	// We want all types from this package, as if they were directly added
-	// by the user.  They WERE added by the user, in effect.
-	if _, err := b.importPackage(dir, true); err != nil {
-		return err
-	}
-	pkg, ok := b.getLoadedBuildPackage(dir)
-	if !ok {
-		return fmt.Errorf("no such package: %q", dir)
-	}
-	return b.findTypesIn(canonicalizeImportPath(pkg.ImportPath), u)
-}
-
-// AddDirectoryTo adds an entire directory to a given Universe. Unlike AddDir,
-// this processes the package immediately, which makes it safe to use from
-// within a generator (rather than just at init time. 'dir' must be a single go
-// package. GOPATH, GOROOT, and the location of your go binary (`which go`)
-// will all be searched if dir doesn't literally resolve.
-func (b *Builder) AddDirectoryTo(dir string, u *types.Universe) (*types.Package, error) {
-	// We want all types from this package, as if they were directly added
-	// by the user.  They WERE added by the user, in effect.
-	if _, err := b.importPackage(dir, true); err != nil {
+	if err := forEachPackageRecursive(pkgs, collectErrors); err != nil {
 		return nil, err
 	}
-	pkg, ok := b.getLoadedBuildPackage(dir)
-	if !ok || pkg == nil {
-		return nil, fmt.Errorf("no such package: %q", dir)
-	}
-	path := canonicalizeImportPath(pkg.ImportPath)
-	if err := b.findTypesIn(path, u); err != nil {
-		return nil, err
-	}
-	return u.Package(string(path)), nil
-}
 
-// The implementation of AddDir. A flag indicates whether this directory was
-// user-requested or just from following the import graph.
-func (b *Builder) addDir(dir string, userRequested bool) error {
-	klog.V(5).Infof("addDir %s", dir)
-	buildPkg, err := b.importBuildPackage(dir)
-	if err != nil {
-		return err
-	}
-	canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-	pkgPath := canonicalPackage
-	if dir != string(canonicalPackage) {
-		klog.V(5).Infof("addDir %s, canonical path is %s", dir, pkgPath)
-	}
+	// Finish integrating packages into our state.
+	absorbPkg := func(pkg *packages.Package) error {
+		pkgPath := importPathString(pkg.PkgPath)
+		b.goPkgs[pkgPath] = pkg
 
-	// Sanity check the pkg dir has not changed.
-	if prev, found := b.absPaths[pkgPath]; found {
-		if buildPkg.Dir != prev {
-			return fmt.Errorf("package %q (%s) previously resolved to %s", pkgPath, buildPkg.Dir, prev)
+		for _, f := range pkg.Syntax {
+			for _, c := range f.Comments {
+				// We need to do this on _every_ pkg, not just user-requested
+				// ones, because some generators look at tags in other
+				// packages.
+				//
+				// TODO: It would be nice if we only did this on user-requested
+				// packages.  The problem is that we don't always know which
+				// other packages will need this information, and even when we
+				// do we may have already loaded the package (as a transitive
+				// dep) and might have stored pointers into it.  Doing a
+				// thorough "reload" without invalidating all those pointers is
+				// a problem for another day.
+				position := b.fset.Position(c.End()) // Fset is synchronized
+				b.endLineToCommentGroup[fileLine{position.Filename, position.Line}] = c
+			}
 		}
+
+		return nil
+	}
+	if err := forEachPackageRecursive(pkgs, absorbPkg); err != nil {
+		return nil, err
+	}
+
+	return append(existingPkgs, pkgs...), nil
+}
+
+// alreadyLoaded figures out which of the specified patterns have already been loaded
+// and which have not, and returns those respectively.
+func (b *Builder) alreadyLoaded(patterns ...string) ([]*packages.Package, []string, error) {
+	existingPkgs := make([]*packages.Package, 0, len(patterns))
+	netNewPkgs := make([]string, 0, len(patterns))
+
+	// Expand and canonicalize the requested patterns.  This should be fast.
+	if pkgPaths, err := b.FindPackages(patterns...); err != nil {
+		return nil, nil, err
 	} else {
-		b.absPaths[pkgPath] = buildPkg.Dir
+		for _, pkgPath := range pkgPaths {
+			ip := importPathString(pkgPath)
+			if pkg := b.goPkgs[ip]; pkg != nil {
+				existingPkgs = append(existingPkgs, pkg)
+			} else {
+				netNewPkgs = append(netNewPkgs, pkgPath)
+			}
+		}
 	}
+	return existingPkgs, netNewPkgs, nil
+}
 
-	files := []string{}
-	files = append(files, buildPkg.GoFiles...)
-	if b.IncludeTestFiles {
-		files = append(files, buildPkg.TestGoFiles...)
+// forEachPackageRecursive will run the provided function on all of the specified
+// packages, and on their imports recursively.  Errors are accumulated and
+// returned as via errors.Join.
+func forEachPackageRecursive(pkgs []*packages.Package, fn func(pkg *packages.Package) error) error {
+	seen := map[string]bool{} // PkgPaths we have already visited
+	var errs []error
+	for _, pkg := range pkgs {
+		errs = append(errs, recursePackage(pkg, fn, seen)...)
 	}
-
-	for _, file := range files {
-		if !strings.HasSuffix(file, ".go") {
-			continue
-		}
-		absPath := filepath.Join(buildPkg.Dir, file)
-		data, err := os.ReadFile(absPath)
-		if err != nil {
-			return fmt.Errorf("while loading %q: %v", absPath, err)
-		}
-		err = b.addFile(pkgPath, absPath, data, userRequested)
-		if err != nil {
-			return fmt.Errorf("while parsing %q: %v", absPath, err)
-		}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }
 
-// regexErrPackageNotFound helps test the expected error for not finding a package.
-var regexErrPackageNotFound = regexp.MustCompile(`^unable to import ".*?":.*`)
-
-func isErrPackageNotFound(err error) bool {
-	return regexErrPackageNotFound.MatchString(err.Error())
+func recursePackage(pkg *packages.Package, fn func(pkg *packages.Package) error, seen map[string]bool) []error {
+	if seen[pkg.PkgPath] {
+		return nil
+	}
+	var errs []error
+	seen[pkg.PkgPath] = true
+	if err := fn(pkg); err != nil {
+		errs = append(errs, err)
+	}
+	for _, imp := range pkg.Imports {
+		errs = append(errs, recursePackage(imp, fn, seen)...)
+	}
+	return errs
 }
 
-// importPackage is a function that will be called by the type check package when it
-// needs to import a go package. 'path' is the import path.
-func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, error) {
-	klog.V(5).Infof("importPackage %s", dir)
-
-	var pkgPath = importPathString(dir)
-
-	// Get the canonical path if we can.
-	if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
-		canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-		klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
-		pkgPath = canonicalPackage
-	}
-
-	// If we have not seen this before, process it now.
-	ignoreError := false
-	if _, found := b.parsed[pkgPath]; !found {
-		// Ignore errors in paths that we're importing solely because
-		// they're referenced by other packages.
-		ignoreError = true
-
-		// Add it.
-		if err := b.addDir(dir, userRequested); err != nil {
-			if isErrPackageNotFound(err) {
-				klog.V(6).Info(err)
-				return nil, nil
-			}
-
-			return nil, err
-		}
-
-		// Get the canonical path now that it has been added.
-		if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
-			canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-			klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
-			pkgPath = canonicalPackage
-		}
-	}
-
-	// If it was previously known, just check that the user-requestedness hasn't
-	// changed.
-	b.userRequested[pkgPath] = userRequested || b.userRequested[pkgPath]
-
-	// Run the type checker.  We may end up doing this to pkgs that are already
-	// done, or are in the queue to be done later, but it will short-circuit,
-	// and we can't miss pkgs that are only depended on.
-	pkg, err := b.typeCheckPackage(pkgPath, !ignoreError)
-	if err != nil {
-		switch {
-		case ignoreError && pkg != nil:
-			klog.V(4).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
-		case !ignoreError && pkg != nil:
-			klog.V(3).Infof("type checking encountered some errors in %q\n", pkgPath)
-			return nil, err
-		default:
-			return nil, err
-		}
-	}
-
-	return pkg, nil
-}
-
-type importAdapter struct {
-	b *Builder
-}
-
-func (a importAdapter) Import(path string) (*tc.Package, error) {
-	return a.b.importPackage(path, false)
-}
-
-// typeCheckPackage will attempt to return the package even if there are some
-// errors, so you may check whether the package is nil or not even if you get
-// an error.
-func (b *Builder) typeCheckPackage(pkgPath importPathString, logErr bool) (*tc.Package, error) {
-	klog.V(5).Infof("typeCheckPackage %s", pkgPath)
-	if pkg, ok := b.typeCheckedPackages[pkgPath]; ok {
-		if pkg != nil {
-			klog.V(6).Infof("typeCheckPackage %s already done", pkgPath)
-			return pkg, nil
-		}
-		// We store a nil right before starting work on a package. So
-		// if we get here and it's present and nil, that means there's
-		// another invocation of this function on the call stack
-		// already processing this package.
-		return nil, fmt.Errorf("circular dependency for %q", pkgPath)
-	}
-	parsedFiles, ok := b.parsed[pkgPath]
-	if !ok {
-		return nil, fmt.Errorf("no files for pkg %q", pkgPath)
-	}
-	files := make([]*ast.File, len(parsedFiles))
-	for i := range parsedFiles {
-		files[i] = parsedFiles[i].file
-	}
-	b.typeCheckedPackages[pkgPath] = nil
-	c := tc.Config{
-		IgnoreFuncBodies: true,
-		// Note that importAdapter can call b.importPackage which calls this
-		// method. So there can't be cycles in the import graph.
-		Importer: importAdapter{b},
-		Error: func(err error) {
-			if logErr {
-				klog.V(2).Infof("type checker: %v\n", err)
-			} else {
-				klog.V(3).Infof("type checker: %v\n", err)
-			}
-		},
-	}
-	pkg, err := c.Check(string(pkgPath), b.fset, files, nil)
-	b.typeCheckedPackages[pkgPath] = pkg // record the result whether or not there was an error
-	return pkg, err
-}
-
-// FindPackages fetches a list of the user-imported packages.
-// Note that you need to call b.FindTypes() first.
-func (b *Builder) FindPackages() []string {
+// UserRequestedPackages fetches a list of the user-imported packages.
+func (b *Builder) UserRequestedPackages() []string {
 	// Iterate packages in a predictable order.
-	pkgPaths := []string{}
-	for k := range b.typeCheckedPackages {
+	pkgPaths := make([]string, 0, len(b.userRequested))
+	for k := range b.userRequested {
 		pkgPaths = append(pkgPaths, string(k))
 	}
 	sort.Strings(pkgPaths)
-
-	result := []string{}
-	for _, pkgPath := range pkgPaths {
-		if b.userRequested[importPathString(pkgPath)] {
-			// Since walkType is recursive, all types that are in packages that
-			// were directly mentioned will be included.  We don't need to
-			// include all types in all transitive packages, though.
-			result = append(result, pkgPath)
-		}
-	}
-	return result
+	return pkgPaths
 }
 
-// FindTypes finalizes the package imports, and searches through all the
-// packages for types.
-func (b *Builder) FindTypes() (types.Universe, error) {
-	// Take a snapshot of pkgs to iterate, since this will recursively mutate
-	// b.parsed. Iterate in a predictable order.
-	pkgPaths := []string{}
-	for pkgPath := range b.parsed {
-		pkgPaths = append(pkgPaths, string(pkgPath))
-	}
-	sort.Strings(pkgPaths)
-
+// NewUniverse finalizes the loaded packages, searches through them for types
+// and produces a new Universe. The returned Universe has one types.Package
+// entry for each Go package that has been loaded, including all of their
+// dependencies, recursively.  It also has one entry, whose key is "", which
+// represents "builtin" types.
+func (b *Builder) NewUniverse() (types.Universe, error) {
 	u := types.Universe{}
-	for _, pkgPath := range pkgPaths {
-		if err := b.findTypesIn(importPathString(pkgPath), &u); err != nil {
-			return nil, err
-		}
+
+	pkgs := []*packages.Package{}
+	for _, path := range b.UserRequestedPackages() {
+		pkgs = append(pkgs, b.goPkgs[importPathString(path)])
 	}
+	if err := b.addPkgsToUniverse(pkgs, &u); err != nil {
+		return nil, err
+	}
+
 	return u, nil
 }
 
@@ -544,44 +350,90 @@ func (b *Builder) addCommentsToType(obj tc.Object, t *types.Type) {
 	}
 }
 
-// findTypesIn finalizes the package import and searches through the package
-// for types.
-func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error {
-	klog.V(5).Infof("findTypesIn %s", pkgPath)
-	pkg := b.typeCheckedPackages[pkgPath]
-	if pkg == nil {
-		return fmt.Errorf("findTypesIn(%s): package is not known", pkgPath)
+// packageDir tries to figure out the directory of the specified package.
+func packageDir(pkg *packages.Package) (string, error) {
+	// Sometimes Module is present but has no Dir, e.g. when it is vendored.
+	if pkg.Module != nil && pkg.Module.Dir != "" {
+		subdir := strings.TrimPrefix(pkg.PkgPath, pkg.Module.Path)
+		return filepath.Join(pkg.Module.Dir, subdir), nil
 	}
-	if !b.userRequested[pkgPath] {
-		// Since walkType is recursive, all types that the
-		// packages they asked for depend on will be included.
-		// But we don't need to include all types in all
-		// *packages* they depend on.
-		klog.V(5).Infof("findTypesIn %s: package is not user requested", pkgPath)
+	if len(pkg.GoFiles) > 0 {
+		return filepath.Dir(pkg.GoFiles[0]), nil
+	}
+	if len(pkg.IgnoredFiles) > 0 {
+		return filepath.Dir(pkg.IgnoredFiles[0]), nil
+	}
+	return "", fmt.Errorf("can't find package dir for %q - no module info and no Go files", pkg.PkgPath)
+}
+
+// addPkgsToUniverse adds the packages, and all of their deps, recursively, to
+// the universe and (if needed) searches through them for types.
+func (b *Builder) addPkgsToUniverse(pkgs []*packages.Package, u *types.Universe) error {
+	addOne := func(pkg *packages.Package) error {
+		if err := b.addPkgToUniverse(pkg, u); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := forEachPackageRecursive(pkgs, addOne); err != nil {
+		return err
+	}
+	return nil
+}
+
+// addPkgToUniverse adds one package to the universe and (if needed) searches
+// through it for types.
+func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) error {
+	pkgPath := importPathString(pkg.PkgPath)
+	if b.fullyProcessed[pkgPath] {
 		return nil
 	}
 
-	// We're keeping this package.  This call will create the record.
-	u.Package(string(pkgPath)).Name = pkg.Name()
-	u.Package(string(pkgPath)).Path = pkg.Path()
-	u.Package(string(pkgPath)).SourcePath = b.absPaths[pkgPath]
+	// We're keeping this package, though we might not fully process it.
+	klog.V(5).Infof("addPkgToUniverse %q", pkgPath)
 
-	for _, f := range b.parsed[pkgPath] {
-		if _, fileName := filepath.Split(f.name); fileName == "doc.go" {
-			tp := u.Package(string(pkgPath))
-			// findTypesIn might be called multiple times. Clean up tp.Comments
-			// to avoid repeatedly fill same comments to it.
-			tp.Comments = []string{}
-			for i := range f.file.Comments {
-				tp.Comments = append(tp.Comments, splitLines(f.file.Comments[i].Text())...)
+	absPath := ""
+	if dir, err := packageDir(pkg); err != nil {
+		return err
+	} else {
+		absPath = dir
+	}
+
+	// This will get-or-create the Package.
+	gengoPkg := u.Package(string(pkgPath))
+	gengoPkg.Path = pkg.PkgPath
+	gengoPkg.SourcePath = absPath
+
+	// If the package was not user-requested, we can stop here.
+	if !b.userRequested[pkgPath] {
+		return nil
+	}
+
+	// Mark it as done, so we don't ever re-process it.
+	b.fullyProcessed[pkgPath] = true
+	gengoPkg.Name = pkg.Name
+
+	// For historical reasons we treat files named "doc.go" specially.
+	// TODO: It would be nice to not do this and instead treat package
+	// doc-comments as the "global" config place.  This would require changing
+	// most generators and input files.
+	for _, f := range pkg.Syntax {
+		// This gets the filename for the ast.File.  Iterating pkg.GoFiles is
+		// documented as unreliable.
+		pos := b.fset.Position(f.FileStart)
+		if filepath.Base(pos.Filename) == "doc.go" {
+			gengoPkg.Comments = []string{}
+			for i := range f.Comments {
+				gengoPkg.Comments = append(gengoPkg.Comments, splitLines(f.Comments[i].Text())...)
 			}
-			if f.file.Doc != nil {
-				tp.DocComments = splitLines(f.file.Doc.Text())
+			if f.Doc != nil {
+				gengoPkg.DocComments = splitLines(f.Doc.Text())
 			}
 		}
 	}
 
-	s := pkg.Scope()
+	// Walk all the types, recursively and save them for later access.
+	s := pkg.Types.Scope()
 	for _, n := range s.Names() {
 		obj := s.Lookup(n)
 		tn, ok := obj.(*tc.TypeName)
@@ -607,38 +459,18 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 		}
 	}
 
+	// Add all of this package's imports.
 	importedPkgs := []string{}
-	for k := range b.importGraph[pkgPath] {
-		importedPkgs = append(importedPkgs, string(k))
+	for _, imp := range pkg.Imports {
+		if err := b.addPkgToUniverse(imp, u); err != nil {
+			return err
+		}
+		importedPkgs = append(importedPkgs, imp.PkgPath)
 	}
 	sort.Strings(importedPkgs)
-	for _, p := range importedPkgs {
-		u.AddImports(string(pkgPath), p)
-	}
+	u.AddImports(pkg.PkgPath, importedPkgs...)
+
 	return nil
-}
-
-func (b *Builder) importWithMode(dir string, mode build.ImportMode) (*build.Package, error) {
-	// This is a bit of a hack.  The srcDir argument to Import() should
-	// properly be the dir of the file which depends on the package to be
-	// imported, so that vendoring can work properly and local paths can
-	// resolve.  We assume that there is only one level of vendoring, and that
-	// the CWD is inside the GOPATH, so this should be safe. Nobody should be
-	// using local (relative) paths except on the CLI, so CWD is also
-	// sufficient.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get current directory: %v", err)
-	}
-
-	// normalize to drop /vendor/ if present
-	dir = string(canonicalizeImportPath(dir))
-
-	buildPkg, err := b.context.Import(filepath.ToSlash(dir), cwd, mode)
-	if err != nil {
-		return nil, err
-	}
-	return buildPkg, nil
 }
 
 // if there's a comment on the line `lines` before pos, return its text, otherwise "".
@@ -782,7 +614,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		return out
 	case *tc.Basic:
 		out := u.Type(types.Name{
-			Package: "",
+			Package: "", // This is a magic package name in the Universe.
 			Name:    t.Name(),
 		})
 		if out.Kind != types.Unknown {
@@ -911,14 +743,4 @@ func (b *Builder) addConstant(u types.Universe, useName *types.Name, in *tc.Cons
 
 	out.ConstValue = &constval
 	return out
-}
-
-// canonicalizeImportPath takes an import path and returns the actual package.
-// It doesn't support nested vendoring.
-func canonicalizeImportPath(importPath string) importPathString {
-	if !strings.Contains(importPath, "/vendor/") {
-		return importPathString(importPath)
-	}
-
-	return importPathString(importPath[strings.Index(importPath, "/vendor/")+len("/vendor/"):])
 }

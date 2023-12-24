@@ -148,7 +148,8 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 
 		pkgs = append(pkgs, &generator.DefaultPackage{
 			PackageName: pkg.Name,
-			PackagePath: path,
+			PackagePath: path,           // output pkg is the same as the input
+			Source:      pkg.SourcePath, // output pkg is the same as the input
 			HeaderText:  header,
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked
