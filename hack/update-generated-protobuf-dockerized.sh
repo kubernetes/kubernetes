@@ -28,10 +28,10 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 
 kube::protoc::check_protoc
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 
-GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf
-GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
+GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf
+GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
 gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 
@@ -41,7 +41,10 @@ gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 # core Google protobuf types
 PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
-  --proto-import="${KUBE_ROOT}/vendor" \
+  -v "${KUBE_VERBOSE}" \
+  --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
+  --output-base="${KUBE_ROOT}/staging/src" \
+  --proto-import="${KUBE_ROOT}/staging/src" \
+  --proto-import="${KUBE_ROOT}/vendor" `# required for gogo.proto` \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
-  --packages="$(IFS=, ; echo "$*")" \
-  --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt"
+  --packages="$(IFS=, ; echo "$*")"
