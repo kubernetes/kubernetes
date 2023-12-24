@@ -247,7 +247,7 @@ EOF
 # first in the case of regenerating everything.
 function codegen::swagger() {
     # Build the tool
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         ./cmd/genswaggertypedocs
 
     local group_versions=()
