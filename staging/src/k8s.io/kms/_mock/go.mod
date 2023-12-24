@@ -1,4 +1,4 @@
-module k8s.io/kms/plugins/mock
+module k8s.io/kms/plugins/_mock
 
 go 1.21
 
@@ -21,4 +21,4 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 )
 
-replace k8s.io/kms => ../../../../kms
+replace k8s.io/kms => ../../kms

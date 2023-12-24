@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kms/pkg/service"
 	"k8s.io/kms/pkg/util"
-	"k8s.io/kms/plugins/mock/pkcs11"
+	"k8s.io/kms/plugins/_mock/pkcs11"
 )
 
 var (

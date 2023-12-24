@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # decoupled from their parent modules.
 MODULES=(
     hack/tools
-    staging/src/k8s.io/kms/internal/plugins/_mock
+    staging/src/k8s.io/kms/_mock
 )
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory

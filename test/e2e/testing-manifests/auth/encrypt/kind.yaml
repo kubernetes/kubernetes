@@ -13,7 +13,7 @@ nodes:
     readOnly: true
     propagation: None
   - containerPath: /etc/kubernetes/manifests/kubernetes-kms.yaml
-    hostPath: staging/src/k8s.io/kms/internal/plugins/_mock/kms.yaml
+    hostPath: staging/src/k8s.io/kms/_mock/kms.yaml
     readOnly: true
     propagation: None
   - containerPath: /etc/softhsm-config.json

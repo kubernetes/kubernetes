@@ -19,7 +19,7 @@ WORKDIR /workspace
 # Copy the source
 COPY apimachinery/ apimachinery/
 COPY kms/ kms/
-WORKDIR /workspace/kms/internal/plugins/_mock
+WORKDIR /workspace/kms/_mock
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
@@ -30,6 +30,6 @@ FROM alpine:latest
 RUN apk add --update --no-cache ca-certificates gcompat
 RUN apk add --no-cache softhsm
 
-COPY --from=builder /workspace/kms/internal/plugins/_mock/mock-kms-plugin /usr/local/bin/mock-kms-plugin
+COPY --from=builder /workspace/kms/_mock/mock-kms-plugin /usr/local/bin/mock-kms-plugin
 
 ENTRYPOINT [ "mock-kms-plugin" ]
