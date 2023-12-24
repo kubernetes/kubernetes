@@ -54,20 +54,18 @@ type Generator struct {
 }
 
 func New() *Generator {
-	sourceTree := args.DefaultSourceTree()
+	defaultSourceTree := "."
 	common := args.GeneratorArgs{
-		OutputBase: sourceTree,
+		OutputBase: defaultSourceTree,
 	}
-	defaultProtoImport := filepath.Join(sourceTree, "k8s.io", "kubernetes", "vendor", "github.com", "gogo", "protobuf", "protobuf")
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Cannot get current directory.")
 	}
 	return &Generator{
 		Common:           common,
-		OutputBase:       sourceTree,
+		OutputBase:       defaultSourceTree,
 		VendorOutputBase: filepath.Join(cwd, "vendor"),
-		ProtoImport:      []string{defaultProtoImport},
 		APIMachineryPackages: strings.Join([]string{
 			`+k8s.io/apimachinery/pkg/util/intstr`,
 			`+k8s.io/apimachinery/pkg/api/resource`,
@@ -99,14 +97,89 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.StringVar(&g.TrimPathPrefix, "trim-path-prefix", g.TrimPathPrefix, "If set, trim the specified prefix from --output-package when generating files.")
 }
 
+// This roughly models gengo/v2/args.GeneratorArgs.Execute.
 func Run(g *Generator) {
 	if g.Common.VerifyOnly {
 		g.OnlyIDL = true
 		g.Clean = false
 	}
 
+	// Roughly models gengo/v2/args.GeneratorArgs.NewBuilder.
+
 	b := parser.New()
 	b.AddBuildTags("proto")
+
+	var allInputs []string
+	if len(g.APIMachineryPackages) != 0 {
+		allInputs = append(allInputs, strings.Split(g.APIMachineryPackages, ",")...)
+	}
+	if len(g.Packages) != 0 {
+		allInputs = append(allInputs, strings.Split(g.Packages, ",")...)
+	}
+	if len(allInputs) == 0 {
+		log.Fatalf("Both apimachinery-packages and packages are empty. At least one package must be specified.")
+	}
+
+	// Build up a list of packages to load from all the inputs.  Track the
+	// special modifiers for each.  NOTE: This does not support pkg/... syntax.
+	type modifier struct {
+		allTypes bool
+		output   bool
+		name     string
+	}
+	inputModifiers := map[string]modifier{}
+	packages := make([]string, 0, len(allInputs))
+
+	for _, d := range allInputs {
+		modifier := modifier{allTypes: true, output: true}
+
+		switch {
+		case strings.HasPrefix(d, "+"):
+			d = d[1:]
+			modifier.allTypes = false
+		case strings.HasPrefix(d, "-"):
+			d = d[1:]
+			modifier.output = false
+		}
+		name := protoSafePackage(d)
+		parts := strings.SplitN(d, "=", 2)
+		if len(parts) > 1 {
+			d = parts[0]
+			name = parts[1]
+		}
+		modifier.name = name
+
+		packages = append(packages, d)
+		inputModifiers[d] = modifier
+	}
+
+	// Load all the packages at once.
+	if err := b.LoadPackages(packages...); err != nil {
+		log.Fatalf("Unable to load packages: %v", err)
+	}
+
+	c, err := generator.NewContext(
+		b,
+		namer.NameSystems{
+			"public": namer.NewPublicNamer(3),
+		},
+		"public",
+	)
+	if err != nil {
+		log.Fatalf("Failed making a context: %v", err)
+	}
+
+	c.Verify = g.Common.VerifyOnly
+	c.FileTypes["protoidl"] = NewProtoFile()
+	c.TrimPathPrefix = g.TrimPathPrefix
+
+	// Roughly models gengo/v2/args.GeneratorArgs.Execute calling the
+	// tool-provided Packages() callback.
+
+	boilerplate, err := g.Common.LoadGoBoilerplate()
+	if err != nil {
+		log.Fatalf("Failed loading boilerplate (consider using the go-header-file flag): %v", err)
+	}
 
 	omitTypes := map[types.Name]struct{}{}
 	for _, t := range strings.Split(g.DropEmbeddedFields, ",") {
@@ -122,57 +195,32 @@ func Run(g *Generator) {
 		omitTypes[name] = struct{}{}
 	}
 
-	boilerplate, err := g.Common.LoadGoBoilerplate()
-	if err != nil {
-		log.Fatalf("Failed loading boilerplate (consider using the go-header-file flag): %v", err)
-	}
-
 	protobufNames := NewProtobufNamer()
 	outputPackages := generator.Packages{}
 	nonOutputPackages := map[string]struct{}{}
 
-	var packages []string
-	if len(g.APIMachineryPackages) != 0 {
-		packages = append(packages, strings.Split(g.APIMachineryPackages, ",")...)
-	}
-	if len(g.Packages) != 0 {
-		packages = append(packages, strings.Split(g.Packages, ",")...)
-	}
-	if len(packages) == 0 {
-		log.Fatalf("Both apimachinery-packages and packages are empty. At least one package must be specified.")
-	}
-
-	for _, d := range packages {
-		generateAllTypes, outputPackage := true, true
-		switch {
-		case strings.HasPrefix(d, "+"):
-			d = d[1:]
-			generateAllTypes = false
-		case strings.HasPrefix(d, "-"):
-			d = d[1:]
-			outputPackage = false
+	for _, input := range c.Inputs {
+		mod, found := inputModifiers[input]
+		if !found {
+			log.Fatalf("BUG: can't find input modifiers for %q", input)
 		}
-		name := protoSafePackage(d)
-		parts := strings.SplitN(d, "=", 2)
-		if len(parts) > 1 {
-			d = parts[0]
-			name = parts[1]
-		}
-		p := newProtobufPackage(d, name, generateAllTypes, omitTypes)
+		pkg := c.Universe[input]
+		protopkg := newProtobufPackage(pkg.Path, pkg.SourcePath, mod.name, mod.allTypes, omitTypes)
 		header := append([]byte{}, boilerplate...)
-		header = append(header, p.HeaderText...)
-		p.HeaderText = header
-		protobufNames.Add(p)
-		if outputPackage {
-			outputPackages = append(outputPackages, p)
+		header = append(header, protopkg.HeaderText...)
+		protopkg.HeaderText = header
+		protobufNames.Add(protopkg)
+		if mod.output {
+			outputPackages = append(outputPackages, protopkg)
 		} else {
-			nonOutputPackages[name] = struct{}{}
+			nonOutputPackages[mod.name] = struct{}{}
 		}
 	}
+	c.Namers["proto"] = protobufNames
 
 	if !g.Common.VerifyOnly {
 		for _, p := range outputPackages {
-			if err := p.(*protobufPackage).Clean(g.OutputBase); err != nil {
+			if err := p.(*protobufPackage).Clean(); err != nil {
 				log.Fatalf("Unable to clean package %s: %v", p.Name(), err)
 			}
 		}
@@ -181,28 +229,6 @@ func Run(g *Generator) {
 	if g.Clean {
 		return
 	}
-
-	for _, p := range protobufNames.List() {
-		if err := b.AddDir(p.Path()); err != nil {
-			log.Fatalf("Unable to add directory %q: %v", p.Path(), err)
-		}
-	}
-
-	c, err := generator.NewContext(
-		b,
-		namer.NameSystems{
-			"public": namer.NewPublicNamer(3),
-			"proto":  protobufNames,
-		},
-		"public",
-	)
-	if err != nil {
-		log.Fatalf("Failed making a context: %v", err)
-	}
-
-	c.Verify = g.Common.VerifyOnly
-	c.FileTypes["protoidl"] = NewProtoFile()
-	c.TrimPathPrefix = g.TrimPathPrefix
 
 	// order package by imports, importees first
 	deps := deps(c, protobufNames.packages)
@@ -216,7 +242,8 @@ func Run(g *Generator) {
 	}
 	sort.Sort(positionOrder{topologicalPos, protobufNames.packages})
 
-	var vendoredOutputPackages, localOutputPackages generator.Packages
+	var vendoredOutputPackages generator.Packages
+	var localOutputPackages generator.Packages
 	for _, p := range protobufNames.packages {
 		if _, ok := nonOutputPackages[p.Name()]; ok {
 			// if we're not outputting the package, don't include it in either package list
@@ -234,10 +261,10 @@ func Run(g *Generator) {
 		log.Fatalf("Failed to identify Common types: %v", err)
 	}
 
-	if err := c.ExecutePackages(g.VendorOutputBase, vendoredOutputPackages); err != nil {
+	if err := c.ExecutePackages(vendoredOutputPackages); err != nil {
 		log.Fatalf("Failed executing vendor generator: %v", err)
 	}
-	if err := c.ExecutePackages(g.OutputBase, localOutputPackages); err != nil {
+	if err := c.ExecutePackages(localOutputPackages); err != nil {
 		log.Fatalf("Failed executing local generator: %v", err)
 	}
 
@@ -255,6 +282,16 @@ func Run(g *Generator) {
 			searchArgs = append(searchArgs, "-I", s)
 		}
 	}
+	// Despite docs saying that `--gogo_out=paths=source_relative:.` will
+	// output the .pb.go file to the same directory as the .proto file, it
+	// doesn't. Given example.com/foo/bar.proto (found in one of the -I paths
+	// above), the output becomes
+	// $output_base/example.com/foo/example.com/foo/bar.pb.go - basically
+	// useless.  Users should set the output-base to a single dir under which
+	// all the packages in question live (e.g. staging/src in kubernetes).
+	// Alternately, we could generate into a temp path and then move the
+	// resulting file back to the input dir, but that seems brittle in other
+	// ways.
 	args := append(searchArgs, fmt.Sprintf("--gogo_out=%s", g.OutputBase))
 
 	buf := &bytes.Buffer{}
@@ -295,7 +332,7 @@ func Run(g *Generator) {
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
 			log.Println(string(out))
-			log.Fatalf("Unable to generate protoc on %s: %v", p.PackageName, err)
+			log.Fatalf("Unable to run protoc on %s: %v", p.PackageName, err)
 		}
 
 		if g.SkipGeneratedRewrite {
@@ -341,10 +378,10 @@ func Run(g *Generator) {
 			p := outputPackage.(*protobufPackage)
 			p.OmitGogo = true
 		}
-		if err := c.ExecutePackages(g.VendorOutputBase, vendoredOutputPackages); err != nil {
+		if err := c.ExecutePackages(vendoredOutputPackages); err != nil {
 			log.Fatalf("Failed executing vendor generator: %v", err)
 		}
-		if err := c.ExecutePackages(g.OutputBase, localOutputPackages); err != nil {
+		if err := c.ExecutePackages(localOutputPackages); err != nil {
 			log.Fatalf("Failed executing local generator: %v", err)
 		}
 	}
