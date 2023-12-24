@@ -23,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -511,7 +514,7 @@ func addAllEventHandlers(
 			gvr, _ := schema.ParseResourceArg(string(gvk))
 			dynInformer := dynInformerFactory.ForResource(*gvr).Informer()
 			if handlerRegistration, err = dynInformer.AddEventHandler(
-				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource)),
+				buildEvtResHandler(at, gvk, cases.Title(language.Und, cases.NoLower).String(gvr.Resource)),
 			); err != nil {
 				return err
 			}
