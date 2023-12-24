@@ -1,0 +1,57 @@
+# Makefile for releasing.
+#
+# The release is controlled from version.go. The version found there is
+# used to tag the git repo, we're not building any artifects so there is nothing
+# to upload to github.
+#
+# * Up the version in version.go
+# * Run: make -f Makefile.release release
+#   * will *commit* your change with 'Release $VERSION'
+#   * push to github
+#
+
+define GO
+//+build ignore
+
+package main
+
+import (
+	"fmt"
+
+	"github.com/miekg/pkcs11"
+)
+
+func main() {
+	fmt.Println(pkcs11.Release.String())
+}
+endef
+
+$(file > version_release.go,$(GO))
+VERSION:=$(shell go run -tags release version_release.go)
+TAG="v$(VERSION)"
+
+all:
+	rm -f version_release.go
+	@echo Use the \'release\' target to start a release $(VERSION)
+
+.PHONY: run
+run:
+	rm -f version_release.go
+	@echo $(VERSION)
+
+.PHONY: release
+release: commit push
+	@echo Released $(VERSION)
+
+.PHONY: commit
+commit:
+	rm -f version_release.go
+	@echo Committing release $(VERSION)
+	git commit -am"Release $(VERSION)"
+	git tag $(TAG)
+
+.PHONY: push
+push:
+	@echo Pushing release $(VERSION) to master
+	git push --tags
+	git push

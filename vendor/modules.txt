@@ -98,6 +98,9 @@ github.com/Microsoft/hcsshim/osversion
 # github.com/NYTimes/gziphandler v1.1.1
 ## explicit; go 1.11
 github.com/NYTimes/gziphandler
+# github.com/ThalesIgnite/crypto11 v1.2.5
+## explicit; go 1.13
+github.com/ThalesIgnite/crypto11
 # github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df
 ## explicit; go 1.18
 github.com/antlr/antlr4/runtime/Go/antlr/v4
@@ -515,6 +518,9 @@ github.com/mailru/easyjson/jwriter
 # github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/miekg/pkcs11 v1.0.3-0.20190429190417-a667d056470f
+## explicit; go 1.12
+github.com/miekg/pkcs11
 # github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
 ## explicit
 github.com/mistifyio/go-zfs
@@ -704,6 +710,9 @@ github.com/stretchr/testify/require
 # github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 ## explicit
 github.com/syndtr/gocapability/capability
+# github.com/thales-e-security/pool v0.0.2
+## explicit; go 1.12
+github.com/thales-e-security/pool
 # github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75
 ## explicit; go 1.15
 github.com/tmc/grpc-websocket-proxy/wsproxy
@@ -1335,6 +1344,8 @@ k8s.io/klog/v2/ktesting
 k8s.io/klog/v2/ktesting/init
 k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
+# k8s.io/kms v0.0.0-00010101000000-000000000000 => ./staging/src/k8s.io/kms
+## explicit; go 1.21
 # k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
 ## explicit; go 1.21
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator

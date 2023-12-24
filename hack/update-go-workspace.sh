@@ -65,7 +65,7 @@ __EOF__
 # Generate the top-level workspace.
 go work init
 go work edit -use .
-git ls-files -z ':(glob)./staging/src/k8s.io/*/go.mod' \
+git ls-files -z ':(glob)./staging/src/k8s.io/**/go.mod' \
     | xargs -0 -n1 dirname -z \
     | xargs -0 -n1 go work edit -use
 fix_go_version_line go.work
