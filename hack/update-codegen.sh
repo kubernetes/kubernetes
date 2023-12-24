@@ -137,7 +137,7 @@ function codegen::protobuf() {
 #               scheme
 function codegen::deepcopy() {
     # Build the tool.
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/deepcopy-gen
 
     # The result file, in each pkg, of deep-copy generation.
@@ -162,7 +162,7 @@ function codegen::deepcopy() {
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
-        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+        tag_pkgs+=("./$dir")
     done
 
     kube::log::status "Generating deepcopy code for ${#tag_pkgs[@]} targets"
@@ -175,7 +175,7 @@ function codegen::deepcopy() {
 
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
-    ./hack/run-in-gopath.sh "${gen_deepcopy_bin}" \
+    "${gen_deepcopy_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
