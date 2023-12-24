@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 cd "${KUBE_ROOT}"
 
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 
 DBG_CODEGEN="${DBG_CODEGEN:-0}"
 GENERATED_FILE_PREFIX="${GENERATED_FILE_PREFIX:-zz_generated.}"
@@ -66,12 +66,6 @@ function git_grep() {
 
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
 # used to derive lists of files/dirs for generation tools.
-#
-# We want to include the "special" vendor directories which are actually part
-# of the Kubernetes source tree (staging/*) but we need them to be named as
-# their vendor/* equivalents.  We do not want all of vendor nor
-# hack/tools/vendor nor even all of vendor/k8s.io - just the subset that lives
-# in staging.
 if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: finding all +k8s: tags"
 fi
@@ -82,7 +76,6 @@ kube::util::read-array ALL_K8S_TAG_FILES < <(
         -- \
         ':!:*/testdata/*'              `# not under any testdata` \
         ':(glob)**/*.go'               `# in any *.go file` \
-        | sed 's|^staging/src|vendor|' `# see comments above` \
     )
 if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: found ${#ALL_K8S_TAG_FILES[@]} +k8s: tagged files"
