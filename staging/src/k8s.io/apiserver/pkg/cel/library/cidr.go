@@ -64,11 +64,11 @@ import (
 //
 // containsIP / containerCIDR / ip / masked / prefixLength
 //
-// - containsIP: Returns true if a the CIDR contains the given IP address.
+// - containsIP: Returns true if the CIDR contains the given IP address.
 // The IP address must be an IPv4 or IPv6 address.
 // May take either a string or IP address as an argument.
 //
-// - containsCIDR: Returns true if a the CIDR contains the given CIDR.
+// - containsCIDR: Returns true if the CIDR contains the given CIDR.
 // The CIDR must be an IPv4 or IPv6 subnet address with a mask.
 // May take either a string or CIDR as an argument.
 //
