@@ -504,11 +504,10 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 // It registers cleanup functions to t.Cleanup(), they will be called when the test completes,
 // no need to do this again.
 func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	testCtx := &TestContext{Ctx: ctx}
+	tCtx := ktesting.Init(t)
+	testCtx := &TestContext{Ctx: tCtx}
 
-	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
@@ -536,7 +535,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 
 	oldCloseFn := testCtx.CloseFn
 	testCtx.CloseFn = func() {
-		cancel()
+		tCtx.Cancel("tearing down apiserver")
 		oldCloseFn()
 	}
 

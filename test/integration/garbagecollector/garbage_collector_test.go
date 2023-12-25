@@ -248,12 +248,12 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
 
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
-		ctx,
+		tCtx,
 		clientSet,
 		metadataClient,
 		restMapper,
@@ -266,7 +266,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	}
 
 	tearDown := func() {
-		cancel()
+		tCtx.Cancel("tearing down")
 		result.TearDownFn()
 	}
 	syncPeriod := 5 * time.Second
@@ -276,9 +276,9 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			restMapper.Reset()
-		}, syncPeriod, ctx.Done())
-		go gc.Run(ctx, workers)
-		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
+		}, syncPeriod, tCtx.Done())
+		go gc.Run(tCtx, workers)
+		go gc.Sync(tCtx, clientSet.Discovery(), syncPeriod)
 	}
 
 	if workerCount > 0 {
