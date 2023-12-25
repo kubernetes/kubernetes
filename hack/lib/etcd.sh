@@ -144,42 +144,49 @@ kube::etcd::cleanup() {
 }
 
 kube::etcd::install() {
-  local os
-  local arch
+  # Make sure that we will abort if the inner shell fails.
+  set -o errexit
+  set -o pipefail
+  set -o nounset
 
-  os=$(kube::util::host_os)
-  arch=$(kube::util::host_arch)
+  # We change directories below, so this subshell is needed.
+  (
+    local os
+    local arch
 
-  cd "${KUBE_ROOT}/third_party" || return 1
-  if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
-    kube::log::info "etcd v${ETCD_VERSION} already installed. To use:"
-    kube::log::info "export PATH=\"$(pwd)/etcd:\${PATH}\""
-    # export into current process
-    PATH="$(pwd)/etcd:${PATH}"
-    export PATH
-    return  #already installed
-  fi
+    os=$(kube::util::host_os)
+    arch=$(kube::util::host_arch)
 
-  if [[ ${os} == "darwin" ]]; then
-    download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
-    url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
-    kube::util::download_file "${url}" "${download_file}"
-    unzip -o "${download_file}"
-    ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
-    rm "${download_file}"
-  elif [[ ${os} == "linux" ]]; then
-    url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
-    download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
-    kube::util::download_file "${url}" "${download_file}"
-    tar xzf "${download_file}"
-    ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
-    rm "${download_file}"
-  else
-    kube::log::info "${os} is NOT supported."
-  fi
-  kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
-  kube::log::info "export PATH=\"$(pwd)/etcd:\${PATH}\""
-  # export into current process
-  PATH="$(pwd)/etcd:${PATH}"
+    cd "${KUBE_ROOT}/third_party" || return 1
+    if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
+      V=3 kube::log::info "etcd v${ETCD_VERSION} is already installed"
+      return 0 # already installed
+    fi
+
+    if [[ ${os} == "darwin" ]]; then
+      download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
+      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
+      kube::util::download_file "${url}" "${download_file}"
+      unzip -o "${download_file}"
+      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
+      rm "${download_file}"
+    elif [[ ${os} == "linux" ]]; then
+      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
+      download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
+      kube::util::download_file "${url}" "${download_file}"
+      tar xzf "${download_file}"
+      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
+      rm "${download_file}"
+    else
+      kube::log::info "${os} is NOT supported."
+      return 1
+    fi
+    V=4 kube::log::info "installed etcd v${ETCD_VERSION}"
+    return 0 # newly installed
+  )
+  # Through the magic of errexit, we will not get here if the above shell
+  # fails!
+  PATH="${KUBE_ROOT}/third_party/etcd:${PATH}" # export into current process
   export PATH
+  V=3 kube::log::info "added etcd to PATH: ${KUBE_ROOT}/third_party/etcd"
 }
