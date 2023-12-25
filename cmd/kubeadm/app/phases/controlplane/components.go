@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
+// ControlPlaneComponents contains all components in control plane
 var ControlPlaneComponents = []string{
 	kubeadmconstants.KubeAPIServer,
 	kubeadmconstants.KubeControllerManager,
@@ -50,7 +51,7 @@ type component struct {
 	touched bool
 }
 
-// WaitForControlPlaneComponent wait for control plane component to be ready by check pod status returned by kubelet
+// WaitForControlPlaneComponents wait for control plane component to be ready by check pod status returned by kubelet
 func WaitForControlPlaneComponents(componentNames []string, timeout time.Duration, manifestDir, kubeletDir, certificatesDir string) error {
 	certFile := filepath.Join(certificatesDir, kubeadmconstants.APIServerKubeletClientCertName)
 	keyFile := filepath.Join(certificatesDir, kubeadmconstants.APIServerKubeletClientKeyName)
