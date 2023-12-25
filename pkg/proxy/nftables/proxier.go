@@ -1620,7 +1620,7 @@ func (proxier *Proxier) syncProxyRules() {
 	err = proxier.nftables.Run(context.TODO(), tx)
 	if err != nil {
 		proxier.logger.Error(err, "nftables sync failed")
-		metrics.IptablesRestoreFailuresTotal.Inc()
+		metrics.IPTablesRestoreFailuresTotal.Inc()
 		return
 	}
 	success = true

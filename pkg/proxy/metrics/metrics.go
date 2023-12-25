@@ -139,9 +139,9 @@ var (
 		},
 	)
 
-	// IptablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
+	// IPTablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
 	// seen.
-	IptablesRestoreFailuresTotal = metrics.NewCounter(
+	IPTablesRestoreFailuresTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_restore_failures_total",
@@ -150,9 +150,9 @@ var (
 		},
 	)
 
-	// IptablesPartialRestoreFailuresTotal is the number of iptables *partial* restore
+	// IPTablesPartialRestoreFailuresTotal is the number of iptables *partial* restore
 	// failures (resulting in a fall back to a full restore) that the proxy has seen.
-	IptablesPartialRestoreFailuresTotal = metrics.NewCounter(
+	IPTablesPartialRestoreFailuresTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_partial_restore_failures_total",
@@ -161,9 +161,9 @@ var (
 		},
 	)
 
-	// IptablesRulesTotal is the total number of iptables rules that the iptables
+	// IPTablesRulesTotal is the total number of iptables rules that the iptables
 	// proxy has installed.
-	IptablesRulesTotal = metrics.NewGaugeVec(
+	IPTablesRulesTotal = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_total",
@@ -173,9 +173,9 @@ var (
 		[]string{"table"},
 	)
 
-	// IptablesRulesLastSync is the number of iptables rules that the iptables proxy
+	// IPTablesRulesLastSync is the number of iptables rules that the iptables proxy
 	// updated in the last sync.
-	IptablesRulesLastSync = metrics.NewGaugeVec(
+	IPTablesRulesLastSync = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_last",
@@ -259,17 +259,17 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 		case kubeproxyconfig.ProxyModeIPTables:
 			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
 			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
-			legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
-			legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
-			legacyregistry.MustRegister(IptablesRulesTotal)
-			legacyregistry.MustRegister(IptablesRulesLastSync)
+			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
+			legacyregistry.MustRegister(IPTablesPartialRestoreFailuresTotal)
+			legacyregistry.MustRegister(IPTablesRulesTotal)
+			legacyregistry.MustRegister(IPTablesRulesLastSync)
 
 		case kubeproxyconfig.ProxyModeIPVS:
-			legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
 
 		case kubeproxyconfig.ProxyModeNFTables:
 			// FIXME: should not use the iptables-specific metric
-			legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
 
 		case kubeproxyconfig.ProxyModeKernelspace:
 			// currently no winkernel-specific metrics
