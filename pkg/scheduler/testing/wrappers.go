@@ -730,6 +730,15 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 	return n
 }
 
+// Annotation applies a {k,v} annotation pair to the inner node.
+func (n *NodeWrapper) Annotation(k, v string) *NodeWrapper {
+	if n.Annotations == nil {
+		n.Annotations = make(map[string]string)
+	}
+	metav1.SetMetaDataAnnotation(&n.ObjectMeta, k, v)
+	return n
+}
+
 // Capacity sets the capacity and the allocatable resources of the inner node.
 // Each entry in `resources` corresponds to a resource name and its quantity.
 // By default, the capacity and allocatable number of pods are set to 32.
