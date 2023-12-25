@@ -270,7 +270,7 @@ function codegen::swagger() {
 #     // +k8s:prerelease-lifecycle-gen=true
 function codegen::prerelease() {
     # Build the tool.
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 
     # The result file, in each pkg, of prerelease-lifecycle generation.
@@ -295,7 +295,7 @@ function codegen::prerelease() {
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
-        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+        tag_pkgs+=("./$dir")
     done
 
     kube::log::status "Generating prerelease-lifecycle code for ${#tag_pkgs[@]} targets"
@@ -308,7 +308,7 @@ function codegen::prerelease() {
 
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
-    ./hack/run-in-gopath.sh "${gen_prerelease_bin}" \
+    "${gen_prerelease_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
