@@ -230,6 +230,8 @@ const (
 
 	// DefaultControlPlaneTimeout specifies the default control plane (actually API Server) timeout for use by kubeadm
 	DefaultControlPlaneTimeout = 4 * time.Minute
+	// DefaultKubeletTimeout specifies the default kubelet timeout
+	DefaultKubeletTimeout = 4 * time.Minute
 
 	// MinimumAddressesInServiceSubnet defines minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
