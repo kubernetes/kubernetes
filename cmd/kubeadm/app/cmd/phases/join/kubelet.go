@@ -236,11 +236,13 @@ func waitForTLSBootstrappedClient() error {
 	fmt.Println("[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap")
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
-	return wait.PollImmediate(kubeadmconstants.TLSBootstrapRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {
-		// Check that we can create a client set out of the kubelet kubeconfig. This ensures not
-		// only that the kubeconfig file exists, but that other files required by it also exist (like
-		// client certificate and key)
-		_, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
-		return (err == nil), nil
-	})
+	return wait.PollUntilContextTimeout(context.Background(),
+		kubeadmconstants.TLSBootstrapRetryInterval, kubeadmconstants.TLSBootstrapTimeout,
+		true, func(_ context.Context) (bool, error) {
+			// Check that we can create a client set out of the kubelet kubeconfig. This ensures not
+			// only that the kubeconfig file exists, but that other files required by it also exist (like
+			// client certificate and key)
+			_, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
+			return (err == nil), nil
+		})
 }

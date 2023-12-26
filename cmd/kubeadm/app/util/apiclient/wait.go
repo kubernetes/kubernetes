@@ -103,43 +103,47 @@ func (w *KubeWaiter) WaitForAPI() error {
 func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 
 	lastKnownPodNumber := -1
-	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-		listOpts := metav1.ListOptions{LabelSelector: kvLabel}
-		pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
-		if err != nil {
-			fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
-			return false, nil
-		}
-
-		if lastKnownPodNumber != len(pods.Items) {
-			fmt.Fprintf(w.writer, "[apiclient] Found %d Pods for label selector %s\n", len(pods.Items), kvLabel)
-			lastKnownPodNumber = len(pods.Items)
-		}
-
-		if len(pods.Items) == 0 {
-			return false, nil
-		}
-
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != v1.PodRunning {
+	return wait.PollUntilContextTimeout(context.Background(),
+		kubeadmconstants.APICallRetryInterval, w.timeout,
+		true, func(_ context.Context) (bool, error) {
+			listOpts := metav1.ListOptions{LabelSelector: kvLabel}
+			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
+			if err != nil {
+				fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
 				return false, nil
 			}
-		}
 
-		return true, nil
-	})
+			if lastKnownPodNumber != len(pods.Items) {
+				fmt.Fprintf(w.writer, "[apiclient] Found %d Pods for label selector %s\n", len(pods.Items), kvLabel)
+				lastKnownPodNumber = len(pods.Items)
+			}
+
+			if len(pods.Items) == 0 {
+				return false, nil
+			}
+
+			for _, pod := range pods.Items {
+				if pod.Status.Phase != v1.PodRunning {
+					return false, nil
+				}
+			}
+
+			return true, nil
+		})
 }
 
 // WaitForPodToDisappear blocks until it timeouts or gets a "NotFound" response from the API Server when getting the Static Pod in question
 func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
-	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-		_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil && apierrors.IsNotFound(err) {
-			fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
-			return true, nil
-		}
-		return false, nil
-	})
+	return wait.PollUntilContextTimeout(context.Background(),
+		kubeadmconstants.APICallRetryInterval, w.timeout,
+		true, func(_ context.Context) (bool, error) {
+			_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), podName, metav1.GetOptions{})
+			if err != nil && apierrors.IsNotFound(err) {
+				fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
+				return true, nil
+			}
+			return false, nil
+		})
 }
 
 // WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'.
@@ -204,14 +208,16 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 	var err, lastErr error
 	mirrorPodHashes := map[string]string{}
 	for _, component := range kubeadmconstants.ControlPlaneComponents {
-		err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-			componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
-			if err != nil {
-				lastErr = err
-				return false, nil
-			}
-			return true, nil
-		})
+		err = wait.PollUntilContextTimeout(context.Background(),
+			kubeadmconstants.APICallRetryInterval, w.timeout,
+			true, func(_ context.Context) (bool, error) {
+				componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
+				if err != nil {
+					lastErr = err
+					return false, nil
+				}
+				return true, nil
+			})
 		if err != nil {
 			return nil, lastErr
 		}
@@ -226,14 +232,16 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 
 	componentPodHash := ""
 	var err, lastErr error
-	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-		componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
-		if err != nil {
-			lastErr = err
-			return false, nil
-		}
-		return true, nil
-	})
+	err = wait.PollUntilContextTimeout(context.Background(),
+		kubeadmconstants.APICallRetryInterval, w.timeout,
+		true, func(_ context.Context) (bool, error) {
+			componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
+			if err != nil {
+				lastErr = err
+				return false, nil
+			}
+			return true, nil
+		})
 
 	if err != nil {
 		err = lastErr
@@ -245,21 +253,23 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 // This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
 func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
 	var err, lastErr error
-	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-		hash, err := getStaticPodSingleHash(w.client, nodeName, component)
-		if err != nil {
-			lastErr = err
-			return false, nil
-		}
-		// Set lastErr to nil to be able to later distinguish between getStaticPodSingleHash() and timeout errors
-		lastErr = nil
-		// We should continue polling until the UID changes
-		if hash == previousHash {
-			return false, nil
-		}
+	err = wait.PollUntilContextTimeout(context.Background(),
+		kubeadmconstants.APICallRetryInterval, w.timeout,
+		true, func(_ context.Context) (bool, error) {
+			hash, err := getStaticPodSingleHash(w.client, nodeName, component)
+			if err != nil {
+				lastErr = err
+				return false, nil
+			}
+			// Set lastErr to nil to be able to later distinguish between getStaticPodSingleHash() and timeout errors
+			lastErr = nil
+			// We should continue polling until the UID changes
+			if hash == previousHash {
+				return false, nil
+			}
 
-		return true, nil
-	})
+			return true, nil
+		})
 
 	// If lastError is not nil, this must be a getStaticPodSingleHash() error, else if err is not nil there was a poll timeout
 	if lastErr != nil {

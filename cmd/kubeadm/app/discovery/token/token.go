@@ -208,28 +208,31 @@ func getClusterInfo(client clientset.Interface, kubeconfig *clientcmdapi.Config,
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), duration)
-	defer cancel()
+	klog.V(1).Infof("[discovery] Waiting for the cluster-info ConfigMap to receive a JWS signature"+
+		"for token ID %q", token.ID)
 
-	wait.JitterUntil(func() {
-		cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-		if err != nil {
-			klog.V(1).Infof("[discovery] Failed to request cluster-info, will try again: %v", err)
-			return
-		}
-		// Even if the ConfigMap is available the JWS signature is patched-in a bit later.
-		// Make sure we retry util then.
-		if _, ok := cm.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]; !ok {
-			klog.V(1).Infof("[discovery] The cluster-info ConfigMap does not yet contain a JWS signature for token ID %q, will try again", token.ID)
-			err = errors.Errorf("could not find a JWS signature in the cluster-info ConfigMap for token ID %q", token.ID)
-			return
-		}
-		// Cancel the context on success
-		cancel()
-	}, interval, 0.3, true, ctx.Done())
-
+	var lastError error
+	err = wait.PollUntilContextTimeout(context.Background(),
+		interval, duration, true,
+		func(ctx context.Context) (bool, error) {
+			cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).
+				Get(ctx, bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+			if err != nil {
+				lastError = errors.Wrapf(err, "failed to request the cluster-info ConfigMap")
+				klog.V(1).Infof("[discovery] Retrying due to error: %v", lastError)
+				return false, nil
+			}
+			// Even if the ConfigMap is available the JWS signature is patched-in a bit later.
+			if _, ok := cm.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]; !ok {
+				lastError = errors.Errorf("could not find a JWS signature in the cluster-info ConfigMap"+
+					" for token ID %q", token.ID)
+				klog.V(1).Infof("[discovery] Retrying due to error: %v", lastError)
+				return false, nil
+			}
+			return true, nil
+		})
 	if err != nil {
-		return nil, err
+		return nil, lastError
 	}
 
 	return cm, nil
