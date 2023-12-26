@@ -59,7 +59,7 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 		}
 		switch decision {
 		case authorizer.DecisionAllow, authorizer.DecisionDeny:
-			return decision, reason, err
+			return decision, reason, utilerrors.NewAggregate(errlist)
 		case authorizer.DecisionNoOpinion:
 			// continue to the next authorizer
 		}
