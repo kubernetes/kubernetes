@@ -354,9 +354,7 @@ func ValidateIngressLoadBalancerStatus(status *networking.IngressLoadBalancerSta
 	for i, ingress := range status.Ingress {
 		idxPath := fldPath.Child("ingress").Index(i)
 		if len(ingress.IP) > 0 {
-			if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
-			}
+			allErrs = append(allErrs, validation.IsValidIP(idxPath.Child("ip"), ingress.IP)...)
 		}
 		if len(ingress.Hostname) > 0 {
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {

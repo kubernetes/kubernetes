@@ -3718,9 +3718,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
 		}
 		for i, ns := range dnsConfig.Nameservers {
-			if ip := netutils.ParseIPSloppy(ns); ip == nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers").Index(i), ns, "must be valid IP address"))
-			}
+			allErrs = append(allErrs, validation.IsValidIP(fldPath.Child("nameservers").Index(i), ns)...)
 		}
 		// Validate searches.
 		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
@@ -3887,12 +3885,10 @@ func validateOnlyDeletedSchedulingGates(newGates, oldGates []core.PodSchedulingG
 
 func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, hostAlias := range hostAliases {
-		if ip := netutils.ParseIPSloppy(hostAlias.IP); ip == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
-		}
-		for _, hostname := range hostAlias.Hostnames {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
+	for i, hostAlias := range hostAliases {
+		allErrs = append(allErrs, validation.IsValidIP(fldPath.Index(i).Child("ip"), hostAlias.IP)...)
+		for j, hostname := range hostAlias.Hostnames {
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Index(i).Child("hostnames").Index(j))...)
 		}
 	}
 	return allErrs
@@ -7254,9 +7250,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 		for i, ingress := range status.Ingress {
 			idxPath := ingrPath.Index(i)
 			if len(ingress.IP) > 0 {
-				if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
-				}
+				allErrs = append(allErrs, validation.IsValidIP(idxPath.Child("ip"), ingress.IP)...)
 			}
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
