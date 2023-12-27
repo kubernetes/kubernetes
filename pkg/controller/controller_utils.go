@@ -423,7 +423,7 @@ type RSControlInterface interface {
 	PatchReplicaSet(ctx context.Context, namespace, name string, data []byte) error
 }
 
-// RealRSControl is the default implementation of RSControllerInterface.
+// RealRSControl is the default implementation of RSControlInterface.
 type RealRSControl struct {
 	KubeClient clientset.Interface
 	Recorder   record.EventRecorder
