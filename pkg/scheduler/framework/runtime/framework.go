@@ -18,7 +18,9 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"sort"
 	"time"
@@ -65,6 +67,9 @@ type frameworkImpl struct {
 	bindPlugins          []framework.BindPlugin
 	postBindPlugins      []framework.PostBindPlugin
 	permitPlugins        []framework.PermitPlugin
+
+	// pluginsMap contains all plugins, by name.
+	pluginsMap map[string]framework.Plugin
 
 	clientSet       clientset.Interface
 	kubeConfig      *restclient.Config
@@ -297,7 +302,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		PluginConfig:             make([]config.PluginConfig, 0, len(pg)),
 	}
 
-	pluginsMap := make(map[string]framework.Plugin)
+	f.pluginsMap = make(map[string]framework.Plugin)
 	for name, factory := range r {
 		// initialize only needed plugins.
 		if !pg.Has(name) {
@@ -315,21 +320,21 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		if err != nil {
 			return nil, fmt.Errorf("initializing plugin %q: %w", name, err)
 		}
-		pluginsMap[name] = p
+		f.pluginsMap[name] = p
 
 		f.fillEnqueueExtensions(p)
 	}
 
 	// initialize plugins per individual extension points
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
-		if err := updatePluginList(e.slicePtr, *e.plugins, pluginsMap); err != nil {
+		if err := updatePluginList(e.slicePtr, *e.plugins, f.pluginsMap); err != nil {
 			return nil, err
 		}
 	}
 
 	// initialize multiPoint plugins to their expanded extension points
 	if len(profile.Plugins.MultiPoint.Enabled) > 0 {
-		if err := f.expandMultiPointPlugins(logger, profile, pluginsMap); err != nil {
+		if err := f.expandMultiPointPlugins(logger, profile); err != nil {
 			return nil, err
 		}
 	}
@@ -341,7 +346,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		return nil, fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", profile.SchedulerName)
 	}
 
-	if err := getScoreWeights(f, pluginsMap, append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...)); err != nil {
+	if err := getScoreWeights(f, append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...)); err != nil {
 		return nil, err
 	}
 
@@ -405,14 +410,29 @@ func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
 	f.PodNominator = n
 }
 
+// Close closes each plugin, when they implement io.Closer interface.
+func (f *frameworkImpl) Close() error {
+	var errs []error
+	for name, plugin := range f.pluginsMap {
+		if closer, ok := plugin.(io.Closer); ok {
+			err := closer.Close()
+			if err != nil {
+				errs = append(errs, fmt.Errorf("%s failed to close: %w", name, err))
+				// We try to close all plugins even if we got errors from some.
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // getScoreWeights makes sure that, between MultiPoint-Score plugin weights and individual Score
 // plugin weights there is not an overflow of MaxTotalScore.
-func getScoreWeights(f *frameworkImpl, pluginsMap map[string]framework.Plugin, plugins []config.Plugin) error {
+func getScoreWeights(f *frameworkImpl, plugins []config.Plugin) error {
 	var totalPriority int64
 	scorePlugins := reflect.ValueOf(&f.scorePlugins).Elem()
 	pluginType := scorePlugins.Type().Elem()
 	for _, e := range plugins {
-		pg := pluginsMap[e.Name]
+		pg := f.pluginsMap[e.Name]
 		if !reflect.TypeOf(pg).Implements(pluginType) {
 			continue
 		}
@@ -469,7 +489,7 @@ func (os *orderedSet) delete(s string) {
 	}
 }
 
-func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *config.KubeSchedulerProfile, pluginsMap map[string]framework.Plugin) error {
+func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *config.KubeSchedulerProfile) error {
 	// initialize MultiPoint plugins
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
 		plugins := reflect.ValueOf(e.slicePtr).Elem()
@@ -495,7 +515,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *con
 		multiPointEnabled := newOrderedSet()
 		overridePlugins := newOrderedSet()
 		for _, ep := range profile.Plugins.MultiPoint.Enabled {
-			pg, ok := pluginsMap[ep.Name]
+			pg, ok := f.pluginsMap[ep.Name]
 			if !ok {
 				return fmt.Errorf("%s %q does not exist", pluginType.Name(), ep.Name)
 			}
@@ -539,17 +559,17 @@ func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *con
 		// part 1
 		for _, name := range slice.CopyStrings(enabledSet.list) {
 			if overridePlugins.has(name) {
-				newPlugins = reflect.Append(newPlugins, reflect.ValueOf(pluginsMap[name]))
+				newPlugins = reflect.Append(newPlugins, reflect.ValueOf(f.pluginsMap[name]))
 				enabledSet.delete(name)
 			}
 		}
 		// part 2
 		for _, name := range multiPointEnabled.list {
-			newPlugins = reflect.Append(newPlugins, reflect.ValueOf(pluginsMap[name]))
+			newPlugins = reflect.Append(newPlugins, reflect.ValueOf(f.pluginsMap[name]))
 		}
 		// part 3
 		for _, name := range enabledSet.list {
-			newPlugins = reflect.Append(newPlugins, reflect.ValueOf(pluginsMap[name]))
+			newPlugins = reflect.Append(newPlugins, reflect.ValueOf(f.pluginsMap[name]))
 		}
 		plugins.Set(newPlugins)
 	}
