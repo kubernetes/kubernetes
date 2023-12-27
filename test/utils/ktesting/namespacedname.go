@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package ktesting
 
 // NamespacedName comprises a resource name, with a mandatory namespace,
 // rendered as "<namespace>/<name>". It implements NamedObject and thus can be
