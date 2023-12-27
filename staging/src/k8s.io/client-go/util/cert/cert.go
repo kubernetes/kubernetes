@@ -244,7 +244,7 @@ func ValidateCertificatePEM(pemData []byte) error {
 		}
 
 		if block.Type != CertificateBlockType {
-			return fmt.Errorf("only CERTIFICATE PEM blocks are allowed, found %q", block.Type)
+			continue
 		}
 		if len(block.Headers) != 0 {
 			return fmt.Errorf("no PEM block headers are permitted")
