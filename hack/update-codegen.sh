@@ -679,7 +679,7 @@ function codegen::clients() {
 }
 
 function codegen::listers() {
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/lister-gen
 
     local listergen
@@ -708,8 +708,9 @@ function codegen::listers() {
         | xargs -0 rm -f
 
     "${listergen}" \
+        --v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/vendor" \
+        --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
         --output-package "k8s.io/client-go/listers" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
