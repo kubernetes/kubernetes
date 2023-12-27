@@ -721,7 +721,7 @@ function codegen::listers() {
 }
 
 function codegen::informers() {
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/informer-gen
 
     local informergen
@@ -750,12 +750,13 @@ function codegen::informers() {
         | xargs -0 rm -f
 
     "${informergen}" \
+        --v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/vendor" \
+        --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go/informers" \
         --output-package "k8s.io/client-go/informers" \
         --single-directory \
-        --versioned-clientset-package k8s.io/client-go/kubernetes \
-        --listers-package k8s.io/client-go/listers \
+        --versioned-clientset-package "k8s.io/client-go/kubernetes" \
+        --listers-package "k8s.io/client-go/listers" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
 
