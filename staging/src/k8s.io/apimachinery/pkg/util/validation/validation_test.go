@@ -458,20 +458,20 @@ func TestIsValidIP(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			msgs := IsValidIP(tc.in)
+			errs := IsValidIP(field.NewPath(""), tc.in)
 			if tc.err == "" {
-				if len(msgs) != 0 {
-					t.Errorf("expected %q to be valid but got: %v", tc.in, msgs)
+				if len(errs) != 0 {
+					t.Errorf("expected %q to be valid but got: %v", tc.in, errs)
 				}
 			} else {
-				if len(msgs) != 1 {
-					t.Errorf("expected %q to have 1 error but got: %v", tc.in, msgs)
-				} else if !strings.Contains(msgs[0], tc.err) {
-					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, msgs[0])
+				if len(errs) != 1 {
+					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
+				} else if !strings.Contains(errs[0].Detail, tc.err) {
+					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
 				}
 			}
 
-			errs := IsValidIPv4Address(field.NewPath(""), tc.in)
+			errs = IsValidIPv4Address(field.NewPath(""), tc.in)
 			if tc.family == 4 {
 				if len(errs) != 0 {
 					t.Errorf("expected %q to pass IsValidIPv4Address but got: %v", tc.in, errs)

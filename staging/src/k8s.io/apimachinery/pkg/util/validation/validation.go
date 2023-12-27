@@ -350,11 +350,12 @@ func IsValidPortName(port string) []string {
 }
 
 // IsValidIP tests that the argument is a valid IP address.
-func IsValidIP(value string) []string {
+func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
 	if netutils.ParseIPSloppy(value) == nil {
-		return []string{"must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"}
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"))
 	}
-	return nil
+	return allErrors
 }
 
 // IsValidIPv4Address tests that the argument is a valid IPv4 address.

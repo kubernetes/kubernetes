@@ -4027,9 +4027,7 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 
 	// all PodIPs must be valid IPs
 	for i, podIP := range pod.Status.PodIPs {
-		for _, msg := range validation.IsValidIP(podIP.IP) {
-			allErrs = append(allErrs, field.Invalid(podIPsField.Index(i), podIP.IP, msg))
-		}
+		allErrs = append(allErrs, validation.IsValidIP(podIPsField.Index(i), podIP.IP)...)
 	}
 
 	// if we have more than one Pod.PodIP then
@@ -4081,9 +4079,7 @@ func validateHostIPs(pod *core.Pod) field.ErrorList {
 
 	// all HostPs must be valid IPs
 	for i, hostIP := range pod.Status.HostIPs {
-		for _, msg := range validation.IsValidIP(hostIP.IP) {
-			allErrs = append(allErrs, field.Invalid(hostIPsField.Index(i), hostIP.IP, msg))
-		}
+		allErrs = append(allErrs, validation.IsValidIP(hostIPsField.Index(i), hostIP.IP)...)
 	}
 
 	// if we have more than one Pod.HostIP then
@@ -5399,10 +5395,8 @@ func ValidateService(service *core.Service) field.ErrorList {
 	ipPath := specPath.Child("externalIPs")
 	for i, ip := range service.Spec.ExternalIPs {
 		idxPath := ipPath.Index(i)
-		if msgs := validation.IsValidIP(ip); len(msgs) != 0 {
-			for i := range msgs {
-				allErrs = append(allErrs, field.Invalid(idxPath, ip, msgs[i]))
-			}
+		if errs := validation.IsValidIP(idxPath, ip); len(errs) != 0 {
+			allErrs = append(allErrs, errs...)
 		} else {
 			allErrs = append(allErrs, ValidateNonSpecialIP(ip, idxPath)...)
 		}
@@ -6914,9 +6908,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path)
 
 func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsValidIP(address.IP) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
-	}
+	allErrs = append(allErrs, validation.IsValidIP(fldPath.Child("ip"), address.IP)...)
 	if len(address.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
@@ -7618,11 +7610,9 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		}
 
 		// is it valid ip?
-		errorMessages := validation.IsValidIP(clusterIP)
+		errorMessages := validation.IsValidIP(clusterIPsField.Index(i), clusterIP)
 		hasInvalidIPs = (len(errorMessages) != 0) || hasInvalidIPs
-		for _, msg := range errorMessages {
-			allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), clusterIP, msg))
-		}
+		allErrs = append(allErrs, errorMessages...)
 	}
 
 	// max two
