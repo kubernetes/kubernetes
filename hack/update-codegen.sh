@@ -625,7 +625,7 @@ function codegen::applyconfigs() {
 }
 
 function codegen::clients() {
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/client-gen
 
     local clientgen
@@ -638,7 +638,7 @@ function codegen::clients() {
         local api_dir
         api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
         local nopkg_dir=${api_dir#pkg/}
-        nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
+        nopkg_dir=${nopkg_dir#staging/src/k8s.io/api/}
         local pkg_dir=${nopkg_dir#apis/}
 
         # skip groups that aren't being served, clients for these don't matter
@@ -665,8 +665,9 @@ function codegen::clients() {
         | xargs -0 rm -f
 
     "${clientgen}" \
+        --v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/vendor" \
+        --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go" \
         --output-package="k8s.io/client-go" \
         --clientset-name="kubernetes" \
         --input-base="k8s.io/api" \
