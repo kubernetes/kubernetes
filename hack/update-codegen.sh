@@ -578,7 +578,7 @@ function codegen::openapi() {
 }
 
 function codegen::applyconfigs() {
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema \
         k8s.io/code-generator/cmd/applyconfiguration-gen
 
@@ -611,9 +611,10 @@ function codegen::applyconfigs() {
         | xargs -0 rm -f
 
     "${applyconfigurationgen}" \
+        --v "${KUBE_VERBOSE}" \
         --openapi-schema <("${modelsschema}") \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/vendor" \
+        --output-base "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
         --output-package "${APPLYCONFIG_PKG}" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
