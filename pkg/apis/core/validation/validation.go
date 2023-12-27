@@ -5870,9 +5870,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 
 		// all PodCIDRs should be valid ones
 		for idx, value := range node.Spec.PodCIDRs {
-			if _, err := ValidateCIDR(value); err != nil {
-				allErrs = append(allErrs, field.Invalid(podCIDRsField.Index(idx), node.Spec.PodCIDRs, "must be valid CIDR"))
-			}
+			allErrs = append(allErrs, validation.IsValidCIDR(podCIDRsField.Index(idx), value)...)
 		}
 
 		// if more than PodCIDR then
@@ -7298,15 +7296,6 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 	}
 
 	return true, allErrs
-}
-
-// ValidateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
-func ValidateCIDR(cidr string) (*net.IPNet, error) {
-	_, net, err := netutils.ParseCIDRSloppy(cidr)
-	if err != nil {
-		return nil, err
-	}
-	return net, nil
 }
 
 func IsDecremented(update, old *int32) bool {
