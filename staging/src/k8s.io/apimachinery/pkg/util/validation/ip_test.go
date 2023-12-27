@@ -81,21 +81,21 @@ func TestIsValidIP(t *testing.T) {
 
 		// BAD VALUES WE CURRENTLY CONSIDER GOOD
 		{
-			name:   "ipv4 with leading 0s",
-			in:     "1.1.1.01",
-			family: 4,
+			name: "ipv4 with leading 0s",
+			in:   "1.1.1.01",
+			err:  "cannot have leading 0s",
 		},
 		{
-			name:   "ipv4-in-ipv6 value",
-			in:     "::ffff:1.1.1.1",
-			family: 4,
+			name: "ipv4-in-ipv6 value",
+			in:   "::ffff:1.1.1.1",
+			err:  "IPv4-mapped IPv6",
 		},
 
 		// BAD VALUES
 		{
 			name: "empty string",
 			in:   "",
-			err:  "must be a valid IP address",
+			err:  "expected an IP address",
 		},
 		{
 			name: "junk",
@@ -110,7 +110,7 @@ func TestIsValidIP(t *testing.T) {
 		{
 			name: "cidr",
 			in:   "1.2.3.0/24",
-			err:  "must be a valid IP address",
+			err:  "got CIDR value",
 		},
 		{
 			name: "ipv4 with out-of-range octets",
@@ -150,7 +150,7 @@ func TestIsValidIP(t *testing.T) {
 		{
 			name: "ipv6 with zone",
 			in:   "1234::abcd%eth0",
-			err:  "must be a valid IP address",
+			err:  "zone specifier is not allowed",
 		},
 		{
 			name: "ipv4 with zone",
@@ -243,33 +243,39 @@ func TestIsValidCIDR(t *testing.T) {
 		{
 			name: "ipv4 with leading 0s",
 			in:   "1.1.01.0/24",
+			err:  "cannot have leading 0s",
 		},
 		{
 			name: "ipv4-in-ipv6 with ipv4-sized prefix",
 			in:   "::ffff:1.1.1.0/24",
+			err:  "IPv4-mapped IPv6",
 		},
 		{
 			name: "ipv4-in-ipv6 with ipv6-sized prefix",
 			in:   "::ffff:1.1.1.0/120",
+			err:  "IPv4-mapped IPv6",
 		},
 		{
 			name: "ipv4 with bits past prefix",
 			in:   "1.2.3.4/24",
+			err:  "bits set beyond the prefix",
 		},
 		{
 			name: "ipv6 with bits past prefix",
 			in:   "2001:db8::1/64",
+			err:  "bits set beyond the prefix",
 		},
 		{
 			name: "prefix length with leading 0s",
 			in:   "192.168.0.0/016",
+			err:  "leading 0s",
 		},
 
 		// BAD VALUES
 		{
 			name: "empty string",
 			in:   "",
-			err:  "must be a valid CIDR value",
+			err:  "expected a CIDR value",
 		},
 		{
 			name: "junk",
@@ -279,7 +285,7 @@ func TestIsValidCIDR(t *testing.T) {
 		{
 			name: "IP address",
 			in:   "1.2.3.4",
-			err:  "must be a valid CIDR value",
+			err:  "got IP address",
 		},
 		{
 			name: "partial URL",

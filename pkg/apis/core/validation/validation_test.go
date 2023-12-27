@@ -22320,8 +22320,8 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IP address",
+			errorType:   "FieldValueRequired",
+			errorDetail: "expected an IP address",
 		},
 		"Port missing number": {
 			endpoints: core.Endpoints{
