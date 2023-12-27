@@ -748,21 +748,15 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 	}
 
 	for i, cidr := range cidrConfig.Spec.CIDRs {
-		allErrs = append(allErrs, validateCIDR(cidr, fieldPath.Index(i))...)
+		allErrs = append(allErrs, validateCanonicalCIDR(cidr, fieldPath.Index(i))...)
 	}
 
 	return allErrs
 }
 
-func validateCIDR(cidr string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	prefix, err := netip.ParsePrefix(cidr)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, cidr, err.Error()))
-	} else {
-		if prefix.Addr() != prefix.Masked().Addr() {
-			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "wrong CIDR format, IP doesn't match network IP address"))
-		}
+func validateCanonicalCIDR(cidr string, fldPath *field.Path) field.ErrorList {
+	allErrs := validation.IsValidCIDR(fldPath, cidr)
+	if prefix, err := netip.ParsePrefix(cidr); err == nil {
 		if prefix.String() != cidr {
 			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "CIDR not in RFC 5952 canonical format"))
 		}

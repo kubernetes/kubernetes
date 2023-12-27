@@ -108,21 +108,21 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			name:    "IPv4 with leading zeros",
 			service: service([]string{"192.012.2.2"}),
 			want: []string{
-				`spec.clusterIPs[0]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.clusterIPs[0]: IP address uses deprecated form: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
 			},
 		},
 		{
 			name:    "Dual Stack IPv4-IPv6 and IPv4 with leading zeros",
 			service: service([]string{"192.012.2.2", "2001:db8::2"}),
 			want: []string{
-				`spec.clusterIPs[0]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.clusterIPs[0]: IP address uses deprecated form: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
 			},
 		},
 		{
 			name:    "Dual Stack IPv6-IPv4 and IPv4 with leading zeros",
 			service: service([]string{"2001:db8::2", "192.012.2.2"}),
 			want: []string{
-				`spec.clusterIPs[1]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.clusterIPs[1]: IP address uses deprecated form: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			name:    "Dual Stack IPv4-IPv6 and IPv4 with leading zeros and IPv6 non-canonical format",
 			service: service([]string{"192.012.2.2", "2001:db8:0:0::2"}),
 			want: []string{
-				`spec.clusterIPs[0]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.clusterIPs[0]: IP address uses deprecated form: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
 				`spec.clusterIPs[1]: IPv6 address "2001:db8:0:0::2" is not in RFC 5952 canonical format ("2001:db8::2"), which may cause controller apply-loops`,
 			},
 		},
@@ -159,7 +159,7 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			service: service([]string{"2001:db8:0:0::2", "192.012.2.2"}),
 			want: []string{
 				`spec.clusterIPs[0]: IPv6 address "2001:db8:0:0::2" is not in RFC 5952 canonical format ("2001:db8::2"), which may cause controller apply-loops`,
-				`spec.clusterIPs[1]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.clusterIPs[1]: IP address uses deprecated form: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
 			},
 		},
 		{
@@ -180,12 +180,12 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			},
 			want: []string{
 				`spec.clusterIPs[0]: IPv6 address "2001:db8:0:0::2" is not in RFC 5952 canonical format ("2001:db8::2"), which may cause controller apply-loops`,
-				`spec.clusterIPs[1]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.clusterIPs[1]: IP address uses deprecated form: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
 				`spec.externalIPs[0]: IPv6 address "2001:db8:1:0::2" is not in RFC 5952 canonical format ("2001:db8:1::2"), which may cause controller apply-loops`,
-				`spec.externalIPs[1]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("10.012.2.2"): IPv4 field has octet with leading zero`,
-				`spec.loadBalancerIP: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("10.001.1.1"): IPv4 field has octet with leading zero`,
+				`spec.externalIPs[1]: IP address uses deprecated form: ParseAddr("10.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.loadBalancerIP: IP address uses deprecated form: ParseAddr("10.001.1.1"): IPv4 field has octet with leading zero`,
 				`spec.loadBalancerSourceRanges[0]: IPv6 prefix "2001:db8:1:0::/64" is not in RFC 5952 canonical format ("2001:db8:1::/64"), which may cause controller apply-loops`,
-				`spec.loadBalancerSourceRanges[1]: IP prefix was accepted, but will be invalid in a future Kubernetes release: netip.ParsePrefix("10.012.2.0/24"): ParseAddr("10.012.2.0"): IPv4 field has octet with leading zero`,
+				`spec.loadBalancerSourceRanges[1]: IP prefix uses deprecated form: netip.ParsePrefix("10.012.2.0/24"): ParseAddr("10.012.2.0"): IPv4 field has octet with leading zero`,
 			},
 		},
 	}
@@ -222,7 +222,7 @@ func Test_getWarningsForIP(t *testing.T) {
 			address:   "192.012.2.2",
 			fieldPath: field.NewPath("spec").Child("clusterIPs").Index(0),
 			want: []string{
-				`spec.clusterIPs[0]: IP address was accepted, but will be invalid in a future Kubernetes release: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
+				`spec.clusterIPs[0]: IP address uses deprecated form: ParseAddr("192.012.2.2"): IPv4 field has octet with leading zero`,
 			},
 		},
 		{
@@ -267,7 +267,7 @@ func Test_getWarningsForCIDR(t *testing.T) {
 			cidr:      "192.012.2.0/24",
 			fieldPath: field.NewPath("spec").Child("loadBalancerSourceRanges").Index(0),
 			want: []string{
-				`spec.loadBalancerSourceRanges[0]: IP prefix was accepted, but will be invalid in a future Kubernetes release: netip.ParsePrefix("192.012.2.0/24"): ParseAddr("192.012.2.0"): IPv4 field has octet with leading zero`,
+				`spec.loadBalancerSourceRanges[0]: IP prefix uses deprecated form: netip.ParsePrefix("192.012.2.0/24"): ParseAddr("192.012.2.0"): IPv4 field has octet with leading zero`,
 			},
 		},
 		{

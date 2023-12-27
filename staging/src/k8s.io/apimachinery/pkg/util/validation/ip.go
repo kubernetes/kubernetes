@@ -17,45 +17,169 @@ limitations under the License.
 package validation
 
 import (
+	"net/netip"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	netutils "k8s.io/utils/net"
 )
 
-// IsValidIP tests that the argument is a valid IP address.
+// IsValidIP tests that the argument is a valid IP address according to current Kubernetes
+// validation rules, and that it would be parsed identically by net.ParseIP,
+// netutils.ParseIPSloppy, netip.ParseAddr, and external APIs. In particular:
+//
+//  1. IPv4 IPs must not have any leading "0"s in octets (e.g. "010.002.003.004").
+//     Historically, net.ParseIP (and later netutils.ParseIPSloppy) simply ignored the
+//     leading "0"s, but some libc-based software treats 0-prefixed octets as octal,
+//     meaning different software would interpret the same string as a different IP.
+//     (Current net.ParseIP and netip.ParseAddr reject inputs with leading "0"s.)
+//
+//     (More generally, IPv4 IPs must use the ordinary decimal dotted quad notation, not
+//     any of the weirder formats historically supported by inet_aton(), which have never
+//     been supported by net.ParseIP/netip.ParseAddr.)
+//
+//  2. IPv4-mapped IPv6 IPs (e.g. "::ffff:1.2.3.4") are not allowed, because they may be
+//     treated as IPv4 by some software and IPv6 by other software, again potentially
+//     leading to different interpretations of the same values. (net.ParseIP and
+//     netip.ParseAddr both allow these, but there are no use cases for representing IPv4
+//     addresses as IPv4-mapped IPv6 addresses in Kubernetes.)
+//
+//  3. IPs may not have a trailing zone identifier (e.g. "fe80::1234%eth0"). This syntax
+//     is accepted by netip.ParseAddr, but not by net.ParseIP/netutils.ParseIPSloppy.
+//
+// Note that objects created before Kubernetes 1.30 may contain IP addresses that are not
+// considered valid according to all of these rules. When validating an update of such an
+// object, you must not require old IP-valued fields to revalidate if they are not being
+// changed.
 func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
-	var allErrors field.ErrorList
-	if netutils.ParseIPSloppy(value) == nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"))
-	}
+	_, allErrors := isValidIPInternal(fldPath, value)
 	return allErrors
+}
+
+func isValidIPInternal(fldPath *field.Path, value string) (netip.Addr, field.ErrorList) {
+	var allErrors field.ErrorList
+	if value == "" {
+		allErrors = append(allErrors, field.Required(fldPath, "expected an IP address"))
+		return netip.Addr{}, allErrors
+	}
+
+	ip, err := netip.ParseAddr(value)
+	if err != nil {
+		// netip.ParseAddr returns very technical/low-level error messages so we
+		// ignore err itself.
+
+		if ip := netutils.ParseIPSloppy(value); ip != nil {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "IP address cannot have leading 0s"))
+			return netip.Addr{}, allErrors
+		}
+		if _, err := netip.ParsePrefix(value); err == nil {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "expected an IP address (e.g. 10.9.8.7 or 2001:db8::ffff), got CIDR value"))
+			return netip.Addr{}, allErrors
+		}
+
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address (e.g. 10.9.8.7 or 2001:db8::ffff)"))
+		return netip.Addr{}, allErrors
+	}
+
+	if ip.Zone() != "" {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "IP address with zone specifier is not allowed"))
+	}
+	if ip.Is4In6() {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "IPv4-mapped IPv6 address is not allowed"))
+	}
+
+	return ip, allErrors
 }
 
 // IsValidIPv4Address tests that the argument is a valid IPv4 address.
 func IsValidIPv4Address(fldPath *field.Path, value string) field.ErrorList {
-	var allErrors field.ErrorList
-	ip := netutils.ParseIPSloppy(value)
-	if ip == nil || ip.To4() == nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address"))
+	ip, allErrors := isValidIPInternal(fldPath, value)
+	// Only check this if there were no other errors, to avoid false positives
+	if len(allErrors) == 0 && !ip.Is4() {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv4 address"))
 	}
 	return allErrors
 }
 
 // IsValidIPv6Address tests that the argument is a valid IPv6 address.
 func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
-	var allErrors field.ErrorList
-	ip := netutils.ParseIPSloppy(value)
-	if ip == nil || ip.To4() != nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
+	ip, allErrors := isValidIPInternal(fldPath, value)
+	// Only check this if there were no other errors, to avoid false positives
+	if len(allErrors) == 0 && !ip.Is6() {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv6 address"))
 	}
 	return allErrors
 }
 
-// IsValidCIDR tests that the argument is a valid CIDR value.
+// IsValidCIDR tests that the argument is a valid CIDR string according to current
+// Kubernetes validation rules, and would be parsed identically by net.ParseCIDR,
+// netutils.ParseCIDRSloppy, netip.ParsePrefix, and external APIs. In particular:
+//
+//  1. The IP part of the CIDR string must be valid according to IsValidIP.
+//
+//  2. The IP part of the CIDR must not have any bits set beyond the prefix length (e.g.
+//     an IPv4 CIDR with a prefix length of "24" must have "0" for its final octet).
+//     net.ParseCIDR and netip.ParsePrefix both accept CIDR values such as
+//     "192.168.1.5/24", because such strings are often used to describe the IPs assigned
+//     to network interfaces. But there are no Kubernetes API objects that expect IP
+//     addresses represented in that form, and passing values in that form to an external
+//     API that was expecting a subnet or a mask value would have undefined results.
+//     (E.g., "192.168.1.5/24" might be treated as meaning either "192.168.1.0/24" or
+//     "192.168.1.5/32" depending on how it gets processed.)
+//
+//  3. The prefix length must consist only of numbers, and not have any leading "0"s.
+//     (net.ParseCIDR and netutils.ParseCIDRSloppy allow leading "0s" (e.g.
+//     "192.168.0.0/016"), and net.ParsePrefix in golang 1.21 and earlier allows both
+//     leading "0"s and a leading "+".)
+//
+// Note that objects created before Kubernetes 1.30 may contain CIDR values that are not
+// considered valid according to all of these rules. When validating an update of such an
+// object, you must not require old CIDR-valued fields to revalidate if they are not being
+// changed.
 func IsValidCIDR(fldPath *field.Path, value string) field.ErrorList {
 	var allErrors field.ErrorList
-	_, _, err := netutils.ParseCIDRSloppy(value)
-	if err != nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
+	if value == "" {
+		allErrors = append(allErrors, field.Required(fldPath, "expected a CIDR value"))
+		return allErrors
 	}
+
+	cidr, err := netip.ParsePrefix(value)
+	if err != nil {
+		// netip.ParsePrefix returns very technical/low-level error messages
+		// so we ignore err itself.
+
+		if _, _, err := netutils.ParseCIDRSloppy(value); err == nil {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "IP address in CIDR cannot have leading 0s"))
+			return allErrors
+		}
+		if _, err := netip.ParseAddr(value); err == nil {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "expected a valid CIDR value (e.g. 10.9.8.0/24 or 2001:db8::/64), got IP address"))
+			return allErrors
+		}
+
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
+		return allErrors
+	}
+
+	// (Unlike netip.ParseAddr, netip.ParsePrefix doesn't allow IPv6 zones, so
+	// we don't have to check for that.)
+
+	if cidr.Addr().Is4In6() {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "CIDR containing IPv4-mapped IPv6 address is not allowed"))
+	} else if cidr != cidr.Masked() {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "CIDR value should not have any bits set beyond the prefix length"))
+	}
+
+	// Up through golang 1.21, ParsePrefix just parses the prefix length with
+	// strconv.Atoi and so ends up allowing things like "1.2.3.0/+24".
+	// https://github.com/golang/go/issues/63850
+	if strings.Contains(value, "/+") {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
+	}
+	// Both net.ParseCIDR and netip.ParsePrefix up to 1.21 allow "1.2.3.0/024".
+	if strings.Contains(value, "/0") && !strings.HasSuffix(value, "/0") {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "prefix length in CIDR cannot have leading 0s"))
+	}
+
 	return allErrors
 }

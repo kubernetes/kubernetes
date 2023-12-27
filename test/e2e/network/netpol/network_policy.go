@@ -19,6 +19,7 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1026,7 +1027,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			framework.ExpectNoError(err, "Failing to find pod x/a")
 			podA := podList.Items[0]
 
-			podServerAllowCIDR := fmt.Sprintf("%s/4", podA.Status.PodIP)
+			podServerAllowCIDR := makeLargeCIDRForIP(podA.Status.PodIP)
 
 			podList, err = f.ClientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=b"})
 			framework.ExpectNoError(err, "Failing to find pod x/b")
@@ -1070,7 +1071,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 				hostMask = 128
 			}
 
-			podServerAllowCIDR := fmt.Sprintf("%s/4", podA.Status.PodIP)
+			podServerAllowCIDR := makeLargeCIDRForIP(podA.Status.PodIP)
 			podServerExceptList := []string{fmt.Sprintf("%s/%d", podB.Status.PodIP, hostMask)}
 			egressRule1 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule1.To = append(egressRule1.To, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: podServerAllowCIDR, Except: podServerExceptList}})
@@ -1464,4 +1465,14 @@ func initializeResources(ctx context.Context, f *framework.Framework, protocols 
 	k8s, err := initializeCluster(ctx, f, protocols, ports)
 	framework.ExpectNoError(err, "unable to initialize resources")
 	return k8s
+}
+
+// Given an IP, this makes a large CIDR that includes that IP (and lots of other IPs)
+func makeLargeCIDRForIP(ip string) string {
+	podIP := utilnet.ParseIPSloppy(ip)
+	if ip4 := podIP.To4(); ip4 != nil {
+		podIP = ip4
+	}
+	cidrBase := podIP.Mask(net.CIDRMask(4, 8*len(podIP)))
+	return fmt.Sprintf("%s/4", cidrBase.String())
 }
