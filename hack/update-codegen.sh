@@ -496,7 +496,7 @@ function k8s_tag_files_except() {
 #     // +k8s:openapi-gen=true
 function codegen::openapi() {
     # Build the tool.
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/openapi-gen
 
     # The result file, in each pkg, of open-api generation.
@@ -507,6 +507,7 @@ function codegen::openapi() {
     gen_openapi_bin="$(kube::util::find-binary "openapi-gen")"
 
     local output_dir="pkg/generated/openapi"
+    local output_pkg="k8s.io/kubernetes/${output_dir}"
     local known_violations_file="${API_KNOWN_VIOLATIONS_DIR}/violation_exceptions.list"
 
     local report_file="${OUT_DIR}/api_violations.report"
@@ -523,8 +524,8 @@ function codegen::openapi() {
     local tag_files=()
     kube::util::read-array tag_files < <(
         k8s_tag_files_except \
-            vendor/k8s.io/code-generator \
-            vendor/k8s.io/sample-apiserver
+            staging/src/k8s.io/code-generator \
+            staging/src/k8s.io/sample-apiserver
         )
 
     local tag_dirs=()
@@ -539,7 +540,7 @@ function codegen::openapi() {
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
-        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+        tag_pkgs+=("./$dir")
     done
 
     kube::log::status "Generating openapi code"
@@ -552,12 +553,13 @@ function codegen::openapi() {
 
     git_find -z ':(glob)pkg/generated/**'/"${output_file}.go" | xargs -0 rm -f
 
-    ./hack/run-in-gopath.sh "${gen_openapi_bin}" \
+    "${gen_openapi_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
-        --output-package "${PRJ_SRC_PATH}/${output_dir}" \
+        --output-base "${output_dir}" \
+        --output-package "${output_pkg}" \
         --report-filename "${report_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
