@@ -38,6 +38,8 @@ limitations under the License.
 //   - Add `ClusterConfiguration.DNS.Disabled` and `ClusterConfiguration.Proxy.Disabled` that can be used to disable
 //     the CoreDNS and kube-proxy addons during cluster initialization. Skipping the related addons phases,
 //     during cluster creation will set the same fields to `false`.
+//   - Add a `Timeouts` structure to `InitConfiguration`, `JoinConfiguration` and `ResetConfiguration“
+//     that can be used to configure various timeouts.
 //
 // Migration from old kubeadm config versions
 //

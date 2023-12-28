@@ -29,11 +29,6 @@ func Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in *kubeadm.
 	return autoConvert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in, out, s)
 }
 
-// Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration converts a private JoinConfiguration to public JoinConfiguration.
-func Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
-	return autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in, out, s)
-}
-
 // Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration converts a public InitConfiguration to private InitConfiguration.
 func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
 	err := autoConvert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s)
@@ -45,7 +40,20 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	// If we call Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration() it will receive
 	// a default value, thus here we need to reset it back to "".
 	out.EncryptionAlgorithm = ""
+	// Set default timeouts.
+	kubeadm.SetDefaultTimeouts(&out.Timeouts)
 	return err
+}
+
+// Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration converts a private JoinConfiguration to public JoinConfiguration.
+func Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	return autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in, out, s)
+}
+
+// Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration converts a public JoinConfiguration to a private JoinConfiguration.
+func Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	kubeadm.SetDefaultTimeouts(&out.Timeouts)
+	return autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 }
 
 // Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration is required due to missing EncryptionAlgorithm in v1beta3.
@@ -134,4 +142,9 @@ func convertFromArgs(in []kubeadm.Arg) map[string]string {
 		args[arg.Name] = arg.Value
 	}
 	return args
+}
+
+// Convert_v1beta3_APIServer_To_kubeadm_APIServer is required due to missing APIServer.TimeoutForControlPlane in v1beta4.
+func Convert_v1beta3_APIServer_To_kubeadm_APIServer(in *APIServer, out *kubeadm.APIServer, s conversion.Scope) error {
+	return autoConvert_v1beta3_APIServer_To_kubeadm_APIServer(in, out, s)
 }
