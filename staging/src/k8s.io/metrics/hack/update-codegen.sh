@@ -23,21 +23,17 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 
 source "${CODEGEN_PKG}/kube_codegen.sh"
 
-# generate the code with:
-# --output-base    because this script should also be able to run inside the vendor dir of
-#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
-#                  instead of the $GOPATH directly. For normal projects this can be dropped.
-#
+THIS_PKG="k8s.io/metrics"
+
 # we skip informers and listers for metrics, because we don't quite support the requisite operations yet
 # we skip generating the internal clientset as it's not really needed
 
 kube::codegen::gen_helpers \
-    --input-pkg-root k8s.io/metrics/pkg/apis \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
 
 kube::codegen::gen_client \
-    --input-pkg-root k8s.io/metrics/pkg/apis \
-    --output-pkg-root k8s.io/metrics/pkg/client \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --output-dir "${SCRIPT_ROOT}/pkg/client" \
+    --output-pkg "${THIS_PKG}/pkg/client" \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
