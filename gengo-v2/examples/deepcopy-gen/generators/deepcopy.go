@@ -898,7 +898,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do(fmt.Sprintf("out.$.name$ = in.$.name$.DeepCopy%s()\n", uft.Name.Name), args)
 			sw.Do("}\n", nil)
 		default:
-			klog.Fatalf("Hit an unsupported type %v for %v, from %v", uft, ft, t)
+			klog.Fatalf("Hit an unsupported type '%v' for '%v', from %v.%v", uft, ft, t, m.Name)
 		}
 	}
 }
