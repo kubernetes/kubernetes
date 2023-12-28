@@ -338,17 +338,8 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	logger.Info("Starting attach detach controller")
 	defer logger.Info("Shutting down attach detach controller")
 
-	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced}
-	if adc.csiNodeSynced != nil {
-		synced = append(synced, adc.csiNodeSynced)
-	}
-	if adc.csiDriversSynced != nil {
-		synced = append(synced, adc.csiDriversSynced)
-	}
-	if adc.volumeAttachmentSynced != nil {
-		synced = append(synced, adc.volumeAttachmentSynced)
-	}
-
+	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced,
+		adc.csiNodeSynced, adc.csiDriversSynced, adc.volumeAttachmentSynced}
 	if !kcache.WaitForNamedCacheSync("attach detach", ctx.Done(), synced...) {
 		return
 	}
