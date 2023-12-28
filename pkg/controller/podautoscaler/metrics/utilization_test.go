@@ -144,6 +144,32 @@ func TestGetMetricUsageRatioBaseCase(t *testing.T) {
 		expectedUsageRatio:   .75,
 		expectedCurrentUsage: 7500,
 	}
-
 	tc.runTest(t)
+
+	tc = metricUsageRatioTestCase{
+		metrics:              nil,
+		targetUsage:          10000,
+		expectedUsageRatio:   0,
+		expectedCurrentUsage: 0,
+	}
+	tc.runTest(t)
+
+	tc = metricUsageRatioTestCase{
+		metrics: PodMetricsInfo{
+			"test-pod-0": {Value: 5000}, "test-pod-1": {Value: 10000},
+		},
+		targetUsage:          0,
+		expectedUsageRatio:   0,
+		expectedCurrentUsage: 0,
+	}
+	tc.runTest(t)
+
+	tc = metricUsageRatioTestCase{
+		metrics:              nil,
+		targetUsage:          0,
+		expectedUsageRatio:   0,
+		expectedCurrentUsage: 0,
+	}
+	tc.runTest(t)
+
 }
