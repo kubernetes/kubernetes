@@ -26,6 +26,7 @@ import (
 )
 
 type runtimeState struct {
+	startTime time.Time
 	sync.RWMutex
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
@@ -87,12 +88,23 @@ func (s *runtimeState) podCIDR() string {
 	return s.cidr
 }
 
+func (s *runtimeState) isRuntimeSyncZero() bool {
+	s.RLock()
+	defer s.RUnlock()
+	return s.lastBaseRuntimeSync.IsZero()
+}
+
 func (s *runtimeState) runtimeErrors() error {
 	s.RLock()
 	defer s.RUnlock()
 	errs := []error{}
 	if s.lastBaseRuntimeSync.IsZero() {
-		errs = append(errs, errors.New("container runtime status check may not have completed yet"))
+		// skip the first time check when kubelet restart, this could lead the node changed from ready to notReady
+		if !s.startTime.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
+			errs = append(errs, errors.New("container runtime status check may not have completed yet"))
+		} else {
+			return nil
+		}
 	} else if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
 		errs = append(errs, errors.New("container runtime is down"))
 	}
@@ -130,6 +142,7 @@ func (s *runtimeState) storageErrors() error {
 
 func newRuntimeState(runtimeSyncThreshold time.Duration) *runtimeState {
 	return &runtimeState{
+		startTime:                time.Now(),
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
 		networkError:             ErrNetworkUnknown,
