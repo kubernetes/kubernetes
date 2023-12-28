@@ -776,17 +776,17 @@ function indent() {
 function codegen::subprojects() {
     # Call generation on sub-projects.
     local subs=(
-        vendor/k8s.io/code-generator/examples
-        vendor/k8s.io/kube-aggregator
-        vendor/k8s.io/sample-apiserver
-        vendor/k8s.io/sample-controller
-        vendor/k8s.io/metrics
-        vendor/k8s.io/apiextensions-apiserver
-        vendor/k8s.io/apiextensions-apiserver/examples/client-go
+        staging/src/k8s.io/code-generator/examples
+        staging/src/k8s.io/kube-aggregator
+        staging/src/k8s.io/sample-apiserver
+        staging/src/k8s.io/sample-controller
+        staging/src/k8s.io/metrics
+        staging/src/k8s.io/apiextensions-apiserver
+        staging/src/k8s.io/apiextensions-apiserver/examples/client-go
     )
 
     local codegen
-    codegen="$(pwd)/vendor/k8s.io/code-generator"
+    codegen="${KUBE_ROOT}/staging/src/k8s.io/code-generator"
     for sub in "${subs[@]}"; do
         kube::log::status "Generating code for subproject ${sub}"
         pushd "${sub}" >/dev/null
