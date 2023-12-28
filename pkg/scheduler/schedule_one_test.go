@@ -92,6 +92,7 @@ type fakeExtender struct {
 	ignorable         bool
 	gotBind           bool
 	isPrioritizer     bool
+	errBind           bool
 }
 
 func (f *fakeExtender) Name() string {
@@ -127,6 +128,9 @@ func (f *fakeExtender) Prioritize(
 
 func (f *fakeExtender) Bind(binding *v1.Binding) error {
 	if f.isBinder {
+		if f.errBind {
+			return errors.New("bind error")
+		}
 		f.gotBind = true
 		return nil
 	}
@@ -1220,6 +1224,14 @@ func TestSchedulerBinding(t *testing.T) {
 			extenders: []framework.Extender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
+			},
+			wantBinderID: -1, // default binding.
+		},
+		{
+			name:    "ignore when extender bind failed",
+			podName: "pod1",
+			extenders: []framework.Extender{
+				&fakeExtender{isBinder: true, errBind: true, interestedPodName: "pod1", ignorable: true},
 			},
 			wantBinderID: -1, // default binding.
 		},
