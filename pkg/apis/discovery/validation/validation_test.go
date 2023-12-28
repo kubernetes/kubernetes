@@ -637,7 +637,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
-			errs := ValidateEndpointSlice(testCase.endpointSlice)
+			errs := ValidateEndpointSlice(testCase.endpointSlice, nil)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
 			}
@@ -737,6 +737,7 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointSliceCreate(testCase.endpointSlice)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
@@ -762,6 +763,23 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,
+			},
+			expectedErrors: 0,
+		},
+		"unchanged IPs are not revalidated": {
+			oldEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.04"},
+				}},
+			},
+			newEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.04"},
+				}},
 			},
 			expectedErrors: 0,
 		},
@@ -823,10 +841,28 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 			},
 			expectedErrors: 1,
 		},
+		"changed IPs are revalidated": {
+			oldEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3"},
+				}},
+			},
+			newEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.03"},
+				}},
+			},
+			expectedErrors: 1,
+		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointSliceUpdate(testCase.newEndpointSlice, testCase.oldEndpointSlice)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
