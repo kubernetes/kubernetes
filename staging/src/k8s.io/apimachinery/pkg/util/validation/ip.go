@@ -111,6 +111,34 @@ func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
 	return allErrors
 }
 
+// IsValidImmutableIPUpdate returns true if we should allow changing an "immutable" IP
+// address field from oldValue to newValue. This is allowed so that objects with fields
+// that historically allowed ambiguous/unsafe IP address syntax can be fixed to use
+// proper syntax instead.
+//
+// So, for example, this would allow updating:
+//
+//   - "010.001.002.003" to "10.1.2.3"
+//   - "::ffff:192.168.0.3" to "192.168.0.3"
+func IsValidImmutableIPUpdate(oldValue, newValue string) bool {
+	// We allow "changing" a value to itself
+	if oldValue == newValue {
+		return true
+	}
+
+	// Otherwise, oldValue must be invalid, and newValue must be valid
+	if errs := IsValidIP(nil, oldValue); len(errs) == 0 {
+		return false
+	}
+	if errs := IsValidIP(nil, newValue); len(errs) != 0 {
+		return false
+	}
+
+	// oldValue must round-trip to newValue
+	oldIP := netutils.ParseIPSloppy(oldValue)
+	return oldIP != nil && oldIP.String() == newValue
+}
+
 // IsValidCIDR tests that the argument is a valid CIDR string according to current
 // Kubernetes validation rules, and would be parsed identically by net.ParseCIDR,
 // netutils.ParseCIDRSloppy, netip.ParsePrefix, and external APIs. In particular:
@@ -182,4 +210,34 @@ func IsValidCIDR(fldPath *field.Path, value string) field.ErrorList {
 	}
 
 	return allErrors
+}
+
+// IsValidImmutableCIDRUpdate returns true if we should allow changing an "immutable" CIDR
+// field from oldValue to newValue. This is allowed so that objects with fields that
+// historically allowed ambiguous/unsafe CIDR syntax can be fixed to use proper syntax
+// instead.
+//
+// So, for example, this would allow updating:
+//
+//   - "010.001.002.000/24" to "10.1.2.0/24"
+//   - "::ffff:192.168.0.0/112" to "192.168.0.0/16"
+//   - "1.2.3.4/24" to "1.2.3.0/24"
+//   - "2001:db8::/064" to "2001:db8::/64"
+func IsValidImmutableCIDRUpdate(oldValue, newValue string) bool {
+	// We allow "changing" a value to itself
+	if oldValue == newValue {
+		return true
+	}
+
+	// Otherwise, oldValue must be invalid, and newValue must be valid
+	if errs := IsValidCIDR(nil, oldValue); len(errs) == 0 {
+		return false
+	}
+	if errs := IsValidCIDR(nil, newValue); len(errs) != 0 {
+		return false
+	}
+
+	// oldValue must round-trip to newValue
+	_, oldCIDR, _ := netutils.ParseCIDRSloppy(oldValue)
+	return oldCIDR != nil && oldCIDR.String() == newValue
 }

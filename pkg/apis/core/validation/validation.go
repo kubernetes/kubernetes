@@ -5254,6 +5254,22 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		// and what if the fieldManager/A sets matchexpressions and fieldManager/B sets matchLabelKeys later. (could it lead the understandable conflict, etc)
 	}
 
+	// Allow changing immutable IPs if we are fixing a previously-invalid value
+	if mungedPodSpec.DNSConfig != nil && oldPod.Spec.DNSConfig != nil && len(mungedPodSpec.DNSConfig.Nameservers) == len(oldPod.Spec.DNSConfig.Nameservers) {
+		for i := range mungedPodSpec.DNSConfig.Nameservers {
+			if validation.IsValidImmutableIPUpdate(oldPod.Spec.DNSConfig.Nameservers[i], mungedPodSpec.DNSConfig.Nameservers[i]) {
+				mungedPodSpec.DNSConfig.Nameservers[i] = oldPod.Spec.DNSConfig.Nameservers[i] // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+	if len(mungedPodSpec.HostAliases) == len(oldPod.Spec.HostAliases) {
+		for i := range mungedPodSpec.HostAliases {
+			if validation.IsValidImmutableIPUpdate(oldPod.Spec.HostAliases[i].IP, mungedPodSpec.HostAliases[i].IP) {
+				mungedPodSpec.HostAliases[i].IP = oldPod.Spec.HostAliases[i].IP // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+
 	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
@@ -7902,7 +7918,7 @@ func validateUpgradeDowngradeClusterIPs(oldService, service *core.Service) field
 	// compare each
 	case len(oldService.Spec.ClusterIPs) == len(service.Spec.ClusterIPs):
 		for i, ip := range oldService.Spec.ClusterIPs {
-			if ip != service.Spec.ClusterIPs[i] {
+			if ip != service.Spec.ClusterIPs[i] && !validation.IsValidImmutableIPUpdate(ip, service.Spec.ClusterIPs[i]) {
 				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(i), service.Spec.ClusterIPs, "may not change once set"))
 			}
 		}
@@ -7917,7 +7933,8 @@ func validateUpgradeDowngradeClusterIPs(oldService, service *core.Service) field
 		// test if primary clusterIP has changed
 		if len(oldService.Spec.ClusterIPs) > 0 &&
 			len(service.Spec.ClusterIPs) > 0 &&
-			service.Spec.ClusterIPs[0] != oldService.Spec.ClusterIPs[0] {
+			service.Spec.ClusterIPs[0] != oldService.Spec.ClusterIPs[0] &&
+			!validation.IsValidImmutableIPUpdate(oldService.Spec.ClusterIPs[0], service.Spec.ClusterIPs[0]) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(0), service.Spec.ClusterIPs, "may not change once set"))
 		}
 
@@ -7932,7 +7949,8 @@ func validateUpgradeDowngradeClusterIPs(oldService, service *core.Service) field
 		// something has been added (upgraded)
 		// test if primary clusterIP has changed
 		if len(oldService.Spec.ClusterIPs) > 0 &&
-			service.Spec.ClusterIPs[0] != oldService.Spec.ClusterIPs[0] {
+			service.Spec.ClusterIPs[0] != oldService.Spec.ClusterIPs[0] &&
+			!validation.IsValidImmutableIPUpdate(oldService.Spec.ClusterIPs[0], service.Spec.ClusterIPs[0]) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(0), service.Spec.ClusterIPs, "may not change once set"))
 		}
 		// we don't check for Policy == RequireDualStack here since, Validation/Creation func takes care of it
