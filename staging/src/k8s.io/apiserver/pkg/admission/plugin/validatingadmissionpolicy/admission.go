@@ -193,5 +193,10 @@ func isPolicyResource(attr admission.Attributes) bool {
 			return true
 		}
 	}
+	if gvk.Group == "authentication.k8s.io" {
+		if gvk.Resource == "tokenreviews" || gvk.Resource == "subjectaccessreviews" {
+			return true
+		}
+	}
 	return false
 }
