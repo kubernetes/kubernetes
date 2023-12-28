@@ -25,6 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
+	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/pointer"
 )
@@ -152,6 +153,13 @@ func SetDefaults_Service(obj *v1.Service) {
 				}
 			}
 		}
+	}
+
+	if obj.Spec.ClusterIP == v1.ClusterIPNone {
+		if obj.Labels == nil {
+			obj.Labels = map[string]string{}
+		}
+		obj.Labels = utillabels.CloneAndAddLabel(obj.Labels, v1.IsHeadlessService, "")
 	}
 
 }

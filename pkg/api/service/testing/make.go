@@ -17,8 +17,10 @@ limitations under the License.
 package testing
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	utilpointer "k8s.io/utils/pointer"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -122,6 +124,7 @@ func MakeServicePort(name string, port int, tgtPort intstr.IntOrString, proto ap
 func SetHeadless(svc *api.Service) {
 	SetTypeClusterIP(svc)
 	SetClusterIPs(api.ClusterIPNone)(svc)
+	SetLabel(v1.IsHeadlessService, "")(svc)
 }
 
 // SetSelector sets the service selector.
@@ -233,5 +236,15 @@ func SetSessionAffinity(affinity api.ServiceAffinity) Tweak {
 func SetExternalName(val string) Tweak {
 	return func(svc *api.Service) {
 		svc.Spec.ExternalName = val
+	}
+}
+
+// SetLabel sets the label field for Service
+func SetLabel(labelKey, labelValue string) Tweak {
+	return func(svc *api.Service) {
+		if svc.ObjectMeta.Labels == nil {
+			svc.ObjectMeta.Labels = map[string]string{}
+		}
+		svc.ObjectMeta.Labels = utillabels.CloneAndAddLabel(svc.ObjectMeta.Labels, labelKey, labelValue)
 	}
 }
