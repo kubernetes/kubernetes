@@ -197,6 +197,112 @@ func TestIsValidIP(t *testing.T) {
 	}
 }
 
+func TestIsValidImmutableIPUpdate(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		orig   string
+		update string
+		ok     bool
+	}{
+		// NON-UPDATES
+		{
+			name:   "valid, not updated",
+			orig:   "1.2.3.4",
+			update: "1.2.3.4",
+			ok:     true,
+		},
+		{
+			name:   "leading 0s, not updated",
+			orig:   "001.002.003.004",
+			update: "001.002.003.004",
+			ok:     true,
+		},
+		{
+			name:   "ipv4-in-ipv6, not updated",
+			orig:   "::ffff:1.1.1.1",
+			update: "::ffff:1.1.1.1",
+			ok:     true,
+		},
+		{
+			name:   "non-canonical, not updated",
+			orig:   "2001:DB8:0:0:0::1",
+			update: "2001:DB8:0:0:0::1",
+			ok:     true,
+		},
+
+		// GOOD UPDATES
+		{
+			name:   "leading 0s fixed",
+			orig:   "001.002.003.004",
+			update: "1.2.3.4",
+			ok:     true,
+		},
+		{
+			name:   "ipv4-in-ipv6 fixed",
+			orig:   "::ffff:1.1.1.1",
+			update: "1.1.1.1",
+			ok:     true,
+		},
+
+		// BAD UPDATES
+		{
+			name:   "leading 0s only partially fixed",
+			orig:   "001.002.003.004",
+			update: "001.2.3.4",
+			ok:     false,
+		},
+		{
+			name:   "ipv4-in-ipv6 with 0s, only fixed ipv4-in-ipv6",
+			orig:   "::ffff:01.01.01.01",
+			update: "01.01.01.01",
+			ok:     false,
+		},
+		{
+			name:   "ipv4-in-ipv6 with 0s, only fixed 0s",
+			orig:   "::ffff:01.01.01.01",
+			update: "::ffff:1.1.1.1",
+			ok:     false,
+		},
+		{
+			name:   "added leading 0s",
+			orig:   "1.1.1.1",
+			update: "01.01.01.01",
+			ok:     false,
+		},
+		{
+			name:   "ipv4 to ipv4-in-ipv6",
+			orig:   "1.1.1.1",
+			update: "::ffff:1.1.1.1",
+			ok:     false,
+		},
+		{
+			name:   "changed value",
+			orig:   "01.01.01.01",
+			update: "1.2.3.4",
+			ok:     false,
+		},
+		{
+			name:   "canonicalized already valid value",
+			orig:   "2001:DB8:0:0:0::1",
+			update: "2001:db8::1",
+			ok:     false,
+		},
+		{
+			name:   "added previously-missing value",
+			orig:   "",
+			update: "1.2.3.4",
+			ok:     false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ok := IsValidImmutableIPUpdate(tc.orig, tc.update)
+			if ok != tc.ok {
+				t.Errorf("expected IsValidImmutableIPUpdate(%q, %q) to be %t, got %t", tc.orig, tc.update, tc.ok, ok)
+			}
+		})
+	}
+}
+
 func TestIsValidCIDR(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -320,6 +426,160 @@ func TestIsValidCIDR(t *testing.T) {
 				} else if !strings.Contains(errs[0].Detail, tc.err) {
 					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
 				}
+			}
+		})
+	}
+}
+
+func TestIsValidImmutableCIDRUpdate(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		orig   string
+		update string
+		ok     bool
+	}{
+		// NON-UPDATES
+		{
+			name:   "valid, not updated",
+			orig:   "1.2.3.0/24",
+			update: "1.2.3.0/24",
+			ok:     true,
+		},
+		{
+			name:   "leading 0s, not updated",
+			orig:   "001.002.003.000/24",
+			update: "001.002.003.000/24",
+			ok:     true,
+		},
+		{
+			name:   "ipv4-in-ipv6 with short prefix, not updated",
+			orig:   "::ffff:1.1.1.0/24",
+			update: "::ffff:1.1.1.0/24",
+			ok:     true,
+		},
+		{
+			name:   "ipv4-in-ipv6 with long prefix, not updated",
+			orig:   "::ffff:1.1.1.0/120",
+			update: "::ffff:1.1.1.0/120",
+			ok:     true,
+		},
+		{
+			name:   "bits after prefix length, not updated",
+			orig:   "1.2.3.4/24",
+			update: "1.2.3.4/24",
+			ok:     true,
+		},
+		{
+			name:   "non-canonical, not updated",
+			orig:   "2001:DB8:0:0:0::/64",
+			update: "2001:DB8:0:0:0::/64",
+			ok:     true,
+		},
+
+		// GOOD UPDATES
+		{
+			name:   "leading 0s fixed",
+			orig:   "001.002.003.000/24",
+			update: "1.2.3.0/24",
+			ok:     true,
+		},
+		{
+			name:   "ipv4-in-ipv6 fixed",
+			orig:   "::ffff:1.1.1.0/120",
+			update: "1.1.1.0/24",
+			ok:     true,
+		},
+		{
+			name:   "bits after prefix length fixed",
+			orig:   "1.2.3.4/24",
+			update: "1.2.3.0/24",
+			ok:     true,
+		},
+
+		// BAD UPDATES
+		{
+			name:   "leading 0s only partially fixed",
+			orig:   "001.002.003.000/24",
+			update: "001.2.3.0/24",
+			ok:     false,
+		},
+		{
+			name:   "ipv4-in-ipv6 with 0s, only fixed ipv4-in-ipv6",
+			orig:   "::ffff:01.01.01.00/120",
+			update: "01.01.01.00/24",
+			ok:     false,
+		},
+		{
+			name:   "ipv4-in-ipv6 with 0s, only fixed 0s",
+			orig:   "::ffff:01.01.01.00/120",
+			update: "::ffff:1.1.1.0/120",
+			ok:     false,
+		},
+		{
+			name:   "leading 0s and bits after prefix length, only fixed 0s",
+			orig:   "001.002.003.004/24",
+			update: "1.2.3.4/24",
+			ok:     false,
+		},
+		{
+			name:   "leading 0s and bits after prefix length, only fixed prefix",
+			orig:   "001.002.003.004/24",
+			update: "001.002.003.000/24",
+			ok:     false,
+		},
+		{
+			name:   "added leading 0s",
+			orig:   "1.1.1.0/24",
+			update: "01.01.01.00/24",
+			ok:     false,
+		},
+		{
+			name:   "ipv4 to ipv4-in-ipv6 with short prefix",
+			orig:   "1.1.1.0/24",
+			update: "::ffff:1.1.1.0/24",
+			ok:     false,
+		},
+		{
+			name:   "ipv4 to ipv4-in-ipv6 with long prefix",
+			orig:   "1.1.1.0/24",
+			update: "::ffff:1.1.1.0/120",
+			ok:     false,
+		},
+		{
+			name:   "ipv4-in-ipv6 with short prefix to long prefix",
+			orig:   "::ffff:1.1.1.0/24",
+			update: "::ffff:1.1.1.0/120",
+			ok:     false,
+		},
+		{
+			name:   "ipv4-in-ipv6 with long prefix to short prefix",
+			orig:   "::ffff:1.1.1.0/120",
+			update: "::ffff:1.1.1.0/24",
+			ok:     false,
+		},
+		{
+			name:   "changed value",
+			orig:   "01.01.01.00/24",
+			update: "1.2.3.0/24",
+			ok:     false,
+		},
+		{
+			name:   "canonicalized already valid value",
+			orig:   "2001:DB8:0:0:0::/64",
+			update: "2001:db8::/64",
+			ok:     false,
+		},
+		{
+			name:   "added previously-missing value",
+			orig:   "",
+			update: "1.2.3.0/24",
+			ok:     false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ok := IsValidImmutableCIDRUpdate(tc.orig, tc.update)
+			if ok != tc.ok {
+				t.Errorf("expected IsValidImmutableCIDRUpdate(%q, %q) to be %t, got %t", tc.orig, tc.update, tc.ok, ok)
 			}
 		})
 	}
