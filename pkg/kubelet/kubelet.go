@@ -2338,7 +2338,7 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 	}
 
 	for {
-		if err := kl.runtimeState.runtimeErrors(); err != nil {
+		if err := kl.runtimeState.runtimeErrors(); err != nil || kl.runtimeState.isRuntimeSyncZero() {
 			klog.ErrorS(err, "Skipping pod synchronization")
 			// exponential backoff
 			time.Sleep(duration)
