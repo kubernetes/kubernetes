@@ -38,14 +38,13 @@ function kube::codegen::internal::git_grep() {
 
 # Generate tagged helper code: conversions, deepcopy, and defaults
 #
-# Args:
-#   --input-pkg-root <string>
-#     The root package under which to search for files which request code to be
-#     generated.  This must be Go package syntax, e.g.  "k8s.io/foo/bar".
+# USAGE: kube::codegen::gen_helpers [FLAGS] <input-dir>
 #
-#   --output-base <string>
-#     The root directory under which to emit code.  The concatenation of
-#     <output-base> + <input-pkg-root> must be valid.
+# <input-dir>
+#   The root directory under which to search for Go files which request code to
+#   be generated.  This must be a local path, not a Go package.
+#
+# FLAGS:
 #
 #   --boilerplate <string = path_to_kube_codegen_boilerplate>
 #     An optional override for the header file to insert into generated files.
@@ -55,22 +54,13 @@ function kube::codegen::internal::git_grep() {
 #     directories to consider during conversion generation.
 #
 function kube::codegen::gen_helpers() {
-    local in_pkg_root=""
-    local out_base="" # gengo needs the output dir must be $out_base/$out_pkg_root
+    local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local v="${KUBE_VERBOSE:-0}"
     local extra_peers=()
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            "--input-pkg-root")
-                in_pkg_root="$2"
-                shift 2
-                ;;
-            "--output-base")
-                out_base="$2"
-                shift 2
-                ;;
             "--boilerplate")
                 boilerplate="$2"
                 shift 2
@@ -80,18 +70,22 @@ function kube::codegen::gen_helpers() {
                 shift 2
                 ;;
             *)
-                echo "unknown argument: $1" >&2
-                return 1
+                if [[ "$1" =~ ^-- ]]; then
+                    echo "unknown argument: $1" >&2
+                    return 1
+                fi
+                if [ -n "$in_dir" ]; then
+                    echo "too many arguments: $1 (already have $in_dir)" >&2
+                    return 1
+                fi
+                in_dir="$1"
+                shift
                 ;;
         esac
     done
 
-    if [ -z "${in_pkg_root}" ]; then
-        echo "--input-pkg-root is required" >&2
-        return 1
-    fi
-    if [ -z "${out_base}" ]; then
-        echo "--output-base is required" >&2
+    if [ -z "${in_dir}" ]; then
+        echo "input-dir argument is required" >&2
         return 1
     fi
 
@@ -110,11 +104,6 @@ function kube::codegen::gen_helpers() {
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
     gobin="${GOBIN:-$(go env GOPATH)/bin}"
 
-    # These tools all assume out-dir == in-dir.
-    root="${out_base}/${in_pkg_root}"
-    mkdir -p "${root}"
-    root="$(cd "${root}" && pwd -P)"
-
     # Deepcopy
     #
     local input_pkgs=()
@@ -124,7 +113,7 @@ function kube::codegen::gen_helpers() {
     done < <(
         ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:deepcopy-gen=' \
-            ":(glob)${root}"/'**/*.go' \
+            ":(glob)${in_dir}"/'**/*.go' \
             || true \
         ) | while read -r -d $'\0' F; do dirname $F; done \
           | LC_ALL=C sort -u
@@ -134,7 +123,7 @@ function kube::codegen::gen_helpers() {
         echo "Generating deepcopy code for ${#input_pkgs[@]} targets"
 
         kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.deepcopy.go' \
+            ":(glob)${in_dir}"/'**/zz_generated.deepcopy.go' \
             | xargs -0 rm -f
 
         local input_args=()
@@ -145,7 +134,6 @@ function kube::codegen::gen_helpers() {
             -v "${v}" \
             -O zz_generated.deepcopy \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_base}" \
             "${input_args[@]}"
     fi
 
@@ -158,7 +146,7 @@ function kube::codegen::gen_helpers() {
     done < <(
         ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:defaulter-gen=' \
-            ":(glob)${root}"/'**/*.go' \
+            ":(glob)${in_dir}"/'**/*.go' \
             || true \
         ) | while read -r -d $'\0' F; do dirname $F; done \
           | LC_ALL=C sort -u
@@ -168,7 +156,7 @@ function kube::codegen::gen_helpers() {
         echo "Generating defaulter code for ${#input_pkgs[@]} targets"
 
         kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.defaults.go' \
+            ":(glob)${in_dir}"/'**/zz_generated.defaults.go' \
             | xargs -0 rm -f
 
         local input_args=()
@@ -179,7 +167,6 @@ function kube::codegen::gen_helpers() {
             -v "${v}" \
             -O zz_generated.defaults \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_base}" \
             "${input_args[@]}"
     fi
 
@@ -192,7 +179,7 @@ function kube::codegen::gen_helpers() {
     done < <(
         ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:conversion-gen=' \
-            ":(glob)${root}"/'**/*.go' \
+            ":(glob)${in_dir}"/'**/*.go' \
             || true \
         ) | while read -r -d $'\0' F; do dirname $F; done \
           | LC_ALL=C sort -u
@@ -202,7 +189,7 @@ function kube::codegen::gen_helpers() {
         echo "Generating conversion code for ${#input_pkgs[@]} targets"
 
         kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.conversion.go' \
+            ":(glob)${in_dir}"/'**/zz_generated.conversion.go' \
             | xargs -0 rm -f
 
         local input_args=()
@@ -217,7 +204,6 @@ function kube::codegen::gen_helpers() {
             -v "${v}" \
             -O zz_generated.conversion \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_base}" \
             "${extra_peer_args[@]:+"${extra_peer_args[@]}"}" \
             "${input_args[@]}"
     fi
@@ -225,21 +211,16 @@ function kube::codegen::gen_helpers() {
 
 # Generate openapi code
 #
-# Args:
-#   --input-pkg-root <string>
-#     The root package under which to search for files which request openapi to
-#     be generated.  This must be Go package syntax, e.g.  "k8s.io/foo/bar".
+# USAGE: kube::codegen::gen_openapi [FLAGS] <input-dir>
 #
-#   --output-pkg-root <string>
-#     The root package under which generated directories and files
-#     will be placed.  This must be go package syntax, e.g. "k8s.io/foo/bar".
+# <input-dir>
+#   The root directory under which to search for Go files which request openapi
+#   to be generated.  This must be a local path, not a Go package.
 #
-#   --output-base <string>
-#     The root directory under which to emit code.  The concatenation of
-#     <output-base> + <input-pkg-root> must be valid.
+# FLAGS:
 #
-#   --openapi-name <string = "openapi">
-#     An optional override for the leaf name of the generated directory.
+#   --output-dir <string>
+#     The directory into which to emit code.
 #
 #   --extra-pkgs <string>
 #     An optional list of additional packages to be imported during openapi
@@ -258,10 +239,8 @@ function kube::codegen::gen_helpers() {
 #     An optional override for the header file to insert into generated files.
 #
 function kube::codegen::gen_openapi() {
-    local in_pkg_root=""
-    local out_pkg_root=""
-    local out_base="" # gengo needs the output dir must be $out_base/$out_pkg_root
-    local openapi_subdir="openapi"
+    local in_dir=""
+    local out_dir=""
     local extra_pkgs=()
     local report="/dev/null"
     local update_report=""
@@ -270,20 +249,8 @@ function kube::codegen::gen_openapi() {
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            "--input-pkg-root")
-                in_pkg_root="$2"
-                shift 2
-                ;;
-            "--output-pkg-root")
-                out_pkg_root="$2"
-                shift 2
-                ;;
-            "--output-base")
-                out_base="$2"
-                shift 2
-                ;;
-            "--openapi-name")
-                openapi_subdir="$2"
+            "--output-dir")
+                out_dir="$2"
                 shift 2
                 ;;
             "--extra-pkgs")
@@ -303,22 +270,26 @@ function kube::codegen::gen_openapi() {
                 shift 2
                 ;;
             *)
-                echo "unknown argument: $1" >&2
-                return 1
+                if [[ "$1" =~ ^-- ]]; then
+                    echo "unknown argument: $1" >&2
+                    return 1
+                fi
+                if [ -n "$in_dir" ]; then
+                    echo "too many arguments: $1 (already have $in_dir)" >&2
+                    return 1
+                fi
+                in_dir="$1"
+                shift
                 ;;
         esac
     done
 
-    if [ -z "${in_pkg_root}" ]; then
-        echo "--input-pkg-root is required" >&2
+    if [ -z "${in_dir}" ]; then
+        echo "input-dir argument is required" >&2
         return 1
     fi
-    if [ -z "${out_pkg_root}" ]; then
-        echo "--output-pkg-root is required" >&2
-        return 1
-    fi
-    if [ -z "${out_base}" ]; then
-        echo "--output-base is required" >&2
+    if [ -z "${out_dir}" ]; then
+        echo "--output-dir is required" >&2
         return 1
     fi
 
@@ -341,11 +312,6 @@ function kube::codegen::gen_openapi() {
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
     gobin="${GOBIN:-$(go env GOPATH)/bin}"
 
-    # These tools all assume out-dir == in-dir.
-    root="${out_base}/${in_pkg_root}"
-    mkdir -p "${root}"
-    root="$(cd "${root}" && pwd -P)"
-
     local input_pkgs=( "${extra_pkgs[@]:+"${extra_pkgs[@]}"}")
     while read -r dir; do
         pkg="$(cd "${dir}" && GO111MODULE=on go list -find .)"
@@ -353,7 +319,7 @@ function kube::codegen::gen_openapi() {
     done < <(
         ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:openapi-gen=' \
-            ":(glob)${root}"/'**/*.go' \
+            ":(glob)${in_dir}"/'**/*.go' \
             || true \
         ) | while read -r -d $'\0' F; do dirname $F; done \
           | LC_ALL=C sort -u
@@ -363,7 +329,7 @@ function kube::codegen::gen_openapi() {
         echo "Generating openapi code for ${#input_pkgs[@]} targets"
 
         kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.openapi.go' \
+            ":(glob)${in_dir}"/'**/zz_generated.openapi.go' \
             | xargs -0 rm -f
 
         local inputs=()
@@ -374,8 +340,7 @@ function kube::codegen::gen_openapi() {
             -v "${v}" \
             -O zz_generated.openapi \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_base}" \
-            --output-package "${out_pkg_root}/${openapi_subdir}" \
+            --output-base "${out_dir}" \
             --report-filename "${new_report}" \
             --input-dirs "k8s.io/apimachinery/pkg/apis/meta/v1" \
             --input-dirs "k8s.io/apimachinery/pkg/runtime" \
@@ -394,24 +359,25 @@ function kube::codegen::gen_openapi() {
 
 # Generate client code
 #
-# Args:
-#   --input-pkg-root <string>
-#     The root package under which to search for *.go files which request
-#     clients to be generated.  This must be Go package syntax, e.g.
-#     "k8s.io/foo/bar".
+# USAGE: kube::codegen::gen_client [FLAGS] <input-dir>
 #
+# <input-dir>
+#   The root package under which to search for Go files which request clients
+#   to be generated. This must be a local path, not a Go package.
+#
+# FLAGS:
 #   --one-input-api <string>
-#     A specific API (a directory) under the --input-pkg-root for which to
-#     generate a client.  If this is not set, clients for all APIs under the
-#     input root will be generated (under the --output-pkg-root).
+#     A specific API (a directory) under the input-dir for which to generate a
+#     client.  If this is not set, clients for all APIs under the input-dir
+#     will be generated (under the --output-pkg-root).
 #
-#   --output-pkg-root <string>
-#     The root package into which generated directories and files will be
-#     placed.  This must be Go package syntax, e.g. "k8s.io/foo/bar".
+#   --output-dir <string>
+#     The root directory under which to emit code.  Each aspect of client
+#     generation will make one or more subdirectories.
 #
-#   --output-base <string>
-#     The root directory under which to emit code.  The concatenation of
-#     <output-base> + <output-pkg-root> must be valid.
+#   --output-pkg <string>
+#     The Go package path (import path) of the --output-dir.  Each aspect of
+#     client generation will make one or more sub-packages.
 #
 #   --boilerplate <string = path_to_kube_codegen_boilerplate>
 #     An optional override for the header file to insert into generated files.
@@ -439,10 +405,10 @@ function kube::codegen::gen_openapi() {
 #     An optional override for the leaf name of the generated "informers" directory.
 #
 function kube::codegen::gen_client() {
-    local in_pkg_root=""
+    local in_dir=""
     local one_input_api=""
-    local out_pkg_root=""
-    local out_base="" # gengo needs the output dir must be $out_base/$out_pkg_root
+    local out_dir=""
+    local out_pkg=""
     local clientset_subdir="clientset"
     local clientset_versioned_name="versioned"
     local applyconfig="false"
@@ -455,20 +421,16 @@ function kube::codegen::gen_client() {
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            "--input-pkg-root")
-                in_pkg_root="$2"
-                shift 2
-                ;;
             "--one-input-api")
                 one_input_api="/$2"
                 shift 2
                 ;;
-            "--output-pkg-root")
-                out_pkg_root="$2"
+            "--output-dir")
+                out_dir="$2"
                 shift 2
                 ;;
-            "--output-base")
-                out_base="$2"
+            "--output-pkg")
+                out_pkg="$2"
                 shift 2
                 ;;
             "--boilerplate")
@@ -504,24 +466,33 @@ function kube::codegen::gen_client() {
                 shift 2
                 ;;
             *)
-                echo "unknown argument: $1" >&2
-                return 1
+                if [[ "$1" =~ ^-- ]]; then
+                    echo "unknown argument: $1" >&2
+                    return 1
+                fi
+                if [ -n "$in_dir" ]; then
+                    echo "too many arguments: $1 (already have $in_dir)" >&2
+                    return 1
+                fi
+                in_dir="$1"
+                shift
                 ;;
         esac
     done
 
-    if [ -z "${in_pkg_root}" ]; then
-        echo "--input-pkg-root is required" >&2
+    if [ -z "${in_dir}" ]; then
+        echo "input-dir argument is required" >&2
         return 1
     fi
-    if [ -z "${out_pkg_root}" ]; then
+    if [ -z "${out_dir}" ]; then
+        echo "--output-dir is required" >&2
+        return 1
+    fi
+    if [ -z "${out_pkg}" ]; then
         echo "--output-pkg-root is required" >&2
-        return 1
     fi
-    if [ -z "${out_base}" ]; then
-        echo "--output-base is required" >&2
-        return 1
-    fi
+
+    mkdir -p "${out_dir}"
 
     (
         # To support running this from anywhere, first cd into this directory,
@@ -539,13 +510,6 @@ function kube::codegen::gen_client() {
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
     gobin="${GOBIN:-$(go env GOPATH)/bin}"
 
-    in_root="${out_base}/${in_pkg_root}"
-    mkdir -p "${in_root}"
-    in_root="$(cd "${in_root}" && pwd -P)"
-    out_root="${out_base}/${out_pkg_root}"
-    mkdir -p "${out_root}"
-    out_root="$(cd "${out_root}" && pwd -P)"
-
     local group_versions=()
     local input_pkgs=()
     while read -r dir; do
@@ -561,7 +525,7 @@ function kube::codegen::gen_client() {
     done < <(
         ( kube::codegen::internal::git_grep -l --null \
             -e '+genclient' \
-            ":(glob)${in_root}${one_input_api}"/'**/*.go' \
+            ":(glob)${in_dir}${one_input_api}"/'**/*.go' \
             || true \
         ) | while read -r -d $'\0' F; do dirname $F; done \
           | LC_ALL=C sort -u
@@ -573,13 +537,13 @@ function kube::codegen::gen_client() {
 
     applyconfig_pkg="" # set this for later use, iff enabled
     if [ "${applyconfig}" == "true" ]; then
-        applyconfig_pkg="${out_pkg_root}/${applyconfig_subdir}"
+        applyconfig_pkg="${out_pkg}/${applyconfig_subdir}"
 
         echo "Generating applyconfig code for ${#input_pkgs[@]} targets"
 
         ( kube::codegen::internal::git_grep -l --null \
             -e '^// Code generated by applyconfiguration-gen. DO NOT EDIT.$' \
-            ":(glob)${out_root}/${applyconfig_subdir}"/'**/*.go' \
+            ":(glob)${out_dir}/${applyconfig_subdir}"/'**/*.go' \
             || true \
         ) | xargs -0 rm -f
 
@@ -590,8 +554,8 @@ function kube::codegen::gen_client() {
         "${gobin}/applyconfiguration-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_base}" \
-            --output-package "${out_pkg_root}/${applyconfig_subdir}" \
+            --output-base "${out_dir}/${applyconfig_subdir}" \
+            --output-package "${applyconfig_pkg}" \
             "${inputs[@]}"
     fi
 
@@ -599,7 +563,7 @@ function kube::codegen::gen_client() {
 
     ( kube::codegen::internal::git_grep -l --null \
         -e '^// Code generated by client-gen. DO NOT EDIT.$' \
-        ":(glob)${out_root}/${clientset_subdir}"/'**/*.go' \
+        ":(glob)${out_dir}/${clientset_subdir}"/'**/*.go' \
         || true \
     ) | xargs -0 rm -f
 
@@ -607,14 +571,14 @@ function kube::codegen::gen_client() {
     for arg in "${group_versions[@]}"; do
         inputs+=("--input" "$arg")
     done
-    "${gobin}/client-gen" \
+     "${gobin}/client-gen" \
         -v "${v}" \
         --go-header-file "${boilerplate}" \
+        --output-base "${out_dir}/${clientset_subdir}" \
+        --output-package "${out_pkg}/${clientset_subdir}" \
         --clientset-name "${clientset_versioned_name}" \
-        --input-base "${in_pkg_root}" \
-        --output-base "${out_base}" \
-        --output-package "${out_pkg_root}/${clientset_subdir}" \
         --apply-configuration-package "${applyconfig_pkg}" \
+        --input-base "$(cd $in_dir; pwd -P)" `# must be absolute path or Go import path"` \
         "${inputs[@]}"
 
     if [ "${watchable}" == "true" ]; then
@@ -622,7 +586,7 @@ function kube::codegen::gen_client() {
 
         ( kube::codegen::internal::git_grep -l --null \
             -e '^// Code generated by lister-gen. DO NOT EDIT.$' \
-            ":(glob)${out_root}/${listers_subdir}"/'**/*.go' \
+            ":(glob)${out_dir}/${listers_subdir}"/'**/*.go' \
             || true \
         ) | xargs -0 rm -f
 
@@ -633,15 +597,14 @@ function kube::codegen::gen_client() {
         "${gobin}/lister-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_base}" \
-            --output-package "${out_pkg_root}/${listers_subdir}" \
+            --output-base "${out_dir}/${listers_subdir}" \
             "${inputs[@]}"
 
         echo "Generating informer code for ${#input_pkgs[@]} targets"
 
         ( kube::codegen::internal::git_grep -l --null \
             -e '^// Code generated by informer-gen. DO NOT EDIT.$' \
-            ":(glob)${out_root}/${informers_subdir}"/'**/*.go' \
+            ":(glob)${out_dir}/${informers_subdir}"/'**/*.go' \
             || true \
         ) | xargs -0 rm -f
 
@@ -652,10 +615,10 @@ function kube::codegen::gen_client() {
         "${gobin}/informer-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_base}" \
-            --output-package "${out_pkg_root}/${informers_subdir}" \
-            --versioned-clientset-package "${out_pkg_root}/${clientset_subdir}/${clientset_versioned_name}" \
-            --listers-package "${out_pkg_root}/${listers_subdir}" \
+            --output-base "${out_dir}/${informers_subdir}" \
+            --output-package "${out_pkg}/${informers_subdir}" \
+            --versioned-clientset-package "${out_pkg}/${clientset_subdir}/${clientset_versioned_name}" \
+            --listers-package "${out_pkg}/${listers_subdir}" \
             "${inputs[@]}"
     fi
 }
