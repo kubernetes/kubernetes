@@ -93,6 +93,10 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 				hasLocalServingTerminatingEndpoints = true
 			}
 		}
+		
+		if hasLocalReadyEndpoints && hasLocalServingTerminatingEndpoints {
+			break
+		}
 	}
 
 	if hasLocalReadyEndpoints {
