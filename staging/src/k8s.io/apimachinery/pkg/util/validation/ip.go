@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
@@ -70,10 +71,17 @@ func parseIP(fldPath *field.Path, value string, strictValidation bool) (net.IP, 
 //     netip.ParseAddr both allow these, but there are no use cases for representing IPv4
 //     addresses as IPv4-mapped IPv6 addresses in Kubernetes.)
 //
+// Alternatively, when validating an update to an existing field, you can pass a list of
+// IP values from the old object that should be accepted if they appear in the new object
+// even if they are not valid.
+//
 // This function should only be used to validate the existing fields that were
 // historically validated in this way, and strictValidation should be true unless the
 // StrictIPCIDRValidation feature gate is disabled. Use IsValidIP for parsing new fields.
-func IsValidIPForLegacyField(fldPath *field.Path, value string, strictValidation bool) field.ErrorList {
+func IsValidIPForLegacyField(fldPath *field.Path, value string, strictValidation bool, validOldIPs []string) field.ErrorList {
+	if slices.Contains(validOldIPs, value) {
+		return nil
+	}
 	_, allErrors := parseIP(fldPath, value, strictValidation)
 	return allErrors.WithOrigin("format=ip-sloppy")
 }
@@ -165,11 +173,19 @@ func parseCIDR(fldPath *field.Path, value string, strictValidation bool) (*net.I
 //
 //  3. The prefix length is allowed to have leading 0s.
 //
+// Alternatively, when validating an update to an existing field, you can pass a list of
+// CIDR values from the old object that should be accepted if they appear in the new
+// object even if they are not valid.
+//
 // This function should only be used to validate the existing fields that were
 // historically validated in this way, and strictValidation should be true unless the
 // StrictIPCIDRValidation feature gate is disabled. Use IsValidCIDR or
 // IsValidInterfaceAddress for parsing new fields.
-func IsValidCIDRForLegacyField(fldPath *field.Path, value string, strictValidation bool) field.ErrorList {
+func IsValidCIDRForLegacyField(fldPath *field.Path, value string, strictValidation bool, validOldCIDRs []string) field.ErrorList {
+	if slices.Contains(validOldCIDRs, value) {
+		return nil
+	}
+
 	_, allErrors := parseCIDR(fldPath, value, strictValidation)
 	return allErrors
 }

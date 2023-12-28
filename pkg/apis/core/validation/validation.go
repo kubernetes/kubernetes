@@ -3790,7 +3790,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
 		}
 		for i, ns := range dnsConfig.Nameservers {
-			allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Child("nameservers").Index(i), ns)...)
+			allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Child("nameservers").Index(i), ns, nil)...)
 		}
 		// Validate searches.
 		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
@@ -3966,7 +3966,7 @@ func validateOnlyDeletedSchedulingGates(newGates, oldGates []core.PodSchedulingG
 func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, hostAlias := range hostAliases {
-		allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Index(i).Child("ip"), hostAlias.IP)...)
+		allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Index(i).Child("ip"), hostAlias.IP, nil)...)
 		for j, hostname := range hostAlias.Hostnames {
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Index(i).Child("hostnames").Index(j))...)
 		}
@@ -4108,14 +4108,21 @@ func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.
 }
 
 // validatePodIPs validates IPs in pod status
-func validatePodIPs(pod *core.Pod) field.ErrorList {
+func validatePodIPs(pod, oldPod *core.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	podIPsField := field.NewPath("status", "podIPs")
 
-	// all PodIPs must be valid IPs
+	// all new PodIPs must be valid IPs, but existing invalid ones can be kept.
+	var existingPodIPs []string
+	if oldPod != nil {
+		existingPodIPs = make([]string, len(oldPod.Status.PodIPs))
+		for i, podIP := range oldPod.Status.PodIPs {
+			existingPodIPs[i] = podIP.IP
+		}
+	}
 	for i, podIP := range pod.Status.PodIPs {
-		allErrs = append(allErrs, IsValidIPForLegacyField(podIPsField.Index(i), podIP.IP)...)
+		allErrs = append(allErrs, IsValidIPForLegacyField(podIPsField.Index(i), podIP.IP, existingPodIPs)...)
 	}
 
 	// if we have more than one Pod.PodIP then we must have a dual-stack pair
@@ -4140,7 +4147,7 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 }
 
 // validateHostIPs validates IPs in pod status
-func validateHostIPs(pod *core.Pod) field.ErrorList {
+func validateHostIPs(pod, oldPod *core.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(pod.Status.HostIPs) == 0 {
@@ -4154,9 +4161,16 @@ func validateHostIPs(pod *core.Pod) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(hostIPsField.Index(0).Child("ip"), pod.Status.HostIPs[0].IP, "must be equal to `hostIP`"))
 	}
 
-	// all HostIPs must be valid IPs
+	// all new HostIPs must be valid IPs, but existing invalid ones can be kept.
+	var existingHostIPs []string
+	if oldPod != nil {
+		existingHostIPs = make([]string, len(oldPod.Status.HostIPs))
+		for i, hostIP := range oldPod.Status.HostIPs {
+			existingHostIPs[i] = hostIP.IP
+		}
+	}
 	for i, hostIP := range pod.Status.HostIPs {
-		allErrs = append(allErrs, IsValidIPForLegacyField(hostIPsField.Index(i), hostIP.IP)...)
+		allErrs = append(allErrs, IsValidIPForLegacyField(hostIPsField.Index(i), hostIP.IP, existingHostIPs)...)
 	}
 
 	// if we have more than one Pod.HostIP then we must have a dual-stack pair
@@ -5462,11 +5476,11 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), core.RestartPolicyNever)...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 
-	if newIPErrs := validatePodIPs(newPod); len(newIPErrs) > 0 {
+	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
 	}
 
-	if newIPErrs := validateHostIPs(newPod); len(newIPErrs) > 0 {
+	if newIPErrs := validateHostIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
 	}
 
@@ -5860,7 +5874,7 @@ var supportedServiceIPFamilyPolicy = sets.New(
 	core.IPFamilyPolicyRequireDualStack)
 
 // ValidateService tests if required fields/annotations of a Service are valid.
-func ValidateService(service *core.Service) field.ErrorList {
+func ValidateService(service, oldService *core.Service) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, metaPath)
 
@@ -5935,12 +5949,19 @@ func ValidateService(service *core.Service) field.ErrorList {
 	}
 
 	// dualstack <-> ClusterIPs <-> ipfamilies
-	allErrs = append(allErrs, ValidateServiceClusterIPsRelatedFields(service)...)
+	allErrs = append(allErrs, ValidateServiceClusterIPsRelatedFields(service, oldService)...)
 
+	// All new ExternalIPs must be valid and "non-special". (Existing ExternalIPs may
+	// have been validated against older rules, but if we allowed them before we can't
+	// reject them now.)
 	ipPath := specPath.Child("externalIPs")
+	var existingExternalIPs []string
+	if oldService != nil {
+		existingExternalIPs = oldService.Spec.ExternalIPs // +k8s:verify-mutation:reason=clone
+	}
 	for i, ip := range service.Spec.ExternalIPs {
 		idxPath := ipPath.Index(i)
-		if errs := IsValidIPForLegacyField(idxPath, ip); len(errs) != 0 {
+		if errs := IsValidIPForLegacyField(idxPath, ip, existingExternalIPs); len(errs) != 0 {
 			allErrs = append(allErrs, errs...)
 		} else {
 			// For historical reasons, this uses ValidateEndpointIP even
@@ -5997,18 +6018,27 @@ func ValidateService(service *core.Service) field.ErrorList {
 		ports[key] = true
 	}
 
-	// Validate SourceRanges field or annotation.
+	// Validate SourceRanges field or annotation. Existing invalid CIDR values do not
+	// need to be fixed. Note that even with the tighter CIDR validation we still
+	// allow excess whitespace, because that is effectively part of the API.
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 {
 		fieldPath := specPath.Child("LoadBalancerSourceRanges")
 
 		if service.Spec.Type != core.ServiceTypeLoadBalancer {
 			allErrs = append(allErrs, field.Forbidden(fieldPath, "may only be used when `type` is 'LoadBalancer'"))
 		}
+		var existingSourceRanges []string
+		if oldService != nil {
+			existingSourceRanges = make([]string, len(oldService.Spec.LoadBalancerSourceRanges))
+			for i, value := range oldService.Spec.LoadBalancerSourceRanges {
+				existingSourceRanges[i] = strings.TrimSpace(value)
+			}
+		}
 		for idx, value := range service.Spec.LoadBalancerSourceRanges {
 			// Note: due to a historical accident around transition from the
 			// annotation value, these values are allowed to be space-padded.
 			value = strings.TrimSpace(value)
-			allErrs = append(allErrs, IsValidCIDRForLegacyField(fieldPath.Index(idx), value)...)
+			allErrs = append(allErrs, IsValidCIDRForLegacyField(fieldPath.Index(idx), value, existingSourceRanges)...)
 		}
 	} else if val, annotationSet := service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]; annotationSet {
 		fieldPath := field.NewPath("metadata", "annotations").Key(core.AnnotationLoadBalancerSourceRangesKey)
@@ -6016,12 +6046,14 @@ func ValidateService(service *core.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(fieldPath, "may only be used when `type` is 'LoadBalancer'"))
 		}
 
-		val = strings.TrimSpace(val)
-		if val != "" {
-			cidrs := strings.Split(val, ",")
-			for _, value := range cidrs {
-				value = strings.TrimSpace(value)
-				allErrs = append(allErrs, IsValidCIDRForLegacyField(fieldPath, value)...)
+		if oldService == nil || oldService.Annotations[core.AnnotationLoadBalancerSourceRangesKey] != val {
+			val = strings.TrimSpace(val)
+			if val != "" {
+				cidrs := strings.Split(val, ",")
+				for _, value := range cidrs {
+					value = strings.TrimSpace(value)
+					allErrs = append(allErrs, IsValidCIDRForLegacyField(fieldPath, value, nil)...)
+				}
 			}
 		}
 	}
@@ -6181,7 +6213,7 @@ func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
 
 // ValidateServiceCreate validates Services as they are created.
 func ValidateServiceCreate(service *core.Service) field.ErrorList {
-	return ValidateService(service)
+	return ValidateService(service, nil)
 }
 
 // ValidateServiceUpdate tests if required fields in the service are set during an update
@@ -6204,13 +6236,13 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsUpdate(oldService, service)...)
 
-	return append(allErrs, ValidateService(service)...)
+	return append(allErrs, ValidateService(service, oldService)...)
 }
 
 // ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
 func ValidateServiceStatusUpdate(service, oldService *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, field.NewPath("status", "loadBalancer"), &service.Spec)...)
+	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, &oldService.Status.LoadBalancer, field.NewPath("status", "loadBalancer"), &service.Spec)...)
 	return allErrs
 }
 
@@ -6405,7 +6437,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 
 		// all PodCIDRs should be valid ones
 		for idx, value := range node.Spec.PodCIDRs {
-			allErrs = append(allErrs, IsValidCIDRForLegacyField(podCIDRsField.Index(idx), value)...)
+			allErrs = append(allErrs, IsValidCIDRForLegacyField(podCIDRsField.Index(idx), value, nil)...)
 		}
 
 		// if more than PodCIDR then it must be a dual-stack pair
@@ -7432,16 +7464,28 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 }
 
 // ValidateEndpoints validates Endpoints on create and update.
-func ValidateEndpoints(endpoints *core.Endpoints) field.ErrorList {
+func ValidateEndpoints(endpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(endpoints.Annotations, field.NewPath("annotations"))...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))...)
+
+	subsetErrs := validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))
+	if len(subsetErrs) != 0 {
+		// If this is an update, and Subsets was unchanged, then ignore the
+		// validation errors, since apparently older versions of Kubernetes
+		// considered the data valid. (We only check this after getting a
+		// validation error since Endpoints may be large and DeepEqual is slow.)
+		if oldEndpoints != nil && apiequality.Semantic.DeepEqual(oldEndpoints.Subsets, endpoints.Subsets) {
+			subsetErrs = nil
+		}
+	}
+	allErrs = append(allErrs, subsetErrs...)
+
 	return allErrs
 }
 
 // ValidateEndpointsCreate validates Endpoints on create.
 func ValidateEndpointsCreate(endpoints *core.Endpoints) field.ErrorList {
-	return ValidateEndpoints(endpoints)
+	return ValidateEndpoints(endpoints, nil)
 }
 
 // ValidateEndpointsUpdate validates Endpoints on update. NodeName changes are
@@ -7450,7 +7494,7 @@ func ValidateEndpointsCreate(endpoints *core.Endpoints) field.ErrorList {
 // happens.
 func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateEndpoints(newEndpoints)...)
+	allErrs = append(allErrs, ValidateEndpoints(newEndpoints, oldEndpoints)...)
 	return allErrs
 }
 
@@ -7481,7 +7525,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path)
 
 func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Child("ip"), address.IP)...)
+	allErrs = append(allErrs, IsValidIPForLegacyField(fldPath.Child("ip"), address.IP, nil)...)
 	if len(address.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
@@ -7844,16 +7888,25 @@ var (
 )
 
 // ValidateLoadBalancerStatus validates required fields on a LoadBalancerStatus
-func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.Path, spec *core.ServiceSpec) field.ErrorList {
+func ValidateLoadBalancerStatus(status, oldStatus *core.LoadBalancerStatus, fldPath *field.Path, spec *core.ServiceSpec) field.ErrorList {
 	allErrs := field.ErrorList{}
 	ingrPath := fldPath.Child("ingress")
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowServiceLBStatusOnNonLB) && spec.Type != core.ServiceTypeLoadBalancer && len(status.Ingress) != 0 {
 		allErrs = append(allErrs, field.Forbidden(ingrPath, "may only be used when `spec.type` is 'LoadBalancer'"))
 	} else {
+		var existingIngressIPs []string
+		if oldStatus != nil {
+			existingIngressIPs = make([]string, 0, len(oldStatus.Ingress))
+			for _, ingress := range oldStatus.Ingress {
+				if len(ingress.IP) > 0 {
+					existingIngressIPs = append(existingIngressIPs, ingress.IP)
+				}
+			}
+		}
 		for i, ingress := range status.Ingress {
 			idxPath := ingrPath.Index(i)
 			if len(ingress.IP) > 0 {
-				allErrs = append(allErrs, IsValidIPForLegacyField(idxPath.Child("ip"), ingress.IP)...)
+				allErrs = append(allErrs, IsValidIPForLegacyField(idxPath.Child("ip"), ingress.IP, existingIngressIPs)...)
 			}
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
@@ -8120,7 +8173,7 @@ func validateLabelKeys(fldPath *field.Path, labelKeys []string, labelSelector *m
 // ValidateServiceClusterIPsRelatedFields validates .spec.ClusterIPs,,
 // .spec.IPFamilies, .spec.ipFamilyPolicy.  This is exported because it is used
 // during IP init and allocation.
-func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorList {
+func ValidateServiceClusterIPsRelatedFields(service, oldService *core.Service) field.ErrorList {
 	// ClusterIP, ClusterIPs, IPFamilyPolicy and IPFamilies are validated prior (all must be unset) for ExternalName service
 	if service.Spec.Type == core.ServiceTypeExternalName {
 		return field.ErrorList{}
@@ -8174,6 +8227,11 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		}
 	}
 
+	var existingClusterIPs []string
+	if oldService != nil {
+		existingClusterIPs = oldService.Spec.ClusterIPs // +k8s:verify-mutation:reason=clone
+	}
+
 	// clusterIPs stand alone validation
 	// valid ips with None and empty string handling
 	// duplication check is done as part of DualStackvalidation below
@@ -8187,8 +8245,8 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 			continue
 		}
 
-		// is it valid ip?
-		errorMessages := IsValidIPForLegacyField(clusterIPsField.Index(i), clusterIP)
+		// is it a valid ip? (or was it at least previously considered valid?)
+		errorMessages := IsValidIPForLegacyField(clusterIPsField.Index(i), clusterIP, existingClusterIPs)
 		hasInvalidIPs = (len(errorMessages) != 0) || hasInvalidIPs
 		allErrs = append(allErrs, errorMessages...)
 	}
@@ -8707,13 +8765,13 @@ func isRestartableInitContainer(initContainer *core.Container) bool {
 // IsValidIPForLegacyField is a wrapper around validation.IsValidIPForLegacyField that
 // handles setting strictValidation correctly. This is only for fields that use legacy IP
 // address validation; use validation.IsValidIP for new fields.
-func IsValidIPForLegacyField(fldPath *field.Path, value string) field.ErrorList {
-	return validation.IsValidIPForLegacyField(fldPath, value, utilfeature.DefaultFeatureGate.Enabled(features.StrictIPCIDRValidation))
+func IsValidIPForLegacyField(fldPath *field.Path, value string, validOldIPs []string) field.ErrorList {
+	return validation.IsValidIPForLegacyField(fldPath, value, utilfeature.DefaultFeatureGate.Enabled(features.StrictIPCIDRValidation), validOldIPs)
 }
 
 // IsValidCIDRForLegacyField is a wrapper around validation.IsValidCIDRForLegacyField that
 // handles setting strictValidation correctly. This is only for fields that use legacy CIDR
 // value validation; use validation.IsValidCIDR for new fields.
-func IsValidCIDRForLegacyField(fldPath *field.Path, value string) field.ErrorList {
-	return validation.IsValidCIDRForLegacyField(fldPath, value, utilfeature.DefaultFeatureGate.Enabled(features.StrictIPCIDRValidation))
+func IsValidCIDRForLegacyField(fldPath *field.Path, value string, validOldCIDRs []string) field.ErrorList {
+	return validation.IsValidCIDRForLegacyField(fldPath, value, utilfeature.DefaultFeatureGate.Enabled(features.StrictIPCIDRValidation), validOldCIDRs)
 }

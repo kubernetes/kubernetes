@@ -56,6 +56,7 @@ var (
 
 type NetworkPolicyValidationOptions struct {
 	AllowInvalidLabelValueInSelector bool
+	AllowCIDRsEvenIfInvalid          []string
 }
 
 // ValidateNetworkPolicyName can be used to check whether the given networkpolicy
@@ -118,7 +119,7 @@ func ValidateNetworkPolicyPeer(peer *networking.NetworkPolicyPeer, opts NetworkP
 	}
 	if peer.IPBlock != nil {
 		numPeers++
-		allErrs = append(allErrs, ValidateIPBlock(peer.IPBlock, peerPath.Child("ipBlock"))...)
+		allErrs = append(allErrs, ValidateIPBlock(peer.IPBlock, peerPath.Child("ipBlock"), opts)...)
 	}
 
 	if numPeers == 0 {
@@ -206,20 +207,47 @@ func ValidationOptionsForNetworking(new, old *networking.NetworkPolicy) NetworkP
 
 // ValidateNetworkPolicyUpdate tests if an update to a NetworkPolicy is valid.
 func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts NetworkPolicyValidationOptions) field.ErrorList {
+	// Record all existing CIDRs in the policy; see ValidateIPBlock.
+	var existingCIDRs []string
+	for _, ingress := range old.Spec.Ingress {
+		for _, peer := range ingress.From {
+			if peer.IPBlock != nil {
+				existingCIDRs = append(existingCIDRs, peer.IPBlock.CIDR)
+				existingCIDRs = append(existingCIDRs, peer.IPBlock.Except...)
+			}
+		}
+	}
+	for _, egress := range old.Spec.Egress {
+		for _, peer := range egress.To {
+			if peer.IPBlock != nil {
+				existingCIDRs = append(existingCIDRs, peer.IPBlock.CIDR)
+				existingCIDRs = append(existingCIDRs, peer.IPBlock.Except...)
+			}
+		}
+	}
+	opts.AllowCIDRsEvenIfInvalid = existingCIDRs
+
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidateNetworkPolicySpec(&update.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
 }
 
-// ValidateIPBlock validates a cidr and the except fields of an IpBlock NetworkPolicyPeer
-func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorList {
+// ValidateIPBlock validates a cidr and the except fields of an IPBlock NetworkPolicyPeer.
+//
+// If a pre-existing CIDR is invalid/insecure, but it is not being changed by this update,
+// then we have to continue allowing it. But since the user may have changed the policy in
+// arbitrary ways (adding/removing rules, adding/removing peers, adding/removing
+// ipBlock.except values, etc), we can't reliably determine whether a CIDR value we see
+// here is a new value or a pre-existing one. So we just allow any CIDR value that
+// appeared in the old NetworkPolicy to be used here without revalidation.
+func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ipb.CIDR == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
 		return allErrs
 	}
-	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR)...)
+	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR, opts.AllowCIDRsEvenIfInvalid)...)
 	_, cidrIPNet, err := netutils.ParseCIDRSloppy(ipb.CIDR)
 	if err != nil {
 		// Implies validation would have failed so we already added errors for it.
@@ -228,7 +256,7 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 
 	for i, exceptCIDRStr := range ipb.Except {
 		exceptPath := fldPath.Child("except").Index(i)
-		allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(exceptPath, exceptCIDRStr)...)
+		allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(exceptPath, exceptCIDRStr, opts.AllowCIDRsEvenIfInvalid)...)
 		_, exceptCIDR, err := netutils.ParseCIDRSloppy(exceptCIDRStr)
 		if err != nil {
 			// Implies validation would have failed so we already added errors for it.
@@ -346,17 +374,28 @@ func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path, opts
 // ValidateIngressStatusUpdate tests if required fields in the Ingress are set when updating status.
 func ValidateIngressStatusUpdate(ingress, oldIngress *networking.Ingress) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateIngressLoadBalancerStatus(&ingress.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	allErrs = append(allErrs, ValidateIngressLoadBalancerStatus(&ingress.Status.LoadBalancer, &oldIngress.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
 	return allErrs
 }
 
 // ValidateIngressLoadBalancerStatus validates required fields on an IngressLoadBalancerStatus
-func ValidateIngressLoadBalancerStatus(status *networking.IngressLoadBalancerStatus, fldPath *field.Path) field.ErrorList {
+func ValidateIngressLoadBalancerStatus(status, oldStatus *networking.IngressLoadBalancerStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	var existingIngressIPs []string
+	if oldStatus != nil {
+		existingIngressIPs = make([]string, 0, len(oldStatus.Ingress))
+		for _, ingress := range oldStatus.Ingress {
+			if len(ingress.IP) > 0 {
+				existingIngressIPs = append(existingIngressIPs, ingress.IP)
+			}
+		}
+	}
+
 	for i, ingress := range status.Ingress {
 		idxPath := fldPath.Child("ingress").Index(i)
 		if len(ingress.IP) > 0 {
-			allErrs = append(allErrs, apivalidation.IsValidIPForLegacyField(idxPath.Child("ip"), ingress.IP)...)
+			allErrs = append(allErrs, apivalidation.IsValidIPForLegacyField(idxPath.Child("ip"), ingress.IP, existingIngressIPs)...)
 		}
 		if len(ingress.Hostname) > 0 {
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {

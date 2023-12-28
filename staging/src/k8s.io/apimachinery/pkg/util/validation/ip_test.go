@@ -25,7 +25,7 @@ import (
 )
 
 func TestIsValidIP(t *testing.T) {
-	for _, tc := range []struct {
+	testCases := []struct {
 		name string
 		in   string
 
@@ -202,7 +202,16 @@ func TestIsValidIP(t *testing.T) {
 			legacyErr:       "must be a valid IP address",
 			legacyStrictErr: "must be a valid IP address",
 		},
-	} {
+	}
+
+	var badIPs []string
+	for _, tc := range testCases {
+		if tc.legacyStrictErr != "" {
+			badIPs = append(badIPs, tc.in)
+		}
+	}
+
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := IsValidIP(field.NewPath(""), tc.in)
 			if tc.err == "" {
@@ -217,7 +226,7 @@ func TestIsValidIP(t *testing.T) {
 				}
 			}
 
-			errs = IsValidIPForLegacyField(field.NewPath(""), tc.in, false)
+			errs = IsValidIPForLegacyField(field.NewPath(""), tc.in, false, nil)
 			if tc.legacyErr == "" {
 				if len(errs) != 0 {
 					t.Errorf("expected %q to be valid according to IsValidIPForLegacyField but got: %v", tc.in, errs)
@@ -230,7 +239,7 @@ func TestIsValidIP(t *testing.T) {
 				}
 			}
 
-			errs = IsValidIPForLegacyField(field.NewPath(""), tc.in, true)
+			errs = IsValidIPForLegacyField(field.NewPath(""), tc.in, true, nil)
 			if tc.legacyStrictErr == "" {
 				if len(errs) != 0 {
 					t.Errorf("expected %q to be valid according to IsValidIPForLegacyField with strict validation, but got: %v", tc.in, errs)
@@ -241,6 +250,11 @@ func TestIsValidIP(t *testing.T) {
 				} else if !strings.Contains(errs[0].Detail, tc.legacyStrictErr) {
 					t.Errorf("expected error from IsValidIPForLegacyField with strict validation for %q to contain %q but got: %q", tc.in, tc.legacyStrictErr, errs[0].Detail)
 				}
+			}
+
+			errs = IsValidIPForLegacyField(field.NewPath(""), tc.in, true, badIPs)
+			if len(errs) != 0 {
+				t.Errorf("expected %q to be accepted when using validOldIPs, but got: %v", tc.in, errs)
 			}
 		})
 	}
@@ -300,7 +314,7 @@ func TestGetWarningsForIP(t *testing.T) {
 }
 
 func TestIsValidCIDR(t *testing.T) {
-	for _, tc := range []struct {
+	testCases := []struct {
 		name string
 		in   string
 
@@ -455,7 +469,16 @@ func TestIsValidCIDR(t *testing.T) {
 			legacyErr:       "must be a valid CIDR value",
 			legacyStrictErr: "must be a valid CIDR value",
 		},
-	} {
+	}
+
+	var badCIDRs []string
+	for _, tc := range testCases {
+		if tc.legacyStrictErr != "" {
+			badCIDRs = append(badCIDRs, tc.in)
+		}
+	}
+
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := IsValidCIDR(field.NewPath(""), tc.in)
 			if tc.err == "" {
@@ -470,7 +493,7 @@ func TestIsValidCIDR(t *testing.T) {
 				}
 			}
 
-			errs = IsValidCIDRForLegacyField(field.NewPath(""), tc.in, false)
+			errs = IsValidCIDRForLegacyField(field.NewPath(""), tc.in, false, nil)
 			if tc.legacyErr == "" {
 				if len(errs) != 0 {
 					t.Errorf("expected %q to be valid according to IsValidCIDRForLegacyField but got: %v", tc.in, errs)
@@ -483,7 +506,7 @@ func TestIsValidCIDR(t *testing.T) {
 				}
 			}
 
-			errs = IsValidCIDRForLegacyField(field.NewPath(""), tc.in, true)
+			errs = IsValidCIDRForLegacyField(field.NewPath(""), tc.in, true, nil)
 			if tc.legacyStrictErr == "" {
 				if len(errs) != 0 {
 					t.Errorf("expected %q to be valid according to IsValidCIDRForLegacyField with strict validation but got: %v", tc.in, errs)
@@ -494,6 +517,11 @@ func TestIsValidCIDR(t *testing.T) {
 				} else if !strings.Contains(errs[0].Detail, tc.legacyStrictErr) {
 					t.Errorf("expected error for %q from IsValidCIDRForLegacyField with strict validation to contain %q but got: %q", tc.in, tc.legacyStrictErr, errs[0].Detail)
 				}
+			}
+
+			errs = IsValidCIDRForLegacyField(field.NewPath(""), tc.in, true, badCIDRs)
+			if len(errs) != 0 {
+				t.Errorf("expected %q to be accepted when using validOldCIDRs, but got: %v", tc.in, errs)
 			}
 		})
 	}

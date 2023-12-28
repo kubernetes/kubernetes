@@ -18892,10 +18892,212 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+
+		// IP validation ratcheting tests. Note: this is tested for
+		// LoadBalancerStatus in TestValidateLoadBalancerStatus.
+		{
+			name: "pre-existing invalid clusterIP ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid clusterIP ignored when adding clusterIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04", "2001:db8::4"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid clusterIP ignored when removing clusterIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04", "2001:db::4"}
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored when adding externalIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"5.6.7.8", "1.2.3.04"}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored when removing externalIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"5.6.7.8", "1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid externalIP",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.4"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can't add invalid externalIP",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+			},
+			numErrs: 1,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when adding source ranges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "010.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when removing source ranges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can't add invalid loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+			},
+			numErrs: 1,
+		}, {
+			name: "pre-existing invalid source ranges ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid source ranges annotation",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "10.0.0.0/8"
+			},
+			numErrs: 0,
+		}, {
+			name: "can't modify pre-existing invalid source ranges annotation without fixing it",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
+			},
+			numErrs: 1,
+		}, {
+			name: "can't add invalid source ranges annotation",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
 			tc.tweakSvc(&oldSvc, &newSvc)
@@ -22089,7 +22291,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
 	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
 	// The same ip will now have a different nodeName.
-	errList := ValidateEndpoints(updatedEndpoint)
+	errList := ValidateEndpoints(updatedEndpoint, oldEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
 	if len(errList) != 0 {
 		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
@@ -22099,7 +22301,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 	// Check NodeName DNS validation
 	endpoint := newNodeNameEndpoint("illegal*.nodename")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, nil)
 	if len(errList) == 0 {
 		t.Error("Endpoint should reject invalid NodeName")
 	}
@@ -22107,7 +22309,7 @@ func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 
 func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	endpoint := newNodeNameEndpoint("10.10.1.1")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, nil)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
@@ -23033,11 +23235,13 @@ func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod 
 func TestPodIPsValidation(t *testing.T) {
 	// We test updating every pod in testCases to every other pod in testCases.
 	// expectError is true if we expect an error when updating *to* that pod.
+	// allowNoOpUpdate is true if we expect a no-op update to succeed.
 
 	testCases := []struct {
-		pod         core.Pod
-		legacyIPs   bool
-		expectError bool
+		pod             core.Pod
+		legacyIPs       bool
+		expectError     bool
+		allowNoOpUpdate bool
 	}{
 		{
 			expectError: false,
@@ -23064,11 +23268,13 @@ func TestPodIPsValidation(t *testing.T) {
 		},
 		/* failure cases start here */
 		{
-			expectError: true,
-			pod:         makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "this-is-not-an-ip"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "1.1.1.01"}}),
 		}, {
-			expectError: true,
-			pod:         makePod("legacy-pod-ip-with-strict-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePod("legacy-pod-ip-with-strict-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
 		}, {
 			expectError: true,
 			pod:         makePod("dualstack-same-ip-family-6", "ns", []core.PodIP{{IP: "::1"}, {IP: "::2"}}),
@@ -23092,10 +23298,14 @@ func TestPodIPsValidation(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
-			for _, oldTestCase := range testCases {
+			for j, oldTestCase := range testCases {
+				if oldTestCase.legacyIPs && !testCase.legacyIPs {
+					continue
+				}
+
 				newPod := testCase.pod.DeepCopy()
 				newPod.ResourceVersion = "1"
 
@@ -23105,7 +23315,11 @@ func TestPodIPsValidation(t *testing.T) {
 
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
-				if len(errs) == 0 && testCase.expectError {
+				expectError := testCase.expectError
+				if testCase.allowNoOpUpdate && i == j {
+					expectError = false
+				}
+				if len(errs) == 0 && expectError {
 					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
@@ -23142,11 +23356,13 @@ func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.Host
 func TestHostIPsValidation(t *testing.T) {
 	// We test updating every pod in testCases to every other pod in testCases.
 	// expectError is true if we expect an error when updating *to* that pod.
+	// allowNoOpUpdate is true if we expect a no-op update to succeed.
 
 	testCases := []struct {
-		pod         core.Pod
-		legacyIPs   bool
-		expectError bool
+		pod             core.Pod
+		legacyIPs       bool
+		expectError     bool
+		allowNoOpUpdate bool
 	}{
 		{
 			expectError: false,
@@ -23179,12 +23395,14 @@ func TestHostIPsValidation(t *testing.T) {
 		},
 		/* failure cases start here */
 		{
-			expectError: true,
-			pod:         makePodWithHostIPs("invalid-host-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePodWithHostIPs("invalid-host-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
 		},
 		{
-			expectError: true,
-			pod:         makePodWithHostIPs("invalid-legacy-host-ip-with-strict-validation", "ns", []core.HostIP{{IP: "001.002.003.004"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePodWithHostIPs("invalid-legacy-host-ip-with-strict-validation", "ns", []core.HostIP{{IP: "001.002.003.004"}}),
 		},
 		{
 			expectError: true,
@@ -23213,10 +23431,14 @@ func TestHostIPsValidation(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
-			for _, oldTestCase := range testCases {
+			for j, oldTestCase := range testCases {
+				if oldTestCase.legacyIPs && !testCase.legacyIPs {
+					continue
+				}
+
 				newPod := testCase.pod.DeepCopy()
 				newPod.ResourceVersion = "1"
 
@@ -23226,7 +23448,11 @@ func TestHostIPsValidation(t *testing.T) {
 
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
-				if len(errs) == 0 && testCase.expectError {
+				expectError := testCase.expectError
+				if testCase.allowNoOpUpdate && i == j {
+					expectError = false
+				}
+				if len(errs) == 0 && expectError {
 					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
@@ -24782,13 +25008,14 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	ipModeDummy := core.LoadBalancerIPMode("dummy")
 
 	testCases := []struct {
-		name          string
-		ipModeEnabled bool
-		legacyIPs     bool
-		nonLBAllowed  bool
-		tweakLBStatus func(s *core.LoadBalancerStatus)
-		tweakSvcSpec  func(s *core.ServiceSpec)
-		numErrs       int
+		name             string
+		ipModeEnabled    bool
+		legacyIPs        bool
+		nonLBAllowed     bool
+		tweakOldLBStatus func(s *core.LoadBalancerStatus)
+		tweakLBStatus    func(s *core.LoadBalancerStatus)
+		tweakSvcSpec     func(s *core.ServiceSpec)
+		numErrs          int
 	}{
 		{
 			name:         "type is not LB",
@@ -24892,6 +25119,54 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 				}}
 			},
 			numErrs: 1,
+		}, {
+			name: "invalid ingress IP ignored on update",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid ingress IP ignored when adding IP",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}, {
+					IP:     "5.6.7.8",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid ingress IP can be fixed",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
 		},
 	}
 	for _, tc := range testCases {
@@ -24905,13 +25180,17 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
+			oldStatus := core.LoadBalancerStatus{}
+			if tc.tweakOldLBStatus != nil {
+				tc.tweakOldLBStatus(&oldStatus)
+			}
 			status := core.LoadBalancerStatus{}
 			tc.tweakLBStatus(&status)
 			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
 			if tc.tweakSvcSpec != nil {
 				tc.tweakSvcSpec(&spec)
 			}
-			errs := ValidateLoadBalancerStatus(&status, field.NewPath("status"), &spec)
+			errs := ValidateLoadBalancerStatus(&status, &oldStatus, field.NewPath("status"), &spec)
 			if len(errs) != tc.numErrs {
 				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
 			}

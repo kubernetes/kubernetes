@@ -442,13 +442,95 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
+		"fix pre-existing invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
+		"fail to fix pre-existing invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.1.0/24",
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
 	}
 
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "1"
-			if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{false}); len(errs) != 0 {
+			if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success, but got %v", errs)
 			}
 		})
@@ -471,13 +553,55 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
+		"add new invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.1.1/24",
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
 	}
 
 	for testName, errorCase := range errorCases {
 		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errorCase.old.ObjectMeta.ResourceVersion = "1"
 			errorCase.update.ObjectMeta.ResourceVersion = "1"
-			if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{false}); len(errs) == 0 {
+			if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{}); len(errs) == 0 {
 				t.Errorf("expected failure")
 			}
 		})
@@ -1864,6 +1988,10 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			oldValue:  oldValue,
 			newValue:  legacyIP,
 			legacyIPs: true,
+		},
+		"legacy IPs unchanged in update": {
+			oldValue: legacyIP,
+			newValue: legacyIP,
 		},
 	}
 	for k, tc := range successCases {
