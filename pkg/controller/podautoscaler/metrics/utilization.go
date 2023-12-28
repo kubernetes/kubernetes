@@ -40,10 +40,18 @@ func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int
 		numEntries++
 	}
 
+	if targetUtilization == 0 {
+		return 0, 0, 0, fmt.Errorf("targetUtilization can not be 0")
+	}
+
 	// if the set of requests is completely disjoint from the set of metrics,
 	// then we could have an issue where the requests total is zero
 	if requestsTotal == 0 {
 		return 0, 0, 0, fmt.Errorf("no metrics returned matched known pods")
+	}
+
+	if numEntries == 0 {
+		return 0, 0, 0, fmt.Errorf("numEntries can not be 0")
 	}
 
 	currentUtilization = int32((metricsTotal * 100) / requestsTotal)
@@ -55,6 +63,10 @@ func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int
 // and calculates the ratio of desired to actual usage
 // (returning that and the actual usage)
 func GetMetricUsageRatio(metrics PodMetricsInfo, targetUsage int64) (usageRatio float64, currentUsage int64) {
+	if len(metrics) == 0 || targetUsage == 0 {
+		return 0, 0
+	}
+
 	metricsTotal := int64(0)
 	for _, metric := range metrics {
 		metricsTotal += metric.Value

@@ -135,6 +135,38 @@ func TestGetResourceUtilizationRatioNoRequests(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestGetResourceUtilizationRatioNoTargetUtilizationRequests(t *testing.T) {
+	tc := resourceUtilizationRatioTestCase{
+		metrics: PodMetricsInfo{
+			"test-pod-0": {Value: 50}, "test-pod-1": {Value: 76},
+		},
+		requests:          map[string]int64{},
+		targetUtilization: 0,
+
+		expectedUtilizationRatio:   0,
+		expectedCurrentUtilization: 0,
+		expectedRawAverageValue:    0,
+		expectedErr:                fmt.Errorf("targetUtilization can not be 0"),
+	}
+
+	tc.runTest(t)
+}
+
+func TestGetResourceUtilizationRatioNoMetricsRequests(t *testing.T) {
+	tc := resourceUtilizationRatioTestCase{
+		metrics:           nil,
+		requests:          map[string]int64{},
+		targetUtilization: 50,
+
+		expectedUtilizationRatio:   0,
+		expectedCurrentUtilization: 0,
+		expectedRawAverageValue:    0,
+		expectedErr:                fmt.Errorf("no metrics returned matched known pods"),
+	}
+
+	tc.runTest(t)
+}
+
 func TestGetMetricUsageRatioBaseCase(t *testing.T) {
 	tc := metricUsageRatioTestCase{
 		metrics: PodMetricsInfo{
@@ -144,6 +176,32 @@ func TestGetMetricUsageRatioBaseCase(t *testing.T) {
 		expectedUsageRatio:   .75,
 		expectedCurrentUsage: 7500,
 	}
-
 	tc.runTest(t)
+
+	tc = metricUsageRatioTestCase{
+		metrics:              nil,
+		targetUsage:          10000,
+		expectedUsageRatio:   0,
+		expectedCurrentUsage: 0,
+	}
+	tc.runTest(t)
+
+	tc = metricUsageRatioTestCase{
+		metrics: PodMetricsInfo{
+			"test-pod-0": {Value: 5000}, "test-pod-1": {Value: 10000},
+		},
+		targetUsage:          0,
+		expectedUsageRatio:   0,
+		expectedCurrentUsage: 0,
+	}
+	tc.runTest(t)
+
+	tc = metricUsageRatioTestCase{
+		metrics:              nil,
+		targetUsage:          0,
+		expectedUsageRatio:   0,
+		expectedCurrentUsage: 0,
+	}
+	tc.runTest(t)
+
 }
