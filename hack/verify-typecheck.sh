@@ -23,10 +23,10 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-
-kube::golang::verify_go_version
-
 cd "${KUBE_ROOT}"
+
+kube::golang::new::setup_env
+kube::golang::verify_go_version
 
 ret=0
 TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
@@ -36,22 +36,15 @@ CLIENT_PLATFORMS=$(echo "${KUBE_SUPPORTED_CLIENT_PLATFORMS[@]}" | tr ' ' ',')
 NODE_PLATFORMS=$(echo "${KUBE_SUPPORTED_NODE_PLATFORMS[@]}" | tr ' ' ',')
 TEST_PLATFORMS=$(echo "${KUBE_SUPPORTED_TEST_PLATFORMS[@]}" | tr ' ' ',')
 
-# As of June, 2020 the typecheck tool is written in terms of go/packages, but
-# that library doesn't work well with multiple modules.  Until that is done,
-# force this tooling to run in a fake GOPATH.
-hack/run-in-gopath.sh \
-    go run test/typecheck/main.go "$@" --serial="${TYPECHECK_SERIAL}" --platform "${SERVER_PLATFORMS}" "${KUBE_SERVER_TARGETS[@]}" \
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${SERVER_PLATFORMS}" "${KUBE_SERVER_TARGETS[@]}" \
     || ret=$?
-hack/run-in-gopath.sh \
-    go run test/typecheck/main.go "$@" --serial="${TYPECHECK_SERIAL}" --platform "${CLIENT_PLATFORMS}" "${KUBE_CLIENT_TARGETS[@]}" \
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${CLIENT_PLATFORMS}" "${KUBE_CLIENT_TARGETS[@]}" \
     || ret=$?
-hack/run-in-gopath.sh \
-    go run test/typecheck/main.go "$@" --serial="${TYPECHECK_SERIAL}" --platform "${NODE_PLATFORMS}" "${KUBE_NODE_TARGETS[@]}" \
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${NODE_PLATFORMS}" "${KUBE_NODE_TARGETS[@]}" \
     || ret=$?
 
 # $KUBE_TEST_TARGETS doesn't seem to work like the other TARGETS variables...
-hack/run-in-gopath.sh \
-    go run test/typecheck/main.go "$@" --serial="${TYPECHECK_SERIAL}" --platform "${TEST_PLATFORMS}" test/e2e \
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${TEST_PLATFORMS}" test/e2e \
     || ret=$?
 
 if [[ $ret -ne 0 ]]; then
