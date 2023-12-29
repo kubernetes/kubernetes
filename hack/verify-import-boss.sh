@@ -26,22 +26,18 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 
-GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/import-boss
+GOPROXY=off go install k8s.io/code-generator/cmd/import-boss
 
-packages=(
-  "k8s.io/kubernetes/pkg/..."
-  "k8s.io/kubernetes/cmd/..."
-  "k8s.io/kubernetes/plugin/..."
-  "k8s.io/kubernetes/test/e2e_node/..."
-  "k8s.io/kubernetes/test/e2e/framework/..."
-  "k8s.io/kubernetes/test/integration/..."
-)
-for d in staging/src/k8s.io/*/; do
-  if [ -d "$d" ]; then
-    packages+=("./vendor/${d#"staging/src/"}...")
-  fi
-done
-
-$(kube::util::find-binary "import-boss") --include-test-files=true --verify-only --input-dirs "$(IFS=, ; echo "${packages[*]}")"
+$(kube::util::find-binary "import-boss") \
+    -v "${KUBE_VERBOSE:-0}" \
+    --include-test-files \
+    --verify-only \
+    --input-dirs "./pkg/..." \
+    --input-dirs "./cmd/..." \
+    --input-dirs "./plugin/..." \
+    --input-dirs "./test/e2e_node/..." \
+    --input-dirs "./test/e2e/framework/..." \
+    --input-dirs "./test/integration/..." \
+    --input-dirs "./staging/src/..."
