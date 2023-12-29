@@ -28,7 +28,6 @@ cd "${KUBE_ROOT}"
 kube::golang::setup_env
 kube::golang::verify_go_version
 
-ret=0
 TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
 
 SERVER_PLATFORMS=$(echo "${KUBE_SUPPORTED_SERVER_PLATFORMS[@]}" | tr ' ' ',')
@@ -36,19 +35,31 @@ CLIENT_PLATFORMS=$(echo "${KUBE_SUPPORTED_CLIENT_PLATFORMS[@]}" | tr ' ' ',')
 NODE_PLATFORMS=$(echo "${KUBE_SUPPORTED_NODE_PLATFORMS[@]}" | tr ' ' ',')
 TEST_PLATFORMS=$(echo "${KUBE_SUPPORTED_TEST_PLATFORMS[@]}" | tr ' ' ',')
 
-go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${SERVER_PLATFORMS}" "${KUBE_SERVER_TARGETS[@]}" \
-    || ret=$?
-go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${CLIENT_PLATFORMS}" "${KUBE_CLIENT_TARGETS[@]}" \
-    || ret=$?
-go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${NODE_PLATFORMS}" "${KUBE_NODE_TARGETS[@]}" \
-    || ret=$?
+ret=0
+targets=()
 
+echo "server targets"
+kube::util::read-array targets < <(kube::golang::best_guess_go_targets "${KUBE_SERVER_TARGETS[@]}")
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${SERVER_PLATFORMS}" "${targets[@]}" \
+    || ret=$?
+echo
+echo "client targets"
+kube::util::read-array targets < <(kube::golang::best_guess_go_targets "${KUBE_CLIENT_TARGETS[@]}")
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${CLIENT_PLATFORMS}" "${targets[@]}" \
+    || ret=$?
+echo
+echo "node targets"
+kube::util::read-array targets < <(kube::golang::best_guess_go_targets "${KUBE_NODE_TARGETS[@]}")
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${NODE_PLATFORMS}" "${targets[@]}" \
+    || ret=$?
+echo
+echo "test targets"
 # $KUBE_TEST_TARGETS doesn't seem to work like the other TARGETS variables...
-go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${TEST_PLATFORMS}" test/e2e \
+go run ./test/typecheck "$@" --serial="${TYPECHECK_SERIAL}" --platform "${TEST_PLATFORMS}" ./test/e2e \
     || ret=$?
 
 if [[ $ret -ne 0 ]]; then
-  echo "!!! Type Check has failed. This may cause cross platform build failures." >&2
+  echo "!!! Typecheck has failed. This may cause cross platform build failures." >&2
   echo "!!! Please see https://git.k8s.io/kubernetes/test/typecheck for more information." >&2
   exit 1
 fi

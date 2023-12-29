@@ -21,9 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -42,7 +40,7 @@ var (
 	parallel   = flag.Int("parallel", 2, "limits how many platforms can be checked in parallel. 0 means no limit.")
 	skipTest   = flag.Bool("skip-test", false, "don't type check test code")
 	tags       = flag.String("tags", "", "comma-separated list of build tags to apply in addition to go's defaults")
-	ignoreDirs = flag.String("ignore-dirs", "", "comma-separated list of directories to ignore in addition to the default hardcoded list including staging, vendor, and hidden dirs")
+	ignoreDirs = flag.String("ignore", "", "comma-separated list of Go patterns to ignore")
 
 	// When processed in order, windows and darwin are early to make
 	// interesting OS-based errors happen earlier.
@@ -53,27 +51,6 @@ var (
 		"windows/amd64", "linux/arm64",
 		"linux/ppc64le", "linux/s390x",
 		"windows/arm64",
-	}
-
-	// directories we always ignore
-	standardIgnoreDirs = []string{
-		// Staging code is symlinked from vendor/k8s.io, and uses import
-		// paths as if it were inside of vendor/. It fails typechecking
-		// inside of staging/, but works when typechecked as part of vendor/.
-		"staging",
-		// OS-specific vendor code tends to be imported by OS-specific
-		// packages. We recursively typecheck imported vendored packages for
-		// each OS, but don't typecheck everything for every OS.
-		"vendor",
-		"_output",
-		// This is a weird one. /testdata/ is *mostly* ignored by Go,
-		// and this translates to kubernetes/vendor not working.
-		// edit/record.go doesn't compile without gopkg.in/yaml.v2
-		// in $GOSRC/$GOROOT (both typecheck and the shell script).
-		"pkg/kubectl/cmd/testdata/edit",
-		// Tools we use for maintaining the code base but not necessarily
-		// ship as part of the release
-		"hack/tools",
 	}
 )
 
@@ -102,95 +79,30 @@ func newConfig(platform string) *packages.Config {
 	}
 }
 
-type collector struct {
-	dirs       []string
-	ignoreDirs []string
-}
-
-func newCollector(ignoreDirs string) collector {
-	c := collector{
-		ignoreDirs: append([]string(nil), standardIgnoreDirs...),
-	}
-	if ignoreDirs != "" {
-		c.ignoreDirs = append(c.ignoreDirs, strings.Split(ignoreDirs, ",")...)
-	}
-	return c
-}
-
-func (c *collector) walk(roots []string) error {
-	for _, root := range roots {
-		err := filepath.Walk(root, c.handlePath)
-		if err != nil {
-			return err
-		}
-	}
-	sort.Strings(c.dirs)
-	return nil
-}
-
-// handlePath walks the filesystem recursively, collecting directories,
-// ignoring some unneeded directories (hidden/vendored) that are handled
-// specially later.
-func (c *collector) handlePath(path string, info os.FileInfo, err error) error {
-	if err != nil {
-		return err
-	}
-	if info.IsDir() {
-		name := info.Name()
-		// Ignore hidden directories (.git, .cache, etc)
-		if (len(name) > 1 && (name[0] == '.' || name[0] == '_')) || name == "testdata" {
-			if *verbose {
-				fmt.Printf("DBG: skipping dir %s\n", path)
-			}
-			return filepath.SkipDir
-		}
-		for _, dir := range c.ignoreDirs {
-			if path == dir {
-				if *verbose {
-					fmt.Printf("DBG: ignoring dir %s\n", path)
-				}
-				return filepath.SkipDir
-			}
-		}
-		// Make dirs into relative pkg names.
-		// NOTE: can't use filepath.Join because it elides the leading "./"
-		pkg := path
-		if !strings.HasPrefix(pkg, "./") {
-			pkg = "./" + pkg
-		}
-		c.dirs = append(c.dirs, pkg)
-		if *verbose {
-			fmt.Printf("DBG: added dir %s\n", path)
-		}
-	}
-	return nil
-}
-
-func (c *collector) verify(plat string) ([]string, error) {
+func verify(plat string, patterns []string, ignore map[string]bool) ([]string, error) {
 	errors := []packages.Error{}
 	start := time.Now()
 	config := newConfig(plat)
 
-	rootPkgs, err := packages.Load(config, c.dirs...)
+	pkgs, err := packages.Load(config, patterns...)
 	if err != nil {
 		return nil, err
+	}
+	todo := []*packages.Package{}
+	for _, p := range pkgs {
+		if ignore[p.PkgPath] {
+			continue
+		}
+		todo = append(todo, p)
 	}
 
 	// Recursively import all deps and flatten to one list.
 	allMap := map[string]*packages.Package{}
-	for _, pkg := range rootPkgs {
+	for _, pkg := range pkgs {
 		if *verbose {
 			serialFprintf(os.Stdout, "pkg %q has %d GoFiles\n", pkg.PkgPath, len(pkg.GoFiles))
 		}
-		allMap[pkg.PkgPath] = pkg
-		if len(pkg.Imports) > 0 {
-			for _, imp := range pkg.Imports {
-				if *verbose {
-					serialFprintf(os.Stdout, "pkg %q imports %q\n", pkg.PkgPath, imp.PkgPath)
-				}
-				allMap[imp.PkgPath] = imp
-			}
-		}
+		accumulate(pkg, allMap)
 	}
 	keys := make([]string, 0, len(allMap))
 	for k := range allMap {
@@ -225,6 +137,19 @@ func (c *collector) verify(plat string) ([]string, error) {
 	return dedup(errors), nil
 }
 
+func accumulate(pkg *packages.Package, allMap map[string]*packages.Package) {
+	allMap[pkg.PkgPath] = pkg
+	for _, imp := range pkg.Imports {
+		if allMap[imp.PkgPath] != nil {
+			continue
+		}
+		if *verbose {
+			serialFprintf(os.Stdout, "pkg %q imports %q\n", pkg.PkgPath, imp.PkgPath)
+		}
+		accumulate(imp, allMap)
+	}
+}
+
 func dedup(errors []packages.Error) []string {
 	ret := []string{}
 
@@ -247,6 +172,24 @@ func serialFprintf(w io.Writer, format string, a ...interface{}) (n int, err err
 	return fmt.Fprintf(w, format, a...)
 }
 
+func resolvePkgs(patterns ...string) (map[string]bool, error) {
+	config := &packages.Config{
+		Mode: packages.NeedName,
+	}
+	pkgs, err := packages.Load(config, patterns...)
+	if err != nil {
+		return nil, err
+	}
+	paths := map[string]bool{}
+	for _, p := range pkgs {
+		// ignore list errors (e.g. doesn't exist)
+		if len(p.Errors) == 0 {
+			paths[p.PkgPath] = true
+		}
+	}
+	return paths, nil
+}
+
 func main() {
 	flag.Parse()
 	args := flag.Args()
@@ -259,10 +202,14 @@ func main() {
 		args = append(args, ".")
 	}
 
-	c := newCollector(*ignoreDirs)
-
-	if err := c.walk(args); err != nil {
-		log.Fatalf("Error walking: %v", err)
+	ignore := []string{}
+	if *ignoreDirs != "" {
+		ignore = append(ignore, strings.Split(*ignoreDirs, ",")...)
+	}
+	ignorePkgs, err := resolvePkgs(ignore...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve ignored packages: %v", err)
+		os.Exit(1)
 	}
 
 	plats := crossPlatforms[:]
@@ -299,7 +246,7 @@ func main() {
 			} else {
 				serialFprintf(os.Stdout, "type-checking %s\n", plat)
 			}
-			errors, err := c.verify(plat)
+			errors, err := verify(plat, args, ignorePkgs)
 			if err != nil {
 				serialFprintf(os.Stderr, "ERROR(%s): failed to verify: %v\n", plat, err)
 				f = true
