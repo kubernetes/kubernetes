@@ -175,6 +175,17 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
+			name: "PersistentVolumeReclaimRecycle deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeReclaimPolicy: The Recycle reclaim policy is deprecated. Instead, the recommended approach is to use dynamic provisioning.`,
+			},
+		},
+		{
 			name: "PV CephFS deprecation warning",
 			template: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{
