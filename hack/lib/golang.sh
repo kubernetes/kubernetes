@@ -553,9 +553,6 @@ EOF
 kube::golang::old::setup_env() {
   kube::golang::verify_go_version
 
-  # Set up GOPATH.  We have tools which depend on being in a GOPATH (see
-  # hack/run-in-gopath.sh).
-  #
   # Even in module mode, we need to set GOPATH for `go build` and `go install`
   # to work.  We build various tools (usually via `go install`) from a lot of
   # scripts.
@@ -569,9 +566,6 @@ kube::golang::old::setup_env() {
   # Instead we set it to a phony local path and process the results ourselves.
   # In particular, GOPATH[0]/bin will be used for `go install`, with
   # cross-compiles adding an extra directory under that.
-  #
-  # Eventually, when we no longer rely on run-in-gopath.sh we may be able to
-  # simplify this some.
   local go_pkg_dir="${KUBE_GOPATH}/src/${KUBE_GO_PACKAGE}"
   local go_pkg_basedir
   go_pkg_basedir=$(dirname "${go_pkg_dir}")
@@ -626,9 +620,6 @@ kube::golang::old::setup_env() {
 kube::golang::new::setup_env() {
   kube::golang::verify_go_version
 
-  # Set up GOPATH.  We have tools which depend on being in a GOPATH (see
-  # hack/run-in-gopath.sh).
-  #
   # Even in module mode, we need to set GOPATH for `go build` and `go install`
   # to work.  We build various tools (usually via `go install`) from a lot of
   # scripts.
@@ -642,9 +633,6 @@ kube::golang::new::setup_env() {
   # Instead we set it to a phony local path and process the results ourselves.
   # In particular, GOPATH[0]/bin will be used for `go install`, with
   # cross-compiles adding an extra directory under that.
-  #
-  # Eventually, when we no longer rely on run-in-gopath.sh we may be able to
-  # simplify this some.
   export GOPATH="${KUBE_GOPATH}"
 
   # If these are not set, set them now.  This ensures that any subsequent
