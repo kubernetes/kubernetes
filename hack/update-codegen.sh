@@ -107,7 +107,7 @@ function codegen::protobuf() {
             -e '// +k8s:protobuf-gen=package' \
             -- \
             cmd pkg staging \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sed 's|^|k8s.io/kubernetes/|;s|k8s.io/kubernetes/staging/src/||' \
             | sort -u)
 
@@ -161,7 +161,7 @@ function codegen::deepcopy() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
         grep -l --null '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:deepcopy-gen tagged dirs"
@@ -294,7 +294,7 @@ function codegen::prerelease() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
         grep -l --null '+k8s:prerelease-lifecycle-gen=true' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:prerelease-lifecycle-gen tagged dirs"
@@ -363,7 +363,7 @@ function codegen::defaults() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
         grep -l --null '+k8s:defaulter-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:defaulter-gen tagged dirs"
@@ -438,7 +438,7 @@ function codegen::conversions() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(\
         grep -l --null '^// *+k8s:conversion-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:conversion-gen tagged dirs"
@@ -539,7 +539,7 @@ function codegen::openapi() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(
         grep -l --null '+k8s:openapi-gen=' "${tag_files[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -598,7 +598,7 @@ function codegen::applyconfigs() {
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
         git_find -z ':(glob)k8s.io/api/**/types.go' \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     ext_apis+=("k8s.io/apimachinery/pkg/apis/meta/v1")
 
@@ -696,7 +696,7 @@ function codegen::listers() {
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
         git_find -z ':(glob)k8s.io/api/**/types.go' \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
     kube::log::status "Generating lister code for ${#ext_apis[@]} targets"
@@ -737,7 +737,7 @@ function codegen::informers() {
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
         git_find -z ':(glob)k8s.io/api/**/types.go' \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
     kube::log::status "Generating informer code for ${#ext_apis[@]} targets"
