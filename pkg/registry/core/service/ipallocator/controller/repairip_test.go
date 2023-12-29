@@ -327,10 +327,7 @@ func TestRepairServiceIP(t *testing.T) {
 					t.Errorf("Unexpected error trying to add Service %v object: %v", cidr, err)
 				}
 			}
-			err := r.syncCIDRs()
-			if err != nil {
-				t.Fatal(err)
-			}
+
 			// override for testing
 			r.servicesSynced = func() bool { return true }
 			r.ipAddressSynced = func() bool { return true }
@@ -352,7 +349,7 @@ func TestRepairServiceIP(t *testing.T) {
 				}
 			}
 
-			err = r.runOnce()
+			err := r.runOnce()
 			if err != nil {
 				t.Fatal(err)
 			}
