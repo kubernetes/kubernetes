@@ -413,7 +413,7 @@ function codegen::defaults() {
 # IDL.
 function codegen::conversions() {
     # Build the tool.
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/conversion-gen
 
     # The result file, in each pkg, of conversion generation.
@@ -438,7 +438,7 @@ function codegen::conversions() {
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
-        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+        tag_pkgs+=("./$dir")
     done
 
     local extra_peer_pkgs=(
@@ -457,13 +457,12 @@ function codegen::conversions() {
 
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
-    ./hack/run-in-gopath.sh "${gen_conversion_bin}" \
+    "${gen_conversion_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
-        $(printf -- " --extra-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
