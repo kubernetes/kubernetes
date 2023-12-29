@@ -62,21 +62,17 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 		importBossFileType: importRuleFile{c},
 	}
 
-	for _, p := range c.Universe {
-		if !inputIncludes(arguments.InputDirs, p) {
-			// Don't run on e.g. third party dependencies.
-			continue
-		}
-		savedPackage := p
+	for _, pkgPath := range c.Inputs {
+		pkg := c.Universe[pkgPath]
 		pkgs = append(pkgs, &generator.DefaultPackage{
-			PackageName: p.Name,
-			PackagePath: p.Path,
-			Source:      p.SourcePath,
+			PackageName: pkg.Name,
+			PackagePath: pkg.Path,
+			Source:      pkg.SourcePath,
 			// GeneratorFunc returns a list of generators. Each generator makes a
 			// single file.
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{&importRules{
-					myPackage: savedPackage,
+					myPackage: pkg,
 				}}
 			},
 			FilterFunc: func(c *generator.Context, t *types.Type) bool {
@@ -86,30 +82,6 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 	}
 
 	return pkgs
-}
-
-// inputIncludes returns true if the given package is a (sub) package of one of
-// the InputDirs.
-func inputIncludes(inputs []string, p *types.Package) bool {
-	// TODO: This does not handle conversion of local paths (./foo) into
-	// canonical packages (github.com/example/project/foo).
-	for _, input := range inputs {
-		// Normalize paths
-		input := strings.TrimSuffix(input, "/")
-		input = strings.TrimPrefix(input, "./vendor/")
-		seek := strings.TrimSuffix(p.Path, "/")
-
-		if input == seek {
-			return true
-		}
-		if strings.HasSuffix(input, "...") {
-			input = strings.TrimSuffix(input, "...")
-			if strings.HasPrefix(seek+"/", input) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // A single import restriction rule.
