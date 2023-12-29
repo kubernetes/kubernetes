@@ -21,16 +21,10 @@ package util
 
 import (
 	"fmt"
-	"math/rand"
-	"net"
-	"os"
 	"reflect"
 	"runtime"
-	"sync"
 	"testing"
-	"time"
 
-	winio "github.com/Microsoft/go-winio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

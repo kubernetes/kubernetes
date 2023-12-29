@@ -904,11 +904,11 @@ func TestGetIndexFailureCount(t *testing.T) {
 			wantResult: 2,
 		},
 		"valid maxint32 value": {
-			pod:        buildPod().indexFailureCount(strconv.Itoa(math.MaxInt32)).Pod,
+			pod:        buildPod().indexFailureCount(strconv.FormatInt(math.MaxInt32, 10)).Pod,
 			wantResult: math.MaxInt32,
 		},
 		"too large value": {
-			pod:        buildPod().indexFailureCount(strconv.Itoa(math.MaxInt32 + 1)).Pod,
+			pod:        buildPod().indexFailureCount(strconv.FormatInt(math.MaxInt32+1, 10)).Pod,
 			wantResult: 0,
 		},
 		"negative value": {
