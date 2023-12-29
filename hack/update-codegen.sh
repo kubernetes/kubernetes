@@ -339,7 +339,7 @@ function codegen::prerelease() {
 #                  for having a defaulter generated
 function codegen::defaults() {
     # Build the tool.
-    GO111MODULE=on GOPROXY=off go install \
+    GOPROXY=off go install \
         k8s.io/code-generator/cmd/defaulter-gen
 
     # The result file, in each pkg, of defaulter generation.
@@ -364,7 +364,7 @@ function codegen::defaults() {
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
-        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+        tag_pkgs+=("./$dir")
     done
 
     kube::log::status "Generating defaulter code for ${#tag_pkgs[@]} targets"
@@ -377,12 +377,11 @@ function codegen::defaults() {
 
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
-    ./hack/run-in-gopath.sh "${gen_defaulter_bin}" \
+    "${gen_defaulter_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
-        $(printf -- " --extra-peer-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
