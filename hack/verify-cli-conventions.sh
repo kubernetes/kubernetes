@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::new::setup_env
+kube::golang::setup_env
 
 hack/make-rules/build.sh ./cmd/clicheck
 

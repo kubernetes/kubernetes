@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 cd "${KUBE_ROOT}"
 
-kube::golang::new::setup_env
+kube::golang::setup_env
 
 DBG_CODEGEN="${DBG_CODEGEN:-0}"
 GENERATED_FILE_PREFIX="${GENERATED_FILE_PREFIX:-zz_generated.}"
