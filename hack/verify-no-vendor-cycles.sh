@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::new::setup_env
+kube::golang::setup_env
 kube::golang::verify_go_version
 
 staging_repos=()

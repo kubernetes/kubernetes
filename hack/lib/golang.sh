@@ -548,7 +548,7 @@ EOF
   fi
 }
 
-# kube::golang::new::setup_env will check that the `go` commands is available in
+# kube::golang::setup_env will check that the `go` commands is available in
 # ${PATH}. It will also check that the Go version is good enough for the
 # Kubernetes build.
 #
@@ -556,8 +556,7 @@ EOF
 #   env-var GOPATH points to our local output dir
 #   env-var GOBIN is unset (we want binaries in a predictable place)
 #   env-var PATH includes the local GOPATH
-#FIXME: rename this when all callers are converted
-kube::golang::new::setup_env() {
+kube::golang::setup_env() {
   kube::golang::verify_go_version
 
   # Even in module mode, we need to set GOPATH for `go build` and `go install`
@@ -876,7 +875,7 @@ kube::golang::build_binaries() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
     # Check for `go` binary and set ${GOPATH}.
-    kube::golang::new::setup_env
+    kube::golang::setup_env
     V=2 kube::log::info "Go version: $(GOFLAGS='' go version)"
 
     local host_platform

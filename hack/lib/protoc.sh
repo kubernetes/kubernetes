@@ -31,7 +31,7 @@ PROTOC_VERSION=23.4
 # and formats it correctly
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::generate_proto() {
-  kube::golang::new::setup_env
+  kube::golang::setup_env
   GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
   kube::protoc::check_protoc

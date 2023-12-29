@@ -25,7 +25,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Get all the default Go environment.
-kube::golang::new::setup_env
+kube::golang::setup_env
 kube::golang::verify_go_version
 
 # Turn off workspaces until we are ready for them later
