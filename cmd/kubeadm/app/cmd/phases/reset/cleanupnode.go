@@ -89,7 +89,7 @@ func runCleanupNode(c workflow.RunData) error {
 			return err
 		}
 		// Unmount all mount paths under kubeletRunDirectory
-		if err := unmountKubeletDirectory(kubeletRunDirectory); err != nil {
+		if err := unmountKubeletDirectory(kubeletRunDirectory, r.ResetCfg().UnmountFlags); err != nil {
 			return err
 		}
 		dirsToClean = append(dirsToClean, kubeletRunDirectory)
