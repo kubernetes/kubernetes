@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -251,7 +252,7 @@ func (c *MetaAllocator) getAllocator(ip net.IP) (*Allocator, error) {
 	c.muTree.Lock()
 	defer c.muTree.Unlock()
 
-	address := ipToAddr(ip)
+	address := utilip.AddrFromIP(ip)
 	prefix := netip.PrefixFrom(address, address.BitLen())
 	// Use the largest subnet to allocate addresses because
 	// all the other subnets will be contained.
@@ -429,22 +430,6 @@ func isReady(serviceCIDR *networkingv1alpha1.ServiceCIDR) bool {
 	}
 	// assume the ServiceCIDR is Ready, in order to handle scenarios where kcm is not running
 	return true
-}
-
-// ipToAddr converts a net.IP to a netip.Addr
-// if the net.IP is not valid it returns an empty netip.Addr{}
-func ipToAddr(ip net.IP) netip.Addr {
-	// https://pkg.go.dev/net/netip#AddrFromSlice can return an IPv4 in IPv6 format
-	// so we have to check the IP family to return exactly the format that we want
-	// address, _ := netip.AddrFromSlice(net.ParseIPSloppy(192.168.0.1)) returns
-	// an address like ::ffff:192.168.0.1/32
-	bytes := ip.To4()
-	if bytes == nil {
-		bytes = ip.To16()
-	}
-	// AddrFromSlice returns Addr{}, false if the input is invalid.
-	address, _ := netip.AddrFromSlice(bytes)
-	return address
 }
 
 // Convert netutils.IPFamily to v1.IPFamily
