@@ -262,6 +262,10 @@ func (f *Fit) EventsToRegister() []framework.ClusterEventWithHint {
 
 // isSchedulableAfterPodChange is invoked whenever a pod deleted or updated. It checks whether
 // that change made a previously unschedulable pod schedulable.
+//
+// Note that, we intentionally don't check whether the deleted pod was scheduled or not.
+// If we want to do so, it'd be complicated because we have to take assume Pods into consideration.
+// See: https://github.com/kubernetes/kubernetes/issues/122444
 func (f *Fit) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	originalPod, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
@@ -269,10 +273,6 @@ func (f *Fit) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldOb
 	}
 
 	if modifiedPod == nil {
-		if originalPod.Spec.NodeName == "" {
-			logger.V(5).Info("the deleted pod was unscheduled and it wouldn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
-			return framework.QueueSkip, nil
-		}
 		logger.V(5).Info("another scheduled pod was deleted, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
 		return framework.Queue, nil
 	}

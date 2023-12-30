@@ -1133,68 +1133,68 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 		expectedHint                    framework.QueueingHint
 		expectedErr                     bool
 	}{
-		"backoff-wrong-old-object": {
+		"return error the old object is not Pod": {
 			pod:                             &v1.Pod{},
 			oldObj:                          "not-a-pod",
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    framework.Queue,
 			expectedErr:                     true,
 		},
-		"backoff-wrong-new-object": {
+		"return error the new object is not Pod": {
 			pod:                             &v1.Pod{},
 			newObj:                          "not-a-pod",
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    framework.Queue,
 			expectedErr:                     true,
 		},
-		"queue-on-deleted": {
+		"return queue when Pod is deleted": {
 			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    framework.Queue,
 		},
-		"skip-queue-on-unscheduled-pod-deleted": {
-			pod:                             &v1.Pod{},
-			oldObj:                          &v1.Pod{},
+		"return queue even when Pod that was unscheduled is deleted": {
+			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    framework.QueueSkip,
+			expectedHint:                    framework.Queue,
 		},
-		"skip-queue-on-disable-inplace-pod-vertical-scaling": {
+		"skip queue for the update event when the inplace pod vertical scaling feature is disabled": {
 			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
 			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
 			enableInPlacePodVerticalScaling: false,
 			expectedHint:                    framework.QueueSkip,
 		},
-		"skip-queue-on-unscheduled-pod": {
+		"skip queue on unscheduled pod changes": {
 			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
 			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    framework.QueueSkip,
 		},
-		"skip-queue-on-non-resource-changes": {
+		"skip queue in a case of non resource changes": {
 			pod:                             &v1.Pod{},
 			oldObj:                          st.MakePod().Label("k", "v").Node("fake").Obj(),
 			newObj:                          st.MakePod().Label("foo", "bar").Node("fake").Obj(),
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    framework.QueueSkip,
 		},
-		"skip-queue-on-unrelated-resource-changes": {
+		"skip queue in a case of unrelated resource changes": {
 			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Node("fake").Obj(),
 			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceMemory: "1"}).Node("fake").Obj(),
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    framework.QueueSkip,
 		},
-		"skip-queue-on-resource-scale-up": {
+		"skip queue when resource scale up": {
 			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
 			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
 			enableInPlacePodVerticalScaling: true,
 			expectedHint:                    framework.QueueSkip,
 		},
-		"queue-on-some-resource-scale-down": {
+		"return queue when some resource are scaled down": {
 			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
 			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
@@ -1270,14 +1270,6 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}).Obj(),
 			expectedHint: framework.Queue,
 		},
-		// uncomment this case when the isSchedulableAfterNodeChange also check the
-		// original node's resources.
-		// "skip-queue-on-node-unrelated-changes": {
-		// 	pod:          &v1.Pod{},
-		// 	oldObj:       st.MakeNode().Obj(),
-		// 	newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-		// 	expectedHint: framework.QueueSkip,
-		// },
 		"skip-queue-on-node-changes-from-suitable-to-unsuitable": {
 			pod: newResourcePod(framework.Resource{
 				Memory:          2,

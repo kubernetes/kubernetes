@@ -310,30 +310,30 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 		expectedHint framework.QueueingHint
 		expectedErr  bool
 	}{
-		"backoff-wrong-old-object": {
+		"return error the object is not Pod": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       "not-a-pod",
 			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
-		"skip-queue-on-unscheduled": {
-			pod:          podWithHostPort.Obj(),
-			oldObj:       st.MakePod().Obj(),
-			expectedHint: framework.QueueSkip,
-		},
-		"skip-queue-on-non-hostport": {
+		"return skip when deleted Pod has no hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").Obj(),
 			expectedHint: framework.QueueSkip,
 		},
-		"skip-queue-on-unrelated-hostport": {
+		"return skip when deleted Pod has different hostport from unscheduled Pod": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").HostPort(8081).Obj(),
 			expectedHint: framework.QueueSkip,
 		},
-		"queue-on-released-hostport": {
+		"return queue when deleted Pod has the same hostport as unscheduled Pod": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").HostPort(8080).Obj(),
+			expectedHint: framework.Queue,
+		},
+		"return queue even when a deleted Pod was unscheduled": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().HostPort(8080).Obj(),
 			expectedHint: framework.Queue,
 		},
 	}
