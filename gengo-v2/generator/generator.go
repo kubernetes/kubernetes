@@ -183,9 +183,6 @@ type Context struct {
 
 	// Allows generators to add packages at runtime.
 	builder *parser.Builder
-
-	// If specified, trim the prefix from a package's path before writing files.
-	TrimPathPrefix string
 }
 
 // NewContext generates a context from the given builder, naming systems, and
