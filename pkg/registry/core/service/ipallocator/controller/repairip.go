@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -363,7 +364,7 @@ func (r *RepairIPAddress) syncService(key string) error {
 		family := getFamilyByIP(ip)
 
 		r.muTree.Lock()
-		prefixes := r.tree.GetHostIPPrefixMatches(ipToAddr(ip))
+		prefixes := r.tree.GetHostIPPrefixMatches(utilip.AddrFromIP(ip))
 		r.muTree.Unlock()
 		if len(prefixes) == 0 {
 			// ClusterIP is out of range
@@ -667,21 +668,4 @@ func verifyIPAddressLabels(ip *networkingv1alpha1.IPAddress) bool {
 		return false
 	}
 	return managedByController(ip)
-}
-
-// TODO(aojea) move to utils, already in pkg/registry/core/service/ipallocator/cidrallocator.go
-// ipToAddr converts a net.IP to a netip.Addr
-// if the net.IP is not valid it returns an empty netip.Addr{}
-func ipToAddr(ip net.IP) netip.Addr {
-	// https://pkg.go.dev/net/netip#AddrFromSlice can return an IPv4 in IPv6 format
-	// so we have to check the IP family to return exactly the format that we want
-	// address, _ := netip.AddrFromSlice(net.ParseIPSloppy(192.168.0.1)) returns
-	// an address like ::ffff:192.168.0.1/32
-	bytes := ip.To4()
-	if bytes == nil {
-		bytes = ip.To16()
-	}
-	// AddrFromSlice returns Addr{}, false if the input is invalid.
-	address, _ := netip.AddrFromSlice(bytes)
-	return address
 }
