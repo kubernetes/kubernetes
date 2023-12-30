@@ -25,6 +25,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/stretchr/testify/require"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
@@ -100,11 +101,11 @@ func testCIDR(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErr 
 }
 
 func TestCIDR(t *testing.T) {
-	ipv4CIDR, _ := netip.ParsePrefix("192.168.0.0/24")
-	ipv4Addr, _ := netip.ParseAddr("192.168.0.0")
+	ipv4CIDR := utilip.MustParseCIDR("192.168.0.0/24")
+	ipv4Addr := utilip.MustParseIP("192.168.0.0")
 
-	ipv6CIDR, _ := netip.ParsePrefix("2001:db8::/32")
-	ipv6Addr, _ := netip.ParseAddr("2001:db8::")
+	ipv6CIDR := utilip.MustParseCIDR("2001:db8::/32")
+	ipv6Addr := utilip.MustParseIP("2001:db8::")
 
 	trueVal := types.Bool(true)
 	falseVal := types.Bool(false)
@@ -124,7 +125,12 @@ func TestCIDR(t *testing.T) {
 		{
 			name:             "parse invalid ipv4",
 			expr:             `cidr("192.168.0.0/")`,
-			expectRuntimeErr: "network address parse error during conversion from string: network address parse error during conversion from string: netip.ParsePrefix(\"192.168.0.0/\"): bad bits after slash: \"\"",
+			expectRuntimeErr: "network address parse error during conversion from string: network address parse error during conversion from string: not a valid CIDR value",
+		},
+		{
+			name:             "parse invalid ipv4 with leading 0s",
+			expr:             `cidr("192.168.001.0/24")`,
+			expectRuntimeErr: "network address parse error during conversion from string: network address parse error during conversion from string: IP address in CIDR should not have leading 0s",
 		},
 		{
 			name:         "contains IP ipv4 (IP)",
@@ -177,9 +183,10 @@ func TestCIDR(t *testing.T) {
 			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv4Addr, 24)},
 		},
 		{
-			name:         "masks unmasked ipv4",
-			expr:         `cidr("192.168.0.1/24").masked()`,
-			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv4Addr, 24)},
+			name:             "masks unmasked ipv4",
+			expr:             `cidr("192.168.0.1/24").masked()`,
+			expectResult:     falseVal,
+			expectRuntimeErr: "network address parse error during conversion from string: network address parse error during conversion from string: CIDR value should not have any bits set beyond the prefix length",
 		},
 		{
 			name:         "returns prefix length ipv4",
@@ -194,7 +201,7 @@ func TestCIDR(t *testing.T) {
 		{
 			name:             "parse invalid ipv6",
 			expr:             `cidr("2001:db8::/")`,
-			expectRuntimeErr: "network address parse error during conversion from string: network address parse error during conversion from string: netip.ParsePrefix(\"2001:db8::/\"): bad bits after slash: \"\"",
+			expectRuntimeErr: "network address parse error during conversion from string: network address parse error during conversion from string: not a valid CIDR value",
 		},
 		{
 			name:         "contains IP ipv6 (IP)",
@@ -247,9 +254,10 @@ func TestCIDR(t *testing.T) {
 			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv6Addr, 32)},
 		},
 		{
-			name:         "masks unmasked ipv6",
-			expr:         `cidr("2001:db8:1::/32").masked()`,
-			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv6Addr, 32)},
+			name:             "masks unmasked ipv6",
+			expr:             `cidr("2001:db8:1::/32").masked()`,
+			expectResult:     falseVal,
+			expectRuntimeErr: "network address parse error during conversion from string: network address parse error during conversion from string: CIDR value should not have any bits set beyond the prefix length",
 		},
 		{
 			name:         "returns prefix length ipv6",

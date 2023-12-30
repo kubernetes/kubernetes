@@ -17,7 +17,6 @@ limitations under the License.
 package library_test
 
 import (
-	"net/netip"
 	"regexp"
 	"testing"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/stretchr/testify/require"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
@@ -100,10 +100,10 @@ func testIP(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErr st
 }
 
 func TestIP(t *testing.T) {
-	ipv4Addr, _ := netip.ParseAddr("192.168.0.1")
+	ipv4Addr := utilip.MustParseIP("192.168.0.1")
 	int4 := types.Int(4)
 
-	ipv6Addr, _ := netip.ParseAddr("2001:db8::68")
+	ipv6Addr := utilip.MustParseIP("2001:db8::68")
 	int6 := types.Int(6)
 
 	trueVal := types.Bool(true)
@@ -124,7 +124,12 @@ func TestIP(t *testing.T) {
 		{
 			name:             "parse invalid ipv4",
 			expr:             `ip("192.168.0.1.0")`,
-			expectRuntimeErr: "IP Address \"192.168.0.1.0\" parse error during conversion from string: ParseAddr(\"192.168.0.1.0\"): IPv4 address too long",
+			expectRuntimeErr: "IP Address \"192.168.0.1.0\" parse error during conversion from string: not a valid IP address",
+		},
+		{
+			name:             "parse invalid ipv4 with leading 0s",
+			expr:             `ip("192.168.0.001")`,
+			expectRuntimeErr: "IP Address \"192.168.0.001\" parse error during conversion from string: IP address should not have leading 0s",
 		},
 		{
 			name:         "isIP valid ipv4",
@@ -144,7 +149,7 @@ func TestIP(t *testing.T) {
 		{
 			name:             "ip.isCanonical invalid ipv4",
 			expr:             `ip.isCanonical("127.0.0.1.0")`,
-			expectRuntimeErr: "IP Address \"127.0.0.1.0\" parse error during conversion from string: ParseAddr(\"127.0.0.1.0\"): IPv4 address too long",
+			expectRuntimeErr: "IP Address \"127.0.0.1.0\" parse error during conversion from string: not a valid IP address",
 		},
 		{
 			name:         "ipv4 family",
@@ -209,7 +214,7 @@ func TestIP(t *testing.T) {
 		{
 			name:             "parse invalid ipv6",
 			expr:             `ip("2001:db8:::68")`,
-			expectRuntimeErr: "IP Address \"2001:db8:::68\" parse error during conversion from string: ParseAddr(\"2001:db8:::68\"): each colon-separated field must have at least one digit (at \":68\")",
+			expectRuntimeErr: "IP Address \"2001:db8:::68\" parse error during conversion from string: not a valid IP address",
 		},
 		{
 			name:         "isIP valid ipv6",
@@ -234,7 +239,7 @@ func TestIP(t *testing.T) {
 		{
 			name:             "ip.isCanonical invalid ipv6",
 			expr:             `ip.isCanonical("2001:db8:::68")`,
-			expectRuntimeErr: "IP Address \"2001:db8:::68\" parse error during conversion from string: ParseAddr(\"2001:db8:::68\"): each colon-separated field must have at least one digit (at \":68\")",
+			expectRuntimeErr: "IP Address \"2001:db8:::68\" parse error during conversion from string: not a valid IP address",
 		},
 		{
 			name:         "ipv6 family",
