@@ -251,27 +251,3 @@ func (c *Context) LoadPackages(patterns ...string) ([]*types.Package, error) {
 func (c *Context) FindPackages(patterns ...string) ([]string, error) {
 	return c.builder.FindPackages(patterns...)
 }
-
-// AddDir adds a Go package to the context. The specified path must be a single
-// go package import path.  GOPATH, GOROOT, and the location of your go binary
-// (`which go`) will all be searched, in the normal Go fashion.
-// Deprecated. Please use AddDirectory.
-func (c *Context) AddDir(path string) error {
-	c.incomingImports = nil
-	c.incomingTransitiveImports = nil
-	_, err := c.builder.LoadPackagesTo(&c.Universe, path)
-	return err
-}
-
-// AddDirectory adds a Go package to the context. The specified path must be a
-// single go package import path.  GOPATH, GOROOT, and the location of your go
-// binary (`which go`) will all be searched, in the normal Go fashion.
-func (c *Context) AddDirectory(path string) (*types.Package, error) {
-	c.incomingImports = nil
-	c.incomingTransitiveImports = nil
-	pkgs, err := c.builder.LoadPackagesTo(&c.Universe, path)
-	if err != nil {
-		return nil, err
-	}
-	return pkgs[0], nil
-}
