@@ -1091,7 +1091,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
 
-	NFTablesProxyMode: {Default: false, PreRelease: featuregate.Alpha},
+	NFTablesProxyMode: {Default: true, PreRelease: featuregate.Alpha},
 
 	NodeLogQuery: {Default: false, PreRelease: featuregate.Alpha},
 

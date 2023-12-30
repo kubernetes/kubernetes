@@ -275,6 +275,9 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		}
 	}
 
+	// just for testing force NFTables on CI
+	o.config.Mode = kubeproxyconfig.ProxyModeNFTables
+
 	o.platformApplyDefaults(o.config)
 
 	if err := o.processHostnameOverrideFlag(); err != nil {
