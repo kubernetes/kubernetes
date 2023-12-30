@@ -24,30 +24,37 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/klog/v2"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // unmountKubeletDirectory unmounts all paths that contain KubeletRunDirectory
-func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
+func unmountKubeletDirectory(kubeletRunDirectory string) error {
 	raw, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return err
 	}
 
-	if !strings.HasSuffix(absoluteKubeletRunDirectory, "/") {
+	if !strings.HasSuffix(kubeletRunDirectory, "/") {
 		// trailing "/" is needed to ensure that possibly mounted /var/lib/kubelet is skipped
-		absoluteKubeletRunDirectory += "/"
+		kubeletRunDirectory += "/"
 	}
 
+	var errList []error
 	mounts := strings.Split(string(raw), "\n")
 	for _, mount := range mounts {
 		m := strings.Split(mount, " ")
-		if len(m) < 2 || !strings.HasPrefix(m[1], absoluteKubeletRunDirectory) {
+		if len(m) < 2 || !strings.HasPrefix(m[1], kubeletRunDirectory) {
 			continue
 		}
+		klog.V(5).Infof("[reset] Unmounting %q", m[1])
 		if err := syscall.Unmount(m[1], 0); err != nil {
-			klog.Warningf("[reset] Failed to unmount mounted directory in %s: %s", absoluteKubeletRunDirectory, m[1])
+			errList = append(errList, errors.WithMessagef(err, "failed to unmount %q", m[1]))
 		}
 	}
-	return nil
+	return errors.Wrapf(utilerrors.NewAggregate(errList),
+		"encountered the following errors while unmounting directories in %q", kubeletRunDirectory)
 }
