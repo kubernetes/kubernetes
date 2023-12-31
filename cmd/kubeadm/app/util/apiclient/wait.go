@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
@@ -79,7 +79,7 @@ func (w *KubeWaiter) WaitForAPI() error {
 	start := time.Now()
 	err := wait.PollUntilContextTimeout(
 		context.Background(),
-		kubeadmconstants.APICallRetryInterval,
+		constants.KubernetesAPICallRetryInterval,
 		w.timeout,
 		true, func(ctx context.Context) (bool, error) {
 			healthStatus := 0
@@ -104,7 +104,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 
 	lastKnownPodNumber := -1
 	return wait.PollUntilContextTimeout(context.Background(),
-		kubeadmconstants.APICallRetryInterval, w.timeout,
+		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
 			listOpts := metav1.ListOptions{LabelSelector: kvLabel}
 			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
@@ -135,7 +135,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 // WaitForPodToDisappear blocks until it timeouts or gets a "NotFound" response from the API Server when getting the Static Pod in question
 func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	return wait.PollUntilContextTimeout(context.Background(),
-		kubeadmconstants.APICallRetryInterval, w.timeout,
+		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
 			_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil && apierrors.IsNotFound(err) {
@@ -151,7 +151,7 @@ func (w *KubeWaiter) WaitForKubelet() error {
 	var (
 		lastError       error
 		start           = time.Now()
-		healthzEndpoint = fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)
+		healthzEndpoint = fmt.Sprintf("http://localhost:%d/healthz", constants.KubeletHealthzPort)
 	)
 
 	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet. This can take up to %v\n", w.timeout)
@@ -163,7 +163,7 @@ func (w *KubeWaiter) WaitForKubelet() error {
 
 	err := wait.PollUntilContextTimeout(
 		context.Background(),
-		kubeadmconstants.APICallRetryInterval,
+		constants.KubernetesAPICallRetryInterval,
 		w.timeout,
 		true, func(ctx context.Context) (bool, error) {
 			client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
@@ -207,9 +207,9 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 	componentHash := ""
 	var err, lastErr error
 	mirrorPodHashes := map[string]string{}
-	for _, component := range kubeadmconstants.ControlPlaneComponents {
+	for _, component := range constants.ControlPlaneComponents {
 		err = wait.PollUntilContextTimeout(context.Background(),
-			kubeadmconstants.APICallRetryInterval, w.timeout,
+			constants.KubernetesAPICallRetryInterval, w.timeout,
 			true, func(_ context.Context) (bool, error) {
 				componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
 				if err != nil {
@@ -233,7 +233,7 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 	componentPodHash := ""
 	var err, lastErr error
 	err = wait.PollUntilContextTimeout(context.Background(),
-		kubeadmconstants.APICallRetryInterval, w.timeout,
+		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
 			componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
 			if err != nil {
@@ -254,7 +254,7 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
 	var err, lastErr error
 	err = wait.PollUntilContextTimeout(context.Background(),
-		kubeadmconstants.APICallRetryInterval, w.timeout,
+		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
 			hash, err := getStaticPodSingleHash(w.client, nodeName, component)
 			if err != nil {

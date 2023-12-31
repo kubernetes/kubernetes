@@ -28,7 +28,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
@@ -90,7 +89,6 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
-	controlPlaneTimeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
 	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods"+
 		" from directory %q\n",
 		data.ManifestDir())
@@ -108,12 +106,12 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.New("couldn't initialize a Kubernetes cluster")
 	}
 
-	waiter.SetTimeout(kubeadmconstants.DefaultKubeletTimeout)
+	waiter.SetTimeout(data.Cfg().Timeouts.KubeletHealthCheck.Duration)
 	if err := waiter.WaitForKubelet(); err != nil {
 		return handleError(err)
 	}
 
-	waiter.SetTimeout(controlPlaneTimeout)
+	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
 	if err := waiter.WaitForAPI(); err != nil {
 		return handleError(err)
 	}

@@ -18,20 +18,20 @@ package kubeadm
 
 import (
 	"sync"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // SetDefaultTimeouts sets an internal Timeouts struct to its default values.
 func SetDefaultTimeouts(t **Timeouts) {
 	*t = &Timeouts{
-		ControlPlaneComponentHealthCheck: &metav1.Duration{Duration: 4 * time.Minute},
-		KubeletHealthCheck:               &metav1.Duration{Duration: 4 * time.Minute},
-		KubernetesAPICall:                &metav1.Duration{Duration: 1 * time.Minute},
-		EtcdAPICall:                      &metav1.Duration{Duration: 2 * time.Minute},
-		TLSBootstrap:                     &metav1.Duration{Duration: 5 * time.Minute},
-		Discovery:                        &metav1.Duration{Duration: 5 * time.Minute},
+		ControlPlaneComponentHealthCheck: &metav1.Duration{Duration: constants.ControlPlaneComponentHealthCheckTimeout},
+		KubeletHealthCheck:               &metav1.Duration{Duration: constants.KubeletHealthCheckTimeout},
+		KubernetesAPICall:                &metav1.Duration{Duration: constants.KubernetesAPICallTimeout},
+		EtcdAPICall:                      &metav1.Duration{Duration: constants.EtcdAPICallTimeout},
+		TLSBootstrap:                     &metav1.Duration{Duration: constants.TLSBootstrapTimeout},
+		Discovery:                        &metav1.Duration{Duration: constants.DiscoveryTimeout},
 	}
 }
 

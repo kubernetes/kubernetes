@@ -18,7 +18,6 @@ package v1beta4
 
 import (
 	"net/url"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,8 +54,6 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
-	DefaultDiscoveryTimeout = 5 * time.Minute
 
 	// DefaultImagePullPolicy is the default image pull policy in kubeadm
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
@@ -226,22 +223,22 @@ func SetDefaults_EnvVar(obj *EnvVar) {
 func SetDefaults_Timeouts(obj *Timeouts) {
 	if obj.ControlPlaneComponentHealthCheck == nil {
 		obj.ControlPlaneComponentHealthCheck = &metav1.Duration{
-			Duration: constants.DefaultControlPlaneTimeout,
+			Duration: constants.ControlPlaneComponentHealthCheckTimeout,
 		}
 	}
 	if obj.KubeletHealthCheck == nil {
 		obj.KubeletHealthCheck = &metav1.Duration{
-			Duration: constants.DefaultKubeletTimeout,
+			Duration: constants.KubeletHealthCheckTimeout,
 		}
 	}
 	if obj.KubernetesAPICall == nil {
 		obj.KubernetesAPICall = &metav1.Duration{
-			Duration: time.Minute * 1, // TODO: use constant
+			Duration: constants.KubernetesAPICallTimeout,
 		}
 	}
 	if obj.EtcdAPICall == nil {
 		obj.EtcdAPICall = &metav1.Duration{
-			Duration: time.Minute * 1, // TODO: use constant
+			Duration: constants.EtcdAPICallTimeout,
 		}
 	}
 	if obj.TLSBootstrap == nil {
@@ -251,7 +248,7 @@ func SetDefaults_Timeouts(obj *Timeouts) {
 	}
 	if obj.Discovery == nil {
 		obj.Discovery = &metav1.Duration{
-			Duration: DefaultDiscoveryTimeout,
+			Duration: constants.DiscoveryTimeout,
 		}
 	}
 }

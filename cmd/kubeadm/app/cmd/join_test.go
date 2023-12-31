@@ -239,7 +239,7 @@ func TestNewJoinData(t *testing.T) {
 					},
 					ignorePreflightErrors: sets.New("c", "d"),
 				}
-				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(joinData{}), cmpopts.IgnoreFields(joinData{}, "client", "initCfg", "cfg.ControlPlane.LocalAPIEndpoint")); diff != "" {
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(joinData{}), cmpopts.IgnoreFields(joinData{}, "client", "initCfg", "cfg.ControlPlane.LocalAPIEndpoint", "cfg.Timeouts")); diff != "" {
 					t.Fatalf("newJoinData returned data (-want,+got):\n%s", diff)
 				}
 			},

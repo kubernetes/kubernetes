@@ -49,13 +49,13 @@ const BootstrapUser = "token-bootstrap-client"
 // RetrieveValidatedConfigInfo connects to the API Server and tries to fetch the cluster-info ConfigMap
 // It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if CACertHashes is not empty)
 // validating the cluster CA against a set of pinned public keys
-func RetrieveValidatedConfigInfo(cfg *kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
-	return retrieveValidatedConfigInfo(nil, cfg, constants.DiscoveryRetryInterval)
+func RetrieveValidatedConfigInfo(cfg *kubeadmapi.Discovery, timeout time.Duration) (*clientcmdapi.Config, error) {
+	return retrieveValidatedConfigInfo(nil, cfg, constants.DiscoveryRetryInterval, timeout)
 }
 
 // retrieveValidatedConfigInfo is a private implementation of RetrieveValidatedConfigInfo.
 // It accepts an optional clientset that can be used for testing purposes.
-func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, interval time.Duration) (*clientcmdapi.Config, error) {
+func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, interval, timeout time.Duration) (*clientcmdapi.Config, error) {
 	token, err := bootstraptokenv1.NewBootstrapTokenString(cfg.BootstrapToken.Token)
 	if err != nil {
 		return nil, err
@@ -67,10 +67,9 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 		return nil, errors.Wrap(err, "invalid discovery token CA certificate hash")
 	}
 
-	duration := cfg.Timeout.Duration
 	// Make sure the interval is not bigger than the duration
-	if interval > duration {
-		interval = duration
+	if interval > timeout {
+		interval = timeout
 	}
 
 	endpoint := cfg.BootstrapToken.APIServerEndpoint
@@ -78,7 +77,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 	clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
 
 	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q", endpoint)
-	insecureClusterInfo, err := getClusterInfo(client, insecureBootstrapConfig, token, interval, duration)
+	insecureClusterInfo, err := getClusterInfo(client, insecureBootstrapConfig, token, interval, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +115,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 	secureBootstrapConfig := buildSecureBootstrapKubeConfig(endpoint, clusterCABytes, clusterName)
 
 	klog.V(1).Infof("[discovery] Requesting info from %q again to validate TLS against the pinned public key", endpoint)
-	secureClusterInfo, err := getClusterInfo(client, secureBootstrapConfig, token, interval, duration)
+	secureClusterInfo, err := getClusterInfo(client, secureBootstrapConfig, token, interval, timeout)
 	if err != nil {
 		return nil, err
 	}
