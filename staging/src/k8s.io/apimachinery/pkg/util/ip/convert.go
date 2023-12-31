@@ -19,6 +19,9 @@ package ip
 import (
 	"net"
 	"net/netip"
+	"strings"
+
+	netutils "k8s.io/utils/net"
 )
 
 // AddrFromIP converts a net.IP to a netip.Addr. Given a valid input this will always
@@ -59,6 +62,40 @@ func IPFromAddr(addr netip.Addr) net.IP {
 	//
 	// Any of those values can be correctly cast directly to a net.IP.
 	return net.IP(addr.AsSlice())
+}
+
+// AddrFromInterfaceAddr converts a net.Addr returned from net.InterfaceAddrs(),
+// net.Interface.Addrs(), or net.Interface.MulticastAddrs() to a netip.Addr. Calling it on
+// other kinds of net.Addr values (such as a net.TCPAddr) will generally fail and return
+// the zero netip.Addr.
+func AddrFromInterfaceAddr(ifaddr net.Addr) netip.Addr {
+	return AddrFromIP(IPFromInterfaceAddr(ifaddr))
+}
+
+// IPFromInterfaceAddr converts a net.Addr returned from net.InterfaceAddrs(),
+// net.Interface.Addrs(), or net.Interface.MulticastAddrs() to a net.IP. Calling it on
+// other kinds of net.Addr values (such as a net.TCPAddr) will generally fail and return
+// nil.
+func IPFromInterfaceAddr(ifaddr net.Addr) net.IP {
+	// On both Linux and Windows, the values returned from the "interface addr"
+	// methods are currently *net.IPNet for unicast addresses or *net.IPAddr for
+	// multicast addresses.
+	if ipnet, ok := ifaddr.(*net.IPNet); ok {
+		return ipnet.IP
+	} else if ipaddr, ok := ifaddr.(*net.IPAddr); ok {
+		return ipaddr.IP
+	}
+
+	// Try to deal with other similar types... in particular, this is needed for
+	// some existing unit tests...
+	addrStr := ifaddr.String()
+	// If it has a subnet length (like net.IPNet) or optional zone identifier (like
+	// net.IPAddr), trim that away.
+	if end := strings.IndexAny(addrStr, "/%"); end != -1 {
+		addrStr = addrStr[:end]
+	}
+	// What's left is either an IP address, or something we can't parse.
+	return netutils.ParseIPSloppy(addrStr)
 }
 
 // PrefixFromIPNet converts a *net.IPNet to a netip.Prefix. Given a valid input this will
