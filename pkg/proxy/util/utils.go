@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -95,12 +96,10 @@ func GetLocalAddrs() ([]net.IP, error) {
 	}
 
 	for _, addr := range addrs {
-		ip, _, err := netutils.ParseCIDRSloppy(addr.String())
-		if err != nil {
-			return nil, err
+		ip := utilip.IPFromInterfaceAddr(addr)
+		if ip != nil {
+			localAddrs = append(localAddrs, ip)
 		}
-
-		localAddrs = append(localAddrs, ip)
 	}
 
 	return localAddrs, nil
@@ -141,16 +140,8 @@ func ShouldSkipService(service *v1.Service) bool {
 func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.Set[string] {
 	ips := sets.New[string]()
 	for _, a := range addrs {
-		var ip net.IP
-		switch v := a.(type) {
-		case *net.IPAddr:
-			ip = v.IP
-		case *net.IPNet:
-			ip = v.IP
-		default:
-			continue
-		}
-		if isValid(ip) {
+		ip := utilip.IPFromInterfaceAddr(a)
+		if ip != nil && isValid(ip) {
 			ips.Insert(ip.String())
 		}
 	}

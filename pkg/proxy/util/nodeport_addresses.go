@@ -21,6 +21,7 @@ import (
 	"net"
 
 	v1 "k8s.io/api/core/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	netutils "k8s.io/utils/net"
 )
 
@@ -111,18 +112,8 @@ func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error)
 	addresses := make(map[string]net.IP)
 	for _, cidr := range npa.cidrs {
 		for _, addr := range addrs {
-			var ip net.IP
-			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
-			switch v := addr.(type) {
-			case *net.IPAddr:
-				ip = v.IP
-			case *net.IPNet:
-				ip = v.IP
-			default:
-				continue
-			}
-
-			if cidr.Contains(ip) {
+			ip := utilip.IPFromInterfaceAddr(addr)
+			if ip != nil && cidr.Contains(ip) {
 				addresses[ip.String()] = ip
 			}
 		}
