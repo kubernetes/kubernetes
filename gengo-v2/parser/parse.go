@@ -340,14 +340,8 @@ func (b *Builder) NewUniverse() (types.Universe, error) {
 // addCommentsToType takes any accumulated comment lines prior to obj and
 // attaches them to the type t.
 func (b *Builder) addCommentsToType(obj tc.Object, t *types.Type) {
-	c1 := b.priorCommentLines(obj.Pos(), 1)
-	// c1.Text() is safe if c1 is nil
-	t.CommentLines = splitLines(c1.Text())
-	if c1 == nil {
-		t.SecondClosestCommentLines = splitLines(b.priorCommentLines(obj.Pos(), 2).Text())
-	} else {
-		t.SecondClosestCommentLines = splitLines(b.priorCommentLines(c1.List[0].Slash, 2).Text())
-	}
+	t.CommentLines = b.docComment(obj.Pos())
+	t.SecondClosestCommentLines = b.priorDetachedComment(obj.Pos())
 }
 
 // packageDir tries to figure out the directory of the specified package.
@@ -473,7 +467,34 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	return nil
 }
 
-// if there's a comment on the line `lines` before pos, return its text, otherwise "".
+// If the specified position has a "doc comment", return that.
+func (b *Builder) docComment(pos token.Pos) []string {
+	// An object's doc comment always ends on the line before the object's own
+	// declaration.
+	c1 := b.priorCommentLines(pos, 1)
+	return splitLines(c1.Text()) // safe even if c1 is nil
+}
+
+// If there is a detached (not immediately before a declaration) comment,
+// return that.
+func (b *Builder) priorDetachedComment(pos token.Pos) []string {
+	// An object's doc comment always ends on the line before the object's own
+	// declaration.
+	c1 := b.priorCommentLines(pos, 1)
+
+	// Using a literal "2" here is brittle in theory (it means literally 2
+	// lines), but in practice Go code is gofmt'ed (which elides repeated blank
+	// lines), so it works.
+	var c2 *ast.CommentGroup
+	if c1 == nil {
+		c2 = b.priorCommentLines(pos, 2)
+	} else {
+		c2 = b.priorCommentLines(c1.List[0].Slash, 2)
+	}
+	return splitLines(c2.Text()) // safe even if c1 is nil
+}
+
+// If there's a comment block which ends nlines before pos, return it.
 func (b *Builder) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup {
 	position := b.fset.Position(pos)
 	key := fileLine{position.Filename, position.Line - lines}
@@ -563,7 +584,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 				Embedded:     f.Anonymous(),
 				Tags:         t.Tag(i),
 				Type:         b.walkType(u, nil, f.Type()),
-				CommentLines: splitLines(b.priorCommentLines(f.Pos(), 1).Text()),
+				CommentLines: b.docComment(f.Pos()),
 			}
 			out.Members = append(out.Members, m)
 		}
@@ -644,7 +665,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			method := t.Method(i)
 			name := tcNameToName(method.String())
 			mt := b.walkType(u, &name, method.Type())
-			mt.CommentLines = splitLines(b.priorCommentLines(method.Pos(), 1).Text())
+			mt.CommentLines = b.docComment(method.Pos())
 			out.Methods[method.Name()] = mt
 		}
 		return out
@@ -680,7 +701,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 				method := t.Method(i)
 				name := tcNameToName(method.String())
 				mt := b.walkType(u, &name, method.Type())
-				mt.CommentLines = splitLines(b.priorCommentLines(method.Pos(), 1).Text())
+				mt.CommentLines = b.docComment(method.Pos())
 				out.Methods[method.Name()] = mt
 			}
 		}
