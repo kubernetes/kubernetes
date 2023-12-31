@@ -290,6 +290,9 @@ const ExtenderName = "Extender"
 
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
+	// NodeToStatusMap records the status of each node
+	// if they're rejected in PreFilter (via PreFilterResult) or Filter plugins.
+	// Nodes that pass PreFilter/Filter plugins are not included in this map.
 	NodeToStatusMap NodeToStatusMap
 	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]

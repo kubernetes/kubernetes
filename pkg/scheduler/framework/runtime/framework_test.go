@@ -1656,7 +1656,7 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			wantStatusCode:      framework.UnschedulableAndUnresolvable,
 		},
 		{
-			name: "all nodes are filtered out by prefilter result, but all other plugins are executed",
+			name: "all nodes are filtered out by prefilter result, but other plugins aren't executed because we consider all nodes are filtered out by UnschedulableAndUnresolvable",
 			plugins: []*TestPlugin{
 				{
 					name: "reject-all-nodes",
@@ -1669,8 +1669,8 @@ func TestRunPreFilterPlugins(t *testing.T) {
 				},
 			},
 			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New[string]()},
-			wantSkippedPlugins:  sets.New("skip"),
-			wantStatusCode:      framework.Unschedulable,
+			wantSkippedPlugins:  sets.New[string](), // "skip" plugin isn't executed.
+			wantStatusCode:      framework.UnschedulableAndUnresolvable,
 		},
 	}
 	for _, tt := range tests {

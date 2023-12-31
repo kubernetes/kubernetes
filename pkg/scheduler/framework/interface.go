@@ -400,6 +400,9 @@ type PreFilterPlugin interface {
 	// plugins must return success or the pod will be rejected. PreFilter could optionally
 	// return a PreFilterResult to influence which nodes to evaluate downstream. This is useful
 	// for cases where it is possible to determine the subset of nodes to process in O(1) time.
+	// When PreFilterResult filters out some Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
+	// i.e., those Nodes will be out of the candidates of the preemption.
+	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)

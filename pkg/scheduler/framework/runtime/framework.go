@@ -684,12 +684,12 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		}
 		if !s.IsSuccess() {
 			s.SetPlugin(pl.Name())
-			if s.IsRejected() {
-				if s.Code() == framework.UnschedulableAndUnresolvable {
-					// In this case, the preemption shouldn't happen in this scheduling cycle.
-					// So, no need to execute all PreFilter.
-					return nil, s
-				}
+			if s.Code() == framework.UnschedulableAndUnresolvable {
+				// In this case, the preemption shouldn't happen in this scheduling cycle.
+				// So, no need to execute all PreFilter.
+				return nil, s
+			}
+			if s.Code() == framework.Unschedulable {
 				// In this case, the preemption should happen later in this scheduling cycle.
 				// So we need to execute all PreFilter.
 				// https://github.com/kubernetes/kubernetes/issues/119770
@@ -707,11 +707,9 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			if len(pluginsWithNodes) == 1 {
 				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
 			}
-			// In this case, the preemption should happen later in this scheduling cycle.
-			// So we need to execute all PreFilter.
-			// https://github.com/kubernetes/kubernetes/issues/119770
-			returnStatus = framework.NewStatus(framework.Unschedulable, msg)
-			continue
+
+			// When PreFilterResult filters out Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
+			return result, framework.NewStatus(framework.UnschedulableAndUnresolvable, msg)
 		}
 	}
 	return result, returnStatus
