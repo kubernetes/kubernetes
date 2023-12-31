@@ -65,7 +65,7 @@ type MetaAllocator struct {
 	muTree sync.Mutex
 	tree   *iptree.Tree[*Allocator]
 
-	ipFamily api.IPFamily
+	ipFamily utilip.IPFamily
 }
 
 var _ Interface = &MetaAllocator{}
@@ -81,9 +81,9 @@ func NewMetaAllocator(
 ) (*MetaAllocator, error) {
 
 	// TODO: make the NewMetaAllocator agnostic of the IP family
-	family := api.IPv4Protocol
+	family := utilip.IPv4Protocol
 	if isIPv6 {
-		family = api.IPv6Protocol
+		family = utilip.IPv6Protocol
 	}
 
 	c := &MetaAllocator{
@@ -196,7 +196,7 @@ func (c *MetaAllocator) syncTree() error {
 		}
 
 		for _, cidr := range serviceCIDR.Spec.CIDRs {
-			if c.ipFamily == api.IPFamily(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))) {
+			if c.ipFamily == utilip.IPFamilyOfCIDR(cidr) {
 				cidrsSet.Insert(cidr)
 				cidrReady[cidr] = ready
 			}
@@ -206,7 +206,7 @@ func (c *MetaAllocator) syncTree() error {
 	// obtain the existing allocators and set the existing state
 	treeSet := sets.New[string]()
 	c.muTree.Lock()
-	c.tree.DepthFirstWalk(c.ipFamily == api.IPv6Protocol, func(k netip.Prefix, v *Allocator) bool {
+	c.tree.DepthFirstWalk(c.ipFamily == utilip.IPv6Protocol, func(k netip.Prefix, v *Allocator) bool {
 		v.ready.Store(cidrReady[k.String()])
 		treeSet.Insert(k.String())
 		return false
@@ -305,7 +305,7 @@ func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error
 	// addresses each, the chances to get B has to be 4 times the chances to
 	// get A so we can spread the load of IPs randomly.
 	// However, we need to validate the best strategy before going to Beta.
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		ip, err := allocator.AllocateNextService(service)
 		if err == nil {
@@ -325,7 +325,7 @@ func (c *MetaAllocator) AllocateNext() (net.IP, error) {
 	// addresses each, the chances to get B has to be 4 times the chances to
 	// get A so we can spread the load of IPs randomly.
 	// However, we need to validate the best strategy before going to Beta.
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		ip, err := allocator.AllocateNext()
 		if err == nil {
@@ -361,7 +361,7 @@ func (c *MetaAllocator) CIDR() net.IPNet {
 	return net.IPNet{}
 
 }
-func (c *MetaAllocator) IPFamily() api.IPFamily {
+func (c *MetaAllocator) IPFamily() utilip.IPFamily {
 	return c.ipFamily
 }
 func (c *MetaAllocator) Has(ip net.IP) bool {
@@ -398,7 +398,7 @@ func (c *MetaAllocator) Free() int {
 	defer c.muTree.Unlock()
 
 	size := 0
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		size += int(allocator.size)
 	}
@@ -411,7 +411,7 @@ func (c *MetaAllocator) EnableMetrics() {}
 func (c *MetaAllocator) DryRun() Interface {
 	c.muTree.Lock()
 	defer c.muTree.Unlock()
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		return allocator.DryRun()
 	}

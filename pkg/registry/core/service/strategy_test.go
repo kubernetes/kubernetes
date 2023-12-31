@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -81,7 +82,7 @@ func makeValidService() *api.Service {
 			ClusterIP:             "1.2.3.4",
 			ClusterIPs:            []string{"1.2.3.4", "5:6:7::8"},
 			IPFamilyPolicy:        &preferDual,
-			IPFamilies:            []api.IPFamily{"IPv4", "IPv6"},
+			IPFamilies:            []utilip.IPFamily{"IPv4", "IPv6"},
 			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 		},
 	}
