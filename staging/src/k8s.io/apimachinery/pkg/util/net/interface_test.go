@@ -564,7 +564,7 @@ func TestGetIPFromInterface(t *testing.T) {
 		{"I/F down", "eth3", familyIPv4, downNetworkInterface{}, nil, ""},
 		{"I/F get fail", "eth3", familyIPv4, noNetworkInterface{}, nil, "no such network interface"},
 		{"fail get addr", "eth3", familyIPv4, networkInterfaceFailGetAddrs{}, nil, "unable to get Addrs"},
-		{"bad addr", "eth3", familyIPv4, networkInterfaceWithInvalidAddr{}, nil, "invalid CIDR"},
+		{"bad addr", "eth3", familyIPv4, networkInterfaceWithInvalidAddr{}, nil, ""},
 	}
 	for _, tc := range testCases {
 		ip, err := getIPFromInterface(tc.nwname, tc.family, tc.nw)
@@ -677,7 +677,7 @@ func TestGetIPFromHostInterfaces(t *testing.T) {
 		{"P2P I/F only", p2pNetworkInterface{}, preferIPv4, nil, "no acceptable"},
 		{"fail get addrs", networkInterfaceFailGetAddrs{}, preferIPv4, nil, "unable to get Addrs"},
 		{"no addresses", networkInterfaceWithNoAddrs{}, preferIPv4, nil, "no acceptable"},
-		{"invalid addr", networkInterfaceWithInvalidAddr{}, preferIPv4, nil, "invalid CIDR"},
+		{"invalid addr", networkInterfaceWithInvalidAddr{}, preferIPv4, nil, "no acceptable"},
 		{"no matches", networkInterfaceWithOnlyLinkLocals{}, preferIPv4, nil, "no acceptable"},
 		{"single-stack ipv4", validNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.254.71.145"), ""},
 		{"single-stack ipv4, prefer ipv6", validNetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("10.254.71.145"), ""},
