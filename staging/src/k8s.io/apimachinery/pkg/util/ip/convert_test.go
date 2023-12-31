@@ -133,6 +133,91 @@ func TestAddrFromIP_IPFromAddr(t *testing.T) {
 	}
 }
 
+type dummyNetAddr string
+
+func (d dummyNetAddr) Network() string {
+	return "dummy"
+}
+func (d dummyNetAddr) String() string {
+	return string(d)
+}
+
+func TestIPFromInterfaceAddr_AddrFromInterfaceAddr(t *testing.T) {
+	testCases := []struct {
+		desc   string
+		ifaddr net.Addr
+		out    string
+	}{
+		{
+			desc:   "net.IPNet",
+			ifaddr: &net.IPNet{IP: net.IP{192, 168, 1, 1}, Mask: net.CIDRMask(24, 32)},
+			out:    "192.168.1.1",
+		},
+		{
+			desc:   "net.IPAddr",
+			ifaddr: &net.IPAddr{IP: net.IP{192, 168, 1, 2}},
+			out:    "192.168.1.2",
+		},
+		{
+			desc:   "net.IPAddr with zone",
+			ifaddr: &net.IPAddr{IP: net.IP{192, 168, 1, 3}, Zone: "eth0"},
+			out:    "192.168.1.3",
+		},
+		{
+			desc:   "net.TCPAddr",
+			ifaddr: &net.TCPAddr{IP: net.IP{192, 168, 1, 4}, Port: 80},
+			out:    "",
+		},
+		{
+			desc:   "unknown plain IP",
+			ifaddr: dummyNetAddr("192.168.1.5"),
+			out:    "192.168.1.5",
+		},
+		{
+			desc:   "unknown CIDR",
+			ifaddr: dummyNetAddr("192.168.1.6/24"),
+			out:    "192.168.1.6",
+		},
+		{
+			desc:   "unknown IP with zone",
+			ifaddr: dummyNetAddr("192.168.1.7%eth0"),
+			out:    "192.168.1.7",
+		},
+		{
+			desc:   "unknown sockaddr",
+			ifaddr: dummyNetAddr("192.168.1.8:80"),
+			out:    "",
+		},
+		{
+			desc:   "unknown junk",
+			ifaddr: dummyNetAddr("junk"),
+			out:    "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ip := IPFromInterfaceAddr(tc.ifaddr)
+			addr := AddrFromInterfaceAddr(tc.ifaddr)
+			if tc.out == "" {
+				if ip != nil {
+					t.Errorf("expected IPFromInterfaceAddr to return nil but got %q", ip.String())
+				}
+				if addr.IsValid() {
+					t.Errorf("expected AddrFromInterfaceAddr to return zero but got %q", addr.String())
+				}
+			} else {
+				if ip.String() != tc.out {
+					t.Errorf("expected IPFromInterfaceAddr to return %q but got %q", tc.out, ip.String())
+				}
+				if addr.String() != tc.out {
+					t.Errorf("expected AddrFromInterfaceAddr to return %q but got %q", tc.out, addr.String())
+				}
+			}
+		})
+	}
+}
+
 func TestPrefixFromIPNet_IPNetFromPrefix(t *testing.T) {
 	testCases := []struct {
 		desc   string
