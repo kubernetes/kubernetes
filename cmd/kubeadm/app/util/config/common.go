@@ -384,6 +384,19 @@ func isKubeadmPrereleaseVersion(versionInfo *apimachineryversion.Info, k8sVersio
 	return false
 }
 
+// prepareStaticVariables takes a given config and stores values from it in variables
+// that can be used from multiple packages.
+func prepareStaticVariables(config any) {
+	switch c := config.(type) {
+	case *kubeadmapi.InitConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+	case *kubeadmapi.JoinConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+	case *kubeadmapi.ResetConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+	}
+}
+
 // migrateMutator can be used to mutate a slice of configuration objects.
 // The mutation is applied in-place and no copies are made.
 type migrateMutator struct {

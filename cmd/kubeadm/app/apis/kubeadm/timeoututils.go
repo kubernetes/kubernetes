@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,4 +33,27 @@ func SetDefaultTimeouts(t **Timeouts) {
 		TLSBootstrap:                     &metav1.Duration{Duration: 5 * time.Minute},
 		Discovery:                        &metav1.Duration{Duration: 5 * time.Minute},
 	}
+}
+
+var (
+	activeTimeouts *Timeouts = nil
+	timeoutMutex             = &sync.RWMutex{}
+)
+
+func init() {
+	SetDefaultTimeouts(&activeTimeouts)
+}
+
+// GetActiveTimeouts gets the active timeouts structure.
+func GetActiveTimeouts() *Timeouts {
+	timeoutMutex.RLock()
+	defer timeoutMutex.RUnlock()
+	return activeTimeouts
+}
+
+// SetActiveTimeouts sets the active timeouts structure.
+func SetActiveTimeouts(timeouts *Timeouts) {
+	timeoutMutex.Lock()
+	activeTimeouts = timeouts.DeepCopy()
+	timeoutMutex.Unlock()
 }
