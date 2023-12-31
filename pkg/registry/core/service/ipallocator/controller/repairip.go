@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/netip"
 	"sync"
 	"time"
@@ -360,8 +359,7 @@ func (r *RepairIPAddress) syncService(key string) error {
 			runtime.HandleError(fmt.Errorf("the ClusterIP %s for Service %s/%s is not a valid IP; please recreate Service", ip, svc.Namespace, svc.Name))
 			continue
 		}
-		// TODO(aojea) Refactor to abstract the IPs checks
-		family := getFamilyByIP(ip)
+		family := utilip.IPFamilyOf(ip)
 
 		r.muTree.Lock()
 		prefixes := r.tree.GetHostIPPrefixMatches(utilip.AddrFromIP(ip))
@@ -606,15 +604,11 @@ func (r *RepairIPAddress) syncCIDRs() error {
 }
 
 func newIPAddress(name string, svc *v1.Service) *networkingv1alpha1.IPAddress {
-	family := string(v1.IPv4Protocol)
-	if netutils.IsIPv6String(name) {
-		family = string(v1.IPv6Protocol)
-	}
 	return &networkingv1alpha1.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				networkingv1alpha1.LabelIPAddressFamily: family,
+				networkingv1alpha1.LabelIPAddressFamily: string(utilip.IPFamilyOf(name)),
 				networkingv1alpha1.LabelManagedBy:       ipallocator.ControllerName,
 			},
 		},
@@ -637,13 +631,6 @@ func serviceToRef(svc *v1.Service) *networkingv1alpha1.ParentReference {
 	}
 }
 
-func getFamilyByIP(ip net.IP) v1.IPFamily {
-	if netutils.IsIPv6(ip) {
-		return v1.IPv6Protocol
-	}
-	return v1.IPv4Protocol
-}
-
 // managedByController returns true if the controller of the provided
 // EndpointSlices is the EndpointSlice controller.
 func managedByController(ip *networkingv1alpha1.IPAddress) bool {
@@ -660,10 +647,7 @@ func verifyIPAddressLabels(ip *networkingv1alpha1.IPAddress) bool {
 		return false
 	}
 
-	family := string(v1.IPv4Protocol)
-	if netutils.IsIPv6String(ip.Name) {
-		family = string(v1.IPv6Protocol)
-	}
+	family := string(utilip.IPFamilyOf(ip.Name))
 	if family != labelFamily {
 		return false
 	}

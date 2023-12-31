@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"net"
 
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	netutils "k8s.io/utils/net"
@@ -49,7 +50,7 @@ type Range struct {
 	// max is the maximum size of the usable addresses in the range
 	max int
 	// family is the IP family of this range
-	family api.IPFamily
+	family utilip.IPFamily
 
 	alloc allocator.Interface
 	// metrics is a metrics recorder that can be disabled
@@ -63,16 +64,14 @@ func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory)
 	max := netutils.RangeSize(cidr)
 	base := netutils.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
-	var family api.IPFamily
 
-	if netutils.IsIPv6CIDR(cidr) {
-		family = api.IPv6Protocol
+	family := utilip.IPFamilyOfCIDR(cidr)
+	if family == utilip.IPv6Protocol {
 		// Limit the max size, since the allocator keeps a bitmap of that size.
 		if max > 65536 {
 			max = 65536
 		}
 	} else {
-		family = api.IPv4Protocol
 		// Don't use the IPv4 network's broadcast address, but don't just
 		// Allocate() it - we don't ever want to be able to release it.
 		max--
@@ -286,7 +285,7 @@ func (r *Range) Has(ip net.IP) bool {
 }
 
 // IPFamily returns the IP family of this range.
-func (r *Range) IPFamily() api.IPFamily {
+func (r *Range) IPFamily() utilip.IPFamily {
 	return r.family
 }
 
@@ -404,7 +403,7 @@ func (dry dryRunRange) CIDR() net.IPNet {
 	return dry.real.CIDR()
 }
 
-func (dry dryRunRange) IPFamily() api.IPFamily {
+func (dry dryRunRange) IPFamily() utilip.IPFamily {
 	return dry.real.IPFamily()
 }
 

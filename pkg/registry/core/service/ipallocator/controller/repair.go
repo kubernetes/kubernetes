@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -82,20 +83,14 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 	allocatorByFamily := make(map[v1.IPFamily]rangeallocation.RangeRegistry)
 	leaksByFamily := make(map[v1.IPFamily]map[string]int)
 
-	primary := v1.IPv4Protocol
-	secondary := v1.IPv6Protocol
-	if netutils.IsIPv6(network.IP) {
-		primary = v1.IPv6Protocol
-	}
+	primary := utilip.IPFamilyOf(network.IP)
+	secondary := utilip.OtherIPFamily(primary)
 
 	networkByFamily[primary] = network
 	allocatorByFamily[primary] = alloc
 	leaksByFamily[primary] = make(map[string]int)
 
 	if secondaryNetwork != nil && secondaryNetwork.IP != nil {
-		if primary == v1.IPv6Protocol {
-			secondary = v1.IPv4Protocol
-		}
 		networkByFamily[secondary] = secondaryNetwork
 		allocatorByFamily[secondary] = secondaryAlloc
 		leaksByFamily[secondary] = make(map[string]int)
@@ -212,13 +207,6 @@ func (c *Repair) doRunOnce() error {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
 
-	getFamilyByIP := func(ip net.IP) v1.IPFamily {
-		if netutils.IsIPv6(ip) {
-			return v1.IPv6Protocol
-		}
-		return v1.IPv4Protocol
-	}
-
 	// Check every Service's ClusterIP, and rebuild the state as we think it should be.
 	for _, svc := range list.Items {
 		if !helper.IsServiceIPSet(&svc) {
@@ -236,7 +224,7 @@ func (c *Repair) doRunOnce() error {
 				continue
 			}
 
-			family := getFamilyByIP(ip)
+			family := utilip.IPFamilyOf(ip)
 			if _, ok := rebuiltByFamily[family]; !ok {
 				// this service is using an IPFamily no longer configured on cluster
 				clusterIPRepairIPErrors.WithLabelValues("invalid").Inc()

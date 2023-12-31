@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -61,7 +62,6 @@ import (
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/util/async"
-	netutils "k8s.io/utils/net"
 )
 
 // Config provides information needed to build RESTStorage for core.
@@ -96,7 +96,7 @@ type legacyProvider struct {
 	Config
 
 	primaryServiceClusterIPAllocator ipallocator.Interface
-	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
+	serviceClusterIPAllocators       map[utilip.IPFamily]ipallocator.Interface
 	serviceNodePortAllocator         *portallocator.PortAllocator
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
@@ -318,8 +318,8 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	return apiGroupInfo, nil
 }
 
-func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryClusterIPAllocator ipallocator.Interface, clusterIPAllocators map[api.IPFamily]ipallocator.Interface, nodePortAllocator *portallocator.PortAllocator, err error) {
-	clusterIPAllocators = map[api.IPFamily]ipallocator.Interface{}
+func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryClusterIPAllocator ipallocator.Interface, clusterIPAllocators map[utilip.IPFamily]ipallocator.Interface, nodePortAllocator *portallocator.PortAllocator, err error) {
+	clusterIPAllocators = map[utilip.IPFamily]ipallocator.Interface{}
 
 	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
 	if err != nil {
@@ -359,7 +359,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			networkingv1alphaClient,
 			c.Informers.Networking().V1alpha1().ServiceCIDRs(),
 			c.Informers.Networking().V1alpha1().IPAddresses(),
-			netutils.IsIPv6CIDR(&serviceClusterIPRange),
+			utilip.IsIPv6CIDR(&serviceClusterIPRange),
 		)
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
@@ -399,7 +399,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 				networkingv1alphaClient,
 				c.Informers.Networking().V1alpha1().ServiceCIDRs(),
 				c.Informers.Networking().V1alpha1().IPAddresses(),
-				netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
+				utilip.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
 			)
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)

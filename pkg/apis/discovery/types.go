@@ -18,6 +18,7 @@ package discovery
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -58,9 +59,9 @@ type AddressType string
 
 const (
 	// AddressTypeIPv4 represents an IPv4 Address.
-	AddressTypeIPv4 = AddressType(api.IPv4Protocol)
+	AddressTypeIPv4 = AddressType(utilip.IPv4Protocol)
 	// AddressTypeIPv6 represents an IPv6 Address.
-	AddressTypeIPv6 = AddressType(api.IPv6Protocol)
+	AddressTypeIPv6 = AddressType(utilip.IPv6Protocol)
 	// AddressTypeFQDN represents a FQDN.
 	AddressTypeFQDN = AddressType("FQDN")
 )

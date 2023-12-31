@@ -31,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	networkingv1alpha1informers "k8s.io/client-go/informers/networking/v1alpha1"
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	networkingv1alpha1listers "k8s.io/client-go/listers/networking/v1alpha1"
@@ -48,10 +49,10 @@ const ControllerName = "ipallocator.k8s.io"
 type Allocator struct {
 	cidr          *net.IPNet
 	prefix        netip.Prefix
-	firstAddress  netip.Addr   // first IP address within the range
-	offsetAddress netip.Addr   // IP address that delimits the upper and lower subranges
-	lastAddress   netip.Addr   // last IP address within the range
-	family        api.IPFamily // family is the IP family of this range
+	firstAddress  netip.Addr      // first IP address within the range
+	offsetAddress netip.Addr      // IP address that delimits the upper and lower subranges
+	lastAddress   netip.Addr      // last IP address within the range
+	family        utilip.IPFamily // family is the IP family of this range
 
 	rangeOffset int    // subdivides the assigned IP range to prefer dynamic allocation from the upper range
 	size        uint64 // cap the total number of IPs available to maxInt64
@@ -91,12 +92,7 @@ func NewIPAllocator(
 
 	// TODO: use the utils/net function once is available
 	size := hostsPerNetwork(cidr)
-	var family api.IPFamily
-	if netutils.IsIPv6CIDR(cidr) {
-		family = api.IPv6Protocol
-	} else {
-		family = api.IPv4Protocol
-	}
+	family := utilip.IPFamilyOfCIDR(cidr)
 	// Caching the first, offset and last addresses allows to optimize
 	// the search loops by using the netip.Addr iterator instead
 	// of having to do conversions with IP addresses.
@@ -111,7 +107,7 @@ func NewIPAllocator(
 		return nil, err
 	}
 	// For IPv4 don't use the network's broadcast address
-	if family == api.IPv4Protocol {
+	if family == utilip.IPv4Protocol {
 		ipLast = ipLast.Prev()
 	}
 	// KEP-3070: Reserve Service IP Ranges For Dynamic and Static IP Allocation
@@ -400,7 +396,7 @@ func (a *Allocator) Has(ip net.IP) bool {
 	return true
 }
 
-func (a *Allocator) IPFamily() api.IPFamily {
+func (a *Allocator) IPFamily() utilip.IPFamily {
 	return a.family
 }
 
@@ -463,7 +459,7 @@ func (dry dryRunAllocator) CIDR() net.IPNet {
 	return dry.real.CIDR()
 }
 
-func (dry dryRunAllocator) IPFamily() api.IPFamily {
+func (dry dryRunAllocator) IPFamily() utilip.IPFamily {
 	return dry.real.IPFamily()
 }
 
@@ -522,7 +518,7 @@ func hostsPerNetwork(subnet *net.IPNet) uint64 {
 		return 0
 	}
 	max--
-	if netutils.IsIPv4CIDR(subnet) {
+	if utilip.IsIPv4CIDR(subnet) {
 		// Don't use the IPv4 network's broadcast address
 		if max == 0 {
 			return 0

@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 )
 
 const (
@@ -4328,17 +4329,6 @@ type LoadBalancerIngress struct {
 	Ports []PortStatus
 }
 
-// IPFamily represents the IP Family (IPv4 or IPv6). This type is used
-// to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
-type IPFamily string
-
-const (
-	// IPv4Protocol indicates that this IP is IPv4 protocol
-	IPv4Protocol IPFamily = "IPv4"
-	// IPv6Protocol indicates that this IP is IPv6 protocol
-	IPv6Protocol IPFamily = "IPv6"
-)
-
 // IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
 type IPFamilyPolicy string
 
@@ -4421,7 +4411,7 @@ type ServiceSpec struct {
 	// conditionally mutable: it allows for adding or removing a secondary IPFamily,
 	// but it does not allow changing the primary IPFamily of the service.
 	// +optional
-	IPFamilies []IPFamily
+	IPFamilies []utilip.IPFamily
 
 	// IPFamilyPolicy represents the dual-stack-ness requested or required by this
 	// Service. If there is no value provided, then this Service will be considered
