@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -29,7 +30,6 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
@@ -208,7 +208,7 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
 				}
 			}
-			endpoints, err := getEtcdEndpointsWithBackoff(client, wait.Backoff{Duration: 0, Jitter: 0, Steps: 1})
+			endpoints, err := getEtcdEndpointsWithRetry(client, time.Microsecond*10, time.Millisecond*100)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %q; was expecting no errors", err)
 				return
@@ -293,7 +293,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 			if rt.clientSetup != nil {
 				rt.clientSetup(client)
 			}
-			endpoints, err := getRawEtcdEndpointsFromPodAnnotation(client, wait.Backoff{Duration: 0, Jitter: 0, Steps: 1})
+			endpoints, err := getRawEtcdEndpointsFromPodAnnotation(client, time.Microsecond*10, time.Millisecond*100)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %v, but wasn't expecting any error", err)
 				return
@@ -482,9 +482,9 @@ func TestClient_GetMemberID(t *testing.T) {
 				Endpoints:     tt.fields.Endpoints,
 				newEtcdClient: tt.fields.newEtcdClient,
 			}
-			c.listMembersFunc = func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+			c.listMembersFunc = func(_ time.Duration) (*clientv3.MemberListResponse, error) {
 				f, _ := c.newEtcdClient([]string{})
-				resp, _ := f.MemberList(context.TODO())
+				resp, _ := f.MemberList(context.Background())
 				return resp, nil
 			}
 
@@ -504,7 +504,7 @@ func TestListMembers(t *testing.T) {
 	type fields struct {
 		Endpoints       []string
 		newEtcdClient   func(endpoints []string) (etcdClient, error)
-		listMembersFunc func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error)
+		listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
 	}
 	tests := []struct {
 		name      string
@@ -606,7 +606,7 @@ func TestListMembers(t *testing.T) {
 					}
 					return f, nil
 				},
-				listMembersFunc: func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+				listMembersFunc: func(_ time.Duration) (*clientv3.MemberListResponse, error) {
 					return nil, errNotImplemented
 				},
 			},
@@ -622,8 +622,8 @@ func TestListMembers(t *testing.T) {
 				listMembersFunc: tt.fields.listMembersFunc,
 			}
 			if c.listMembersFunc == nil {
-				c.listMembersFunc = func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
-					return c.listMembers(&wait.Backoff{Steps: 1})
+				c.listMembersFunc = func(_ time.Duration) (*clientv3.MemberListResponse, error) {
+					return c.listMembers(100 * time.Millisecond)
 				}
 			}
 			got, err := c.ListMembers()
@@ -641,7 +641,7 @@ func TestIsLearner(t *testing.T) {
 	type fields struct {
 		Endpoints       []string
 		newEtcdClient   func(endpoints []string) (etcdClient, error)
-		listMembersFunc func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error)
+		listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
 	}
 	tests := []struct {
 		name      string
@@ -756,7 +756,7 @@ func TestIsLearner(t *testing.T) {
 					}
 					return f, nil
 				},
-				listMembersFunc: func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+				listMembersFunc: func(_ time.Duration) (*clientv3.MemberListResponse, error) {
 					return nil, errNotImplemented
 				},
 			},
@@ -772,9 +772,9 @@ func TestIsLearner(t *testing.T) {
 				listMembersFunc: tt.fields.listMembersFunc,
 			}
 			if c.listMembersFunc == nil {
-				c.listMembersFunc = func(backoff *wait.Backoff) (*clientv3.MemberListResponse, error) {
+				c.listMembersFunc = func(t_ time.Duration) (*clientv3.MemberListResponse, error) {
 					f, _ := c.newEtcdClient([]string{})
-					resp, _ := f.MemberList(context.TODO())
+					resp, _ := f.MemberList(context.Background())
 					return resp, nil
 				}
 			}

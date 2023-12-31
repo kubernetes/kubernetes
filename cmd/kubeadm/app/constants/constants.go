@@ -28,7 +28,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apimachinery/pkg/util/wait"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	componentversion "k8s.io/component-base/version"
 	netutils "k8s.io/utils/net"
@@ -494,15 +493,6 @@ var (
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
 	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
 	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
-
-	// StaticPodMirroringDefaultRetry is used a backoff strategy for
-	// waiting for static pods to be mirrored to the apiserver.
-	StaticPodMirroringDefaultRetry = wait.Backoff{
-		Steps:    30,
-		Duration: 1 * time.Second,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}
 
 	// defaultKubernetesPlaceholderVersion is a placeholder version in case the component-base
 	// version was not populated during build.
