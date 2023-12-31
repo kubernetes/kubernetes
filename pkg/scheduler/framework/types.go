@@ -65,6 +65,12 @@ type GVK string
 
 // Constants for GVKs.
 const (
+	// There are a couple of notes about how the scheduler notifies the events of Pods:
+	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is scheduled to a Node.
+	// - Delete: delete events could be triggered by:
+	//           - a Pod that is deleted
+	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
+	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
 	Pod                   GVK = "Pod"
 	Node                  GVK = "Node"
 	PersistentVolume      GVK = "PersistentVolume"
