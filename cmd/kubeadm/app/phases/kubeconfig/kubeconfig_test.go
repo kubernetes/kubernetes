@@ -944,3 +944,202 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateKubeConfigAndCSR(t *testing.T) {
+	tmpDir := testutil.SetupTempDir(t)
+	testutil.SetupEmptyFiles(t, tmpDir, "testfile", "bar.csr", "bar.key")
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
+
+	type args struct {
+		kubeConfigDir string
+		kubeadmConfig *kubeadmapi.InitConfiguration
+		name          string
+		spec          *kubeConfigSpec
+	}
+	tests := []struct {
+		name          string
+		args          args
+		expectedError bool
+	}{
+		{
+			name: "kubeadmConfig is nil",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: nil,
+				name:          "foo",
+				spec: &kubeConfigSpec{
+					CACert:         caCert,
+					APIServer:      "10.0.0.1",
+					ClientName:     "foo",
+					TokenAuth:      &tokenAuth{Token: "test"},
+					ClientCertAuth: &clientCertAuth{CAKey: caKey},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "The kubeConfigDir is empty",
+			args: args{
+				kubeConfigDir: "",
+				kubeadmConfig: &kubeadmapi.InitConfiguration{},
+				name:          "foo",
+				spec: &kubeConfigSpec{
+					CACert:         caCert,
+					APIServer:      "10.0.0.1",
+					ClientName:     "foo",
+					TokenAuth:      &tokenAuth{Token: "test"},
+					ClientCertAuth: &clientCertAuth{CAKey: caKey},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "The name is empty",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{},
+				name:          "",
+				spec: &kubeConfigSpec{
+					CACert:         caCert,
+					APIServer:      "10.0.0.1",
+					ClientName:     "foo",
+					TokenAuth:      &tokenAuth{Token: "test"},
+					ClientCertAuth: &clientCertAuth{CAKey: caKey},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "The spec is empty",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{},
+				name:          "foo",
+				spec:          nil,
+			},
+			expectedError: true,
+		},
+		{
+			name: "The kubeconfig file already exists",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{},
+				name:          "testfile",
+				spec: &kubeConfigSpec{
+					CACert:         caCert,
+					APIServer:      "10.0.0.1",
+					ClientName:     "foo",
+					TokenAuth:      &tokenAuth{Token: "test"},
+					ClientCertAuth: &clientCertAuth{CAKey: caKey},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "The CSR or key files already exists",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{},
+				name:          "bar",
+				spec: &kubeConfigSpec{
+					CACert:         caCert,
+					APIServer:      "10.0.0.1",
+					ClientName:     "foo",
+					TokenAuth:      &tokenAuth{Token: "test"},
+					ClientCertAuth: &clientCertAuth{CAKey: caKey},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "configuration is valid, expect no errors",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{},
+				name:          "test",
+				spec: &kubeConfigSpec{
+					CACert:         caCert,
+					APIServer:      "10.0.0.1",
+					ClientName:     "foo",
+					TokenAuth:      &tokenAuth{Token: "test"},
+					ClientCertAuth: &clientCertAuth{CAKey: caKey},
+				},
+			},
+			expectedError: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := createKubeConfigAndCSR(tc.args.kubeConfigDir, tc.args.kubeadmConfig, tc.args.name, tc.args.spec); (err != nil) != tc.expectedError {
+				t.Errorf("createKubeConfigAndCSR() error = %v, wantErr %v", err, tc.expectedError)
+			}
+		})
+	}
+}
+
+func TestCreateDefaultKubeConfigsAndCSRFiles(t *testing.T) {
+	tmpDir := testutil.SetupTempDir(t)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
+	type args struct {
+		kubeConfigDir string
+		kubeadmConfig *kubeadmapi.InitConfiguration
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "kubeadmConfig is empty",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "The APIEndpoint is invalid",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{
+					LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+						AdvertiseAddress: "x.12.FOo.1",
+						BindPort:         6443,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "The APIEndpoint is valid",
+			args: args{
+				kubeConfigDir: tmpDir,
+				kubeadmConfig: &kubeadmapi.InitConfiguration{
+					LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+						AdvertiseAddress: "127.0.0.1",
+						BindPort:         6443,
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			if err := CreateDefaultKubeConfigsAndCSRFiles(out, tc.args.kubeConfigDir, tc.args.kubeadmConfig); (err != nil) != tc.wantErr {
+				t.Errorf("CreateDefaultKubeConfigsAndCSRFiles() error = %v, wantErr %v", err, tc.wantErr)
+				return
+			}
+		})
+	}
+}
