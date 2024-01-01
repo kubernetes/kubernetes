@@ -27,6 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	netutils "k8s.io/utils/net"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -209,10 +209,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		const expectedTimeoutSeconds = 60 * 60
 		// the conntrack file uses the IPv6 expanded format
 		ip := serverNodeInfo.nodeIP
-		ipFamily := "ipv4"
-		if netutils.IsIPv6String(ip) {
-			ipFamily = "ipv6"
-		}
+		ipFamily := strings.ToLower(string(utilip.IPFamilyOf(ip)))
 		// Obtain the corresponding conntrack entry on the host checking
 		// the nf_conntrack file from the pod e2e-net-exec.
 		// It retries in a loop if the entry is not found.

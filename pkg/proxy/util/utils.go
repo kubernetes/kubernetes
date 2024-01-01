@@ -170,7 +170,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]net.IP {
 		ip := netutils.ParseIPSloppy(ipStr)
 		if ip != nil {
 			// Since ip is parsed ok, GetIPFamilyFromIP will never return v1.IPFamilyUnknown
-			ipFamily := GetIPFamilyFromIP(ip)
+			ipFamily := utilip.IPFamilyOf(ip)
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
 			// ExternalIPs may not be validated by the api-server.
@@ -198,36 +198,10 @@ func MapCIDRsByIPFamily(cidrsStrings []string) map[v1.IPFamily][]*net.IPNet {
 			continue
 		}
 		// since we just succefully parsed the CIDR, IPFamilyOfCIDR will never return "IPFamilyUnknown"
-		ipFamily := convertToV1IPFamily(netutils.IPFamilyOfCIDR(cidr))
+		ipFamily := utilip.IPFamilyOfCIDR(cidr)
 		ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 	}
 	return ipFamilyMap
-}
-
-// GetIPFamilyFromIP Returns the IP family of ipStr, or IPFamilyUnknown if ipStr can't be parsed as an IP
-func GetIPFamilyFromIP(ip net.IP) v1.IPFamily {
-	return convertToV1IPFamily(netutils.IPFamilyOf(ip))
-}
-
-// Convert netutils.IPFamily to v1.IPFamily
-func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
-	switch ipFamily {
-	case netutils.IPv4:
-		return v1.IPv4Protocol
-	case netutils.IPv6:
-		return v1.IPv6Protocol
-	}
-
-	return v1.IPFamilyUnknown
-}
-
-// OtherIPFamily returns the other ip family
-func OtherIPFamily(ipFamily v1.IPFamily) v1.IPFamily {
-	if ipFamily == v1.IPv6Protocol {
-		return v1.IPv4Protocol
-	}
-
-	return v1.IPv6Protocol
 }
 
 // AppendPortIfNeeded appends the given port to IP address unless it is already in
