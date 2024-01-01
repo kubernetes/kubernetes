@@ -166,17 +166,45 @@ func TestGetMappedImageConfigs(t *testing.T) {
 	originals := map[ImageID]Config{
 		10: {registry: "docker.io", name: "source/repo", version: "1.0"},
 	}
-	mapping := GetMappedImageConfigs(originals, "quay.io/repo/for-test")
-
-	actual := make(map[string]string)
-	for i, mapping := range mapping {
-		source := originals[i]
-		actual[source.GetE2EImage()] = mapping.GetE2EImage()
-	}
-	expected := map[string]string{
-		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-10-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
-	}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Fatal(cmp.Diff(expected, actual))
+	for repo, test := range map[string]struct {
+		expected map[string]string
+	}{
+		"quay.io/repo/for-test": {
+			map[string]string{
+				"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-10-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
+			},
+		},
+		"localhost/repo": {
+			map[string]string{
+				"docker.io/source/repo:1.0": "localhost/repo:e2e-10-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
+			},
+		},
+		"localhost:5001/repo": {
+			map[string]string{
+				"docker.io/source/repo:1.0": "localhost:5001/repo:e2e-10-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
+			},
+		},
+		"localhost:5001/": {
+			map[string]string{
+				"docker.io/source/repo:1.0": "localhost:5001/:e2e-10-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
+			},
+		},
+		"localhost:5001": {
+			map[string]string{
+				"docker.io/source/repo:1.0": "localhost:5001/:e2e-10-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
+			},
+		},
+	} {
+		t.Run(repo, func(t *testing.T) {
+			mapping := GetMappedImageConfigs(originals, repo)
+			actual := make(map[string]string)
+			for i, mapping := range mapping {
+				source := originals[i]
+				actual[source.GetE2EImage()] = mapping.GetE2EImage()
+			}
+			if !reflect.DeepEqual(test.expected, actual) {
+				t.Fatal(cmp.Diff(test.expected, actual))
+			}
+		})
 	}
 }

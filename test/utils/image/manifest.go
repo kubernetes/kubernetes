@@ -319,8 +319,14 @@ var (
 // fit in the tag to allow a human to recognize the value. If imageID is None, then no
 // imageID will be added to the tag.
 func getRepositoryMappedConfig(imageID ImageID, config Config, repo string) Config {
-	parts := strings.SplitN(repo, "/", 2)
-	registry, name := parts[0], parts[1]
+	var registry, name string
+	if strings.Contains(repo, "/") {
+		parts := strings.SplitN(repo, "/", 2)
+		registry, name = parts[0], parts[1]
+	} else {
+		registry = repo
+		name = ""
+	}
 
 	pullSpec := config.GetE2EImage()
 
