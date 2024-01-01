@@ -429,27 +429,26 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	// Walk all the types, recursively and save them for later access.
 	s := pkg.Types.Scope()
 	for _, n := range s.Names() {
-		obj := s.Lookup(n)
-		tn, ok := obj.(*tc.TypeName)
-		if ok {
-			t := b.walkType(*u, nil, tn.Type())
+		switch obj := s.Lookup(n).(type) {
+		case *tc.TypeName:
+			t := b.walkType(*u, nil, obj.Type())
 			b.addCommentsToType(obj, t)
-		}
-		tf, ok := obj.(*tc.Func)
-		// We only care about functions, not concrete/abstract methods.
-		if ok && tf.Type() != nil && tf.Type().(*tc.Signature).Recv() == nil {
-			t := b.addFunction(*u, nil, tf)
+		case *tc.Func:
+			// We only care about functions, not concrete/abstract methods.
+			if obj.Type() != nil && obj.Type().(*tc.Signature).Recv() == nil {
+				t := b.addFunction(*u, nil, obj)
+				b.addCommentsToType(obj, t)
+			}
+		case *tc.Var:
+			if !obj.IsField() {
+				t := b.addVariable(*u, nil, obj)
+				b.addCommentsToType(obj, t)
+			}
+		case *tc.Const:
+			t := b.addConstant(*u, nil, obj)
 			b.addCommentsToType(obj, t)
-		}
-		tv, ok := obj.(*tc.Var)
-		if ok && !tv.IsField() {
-			t := b.addVariable(*u, nil, tv)
-			b.addCommentsToType(obj, t)
-		}
-		tconst, ok := obj.(*tc.Const)
-		if ok {
-			t := b.addConstant(*u, nil, tconst)
-			b.addCommentsToType(obj, t)
+		default:
+			klog.Infof("addPkgToUniverse %q: unhandled object: %v", pkgPath, obj)
 		}
 	}
 
