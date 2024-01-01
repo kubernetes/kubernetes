@@ -442,7 +442,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 			return mounter.isLikelyNotMountPoint(file)
 		}
 
-		return false, err
+		return true, err
 	}
 
 	if stat.Attributes_mask != 0 {
@@ -459,10 +459,10 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 
 	root := filepath.Dir(strings.TrimSuffix(file, "/"))
 	if rootStat, err = statx(root); err != nil {
-		return false, err
+		return true, err
 	}
 
-	return !(stat.Dev_major == rootStat.Dev_major && stat.Dev_minor == rootStat.Dev_minor), nil
+	return (stat.Dev_major == rootStat.Dev_major && stat.Dev_minor == rootStat.Dev_minor), nil
 }
 
 // CanSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
