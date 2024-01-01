@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,7 +46,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/iptree"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -439,7 +439,7 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 	for _, cidr := range serviceCIDR.Spec.CIDRs {
 		// get all the IPv4 addresses
 		ipLabelSelector := labels.Set(map[string]string{
-			networkingapiv1alpha1.LabelIPAddressFamily: string(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))),
+			networkingapiv1alpha1.LabelIPAddressFamily: string(utilip.IPFamilyOfCIDR(cidr)),
 			networkingapiv1alpha1.LabelManagedBy:       ipallocator.ControllerName,
 		}).AsSelectorPreValidated()
 		ips, err := c.ipAddressLister.List(ipLabelSelector)
@@ -526,18 +526,4 @@ func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cid
 	}
 	klog.FromContext(ctx).V(4).Info("Removed protection finalizer from ServiceCIDRs", "ServiceCIDR", cidr.Name)
 	return nil
-}
-
-// Convert netutils.IPFamily to v1.IPFamily
-// TODO: consolidate helpers
-// copied from pkg/proxy/util/utils.go
-func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
-	switch ipFamily {
-	case netutils.IPv4:
-		return v1.IPv4Protocol
-	case netutils.IPv6:
-		return v1.IPv6Protocol
-	}
-
-	return v1.IPFamilyUnknown
 }

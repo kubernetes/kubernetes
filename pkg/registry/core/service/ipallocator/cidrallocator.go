@@ -431,17 +431,3 @@ func isReady(serviceCIDR *networkingv1alpha1.ServiceCIDR) bool {
 	// assume the ServiceCIDR is Ready, in order to handle scenarios where kcm is not running
 	return true
 }
-
-// Convert netutils.IPFamily to v1.IPFamily
-// TODO: consolidate helpers
-// copied from pkg/proxy/util/utils.go
-func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
-	switch ipFamily {
-	case netutils.IPv4:
-		return v1.IPv4Protocol
-	case netutils.IPv6:
-		return v1.IPv6Protocol
-	}
-
-	return v1.IPFamilyUnknown
-}

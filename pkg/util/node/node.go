@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	netutils "k8s.io/utils/net"
@@ -94,7 +95,7 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 
 	nodeIPs := []net.IP{allIPs[0]}
 	for _, ip := range allIPs {
-		if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
+		if utilip.IPFamilyOf(ip) != utilip.IPFamilyOf(nodeIPs[0]) {
 			nodeIPs = append(nodeIPs, ip)
 			break
 		}

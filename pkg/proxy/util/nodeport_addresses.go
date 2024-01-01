@@ -48,7 +48,7 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string, primaryIP ne
 
 	// Filter CIDRs to correct family
 	for _, str := range cidrStrings {
-		if (family == v1.IPv4Protocol) == netutils.IsIPv4CIDRString(str) {
+		if utilip.IPFamilyOfCIDR(str) == family {
 			npa.cidrStrings = append(npa.cidrStrings, str)
 		}
 	}
@@ -71,7 +71,8 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string, primaryIP ne
 	// Now parse
 	for _, str := range npa.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
-		if netutils.IsIPv4CIDR(cidr) {
+
+		if utilip.IsIPv4CIDR(cidr) {
 			if cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart) {
 				npa.containsIPv4Loopback = true
 			}

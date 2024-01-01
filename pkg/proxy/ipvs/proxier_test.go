@@ -4579,27 +4579,27 @@ func TestFilterCIDRs(t *testing.T) {
 	var cidrList []string
 	var cidrs []string
 	var expected []string
-	cidrs = filterCIDRs(true, []string{})
+	cidrs = filterCIDRs(v1.IPv6Protocol, []string{})
 	if len(cidrs) > 0 {
 		t.Errorf("An empty list produces a non-empty return %v", cidrs)
 	}
 
 	cidrList = []string{"1000::/64", "10.0.0.0/16", "11.0.0.0/16", "2000::/64"}
 	expected = []string{"1000::/64", "2000::/64"}
-	cidrs = filterCIDRs(true, cidrList)
+	cidrs = filterCIDRs(v1.IPv6Protocol, cidrList)
 	if !reflect.DeepEqual(cidrs, expected) {
 		t.Errorf("cidrs %v is not expected %v", cidrs, expected)
 	}
 
 	expected = []string{"10.0.0.0/16", "11.0.0.0/16"}
-	cidrs = filterCIDRs(false, cidrList)
+	cidrs = filterCIDRs(v1.IPv4Protocol, cidrList)
 	if !reflect.DeepEqual(cidrs, expected) {
 		t.Errorf("cidrs %v is not expected %v", cidrs, expected)
 	}
 
 	cidrList = []string{"1000::/64", "2000::/64"}
 	expected = []string{}
-	cidrs = filterCIDRs(false, cidrList)
+	cidrs = filterCIDRs(v1.IPv4Protocol, cidrList)
 	if len(cidrs) > 0 {
 		t.Errorf("cidrs %v is not expected %v", cidrs, expected)
 	}

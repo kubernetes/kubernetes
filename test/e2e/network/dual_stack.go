@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	netutils "k8s.io/utils/net"
 )
 
 // Tests for ipv4-ipv6 dual-stack feature
@@ -68,7 +68,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 			gomega.Expect(internalIPs).To(gomega.HaveLen(2))
 			// assert 2 ips belong to different families
-			if netutils.IsIPv4String(internalIPs[0]) == netutils.IsIPv4String(internalIPs[1]) {
+			if utilip.IPFamilyOf(internalIPs[0]) == utilip.IPFamilyOf(internalIPs[1]) {
 				framework.Failf("both internalIPs %s and %s belong to the same families", internalIPs[0], internalIPs[1])
 			}
 		}
@@ -103,7 +103,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		// validate first ip in PodIPs is same as PodIP
 		gomega.Expect(p.Status.PodIP).To(gomega.Equal(p.Status.PodIPs[0].IP))
 		// assert 2 pod ips belong to different families
-		if netutils.IsIPv4String(p.Status.PodIPs[0].IP) == netutils.IsIPv4String(p.Status.PodIPs[1].IP) {
+		if utilip.IPFamilyOf(p.Status.PodIPs[0].IP) == utilip.IPFamilyOf(p.Status.PodIPs[1].IP) {
 			framework.Failf("both internalIPs %s and %s belong to the same families", p.Status.PodIPs[0].IP, p.Status.PodIPs[1].IP)
 		}
 
@@ -141,7 +141,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		// validate first ip in hostIPs is same as HostIP
 		gomega.Expect(p.Status.HostIP).To(gomega.Equal(p.Status.HostIPs[0].IP))
 		// assert 2 host ips belong to different families
-		if netutils.IsIPv4String(p.Status.HostIPs[0].IP) == netutils.IsIPv4String(p.Status.HostIPs[1].IP) {
+		if utilip.IPFamilyOf(p.Status.HostIPs[0].IP) == utilip.IPFamilyOf(p.Status.HostIPs[1].IP) {
 			framework.Failf("both internalIPs %s and %s belong to the same families", p.Status.HostIPs[0], p.Status.HostIPs[1])
 		}
 
@@ -748,7 +748,7 @@ func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.
 	}
 
 	for idx, family := range svc.Spec.IPFamilies {
-		if (family == v1.IPv6Protocol) != netutils.IsIPv6String(svc.Spec.ClusterIPs[idx]) {
+		if utilip.IPFamilyOf(svc.Spec.ClusterIPs[idx]) != family {
 			framework.Failf("service %s/%s assigned ips at [%v]:%v does not match family:%v", svc.Namespace, svc.Name, idx, svc.Spec.ClusterIPs[idx], family)
 		}
 	}
@@ -771,7 +771,7 @@ func validateEndpointsBelongToIPFamily(svc *v1.Service, endpoint *v1.Endpoints, 
 	}
 	for _, ss := range endpoint.Subsets {
 		for _, e := range ss.Addresses {
-			if (expectedIPFamily == v1.IPv6Protocol) != netutils.IsIPv6String(e.IP) {
+			if utilip.IPFamilyOf(e.IP) != expectedIPFamily {
 				framework.Failf("service endpoint %s doesn't belong to %s ip family", e.IP, expectedIPFamily)
 			}
 		}
@@ -789,7 +789,7 @@ func assertNetworkConnectivity(ctx context.Context, f *framework.Framework, serv
 		if pod.Status.PodIPs == nil || len(pod.Status.PodIPs) != 2 {
 			framework.Failf("PodIPs list not expected value, got %v", pod.Status.PodIPs)
 		}
-		if netutils.IsIPv4String(pod.Status.PodIPs[0].IP) == netutils.IsIPv4String(pod.Status.PodIPs[1].IP) {
+		if utilip.IPFamilyOf(pod.Status.PodIPs[0].IP) == utilip.IPFamilyOf(pod.Status.PodIPs[1].IP) {
 			framework.Failf("PodIPs should belong to different families, got %v", pod.Status.PodIPs)
 		}
 		serverIPs = append(serverIPs, pod.Status.PodIPs[0].IP, pod.Status.PodIPs[1].IP)

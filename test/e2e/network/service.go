@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	cloudprovider "k8s.io/cloud-provider"
-	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -3915,10 +3915,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 		// The node addresses must have the same IP family as the ClusterIP
-		family := v1.IPv4Protocol
-		if netutils.IsIPv6String(svc.Spec.ClusterIP) {
-			family = v1.IPv6Protocol
-		}
+		family := utilip.IPFamilyOf(svc.Spec.ClusterIP)
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
 		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
@@ -3998,10 +3995,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 		// The node addresses must have the same IP family as the ClusterIP
-		family := v1.IPv4Protocol
-		if netutils.IsIPv6String(svc.Spec.ClusterIP) {
-			family = v1.IPv6Protocol
-		}
+		family := utilip.IPFamilyOf(svc.Spec.ClusterIP)
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
 		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
