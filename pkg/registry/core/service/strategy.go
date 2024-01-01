@@ -18,11 +18,16 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -160,6 +165,38 @@ func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 // WarningsOnUpdate returns warnings for the given update.
 func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// MatchService returns a generic matcher for a given label and field selector.
+func MatchService(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+	return storage.SelectionPredicate{
+		Label:       label,
+		Field:       field,
+		GetAttrs:    GetAttrs,
+		IndexFields: []string{"spec.clusterIP"},
+	}
+}
+
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	serviceObj, ok := obj.(*api.Service)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a service")
+	}
+	return labels.Set(serviceObj.ObjectMeta.Labels), SelectableFields(serviceObj), nil
+}
+
+// SelectableFields returns a field set that can be used for filter selection.
+func SelectableFields(service *api.Service) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&service.ObjectMeta, false)
+	specificFieldsSet := fields.Set{
+		"spec.clusterIP": fmt.Sprint(service.Spec.ClusterIP),
+	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+}
+
+func ClusterIPTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Service).Spec.ClusterIP
 }
 
 // dropServiceStatusDisabledFields drops fields that are not used if their associated feature gates

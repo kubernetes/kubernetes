@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -91,6 +92,7 @@ func NewREST(
 		DefaultQualifiedResource:  api.Resource("services"),
 		SingularQualifiedResource: api.Resource("service"),
 		ReturnDeletedObject:       true,
+		PredicateFunc:             svcreg.MatchService,
 
 		CreateStrategy:      svcreg.Strategy,
 		UpdateStrategy:      svcreg.Strategy,
@@ -99,7 +101,13 @@ func NewREST(
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    svcreg.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{
+			"spec.clusterIP": svcreg.ClusterIPTriggerFunc,
+		},
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, nil, err
 	}

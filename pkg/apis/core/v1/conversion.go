@@ -88,6 +88,21 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err != nil {
 		return err
 	}
+	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Service"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name",
+				"metadata.namespace",
+				"spec.clusterIP":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
+	if err != nil {
+		return err
+	}
 	if err := AddFieldLabelConversionsForEvent(scheme); err != nil {
 		return err
 	}
