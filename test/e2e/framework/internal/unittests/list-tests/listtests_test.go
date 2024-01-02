@@ -27,6 +27,10 @@ import (
 )
 
 func TestListTests(t *testing.T) {
+	// TODO(soltysh): we need to figure out how we want to handle labels
+	// https://issues.redhat.com/browse/OCPBUGS-25641
+	t.Skip("temporarily disabled")
+
 	bugs.Describe()
 	framework.CheckForBugs = false
 	output, code := unittests.GetFrameworkOutput(t, map[string]string{"list-tests": "true"})

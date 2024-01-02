@@ -27,6 +27,10 @@ import (
 )
 
 func TestBugs(t *testing.T) {
+	// TODO(soltysh): we need to figure out how we want to handle labels
+	// https://issues.redhat.com/browse/OCPBUGS-25641
+	t.Skip("temporarily disabled")
+
 	assert.NoError(t, framework.FormatBugs())
 	RecordBugs()
 	Describe()
