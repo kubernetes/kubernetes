@@ -376,6 +376,7 @@ type ExtraMapping struct {
 	// subdomain as defined by RFC 1123. All characters trailing the first "/" must
 	// be valid HTTP Path characters as defined by RFC 3986.
 	// key must be lowercase.
+	// Required to be unique.
 	// +required
 	Key string `json:"key"`
 
