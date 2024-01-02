@@ -41,7 +41,6 @@ type RegistryList struct {
 	GcRegistry               string `yaml:"gcRegistry"`
 	SigStorageRegistry       string `yaml:"sigStorageRegistry"`
 	PrivateRegistry          string `yaml:"privateRegistry"`
-	MicrosoftRegistry        string `yaml:"microsoftRegistry"`
 	DockerLibraryRegistry    string `yaml:"dockerLibraryRegistry"`
 	CloudProviderGcpRegistry string `yaml:"cloudProviderGcpRegistry"`
 }
@@ -138,7 +137,6 @@ var (
 		GcRegistry:               "registry.k8s.io",
 		SigStorageRegistry:       "registry.k8s.io/sig-storage",
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
-		MicrosoftRegistry:        "mcr.microsoft.com",
 		DockerLibraryRegistry:    "docker.io/library",
 		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
@@ -226,8 +224,6 @@ const (
 	VolumeISCSIServer
 	// VolumeRBDServer image
 	VolumeRBDServer
-	// WindowsServer image
-	WindowsServer
 )
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
@@ -270,7 +266,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.3"}
 	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.6"}
 	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.6"}
-	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,
 	// but will be used via ReplaceRegistryInImageURL when deploying
@@ -420,8 +415,6 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		registryAndUser = reg.PrivateRegistry
 	case initRegistry.InvalidRegistry:
 		registryAndUser = reg.InvalidRegistry
-	case initRegistry.MicrosoftRegistry:
-		registryAndUser = reg.MicrosoftRegistry
 	case initRegistry.PromoterE2eRegistry:
 		registryAndUser = reg.PromoterE2eRegistry
 	case initRegistry.BuildImageRegistry:
