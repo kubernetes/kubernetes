@@ -48,7 +48,6 @@ func TestCSIImageConfigs(t *testing.T) {
 		"gcp-compute-persistent-disk-csi-driver",
 
 		// For some hostpath tests.
-		"socat",
 		"busybox",
 
 		// For AnyVolumeDataSource feature tests.
