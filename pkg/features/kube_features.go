@@ -458,14 +458,6 @@ const (
 	// `externalTrafficPolicy: Cluster` services.
 	KubeProxyDrainingTerminatingNodes featuregate.Feature = "KubeProxyDrainingTerminatingNodes"
 
-	// owner: @zshihang
-	// kep: http://kep.k8s.io/2800
-	// alpha: v1.26
-	// beta: v1.27
-	//
-	// Enables tracking of secret-based service account tokens usage.
-	LegacyServiceAccountTokenTracking featuregate.Feature = "LegacyServiceAccountTokenTracking"
-
 	// owner: @yt2985
 	// kep: http://kep.k8s.io/2800
 	// alpha: v1.28
@@ -1066,8 +1058,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletTracing: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeProxyDrainingTerminatingNodes: {Default: false, PreRelease: featuregate.Alpha},
-
-	LegacyServiceAccountTokenTracking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	LegacyServiceAccountTokenCleanUp: {Default: true, PreRelease: featuregate.Beta},
 
