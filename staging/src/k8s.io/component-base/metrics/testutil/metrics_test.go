@@ -21,10 +21,12 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	dto "github.com/prometheus/client_model/go"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/component-base/metrics"
 	"k8s.io/utils/pointer"
 )
@@ -516,6 +518,7 @@ func TestHistogramVec_Validate(t *testing.T) {
 }
 
 func TestGetHistogramVecFromGatherer(t *testing.T) {
+	now := time.Now()
 	tests := []struct {
 		name    string
 		lvMap   map[string]string
@@ -533,6 +536,7 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(2.0)},
 						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
 					},
+					CreatedTimestamp: timestamppb.New(now),
 				}},
 				&Histogram{&dto.Histogram{
 					SampleCount: uint64Ptr(1),
@@ -542,6 +546,7 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(2.0)},
 						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
 					},
+					CreatedTimestamp: timestamppb.New(now),
 				}},
 			},
 		},
@@ -557,6 +562,7 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(2.0)},
 						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
 					},
+					CreatedTimestamp: timestamppb.New(now),
 				}},
 			},
 		},
@@ -585,7 +591,7 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			vec.WithLabelValues("value1-1", "value2-1").Observe(4.5)
 			metricName := fmt.Sprintf("%s_%s_%s", HistogramOpts.Namespace, HistogramOpts.Subsystem, HistogramOpts.Name)
 			histogramVec, _ := GetHistogramVecFromGatherer(gather, metricName, tt.lvMap)
-			if diff := cmp.Diff(tt.wantVec, histogramVec, cmpopts.IgnoreFields(dto.Histogram{}, "state", "sizeCache", "unknownFields"), cmpopts.IgnoreFields(dto.Bucket{}, "state", "sizeCache", "unknownFields")); diff != "" {
+			if diff := cmp.Diff(tt.wantVec, histogramVec, cmpopts.IgnoreUnexported(timestamppb.Timestamp{}), cmpopts.IgnoreFields(dto.Histogram{}, "state", "sizeCache", "unknownFields", "CreatedTimestamp.Nanos"), cmpopts.IgnoreFields(dto.Bucket{}, "state", "sizeCache", "unknownFields")); diff != "" {
 				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
 			}
 		})

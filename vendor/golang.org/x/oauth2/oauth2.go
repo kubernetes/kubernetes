@@ -58,6 +58,10 @@ type Config struct {
 
 	// Scope specifies optional requested permissions.
 	Scopes []string
+
+	// authStyleCache caches which auth style to use when Endpoint.AuthStyle is
+	// the zero value (AuthStyleAutoDetect).
+	authStyleCache internal.LazyAuthStyleCache
 }
 
 // A TokenSource is anything that can return a token.

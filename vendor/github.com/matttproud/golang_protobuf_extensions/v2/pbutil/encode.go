@@ -18,7 +18,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // WriteDelimited encodes and dumps a message to the provided writer prefixed
@@ -28,6 +28,9 @@ import (
 // number of bytes written and any applicable error.  This is roughly
 // equivalent to the companion Java API's MessageLite#writeDelimitedTo.
 func WriteDelimited(w io.Writer, m proto.Message) (n int, err error) {
+	// TODO: Consider allowing the caller to specify an encode buffer in the
+	// next major version.
+
 	buffer, err := proto.Marshal(m)
 	if err != nil {
 		return 0, err

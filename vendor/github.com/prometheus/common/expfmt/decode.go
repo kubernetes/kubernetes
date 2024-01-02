@@ -22,7 +22,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/matttproud/golang_protobuf_extensions/pbutil"
+	"github.com/matttproud/golang_protobuf_extensions/v2/pbutil"
 	"github.com/prometheus/common/model"
 )
 
