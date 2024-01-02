@@ -81,6 +81,10 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 	// OpenTelemetry instrumentation scope name
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	// Minimal Containerd version with CDI support: https://github.com/containerd/containerd/releases/tag/v1.7.0
+	minContainerdCDIVersion = "1.7.0"
+	// Minimal CRI-O version with CDI support: https://github.com/cri-o/cri-o/releases/tag/v1.23.2
+	minCRIOCDIVersion = "1.23.2"
 )
 
 var (
@@ -252,6 +256,24 @@ func NewKubeGenericRuntimeManager(
 			"apiVersion", typedVersion.Version,
 			"supportedAPIVersion", kubeRuntimeAPIVersion)
 		return nil, ErrVersionNotSupported
+	}
+
+	// Check if runtime supports CDI
+	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePluginCDIDevices) || utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		minVersions := map[string]string{"containerd": minContainerdCDIVersion, "cri-o": minCRIOCDIVersion}
+		if rversion, ok := minVersions[typedVersion.RuntimeName]; ok {
+			runtimeVersion, err := kubeRuntimeManager.Version(ctx)
+			if err != nil {
+				klog.InfoS("WARNING: can't get runtime version", "error", err)
+			} else {
+				cmp, err := runtimeVersion.Compare(rversion)
+				if err != nil {
+					klog.InfoS("WARNING: can't compare versions", "runtime", typedVersion.RuntimeName, "version", runtimeVersion, "minimal version with CDI support", rversion)
+				} else if cmp < 0 {
+					klog.InfoS("WARNING: runtime doesn't support CDI", "runtime", typedVersion.RuntimeName, "version", runtimeVersion, "minimal version with CDI support", rversion)
+				}
+			}
+		}
 	}
 
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
