@@ -464,8 +464,13 @@ var _ = SIGDescribe("kubelet", func() {
 			nodes, err := e2enode.GetReadyNodesIncludingTainted(ctx, c)
 			framework.ExpectNoError(err)
 			if len(nodes.Items) == 0 {
+				framework.Fail("Expected at least one node to be present")
+			}
+			linuxNodes := getLinuxNodes(nodes)
+			if len(linuxNodes.Items) == 0 {
 				framework.Fail("Expected at least one Linux node to be present")
 			}
+
 			linuxNodeName = nodes.Items[0].Name
 		})
 
@@ -578,6 +583,23 @@ var _ = SIGDescribe("kubelet", func() {
 		})
 	})
 })
+
+func getLinuxNodes(nodes *v1.NodeList) *v1.NodeList {
+	e2enode.Filter(nodes, func(node v1.Node) bool {
+		return isLinuxNode(&node)
+	})
+	return nodes
+}
+
+func isLinuxNode(node *v1.Node) bool {
+	if node == nil {
+		return false
+	}
+	if os, found := node.Labels[v1.LabelOSStable]; found {
+		return (os == "linux")
+	}
+	return false
+}
 
 func runKubectlCommand(cmd *exec.Cmd) (result string) {
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
