@@ -18,25 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# This will canonicalize the path
+KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd -P)
 cd "${KUBE_ROOT}"
 
-# generate json spec -> yaml
-test/conformance/gen-conformance-yaml.sh
-
-# diff generated and checked-in
-if ! diff -u test/conformance/testdata/conformance.yaml _output/conformance.yaml; then
-  echo FAIL
-  echo 'See instructions in test/conformance/README.md'
-  exit 1
-fi
-
-# generate image list
-test/conformance/gen-test-image-list.sh
-
-# diff generated and checked-in
-if ! diff -u test/conformance/testdata/repo_list_images.txt _output/repo_list_images.txt; then
-  echo FAIL
-  exit 1
-fi
-exit 0
+# dump list of images
+./_output/bin/e2e.test --list-images | sort > "${KUBE_ROOT}/_output/repo_list_images.txt"
