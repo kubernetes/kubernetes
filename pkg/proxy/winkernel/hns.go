@@ -150,9 +150,9 @@ func (hns hns) getEndpointByID(id string) (*endpointInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &endpointInfo{ //TODO: fill out PA
+	return &endpointInfo{ // TODO: fill out PA
 		ip:         hnsendpoint.IpConfigurations[0].IpAddress,
-		isLocal:    uint32(hnsendpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
+		isLocal:    uint32(hnsendpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, // TODO: Change isLocal to isRemote
 		macAddress: hnsendpoint.MacAddress,
 		hnsID:      hnsendpoint.Id,
 		hns:        hns,
@@ -181,7 +181,7 @@ func (hns hns) getEndpointByIpAddress(ip string, networkName string) (*endpointI
 		if equal && strings.EqualFold(endpoint.HostComputeNetwork, hnsnetwork.Id) {
 			return &endpointInfo{
 				ip:         ip,
-				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
+				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, // TODO: Change isLocal to isRemote
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
 				hns:        hns,
@@ -195,9 +195,9 @@ func (hns hns) getEndpointByName(name string) (*endpointInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &endpointInfo{ //TODO: fill out PA
+	return &endpointInfo{ // TODO: fill out PA
 		ip:         hnsendpoint.IpConfigurations[0].IpAddress,
-		isLocal:    uint32(hnsendpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
+		isLocal:    uint32(hnsendpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, // TODO: Change isLocal to isRemote
 		macAddress: hnsendpoint.MacAddress,
 		hnsID:      hnsendpoint.Id,
 		hns:        hns,
@@ -256,7 +256,7 @@ func (hns hns) createEndpoint(ep *endpointInfo, networkName string) (*endpointIn
 		isLocal:         uint32(createdEndpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
 		macAddress:      createdEndpoint.MacAddress,
 		hnsID:           createdEndpoint.Id,
-		providerAddress: ep.providerAddress, //TODO get from createdEndpoint
+		providerAddress: ep.providerAddress, // TODO get from createdEndpoint
 		hns:             hns,
 	}, nil
 }

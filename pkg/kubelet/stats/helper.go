@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 )
 
-// defaultNetworkInterfaceName is used for collectng network stats.
+// defaultNetworkInterfaceName is used for collecting network stats.
 // This logic relies on knowledge of the container runtime implementation and
 // is not reliable.
 const defaultNetworkInterfaceName = "eth0"

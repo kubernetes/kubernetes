@@ -237,7 +237,7 @@ func formatResourceUsageStats(containerStats e2ekubelet.ResourceUsagePerContaine
 	// Example output:
 	//
 	// Resource usage:
-	//container cpu(cores) memory_working_set(MB) memory_rss(MB)
+	// container cpu(cores) memory_working_set(MB) memory_rss(MB)
 	//"kubelet" 0.068      27.92                  15.43
 	//"runtime" 0.664      89.88                  68.13
 

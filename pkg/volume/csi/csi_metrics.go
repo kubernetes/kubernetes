@@ -41,7 +41,7 @@ type metricsCsi struct {
 	// Volume handle or id
 	volumeID string
 
-	//csiClient with cache
+	// csiClient with cache
 	csiClientGetter
 }
 
@@ -84,7 +84,7 @@ func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
 	if metrics == nil {
 		return nil, fmt.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", mc.volumeID)
 	}
-	//set recorded time
+	// set recorded time
 	metrics.Time = currentTime
 	return metrics, nil
 }

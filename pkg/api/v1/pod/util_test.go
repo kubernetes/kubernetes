@@ -154,7 +154,7 @@ func TestFindPort(t *testing.T) {
 			port:     intstr.FromString("a"),
 			expected: 11,
 			pass:     true,
-			//this should fail but passes.
+			// this should fail but passes.
 		},
 		{
 			name: "invalid ContainerPort",
@@ -167,7 +167,7 @@ func TestFindPort(t *testing.T) {
 			port:     intstr.FromString("a"),
 			expected: -1,
 			pass:     true,
-			//this should fail but passes
+			// this should fail but passes
 		},
 		{
 			name: "HostIP Address",

@@ -58,7 +58,7 @@ ceph osd pool create cephfs_metadata 4
 ceph fs new cephfs cephfs_metadata cephfs_data
 # Put index.html into the volume
 # It takes a while until the volume created above is mountable,
-# 1 second is usually enough, but try indefinetily.
+# 1 second is usually enough, but try indefinitely.
 sleep 1
 while ! ceph-fuse -m "$(hostname -i):6789" /mnt; do
     echo "Waiting for cephfs to be up"

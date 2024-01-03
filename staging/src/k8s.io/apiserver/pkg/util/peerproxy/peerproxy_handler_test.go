@@ -106,7 +106,7 @@ func TestPeerProxy(t *testing.T) {
 		},
 		{
 			// since if no server id is found, we pass request to next handler
-			//, and our last handler in local chain is an http ok handler
+			// , and our last handler in local chain is an http ok handler
 			desc:                 "200 if no serverid found",
 			requestPath:          "/api/bar/baz",
 			expectedStatus:       http.StatusOK,
@@ -243,7 +243,7 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 	t.Cleanup(func() { server.Terminate(t) })
 	scheme := runtime.NewScheme()
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	//utilruntime.Must(core.AddToScheme(scheme))
+	// utilruntime.Must(core.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(corev1.SchemeGroupVersion))
 	codecs := serializer.NewCodecFactory(scheme)

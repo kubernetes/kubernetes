@@ -922,7 +922,7 @@ func TestBindSubPath(t *testing.T) {
 }
 
 func TestSubpath_PrepareSafeSubpath(t *testing.T) {
-	//complete code
+	// complete code
 	defaultPerm := os.FileMode(0750)
 
 	tests := []struct {

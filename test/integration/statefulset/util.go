@@ -39,7 +39,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
-	//svc "k8s.io/kubernetes/pkg/api/v1/service"
+	// svc "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/test/integration/framework"
 )

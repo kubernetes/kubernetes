@@ -164,7 +164,7 @@ type kubeGenericRuntimeManager struct {
 	// MemorySwapBehavior defines how swap is used
 	memorySwapBehavior string
 
-	//Function to get node allocatable resources
+	// Function to get node allocatable resources
 	getNodeAllocatable func() v1.ResourceList
 
 	// Memory throttling factor for MemoryQoS
@@ -575,7 +575,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	currentMemoryLimit := apiContainerStatus.Resources.Limits.Memory().Value()
 	currentCPULimit := apiContainerStatus.Resources.Limits.Cpu().MilliValue()
 	currentCPURequest := apiContainerStatus.Resources.Requests.Cpu().MilliValue()
-	// Runtime container status resources (from CRI), if set, supercedes v1(api) container status resrouces.
+	// Runtime container status resources (from CRI), if set, supercedes v1(api) container status resources.
 	if kubeContainerStatus.Resources != nil {
 		if kubeContainerStatus.Resources.MemoryLimit != nil {
 			currentMemoryLimit = kubeContainerStatus.Resources.MemoryLimit.Value()
@@ -665,7 +665,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 
 func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *kubecontainer.PodStatus, podContainerChanges podActions, result kubecontainer.PodSyncResult) {
 	pcm := m.containerManager.NewPodContainerManager()
-	//TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
+	// TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
 	podResources := cm.ResourceConfigForPod(pod, m.cpuCFSQuota, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
 	if podResources == nil {
 		klog.ErrorS(nil, "Unable to get resource configuration", "pod", pod.Name)
@@ -1140,7 +1140,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// When runc supports slash as sysctl separator, this function can no longer be used.
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
-		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
+		// Prepare resources allocated by the Dynamic Resource Allocation feature for the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 			if err := m.runtimeHelper.PrepareDynamicResources(pod); err != nil {
 				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)

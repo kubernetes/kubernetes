@@ -203,7 +203,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	if r.maxExpirationSeconds > 0 && req.Spec.ExpirationSeconds > r.maxExpirationSeconds {
-		//only positive value is valid
+		// only positive value is valid
 		warning.AddWarning(ctx, "", fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", req.Spec.ExpirationSeconds, r.maxExpirationSeconds))
 		req.Spec.ExpirationSeconds = r.maxExpirationSeconds
 	}

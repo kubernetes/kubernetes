@@ -172,17 +172,17 @@ func (e *Entry) Validate(set *IPSet) bool {
 	}
 	switch e.SetType {
 	case HashIP:
-		//check if IP of Entry is valid.
+		// check if IP of Entry is valid.
 		if valid := e.checkIP(set); !valid {
 			return false
 		}
 	case HashIPPort:
-		//check if IP and Protocol of Entry is valid.
+		// check if IP and Protocol of Entry is valid.
 		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
 	case HashIPPortIP:
-		//check if IP and Protocol of Entry is valid.
+		// check if IP and Protocol of Entry is valid.
 		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
@@ -193,7 +193,7 @@ func (e *Entry) Validate(set *IPSet) bool {
 			return false
 		}
 	case HashIPPortNet:
-		//check if IP and Protocol of Entry is valid.
+		// check if IP and Protocol of Entry is valid.
 		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}

@@ -1469,9 +1469,9 @@ func TestCreateInitIPFields(t *testing.T) {
 			name:            "singlestack:v4",
 			clusterFamilies: []api.IPFamily{api.IPv4Protocol},
 			cases: []testCase{
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v4 ClusterIPs:unset
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
 					line:           line(),
@@ -1610,9 +1610,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v4 ClusterIPs:v4
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v4_Policy:unset_Families:unset",
 					line: line(),
@@ -1771,9 +1771,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v4 ClusterIPs:v4v6
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
 					line: line(),
@@ -1926,9 +1926,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v4 ClusterIPs:v6v4
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
 					line: line(),
@@ -2081,9 +2081,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v4 Headless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "Headless_Policy:unset_Families:unset",
 					line: line(),
@@ -2248,9 +2248,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v4 HeadlessSelectorless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "HeadlessSelectorless_Policy:unset_Families:unset",
 					line: line(),
@@ -2464,9 +2464,9 @@ func TestCreateInitIPFields(t *testing.T) {
 			name:            "singlestack:v6",
 			clusterFamilies: []api.IPFamily{api.IPv6Protocol},
 			cases: []testCase{
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v6 ClusterIPs:unset
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
 					line:           line(),
@@ -2605,9 +2605,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v6 ClusterIPs:v6
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v6_Policy:unset_Families:unset",
 					line: line(),
@@ -2766,9 +2766,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v6 ClusterIPs:v4v6
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
 					line: line(),
@@ -2921,9 +2921,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v6 ClusterIPs:v6v4
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
 					line: line(),
@@ -3076,9 +3076,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v6 Headless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "Headless_Policy:unset_Families:unset",
 					line: line(),
@@ -3243,9 +3243,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// singlestack:v6 HeadlessSelectorless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "HeadlessSelectorless_Policy:unset_Families:unset",
 					line: line(),
@@ -3459,9 +3459,9 @@ func TestCreateInitIPFields(t *testing.T) {
 			name:            "dualstack:v4v6",
 			clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			cases: []testCase{
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v4v6 ClusterIPs:unset
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
 					line:           line(),
@@ -3610,9 +3610,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v4v6 ClusterIPs:v4
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v4_Policy:unset_Families:unset",
 					line: line(),
@@ -3775,9 +3775,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v4v6 ClusterIPs:v6
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v6_Policy:unset_Families:unset",
 					line: line(),
@@ -3940,9 +3940,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v4v6 ClusterIPs:v4v6
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
 					line: line(),
@@ -4101,9 +4101,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v4v6 ClusterIPs:v6v4
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
 					line: line(),
@@ -4262,9 +4262,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v4v6 Headless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "Headless_Policy:unset_Families:unset",
 					line: line(),
@@ -4449,9 +4449,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v4v6 HeadlessSelectorless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "HeadlessSelectorless_Policy:unset_Families:unset",
 					line: line(),
@@ -4665,9 +4665,9 @@ func TestCreateInitIPFields(t *testing.T) {
 			name:            "dualstack:v6v4",
 			clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			cases: []testCase{
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v6v4 ClusterIPs:unset
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
 					line:           line(),
@@ -4816,9 +4816,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v6v4 ClusterIPs:v4
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v4_Policy:unset_Families:unset",
 					line: line(),
@@ -4981,9 +4981,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v6v4 ClusterIPs:v6
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v6_Policy:unset_Families:unset",
 					line: line(),
@@ -5146,9 +5146,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v6v4 ClusterIPs:v4v6
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
 					line: line(),
@@ -5307,9 +5307,9 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v6v4 ClusterIPs:v6v4
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
 					line: line(),
@@ -5468,9 +5468,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v6v4 Headless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "Headless_Policy:unset_Families:unset",
 					line: line(),
@@ -5655,9 +5655,9 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
 				},
-				//----------------------------------------
+				// ----------------------------------------
 				// dualstack:v6v4 HeadlessSelectorless
-				//----------------------------------------
+				// ----------------------------------------
 				{
 					name: "HeadlessSelectorless_Policy:unset_Families:unset",
 					line: line(),

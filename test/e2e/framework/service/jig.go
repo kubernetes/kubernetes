@@ -355,7 +355,7 @@ func (j *TestJig) WaitForEndpointOnNode(ctx context.Context, nodeName string) er
 
 // waitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
 func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Duration) error {
-	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
+	// Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
 	endpointSelector := fields.OneTermEqualSelector("metadata.name", j.Name)
 	stopCh := make(chan struct{})
 	endpointAvailable := false
@@ -509,7 +509,7 @@ func needsNodePorts(svc *v1.Service) bool {
 	}
 	// Type LoadBalancer
 	if svc.Spec.AllocateLoadBalancerNodePorts == nil {
-		return true //back-compat
+		return true // back-compat
 	}
 	return *svc.Spec.AllocateLoadBalancerNodePorts
 }

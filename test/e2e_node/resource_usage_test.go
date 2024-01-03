@@ -152,7 +152,7 @@ func runResourceUsageTest(ctx context.Context, f *framework.Framework, rc *Resou
 	pods := newTestPods(testArg.podsNr, true, imageutils.GetPauseImageName(), "test_pod")
 
 	rc.Start()
-	// Explicitly delete pods to prevent namespace controller cleanning up timeout
+	// Explicitly delete pods to prevent namespace controller cleaning up timeout
 	ginkgo.DeferCleanup(deletePodsSync, f, append(pods, getCadvisorPod()))
 	ginkgo.DeferCleanup(rc.Stop)
 

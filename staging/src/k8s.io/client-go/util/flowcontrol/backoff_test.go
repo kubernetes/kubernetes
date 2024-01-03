@@ -40,7 +40,7 @@ func TestSlowBackoff(t *testing.T) {
 		b.Next(id, tc.Now())
 	}
 
-	//Now confirm that the Reset cancels backoff.
+	// Now confirm that the Reset cancels backoff.
 	b.Next(id, tc.Now())
 	b.Reset(id)
 	if b.Get(id) != 0 {

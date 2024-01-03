@@ -1075,7 +1075,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 		t.Errorf("unexpected error, object should be deleted immediately: %v", err)
 	}
 	objectMeta = t.getObjectMetaOrFail(out)
-	// the second delete shouldn't update the object, so the objectMeta.GetDeletionGracePeriodSeconds() should eqaul to the value set in the first delete.
+	// the second delete shouldn't update the object, so the objectMeta.GetDeletionGracePeriodSeconds() should equal to the value set in the first delete.
 	if objectMeta.GetDeletionTimestamp() == nil || objectMeta.GetDeletionGracePeriodSeconds() == nil || *objectMeta.GetDeletionGracePeriodSeconds() != 0 {
 		t.Errorf("unexpected deleted meta: %#v", objectMeta)
 	}

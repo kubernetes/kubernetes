@@ -5454,7 +5454,7 @@ func getHugePageResourceList(pageSize, value string) corev1.ResourceList {
 	return res
 }
 
-// mergeResourceLists will merge resoure lists. When two lists have the same resourece, the value from
+// mergeResourceLists will merge resource lists. When two lists have the same resource, the value from
 // the last list will be present in the result
 func mergeResourceLists(resourceLists ...corev1.ResourceList) corev1.ResourceList {
 	result := corev1.ResourceList{}

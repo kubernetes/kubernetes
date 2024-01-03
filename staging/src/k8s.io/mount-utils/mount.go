@@ -100,7 +100,7 @@ type MounterForceUnmounter interface {
 }
 
 // MountPoint represents a single line in /proc/mounts or /etc/fstab.
-type MountPoint struct { // nolint: golint
+type MountPoint struct { //nolint: golint
 	Device string
 	Path   string
 	Type   string
@@ -109,7 +109,7 @@ type MountPoint struct { // nolint: golint
 	Pass   int
 }
 
-type MountErrorType string // nolint: golint
+type MountErrorType string //nolint: golint
 
 const (
 	FilesystemMismatch  MountErrorType = "FilesystemMismatch"
@@ -120,7 +120,7 @@ const (
 	UnknownMountError   MountErrorType = "UnknownMountError"
 )
 
-type MountError struct { // nolint: golint
+type MountError struct { //nolint: golint
 	Type    MountErrorType
 	Message string
 }
@@ -209,7 +209,7 @@ func (mounter *SafeFormatAndMount) FormatAndMountSensitiveWithFormatOptions(sour
 
 // getMountRefsByDev finds all references to the device provided
 // by mountPath; returns a list of paths.
-// Note that mountPath should be path after the evaluation of any symblolic links.
+// Note that mountPath should be path after the evaluation of any symbolic links.
 func getMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	mps, err := mounter.List()
 	if err != nil {

@@ -52,9 +52,9 @@ func printf(item logMessage) {
 
 func prints(logger klog.Logger, item logMessage) {
 	if item.isError {
-		logger.Error(item.err, item.msg, item.kvs...) // nolint: logcheck
+		logger.Error(item.err, item.msg, item.kvs...) //nolint: logcheck
 	} else {
-		logger.Info(item.msg, item.kvs...) // nolint: logcheck
+		logger.Info(item.msg, item.kvs...) //nolint: logcheck
 	}
 }
 

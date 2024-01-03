@@ -92,7 +92,7 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 		klog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
 	}
 
-	//If we got this far, there is no backoff required for this URL anymore.
+	// If we got this far, there is no backoff required for this URL anymore.
 	b.Backoff.Reset(b.baseUrlKey(actualUrl))
 }
 

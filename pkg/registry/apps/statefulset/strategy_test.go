@@ -492,7 +492,7 @@ func TestStatefulSetStartOrdinalEnablement(t *testing.T) {
 		t.Errorf("Generation = %v, want = 1 for StatefulSet: %v", ss.Generation, ss)
 	}
 
-	// Validate that the ordinals field is retained when StatefulSetStartOridnal is disabled.
+	// Validate that the ordinals field is retained when StatefulSetStartOrdinal is disabled.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)()
 	ssWhenDisabled := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
 	ssWhenDisabled.Spec.Replicas = 2

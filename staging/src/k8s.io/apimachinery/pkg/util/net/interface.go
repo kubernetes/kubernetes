@@ -111,7 +111,7 @@ func getIPv4DefaultRoutes(input io.Reader) ([]Route, error) {
 		if err == io.EOF {
 			break
 		}
-		//ignore the headers in the route info
+		// ignore the headers in the route info
 		if strings.HasPrefix(line, "Iface") {
 			continue
 		}

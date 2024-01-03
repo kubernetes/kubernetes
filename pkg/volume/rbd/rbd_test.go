@@ -55,12 +55,12 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
-	//deferred clean up
+	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
-	//Bad Path
+	// Bad Path
 	badspec, err := getVolumeSpecFromGlobalMapPath("", testVolName)
 	if badspec != nil || err == nil {
 		t.Fatalf("Expected not to get spec from GlobalMapPath but did")

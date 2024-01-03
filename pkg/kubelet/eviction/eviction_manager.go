@@ -394,7 +394,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjSlice(activePods))
 
-	//record age of metrics for met thresholds that we are using for evictions.
+	// record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
 		timeObserved := observations[t.Signal].time
 		if !timeObserved.IsZero() {

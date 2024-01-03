@@ -3050,7 +3050,7 @@ func setupCRD(t testing.TB, config *rest.Config, apiGroup string, schemaless boo
 	if err != nil {
 		t.Fatal(err)
 	}
-	//crd.Spec.PreserveUnknownFields = false
+	// crd.Spec.PreserveUnknownFields = false
 	for i := range crd.Spec.Versions {
 		crd.Spec.Versions[i].Schema = &c
 	}

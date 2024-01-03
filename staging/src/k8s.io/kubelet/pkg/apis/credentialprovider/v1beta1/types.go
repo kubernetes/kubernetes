@@ -58,7 +58,7 @@ const (
 type CredentialProviderResponse struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// cacheKeyType indiciates the type of caching key to use based on the image provided
+	// cacheKeyType indicates the type of caching key to use based on the image provided
 	// in the request. There are three valid values for the cache key type: Image, Registry, and
 	// Global. If an invalid value is specified, the response will NOT be used by the kubelet.
 	CacheKeyType PluginCacheKeyType `json:"cacheKeyType"`

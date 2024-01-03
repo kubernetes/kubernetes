@@ -510,7 +510,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	clearMetrics()
 	// because anything (other than allocator) depends
 	// on families assigned to service (not the value of IPFamilyPolicy)
-	// we can saftly create tests that has ipFamilyPolicy:nil
+	// we can safely create tests that has ipFamilyPolicy:nil
 	// this will work every where except alloc & validation
 
 	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")

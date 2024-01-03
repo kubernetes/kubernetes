@@ -381,7 +381,7 @@ func (vm *VirtualMachine) GetVirtualDiskPath(ctx context.Context) (string, error
 	return "", nil
 }
 
-// createAndAttachSCSIController creates and attachs the SCSI controller to the VM.
+// createAndAttachSCSIController creates and attaches the SCSI controller to the VM.
 func (vm *VirtualMachine) createAndAttachSCSIController(ctx context.Context, diskControllerType string) (types.BaseVirtualDevice, error) {
 	// Get VM device list
 	vmDevices, err := vm.Device(ctx)

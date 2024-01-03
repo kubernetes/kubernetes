@@ -109,7 +109,7 @@ func (rc *reconciler) getHandlers() map[string]cache.PluginHandler {
 }
 
 func (rc *reconciler) reconcile() {
-	// Unregisterations are triggered before registrations
+	// Unregistrations are triggered before registrations
 
 	// Ensure plugins that should be unregistered are unregistered.
 	for _, registeredPlugin := range rc.actualStateOfWorld.GetRegisteredPlugins() {

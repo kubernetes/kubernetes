@@ -79,7 +79,7 @@ type cloudCIDRAllocator struct {
 	broadcaster       record.EventBroadcaster
 	recorder          record.EventRecorder
 
-	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
+	// Keep a set of nodes that are correctly being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
 	nodesInProcessing map[string]*nodeProcessingInfo
 }
@@ -279,7 +279,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 		controllerutil.RecordNodeStatusChange(logger, ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
-	//Can have at most 2 ips (one for v4 and one for v6)
+	// Can have at most 2 ips (one for v4 and one for v6)
 	if len(cidrStrings) > 2 {
 		logger.Info("Got more than 2 ips, truncating to 2", "cidrStrings", cidrStrings)
 		cidrStrings = cidrStrings[:2]

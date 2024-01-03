@@ -231,7 +231,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			})
 
 			// Create PV and pre-bound PVC that matches the PV, verify that when PV and PVC bind
-			// the LastPhaseTransitionTime filed of the PV is updated.
+			// the LastPhaseTransitionTime field of the PV is updated.
 			f.It("create a PV and a pre-bound PVC: test phase transition timestamp is set", feature.PersistentVolumeLastPhaseTransitionTime, func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)

@@ -50,19 +50,19 @@ const (
 
 	// LoadBalancerCreateTimeoutDefault is the default time to wait for a load balancer to be created/modified.
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
-	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
+	// Hidden - use GetServiceLoadBalancerCreateTimeout function instead.
 	loadBalancerCreateTimeoutDefault = 15 * time.Minute
 	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
-	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
+	// Hidden - use GetServiceLoadBalancerCreateTimeout function instead.
 	loadBalancerCreateTimeoutLarge = 60 * time.Minute
 
 	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
 	// be targeted by load balancers.
-	// Hideen - use GetServiceLoadBalancerPropagationTimeout function instead.
+	// Hidden - use GetServiceLoadBalancerPropagationTimeout function instead.
 	loadBalancerPropagationTimeoutDefault = 10 * time.Minute
 	// LoadBalancerPropagationTimeoutLarge is the maximum time to wait for pods to
 	// be targeted by load balancers.
-	// Hideen - use GetServiceLoadBalancerPropagationTimeout function instead.
+	// Hidden - use GetServiceLoadBalancerPropagationTimeout function instead.
 	loadBalancerPropagationTimeoutLarge = time.Hour
 
 	// LoadBalancerCleanupTimeout is the time required by the loadbalancer to cleanup, proportional to numApps/Ing.

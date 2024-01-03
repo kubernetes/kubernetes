@@ -232,7 +232,7 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 	}
 	d.plugin = plugin
 	defer func() {
-		// Clean up if we didn't finish succcessfully.
+		// Clean up if we didn't finish successfully.
 		if r := recover(); r != nil {
 			plugin.stop()
 			panic(r)

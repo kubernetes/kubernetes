@@ -58,7 +58,7 @@ func TestFSGroupMount(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	//Checking if GID of tmpDir has not been changed by mounting it by second pod
+	// Checking if GID of tmpDir has not been changed by mounting it by second pod
 	s = info.Sys().(*syscall.Stat_t)
 	if s == nil {
 		t.Fatalf("Error getting stats for %s (%v)", tmpDir, err)

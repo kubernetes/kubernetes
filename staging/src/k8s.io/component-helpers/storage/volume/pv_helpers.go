@@ -74,7 +74,7 @@ const (
 	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
 	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
-	//PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
+	// PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
 	PVDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 
 	// PVDeletionInTreeProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.

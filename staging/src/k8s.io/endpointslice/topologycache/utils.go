@@ -67,7 +67,7 @@ func RemoveHintsFromSlices(si *SliceInfo) ([]*discovery.EndpointSlice, []*discov
 	return si.ToCreate, si.ToUpdate
 }
 
-// FormatWithAddressType foramts a given string by adding an addressType to the end of it.
+// FormatWithAddressType formats a given string by adding an addressType to the end of it.
 func FormatWithAddressType(s string, addressType discovery.AddressType) string {
 	return fmt.Sprintf("%s, addressType: %s", s, addressType)
 }

@@ -157,7 +157,7 @@ func TestRouting(t *testing.T) {
 
 	// note that in production we delegate to the special handler that is attached at the end of the delegation chain that checks if the server has installed all known HTTP paths before replying to the client.
 	// it returns 503 if not all registered signals have been ready (closed) otherwise it simply replies with 404.
-	// the apiextentionserver is considered to be initialized once hasCRDInformerSyncedSignal is closed.
+	// the apiextensionserver is considered to be initialized once hasCRDInformerSyncedSignal is closed.
 	//
 	// here, in this test the delegate represent the special handler and hasSync represents the signal.
 	// primarily we just want to make sure that the delegate has been called.

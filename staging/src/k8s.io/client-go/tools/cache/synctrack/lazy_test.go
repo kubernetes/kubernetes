@@ -149,7 +149,7 @@ func asyncGet[T any](t *testing.T, seq sequence, z *synctrack.Lazy[T], pre, post
 
 func TestLazySlowEval(t *testing.T) {
 	// This tests the case where the first invocation of eval finishes
-	// after a subseqent invocation. The old value should not be put into
+	// after a subsequent invocation. The old value should not be put into
 	// the cache and returned. Nor should eval be called an extra time to
 	// correct the old value having been placed into the cache.
 
@@ -194,7 +194,7 @@ func TestLazySlowEval(t *testing.T) {
 
 func TestLazySlowEval2(t *testing.T) {
 	// This tests the case where the first invocation of eval finishes
-	// before a subseqent invocation. The old value should be overwritten.
+	// before a subsequent invocation. The old value should be overwritten.
 	// Eval should not be called an extra time to correct the wrong value
 	// having been placed into the cache.
 

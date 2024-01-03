@@ -78,9 +78,9 @@ func (al *Allocators) allocateCreate(service *api.Service, dryRun bool) (transac
 	}
 
 	// Allocate ClusterIPs
-	//TODO(thockin): validation should not pass with empty clusterIP, but it
-	//does (and is tested!).  Fixing that all is a big PR and will have to
-	//happen later.
+	// TODO(thockin): validation should not pass with empty clusterIP, but it
+	// does (and is tested!).  Fixing that all is a big PR and will have to
+	// happen later.
 	if txn, err := al.txnAllocClusterIPs(service, dryRun); err != nil {
 		return nil, err
 	} else {
@@ -157,7 +157,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
 
-	//TODO(thockin): Move this logic to validation?
+	// TODO(thockin): Move this logic to validation?
 	el := make(field.ErrorList, 0)
 
 	// Update-only prep work.
@@ -602,9 +602,9 @@ func (al *Allocators) allocateUpdate(after After, before Before, dryRun bool) (t
 	}
 
 	// Allocate ClusterIPs
-	//TODO(thockin): validation should not pass with empty clusterIP, but it
-	//does (and is tested!).  Fixing that all is a big PR and will have to
-	//happen later.
+	// TODO(thockin): validation should not pass with empty clusterIP, but it
+	// does (and is tested!).  Fixing that all is a big PR and will have to
+	// happen later.
 	if txn, err := al.txnUpdateClusterIPs(after, before, dryRun); err != nil {
 		return nil, err
 	} else {

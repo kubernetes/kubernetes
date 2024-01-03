@@ -30,7 +30,7 @@ import (
 func Verify(value interface{}) []string {
 	defer func() {
 		if r := recover(); r != nil {
-			//TODO maybe export a metric
+			// TODO maybe export a metric
 			klog.Warningf("Error while inspecting arguments for sensitive data: %v", r)
 		}
 	}()

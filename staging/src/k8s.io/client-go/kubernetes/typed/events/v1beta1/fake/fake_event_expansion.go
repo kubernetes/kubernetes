@@ -22,7 +22,7 @@ import (
 	core "k8s.io/client-go/testing"
 )
 
-// CreateWithEventNamespace creats a new event. Returns the copy of the event the server returns, or an error.
+// CreateWithEventNamespace creates a new event. Returns the copy of the event the server returns, or an error.
 func (c *FakeEvents) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
 	action := core.NewRootCreateAction(eventsResource, event)
 	if c.ns != "" {

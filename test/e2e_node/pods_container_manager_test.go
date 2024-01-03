@@ -119,7 +119,7 @@ func makePodToVerifyCgroups(cgroupNames []string) *v1.Pod {
 	return pod
 }
 
-// makePodToVerifyCgroupRemoved verfies the specified cgroup does not exist.
+// makePodToVerifyCgroupRemoved verifies the specified cgroup does not exist.
 func makePodToVerifyCgroupRemoved(baseName string) *v1.Pod {
 	components := strings.Split(baseName, "/")
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, components...)

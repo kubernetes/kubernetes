@@ -802,7 +802,7 @@ func GetVMUUID() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
 	}
-	//strip leading and trailing white space and new line char
+	// strip leading and trailing white space and new line char
 	uuid := strings.TrimSpace(uuidFromFile)
 	// check the uuid starts with "VMware-"
 	if !strings.HasPrefix(uuid, UUIDPrefix) {

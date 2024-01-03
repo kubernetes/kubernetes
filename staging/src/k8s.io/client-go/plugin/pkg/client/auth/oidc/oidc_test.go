@@ -73,7 +73,7 @@ func TestExpired(t *testing.T) {
 			idToken: encodeJWT(
 				"{}",
 				fmt.Sprintf(`{"exp":%d}`, now.Add(time.Hour).Unix()),
-				"blah", // signature isn't veified.
+				"blah", // signature isn't verified.
 			),
 		},
 		{
@@ -81,7 +81,7 @@ func TestExpired(t *testing.T) {
 			idToken: encodeJWT(
 				"{}",
 				fmt.Sprintf(`{"exp":%d}`, now.Add(-time.Hour).Unix()),
-				"blah", // signature isn't veified.
+				"blah", // signature isn't verified.
 			),
 			wantExpired: true,
 		},
@@ -90,7 +90,7 @@ func TestExpired(t *testing.T) {
 			idToken: encodeJWT(
 				"{}",
 				`{"exp":"foobar"}`,
-				"blah", // signature isn't veified.
+				"blah", // signature isn't verified.
 			),
 			wantErr: true,
 		},

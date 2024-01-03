@@ -147,7 +147,7 @@ func TestGracefulShutdownForActiveHTTP2Streams(t *testing.T) {
 			t.Errorf("%v", err)
 		}
 		if resp.StatusCode != 200 {
-			t.Errorf("unexpected HTTP staus: %v, expected: 200", resp.StatusCode)
+			t.Errorf("unexpected HTTP status: %v, expected: 200", resp.StatusCode)
 		}
 		expectedProto := "HTTP/2.0"
 		if resp.Proto != expectedProto {

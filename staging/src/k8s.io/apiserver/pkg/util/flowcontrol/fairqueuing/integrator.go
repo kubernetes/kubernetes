@@ -41,9 +41,9 @@ type Integrator interface {
 
 // IntegratorResults holds statistical abstracts of the integration
 type IntegratorResults struct {
-	Duration  float64 //seconds
-	Average   float64 //time-weighted
-	Deviation float64 //standard deviation: sqrt(avg((value-avg)^2))
+	Duration  float64 // seconds
+	Average   float64 // time-weighted
+	Deviation float64 // standard deviation: sqrt(avg((value-avg)^2))
 	Min, Max  float64
 }
 
@@ -173,7 +173,7 @@ func (igr Moments) Sub(ogr Moments) Moments {
 	}
 }
 
-// AvgAndStdDev returns the average and standard devation
+// AvgAndStdDev returns the average and standard deviation
 func (igr Moments) AvgAndStdDev() (float64, float64) {
 	if igr.ElapsedSeconds <= 0 {
 		return math.NaN(), math.NaN()

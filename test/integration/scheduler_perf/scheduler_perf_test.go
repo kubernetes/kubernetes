@@ -283,7 +283,7 @@ type realOp interface {
 	patchParams(w *workload) (realOp, error)
 }
 
-// runnableOp is an interface implemented by some operations. It makes it posssible
+// runnableOp is an interface implemented by some operations. It makes it possible
 // to execute the operation without having to add separate code into runWorkload.
 type runnableOp interface {
 	realOp

@@ -82,7 +82,7 @@ type TestContainerInfo struct {
 }
 
 func isInPlaceResizeSupportedByRuntime(c clientset.Interface, nodeName string) bool {
-	//TODO(vinaykul,InPlacePodVerticalScaling): Can we optimize this?
+	// TODO(vinaykul,InPlacePodVerticalScaling): Can we optimize this?
 	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return false
@@ -325,13 +325,13 @@ func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
 		cs := csMap[ci.Name]
 		tc, _ := makeTestContainer(ci)
 		gomega.Expect(tc.Resources).To(gomega.Equal(*cs.Resources))
-		//gomega.Expect(cs.RestartCount).To(gomega.Equal(ci.RestartCount))
+		// gomega.Expect(cs.RestartCount).To(gomega.Equal(ci.RestartCount))
 	}
 }
 
 func isPodOnCgroupv2Node(pod *v1.Pod) bool {
 	// Determine if pod is running on cgroupv2 or cgroupv1 node
-	//TODO(vinaykul,InPlacePodVerticalScaling): Is there a better way to determine this?
+	// TODO(vinaykul,InPlacePodVerticalScaling): Is there a better way to determine this?
 	cgroupv2File := "/sys/fs/cgroup/cgroup.controllers"
 	_, err := e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--", "ls", cgroupv2File)
 	if err == nil {

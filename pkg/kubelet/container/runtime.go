@@ -294,7 +294,7 @@ type Container struct {
 	// Hash of the container over fields with Resources field zero'd out.
 	// NOTE: This is needed during alpha and beta so that containers using Resources are
 	// not unexpectedly restarted when InPlacePodVerticalScaling feature-gate is toggled.
-	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashWithoutResources to become Hash.
+	// TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashWithoutResources to become Hash.
 	HashWithoutResources uint64
 	// State is the state of the container.
 	State State
@@ -326,7 +326,7 @@ type ContainerResources struct {
 	CPURequest *resource.Quantity
 	// CPU limit enforced on the container
 	CPULimit *resource.Quantity
-	// Memory capaacity reserved for the container
+	// Memory capacity reserved for the container
 	MemoryRequest *resource.Quantity
 	// Memory limit enforced on the container
 	MemoryLimit *resource.Quantity

@@ -452,8 +452,8 @@ func TestMatchConditions(t *testing.T) {
 				}
 			}
 
-			//Reset and rerun against mutating webhook configuration
-			//TODO: private helper function for validation after creating vwh or mwh
+			// Reset and rerun against mutating webhook configuration
+			// TODO: private helper function for validation after creating vwh or mwh
 			upCh = recorder.Reset()
 			err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), validatingcfg.GetName(), metav1.DeleteOptions{})
 			if err != nil {

@@ -383,7 +383,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	}
 	if unmanaged {
 		if az.ipv6DualStackEnabled {
-			//TODO (khenidak) add support for unmanaged nodes when the feature reaches beta
+			// TODO (khenidak) add support for unmanaged nodes when the feature reaches beta
 			return fmt.Errorf("unmanaged nodes are not supported in dual stack mode")
 		}
 		klog.V(2).Infof("CreateRoute: omitting unmanaged node %q", kubeRoute.TargetNode)

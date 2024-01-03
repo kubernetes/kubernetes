@@ -93,7 +93,7 @@ func DefaultBehaviorOnFatal() {
 // klog.Fatal is invoked for extended information. This is intended for maintainer
 // debugging and out of a reasonable range for users.
 func fatal(msg string, code int) {
-	// nolint:logcheck // Not using the result of klog.V(99) inside the if
+	//nolint:logcheck // Not using the result of klog.V(99) inside the if
 	// branch is okay, we just use it to determine how to terminate.
 	if klog.V(99).Enabled() {
 		klog.FatalDepth(2, msg)

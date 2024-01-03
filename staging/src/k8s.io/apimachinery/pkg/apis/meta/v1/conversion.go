@@ -131,8 +131,8 @@ func Convert_bool_To_Pointer_bool(in *bool, out **bool, s conversion.Scope) erro
 // +k8s:conversion-fn=drop
 func Convert_v1_TypeMeta_To_v1_TypeMeta(in, out *TypeMeta, s conversion.Scope) error {
 	// These values are explicitly not copied
-	//out.APIVersion = in.APIVersion
-	//out.Kind = in.Kind
+	// out.APIVersion = in.APIVersion
+	// out.Kind = in.Kind
 	return nil
 }
 
@@ -193,7 +193,7 @@ func Convert_Pointer_v1_Duration_To_v1_Duration(in **Duration, out *Duration, s 
 }
 
 func Convert_v1_Duration_To_Pointer_v1_Duration(in *Duration, out **Duration, s conversion.Scope) error {
-	temp := *in //copy
+	temp := *in // copy
 	*out = &temp
 	return nil
 }

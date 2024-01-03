@@ -303,7 +303,7 @@ func TestServer(t *testing.T) {
 
 	// sync new services
 	hcs.SyncServices(map[types.NamespacedName]uint16{
-		//nsn1: 9376, // remove it
+		// nsn1: 9376, // remove it
 		nsn2: 12909, // leave it
 		nsn3: 11114, // change it
 		nsn4: 11878, // add it

@@ -436,7 +436,7 @@ func (dswp *desiredStateOfWorldPopulator) markPodProcessingFailed(
 	dswp.pods.Unlock()
 }
 
-// podHasBeenSeenOnce returns true if the pod has been seen by the popoulator
+// podHasBeenSeenOnce returns true if the pod has been seen by the populator
 // at least once.
 func (dswp *desiredStateOfWorldPopulator) podHasBeenSeenOnce(
 	podName volumetypes.UniquePodName) bool {

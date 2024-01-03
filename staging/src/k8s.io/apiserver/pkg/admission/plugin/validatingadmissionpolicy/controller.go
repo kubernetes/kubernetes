@@ -60,7 +60,7 @@ type celAdmissionController struct {
 	policyController *policyController
 
 	// atomic []policyData
-	// list of every known policy definition, and all informatoin required to
+	// list of every known policy definition, and all information required to
 	// validate its bindings against an object.
 	// A snapshot of the current policy configuration is synced with this field
 	// asynchronously

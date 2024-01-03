@@ -253,7 +253,7 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 			// when it context is actually cancelled) - we want to unblock the goroutine as
 			// soon as the request is processed from the APF point of view.
 			//
-			// Note that we explicitly do NOT call the actuall handler using that context
+			// Note that we explicitly do NOT call the actual handler using that context
 			// to avoid cancelling request too early.
 			handleCtx, handleCtxCancel := h.newReqWaitCtxFn(ctx)
 			defer handleCtxCancel()

@@ -70,7 +70,7 @@ func estimateMaximumPods(ctx context.Context, c clientset.Interface, min, max in
 		// one core.
 		availablePods += 10
 	}
-	//avoid creating exactly max pods
+	// avoid creating exactly max pods
 	availablePods = int32(float32(availablePods) * 0.5)
 	// bound the top and bottom
 	if availablePods > max {

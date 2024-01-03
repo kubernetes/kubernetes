@@ -91,8 +91,8 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 		Release: v1.28
 		Testname: Ephemeral Container, update ephemeral containers
 		Description: Adding an ephemeral container to pod.spec MUST result in the container
-		running. There MUST now be only one ephermal container found. Updating the pod with
-		another ephemeral container MUST succeed. There MUST now be two ephermal containers
+		running. There MUST now be only one ephemeral container found. Updating the pod with
+		another ephemeral container MUST succeed. There MUST now be two ephemeral containers
 		found.
 	*/
 	framework.ConformanceIt("should update the ephemeral containers in an existing pod", func(ctx context.Context) {

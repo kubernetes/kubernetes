@@ -67,41 +67,41 @@ func TestNewFeatureGate(t *testing.T) {
 		expectedError        bool
 		expectedFeaturesGate map[string]bool
 	}{
-		{ //invalid value (missing =)
+		{ // invalid value (missing =)
 			value:         "invalidValue",
 			expectedError: true,
 		},
-		{ //invalid value (missing =)
+		{ // invalid value (missing =)
 			value:         "feature1=true,invalidValue",
 			expectedError: true,
 		},
-		{ //invalid value (not a boolean)
+		{ // invalid value (not a boolean)
 			value:         "feature1=notABoolean",
 			expectedError: true,
 		},
-		{ //invalid value (not a boolean)
+		{ // invalid value (not a boolean)
 			value:         "feature1=true,feature2=notABoolean",
 			expectedError: true,
 		},
-		{ //unrecognized feature-gate key
+		{ // unrecognized feature-gate key
 			value:         "unknownFeature=false",
 			expectedError: true,
 		},
-		{ //unrecognized feature-gate key
+		{ // unrecognized feature-gate key
 			value:         "feature1=true,unknownFeature=false",
 			expectedError: true,
 		},
-		{ //deprecated feature-gate key
+		{ // deprecated feature-gate key
 			value:                "deprecated=true",
 			expectedError:        false,
 			expectedFeaturesGate: map[string]bool{"deprecated": true},
 		},
-		{ //one feature
+		{ // one feature
 			value:                "feature1=true",
 			expectedError:        false,
 			expectedFeaturesGate: map[string]bool{"feature1": true},
 		},
-		{ //two features
+		{ // two features
 			value:                "feature1=true,feature2=false",
 			expectedError:        false,
 			expectedFeaturesGate: map[string]bool{"feature1": true, "feature2": false},

@@ -134,9 +134,9 @@ func TestAllocateIPAllocator(t *testing.T) {
 					t.Fatalf("[%s] error @ free: %d used: %d count: %d: %v", tc.name, r.Free(), r.Used(), count, err)
 				}
 				count++
-				//if !cidr.Contains(ip) {
+				// if !cidr.Contains(ip) {
 				//	t.Fatalf("[%s] allocated %s which is outside of %s", tc.name, ip, cidr)
-				//}
+				// }
 				if found.Has(ip.String()) {
 					t.Fatalf("[%s] allocated %s twice @ %d", tc.name, ip, count)
 				}

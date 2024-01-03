@@ -78,8 +78,8 @@ func TestDynamicClientBuilder(t *testing.T) {
 	defer tearDownFn()
 
 	// We want to test if the token rotation works fine here.
-	// To minimize the time this test would consume, we use the minimial token expiration.
-	// The minimial token expiration is defined in:
+	// To minimize the time this test would consume, we use the minimal token expiration.
+	// The minimal token expiration is defined in:
 	// pkg/apis/authentication/validation/validation.go
 	exp := int64(600)
 	leeway := 99

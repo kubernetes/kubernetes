@@ -574,7 +574,7 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, 
 	}
 
 	// if apiserver, renew apiserver serving certificate, kubelet and front-proxy client certificate.
-	//if local etcd, renew also the etcd client certificate
+	// if local etcd, renew also the etcd client certificate
 	if component == constants.KubeAPIServer {
 		certificates = []string{
 			certsphase.KubeadmCertAPIServer().Name,

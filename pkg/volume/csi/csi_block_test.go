@@ -537,7 +537,7 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// ensure csi client call and node unpblished
+	// ensure csi client call and node unpublished
 	pubs := csiUnmapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
 	if _, ok := pubs[csiUnmapper.volumeID]; ok {
 		t.Error("csi server may not have received NodeUnpublishVolume call")

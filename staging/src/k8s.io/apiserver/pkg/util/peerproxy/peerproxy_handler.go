@@ -302,7 +302,7 @@ func (h *peerProxyHandler) deleteSV(obj interface{}) {
 	h.updateSVMap(sv, nil)
 }
 
-// Delete old storageversion, add new storagversion
+// Delete old storageversion, add new StorageVersion
 func (h *peerProxyHandler) updateSVMap(oldSV *v1alpha1.StorageVersion, newSV *v1alpha1.StorageVersion) {
 	if oldSV != nil {
 		// delete old SV entries

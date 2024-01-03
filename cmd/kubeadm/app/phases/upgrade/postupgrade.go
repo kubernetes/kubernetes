@@ -107,7 +107,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// Create the cluster-info ConfigMap with the associated RBAC rules
 	// if err := clusterinfo.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
 	// 	return err
-	//}
+	// }
 	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
 	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
 		errs = append(errs, err)

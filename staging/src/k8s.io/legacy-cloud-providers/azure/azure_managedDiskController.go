@@ -193,7 +193,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		diskID = id
 		// We are waiting for provisioningState==Succeeded
 		// We don't want to hand-off managed disks to k8s while they are
-		//still being provisioned, this is to avoid some race conditions
+		// still being provisioned, this is to avoid some race conditions
 		if err != nil {
 			return false, err
 		}

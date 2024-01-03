@@ -938,7 +938,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 
 		migrated := getMigratedStatusBySpec(deviceToDetach.VolumeSpec)
 
-		//deviceMountPath := deviceToDetach.DeviceMountPath
+		// deviceMountPath := deviceToDetach.DeviceMountPath
 		deviceMountPath, err :=
 			volumeDeviceMounter.GetDeviceMountPath(deviceToDetach.VolumeSpec)
 		if err != nil {
@@ -1265,7 +1265,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	}, nil
 }
 
-// GenerateUnmapVolumeFunc marks volume as unmonuted based on following steps.
+// GenerateUnmapVolumeFunc marks volume as unmounted based on following steps.
 // Remove symbolic links from pod device map path dir and  global map path dir.
 // Once those cleanups are done, remove pod device map path dir.
 // If all steps are completed, the volume is marked as unmounted.
@@ -2283,7 +2283,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) 
 	if !isDevicePath && devicePathErr == nil ||
 		(devicePathErr != nil && strings.Contains(devicePathErr.Error(), "does not exist")) {
 		// not a device path or path doesn't exist
-		//TODO: refer to #36092
+		// TODO: refer to #36092
 		klog.V(3).Infof("The path isn't device path or doesn't exist. Skip checking device path: %s", deviceToDetach.DevicePath)
 		deviceOpened = false
 	} else if devicePathErr != nil {

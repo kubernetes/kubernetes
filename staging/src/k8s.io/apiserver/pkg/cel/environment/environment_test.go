@@ -59,7 +59,7 @@ func TestBaseEnvironment(t *testing.T) {
 			},
 			validExpressions: []string{
 				"[1, 2, 3].indexOf(2) == 1",      // lists
-				"'abc'.contains('bc')",           //strings
+				"'abc'.contains('bc')",           // strings
 				"isURL('http://example.com')",    // urls
 				"'a 1 b 2'.find('[0-9]') == '1'", // regex
 			},

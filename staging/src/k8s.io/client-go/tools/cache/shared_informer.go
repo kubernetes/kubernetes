@@ -984,7 +984,7 @@ func (p *processorListener) run() {
 	}, 1*time.Second, stopCh)
 }
 
-// shouldResync deterimines if the listener needs a resync. If the listener's resyncPeriod is 0,
+// shouldResync determines if the listener needs a resync. If the listener's resyncPeriod is 0,
 // this always returns false.
 func (p *processorListener) shouldResync(now time.Time) bool {
 	p.resyncLock.Lock()

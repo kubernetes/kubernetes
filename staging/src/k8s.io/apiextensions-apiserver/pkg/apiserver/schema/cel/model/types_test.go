@@ -78,17 +78,17 @@ func TestTypes_RuleTypesFieldMapping(t *testing.T) {
 	mapVal := apiservercel.NewMapValue()
 	mapVal.AddField(name)
 	mapVal.AddField(nested)
-	//rule := rt.ConvertToRule(testValue(t, 11, mapVal))
-	//if rule == nil {
+	// rule := rt.ConvertToRule(testValue(t, 11, mapVal))
+	// if rule == nil {
 	//	t.Error("map could not be converted to rule")
-	//}
-	//if rule.GetID() != 11 {
+	// }
+	// if rule.GetID() != 11 {
 	//	t.Errorf("got %d as the rule id, wanted 11", rule.GetID())
-	//}
-	//ruleVal := rt.NativeToValue(rule)
-	//if ruleVal == nil {
+	// }
+	// ruleVal := rt.NativeToValue(rule)
+	// if ruleVal == nil {
 	//	t.Error("got CEL rule value of nil, wanted non-nil")
-	//}
+	// }
 
 	opts, err := rt.EnvOptions(stdEnv.TypeProvider())
 	if err != nil {

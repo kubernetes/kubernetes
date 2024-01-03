@@ -3389,7 +3389,7 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 		},
 		reportedLevels:      []uint64{20000, 10000, 30000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		//useMetricsAPI:       true,
+		// useMetricsAPI:       true,
 		lastScaleTime: &time,
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
@@ -3741,7 +3741,7 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 									Type: autoscalingv2.UtilizationMetricType,
 									// TODO: Change this to &tc.CPUTarget and the expected ScaleLimited
 									//       condition to False. This test incorrectly leaves the v1
-									//       HPA field TargetCPUUtilizization field blank and the
+									//       HPA field TargetCPUUtilization field blank and the
 									//       controller defaults to a target of 80. So the test relies
 									//       on downscale stabilization to prevent a scale change.
 									AverageUtilization: &eighty,

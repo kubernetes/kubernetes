@@ -736,7 +736,7 @@ func NewProxier(
 			}
 		}
 
-		interfaces, _ := net.Interfaces() //TODO create interfaces
+		interfaces, _ := net.Interfaces() // TODO create interfaces
 		for _, inter := range interfaces {
 			addresses, _ := inter.Addrs()
 			for _, addr := range addresses {

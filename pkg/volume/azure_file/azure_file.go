@@ -83,7 +83,7 @@ func (plugin *azureFilePlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 }
 
 func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
-	//TODO: check if mount.cifs is there
+	// TODO: check if mount.cifs is there
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureFile != nil) ||
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
 }

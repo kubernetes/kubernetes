@@ -642,7 +642,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 				// If the class cannot be retrieved, allocation cannot proceed.
 				if apierrors.IsNotFound(err) {
 					// Here we mark the pod as "unschedulable", so it'll sleep in
-					// the unscheduleable queue until a ResourceClass event occurs.
+					// the unschedulable queue until a ResourceClass event occurs.
 					return nil, statusUnschedulable(logger, fmt.Sprintf("resource class %s does not exist", claim.Spec.ResourceClassName))
 				}
 				// Other error, retry with backoff.
@@ -1099,7 +1099,7 @@ func statusUnschedulable(logger klog.Logger, reason string, kv ...interface{}) *
 		helper, loggerV := loggerV.WithCallStackHelper()
 		helper()
 		kv = append(kv, "reason", reason)
-		// nolint: logcheck // warns because it cannot check key/values
+		//nolint: logcheck // warns because it cannot check key/values
 		loggerV.Info("pod unschedulable", kv...)
 	}
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, reason)
@@ -1126,7 +1126,7 @@ func statusError(logger klog.Logger, err error, kv ...interface{}) *framework.St
 	if loggerV := logger.V(5); loggerV.Enabled() {
 		helper, loggerV := loggerV.WithCallStackHelper()
 		helper()
-		// nolint: logcheck // warns because it cannot check key/values
+		//nolint: logcheck // warns because it cannot check key/values
 		loggerV.Error(err, "dynamic resource plugin failed", kv...)
 	}
 	return framework.AsStatus(err)

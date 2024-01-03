@@ -64,7 +64,7 @@ var _ = Describe("cluster-info ConfigMap", func() {
 		gomega.Expect(cm.Data).To(gomega.HaveKey(gomega.HavePrefix(bootstrapapi.JWSSignatureKeyPrefix)))
 		gomega.Expect(cm.Data).To(gomega.HaveKey(bootstrapapi.KubeConfigKey))
 
-		//TODO: What else? server?
+		// TODO: What else? server?
 	})
 
 	ginkgo.It("should have related Role and RoleBinding", func(ctx context.Context) {

@@ -60,8 +60,8 @@ func TestConformance(t *testing.T) {
 	var _ = SIGDescribe("Feature", func() {
 		   Context("with context and extra spaces before It block should still pick up Testname", func() {
 				   //                                      Testname: Test with spaces
-				   //Description: Should pick up testname even if it is not within 3 spaces
-				   //even when executed from memory.
+				   // Description: Should pick up testname even if it is not within 3 spaces
+				   // even when executed from memory.
 				   framework.ConformanceIt("should work", func() {})
 		   })
 	})`,

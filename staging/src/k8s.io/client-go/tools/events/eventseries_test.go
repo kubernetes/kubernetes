@@ -358,7 +358,7 @@ func TestRefreshExistingEventSeries(t *testing.T) {
 		{
 			patchFunc: func(event *eventsv1.Event, patch []byte) (*eventsv1.Event, error) {
 				// event we receive is already patched, usually the sink uses it
-				//only to retrieve the name and namespace, here we'll use it directly.
+				// only to retrieve the name and namespace, here we'll use it directly.
 				patchEvent <- event
 				return event, nil
 			},

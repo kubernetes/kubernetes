@@ -1011,16 +1011,16 @@ func TestNodesNotEqual(t *testing.T) {
 func TestProcessServiceCreateOrUpdate(t *testing.T) {
 	controller, _, client := newController(nil)
 
-	//A pair of old and new loadbalancer IP address
+	// A pair of old and new loadbalancer IP address
 	oldLBIP := "192.168.1.1"
 	newLBIP := "192.168.1.11"
 
 	testCases := []struct {
 		testName   string
 		key        string
-		updateFn   func(*v1.Service) *v1.Service //Manipulate the structure
+		updateFn   func(*v1.Service) *v1.Service // Manipulate the structure
 		svc        *v1.Service
-		expectedFn func(*v1.Service, error) error //Error comparison function
+		expectedFn func(*v1.Service, error) error // Error comparison function
 	}{{
 		testName: "If updating a valid service",
 		key:      "validKey",
@@ -1161,8 +1161,8 @@ func TestSyncService(t *testing.T) {
 	testCases := []struct {
 		testName   string
 		key        string
-		updateFn   func()            //Function to manipulate the controller element to simulate error
-		expectedFn func(error) error //Expected function if returns nil then test passed, failed otherwise
+		updateFn   func()            // Function to manipulate the controller element to simulate error
+		expectedFn func(error) error // Expected function if returns nil then test passed, failed otherwise
 	}{
 		{
 			testName: "if an invalid service name is synced",
@@ -1171,9 +1171,9 @@ func TestSyncService(t *testing.T) {
 				controller, _, _ = newController(nil)
 			},
 			expectedFn: func(e error) error {
-				//TODO: should find a way to test for dependent package errors in such a way that it won't break
-				//TODO:	our tests, currently we only test if there is an error.
-				//Error should be unexpected key format: "invalid/key/string"
+				// TODO: should find a way to test for dependent package errors in such a way that it won't break
+				// TODO:	our tests, currently we only test if there is an error.
+				// Error should be unexpected key format: "invalid/key/string"
 				expectedError := fmt.Sprintf("unexpected key format: %q", "invalid/key/string")
 				if e == nil || e.Error() != expectedError {
 					return fmt.Errorf("Expected=unexpected key format: %q, Obtained=%v", "invalid/key/string", e)
@@ -1194,7 +1194,7 @@ func TestSyncService(t *testing.T) {
 		},
 		*/
 
-		//TODO: see if we can add a test for valid but error throwing service, its difficult right now because synCService() currently runtime.HandleError
+		// TODO: see if we can add a test for valid but error throwing service, its difficult right now because synCService() currently runtime.HandleError
 		{
 			testName: "if valid service",
 			key:      "external-balancer",
@@ -1206,7 +1206,7 @@ func TestSyncService(t *testing.T) {
 				svc.state = testSvc
 			},
 			expectedFn: func(e error) error {
-				//error should be nil
+				// error should be nil
 				if e != nil {
 					return fmt.Errorf("Expected=nil, Obtained=%v", e)
 				}
@@ -1223,12 +1223,12 @@ func TestSyncService(t *testing.T) {
 			tc.updateFn()
 			obtainedErr := controller.syncService(ctx, tc.key)
 
-			//expected matches obtained ??.
+			// expected matches obtained ??.
 			if exp := tc.expectedFn(obtainedErr); exp != nil {
 				t.Errorf("%v Error:%v", tc.testName, exp)
 			}
 
-			//Post processing, the element should not be in the sync queue.
+			// Post processing, the element should not be in the sync queue.
 			_, exist := controller.cache.get(tc.key)
 			if exist {
 				t.Fatalf("%v working Queue should be empty, but contains %s", tc.testName, tc.key)
@@ -1305,7 +1305,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		//Create a new controller.
+		// Create a new controller.
 		controller, cloud, _ = newController(nil)
 		tc.updateFn(controller)
 		obtainedErr := controller.processServiceDeletion(ctx, svcKey)
@@ -1481,9 +1481,9 @@ func TestSlowNodeSync(t *testing.T) {
 
 func TestNeedsUpdate(t *testing.T) {
 	testCases := []struct {
-		testName            string                            //Name of the test case
-		updateFn            func() (*v1.Service, *v1.Service) //Function to update the service object
-		expectedNeedsUpdate bool                              //needsupdate always returns bool
+		testName            string                            // Name of the test case
+		updateFn            func() (*v1.Service, *v1.Service) // Function to update the service object
+		expectedNeedsUpdate bool                              // needsupdate always returns bool
 
 	}{{
 		testName: "If the service type is changed from LoadBalancer to ClusterIP",
@@ -1655,7 +1655,7 @@ func TestNeedsUpdate(t *testing.T) {
 // Please keep this in mind while adding new test cases.
 func TestServiceCache(t *testing.T) {
 
-	//ServiceCache a common service cache for all the test cases
+	// ServiceCache a common service cache for all the test cases
 	sc := &serviceCache{serviceMap: make(map[string]*cachedService)}
 
 	testCases := []struct {
@@ -1669,7 +1669,7 @@ func TestServiceCache(t *testing.T) {
 			cS.state = defaultExternalService()
 		},
 		checkCacheFn: func() error {
-			//There must be exactly one element
+			// There must be exactly one element
 			if len(sc.serviceMap) != 1 {
 				return fmt.Errorf("Expected=1 Obtained=%d", len(sc.serviceMap))
 			}
@@ -1682,7 +1682,7 @@ func TestServiceCache(t *testing.T) {
 
 		},
 		checkCacheFn: func() error {
-			//Now it should have no element
+			// Now it should have no element
 			if len(sc.serviceMap) != 0 {
 				return fmt.Errorf("Expected=0 Obtained=%d", len(sc.serviceMap))
 			}
@@ -1694,7 +1694,7 @@ func TestServiceCache(t *testing.T) {
 			sc.set("addTest", &cachedService{state: defaultExternalService()})
 		},
 		checkCacheFn: func() error {
-			//Now it should have one element
+			// Now it should have one element
 			Cs, bool := sc.get("addTest")
 			if !bool {
 				return fmt.Errorf("is Available Expected=true Obtained=%v", bool)
@@ -1707,11 +1707,11 @@ func TestServiceCache(t *testing.T) {
 	}, {
 		testName: "ListKeys",
 		setCacheFn: func() {
-			//Add one more entry here
+			// Add one more entry here
 			sc.set("addTest1", &cachedService{state: defaultExternalService()})
 		},
 		checkCacheFn: func() error {
-			//It should have two elements
+			// It should have two elements
 			keys := sc.ListKeys()
 			if len(keys) != 2 {
 				return fmt.Errorf("elements Expected=2 Obtained=%v", len(keys))
@@ -1720,9 +1720,9 @@ func TestServiceCache(t *testing.T) {
 		},
 	}, {
 		testName:   "GetbyKeys",
-		setCacheFn: nil, //Nothing to set
+		setCacheFn: nil, // Nothing to set
 		checkCacheFn: func() error {
-			//It should have two elements
+			// It should have two elements
 			svc, isKey, err := sc.GetByKey("addTest")
 			if svc == nil || isKey == false || err != nil {
 				return fmt.Errorf("Expected(non-nil, true, nil) Obtained(%v,%v,%v)", svc, isKey, err)
@@ -1731,9 +1731,9 @@ func TestServiceCache(t *testing.T) {
 		},
 	}, {
 		testName:   "allServices",
-		setCacheFn: nil, //Nothing to set
+		setCacheFn: nil, // Nothing to set
 		checkCacheFn: func() error {
-			//It should return two elements
+			// It should return two elements
 			svcArray := sc.allServices()
 			if len(svcArray) != 2 {
 				return fmt.Errorf("Expected(2) Obtained(%v)", len(svcArray))

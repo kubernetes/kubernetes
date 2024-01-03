@@ -113,7 +113,7 @@ func NewTestUnstructuredConverter(comparison conversion.Equalities) Unstructured
 	return NewTestUnstructuredConverterWithValidation(comparison)
 }
 
-// NewTestUnstrucutredConverterWithValidation allows for access to
+// NewTestUnstructuredConverterWithValidation allows for access to
 // FromUnstructuredWithValidation from within tests.
 func NewTestUnstructuredConverterWithValidation(comparison conversion.Equalities) *unstructuredConverter {
 	return &unstructuredConverter{

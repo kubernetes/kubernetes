@@ -240,7 +240,7 @@ func unionManagerIntoIndex(
 		func(entry metav1.ManagedFieldsEntry) bool {
 			return entry.Manager == csaManagerName &&
 				entry.Operation == metav1.ManagedFieldsOperationUpdate &&
-				//!TODO: some users may want to migrate subresources.
+				// !TODO: some users may want to migrate subresources.
 				// should thread through the args at some point.
 				entry.Subresource == "" &&
 				entry.APIVersion == ssaManager.APIVersion

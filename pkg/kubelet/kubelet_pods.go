@@ -1743,7 +1743,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 		// copy over the pod disruption conditions from state which is already
-		// updated during the eviciton (due to either node resource pressure or
+		// updated during the eviction (due to either node resource pressure or
 		// node graceful shutdown). We do not re-generate the conditions based
 		// on the container statuses as they are added based on one-time events.
 		cType := v1.DisruptionTarget
@@ -2016,7 +2016,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
 		}
-		//TODO(vinaykul,derekwaynecarr,InPlacePodVerticalScaling): Update this to include extended resources in
+		// TODO(vinaykul,derekwaynecarr,InPlacePodVerticalScaling): Update this to include extended resources in
 		// addition to CPU, memory, ephemeral storage. Add test case for extended resources.
 		resources := &v1.ResourceRequirements{
 			Limits:   limits,

@@ -199,7 +199,7 @@ func (m *manager) Start() {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
 		if err != nil {
-			// This is a crictical, non-recoverable failure.
+			// This is a critical, non-recoverable failure.
 			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
 			panic(err)
 		}
@@ -242,7 +242,7 @@ func (m *manager) GetContainerResourceAllocation(podUID string, containerName st
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
 }
 
-// GetPodResizeStatus returns the last checkpointed ResizeStaus value
+// GetPodResizeStatus returns the last checkpointed Resizestatus value
 // If checkpoint manager has not been initialized, it returns nil, false
 func (m *manager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
 	m.podStatusesLock.RLock()
@@ -950,7 +950,7 @@ func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus, podIsFinished b
 // needsReconcile compares the given status with the status in the pod manager (which
 // in fact comes from apiserver), returns whether the status needs to be reconciled with
 // the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
-// kubelet should forcibly send an update to reconcile the inconsistence, because kubelet
+// kubelet should forcibly send an update to reconcile the inconsistency, because kubelet
 // should be the source of truth of pod status.
 // NOTE(random-liu): It's simpler to pass in mirror pod uid and get mirror pod by uid, but
 // now the pod manager only supports getting mirror pod by static pod, so we have to pass

@@ -64,7 +64,7 @@ const (
 	TimeoutOnSetupVolumeName = "timeout-setup-volume"
 	// FailOnSetupVolumeName will cause setup call to fail
 	FailOnSetupVolumeName = "fail-setup-volume"
-	//TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
+	// TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
 	TimeoutAndFailOnSetupVolumeName = "timeout-and-fail-setup-volume"
 	// SuccessAndTimeoutSetupVolumeName will cause first mount operation to succeed but subsequent attempts to timeout
 	SuccessAndTimeoutSetupVolumeName = "success-and-timeout-setup-volume-name"
@@ -1453,7 +1453,7 @@ func VerifyZeroSetUpCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 	return nil
 }
 
-// VerifyTearDownCallCount ensures that at least one of the Unounters for this
+// VerifyTearDownCallCount ensures that at least one of the Unmounters for this
 // plugin has the expectedTearDownCallCount number of calls. Otherwise it
 // returns an error.
 func VerifyTearDownCallCount(

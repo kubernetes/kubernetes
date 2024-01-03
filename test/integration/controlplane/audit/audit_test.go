@@ -485,7 +485,7 @@ func getExpectedEvents(level auditinternal.Level, enableMutatingWebhook bool, na
 		requestObject = true
 	}
 	if level.GreaterOrEqual(auditinternal.LevelRequestResponse) {
-		// expect response obect in audit log
+		// expect response object in audit log
 		responseObject = true
 	}
 	return []utils.AuditEvent{

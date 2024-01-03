@@ -42,7 +42,7 @@ import (
 //
 // Note that GenericPLEG assumes that a container would not be created,
 // terminated, and garbage collected within one relist period. If such an
-// incident happens, GenenricPLEG would miss all events regarding this
+// incident happens, GenericPLEG would miss all events regarding this
 // container. In the case of relisting failure, the window may become longer.
 // Note that this assumption is not unique -- many kubelet internal components
 // rely on terminated containers as tombstones for bookkeeping purposes. The
@@ -444,7 +444,7 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 
 	status, err := g.runtime.GetPodStatus(ctx, pod.ID, pod.Name, pod.Namespace)
 	if err != nil {
-		// nolint:logcheck // Not using the result of klog.V inside the
+		//nolint:logcheck // Not using the result of klog.V inside the
 		// if branch is okay, we just use it to determine whether the
 		// additional "podStatus" key and its value should be added.
 		if klog.V(6).Enabled() {

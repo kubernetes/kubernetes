@@ -192,7 +192,7 @@ type DeploymentStrategy struct {
 
 	// Rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
-	//---
+	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be.
 	// +optional
@@ -341,7 +341,7 @@ type DaemonSetUpdateStrategy struct {
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 
 	// Rolling update config params. Present only if type = "RollingUpdate".
-	//---
+	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as Deployment `strategy.rollingUpdate`.
 	// See https://github.com/kubernetes/kubernetes/issues/35345
@@ -391,7 +391,7 @@ type RollingUpdateDaemonSet struct {
 	// pod is available (Ready for at least minReadySeconds) the old DaemonSet pod
 	// on that node is marked deleted. If the old pod becomes unavailable for any
 	// reason (Ready transitions to false, is evicted, or is drained) an updated
-	// pod is immediatedly created on that node without considering surge limits.
+	// pod is immediately created on that node without considering surge limits.
 	// Allowing surge implies the possibility that the resources consumed by the
 	// daemonset on any given node can double if the readiness check fails, and
 	// so resource intensive daemonsets should take into account that they may
@@ -783,7 +783,7 @@ type IngressRule struct {
 // mixing different types of rules in a single Ingress is disallowed, so exactly
 // one of the following must be set.
 type IngressRuleValue struct {
-	//TODO:
+	// TODO:
 	// 1. Consider renaming this resource and the associated rules so they
 	// aren't tied to Ingress. They can be used to route intra-cluster traffic.
 	// 2. Consider adding fields for ingress-type specific global options

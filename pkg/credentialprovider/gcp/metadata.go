@@ -192,7 +192,7 @@ func runWithBackoff(f func() ([]byte, error)) []byte {
 // If running on a GCE VM, check if 'default' service account exists.
 // If it does not exist, assume that registry is not enabled.
 // If default service account exists, check if relevant scopes exist in the default service account.
-// The metadata service can become temporarily inaccesible. Hence all requests to the metadata
+// The metadata service can become temporarily inaccessible. Hence all requests to the metadata
 // service will be retried until the metadata server returns a `200`.
 // It is expected that "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/" will return a `200`
 // and "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/default/scopes" will also return `200`.

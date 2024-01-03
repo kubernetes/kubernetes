@@ -502,7 +502,7 @@ type DeploymentStrategy struct {
 
 	// Rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
-	//---
+	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be.
 	// +optional
