@@ -73,28 +73,32 @@ func TestEventCompatibility(t *testing.T) {
 	newRecorder := newBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-scheduler")
 	newBroadcaster.StartRecordingToSink(stopCh)
 	newRecorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
-	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
-		v1Events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for events")
+		default:
+			v1Events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			if len(v1Events.Items) == 2 {
+				events, err := client.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+
+				if len(events.Items) == 2 {
+					return
+				}
+			}
 		}
 
-		if len(v1Events.Items) != 2 {
-			return false, nil
-		}
-
-		events, err := client.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if len(events.Items) != 2 {
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
+		time.Sleep(100 * time.Millisecond) // Adjust the sleep duration as needed
 	}
 }
 
