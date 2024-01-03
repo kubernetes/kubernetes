@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,7 +102,7 @@ func (ft DefaultFileType) VerifyFile(f *File, pathname string) error {
 	if err != nil {
 		return fmt.Errorf("unable to format the output for %q: %v", friendlyName, err)
 	}
-	existing, err := ioutil.ReadFile(pathname)
+	existing, err := os.ReadFile(pathname)
 	if err != nil {
 		return fmt.Errorf("unable to read file %q for comparison: %v", friendlyName, err)
 	}

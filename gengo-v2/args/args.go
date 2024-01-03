@@ -21,7 +21,6 @@ import (
 	"bytes"
 	goflag "flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -114,7 +113,7 @@ func (g *GeneratorArgs) LoadGoBoilerplate() ([]byte, error) {
 
 	if g.GoHeaderFilePath != "" {
 		var err error
-		b, err = ioutil.ReadFile(g.GoHeaderFilePath)
+		b, err = os.ReadFile(g.GoHeaderFilePath)
 		if err != nil {
 			return nil, err
 		}
