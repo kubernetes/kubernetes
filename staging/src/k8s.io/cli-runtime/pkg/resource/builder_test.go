@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
+
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -1050,7 +1051,7 @@ func TestRestMappingErrors(t *testing.T) {
 	// ensure that requesting a resource we _know_ not to exist results in an expected *meta.NoKindMatchError
 	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
 	if err != nil {
-		if !strings.Contains(err.Error(), "server doesn't have a resource type \"foo\"") {
+		if !errors.Is(err, &meta.NoKindMatchError{}) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	}

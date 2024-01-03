@@ -803,7 +803,7 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		// if the error is _not_ a *meta.NoKindMatchError, then we had trouble doing discovery,
 		// so we should return the original error since it may help a user diagnose what is actually wrong
 		if meta.IsNoMatchError(err) {
-			return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+			return nil, fmt.Errorf("the server doesn't have a resource type %q: %w", groupResource.Resource, err)
 		}
 		return nil, err
 	}
