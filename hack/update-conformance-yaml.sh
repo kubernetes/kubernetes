@@ -25,3 +25,8 @@ cd "${KUBE_ROOT}"
 test/conformance/gen-conformance-yaml.sh
 # replace checked-in yaml
 cp _output/conformance.yaml test/conformance/testdata/conformance.yaml
+
+# generate list of images
+test/conformance/gen-test-image-list.sh
+# replace checked-in list of images
+cp _output/repo_list_images.txt test/conformance/testdata/repo_list_images.txt
