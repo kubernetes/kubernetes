@@ -155,14 +155,6 @@ const (
 	// to a chunking list request.
 	RemainingItemCount featuregate.Feature = "RemainingItemCount"
 
-	// owner: @wojtek-t
-	// alpha: v1.16
-	// beta: v1.20
-	// GA: v1.24
-	//
-	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
-	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
-
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.14
 	// beta: v1.16
@@ -300,8 +292,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
