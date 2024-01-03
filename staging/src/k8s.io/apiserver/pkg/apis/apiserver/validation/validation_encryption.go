@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/apis/config"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 )
 
 const (
@@ -59,12 +59,11 @@ var (
 
 	// See https://godoc.org/golang.org/x/crypto/nacl/secretbox#Open for details on the supported key sizes for Secretbox.
 	secretBoxKeySizes = []int{32}
-
-	root = field.NewPath("resources")
 )
 
 // ValidateEncryptionConfiguration validates a v1.EncryptionConfiguration.
-func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration, reload bool) field.ErrorList {
+func ValidateEncryptionConfiguration(c *apiserver.EncryptionConfiguration, reload bool) field.ErrorList {
+	root := field.NewPath("resources")
 	allErrs := field.ErrorList{}
 
 	if c == nil {
@@ -78,7 +77,7 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration, reload b
 	}
 
 	// kmsProviderNames is used to track config names to ensure they are unique.
-	kmsProviderNames := sets.NewString()
+	kmsProviderNames := sets.New[string]()
 	for i, conf := range c.Resources {
 		r := root.Index(i).Child("resources")
 		p := root.Index(i).Child("providers")
@@ -284,7 +283,7 @@ func validateResourceNames(resources []string, fieldPath *field.Path) field.Erro
 	return allErrs
 }
 
-func validateSingleProvider(provider config.ProviderConfiguration, fieldPath *field.Path) field.ErrorList {
+func validateSingleProvider(provider apiserver.ProviderConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	found := 0
 
@@ -315,7 +314,7 @@ func validateSingleProvider(provider config.ProviderConfiguration, fieldPath *fi
 	return allErrs
 }
 
-func validateKeys(keys []config.Key, fieldPath *field.Path, expectedLen []int) field.ErrorList {
+func validateKeys(keys []apiserver.Key, fieldPath *field.Path, expectedLen []int) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(keys) == 0 {
@@ -330,7 +329,7 @@ func validateKeys(keys []config.Key, fieldPath *field.Path, expectedLen []int) f
 	return allErrs
 }
 
-func validateKey(key config.Key, fieldPath *field.Path, expectedLen []int) field.ErrorList {
+func validateKey(key apiserver.Key, fieldPath *field.Path, expectedLen []int) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if key.Name == "" {
@@ -363,7 +362,7 @@ func validateKey(key config.Key, fieldPath *field.Path, expectedLen []int) field
 	return allErrs
 }
 
-func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
+func validateKMSConfiguration(c *apiserver.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.Set[string], reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateKMSConfigName(c, fieldPath.Child("name"), kmsProviderNames, reload)...)
@@ -374,7 +373,7 @@ func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path,
 	return allErrs
 }
 
-func validateKMSCacheSize(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+func validateKMSCacheSize(c *apiserver.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// In defaulting, we set the cache size to the default value only when API version is v1.
@@ -389,7 +388,7 @@ func validateKMSCacheSize(c *config.KMSConfiguration, fieldPath *field.Path) fie
 	return allErrs
 }
 
-func validateKMSTimeout(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+func validateKMSTimeout(c *apiserver.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.Timeout.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(fieldPath, c.Timeout, fmt.Sprintf(zeroOrNegativeErrFmt, "timeout")))
@@ -398,7 +397,7 @@ func validateKMSTimeout(c *config.KMSConfiguration, fieldPath *field.Path) field
 	return allErrs
 }
 
-func validateKMSEndpoint(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+func validateKMSEndpoint(c *apiserver.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(c.Endpoint) == 0 {
 		return append(allErrs, field.Invalid(fieldPath, "", fmt.Sprintf(mandatoryFieldErrFmt, "endpoint", "kms")))
@@ -416,7 +415,7 @@ func validateKMSEndpoint(c *config.KMSConfiguration, fieldPath *field.Path) fiel
 	return allErrs
 }
 
-func validateKMSAPIVersion(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+func validateKMSAPIVersion(c *apiserver.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.APIVersion != "v1" && c.APIVersion != "v2" {
 		allErrs = append(allErrs, field.Invalid(fieldPath, c.APIVersion, fmt.Sprintf(unsupportedKMSAPIVersionErrFmt, "apiVersion")))
@@ -425,7 +424,7 @@ func validateKMSAPIVersion(c *config.KMSConfiguration, fieldPath *field.Path) fi
 	return allErrs
 }
 
-func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
+func validateKMSConfigName(c *apiserver.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.Set[string], reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.Name == "" {
 		allErrs = append(allErrs, field.Required(fieldPath, fmt.Sprintf(mandatoryFieldErrFmt, "name", "provider")))
