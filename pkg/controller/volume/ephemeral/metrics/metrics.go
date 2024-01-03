@@ -33,7 +33,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      EphemeralVolumeSubsystem,
 			Name:           "create_total",
-			Help:           "Number of PersistenVolumeClaims creation requests",
+			Help:           "Number of PersistentVolumeClaims creation requests",
 			StabilityLevel: metrics.ALPHA,
 		})
 	// EphemeralVolumeCreateFailures tracks the number of unsuccessful
@@ -42,7 +42,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      EphemeralVolumeSubsystem,
 			Name:           "create_failures_total",
-			Help:           "Number of PersistenVolumeClaims creation requests",
+			Help:           "Number of PersistentVolumeClaims creation requests",
 			StabilityLevel: metrics.ALPHA,
 		})
 )
