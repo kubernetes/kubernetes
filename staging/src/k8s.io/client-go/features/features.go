@@ -141,9 +141,3 @@ var (
 	// should use AddFeaturesToExistingFeatureGates followed by ReplaceFeatureGates.
 	featureGates = &atomic.Value{}
 )
-
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-//
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{}
