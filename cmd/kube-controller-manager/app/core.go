@@ -688,6 +688,8 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 	for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
+
+	attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster := controllerContext.GraphBuilder.GetGraphResources()
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
 		ctx,
 		gcClientset,
@@ -695,10 +697,14 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 		controllerContext.RESTMapper,
 		ignoredResources,
 		controllerContext.ObjectOrMetadataInformerFactory,
-		controllerContext.InformersStarted,
+		controllerContext.GraphBuilder,
+		attemptToDelete,
+		attemptToOrphan,
+		absentOwnerCache,
+		eventBroadcaster,
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %v", err)
+		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %w", err)
 	}
 
 	// Start the garbage collector.
