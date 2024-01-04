@@ -26,6 +26,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -71,6 +73,7 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 			newEtcdLocalSubphase(),
 			newUpdateStatusSubphase(),
 			newMarkControlPlaneSubphase(),
+			newWaitControlPlaneComponentsSubphase(),
 		},
 	}
 }
@@ -105,6 +108,14 @@ func newMarkControlPlaneSubphase() workflow.Phase {
 		Run:           runMarkControlPlanePhase,
 		InheritFlags:  getControlPlaneJoinPhaseFlags("mark-control-plane"),
 		ArgsValidator: cobra.NoArgs,
+	}
+}
+
+func newWaitControlPlaneComponentsSubphase() workflow.Phase {
+	return workflow.Phase{
+		Name:   "wait-control-plane-components",
+		Hidden: true,
+		Run:    runWaitControlPlaneComponentsPhase,
 	}
 }
 
@@ -198,6 +209,39 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 		}
 	} else {
 		fmt.Printf("[control-plane-join] Would mark node %s as a control-plane\n", cfg.NodeRegistration.Name)
+	}
+
+	return nil
+}
+
+func runWaitControlPlaneComponentsPhase(c workflow.RunData) error {
+	data, ok := c.(JoinData)
+	if !ok {
+		return errors.New("control-plane-join phase invoked with an invalid data struct")
+	}
+
+	if data.Cfg().ControlPlane == nil {
+		return nil
+	}
+
+	initCfg, err := data.InitCfg()
+	if err != nil {
+		return err
+	}
+
+	if features.Enabled(initCfg.FeatureGates, features.WaitForAllControlPlaneComponents) {
+		fmt.Println("[wait-control-plane] Waiting for the kubelet to boot up control plane components")
+		timeout := initCfg.Timeouts.ControlPlaneComponentHealthCheck.Duration
+		err := controlplane.WaitForControlPlaneComponents(
+			controlplane.ControlPlaneComponents,
+			timeout,
+			data.ManifestDir(),
+			data.KubeletDir(),
+			initCfg.CertificatesDir)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
