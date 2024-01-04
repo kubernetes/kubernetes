@@ -212,7 +212,6 @@ func (c *Context) ExecutePackage(p Package) error {
 	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), path)
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)
-	os.MkdirAll(path, 0755)
 	files := map[string]*File{}
 	for _, g := range p.Generators(packageContext) {
 		// Filter out types the *generator* doesn't care about.
@@ -280,7 +279,10 @@ func (c *Context) ExecutePackage(p Package) error {
 		if c.Verify {
 			err = assembler.VerifyFile(f, finalPath)
 		} else {
-			err = assembler.AssembleFile(f, finalPath)
+			err = os.MkdirAll(path, 0755)
+			if err != nil {
+				err = assembler.AssembleFile(f, finalPath)
+			}
 		}
 		if err != nil {
 			errors = append(errors, err)
