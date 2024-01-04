@@ -836,6 +836,77 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 	}
 }
 
+// Test that When a DaemonSet is rolling updated, the UpdatedNumberScheduled
+// should increase immediately after a new Pod is successfully created.
+//
+// Issue: https://github.com/kubernetes/kubernetes/issues/122527
+func TestUpdatedNumberScheduledWithRollingUpdateStrategy(t *testing.T) {
+	one := intstr.FromInt32(1)
+	zero := intstr.FromInt32(0)
+	strategy := &apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateDaemonSet{
+			MaxUnavailable: &zero,
+			MaxSurge:       &one,
+		},
+	}
+
+	ds := newDaemonSet("foo")
+	ds.Spec.UpdateStrategy = *strategy
+	ds.Spec.Template.Spec.Containers[0].Image = "busybox1"
+	_, ctx := ktesting.NewTestContext(t)
+	manager, podControl, clientset, err := newTestController(ctx, ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	podControl.FakePodControl.CreateLimit = 10
+	addNodes(manager.nodeStore, 0, 1, nil)
+	err = manager.dsStore.Add(ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var updated *apps.DaemonSet
+	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetSubresource() != "status" {
+			return false, nil, nil
+		}
+		if u, ok := action.(core.UpdateAction); ok {
+			updated = u.GetObject().(*apps.DaemonSet)
+		}
+		return false, nil, nil
+	})
+	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+	if got, want := updated.Status.UpdatedNumberScheduled, int32(1); got != want {
+		t.Errorf("Status.UpdatedNumberScheduled = %v, want %v", got, want)
+	}
+
+	// Modify the DaemonSet spec to trigger rolling update
+	newDs := ds.DeepCopy()
+	newDs.Spec.Template.Spec.Containers[0].Image = "busybox2"
+	err = manager.dsStore.Update(newDs)
+	if err != nil {
+		t.Fatalf("Failed to update DaemonSet: %v", err)
+	}
+
+	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetSubresource() != "status" {
+			return false, nil, nil
+		}
+		if u, ok := action.(core.UpdateAction); ok {
+			updated = u.GetObject().(*apps.DaemonSet)
+		}
+		return false, nil, nil
+	})
+
+	expectSyncDaemonSets(t, manager, newDs, podControl, 2, 0, 0)
+
+	if got, want := updated.Status.UpdatedNumberScheduled, int32(1); got != want {
+		t.Errorf("Status.UpdatedNumberScheduled = %v, want %v", got, want)
+	}
+}
+
 func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	strategies := updateStrategies()
