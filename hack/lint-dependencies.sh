@@ -25,9 +25,9 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Explicitly opt into go modules
-export GO111MODULE=on
-# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+# Set the Go environment, otherwise we get "can't compute 'all' using the
+# vendor directory".
+export GOWORK=off
 export GOFLAGS=-mod=mod
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
@@ -35,6 +35,7 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
   exit 1
 fi
 
+kube::golang::setup_env
 kube::golang::verify_go_version
 kube::util::require-jq
 
