@@ -85,8 +85,8 @@ func init() {
 }
 
 const (
-	defaultGCEMachine             = "n1-standard-1"
-	acceleratorTypeResourceFormat = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s/acceleratorTypes/%s"
+	defaultGCEMachine             = "e2-standard-2"
+	acceleratorTypeResourceFormat = "https://www.googleapis.com/compute/beta/projects/%s/zones/%s/acceleratorTypes/%s"
 )
 
 type GCERunner struct {

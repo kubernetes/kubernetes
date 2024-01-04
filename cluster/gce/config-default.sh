@@ -27,12 +27,10 @@ ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 export REGION=${ZONE%-*}
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
-# TODO: Migrate to e2-standard machine family.
-NODE_SIZE=${NODE_SIZE:-n1-standard-2}
+NODE_SIZE=${NODE_SIZE:-e2-standard-2}
 NUM_NODES=${NUM_NODES:-3}
 NUM_WINDOWS_NODES=${NUM_WINDOWS_NODES:-0}
-# TODO: Migrate to e2-standard machine family.
-MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
+MASTER_SIZE=${MASTER_SIZE:-e2-standard-$(get-master-size)}
 MASTER_MIN_CPU_ARCHITECTURE=${MASTER_MIN_CPU_ARCHITECTURE:-} # To allow choosing better architectures.
 export MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-$(get-master-disk-size)}
