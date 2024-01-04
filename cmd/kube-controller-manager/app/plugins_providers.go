@@ -25,7 +25,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/rbd"
@@ -77,24 +76,5 @@ func appendExpandableLegacyProviderVolumes(logger klog.Logger, allPlugins []volu
 }
 
 func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
-	var err error
-	// First append attachable volumes
-	allPlugins, err = appendAttachableLegacyProviderVolumes(logger, allPlugins, featureGate)
-	if err != nil {
-		return allPlugins, err
-	}
-
-	// Then append non-attachable volumes
-	pluginName := plugins.AzureFileInTreePluginName
-	pluginInfo := pluginInfo{
-		pluginMigrationFeature:  features.CSIMigrationAzureFile,
-		pluginUnregisterFeature: features.InTreePluginAzureFileUnregister,
-		pluginProbeFunction:     azure_file.ProbeVolumePlugins,
-	}
-	allPlugins, err = appendPluginBasedOnFeatureFlags(logger, allPlugins, pluginName, featureGate, pluginInfo)
-	if err != nil {
-		return allPlugins, err
-	}
-
-	return allPlugins, nil
+	return appendAttachableLegacyProviderVolumes(logger, allPlugins, featureGate)
 }
