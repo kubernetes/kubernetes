@@ -276,50 +276,23 @@ func TestRunHandlerHttps(t *testing.T) {
 			t.Errorf("unexpected url: %s", fakeHTTPDoer.url)
 		}
 	})
-
-	t.Run("inconsistent", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
-		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromString("70")
-		pod.Spec.Containers = []v1.Container{container}
-		_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if fakeHTTPDoer.url != "http://foo:70/bar" {
-			t.Errorf("unexpected url: %q", fakeHTTPDoer.url)
-		}
-	})
 }
 
 func TestRunHandlerHTTPPort(t *testing.T) {
 	tests := []struct {
-		Name               string
-		FeatureGateEnabled bool
-		Port               intstr.IntOrString
-		ExpectError        bool
-		Expected           string
+		Name        string
+		Port        intstr.IntOrString
+		ExpectError bool
+		Expected    string
 	}{
 		{
-			Name:               "consistent/with port",
-			FeatureGateEnabled: true,
-			Port:               intstr.FromString("70"),
-			Expected:           "https://foo:70/bar",
+			Name:     "consistent/with port",
+			Port:     intstr.FromString("70"),
+			Expected: "https://foo:70/bar",
 		}, {
-			Name:               "consistent/without port",
-			FeatureGateEnabled: true,
-			Port:               intstr.FromString(""),
-			ExpectError:        true,
-		}, {
-			Name:               "inconsistent/with port",
-			FeatureGateEnabled: false,
-			Port:               intstr.FromString("70"),
-			Expected:           "http://foo:70/bar",
-		}, {
-			Name:               "inconsistent/without port",
-			Port:               intstr.FromString(""),
-			FeatureGateEnabled: false,
-			Expected:           "http://foo:80/bar",
+			Name:        "consistent/without port",
+			Port:        intstr.FromString(""),
+			ExpectError: true,
 		},
 	}
 
@@ -349,7 +322,6 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			ctx := context.Background()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, tt.FeatureGateEnabled)()
 			fakeHTTPDoer := fakeHTTP{}
 			handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
@@ -644,13 +616,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			}
 
 			t.Run("consistent", func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 				verify(t, tt.Expected.NewHeader, tt.Expected.NewURL)
-			})
-
-			t.Run("inconsistent", func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
-				verify(t, tt.Expected.OldHeader, tt.Expected.OldURL)
 			})
 		})
 	}
@@ -760,7 +726,6 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 
 func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	ctx := context.Background()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 
 	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
 	// we need to reset them prior running this test.

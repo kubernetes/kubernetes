@@ -954,7 +954,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ContainerCheckpoint: {Default: false, PreRelease: featuregate.Alpha},
 
-	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
+	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	CronJobsScheduledAnnotation: {Default: true, PreRelease: featuregate.Beta},
 
