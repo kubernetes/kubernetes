@@ -501,13 +501,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	//
 	// This client must not be modified to include credentials, because it is
 	// critical that credentials not leak from the client to arbitrary hosts.
-	insecureContainerLifecycleHTTPClient := &http.Client{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
-		insecureTLSTransport := &http.Transport{
+	insecureContainerLifecycleHTTPClient := &http.Client{
+		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		insecureContainerLifecycleHTTPClient.Transport = insecureTLSTransport
-		insecureContainerLifecycleHTTPClient.CheckRedirect = httpprobe.RedirectChecker(false)
+		},
+		CheckRedirect: httpprobe.RedirectChecker(false),
 	}
 
 	tracer := kubeDeps.TracerProvider.Tracer(instrumentationScope)
