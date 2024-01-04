@@ -210,9 +210,16 @@ func (c *Context) ExecutePackage(p Package) error {
 		return fmt.Errorf("no source-path for package %s", p.Path())
 	}
 	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), path)
+
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)
-	os.MkdirAll(path, 0755)
+
+	if !c.Verify {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return err
+		}
+	}
+
 	files := map[string]*File{}
 	for _, g := range p.Generators(packageContext) {
 		// Filter out types the *generator* doesn't care about.
