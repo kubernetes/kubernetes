@@ -1,0 +1,80 @@
+rebase
+break up commits as much as possible
+FIXMES
+make sure gengo logging is good
+  -not spammy
+  -use %q
+find all `go build` and `go install`
+find all "vendor/..."
+all GO111MODULE either clearly documented or removed
+finish patches from other branch
+  - b5d6531d3ecf4291b1f41604b123db225ea05123
+
+input-dirs -> input-pkgs
+move away from DefaultPackage
+move away from DefaultGen
+customArgs should implement AddFlags
+Package Path -> ImportPath
+Package SourcePath -> Dir
+DefaultPakcage.Source -> Dir
+generator.Package -> generator.GenPkg or something
+scrub gengo/v2/generator code (eg. errors in ExecutePackage)
+scrub gengo/v2/types code (e.g. flatten.go)
+
+Universe:
+----------
+- get rid of u.Package() and other universe functions
+- store packages.Package in gengo Package
+- types.Package -> gengo.GoPackage
+- Move FindTypes into NewBuilder,  -> NewUniverse
+
+Flags:
+----------
+- Move flags into each tool
+- OutputFileBase -> OutputBasename (e.g. openapi script is "output_base")
+- InputDirs -> InputPatterns
+- protobuf should take the same input flags
+- s/OutputBase OutputDir
+
+Need input:
+----------
+- decide on kms/_mock and code_gen examples - in or out?
+  - Jordan: "+100 to not adding new deps to k/k, especially ones we don't
+    really need for shipped binaries, and especially especially not new crypto
+    / security deps"
+- gengo/v2 vs internal/... vs code-generator
+- code-generator/v2 or ... ?  Compat.
+- go caches (GOCACHE and GOMODCACHE) in _output or no?
+
+Lower prio:
+----------
+- add a default "null" filetype
+- client-gen - get rid of input-base and --input and just take input-dirs like everyone else
+- gengo support for generics (builder.walkType)
+- Drop vendor hacks from generators
+  - kill off k8s.io/code-generator/pkg/util (Vendorless())
+- move generators out of gengo/v2/examples -> code_generator/cmd
+- protobuf doesn't need to Clean itself
+- simple generators like deepcopy can just use ./... - slower but simpler?
+- subproj - restore pwd -P?
+- stop looking at InputDirs and look at Inputs
+- run `go env GOROOT` rather than `which go` (gengo-v2/parser/parse.go 'New()')
+
+Move FormatOnly to gengo
+  - results in importing "self pkg" in each file
+Move namer/import tweaks to prefactoring and see if dbsmith hates them
+client-go and other codegens - use zz_generated.* names?
+Step thru commits and run `go work sync`
+  - maybe add that to the verify-go-workspace script?
+Decide and document: how to install tools
+Try to make all codegens work at each step?
+find and remove all ./output and _gopath refs (weird old names?)
+Do we commit go.work.sum?  How do I force it to generate?
+  - Why is it different at the end of my stack - where did it change?
+"genericArgs.Execute" -> "gengo.Execute"
+packages.Load already finds types and funcs - use that?
+kill off find-binary shell function
+remove defaulter --extra-peer-dirs flag
+Why do we have staging/src/k8s.io/code-generator/hack/boilerplate.go.txt and
+  hack/boilerplate/... and in staging/src/k8s.io/code-generator/hack and ...
+Drop --logtostderr in makefile calls to generators - default?
