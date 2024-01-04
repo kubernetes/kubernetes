@@ -257,15 +257,6 @@ const (
 	// Lock to default and remove after v1.22 based on user feedback that should be reflected in KEP #1972 update
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
-	// owner: @gjkim42
-	// kep: https://kep.k8s.io/2595
-	// alpha: v1.22
-	// beta: v1.26
-	// GA: v1.28
-	//
-	// Enables apiserver and kubelet to allow up to 32 DNSSearchPaths and up to 2048 DNSSearchListChars.
-	ExpandedDNSConfig featuregate.Feature = "ExpandedDNSConfig"
-
 	// owner: @bobbypage
 	// alpha: v1.20
 	// beta:  v1.21
@@ -988,8 +979,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EventedPLEG: {Default: false, PreRelease: featuregate.Beta}, // off by default, requires CRI Runtime support
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
-
-	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	GracefulNodeShutdown: {Default: true, PreRelease: featuregate.Beta},
 
