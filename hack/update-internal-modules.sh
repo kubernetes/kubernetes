@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # decoupled from their parent modules.
 MODULES=(
     hack/tools
+    cmd/kubeadm
     staging/src/k8s.io/code-generator/examples
     staging/src/k8s.io/kms/internal/plugins/_mock
 )
