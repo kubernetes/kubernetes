@@ -22,7 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
-	gopath "path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -585,18 +585,18 @@ func TestRBAC(t *testing.T) {
 			for j, r := range tc.requests {
 				path := "/"
 				if r.apiGroup == "" {
-					path = gopath.Join(path, "api/v1")
+					path = filepath.Join(path, "api/v1")
 				} else {
-					path = gopath.Join(path, "apis", r.apiGroup, "v1")
+					path = filepath.Join(path, "apis", r.apiGroup, "v1")
 				}
 				if r.namespace != "" {
-					path = gopath.Join(path, "namespaces", r.namespace)
+					path = filepath.Join(path, "namespaces", r.namespace)
 				}
 				if r.resource != "" {
-					path = gopath.Join(path, r.resource)
+					path = filepath.Join(path, r.resource)
 				}
 				if r.name != "" {
-					path = gopath.Join(path, r.name)
+					path = filepath.Join(path, r.name)
 				}
 
 				var body io.Reader

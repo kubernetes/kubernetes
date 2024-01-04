@@ -187,7 +187,7 @@ func isGoModRoot(path string) bool {
 }
 
 // recursiveRead collects all '.import-restriction' files, between the current directory,
-// and the package root when Go modules are enabled, or $GOPATH/src when they are not.
+// and the module root.
 func recursiveRead(path string) ([]*fileFormat, error) {
 	restrictionFiles := make([]*fileFormat, 0)
 
