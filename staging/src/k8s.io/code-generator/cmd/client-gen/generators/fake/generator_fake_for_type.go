@@ -18,7 +18,6 @@ package fake
 
 import (
 	"io"
-	gopath "path"
 	"path/filepath"
 	"strings"
 
@@ -153,7 +152,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	if generateApply {
 		// Generated apply builder type references required for generated Apply function
 		_, gvString := util.ParsePathGroupVersion(g.inputPackage)
-		m["inputApplyConfig"] = types.Ref(gopath.Join(g.applyConfigurationPackage, gvString), t.Name.Name+"ApplyConfiguration")
+		m["inputApplyConfig"] = types.Ref(filepath.Join(g.applyConfigurationPackage, gvString), t.Name.Name+"ApplyConfiguration")
 	}
 
 	if tags.NonNamespaced {
@@ -237,7 +236,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		m["resultType"] = &resultType
 		m["subresourcePath"] = e.SubResourcePath
 		if e.HasVerb("apply") {
-			m["inputApplyConfig"] = types.Ref(gopath.Join(g.applyConfigurationPackage, inputGVString), inputType.Name.Name+"ApplyConfiguration")
+			m["inputApplyConfig"] = types.Ref(filepath.Join(g.applyConfigurationPackage, inputGVString), inputType.Name.Name+"ApplyConfiguration")
 		}
 
 		if e.HasVerb("get") {

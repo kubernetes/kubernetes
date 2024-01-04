@@ -147,7 +147,6 @@ def file_extension(filename):
 
 skipped_names = [
     "third_party",
-    "_gopath",
     "_output",
     ".git",
     "cluster/env.sh",
