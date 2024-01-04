@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 	"k8s.io/gengo/v2/types"
@@ -167,11 +168,25 @@ func (b *Builder) LoadPackagesTo(u *types.Universe, patterns ...string) ([]*type
 }
 
 func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) {
+	klog.V(5).Infof("loadPackages %q", patterns)
+
 	// Loading packages is slow - only do ones we know we have not already done
 	// (e.g. if a tool calls LoadPackages itself).
 	existingPkgs, netNewPkgs, err := b.alreadyLoaded(patterns...)
 	if err != nil {
 		return nil, err
+	}
+	if vlog := klog.V(5); vlog.Enabled() {
+		if len(existingPkgs) > 0 {
+			keys := make([]string, 0, len(existingPkgs))
+			for _, p := range existingPkgs {
+				keys = append(keys, p.PkgPath)
+			}
+			vlog.Infof("  already have: %q", keys)
+		}
+		if len(netNewPkgs) > 0 {
+			vlog.Infof("  to be loaded: %q", netNewPkgs)
+		}
 	}
 
 	// If these were not user-requested before, they are now.
@@ -201,10 +216,12 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 		Fset:       b.fset,
 	}
 
+	tBefore := time.Now()
 	pkgs, err := packages.Load(&cfg, netNewPkgs...)
 	if err != nil {
 		return nil, fmt.Errorf("error loading packages: %w", err)
 	}
+	klog.V(5).Infof("  loaded %d pkg(s) in %v", len(pkgs), time.Since(tBefore))
 
 	// Handle any errors.
 	collectErrors := func(pkg *packages.Package) error {
@@ -384,7 +401,13 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	}
 
 	// We're keeping this package, though we might not fully process it.
-	klog.V(5).Infof("addPkgToUniverse %q", pkgPath)
+	if vlog := klog.V(5); vlog.Enabled() {
+		why := "user-requested"
+		if !b.userRequested[pkgPath] {
+			why = "dependency"
+		}
+		vlog.Infof("addPkgToUniverse %q (%s)", pkgPath, why)
+	}
 
 	absPath := ""
 	if dir, err := packageDir(pkg); err != nil {

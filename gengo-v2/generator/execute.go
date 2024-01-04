@@ -18,6 +18,7 @@ package generator
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,28 +28,21 @@ import (
 	"golang.org/x/tools/imports"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
 	"k8s.io/klog/v2"
 )
 
-func errs2strings(errors []error) []string {
-	strs := make([]string, len(errors))
-	for i := range errors {
-		strs[i] = errors[i].Error()
-	}
-	return strs
-}
-
 // ExecutePackages runs the generators for the provided packages.
 func (c *Context) ExecutePackages(packages Packages) error {
-	var errors []error
+	klog.V(5).Infof("ExecutePackages: %d packages", len(packages))
+
+	var errs []error
 	for _, p := range packages {
 		if err := c.ExecutePackage(p); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
-	if len(errors) > 0 {
-		return fmt.Errorf("some packages had errors:\n%v", strings.Join(errs2strings(errors), "\n"))
+	if len(errs) > 0 {
+		return fmt.Errorf("some packages had errors: %w", errors.Join(errs...))
 	}
 	return nil
 }
@@ -60,6 +54,7 @@ type DefaultFileType struct {
 
 func (ft DefaultFileType) AssembleFile(f *File, pathname string) error {
 	klog.V(5).Infof("Assembling file %q", pathname)
+
 	destFile, err := os.Create(pathname)
 	if err != nil {
 		return err
@@ -87,6 +82,7 @@ func (ft DefaultFileType) AssembleFile(f *File, pathname string) error {
 
 func (ft DefaultFileType) VerifyFile(f *File, pathname string) error {
 	klog.V(5).Infof("Verifying file %q", pathname)
+
 	friendlyName := filepath.Join(f.PackageName, f.Name)
 	b := &bytes.Buffer{}
 	et := NewErrorTracker(b)
@@ -209,7 +205,7 @@ func (c *Context) ExecutePackage(p Package) error {
 	if path == "" {
 		return fmt.Errorf("no source-path for package %s", p.Path())
 	}
-	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), path)
+	klog.V(5).Infof("Executing package %q (%q)", p.Name(), path)
 
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)
@@ -274,7 +270,7 @@ func (c *Context) ExecutePackage(p Package) error {
 		}
 	}
 
-	var errors []error
+	var errs []error
 	for _, f := range files {
 		finalPath := filepath.Join(path, f.Name)
 		assembler, ok := c.FileTypes[f.FileType]
@@ -288,11 +284,11 @@ func (c *Context) ExecutePackage(p Package) error {
 			err = assembler.AssembleFile(f, finalPath)
 		}
 		if err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
-	if len(errors) > 0 {
-		return fmt.Errorf("errors in package %q:\n%v", p.Path(), strings.Join(errs2strings(errors), "\n"))
+	if len(errs) > 0 {
+		return fmt.Errorf("errors in package %q: %w", p.Path(), errors.Join(errs...))
 	}
 	return nil
 }
