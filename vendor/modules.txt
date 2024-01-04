@@ -153,13 +153,6 @@ github.com/containerd/console
 # github.com/containerd/ttrpc v1.2.2
 ## explicit; go 1.13
 github.com/containerd/ttrpc
-# github.com/coredns/caddy v1.1.1
-## explicit; go 1.13
-github.com/coredns/caddy/caddyfile
-# github.com/coredns/corefile-migration v1.0.21
-## explicit; go 1.14
-github.com/coredns/corefile-migration/migration
-github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/go-oidc v2.2.1+incompatible
 ## explicit
 github.com/coreos/go-oidc
@@ -1034,7 +1027,6 @@ golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
-golang.org/x/sys/windows/svc/mgr
 # golang.org/x/term v0.15.0
 ## explicit; go 1.18
 golang.org/x/term
@@ -1409,7 +1401,6 @@ k8s.io/apimachinery/pkg/runtime/serializer/protobuf
 k8s.io/apimachinery/pkg/runtime/serializer/recognizer
 k8s.io/apimachinery/pkg/runtime/serializer/streaming
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
-k8s.io/apimachinery/pkg/runtime/serializer/yaml
 k8s.io/apimachinery/pkg/selection
 k8s.io/apimachinery/pkg/types
 k8s.io/apimachinery/pkg/util/cache
