@@ -24,6 +24,13 @@ const (
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
 )
 
+// Label value constants
+const (
+	// PodInfraContainerName is the KubernetesPodNameLabel value for infra
+	// containers.
+	PodInfraContainerName = "POD"
+)
+
 // GetContainerName returns the value of the KubernetesContainerNameLabel.
 func GetContainerName(labels map[string]string) string {
 	return labels[KubernetesContainerNameLabel]
