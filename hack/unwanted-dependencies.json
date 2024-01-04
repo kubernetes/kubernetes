@@ -52,6 +52,7 @@
       "github.com/mindprince/gonvml": "depends on nvml.h that does not appear to permit modification, redistribution",
       "github.com/mitchellh/cli": "MPL license not in CNCF allowlist",
       "github.com/mitchellh/gox": "MPL license not in CNCF allowlist",
+      "github.com/mitchellh/go-wordwrap": "unmaintained",
       "github.com/mndrix/tap-go": "unmaintained",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/pkg/errors": "unmaintained, archive mode",
@@ -172,6 +173,9 @@
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
+	  "github.com/mitchellh/go-wordwrap": [
+	    "k8s.io/kubectl"
+	  ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hcsshim",
         "github.com/containerd/continuity",
@@ -248,6 +252,7 @@
       "github.com/grpc-ecosystem/grpc-gateway",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
+      "github.com/mitchellh/go-wordwrap",
       "github.com/pkg/errors",
       "github.com/rubiojr/go-vhd",
       "go.opencensus.io",
