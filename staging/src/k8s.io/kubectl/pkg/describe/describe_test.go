@@ -236,6 +236,42 @@ func TestDescribePodTolerations(t *testing.T) {
 	}
 }
 
+func TestDescribePodResize(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{},
+			},
+		},
+		Status: corev1.PodStatus{
+			Resize: corev1.PodResizeStatusProposed,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					AllocatedResources: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("100m"),
+					},
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Resize:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "Allocated Resources:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeTopologySpreadConstraints(t *testing.T) {
 	fake := fake.NewSimpleClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

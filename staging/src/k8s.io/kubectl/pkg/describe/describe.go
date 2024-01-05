@@ -820,6 +820,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		if len(pod.Status.Message) > 0 {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
+		if len(pod.Status.Resize) > 0 {
+			w.Write(LEVEL_0, "Resize:\t%s\n", pod.Status.Resize)
+		}
 		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
 			w.Write(LEVEL_0, "SeccompProfile:\t%s\n", pod.Spec.SecurityContext.SeccompProfile.Type)
 			if pod.Spec.SecurityContext.SeccompProfile.Type == corev1.SeccompProfileTypeLocalhost {
@@ -1789,7 +1792,7 @@ func describeContainers(label string, containers []corev1.Container, containerSt
 		if ok {
 			describeContainerState(status, w)
 		}
-		describeContainerResource(container, w)
+		describeContainerResource(container, status.AllocatedResources, w)
 		describeContainerProbe(container, w)
 		if len(container.EnvFrom) > 0 {
 			describeContainerEnvFrom(container, resolverFn, w)
@@ -1875,7 +1878,7 @@ func describeContainerCommand(container corev1.Container, w PrefixWriter) {
 	}
 }
 
-func describeContainerResource(container corev1.Container, w PrefixWriter) {
+func describeContainerResource(container corev1.Container, allocated corev1.ResourceList, w PrefixWriter) {
 	resources := container.Resources
 	if len(resources.Limits) > 0 {
 		w.Write(LEVEL_2, "Limits:\n")
@@ -1890,6 +1893,14 @@ func describeContainerResource(container corev1.Container, w PrefixWriter) {
 	}
 	for _, name := range SortedResourceNames(resources.Requests) {
 		quantity := resources.Requests[name]
+		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+	}
+
+	if len(allocated) > 0 {
+		w.Write(LEVEL_2, "Allocated Resources:\n")
+	}
+	for _, name := range SortedResourceNames(allocated) {
+		quantity := allocated[name]
 		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
 	}
 }
