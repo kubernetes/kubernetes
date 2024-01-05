@@ -11,7 +11,6 @@ use (
 	./staging/src/k8s.io/cloud-provider
 	./staging/src/k8s.io/cluster-bootstrap
 	./staging/src/k8s.io/code-generator
-	./staging/src/k8s.io/code-generator/examples
 	./staging/src/k8s.io/component-base
 	./staging/src/k8s.io/component-helpers
 	./staging/src/k8s.io/controller-manager
