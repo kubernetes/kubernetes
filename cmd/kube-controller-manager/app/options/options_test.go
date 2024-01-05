@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -41,6 +42,7 @@ import (
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	netutils "k8s.io/utils/net"
 
+	clientgofeaturegate "k8s.io/client-go/features"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -1328,6 +1330,54 @@ func TestControllerManagerAliases(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cfg.ComponentConfig.Generic.Controllers, expectedControllers) {
 		t.Errorf("controller aliases not resolved correctly, expected %+v, got %+v", expectedControllers, cfg.ComponentConfig.Generic.Controllers)
+	}
+}
+
+func TestWatchListClientFlagUsage(t *testing.T) {
+	assertWatchListClientFeatureDefaultValue(t)
+
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	s, _ := NewKubeControllerManagerOptions()
+	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
+		fs.AddFlagSet(f)
+	}
+
+	fgFlagName := "feature-gates"
+	fg := fs.Lookup(fgFlagName)
+	if fg == nil {
+		t.Fatalf("didn't find %q flag", fgFlagName)
+	}
+
+	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=false)"
+	if !strings.Contains(fg.Usage, expectedWatchListClientString) {
+		t.Fatalf("%q flag doesn't contain the expected usage for %v feature gate.\nExpected = %v\nUsage = %v", fgFlagName, clientgofeaturegate.WatchListClient, expectedWatchListClientString, fg.Usage)
+	}
+}
+
+func TestWatchListClientFlagChange(t *testing.T) {
+	assertWatchListClientFeatureDefaultValue(t)
+
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	s, _ := NewKubeControllerManagerOptions()
+	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
+		fs.AddFlagSet(f)
+	}
+
+	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
+	if err := fs.Parse(args); err != nil {
+		t.Fatal(err)
+	}
+
+	watchListClientValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
+	if !watchListClientValue {
+		t.Fatalf("expected %q feature gate to be enabled after setting the command line flag", clientgofeaturegate.WatchListClient)
+	}
+}
+
+func assertWatchListClientFeatureDefaultValue(t *testing.T) {
+	watchListClientDefaultValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
+	if watchListClientDefaultValue {
+		t.Fatalf("expected %q feature gate to be disabled for KCM", clientgofeaturegate.WatchListClient)
 	}
 }
 
