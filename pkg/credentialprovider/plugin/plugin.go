@@ -102,7 +102,7 @@ func RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir string) er
 		// LookPath() also calls os.Stat().
 		pluginBin, err := exec.LookPath(filepath.Join(pluginBinDir, provider.Name))
 		if err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, os.ErrNotExist) || errors.Is(err, exec.ErrNotFound) {
 				return fmt.Errorf("plugin binary executable %s did not exist", pluginBin)
 			}
 
