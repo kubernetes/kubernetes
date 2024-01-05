@@ -1051,8 +1051,11 @@ func TestRestMappingErrors(t *testing.T) {
 	// ensure that requesting a resource we _know_ not to exist results in an expected *meta.NoKindMatchError
 	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
 	if err != nil {
-		if !errors.Is(err, &meta.NoKindMatchError{}) {
+		if !strings.Contains(err.Error(), "server doesn't have a resource type \"foo\"") {
 			t.Fatalf("unexpected error: %v", err)
+		}
+		if !errors.Is(err, &meta.NoKindMatchError{}) {
+			t.Fatalf("unexpected error type: %v", err)
 		}
 	}
 
