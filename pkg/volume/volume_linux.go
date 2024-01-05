@@ -20,15 +20,16 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"syscall"
-
-	"os"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -37,36 +38,72 @@ const (
 	execMask = os.FileMode(0110)
 )
 
+var (
+	// podFsGroupCheckInterval is the amount of time to check
+	// the pod fsGroup has been finished
+	podFsGroupCheckInterval = 30 * time.Second
+
+	// Define walkDeepFunc for easy replacement with mock functions during testing
+	walkDeepFunc func(root string, walkFunc filepath.WalkFunc) error = walkDeep
+
+	timeClock clock.WithTicker = clock.RealClock{}
+)
+
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
+func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam), eventRecorderFunc func(string)) error {
 	if fsGroup == nil {
 		return nil
 	}
-
-	timer := time.AfterFunc(30*time.Second, func() {
-		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
-	})
-	defer timer.Stop()
 
 	if skipPermissionChange(mounter, dir, fsGroup, fsGroupChangePolicy) {
 		klog.V(3).InfoS("Skipping permission and ownership change for volume", "path", dir)
 		return nil
 	}
 
-	err := walkDeep(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
-	})
-	if completeFunc != nil {
-		completeFunc(types.CompleteFuncParam{
-			Err: &err,
+	var (
+		err         error
+		requestTime = timeClock.Now()
+		done        = make(chan bool)
+	)
+
+	go func() {
+		err = walkDeepFunc(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
 		})
+
+		done <- true
+	}()
+
+	tick := timeClock.NewTicker(podFsGroupCheckInterval)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-done:
+			if completeFunc != nil {
+				completeFunc(types.CompleteFuncParam{
+					Err: &err,
+				})
+			}
+			return err
+
+		case <-tick.C():
+			klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
+			if eventRecorderFunc != nil {
+				timeTaken := timeClock.Since(requestTime).Seconds()
+				msg := "Applying fsgroup volume ownership for volume %s is still processing after " + fmt.Sprintf("%d", int(timeTaken)) + " seconds. If the volume has many files, this operation can take a long time"
+				if fsGroupChangePolicy != nil && *fsGroupChangePolicy != v1.FSGroupChangeOnRootMismatch {
+					msg += "It is recommended to set fsGroupChangePolicy to OnRootMismatch to speed up subsequent mounts"
+				}
+				eventRecorderFunc(msg)
+			}
+		}
 	}
-	return err
 }
 
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
