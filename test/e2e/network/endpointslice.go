@@ -307,7 +307,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		})
 
-		err := wait.Poll(5*time.Second, 3*time.Minute, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			var err error
 			pod1, err = podClient.Get(ctx, pod1.Name, metav1.GetOptions{})
 			if err != nil {
@@ -740,7 +740,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 // the only caller of this function.
 func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
 	endpointSlices := []discoveryv1.EndpointSlice{}
-	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(ctx, cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
 			return false, nil
@@ -752,7 +752,7 @@ func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns st
 	}
 
 	endpoints := &v1.Endpoints{}
-	if err := wait.PollWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointsFound, hasMatchingEndpoints := hasMatchingEndpoints(ctx, cs, ns, svc.Name, len(pods), numSubsets)
 		if !hasMatchingEndpoints {
 			framework.Logf("Matching Endpoints not found")
