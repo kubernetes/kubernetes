@@ -894,6 +894,7 @@ func autoConvert_v1beta4_ResetConfiguration_To_kubeadm_ResetConfiguration(in *Re
 	out.Force = in.Force
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
+	out.UnmountFlags = *(*[]string)(unsafe.Pointer(&in.UnmountFlags))
 	return nil
 }
 
@@ -910,6 +911,7 @@ func autoConvert_kubeadm_ResetConfiguration_To_v1beta4_ResetConfiguration(in *ku
 	out.Force = in.Force
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
+	out.UnmountFlags = *(*[]string)(unsafe.Pointer(&in.UnmountFlags))
 	return nil
 }
 

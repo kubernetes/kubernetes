@@ -517,6 +517,12 @@ type ResetConfiguration struct {
 	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
 	// +optional
 	SkipPhases []string `json:"skipPhases,omitempty"`
+
+	// UnmountFlags is a list of unmount2() syscall flags that kubeadm can use when unmounting
+	// directories during "reset". A flag can be one of: MNT_FORCE, MNT_DETACH, MNT_EXPIRE, UMOUNT_NOFOLLOW.
+	// By default this list is empty.
+	// +optional
+	UnmountFlags []string `json:"unmountFlags,omitempty"`
 }
 
 // Arg represents an argument with a name and a value.

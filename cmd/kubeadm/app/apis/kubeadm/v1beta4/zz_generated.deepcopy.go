@@ -577,6 +577,11 @@ func (in *ResetConfiguration) DeepCopyInto(out *ResetConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.UnmountFlags != nil {
+		in, out := &in.UnmountFlags, &out.UnmountFlags
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

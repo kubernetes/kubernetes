@@ -522,7 +522,23 @@ type ResetConfiguration struct {
 	// SkipPhases is a list of phases to skip during command execution.
 	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
 	SkipPhases []string
+
+	// UnmountFlags is a list of unmount2() syscall flags that kubeadm can use when unmounting
+	// directories during "reset". A flag can be one of: MNT_FORCE, MNT_DETACH, MNT_EXPIRE, UMOUNT_NOFOLLOW.
+	// By default this list is empty.
+	UnmountFlags []string
 }
+
+const (
+	// UnmountFlagMNTForce represents the flag "MNT_FORCE"
+	UnmountFlagMNTForce = "MNT_FORCE"
+	// UnmountFlagMNTDetach represents the flag "MNT_DETACH"
+	UnmountFlagMNTDetach = "MNT_DETACH"
+	// UnmountFlagMNTExpire represents the flag "MNT_EXPIRE"
+	UnmountFlagMNTExpire = "MNT_EXPIRE"
+	// UnmountFlagUmountNoFollow represents the flag "UMOUNT_NOFOLLOW"
+	UnmountFlagUmountNoFollow = "UMOUNT_NOFOLLOW"
+)
 
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
 type ComponentConfigMap map[string]ComponentConfig
