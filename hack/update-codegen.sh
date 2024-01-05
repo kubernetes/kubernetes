@@ -148,7 +148,7 @@ function codegen::deepcopy() {
         k8s.io/code-generator/cmd/deepcopy-gen
 
     # The result file, in each pkg, of deep-copy generation.
-    local output_base="${GENERATED_FILE_PREFIX}deepcopy"
+    local output_file="${GENERATED_FILE_PREFIX}deepcopy"
 
     # The tool used to generate deep copies.
     local gen_deepcopy_bin
@@ -180,13 +180,13 @@ function codegen::deepcopy() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_deepcopy_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        -O "${output_file}" \
         --bounding-dirs "${PRJ_SRC_PATH},k8s.io/api" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -281,7 +281,7 @@ function codegen::prerelease() {
         k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 
     # The result file, in each pkg, of prerelease-lifecycle generation.
-    local output_base="${GENERATED_FILE_PREFIX}prerelease-lifecycle"
+    local output_file="${GENERATED_FILE_PREFIX}prerelease-lifecycle"
 
     # The tool used to generate prerelease-lifecycle code.
     local gen_prerelease_bin
@@ -313,13 +313,13 @@ function codegen::prerelease() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_prerelease_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        -O "${output_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
@@ -350,7 +350,7 @@ function codegen::defaults() {
         k8s.io/code-generator/cmd/defaulter-gen
 
     # The result file, in each pkg, of defaulter generation.
-    local output_base="${GENERATED_FILE_PREFIX}defaults"
+    local output_file="${GENERATED_FILE_PREFIX}defaults"
 
     # The tool used to generate defaulters.
     local gen_defaulter_bin
@@ -382,13 +382,13 @@ function codegen::defaults() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_defaulter_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        -O "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -425,7 +425,7 @@ function codegen::conversions() {
         k8s.io/code-generator/cmd/conversion-gen
 
     # The result file, in each pkg, of conversion generation.
-    local output_base="${GENERATED_FILE_PREFIX}conversion"
+    local output_file="${GENERATED_FILE_PREFIX}conversion"
 
     # The tool used to generate conversions.
     local gen_conversion_bin
@@ -463,13 +463,13 @@ function codegen::conversions() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_conversion_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        -O "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         $(printf -- " --extra-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
@@ -509,7 +509,7 @@ function codegen::openapi() {
         k8s.io/code-generator/cmd/openapi-gen
 
     # The result file, in each pkg, of open-api generation.
-    local output_base="${GENERATED_FILE_PREFIX}openapi"
+    local output_file="${GENERATED_FILE_PREFIX}openapi"
 
     # The tool used to generate open apis.
     local gen_openapi_bin
@@ -559,13 +559,13 @@ function codegen::openapi() {
         done
     fi
 
-    git_find -z ':(glob)pkg/generated/**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)pkg/generated/**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_openapi_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        -O "${output_file}" \
         -p "${PRJ_SRC_PATH}/${output_dir}" \
         -r "${report_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
