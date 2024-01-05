@@ -196,7 +196,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(ctx, &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
-			err = wait.PollWithContext(ctx, 5*time.Second, propagationTimeout, func(ctx context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(ctx, 5*time.Second, propagationTimeout, false, func(ctx context.Context) (bool, error) {
 				if err := gceController.BackendServiceUsingIG(jig.GetServicePorts(ctx, false)); err != nil {
 					framework.Logf("ginkgo.Failed to verify IG backend service: %v", err)
 					return false, nil
@@ -214,7 +214,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(ctx, &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
-			err = wait.PollWithContext(ctx, 5*time.Second, propagationTimeout, func(ctx context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(ctx, 5*time.Second, propagationTimeout, false, func(ctx context.Context) (bool, error) {
 				if err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(ctx, false)); err != nil {
 					framework.Logf("ginkgo.Failed to verify NEG backend service: %v", err)
 					return false, nil

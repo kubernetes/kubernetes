@@ -605,7 +605,7 @@ func deleteCronJob(ctx context.Context, c clientset.Interface, ns, name string) 
 
 // Wait for at least given amount of active jobs.
 func waitForActiveJobs(ctx context.Context, c clientset.Interface, ns, cronJobName string, active int) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := getCronJob(ctx, c, ns, cronJobName)
 		if err != nil {
 			return false, err
@@ -619,7 +619,7 @@ func waitForActiveJobs(ctx context.Context, c clientset.Interface, ns, cronJobNa
 // the timeout. When failIfNonEmpty is not set, this fails if the active set of jobs is still
 // empty after the timeout.
 func waitForNoJobs(ctx context.Context, c clientset.Interface, ns, jobName string, failIfNonEmpty bool) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := getCronJob(ctx, c, ns, jobName)
 		if err != nil {
 			return false, err
@@ -634,7 +634,7 @@ func waitForNoJobs(ctx context.Context, c clientset.Interface, ns, jobName strin
 
 // Wait till a given job actually goes away from the Active list for a given cronjob
 func waitForJobNotActive(ctx context.Context, c clientset.Interface, ns, cronJobName, jobName string) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := getCronJob(ctx, c, ns, cronJobName)
 		if err != nil {
 			return false, err
@@ -651,7 +651,7 @@ func waitForJobNotActive(ctx context.Context, c clientset.Interface, ns, cronJob
 
 // Wait for a job to disappear by listing them explicitly.
 func waitForJobToDisappear(ctx context.Context, c clientset.Interface, ns string, targetJob *batchv1.Job) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		jobs, err := c.BatchV1().Jobs(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -668,7 +668,7 @@ func waitForJobToDisappear(ctx context.Context, c clientset.Interface, ns string
 
 // Wait for a pod to disappear by listing them explicitly.
 func waitForJobsPodToDisappear(ctx context.Context, c clientset.Interface, ns string, targetJob *batchv1.Job) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		options := metav1.ListOptions{LabelSelector: fmt.Sprintf("controller-uid=%s", targetJob.UID)}
 		pods, err := c.CoreV1().Pods(ns).List(ctx, options)
 		if err != nil {
@@ -680,7 +680,7 @@ func waitForJobsPodToDisappear(ctx context.Context, c clientset.Interface, ns st
 
 // Wait for a job to be replaced with a new one.
 func waitForJobReplaced(ctx context.Context, c clientset.Interface, ns, previousJobName string) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		jobs, err := c.BatchV1().Jobs(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -699,7 +699,7 @@ func waitForJobReplaced(ctx context.Context, c clientset.Interface, ns, previous
 
 // waitForJobsAtLeast waits for at least a number of jobs to appear.
 func waitForJobsAtLeast(ctx context.Context, c clientset.Interface, ns string, atLeast int) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		jobs, err := c.BatchV1().Jobs(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -710,7 +710,7 @@ func waitForJobsAtLeast(ctx context.Context, c clientset.Interface, ns string, a
 
 // waitForAnyFinishedJob waits for any completed job to appear.
 func waitForAnyFinishedJob(ctx context.Context, c clientset.Interface, ns string) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, cronJobTimeout, false, func(ctx context.Context) (bool, error) {
 		jobs, err := c.BatchV1().Jobs(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -726,7 +726,7 @@ func waitForAnyFinishedJob(ctx context.Context, c clientset.Interface, ns string
 
 // waitForEventWithReason waits for events with a reason within a list has occurred
 func waitForEventWithReason(ctx context.Context, c clientset.Interface, ns, cronJobName string, reasons []string) error {
-	return wait.PollWithContext(ctx, framework.Poll, 30*time.Second, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		sj, err := getCronJob(ctx, c, ns, cronJobName)
 		if err != nil {
 			return false, err

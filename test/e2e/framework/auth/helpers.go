@@ -65,7 +65,7 @@ func WaitForNamedAuthorizationUpdate(ctx context.Context, c v1authorization.Subj
 		},
 	}
 
-	err := wait.PollWithContext(ctx, policyCachePollInterval, policyCachePollTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, policyCachePollInterval, policyCachePollTimeout, false, func(ctx context.Context) (bool, error) {
 		response, err := c.SubjectAccessReviews().Create(ctx, review, metav1.CreateOptions{})
 		if err != nil {
 			return false, err

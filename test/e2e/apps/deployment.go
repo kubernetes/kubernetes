@@ -1156,7 +1156,7 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Wait for the ReplicaSet to be orphaned")
-	err = wait.PollWithContext(ctx, dRetryPeriod, dRetryTimeout, waitDeploymentReplicaSetsOrphaned(c, ns, podLabels))
+	err = wait.PollUntilContextTimeout(ctx, dRetryPeriod, dRetryTimeout, false, waitDeploymentReplicaSetsOrphaned(c, ns, podLabels))
 	framework.ExpectNoError(err, "error waiting for Deployment ReplicaSet to be orphaned")
 
 	deploymentName = "test-adopt-deployment"

@@ -84,7 +84,7 @@ func WaitForNodeBootIdsToChange(ctx context.Context, c clientset.Interface, node
 	errMsg := []string{}
 	for i := range nodes {
 		node := &nodes[i]
-		if err := wait.PollWithContext(ctx, 30*time.Second, timeout, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 30*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
