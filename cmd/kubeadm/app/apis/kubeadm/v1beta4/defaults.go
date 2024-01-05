@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -193,6 +194,9 @@ func SetDefaults_APIEndpoint(obj *APIEndpoint) {
 func SetDefaults_NodeRegistration(obj *NodeRegistrationOptions) {
 	if len(obj.ImagePullPolicy) == 0 {
 		obj.ImagePullPolicy = DefaultImagePullPolicy
+	}
+	if obj.ImagePullSerial == nil {
+		obj.ImagePullSerial = ptr.To(true)
 	}
 }
 

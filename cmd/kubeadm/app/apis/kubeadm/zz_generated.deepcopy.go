@@ -558,6 +558,11 @@ func (in *NodeRegistrationOptions) DeepCopyInto(out *NodeRegistrationOptions) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ImagePullSerial != nil {
+		in, out := &in.ImagePullSerial, &out.ImagePullSerial
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

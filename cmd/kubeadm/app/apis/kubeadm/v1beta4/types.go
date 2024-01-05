@@ -263,6 +263,11 @@ type NodeRegistrationOptions struct {
 	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSerial specifies if image pulling performed by kubeadm must be done serially or in parallel.
+	// Default: true
+	// +optional
+	ImagePullSerial *bool `json:"imagePullSerial,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration
