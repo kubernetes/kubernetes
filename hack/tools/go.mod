@@ -8,7 +8,6 @@ require (
 	github.com/client9/misspell v0.3.4
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.55.2
-	github.com/google/go-flow-levee v0.1.5
 	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
 	honnef.co/go/tools v0.4.6
@@ -194,7 +193,6 @@ require (
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
-	golang.org/x/tools/go/pointer v0.1.0-deprecated // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -203,5 +201,4 @@ require (
 	mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed // indirect
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20221223090309-7455f1af531d // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
 )

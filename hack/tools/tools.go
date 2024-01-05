@@ -23,7 +23,6 @@ import (
 	_ "github.com/aojea/sloppy-netparser"
 	_ "github.com/client9/misspell/cmd/misspell"
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
-	_ "github.com/google/go-flow-levee/cmd/levee"
 	_ "honnef.co/go/tools/cmd/staticcheck"
 	_ "sigs.k8s.io/logtools/logcheck"
 
