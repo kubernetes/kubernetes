@@ -401,7 +401,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			return nil, err
 		}
 		if instanceType != "" {
-			klog.InfoS("Adding label from cloud provider", "labelKey", v1.LabelInstanceType, "labelValue", instanceType)
+			klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelInstanceType, "labelValue", instanceType)
 			node.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
 			klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelInstanceTypeStable, "labelValue", instanceType)
 			node.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = instanceType
