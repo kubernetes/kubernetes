@@ -52,14 +52,6 @@ import (
 	// ensure auth plugins are loaded
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	// ensure that cloud providers are loaded
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/aws"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
-
 	// Ensure that logging flags are part of the command line.
 	_ "k8s.io/component-base/logs/testinit"
 )
