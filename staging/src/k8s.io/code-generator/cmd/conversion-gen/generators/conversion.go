@@ -135,7 +135,7 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 		klog.Warning("Skipping nil package passed to getManualConversionFunctions")
 		return
 	}
-	klog.V(5).Infof("Scanning for conversion functions in %v", pkg.Path)
+	klog.V(3).Infof("Scanning for conversion functions in %v", pkg.Path)
 
 	scopeName := types.Ref(conversionPackagePath, "Scope").Name
 	errorName := types.Ref("", "error").Name
@@ -151,27 +151,27 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			klog.Errorf("Function without signature: %#v", f)
 			continue
 		}
-		klog.V(8).Infof("Considering function %s", f.Name)
+		klog.V(6).Infof("Considering function %s", f.Name)
 		signature := f.Underlying.Signature
 		// Check whether the function is conversion function.
 		// Note that all of them have signature:
 		// func Convert_inType_To_outType(inType, outType, conversion.Scope) error
 		if signature.Receiver != nil {
-			klog.V(8).Infof("%s has a receiver", f.Name)
+			klog.V(6).Infof("%s has a receiver", f.Name)
 			continue
 		}
 		if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
-			klog.V(8).Infof("%s has wrong parameters", f.Name)
+			klog.V(6).Infof("%s has wrong parameters", f.Name)
 			continue
 		}
 		if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
-			klog.V(8).Infof("%s has wrong results", f.Name)
+			klog.V(6).Infof("%s has wrong results", f.Name)
 			continue
 		}
 		inType := signature.Parameters[0]
 		outType := signature.Parameters[1]
 		if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
-			klog.V(8).Infof("%s has wrong parameter types", f.Name)
+			klog.V(6).Infof("%s has wrong parameter types", f.Name)
 			continue
 		}
 		// Now check if the name satisfies the convention.
@@ -179,7 +179,7 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 		args := argsFromType(inType.Elem, outType.Elem)
 		sw.Do("Convert_$.inType|public$_To_$.outType|public$", args)
 		if f.Name.Name == buffer.String() {
-			klog.V(4).Infof("Found conversion function %s", f.Name)
+			klog.V(2).Infof("Found conversion function %s", f.Name)
 			key := conversionPair{inType.Elem, outType.Elem}
 			// We might scan the same package twice, and that's OK.
 			if v, ok := manualMap[key]; ok && v != nil && v.Name.Package != pkg.Path {
@@ -191,7 +191,7 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			if strings.HasPrefix(f.Name.Name, "Convert_") {
 				klog.Errorf("Rename function %s %s -> %s to match expected conversion signature", f.Name.Package, f.Name.Name, buffer.String())
 			}
-			klog.V(8).Infof("%s has wrong name", f.Name)
+			klog.V(3).Infof("%s has wrong name", f.Name)
 		}
 		buffer.Reset()
 	}
@@ -225,7 +225,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	pkgToPeers := map[string][]string{}
 	pkgToExternal := map[string]string{}
 	for _, i := range context.Inputs {
-		klog.V(5).Infof("pre-processing pkg %q", i)
+		klog.V(3).Infof("pre-processing pkg %q", i)
 
 		pkg := context.Universe[i]
 		if pkg == nil {
@@ -238,10 +238,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// in their doc.go file.
 		peerPkgs := extractTag(pkg.Comments)
 		if peerPkgs == nil {
-			klog.V(5).Infof("  no tag")
+			klog.V(3).Infof("  no tag")
 			continue
 		}
-		klog.V(5).Infof("  tags: %q", peerPkgs)
+		klog.V(3).Infof("  tags: %q", peerPkgs)
 		if len(peerPkgs) == 1 && peerPkgs[0] == "false" {
 			// If a single +k8s:conversion-gen=false tag is defined, we still want
 			// the generator to fire for this package for explicit conversions, but
@@ -263,7 +263,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				klog.Fatalf("  expect only one value for %q tag, got: %q", externalTypesTagName, externalTypesValues)
 			}
 			externalTypes := externalTypesValues[0]
-			klog.V(5).Infof("  external types tags: %q", externalTypes)
+			klog.V(3).Infof("  external types tags: %q", externalTypes)
 			otherPkgs = append(otherPkgs, externalTypes)
 			pkgToExternal[i] = externalTypes
 		} else {
@@ -311,7 +311,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	// We are generating conversions only for packages that are explicitly
 	// passed as InputDir.
 	for _, i := range filteredInputs {
-		klog.V(5).Infof("considering pkg %q", i)
+		klog.V(3).Infof("considering pkg %q", i)
 		pkg := context.Universe[i]
 		// typesPkg is where the versioned types are defined. Sometimes it is
 		// different from pkg. For example, kubernetes core/v1 types are defined
@@ -351,7 +351,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	// from being a candidate for unsafe conversion
 	for k, v := range manualConversions {
 		if isCopyOnly(v.CommentLines) {
-			klog.V(5).Infof("Conversion function %s will not block memory copy because it is copy-only", v.Name)
+			klog.V(4).Infof("Conversion function %s will not block memory copy because it is copy-only", v.Name)
 			continue
 		}
 		// this type should be excluded from all equivalence, because the converter must be called.
@@ -538,7 +538,7 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 		if tagvals[0] != "false" {
 			klog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tagvals[0])
 		}
-		klog.V(5).Infof("type %v requests no conversion generation, skipping", t)
+		klog.V(2).Infof("type %v requests no conversion generation, skipping", t)
 		return false
 	}
 	// TODO: Consider generating functions for other kinds too.
@@ -638,7 +638,7 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
-	klogV := klog.V(5)
+	klogV := klog.V(6)
 	if klogV.Enabled() {
 		if m, ok := g.useUnsafe.(equalMemoryTypes); ok {
 			var result []string
@@ -771,7 +771,7 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 // at any nesting level. This makes the autogenerator easy to understand, and
 // the compiler shouldn't care.
 func (g *genConversion) generateFor(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	klog.V(5).Infof("generating %v -> %v", inType, outType)
+	klog.V(4).Infof("generating %v -> %v", inType, outType)
 	var f func(*types.Type, *types.Type, *generator.SnippetWriter)
 
 	switch inType.Kind {
@@ -948,7 +948,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("}\n", nil)
 				continue
 			}
-			klog.V(5).Infof("Skipped function %s because it is copy-only and we can use direct assignment", function.Name)
+			klog.V(2).Infof("Skipped function %s because it is copy-only and we can use direct assignment", function.Name)
 		}
 
 		// If we can't auto-convert, punt before we emit any code.
