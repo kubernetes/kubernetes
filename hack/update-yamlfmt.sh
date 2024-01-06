@@ -38,5 +38,4 @@ find_files() {
     \) -name 'OWNERS*'
 }
 
-export GO111MODULE=on
 find_files | xargs go run cmd/yamlfmt/yamlfmt.go

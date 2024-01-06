@@ -126,9 +126,6 @@ for arg; do
   fi
 done
 
-# Explicitly opt into go modules
-export GO111MODULE=on
-
 # Install golangci-lint
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null

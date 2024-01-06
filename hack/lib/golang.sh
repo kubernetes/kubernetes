@@ -597,7 +597,7 @@ kube::golang::setup_gomaxprocs() {
     if ! command -v ncpu >/dev/null 2>&1; then
       # shellcheck disable=SC2164
       pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-      GO111MODULE=on go install ./ncpu || echo "Will not automatically set GOMAXPROCS"
+      go install ./ncpu || echo "Will not automatically set GOMAXPROCS"
       # shellcheck disable=SC2164
       popd >/dev/null
     fi

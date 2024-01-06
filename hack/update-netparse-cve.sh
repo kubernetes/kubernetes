@@ -35,9 +35,6 @@ kube::golang::verify_go_version
 export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
-# Explicitly opt into go modules
-export GO111MODULE=on
-
 # Install golangci-lint
 echo 'installing net parser converter'
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null

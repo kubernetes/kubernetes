@@ -25,12 +25,6 @@ set -o pipefail
 # https://github.com/kubernetes/kubernetes/issues/52255
 unset CDPATH
 
-# Until all GOPATH references are removed from all build scripts as well,
-# explicitly disable module mode to avoid picking up user-set GO111MODULE preferences.
-# As individual scripts (like hack/update-vendor.sh) make use of go modules,
-# they can explicitly set GO111MODULE=on
-export GO111MODULE=off
-
 # FIXME(dims): Note that here we assume that if GOFLAGS are already set we
 # leave them as-is and not try to add providerless to it. So if you
 # really need to set your own GOFLAGS, ensure you add "providerless" explicitly
