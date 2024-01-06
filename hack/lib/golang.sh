@@ -496,7 +496,7 @@ kube::golang::set_platform_envs() {
 # Inputs:
 #   env-var GO_VERSION is the desired go version to use, downloading it if needed (defaults to content of .go-version)
 #   env-var FORCE_HOST_GO set to a non-empty value uses the go version in the $PATH and skips ensuring $GO_VERSION is used
-kube::golang::verify_go_version() {
+kube::golang::internal::verify_go_version() {
   # default GO_VERSION to content of .go-version
   GO_VERSION="${GO_VERSION:-"$(cat "${KUBE_ROOT}/.go-version")"}"
   if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
@@ -549,8 +549,6 @@ EOF
 #   env-var GOBIN is unset (we want binaries in a predictable place)
 #   env-var PATH includes the local GOPATH
 kube::golang::setup_env() {
-  kube::golang::verify_go_version
-
   # Even in module mode, we need to set GOPATH for `go build` and `go install`
   # to work.  We build various tools (usually via `go install`) from a lot of
   # scripts.
@@ -580,6 +578,10 @@ kube::golang::setup_env() {
 
   # Explicitly turn on modules.
   export GO111MODULE=on
+
+  # This may try to download our specific Go version.  Do it last so it uses
+  # the above-configured environment.
+  kube::golang::internal::verify_go_version
 }
 
 kube::golang::setup_gomaxprocs() {

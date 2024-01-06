@@ -36,7 +36,6 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
 fi
 
 kube::golang::setup_env
-kube::golang::verify_go_version
 kube::util::require-jq
 
 # let us log all errors before we exit

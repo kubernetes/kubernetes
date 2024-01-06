@@ -45,7 +45,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::golang::setup_env
-kube::golang::verify_go_version
 export GOBIN="${KUBE_OUTPUT_BIN}"
 
 kube::util::require-jq

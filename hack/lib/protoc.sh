@@ -84,7 +84,7 @@ function kube::protoc::format() {
   cat hack/boilerplate/boilerplate.generatego.txt "${package}/api.pb.go" > tmpfile && mv tmpfile "${package}/api.pb.go"
 
   # Run gofmt to clean up the generated code.
-  kube::golang::verify_go_version
+  kube::golang::setup_env
   gofmt -s -w "${package}/api.pb.go"
 }
 
