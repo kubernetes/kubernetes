@@ -146,7 +146,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	for _, i := range context.Inputs {
-		klog.V(5).Infof("Considering pkg %q", i)
+		klog.V(3).Infof("Considering pkg %q", i)
 		pkg := context.Universe[i]
 		if pkg == nil {
 			// If the input had no Go files, for example.
@@ -162,9 +162,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				klog.Fatalf("Package %v: unsupported %s value: %q", i, tagEnabledName, ptagValue)
 			}
 			ptagRegister = ptag.register
-			klog.V(5).Infof("  tag.value: %q, tag.register: %t", ptagValue, ptagRegister)
+			klog.V(3).Infof("  tag.value: %q, tag.register: %t", ptagValue, ptagRegister)
 		} else {
-			klog.V(5).Infof("  no tag")
+			klog.V(3).Infof("  no tag")
 		}
 
 		// If the pkg-scoped tag says to generate, we can skip scanning types.
@@ -175,10 +175,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// can be copied.
 			var uncopyable []string
 			for _, t := range pkg.Types {
-				klog.V(5).Infof("  considering type %q", t.Name.String())
+				klog.V(3).Infof("  considering type %q", t.Name.String())
 				ttag := extractEnabledTypeTag(t)
 				if ttag != nil && ttag.value == "true" {
-					klog.V(5).Infof("    tag=true")
+					klog.V(3).Infof("    tag=true")
 					if !copyableType(t) {
 						uncopyable = append(uncopyable, fmt.Sprintf("%v", t))
 					} else {
@@ -259,10 +259,10 @@ func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
 		return false
 	}
 	if !copyableType(t) {
-		klog.V(2).Infof("Type %v is not copyable", t)
+		klog.V(3).Infof("Type %v is not copyable", t)
 		return false
 	}
-	klog.V(4).Infof("Type %v is copyable", t)
+	klog.V(3).Infof("Type %v is copyable", t)
 	g.typesForInit = append(g.typesForInit, t)
 	return true
 }
@@ -472,12 +472,12 @@ func (g *genDeepCopy) needsGeneration(t *types.Type) bool {
 	}
 	if g.allTypes && tv == "false" {
 		// The whole package is being generated, but this type has opted out.
-		klog.V(5).Infof("Not generating for type %v because type opted out", t)
+		klog.V(2).Infof("Not generating for type %v because type opted out", t)
 		return false
 	}
 	if !g.allTypes && tv != "true" {
 		// The whole package is NOT being generated, and this type has NOT opted in.
-		klog.V(5).Infof("Not generating for type %v because type did not opt in", t)
+		klog.V(2).Infof("Not generating for type %v because type did not opt in", t)
 		return false
 	}
 	return true
@@ -527,6 +527,7 @@ func (g *genDeepCopy) deepCopyableInterfacesInner(c *generator.Context, t *types
 	var ts []*types.Type
 	for _, intf := range intfs {
 		t := types.ParseFullyQualifiedName(intf)
+		klog.V(3).Infof("Loading package for interface %v", intf)
 		_, err := c.LoadPackages(t.Package)
 		if err != nil {
 			return nil, err
@@ -583,7 +584,7 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	if !g.needsGeneration(t) {
 		return nil
 	}
-	klog.V(5).Infof("Generating deepcopy function for type %v", t)
+	klog.V(2).Infof("Generating deepcopy functions for type %v", t)
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	args := argsFromType(t)
@@ -884,7 +885,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do(fmt.Sprintf("out.$.name$ = in.$.name$.DeepCopy%s()\n", uft.Name.Name), args)
 			sw.Do("}\n", nil)
 		default:
-			klog.Fatalf("Hit an unsupported type %v for %v, from %v", uft, ft, t)
+			klog.Fatalf("Hit an unsupported type '%v' for '%v', from %v.%v", uft, ft, t, m.Name)
 		}
 	}
 }
