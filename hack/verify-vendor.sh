@@ -25,6 +25,8 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::golang::setup_env
+
 # create a nice clean place to put our new vendor tree
 mkdir -p "${KUBE_ROOT}/_tmp"
 _tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendor.XXXXXX")"
@@ -49,9 +51,6 @@ kube::util::trap_add cleanup EXIT
 _kubetmp="${_tmpdir}/kubernetes"
 mkdir -p "${_kubetmp}"
 tar --exclude=.git --exclude="./_*" -c . | (cd "${_kubetmp}" && tar xf -)
-
-# Do all our work in module mode
-export GO111MODULE=on
 
 pushd "${_kubetmp}" > /dev/null 2>&1
   # Destroy deps in the copy of the kube tree
