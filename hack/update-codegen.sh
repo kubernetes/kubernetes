@@ -175,7 +175,7 @@ function codegen::deepcopy() {
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     "${gen_deepcopy_bin}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
@@ -308,7 +308,7 @@ function codegen::prerelease() {
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     "${gen_prerelease_bin}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
@@ -377,7 +377,7 @@ function codegen::defaults() {
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     "${gen_defaulter_bin}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
@@ -457,7 +457,7 @@ function codegen::conversions() {
     git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     "${gen_conversion_bin}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
@@ -553,7 +553,7 @@ function codegen::openapi() {
     git_find -z ':(glob)pkg/generated/**'/"${output_file}.go" | xargs -0 rm -f
 
     "${gen_openapi_bin}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --logtostderr \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
@@ -610,7 +610,7 @@ function codegen::applyconfigs() {
         | xargs -0 rm -f
 
     "${applyconfigurationgen}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --openapi-schema <("${modelsschema}") \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
@@ -664,7 +664,7 @@ function codegen::clients() {
         | xargs -0 rm -f
 
     "${clientgen}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go" \
         --output-package="k8s.io/client-go" \
@@ -709,7 +709,7 @@ function codegen::listers() {
         | xargs -0 rm -f
 
     "${listergen}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
         --output-package "k8s.io/client-go/listers" \
@@ -751,7 +751,7 @@ function codegen::informers() {
         | xargs -0 rm -f
 
     "${informergen}" \
-        --v "${KUBE_VERBOSE}" \
+        -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go/informers" \
         --output-package "k8s.io/client-go/informers" \
