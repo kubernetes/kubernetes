@@ -55,6 +55,7 @@ exec 22>&2            # Real stderr, use this explicitly
 exec 1>"${LOG_FILE}"  # Automatic stdout
 exec 2>&1             # Automatic stderr
 set -x                # Trace this script to stderr
+go env                # For the log
 
 function finish {
   ret=$?
