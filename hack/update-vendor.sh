@@ -55,6 +55,7 @@ exec 22>&2            # Real stderr, use this explicitly
 exec 1>"${LOG_FILE}"  # Automatic stdout
 exec 2>&1             # Automatic stderr
 set -x                # Trace this script to stderr
+go env                # For the log
 
 function finish {
   ret=$?
@@ -249,9 +250,17 @@ for repo in $(kube::util::list_staging_repos); do
         | while read -r X; do echo "-droprequire k8s.io/${X}"; done \
         | xargs -L 100 go mod edit
     # rewrite `replace` directives for staging components to point to peer directories
-    kube::util::list_staging_repos \
-        | while read -r X; do echo "-replace k8s.io/${X}=../${X}"; done \
-        | xargs -L 100 go mod edit
+    go mod edit -json \
+        | jq -r '.Replace[] | "\(.Old.Path) \(.New.Path)"' \
+        | while read -r mod path; do
+            # assumes all replacements are relative to KUBE_ROOT
+            rel="$(realpath "${KUBE_ROOT}/${path}" --relative-to "$(pwd)")"
+            if [[ "${rel}" == "." ]]; then # elide "this package"
+                go mod edit -dropreplace="${mod}"
+            else
+                go mod edit -replace "${mod}=${rel}"
+            fi
+        done
   )
 done
 
