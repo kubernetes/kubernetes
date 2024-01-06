@@ -185,7 +185,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	for _, ip := range ipStrings {
 		// Handle only the valid IPs
 		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != v1.IPFamilyUnknown {
-			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
+			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], netutils.ParseIPSloppy(ip).String())
 		} else {
 			// this function is called in multiple places. All of which
 			// have sanitized data. Except the case of ExternalIPs which is

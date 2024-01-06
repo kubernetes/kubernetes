@@ -253,7 +253,7 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 		// kube-proxy does not implement IP family translation, skip addresses with
 		// different IP family
 		if ingFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ingFamily == ipFamily {
-			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ing.IP)
+			info.loadBalancerVIPs = append(info.loadBalancerVIPs, netutils.ParseIPSloppy(ing.IP).String())
 		} else {
 			invalidIPs = append(invalidIPs, ing.IP)
 		}
