@@ -36,7 +36,6 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
 fi
 
 kube::golang::setup_env
-kube::golang::verify_go_version
 
 for mod in "${MODULES[@]}"; do
   pushd "${KUBE_ROOT}/${mod}" >/dev/null

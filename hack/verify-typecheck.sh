@@ -26,7 +26,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
 kube::golang::setup_env
-kube::golang::verify_go_version
 
 ret=0
 TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
