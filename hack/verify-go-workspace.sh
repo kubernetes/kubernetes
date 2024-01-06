@@ -27,5 +27,4 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
 
-export GO111MODULE=on # TODO(thockin): remove this when init.sh stops disabling it
 kube::verify::generated "Go workspace files need to be updated" "Please run 'hack/update-go-workspace.sh'" hack/update-go-workspace.sh
