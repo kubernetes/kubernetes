@@ -31,6 +31,10 @@ unset CDPATH
 # they can explicitly set GO111MODULE=on
 export GO111MODULE=off
 
+if [[ "${KUBE_PROVIDERLESS:-"off"}" == "on" ]]; then
+  export GOFLAGS=${GOFLAGS:-"-tags=providerless"}
+fi
+
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
