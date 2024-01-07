@@ -182,19 +182,19 @@ func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName,
 // MapIPsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
 func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
-	for _, ip := range ipStrings {
+	for _, ipStr := range ipStrings {
+		ip := netutils.ParseIPSloppy(ipStr)
 		// Handle only the valid IPs
 		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != v1.IPFamilyUnknown {
-			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
+			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ipStr)
 		} else {
 			// this function is called in multiple places. All of which
 			// have sanitized data. Except the case of ExternalIPs which is
 			// not validated by api-server. Specifically empty strings
 			// validation. Which yields into a lot of bad error logs.
 			// check for empty string
-			if len(strings.TrimSpace(ip)) != 0 {
-				klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
-
+			if len(strings.TrimSpace(ipStr)) != 0 {
+				klog.ErrorS(nil, "Skipping invalid IP", "ip", ipStr)
 			}
 		}
 	}
@@ -216,8 +216,8 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 }
 
 // GetIPFamilyFromIP Returns the IP family of ipStr, or IPFamilyUnknown if ipStr can't be parsed as an IP
-func GetIPFamilyFromIP(ipStr string) v1.IPFamily {
-	return convertToV1IPFamily(netutils.IPFamilyOfString(ipStr))
+func GetIPFamilyFromIP(ip net.IP) v1.IPFamily {
+	return convertToV1IPFamily(netutils.IPFamilyOf(ip))
 }
 
 // Returns the IP family of cidrStr, or IPFamilyUnknown if cidrStr can't be parsed as a CIDR

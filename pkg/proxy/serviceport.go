@@ -42,8 +42,8 @@ type ServicePort interface {
 	StickyMaxAgeSeconds() int
 	// ExternalIPStrings returns service ExternalIPs as a string array.
 	ExternalIPStrings() []string
-	// LoadBalancerVIPStrings returns service LoadBalancerIPs which are VIP mode as a string array.
-	LoadBalancerVIPStrings() []string
+	// LoadBalancerVIPs returns service LoadBalancerIPs which are VIP mode
+	LoadBalancerVIPs() []net.IP
 	// Protocol returns service protocol.
 	Protocol() v1.Protocol
 	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
@@ -78,7 +78,7 @@ type BaseServicePortInfo struct {
 	port                     int
 	protocol                 v1.Protocol
 	nodePort                 int
-	loadBalancerVIPs         []string
+	loadBalancerVIPs         []net.IP
 	sessionAffinityType      v1.ServiceAffinity
 	stickyMaxAgeSeconds      int
 	externalIPs              []string
@@ -141,8 +141,8 @@ func (bsvcPortInfo *BaseServicePortInfo) ExternalIPStrings() []string {
 	return bsvcPortInfo.externalIPs
 }
 
-// LoadBalancerVIPStrings is part of ServicePort interface.
-func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerVIPStrings() []string {
+// LoadBalancerVIPs is part of ServicePort interface.
+func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerVIPs() []net.IP {
 	return bsvcPortInfo.loadBalancerVIPs
 }
 
@@ -235,7 +235,7 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 	}
 
 	// Obtain Load Balancer Ingress
-	var invalidIPs []string
+	var invalidIPs []net.IP
 	for _, ing := range service.Status.LoadBalancer.Ingress {
 		if ing.IP == "" {
 			continue
@@ -252,15 +252,16 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 
 		// kube-proxy does not implement IP family translation, skip addresses with
 		// different IP family
-		if ingFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ingFamily == ipFamily {
-			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ing.IP)
+		ip := netutils.ParseIPSloppy(ing.IP) // (already verified as an IP-address)
+		if ingFamily := proxyutil.GetIPFamilyFromIP(ip); ingFamily == ipFamily {
+			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ip)
 		} else {
-			invalidIPs = append(invalidIPs, ing.IP)
+			invalidIPs = append(invalidIPs, ip)
 		}
 	}
 	if len(invalidIPs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
-			"ipFamily", ipFamily, "loadBalancerIngressIPs", strings.Join(invalidIPs, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "loadBalancerIngressIPs", invalidIPs, "service", klog.KObj(service))
 	}
 
 	if apiservice.NeedsHealthCheck(service) {

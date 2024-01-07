@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -85,6 +86,13 @@ func makeServicePortName(ns, name, port string, protocol v1.Protocol) ServicePor
 		Port:           port,
 		Protocol:       protocol,
 	}
+}
+func makeIPs(ipStr ...string) []net.IP {
+	var ips []net.IP
+	for _, s := range ipStr {
+		ips = append(ips, netutils.ParseIPSloppy(s))
+	}
+	return ips
 }
 
 func TestServiceToServiceMap(t *testing.T) {
@@ -187,10 +195,10 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 			},
 		},
@@ -208,10 +216,10 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 			},
 		},
@@ -229,10 +237,10 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 			},
 		},
@@ -251,10 +259,10 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.4"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
 				}),
 			},
 		},
@@ -294,10 +302,10 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("ns1", "only-local-load-balancer", "portx", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8677, "UDP", 345, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.3"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.3")
 				}),
 				makeServicePortName("ns1", "only-local-load-balancer", "porty", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.12", 8678, "UDP", 345, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.loadBalancerVIPs = []string{"10.1.2.3"}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.3")
 				}),
 			},
 		},
@@ -405,7 +413,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "validIPv4", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
-					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv4}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv4)
 				}),
 			},
 		},
@@ -443,7 +451,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "validIPv6", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
-					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv6}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv6)
 				}),
 			},
 		},
@@ -481,7 +489,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
-					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv4}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv4)
 				}),
 			},
 		},
@@ -519,7 +527,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
-					bsvcPortInfo.loadBalancerVIPs = []string{testExternalIPv6}
+					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv6)
 				}),
 			},
 		},

@@ -1188,7 +1188,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		usesFWChain := len(svcInfo.LoadBalancerVIPStrings()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
+		usesFWChain := len(svcInfo.LoadBalancerVIPs()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
 		fwChain := svcInfo.firewallChainName
 		if usesFWChain {
 			ensureChain(fwChain, tx, activeChains)
@@ -1213,8 +1213,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// will loop back with the source IP set to the VIP.  We
 			// need the following rules to allow requests from this node.
 			if allowFromNode {
-				for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
-					sources = append(sources, ",", lbip)
+				for _, lbip := range svcInfo.LoadBalancerVIPs() {
+					sources = append(sources, ",", lbip.String())
 				}
 			}
 			tx.Add(&knftables.Rule{
@@ -1227,12 +1227,12 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
+		for _, lbip := range svcInfo.LoadBalancerVIPs() {
 			if hasEndpoints {
 				tx.Add(&knftables.Element{
 					Map: kubeServiceIPsMap,
 					Key: []string{
-						lbip,
+						lbip.String(),
 						protocol,
 						strconv.Itoa(svcInfo.Port()),
 					},
@@ -1246,7 +1246,7 @@ func (proxier *Proxier) syncProxyRules() {
 				tx.Add(&knftables.Element{
 					Map: kubeFirewallIPsMap,
 					Key: []string{
-						lbip,
+						lbip.String(),
 						protocol,
 						strconv.Itoa(svcInfo.Port()),
 					},
@@ -1261,11 +1261,11 @@ func (proxier *Proxier) syncProxyRules() {
 			// Either no endpoints at all (REJECT) or no endpoints for
 			// external traffic (DROP anything that didn't get short-circuited
 			// by the EXT chain.)
-			for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
+			for _, lbip := range svcInfo.LoadBalancerVIPs() {
 				tx.Add(&knftables.Element{
 					Map: kubeNoEndpointServicesMap,
 					Key: []string{
-						lbip,
+						lbip.String(),
 						protocol,
 						strconv.Itoa(svcInfo.Port()),
 					},

@@ -53,8 +53,8 @@ func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, sv
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				conntrackCleanupServiceIPs.Insert(extIP)
 			}
-			for _, lbIP := range svcInfo.LoadBalancerVIPStrings() {
-				conntrackCleanupServiceIPs.Insert(lbIP)
+			for _, lbIP := range svcInfo.LoadBalancerVIPs() {
+				conntrackCleanupServiceIPs.Insert(lbIP.String())
 			}
 			nodePort := svcInfo.NodePort()
 			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
@@ -103,8 +103,8 @@ func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap pro
 					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
 				}
 			}
-			for _, lbIP := range svcInfo.LoadBalancerVIPStrings() {
-				err := ClearEntriesForNAT(exec, lbIP, endpointIP, v1.ProtocolUDP)
+			for _, lbIP := range svcInfo.LoadBalancerVIPs() {
+				err := ClearEntriesForNAT(exec, lbIP.String(), endpointIP, v1.ProtocolUDP)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "loadBalancerIP", lbIP)
 				}
