@@ -1097,10 +1097,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture externalIPs.
-		for _, externalIP := range svcInfo.ExternalIPStrings() {
+		for _, externalIP := range svcInfo.ExternalIPs() {
 			// ipset call
 			entry := &utilipset.Entry{
-				IP:       externalIP,
+				IP:       externalIP.String(),
 				Port:     svcInfo.Port(),
 				Protocol: protocol,
 				SetType:  utilipset.HashIPPort,
@@ -1123,7 +1123,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// ipvs call
 			serv := &utilipvs.VirtualServer{
-				Address:   netutils.ParseIPSloppy(externalIP),
+				Address:   externalIP,
 				Port:      uint16(svcInfo.Port()),
 				Protocol:  string(svcInfo.Protocol()),
 				Scheduler: proxier.ipvsScheduler,

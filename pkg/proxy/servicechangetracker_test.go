@@ -411,7 +411,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("test", "validIPv4", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
+					bsvcPortInfo.externalIPs = makeIPs(testExternalIPv4)
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
 					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv4)
 				}),
@@ -449,7 +449,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("test", "validIPv6", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
+					bsvcPortInfo.externalIPs = makeIPs(testExternalIPv6)
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
 					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv6)
 				}),
@@ -487,7 +487,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.externalIPs = []string{testExternalIPv4}
+					bsvcPortInfo.externalIPs = makeIPs(testExternalIPv4)
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
 					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv4)
 				}),
@@ -525,7 +525,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServicePortInfo{
 				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
-					bsvcPortInfo.externalIPs = []string{testExternalIPv6}
+					bsvcPortInfo.externalIPs = makeIPs(testExternalIPv6)
 					bsvcPortInfo.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
 					bsvcPortInfo.loadBalancerVIPs = makeIPs(testExternalIPv6)
 				}),
@@ -580,7 +580,7 @@ func TestServiceToServiceMap(t *testing.T) {
 					svcInfo.port != expectedInfo.port ||
 					svcInfo.protocol != expectedInfo.protocol ||
 					svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
-					!sets.New[string](svcInfo.externalIPs...).Equal(sets.New[string](expectedInfo.externalIPs...)) ||
+					!reflect.DeepEqual(svcInfo.externalIPs, expectedInfo.externalIPs) ||
 					!sets.New[string](svcInfo.loadBalancerSourceRanges...).Equal(sets.New[string](expectedInfo.loadBalancerSourceRanges...)) ||
 					!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) {
 					t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
@@ -591,7 +591,7 @@ func TestServiceToServiceMap(t *testing.T) {
 						svcInfo.port != expectedInfo.port ||
 						svcInfo.protocol != expectedInfo.protocol ||
 						svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
-						!sets.New[string](svcInfo.externalIPs...).Equal(sets.New[string](expectedInfo.externalIPs...)) ||
+						!reflect.DeepEqual(svcInfo.externalIPs, expectedInfo.externalIPs) ||
 						!sets.New[string](svcInfo.loadBalancerSourceRanges...).Equal(sets.New[string](expectedInfo.loadBalancerSourceRanges...)) ||
 						!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) {
 						t.Errorf("expected new[%v]to be %v, got %v", svcKey, expectedInfo, *svcInfo)

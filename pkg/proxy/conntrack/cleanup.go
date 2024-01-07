@@ -50,8 +50,8 @@ func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, sv
 		if svcInfo, ok := svcPortMap[svcPortName]; ok {
 			klog.V(4).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
 			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
-			for _, extIP := range svcInfo.ExternalIPStrings() {
-				conntrackCleanupServiceIPs.Insert(extIP)
+			for _, extIP := range svcInfo.ExternalIPs() {
+				conntrackCleanupServiceIPs.Insert(extIP.String())
 			}
 			for _, lbIP := range svcInfo.LoadBalancerVIPs() {
 				conntrackCleanupServiceIPs.Insert(lbIP.String())
@@ -97,8 +97,8 @@ func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap pro
 			if err != nil {
 				klog.ErrorS(err, "Failed to delete endpoint connections", "servicePortName", epSvcPair.ServicePortName)
 			}
-			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := ClearEntriesForNAT(exec, extIP, endpointIP, v1.ProtocolUDP)
+			for _, extIP := range svcInfo.ExternalIPs() {
+				err := ClearEntriesForNAT(exec, extIP.String(), endpointIP, v1.ProtocolUDP)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
 				}

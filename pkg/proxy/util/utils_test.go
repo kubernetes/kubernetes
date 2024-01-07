@@ -338,10 +338,18 @@ func TestMapIPsByIPFamily(t *testing.T) {
 
 			ipMap := MapIPsByIPFamily(testcase.ipString)
 
-			if !reflect.DeepEqual(testcase.expectCorrect, ipMap[ipFamily]) {
+			var ipStr []string
+			for _, ip := range ipMap[ipFamily] {
+				ipStr = append(ipStr, ip.String())
+			}
+			if !reflect.DeepEqual(testcase.expectCorrect, ipStr) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, ipMap[ipFamily])
 			}
-			if !reflect.DeepEqual(testcase.expectIncorrect, ipMap[otherIPFamily]) {
+			ipStr = nil
+			for _, ip := range ipMap[otherIPFamily] {
+				ipStr = append(ipStr, ip.String())
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, ipStr) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, ipMap[otherIPFamily])
 			}
 		})

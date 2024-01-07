@@ -1153,14 +1153,14 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture externalIPs.
-		for _, externalIP := range svcInfo.ExternalIPStrings() {
+		for _, externalIP := range svcInfo.ExternalIPs() {
 			if hasEndpoints {
 				// Send traffic bound for external IPs to the "external
 				// destinations" chain.
 				tx.Add(&knftables.Element{
 					Map: kubeServiceIPsMap,
 					Key: []string{
-						externalIP,
+						externalIP.String(),
 						protocol,
 						strconv.Itoa(svcInfo.Port()),
 					},
@@ -1176,7 +1176,7 @@ func (proxier *Proxier) syncProxyRules() {
 				tx.Add(&knftables.Element{
 					Map: kubeNoEndpointServicesMap,
 					Key: []string{
-						externalIP,
+						externalIP.String(),
 						protocol,
 						strconv.Itoa(svcInfo.Port()),
 					},

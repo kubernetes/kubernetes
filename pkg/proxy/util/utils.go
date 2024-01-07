@@ -180,19 +180,18 @@ func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName,
 }
 
 // MapIPsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
-func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
-	ipFamilyMap := map[v1.IPFamily][]string{}
+func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]net.IP {
+	ipFamilyMap := map[v1.IPFamily][]net.IP{}
 	for _, ipStr := range ipStrings {
 		ip := netutils.ParseIPSloppy(ipStr)
-		// Handle only the valid IPs
-		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != v1.IPFamilyUnknown {
-			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ipStr)
+		if ip != nil {
+			// Since ip is parsed ok, GetIPFamilyFromIP will never return v1.IPFamilyUnknown
+			ipFamily := GetIPFamilyFromIP(ip)
+			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			// this function is called in multiple places. All of which
-			// have sanitized data. Except the case of ExternalIPs which is
-			// not validated by api-server. Specifically empty strings
-			// validation. Which yields into a lot of bad error logs.
-			// check for empty string
+			// ExternalIPs may not be validated by the api-server.
+			// Specifically empty strings validation, which yields into a lot
+			// of bad error logs.
 			if len(strings.TrimSpace(ipStr)) != 0 {
 				klog.ErrorS(nil, "Skipping invalid IP", "ip", ipStr)
 			}

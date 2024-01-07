@@ -40,8 +40,8 @@ type ServicePort interface {
 	SessionAffinityType() v1.ServiceAffinity
 	// StickyMaxAgeSeconds returns service max connection age
 	StickyMaxAgeSeconds() int
-	// ExternalIPStrings returns service ExternalIPs as a string array.
-	ExternalIPStrings() []string
+	// ExternalIPs returns service ExternalIPs
+	ExternalIPs() []net.IP
 	// LoadBalancerVIPs returns service LoadBalancerIPs which are VIP mode
 	LoadBalancerVIPs() []net.IP
 	// Protocol returns service protocol.
@@ -81,7 +81,7 @@ type BaseServicePortInfo struct {
 	loadBalancerVIPs         []net.IP
 	sessionAffinityType      v1.ServiceAffinity
 	stickyMaxAgeSeconds      int
-	externalIPs              []string
+	externalIPs              []net.IP
 	loadBalancerSourceRanges []string
 	healthCheckNodePort      int
 	externalPolicyLocal      bool
@@ -136,8 +136,8 @@ func (bsvcPortInfo *BaseServicePortInfo) NodePort() int {
 	return bsvcPortInfo.nodePort
 }
 
-// ExternalIPStrings is part of ServicePort interface.
-func (bsvcPortInfo *BaseServicePortInfo) ExternalIPStrings() []string {
+// ExternalIPs is part of ServicePort interface.
+func (bsvcPortInfo *BaseServicePortInfo) ExternalIPs() []net.IP {
 	return bsvcPortInfo.externalIPs
 }
 
@@ -216,20 +216,19 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 	// prior to dual stack services, this was considered an error, but with dual stack
 	// services, this is actually expected. Hence we downgraded from reporting by events
 	// to just log lines with high verbosity
-
 	ipFamilyMap := proxyutil.MapIPsByIPFamily(service.Spec.ExternalIPs)
 	info.externalIPs = ipFamilyMap[ipFamily]
 
 	// Log the IPs not matching the ipFamily
 	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
-			"ipFamily", ipFamily, "externalIPs", strings.Join(ips, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "externalIPs", ips, "service", klog.KObj(service))
 	}
 
-	ipFamilyMap = proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
-	info.loadBalancerSourceRanges = ipFamilyMap[ipFamily]
+	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
+	info.loadBalancerSourceRanges = cidrFamilyMap[ipFamily]
 	// Log the CIDRs not matching the ipFamily
-	if cidrs, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
+	if cidrs, ok := cidrFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
 			"ipFamily", ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ", "), "service", klog.KObj(service))
 	}
