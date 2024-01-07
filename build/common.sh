@@ -81,6 +81,7 @@ readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 # This is a symlink to binaries for "this platform" (e.g. build tools).
 readonly THIS_PLATFORM_BIN="${LOCAL_OUTPUT_ROOT}/bin"
 
+readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly REMOTE_ROOT="/go/src/${KUBE_GO_PACKAGE}"
 readonly REMOTE_OUTPUT_ROOT="${REMOTE_ROOT}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
