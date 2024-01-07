@@ -104,7 +104,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	if apierrors.IsNotFound(err) {
 		// When csiNode for a deleted Pod is not found, it doesn't make the pod schedulable
 		// because csiNode should be recreated again to let the pod go to this node.
-		logger.V(5).Info("csiNode for a deleted Pod is not found", "nodeName", deletedPod.Spec.NodeName)
+		logger.V(5).Info("A PVC for the Pod is not found, this Pod won't be schedulable until it's recreated", "pod", klog.KObj(pod), "namespace", pod.Namespace)
 		return framework.QueueSkip, nil
 	} else if err != nil {
 		return framework.Queue, fmt.Errorf("could not get a CSINode object: %w", err)
