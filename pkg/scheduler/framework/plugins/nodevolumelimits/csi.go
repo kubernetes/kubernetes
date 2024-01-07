@@ -129,7 +129,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	}
 
 	fmt.Println("Deleted pod drivers: ", deletedPodDrivers)
-	for deletedPodDriverName, _ := range deletedPodDrivers {
+	for deletedPodDriverName := range deletedPodDrivers {
 		if schedulingPodDrivers.Has(deletedPodDriverName) {
 			// This event may make Pod schedulable because the deleted Pod used the same CSI driver as the new Pod.
 			return framework.Queue, nil
