@@ -178,6 +178,115 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 	}
 }
 
+// Test_ServiceLoadBalancerDisableAllocatedNodePort test that switching a Service
+// to spec.allocateLoadBalancerNodePorts=false can de-allocate existing node ports.
+func Test_ServiceLoadBalancerDisableAllocatedNodePort(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			AllocateLoadBalancerNodePorts: utilpointer.Bool(true),
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if !serviceHasNodePorts(service) {
+		t.Error("expected node ports but found none")
+	}
+
+	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+	service.Spec.Ports[0].NodePort = 0
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error updating test service: %v", err)
+	}
+
+	if serviceHasNodePorts(service) {
+		t.Error("node ports were expected to be deallocated")
+	}
+}
+
+// Test_ServiceLoadBalancerDisableAllocatedNodePorts test that switching a Service
+// to spec.allocateLoadBalancerNodePorts=false can de-allocate one of existing node ports.
+func Test_ServiceLoadBalancerDisableAllocatedNodePorts(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			AllocateLoadBalancerNodePorts: utilpointer.Bool(true),
+			Ports: []corev1.ServicePort{{
+				Name: "np-1",
+				Port: int32(80),
+			}, {
+				Name: "np-2",
+				Port: int32(81),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if !serviceHasNodePorts(service) {
+		t.Error("expected node ports but found none")
+	}
+
+	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+	service.Spec.Ports[0].NodePort = 0
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error updating test service: %v", err)
+	}
+
+	if service.Spec.Ports[0].NodePort != 0 {
+		t.Error("node ports[0] was expected to be deallocated")
+	}
+	if service.Spec.Ports[1].NodePort == 0 {
+		t.Error("node ports was not expected to be deallocated")
+	}
+}
+
 // Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=true from false, allocate new node ports.
 func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
