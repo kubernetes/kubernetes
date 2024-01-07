@@ -35,17 +35,18 @@ const (
 )
 
 var (
-	// AssignedPodAdd is the event when a pod is added that causes pods with matching affinity terms
-	// to be more schedulable.
+	// AssignedPodAdd is the event when a pod is added.
 	AssignedPodAdd = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add, Label: "AssignedPodAdd"}
 	// NodeAdd is the event when a new node is added to the cluster.
 	NodeAdd = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add, Label: "NodeAdd"}
-	// AssignedPodUpdate is the event when a pod is updated that causes pods with matching affinity
-	// terms to be more schedulable.
+	// AssignedPodUpdate is the event when a pod is updated.
 	AssignedPodUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "AssignedPodUpdate"}
-	// AssignedPodDelete is the event when a pod is deleted that causes pods with matching affinity
-	// terms to be more schedulable.
+	// AssignedPodDelete is the event when a pod is deleted.
 	AssignedPodDelete = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete, Label: "AssignedPodDelete"}
+	// PodRequestChange is the event when a pod's resource request is changed.
+	PodRequestChange = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodRequest, Label: "PodRequestChange"}
+	// PodLabelChange is the event when a pod's label is changed.
+	PodLabelChange = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodLabel, Label: "PodLabelChange"}
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
 	NodeSpecUnschedulableChange = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint, Label: "NodeSpecUnschedulableChange"}
 	// NodeAllocatableChange is the event when node allocatable is changed.

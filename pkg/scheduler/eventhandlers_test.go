@@ -29,15 +29,13 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dyfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
@@ -84,31 +82,31 @@ func TestNodeAllocatableChanged(t *testing.T) {
 
 func TestNodeLabelsChanged(t *testing.T) {
 	for _, test := range []struct {
-		Name      string
-		Changed   bool
-		OldLabels map[string]string
-		NewLabels map[string]string
+		name      string
+		changed   bool
+		oldLabels map[string]string
+		newLabels map[string]string
 	}{
 		{
-			Name:      "no labels changed",
-			Changed:   false,
-			OldLabels: map[string]string{"foo": "bar"},
-			NewLabels: map[string]string{"foo": "bar"},
+			name:      "no labels changed",
+			changed:   false,
+			oldLabels: map[string]string{"foo": "bar"},
+			newLabels: map[string]string{"foo": "bar"},
 		},
 		// Labels changed.
 		{
-			Name:      "new node has more labels",
-			Changed:   true,
-			OldLabels: map[string]string{"foo": "bar"},
-			NewLabels: map[string]string{"foo": "bar", "test": "value"},
+			name:      "new object has more labels",
+			changed:   true,
+			oldLabels: map[string]string{"foo": "bar"},
+			newLabels: map[string]string{"foo": "bar", "test": "value"},
 		},
 	} {
-		t.Run(test.Name, func(t *testing.T) {
-			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.OldLabels}}
-			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.NewLabels}}
-			changed := nodeLabelsChanged(newNode, oldNode)
-			if changed != test.Changed {
-				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+		t.Run(test.name, func(t *testing.T) {
+			oldNodeObjectMeta := metav1.ObjectMeta{Labels: test.oldLabels}
+			newNodeObjectMeta := metav1.ObjectMeta{Labels: test.newLabels}
+			changed := labelsChanged(newNodeObjectMeta, oldNodeObjectMeta)
+			if changed != test.changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.name, test.changed, changed)
 			}
 		})
 	}
@@ -610,5 +608,110 @@ func TestNodeSchedulingPropertiesChange(t *testing.T) {
 		if diff := cmp.Diff(tc.wantEvents, gotEvents); diff != "" {
 			t.Errorf("unexpected event (-want, +got):\n%s", diff)
 		}
+	}
+}
+
+func Test_podSchedulingPropertiesChange(t *testing.T) {
+	podWithBigRequest := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "app",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "app",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+				},
+			},
+		},
+	}
+	podWithBigRequestAndLabel := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"foo": "bar"},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "app",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "app",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+				},
+			},
+		},
+	}
+	podWithSmallRequest := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "app",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "app",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+				},
+			},
+		},
+	}
+	tests := []struct {
+		name   string
+		newPod *v1.Pod
+		oldPod *v1.Pod
+		want   []framework.ClusterEvent
+	}{
+		{
+			name:   "only label is updated",
+			newPod: st.MakePod().Label("foo", "bar").Obj(),
+			oldPod: st.MakePod().Label("foo", "bar2").Obj(),
+			want:   []framework.ClusterEvent{queue.PodLabelChange},
+		},
+		{
+			name:   "only pod's resource request is updated",
+			oldPod: podWithSmallRequest,
+			newPod: podWithBigRequest,
+			want:   []framework.ClusterEvent{queue.PodRequestChange},
+		},
+		{
+			name:   "both pod's resource request and label are updated",
+			oldPod: podWithSmallRequest,
+			newPod: podWithBigRequestAndLabel,
+			want:   []framework.ClusterEvent{queue.PodLabelChange, queue.PodRequestChange},
+		},
+		{
+			name:   "different part of pod is updated",
+			newPod: st.MakePod().Annotation("foo", "bar").Obj(),
+			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
+			want:   []framework.ClusterEvent{queue.AssignedPodUpdate},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := podSchedulingPropertiesChange(tt.newPod, tt.oldPod)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

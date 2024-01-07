@@ -46,19 +46,28 @@ type ActionType int64
 
 // Constants for ActionTypes.
 const (
-	Add    ActionType = 1 << iota // 1
-	Delete                        // 10
+	Add ActionType = 1 << iota
+	Delete
 	// UpdateNodeXYZ is only applicable for Node events.
-	UpdateNodeAllocatable // 100
-	UpdateNodeLabel       // 1000
-	UpdateNodeTaint       // 10000
-	UpdateNodeCondition   // 100000
-	UpdateNodeAnnotation  // 1000000
+	// If you use UpdateNodeXYZ,
+	// your plugin's QueueingHint is only executed for the specific sub-Update event.
+	// It's better to narrow down the scope of the event by specifying them
+	// for better performance in requeueing.
+	UpdateNodeAllocatable
+	UpdateNodeLabel
+	UpdateNodeTaint
+	UpdateNodeCondition
+	UpdateNodeAnnotation
 
-	All ActionType = 1<<iota - 1 // 1111111
+	// UpdatePodXYZ is only applicable for Pod events.
+	UpdatePodLabel
+	// UpdatePodRequest is a update for pod's resource request calculated by resource.PodRequests() function.
+	UpdatePodRequest
+
+	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodRequest
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.
@@ -72,6 +81,11 @@ const (
 	//           - a Pod that is deleted
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
+	//
+	// Also, there are some special events (UpdatePodXYZ) that are appliciable for Pod.
+	// The scheduler uses those special events to prefilter events to be cached (inFlightEvents).
+	// So, it's better to narrow down the scope of the event by specifying them
+	// to avoid unnecessary memory consumption by keeping Pod updates that never affect scheduling of your plugin.
 	Pod GVK = "Pod"
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
@@ -82,6 +96,11 @@ const (
 	// unschedulable pod pool.
 	// This behavior will be removed when we remove the preCheck feature.
 	// See: https://github.com/kubernetes/kubernetes/issues/110175
+	//
+	// Also, there are some special events (UpdateNodeXYZ) that are appliciable for Node.
+	// The scheduler uses those special events to prefilter events to be cached (inFlightEvents).
+	// So, it's better to narrow down the scope of the event by specifying them
+	// to avoid unnecessary memory consumption by keeping Node updates that never affect scheduling of your plugin.
 	Node                    GVK = "Node"
 	PersistentVolume        GVK = "PersistentVolume"
 	PersistentVolumeClaim   GVK = "PersistentVolumeClaim"
@@ -155,7 +174,8 @@ func (s QueueingHint) String() string {
 type ClusterEvent struct {
 	Resource   GVK
 	ActionType ActionType
-	Label      string
+	// Label describes this cluster event, only used in logging and metrics.
+	Label string
 }
 
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
@@ -164,14 +184,25 @@ func (ce ClusterEvent) IsWildCard() bool {
 }
 
 // Match returns true if ClusterEvent is matched with the coming event.
+// "match" means the coming event is the same or more specific than the ce.
+// i.e., when ce.ActionType is Update, it return true if a coming event is UpdateNodeLabel
+// because UpdateNodeLabel is more specific than Update.
+// On the other hand, when ce.ActionType is UpdateNodeLabel, it doesn't return true if a coming event is Update.
+// This is based on the fact that the scheduler interprets the coming cluster event as specific event if possible;
+// meaning, if a coming event is Node/Update,
+// it means that Node's update is not something that can be interpreted as any of Node's specific Update events.
+//
 // If the ce.Resource is "*", there's no requirement for the coming event' Resource.
 // Contrarily, if the coming event's Resource is "*", the ce.Resource should only be "*".
+// (which should never happen in the current implementation of the scheduling queue.)
 //
 // Note: we have a special case here when the coming event is a wildcard event,
 // it will force all Pods to move to activeQ/backoffQ,
 // but we take it as an unmatched event unless the ce is also a wildcard one.
-func (ce ClusterEvent) Match(event ClusterEvent) bool {
-	return ce.IsWildCard() || (ce.Resource == WildCard || ce.Resource == event.Resource) && ce.ActionType&event.ActionType != 0
+func (ce ClusterEvent) Match(comingEvent ClusterEvent) bool {
+	return ce.IsWildCard() ||
+		(ce.Resource == WildCard || ce.Resource == comingEvent.Resource) &&
+			(ce.ActionType&comingEvent.ActionType != 0 && comingEvent.ActionType <= ce.ActionType)
 }
 
 func UnrollWildCardResource() []ClusterEventWithHint {
