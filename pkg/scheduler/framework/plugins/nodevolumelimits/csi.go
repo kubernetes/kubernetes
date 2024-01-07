@@ -114,55 +114,27 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		return framework.Queue, fmt.Errorf("could not get a CSINode object: %w", err)
 	}
 
+	deletedPodAttachedVolumes := make(map[string]string)
+	if err := pl.filterAttachableVolumes(logger, deletedPod, csiNode, false /* existing pod */, deletedPodAttachedVolumes); err != nil {
+		return framework.Queue, fmt.Errorf("failed to filter attachable volumes from %v: %w", klog.KObj(deletedPod), err)
+	}
 	deletedPodDrivers := sets.Set[string]{}
-	for _, vol := range deletedPod.Spec.Volumes {
-		pvcName := ""
-		switch {
-		case vol.PersistentVolumeClaim != nil:
-			pvcName = vol.PersistentVolumeClaim.ClaimName
-		case vol.Ephemeral != nil:
-			pvcName = ephemeral.VolumeClaimName(pod, &vol)
-		default:
-			continue
-		}
-
-		pvc, err := pl.pvcLister.PersistentVolumeClaims(deletedPod.Namespace).Get(pvcName)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				logger.V(5).Info("A PVC for a deleted Pod is not found", "deletedPod", deletedPod, "namespace", deletedPod.Namespace, "pvc name", pvcName)
-				// Ignore the PVC that is not found.
-				continue
-			}
-			return framework.Queue, fmt.Errorf("unable to look up a PVC of a deleted pod: %w", err)
-
-		}
-
-		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
+	for _, driverName := range deletedPodAttachedVolumes {
 		deletedPodDrivers.Insert(driverName)
 	}
 
-	for _, vol := range pod.Spec.Volumes {
-		pvcName := ""
-		switch {
-		case vol.PersistentVolumeClaim != nil:
-			pvcName = vol.PersistentVolumeClaim.ClaimName
-		case vol.Ephemeral != nil:
-			pvcName = ephemeral.VolumeClaimName(pod, &vol)
-		default:
-			continue
-		}
+	schedulingPodAttachedVolumes := make(map[string]string)
+	if err := pl.filterAttachableVolumes(logger, pod, csiNode, false /* new pod */, schedulingPodAttachedVolumes); err != nil {
+		return framework.Queue, fmt.Errorf("failed to filter attachable volumes from %v: %w", klog.KObj(pod), err)
+	}
+	schedulingPodDrivers := sets.Set[string]{}
+	for _, driverName := range schedulingPodAttachedVolumes {
+		schedulingPodDrivers.Insert(driverName)
+	}
 
-		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-		if apierrors.IsNotFound(err) {
-			logger.V(5).Info("A PVC info is not found", "namespace", pod.Namespace, "pvc name", pvcName)
-			return framework.QueueSkip, nil
-		} else if err != nil {
-			return framework.Queue, fmt.Errorf("unable to look up a PVC of the pod: %w", err)
-		}
-
-		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
-
-		if deletedPodDrivers.Has(driverName) {
+	fmt.Println("Deleted pod drivers: ", deletedPodDrivers)
+	for deletedPodDriverName, _ := range deletedPodDrivers {
+		if schedulingPodDrivers.Has(deletedPodDriverName) {
 			// This event may make Pod schedulable because the deleted Pod used the same CSI driver as the new Pod.
 			return framework.Queue, nil
 
