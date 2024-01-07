@@ -58,7 +58,6 @@ const (
 	nodeStatusTimeout   = 10 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	podEvictTimeout     = 2 * time.Minute
-	minNodes            = 2
 )
 
 var _ = utils.SIGDescribe("Pod Disks", feature.StorageProvider, func() {
