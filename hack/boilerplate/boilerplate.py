@@ -152,6 +152,7 @@ skipped_names = [
     ".git",
     "cluster/env.sh",
     "vendor",
+    "testdata",
     "test/e2e/generated/bindata.go",
     "hack/boilerplate/test",
     "staging/src/k8s.io/kubectl/pkg/generated/bindata.go",

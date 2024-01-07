@@ -36,6 +36,7 @@ function find_files_to_check() {
     git ls-files -cmo --exclude-standard \
         ':!:vendor/*'        `# catches vendor/...` \
         ':!:*/vendor/*'      `# catches any subdir/vendor/...` \
+        ':!:*/testdata/*'    `# catches any subdir/testdata/...` \
         ':!:third_party/*'   `# catches third_party/...` \
         ':!:*/third_party/*' `# catches third_party/...` \
         ':!:hack/*'          `# catches hack/...` \
