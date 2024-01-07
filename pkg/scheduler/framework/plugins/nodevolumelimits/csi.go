@@ -92,10 +92,6 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
 	}
 
-	if deletedPod.Namespace != pod.Namespace {
-		return framework.QueueSkip, nil
-	}
-
 	if len(deletedPod.Spec.Volumes) == 0 {
 		return framework.QueueSkip, nil
 	}
