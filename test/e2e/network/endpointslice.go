@@ -583,6 +583,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		// create custom endpoint slices
 		tcpProtocol := v1.ProtocolTCP
+		readyCondTrue := true
 		epsTemplate := &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
 				Labels: map[string]string{
@@ -591,7 +592,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				}},
 			AddressType: addressType,
 			Endpoints: []discoveryv1.Endpoint{
-				{Addresses: []string{pod.Status.PodIP}},
+				{
+					Addresses:  []string{pod.Status.PodIP},
+					Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+				},
 			},
 		}
 
@@ -684,6 +688,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		// create custom endpoint slices
 		tcpProtocol := v1.ProtocolTCP
+		readyCondTrue := true
 		epsTemplate := &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
 				Labels: map[string]string{
@@ -696,7 +701,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("creating")
 		eps1 := epsTemplate.DeepCopy()
 		eps1.Endpoints = []discoveryv1.Endpoint{
-			{Addresses: []string{pod1.Status.PodIP}},
+			{
+				Addresses:  []string{pod1.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+			},
 		}
 		eps1.Ports = []discoveryv1.EndpointPort{{
 			Name:     pointer.String("port80"),
@@ -708,7 +716,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Endpoints = []discoveryv1.Endpoint{
-			{Addresses: []string{pod2.Status.PodIP}},
+			{
+				Addresses:  []string{pod2.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+			},
 		}
 		eps2.Ports = []discoveryv1.EndpointPort{{
 			Name:     pointer.String("port81"),
