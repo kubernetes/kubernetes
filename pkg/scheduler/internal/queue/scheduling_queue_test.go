@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1938,6 +1939,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	defer cancel()
 
 	affinityPod := st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").Priority(mediumPriority).NominatedNodeName("node1").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj()
+	spreadPod := st.MakePod().Name("tsp").Namespace("ns1").UID("tsp").SpreadConstraint(1, "node", v1.DoNotSchedule, nil, nil, nil, nil, nil).Obj()
 	labelPod := st.MakePod().Name("lbp").Namespace(affinityPod.Namespace).Label("service", "securityscan").Node("node1").Obj()
 
 	c := testingclock.NewFakeClock(time.Now())
@@ -1947,15 +1949,29 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 			PluginName:     "fakePlugin",
 			QueueingHintFn: queueHintReturnQueue,
 		},
+		{
+			PluginName:     podtopologyspread.Name,
+			QueueingHintFn: queueHintReturnQueue,
+		},
 	}
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
-	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
+	if err := q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod)); err != nil {
+		t.Errorf("failed to add pod to activeQ: %v", err)
+	}
 	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
-	q.activeQ.Add(q.newQueuedPodInfo(affinityPod))
+	if err := q.activeQ.Add(q.newQueuedPodInfo(affinityPod)); err != nil {
+		t.Errorf("failed to add pod to activeQ: %v", err)
+	}
 	if p, err := q.Pop(logger); err != nil || p.Pod != affinityPod {
+		t.Errorf("Expected: %v after Pop, but got: %v", affinityPod.Name, p.Pod.Name)
+	}
+	if err := q.activeQ.Add(q.newQueuedPodInfo(spreadPod)); err != nil {
+		t.Errorf("failed to add pod to activeQ: %v", err)
+	}
+	if p, err := q.Pop(logger); err != nil || p.Pod != spreadPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", affinityPod.Name, p.Pod.Name)
 	}
 	q.Add(logger, medPriorityPodInfo.Pod)
@@ -1967,17 +1983,29 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
 	}
+	err = q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(spreadPod, podtopologyspread.Name), q.SchedulingCycle())
+	if err != nil {
+		t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
+	}
 
 	// Move clock to make the unschedulable pods complete backoff.
 	c.Step(DefaultPodInitialBackoffDuration + time.Second)
 	// Simulate addition of an assigned pod. The pod has matching labels for
-	// affinityPod. So, affinityPod should go to activeQ.
+	// affinityPod.
+	// - affinityPod should go to activeQ.
+	// - spreadPod should go to activeQ because it's rejected by podtopologyspread.
 	q.AssignedPodAdded(logger, labelPod)
 	if getUnschedulablePod(q, affinityPod) != nil {
 		t.Error("affinityPod is still in the unschedulablePods.")
 	}
+	if getUnschedulablePod(q, spreadPod) != nil {
+		t.Error("spreadPod is still in the unschedulablePods.")
+	}
 	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(affinityPod)); !exists {
 		t.Error("affinityPod is not moved to activeQ.")
+	}
+	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(spreadPod)); !exists {
+		t.Error("spreadPod is not moved to activeQ.")
 	}
 	// Check that the other pod is still in the unschedulablePods.
 	if getUnschedulablePod(q, unschedulablePodInfo.Pod) == nil {
