@@ -57,23 +57,25 @@ readonly SHELLCHECK_DISABLED
 # ensure we're linting the k8s source tree
 cd "${KUBE_ROOT}"
 
-# Find all shell scripts excluding:
-# - Anything git-ignored - No need to lint untracked files.
-# - ./_* - No need to lint output directories.
-# - ./.git/* - Ignore anything in the git object store.
-# - ./vendor* - Vendored code should be fixed upstream instead.
-# - ./third_party/*, but re-include ./third_party/forked/*  - only code we
-#    forked should be linted and fixed.
-all_shell_scripts=()
-while IFS=$'\n' read -r script;
-  do git check-ignore -q "$script" || all_shell_scripts+=("$script");
-done < <(find . -name "*.sh" \
-  -not \( \
-    -path ./_\*      -o \
-    -path ./.git\*   -o \
-    -path ./vendor\* -o \
-    \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
-  \))
+scripts_to_check=("$@")
+if [[ "$#" == 0 ]]; then
+  # Find all shell scripts excluding:
+  # - Anything git-ignored - No need to lint untracked files.
+  # - ./_* - No need to lint output directories.
+  # - ./.git/* - Ignore anything in the git object store.
+  # - ./vendor* - Vendored code should be fixed upstream instead.
+  # - ./third_party/*, but re-include ./third_party/forked/*  - only code we
+  #    forked should be linted and fixed.
+  while IFS=$'\n' read -r script;
+    do git check-ignore -q "$script" || scripts_to_check+=("$script");
+  done < <(find . -name "*.sh" \
+    -not \( \
+      -path ./_\*      -o \
+      -path ./.git\*   -o \
+      -path ./vendor\* -o \
+      \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
+    \))
+fi
 
 # detect if the host machine has the required shellcheck version installed
 # if so, we will use that instead.
@@ -110,13 +112,13 @@ SHELLCHECK_OPTIONS=(
 res=0
 if ${HAVE_SHELLCHECK}; then
   echo "Using host shellcheck ${SHELLCHECK_VERSION} binary."
-  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" >&2 || res=$?
+  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${scripts_to_check[@]}" >&2 || res=$?
 else
   echo "Using shellcheck ${SHELLCHECK_VERSION} docker image."
   "${DOCKER}" run \
     --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" \
     "${SHELLCHECK_IMAGE}" \
-  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" >&2 || res=$?
+  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${scripts_to_check[@]}" >&2 || res=$?
 fi
 
 # print a message based on the result
