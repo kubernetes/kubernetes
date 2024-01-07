@@ -270,19 +270,22 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	// SchedulingQueue.AssignedPodUpdated has a problem:
-	// It internally pre-filters Pods to move to activeQ,
-	// while taking only in-tree plugins into consideration.
-	// Consequently, if custom plugins that subscribes Pod/Update events reject Pods,
-	// those Pods will never be requeued to activeQ by an assigned Pod related events,
-	// and they may be stuck in unschedulableQ.
-	//
-	// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
-	// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
-	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodUpdate, oldPod, newPod, nil)
-	} else {
-		sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod)
+	events := queue.PodSchedulingPropertiesChange(newPod, oldPod)
+	for _, evt := range events {
+		// SchedulingQueue.AssignedPodUpdated has a problem:
+		// It internally pre-filters Pods to move to activeQ,
+		// while taking only in-tree plugins into consideration.
+		// Consequently, if custom plugins that subscribes Pod/Update events reject Pods,
+		// those Pods will never be requeued to activeQ by an assigned Pod related events,
+		// and they may be stuck in unschedulableQ.
+		//
+		// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
+		// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
+		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodUpdate, oldPod, newPod, nil)
+		} else {
+			sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod, evt)
+		}
 	}
 }
 

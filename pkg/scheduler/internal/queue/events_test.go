@@ -270,3 +270,108 @@ func TestNodeSchedulingPropertiesChange(t *testing.T) {
 		}
 	}
 }
+
+func Test_podSchedulingPropertiesChange(t *testing.T) {
+	podWithBigRequest := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "app",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "app",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+				},
+			},
+		},
+	}
+	podWithBigRequestAndLabel := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"foo": "bar"},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "app",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "app",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+				},
+			},
+		},
+	}
+	podWithSmallRequest := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "app",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "app",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+				},
+			},
+		},
+	}
+	tests := []struct {
+		name   string
+		newPod *v1.Pod
+		oldPod *v1.Pod
+		want   []framework.ClusterEvent
+	}{
+		{
+			name:   "only label is updated",
+			newPod: st.MakePod().Label("foo", "bar").Obj(),
+			oldPod: st.MakePod().Label("foo", "bar2").Obj(),
+			want:   []framework.ClusterEvent{PodLabelChange},
+		},
+		{
+			name:   "only pod's resource request is updated",
+			oldPod: podWithSmallRequest,
+			newPod: podWithBigRequest,
+			want:   []framework.ClusterEvent{PodRequestChange},
+		},
+		{
+			name:   "both pod's resource request and label are updated",
+			oldPod: podWithSmallRequest,
+			newPod: podWithBigRequestAndLabel,
+			want:   []framework.ClusterEvent{PodLabelChange, PodRequestChange},
+		},
+		{
+			name:   "untracked properties of pod is updated",
+			newPod: st.MakePod().Annotation("foo", "bar").Obj(),
+			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
+			want:   []framework.ClusterEvent{AssignedPodUpdate},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}

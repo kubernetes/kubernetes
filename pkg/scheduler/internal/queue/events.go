@@ -19,6 +19,9 @@ package queue
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -53,6 +56,10 @@ var (
 	UnscheduledPodDelete = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "UnschedulablePodDelete"}
 	// AssignedPodDelete is the event when an assigned pod is deleted.
 	AssignedPodDelete = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete, Label: "AssignedPodDelete"}
+	// PodRequestChange is the event when a pod's resource request is changed.
+	PodRequestChange = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodRequest, Label: "PodRequestChange"}
+	// PodLabelChange is the event when a pod's label is changed.
+	PodLabelChange = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodLabel, Label: "PodLabelChange"}
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
 	NodeSpecUnschedulableChange = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint, Label: "NodeSpecUnschedulableChange"}
 	// NodeAllocatableChange is the event when node allocatable is changed.
@@ -95,6 +102,44 @@ var (
 	UnschedulableTimeout = framework.ClusterEvent{Resource: framework.WildCard, ActionType: framework.All, Label: "UnschedulableTimeout"}
 )
 
+// PodSchedulingPropertiesChange interprets the update of a pod and returns corresponding UpdatePodXYZ event(s).
+// Once we have other pod update events, we should update here as well.
+func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []framework.ClusterEvent) {
+	podChangeExtracters := []podChangeExtractor{
+		extractPodLabelsChange,
+		extractPodResourceRequestChange,
+	}
+
+	for _, fn := range podChangeExtracters {
+		if event := fn(newPod, oldPod); event != nil {
+			events = append(events, *event)
+		}
+	}
+
+	if len(events) == 0 {
+		events = append(events, AssignedPodUpdate)
+	}
+
+	return
+}
+
+type podChangeExtractor func(newNode *v1.Pod, oldNode *v1.Pod) *framework.ClusterEvent
+
+func extractPodResourceRequestChange(newPod, oldPod *v1.Pod) *framework.ClusterEvent {
+	opt := resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)}
+	if !equality.Semantic.DeepEqual(resource.PodRequests(newPod, opt), resource.PodRequests(oldPod, opt)) {
+		return &PodRequestChange
+	}
+	return nil
+}
+
+func extractPodLabelsChange(newPod *v1.Pod, oldPod *v1.Pod) *framework.ClusterEvent {
+	if isLabelChanged(newPod.GetLabels(), oldPod.GetLabels()) {
+		return &PodLabelChange
+	}
+	return nil
+}
+
 // NodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
 func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events []framework.ClusterEvent) {
 	nodeChangeExtracters := []nodeChangeExtractor{
@@ -124,10 +169,14 @@ func extractNodeAllocatableChange(newNode *v1.Node, oldNode *v1.Node) *framework
 }
 
 func extractNodeLabelsChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
-	if !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels()) {
+	if isLabelChanged(newNode.GetLabels(), oldNode.GetLabels()) {
 		return &NodeLabelChange
 	}
 	return nil
+}
+
+func isLabelChanged(newLabels map[string]string, oldLabels map[string]string) bool {
+	return !equality.Semantic.DeepEqual(newLabels, oldLabels)
 }
 
 func extractNodeTaintsChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
