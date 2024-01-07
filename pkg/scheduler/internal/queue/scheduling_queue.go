@@ -409,6 +409,26 @@ const (
 	queueImmediately
 )
 
+// isEventOfInterest returns true if the event is of interest by some plugins.
+func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event framework.ClusterEvent) bool {
+	if event.IsWildCard() {
+		return true
+	}
+
+	for _, hintMap := range p.queueingHintMap {
+		for eventToMatch := range hintMap {
+			if eventToMatch.Match(event) {
+				// This event is interested by some plugins.
+				return true
+			}
+		}
+	}
+
+	logger.V(6).Info("receive an event that isn't interested by any enabled plugins", "event", event)
+
+	return false
+}
+
 // isPodWorthRequeuing calls QueueingHintFn of only plugins registered in pInfo.unschedulablePlugins and pInfo.PendingPlugins.
 //
 // If any of pInfo.PendingPlugins return Queue,
@@ -1077,6 +1097,12 @@ func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v
 // if Pop() is waiting for an item, it receives the signal after all the pods are in the
 // queue and the head is the highest priority pod.
 func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
+	if !p.isEventOfInterest(logger, event) {
+		// No plugin is interested in this event.
+		// Return early before iterating all pods in unschedulablePods for preCheck.
+		return
+	}
+
 	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		if preCheck == nil || preCheck(pInfo.Pod) {
@@ -1141,6 +1167,11 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) {
+	if !p.isEventOfInterest(logger, event) {
+		// No plugin is interested in this event.
+		return
+	}
+
 	activated := false
 	for _, pInfo := range podInfoList {
 		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
