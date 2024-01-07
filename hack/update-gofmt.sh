@@ -36,6 +36,7 @@ function git_find() {
         ':!:*/vendor/*'      `# catches any subdir/vendor/...` \
         ':!:third_party/*'   `# catches third_party/...` \
         ':!:*/third_party/*' `# catches third_party/...` \
+        ':!:*/testdata/*'    `# catches any subdir/testdata/...` \
         ':(glob)**/*.go' \
         "$@"
 }
