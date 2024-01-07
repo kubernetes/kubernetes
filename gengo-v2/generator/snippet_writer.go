@@ -74,15 +74,15 @@ func NewSnippetWriter(w io.Writer, c *Context, left, right string) *SnippetWrite
 // return sw.Error()
 //
 // Where:
-// * "$" starts a template directive
-// * "." references the entire thing passed as args
-// * "type" therefore sees a map and looks up the key "type"
-// * "|" means "pass the thing on the left to the thing on the right"
-// * "public" is the name of a naming system, so the SnippetWriter has given
-//   the template a function called "public" that takes a *types.Type and
-//   returns the naming system's name. E.g., if the type is "string" this might
-//   return "String".
-// * the second "$" ends the template directive.
+//   - "$" starts a template directive
+//   - "." references the entire thing passed as args
+//   - "type" therefore sees a map and looks up the key "type"
+//   - "|" means "pass the thing on the left to the thing on the right"
+//   - "public" is the name of a naming system, so the SnippetWriter has given
+//     the template a function called "public" that takes a *types.Type and
+//     returns the naming system's name. E.g., if the type is "string" this might
+//     return "String".
+//   - the second "$" ends the template directive.
 //
 // The map is actually not necessary. The below does the same thing:
 //

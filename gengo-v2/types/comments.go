@@ -25,7 +25,7 @@ import (
 
 // ExtractCommentTags parses comments for lines of the form:
 //
-//   'marker' + "key=value".
+//	'marker' + "key=value".
 //
 // Values are optional; "" is the default.  A tag can be specified more than
 // one time and all values are returned.  If the resulting map has an entry for
@@ -33,12 +33,15 @@ import (
 //
 // Example: if you pass "+" for 'marker', and the following lines are in
 // the comments:
-//   +foo=value1
-//   +bar
-//   +foo=value2
-//   +baz="qux"
+//
+//	+foo=value1
+//	+bar
+//	+foo=value2
+//	+baz="qux"
+//
 // Then this function will return:
-//   map[string][]string{"foo":{"value1, "value2"}, "bar": {""}, "baz": {"qux"}}
+//
+//	map[string][]string{"foo":{"value1, "value2"}, "bar": {""}, "baz": {"qux"}}
 func ExtractCommentTags(marker string, lines []string) map[string][]string {
 	out := map[string][]string{}
 	for _, line := range lines {
@@ -62,7 +65,7 @@ func ExtractCommentTags(marker string, lines []string) map[string][]string {
 
 // ExtractSingleBoolCommentTag parses comments for lines of the form:
 //
-//   'marker' + "key=value1"
+//	'marker' + "key=value1"
 //
 // If the tag is not found, the default value is returned.  Values are asserted
 // to be boolean ("true" or "false"), and any other value will cause an error
