@@ -39,6 +39,7 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -274,7 +275,8 @@ func Test_getLocalDetector(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			r, err := getLocalDetector(c.family, c.mode, c.config, c.nodePodCIDRs)
+			logger, _ := ktesting.NewTestContext(t)
+			r, err := getLocalDetector(logger, c.family, c.mode, c.config, c.nodePodCIDRs)
 			if c.errExpected {
 				if err == nil {
 					t.Errorf("Expected error, but succeeded with %v", r)
@@ -421,7 +423,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			r, err := getDualStackLocalDetectorTuple(c.mode, c.config, c.nodePodCIDRs)
+			logger, _ := ktesting.NewTestContext(t)
+			r, err := getDualStackLocalDetectorTuple(logger, c.mode, c.config, c.nodePodCIDRs)
 			if c.errExpected {
 				if err == nil {
 					t.Errorf("Expected error, but succeeded with %q", r)
@@ -675,7 +678,8 @@ func TestGetConntrackMax(t *testing.T) {
 			Min:        ptr.To(tc.min),
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
-		x, e := getConntrackMax(cfg)
+		logger, _ := ktesting.NewTestContext(t)
+		x, e := getConntrackMax(logger, cfg)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
