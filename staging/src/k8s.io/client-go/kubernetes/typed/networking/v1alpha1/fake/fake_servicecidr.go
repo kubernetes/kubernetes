@@ -143,12 +143,18 @@ func (c *FakeServiceCIDRs) Apply(ctx context.Context, serviceCIDR *networkingv1a
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := serviceCIDR.Name
 	if name == nil {
 		return nil, fmt.Errorf("serviceCIDR.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, *name, types.ApplyPatchType, data), &v1alpha1.ServiceCIDR{})
+		Invokes(testing.NewRootApplySubresourceAction(servicecidrsResource, *name, data, manager, opts.Force), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakeServiceCIDRs) ApplyStatus(ctx context.Context, serviceCIDR *network
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := serviceCIDR.Name
 	if name == nil {
 		return nil, fmt.Errorf("serviceCIDR.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ServiceCIDR{})
+		Invokes(testing.NewRootApplySubresourceAction(servicecidrsResource, *name, data, manager, opts.Force, "status"), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
 		return nil, err
 	}

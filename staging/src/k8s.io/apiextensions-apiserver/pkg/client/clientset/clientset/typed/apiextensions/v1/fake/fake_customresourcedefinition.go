@@ -143,12 +143,18 @@ func (c *FakeCustomResourceDefinitions) Apply(ctx context.Context, customResourc
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := customResourceDefinition.Name
 	if name == nil {
 		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data), &v1.CustomResourceDefinition{})
+		Invokes(testing.NewRootApplySubresourceAction(customresourcedefinitionsResource, *name, data, manager, opts.Force), &v1.CustomResourceDefinition{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakeCustomResourceDefinitions) ApplyStatus(ctx context.Context, customR
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := customResourceDefinition.Name
 	if name == nil {
 		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data, "status"), &v1.CustomResourceDefinition{})
+		Invokes(testing.NewRootApplySubresourceAction(customresourcedefinitionsResource, *name, data, manager, opts.Force, "status"), &v1.CustomResourceDefinition{})
 	if obj == nil {
 		return nil, err
 	}
