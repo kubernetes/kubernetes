@@ -319,6 +319,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithPropagators(tracing.Propagators()),
 			otelgrpc.WithTracerProvider(c.TracerProvider),
+			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
 		}
 		// Even with Noop  TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
