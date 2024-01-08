@@ -45,7 +45,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
@@ -1056,7 +1056,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
 	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
-		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
+		ref, err := ref.GetReference(clientscheme.Scheme, pod)
 		if err != nil {
 			klog.ErrorS(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 		}
@@ -1143,7 +1143,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 			if err := m.runtimeHelper.PrepareDynamicResources(pod); err != nil {
-				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+				ref, referr := ref.GetReference(clientscheme.Scheme, pod)
 				if referr != nil {
 					klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 					return
@@ -1170,7 +1170,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			metrics.StartedPodsErrorsTotal.Inc()
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			klog.ErrorS(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
-			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			ref, referr := ref.GetReference(clientscheme.Scheme, pod)
 			if referr != nil {
 				klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}
@@ -1181,7 +1181,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		resp, err := m.runtimeService.PodSandboxStatus(ctx, podSandboxID, false)
 		if err != nil {
-			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			ref, referr := ref.GetReference(clientscheme.Scheme, pod)
 			if referr != nil {
 				klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}

@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // ImplicitContainerPrefix is a container name prefix that will indicate that container was started implicitly (like the pod infra container).
@@ -37,7 +37,7 @@ func GenerateContainerRef(pod *v1.Pod, container *v1.Container) (*v1.ObjectRefer
 		// start (like the pod infra container). This is not a good way, ugh.
 		fieldPath = ImplicitContainerPrefix + container.Name
 	}
-	ref, err := ref.GetPartialReference(legacyscheme.Scheme, pod, fieldPath)
+	ref, err := ref.GetPartialReference(clientscheme.Scheme, pod, fieldPath)
 	if err != nil {
 		return nil, err
 	}
