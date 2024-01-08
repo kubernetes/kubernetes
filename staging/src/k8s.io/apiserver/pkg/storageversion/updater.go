@@ -125,6 +125,7 @@ func setStatusCondition(conditions *[]v1alpha1.StorageVersionCondition, newCondi
 	existingCondition.ObservedGeneration = newCondition.ObservedGeneration
 }
 
+// UpdateStorageVersionFor updates the storage version object for the resource.
 // postProcessFunc is invoked on the storage version object after the local
 // calulation is finished, and before the client sends the create/update request.
 // It allows the caller to customizes the storage version object, e.g. setting
@@ -174,6 +175,11 @@ func singleUpdate(ctx context.Context, c Client, apiserverID string, gr schema.G
 	}
 	svCopy := sv.DeepCopy()
 	updatedSV := localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions, servedVersions)
+	if postProcessFunc != nil {
+		if err := postProcessFunc(updatedSV); err != nil {
+			return err
+		}
+	}
 	if shouldCreate {
 		createdSV, err := c.Create(ctx, updatedSV, metav1.CreateOptions{})
 		if err != nil {

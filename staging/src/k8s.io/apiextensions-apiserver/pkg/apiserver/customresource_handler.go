@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
+	"k8s.io/apiextensions-apiserver/pkg/storageversion"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,8 +71,10 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/scale"
@@ -177,51 +181,16 @@ type crdInfo struct {
 	// information to decide whether a CR write request should be allowed,
 	// rejected, or blocked.
 	storageVersionUpdate *storageVersionUpdate
-
 }
 
 func (i *crdInfo) waitForStorageVersionUpdate(ctx context.Context) error {
 	// StorageVersionAPI feature gate is disabled
-	if i.storageVersionUpdate == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		klog.V(2).Infof("Skipped waiting for storage version to finish updating since StorageVersionAPI and/or APIServerIdentity feature are disabled.")
 		return nil
 	}
 
-	// NOTE: currently the graceful CRD deletion waits 1s for in-flight requests
-	// to register themselves to the wait group. Ideally the storage version update should
-	// not cause the requests to miss the 1s window; otherwise the requests may
-	// fail ungracefully (e.g. it may happen if the CRD was deleted immediately after the
-	// first CR request establishes the underlying storage).
-	select {
-	case <-i.storageVersionUpdate.processedCh:
-		return nil
-	case <-ctx.Done():
-		return fmt.Errorf("aborted waiting for CRD storage version update: %v", ctx.Err())
-	// Unblock the requests if the storage version update takes a long time, otherwise
-	// CR requests may stack up and overwhelm the API server.
-	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
-	case <-time.After(i.storageVersionUpdate.timeout.Sub(time.Now())):
-		return fmt.Errorf("timeout waiting for CRD storage version update")
-	}
-	return nil
-}
-
-// storageVersionUpdate holds information about a storage version update,
-// indicating whether the update gets processed, or timed-out.
-type storageVersionUpdate struct {
-	// processedCh is closed by the storage version manager after the
-	// storage version update gets processed (either succeeded or failed).
-	// The API server will unblock and allow CR write requests if this
-	// channel is closed.
-	processedCh <-chan struct{}
-	// timeout is the time when the API server will unblock and allow CR
-	// write requests even if the storage version update hasn't been
-	// processed.
-	timeout time.Time
->>>>>>> ab60571b948 (add initial support for StorageVersion API for CRDs)
-}
-
-func (i *crdInfo) waitForStorageVersionUpdate(ctx context.Context) error {
-	// StorageVersionAPI feature gate is disabled
 	if i.storageVersionUpdate == nil {
 		return nil
 	}
@@ -486,7 +455,6 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
 			return nil
 		}
-
 		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
 			err := apierrors.NewServiceUnavailable(err.Error())
 			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
@@ -599,9 +567,12 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	if found {
 		tearDownFinishedCh = r.removeStorage_locked(crd.UID)
 	}
-	// Update storage version with the latest info in the watch event
-	if r.storageVersionManager != nil {
-		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, tearDownFinishedCh, nil)
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		processedCh := make(chan struct{})
+		ctx := context.TODO()
+		defer ctx.Done()
+		r.storageVersionManager.UpdateStorageVersion(ctx, crd, tearDownFinishedCh, processedCh)
 	}
 	r.removeStorage_locked(crd.UID)
 }
@@ -652,8 +623,12 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		tearDownFinishedCh = r.removeStorage_locked(newCRD.UID)
 	}
 	// Update storage version with the latest info in the watch event
-	if r.storageVersionManager != nil {
-		r.storageVersionManager.EnqueueStorageVersionUpdate(newCRD, tearDownFinishedCh, nil)
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		processedCh := make(chan struct{})
+		ctx := context.TODO()
+		defer ctx.Done()
+		r.storageVersionManager.UpdateStorageVersion(ctx, newCRD, tearDownFinishedCh, processedCh)
 	}
 }
 
@@ -1184,10 +1159,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
 
-	if r.storageVersionManager != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		// spawn storage version update in background and use channels to make handlers wait
 		processedCh := make(chan struct{})
-		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, processedCh)
+		r.storageVersionManager.UpdateStorageVersion(context.TODO(), crd, nil, processedCh)
 		ret.storageVersionUpdate = &storageVersionUpdate{
 			processedCh: processedCh,
 			timeout:     time.Now().Add(storageVersionUpdateTimeout),
