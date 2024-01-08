@@ -944,7 +944,7 @@ func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assum
 		sched.finishBinding(logger, fwk, assumed, targetNode, status)
 	}()
 
-	bound, err := sched.extendersBinding(assumed, targetNode)
+	bound, err := sched.extendersBinding(logger, assumed, targetNode)
 	if bound {
 		return framework.AsStatus(err)
 	}
@@ -952,15 +952,20 @@ func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assum
 }
 
 // TODO(#87159): Move this to a Plugin.
-func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error) {
+func (sched *Scheduler) extendersBinding(logger klog.Logger, pod *v1.Pod, node string) (bool, error) {
 	for _, extender := range sched.Extenders {
 		if !extender.IsBinder() || !extender.IsInterested(pod) {
 			continue
 		}
-		return true, extender.Bind(&v1.Binding{
+		err := extender.Bind(&v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node},
 		})
+		if err != nil && extender.IsIgnorable() {
+			logger.Info("Skipping extender in bind as it returned error and has ignorable flag set", "extender", extender, "err", err)
+			continue
+		}
+		return true, err
 	}
 	return false, nil
 }

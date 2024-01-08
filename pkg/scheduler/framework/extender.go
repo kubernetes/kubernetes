@@ -71,5 +71,6 @@ type Extender interface {
 
 	// IsIgnorable returns true indicates scheduling should not fail when this extender
 	// is unavailable. This gives scheduler ability to fail fast and tolerate non-critical extenders as well.
+	// Both Filter and Bind actions are supported.
 	IsIgnorable() bool
 }
