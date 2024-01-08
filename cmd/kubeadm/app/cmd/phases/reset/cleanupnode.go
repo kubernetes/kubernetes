@@ -81,18 +81,21 @@ func runCleanupNode(c workflow.RunData) error {
 	}
 
 	if !r.DryRun() {
-		// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
-		fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
-		// In case KubeletRunDirectory holds a symbolic link, evaluate it
-		kubeletRunDirectory, err := absoluteKubeletRunDirectory()
+		// In case KubeletRunDirectory holds a symbolic link, evaluate it.
+		// This would also throw an error if the directory does not exist.
+		kubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 		if err != nil {
-			return err
+			klog.Warningf("[reset] Skipping unmount of directories in %q: %v\n",
+				kubeadmconstants.KubeletRunDirectory, err)
+		} else {
+			// Unmount all mount paths under kubeletRunDirectory.
+			fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+			if err := unmountKubeletDirectory(kubeletRunDirectory, r.ResetCfg().UnmountFlags); err != nil {
+				return err
+			}
+			// Clean the kubeletRunDirectory.
+			dirsToClean = append(dirsToClean, kubeletRunDirectory)
 		}
-		// Unmount all mount paths under kubeletRunDirectory
-		if err := unmountKubeletDirectory(kubeletRunDirectory, r.ResetCfg().UnmountFlags); err != nil {
-			return err
-		}
-		dirsToClean = append(dirsToClean, kubeletRunDirectory)
 	} else {
 		fmt.Printf("[reset] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
 	}
@@ -130,14 +133,6 @@ func runCleanupNode(c workflow.RunData) error {
 	}
 
 	return nil
-}
-
-func absoluteKubeletRunDirectory() (string, error) {
-	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to evaluate the %q directory", kubeadmconstants.KubeletRunDirectory)
-	}
-	return absoluteKubeletRunDirectory, nil
 }
 
 func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
