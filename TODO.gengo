@@ -1,0 +1,27 @@
+Final:
+--------
+- Update for go 1.22 final
+- Pick a new branch name for the final PR
+- Run update-vendor when gengo and kube-openapi are re-vendored
+- Run `go work sync` ?
+  - maybe add that to the verify-go-workspace script?
+- Remove DNM commit(s)
+
+Need input:
+----------
+- decide on code_gen examples - module not?
+- modcacherw or no?
+- code-generator/v2 or ... ?  Compat.
+
+Lower prio:
+----------
+- Defaulter-gen should not depend on runtime.Scheme - declare a local interface!
+- Gengo support for generics (builder.walkType)
+- client-gen: drop --input-base & --input and take input-dirs like everyone else
+- u.Package() and other universe methods are sloppy - no error handling
+  - walkType loads types before their package is load
+- Protobuf doesn't need to Clean itself
+- Store packages.Package in gengo Package
+- Simple generators like deepcopy can just use ./... - slower but simpler?
+- Patches from other branch
+- Gengo adds all pointer type and primitives, methods, etc to pkg "" - why?
