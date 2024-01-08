@@ -210,6 +210,17 @@ func (tracer *nftablesTracer) addressMatches(ipStr, not, ruleAddress string) boo
 	}
 }
 
+func (tracer *nftablesTracer) noneAddressesMatch(ipStr, ruleAddress string) bool {
+	ruleAddress = strings.ReplaceAll(ruleAddress, " ", "")
+	addresses := strings.Split(ruleAddress, ",")
+	for _, address := range addresses {
+		if tracer.addressMatches(ipStr, "", address) {
+			return false
+		}
+	}
+	return true
+}
+
 // matchDestIPOnly checks an "ip daddr" against a set/map, and returns the matching
 // Element, if found.
 func (tracer *nftablesTracer) matchDestIPOnly(elements []*knftables.Element, destIP string) *knftables.Element {
@@ -267,6 +278,7 @@ func (tracer *nftablesTracer) matchDestPort(elements []*knftables.Element, proto
 // match verdictRegexp.
 
 var destAddrRegexp = regexp.MustCompile(`^ip6* daddr (!= )?(\S+)`)
+var destAddrLookupRegexp = regexp.MustCompile(`^ip6* daddr != \{([^}]*)\}`)
 var destAddrLocalRegexp = regexp.MustCompile(`^fib daddr type local`)
 var destPortRegexp = regexp.MustCompile(`^(tcp|udp|sctp) dport (\d+)`)
 var destIPOnlyLookupRegexp = regexp.MustCompile(`^ip6* daddr @(\S+)`)
@@ -278,6 +290,7 @@ var destDispatchRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th d
 var destPortDispatchRegexp = regexp.MustCompile(`^meta l4proto \. th dport vmap @(\S+)$`)
 
 var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
+var sourceAddrLookupRegexp = regexp.MustCompile(`^ip6* saddr != \{([^}]*)\}`)
 var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
 
 var endpointVMAPRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
@@ -400,6 +413,16 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 					rule = element.Value[0]
 				}
 
+			case destAddrLookupRegexp.MatchString(rule):
+				// `^ip6* daddr != \{([^}]*)\}`
+				// Tests whether destIP doesn't match an anonymous set.
+				match := destAddrLookupRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				if !tracer.noneAddressesMatch(destIP, match[1]) {
+					rule = ""
+					break
+				}
+
 			case destAddrRegexp.MatchString(rule):
 				// `^ip6* daddr (!= )?(\S+)`
 				// Tests whether destIP does/doesn't match a literal.
@@ -428,6 +451,16 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				rule = strings.TrimPrefix(rule, match[0])
 				proto, port := match[1], match[2]
 				if protocol != proto || destPort != port {
+					rule = ""
+					break
+				}
+
+			case sourceAddrLookupRegexp.MatchString(rule):
+				// `^ip6* saddr != \{([^}]*)\}`
+				// Tests whether sourceIP doesn't match an anonymous set.
+				match := sourceAddrLookupRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				if !tracer.noneAddressesMatch(sourceIP, match[1]) {
 					rule = ""
 					break
 				}
