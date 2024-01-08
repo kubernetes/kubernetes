@@ -47,7 +47,7 @@ func (t *JobUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	t.namespace = f.Namespace.Name
 
 	ginkgo.By("Creating a job")
-	t.job = e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
+	t.job = e2ejob.NewTestJob("neverTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
 	job, err := e2ejob.CreateJob(ctx, f.ClientSet, t.namespace, t.job)
 	t.job = job
 	framework.ExpectNoError(err)
