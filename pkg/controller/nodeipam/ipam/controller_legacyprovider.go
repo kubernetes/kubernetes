@@ -165,17 +165,6 @@ func (c *Controller) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-// occupyServiceCIDR removes the service CIDR range from the cluster CIDR if it
-// intersects.
-func occupyServiceCIDR(set *cidrset.CidrSet, clusterCIDR, serviceCIDR *net.IPNet) error {
-	if clusterCIDR.Contains(serviceCIDR.IP) || serviceCIDR.Contains(clusterCIDR.IP) {
-		if err := set.Occupy(serviceCIDR); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 type nodeState struct {
 	t Timeout
 }
