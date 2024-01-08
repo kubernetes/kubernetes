@@ -427,9 +427,10 @@ const (
 	KubeProxyDrainingTerminatingNodes featuregate.Feature = "KubeProxyDrainingTerminatingNodes"
 
 	// owner: @yt2985
-	// kep: http://kep.k8s.io/2800
+	// kep: http://kep.k8s.io/2799
 	// alpha: v1.28
 	// beta: v1.29
+	// GA: v1.30
 	//
 	// Enables cleaning up of secret-based service account tokens.
 	LegacyServiceAccountTokenCleanUp featuregate.Feature = "LegacyServiceAccountTokenCleanUp"
@@ -1020,7 +1021,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeProxyDrainingTerminatingNodes: {Default: false, PreRelease: featuregate.Alpha},
 
-	LegacyServiceAccountTokenCleanUp: {Default: true, PreRelease: featuregate.Beta},
+	LegacyServiceAccountTokenCleanUp: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
