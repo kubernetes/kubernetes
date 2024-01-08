@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -42,7 +41,6 @@ type Generator struct {
 	APIMachineryPackages string
 	Packages             string
 	OutputBase           string
-	VendorOutputBase     string
 	ProtoImport          []string
 	Conditional          string
 	Clean                bool
@@ -57,14 +55,9 @@ func New() *Generator {
 	common := args.GeneratorArgs{
 		OutputBase: defaultSourceTree,
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Cannot get current directory.")
-	}
 	return &Generator{
-		Common:           common,
-		OutputBase:       defaultSourceTree,
-		VendorOutputBase: filepath.Join(cwd, "vendor"),
+		Common:     common,
+		OutputBase: defaultSourceTree,
 		APIMachineryPackages: strings.Join([]string{
 			`+k8s.io/apimachinery/pkg/util/intstr`,
 			`+k8s.io/apimachinery/pkg/api/resource`,
@@ -85,8 +78,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.StringVarP(&g.Packages, "packages", "p", g.Packages, "comma-separated list of directories to get input types from. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVar(&g.APIMachineryPackages, "apimachinery-packages", g.APIMachineryPackages, "comma-separated list of directories to get apimachinery input types from which are needed by any API. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to $GOPATH/src/")
-	flag.StringVar(&g.VendorOutputBase, "vendor-output-base", g.VendorOutputBase, "The vendor/ directory to look for packages in; defaults to $PWD/vendor/.")
-	flag.StringSliceVar(&g.ProtoImport, "proto-import", g.ProtoImport, "The search path for the core protobuf .protos, required; defaults $GOPATH/src/k8s.io/kubernetes/vendor/github.com/gogo/protobuf/protobuf.")
+	flag.StringSliceVar(&g.ProtoImport, "proto-import", g.ProtoImport, "A search path for imported protobufs (may be repeated).")
 	flag.StringVar(&g.Conditional, "conditional", g.Conditional, "An optional Golang build tag condition to add to the generated Go code")
 	flag.BoolVar(&g.Clean, "clean", g.Clean, "If true, remove all generated files for the specified Packages.")
 	flag.BoolVar(&g.OnlyIDL, "only-idl", g.OnlyIDL, "If true, only generate the IDL for each package.")
@@ -238,28 +230,19 @@ func Run(g *Generator) {
 	}
 	sort.Sort(positionOrder{topologicalPos, protobufNames.packages})
 
-	var vendoredOutputPackages generator.Packages
 	var localOutputPackages generator.Packages
 	for _, p := range protobufNames.packages {
 		if _, ok := nonOutputPackages[p.Name()]; ok {
 			// if we're not outputting the package, don't include it in either package list
 			continue
 		}
-		p.Vendored = strings.Contains(c.Universe[p.PackagePath].SourcePath, "/vendor/")
-		if p.Vendored {
-			vendoredOutputPackages = append(vendoredOutputPackages, p)
-		} else {
-			localOutputPackages = append(localOutputPackages, p)
-		}
+		localOutputPackages = append(localOutputPackages, p)
 	}
 
 	if err := protobufNames.AssignTypesToPackages(c); err != nil {
 		log.Fatalf("Failed to identify Common types: %v", err)
 	}
 
-	if err := c.ExecutePackages(vendoredOutputPackages); err != nil {
-		log.Fatalf("Failed executing vendor generator: %v", err)
-	}
 	if err := c.ExecutePackages(localOutputPackages); err != nil {
 		log.Fatalf("Failed executing local generator: %v", err)
 	}
@@ -301,10 +284,6 @@ func Run(g *Generator) {
 
 		path := filepath.Join(g.OutputBase, p.ImportPath())
 		outputPath := filepath.Join(g.OutputBase, p.OutputPath())
-		if p.Vendored {
-			path = filepath.Join(g.VendorOutputBase, p.ImportPath())
-			outputPath = filepath.Join(g.VendorOutputBase, p.OutputPath())
-		}
 
 		// generate the gogoprotobuf protoc
 		cmd := exec.Command("protoc", append(args, path)...)
@@ -358,9 +337,6 @@ func Run(g *Generator) {
 			p := outputPackage.(*protobufPackage)
 			p.OmitGogo = true
 		}
-		if err := c.ExecutePackages(vendoredOutputPackages); err != nil {
-			log.Fatalf("Failed executing vendor generator: %v", err)
-		}
 		if err := c.ExecutePackages(localOutputPackages); err != nil {
 			log.Fatalf("Failed executing local generator: %v", err)
 		}
@@ -374,9 +350,6 @@ func Run(g *Generator) {
 		}
 
 		pattern := filepath.Join(g.OutputBase, p.PackagePath, "*.go")
-		if p.Vendored {
-			pattern = filepath.Join(g.VendorOutputBase, p.PackagePath, "*.go")
-		}
 		files, err := filepath.Glob(pattern)
 		if err != nil {
 			log.Fatalf("Can't glob pattern %q: %v", pattern, err)
