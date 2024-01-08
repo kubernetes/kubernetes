@@ -1509,11 +1509,15 @@ func (proxier *Proxier) syncProxyRules() {
 	existingChains, err := proxier.nftables.List(context.TODO(), "chains")
 	if err == nil {
 		for _, chain := range existingChains {
-			if isServiceChainName(chain) && !activeChains.Has(chain) {
-				tx.Flush(&knftables.Chain{
-					Name: chain,
-				})
-				proxier.staleChains[chain] = start
+			if isServiceChainName(chain) {
+				if !activeChains.Has(chain) {
+					tx.Flush(&knftables.Chain{
+						Name: chain,
+					})
+					proxier.staleChains[chain] = start
+				} else {
+					delete(proxier.staleChains, chain)
+				}
 			}
 		}
 	} else if !knftables.IsNotFound(err) {
