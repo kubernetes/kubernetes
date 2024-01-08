@@ -18,6 +18,8 @@ package features
 
 import (
 	"sync/atomic"
+
+	"k8s.io/klog/v2"
 )
 
 // NOTE: types Feature, FeatureSpec, prerelease (and its values)
@@ -99,8 +101,23 @@ func AddFeaturesToExistingFeatureGates(registry Registry) error {
 //	// then replace client-go's feature gates implementation with your implementation
 //	clientgofeaturegate.SetFeatureGates(utilfeature.DefaultMutableFeatureGate)
 func SetFeatureGates(newFeatureGates Gates) {
+	if setFeatureGatesWithWarningIndicator(newFeatureGates) {
+		klog.Warningf("The default feature gates implementation has already been used and now it's being overwritten. This might lead to unexpected behaviour. Check your initialization order.")
+	}
+}
+
+func setFeatureGatesWithWarningIndicator(newFeatureGates Gates) bool {
+	shouldProduceWarning := false
+
+	if defaultFeatureGates, ok := FeatureGates().(*envVarFeatureGates); ok {
+		if defaultFeatureGates.hasAlreadyReadEnvVar() {
+			shouldProduceWarning = true
+		}
+	}
 	wrappedFeatureGates := &featureGatesWrapper{newFeatureGates}
 	featureGates.Store(wrappedFeatureGates)
+
+	return shouldProduceWarning
 }
 
 func init() {

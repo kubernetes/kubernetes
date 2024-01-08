@@ -52,6 +52,9 @@ func newEnvVarFeatureGates(features map[Feature]FeatureSpec) *envVarFeatureGates
 	enabledValue := &atomic.Value{}
 	enabledValue.Store(enabled)
 
+	readEnvVarValue := &atomic.Value{}
+	readEnvVarValue.Store(false)
+
 	known := map[Feature]FeatureSpec{}
 	for name, spec := range features {
 		known[name] = spec
@@ -61,6 +64,7 @@ func newEnvVarFeatureGates(features map[Feature]FeatureSpec) *envVarFeatureGates
 		callSiteName: naming.GetNameFromCallsite(internalPackages...),
 		known:        known,
 		enabled:      enabledValue,
+		readEnvVars:  readEnvVarValue,
 	}
 }
 
@@ -72,6 +76,10 @@ type envVarFeatureGates struct {
 
 	// readEnvVarsOnce guards reading environmental variables
 	readEnvVarsOnce sync.Once
+
+	// readEnvVars holds the boolean value which
+	// indicates whether readEnvVarsOnce has been called.
+	readEnvVars *atomic.Value
 
 	// known holds known feature gates
 	known map[Feature]FeatureSpec
@@ -118,6 +126,7 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 			}
 		}
 		f.enabled.Store(featureGatesState)
+		f.readEnvVars.Store(true)
 
 		for feature, featureSpec := range f.known {
 			if featureState, ok := featureGatesState[feature]; ok {
@@ -128,4 +137,8 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 		}
 	})
 	return f.enabled.Load().(map[Feature]bool)
+}
+
+func (f *envVarFeatureGates) hasAlreadyReadEnvVar() bool {
+	return f.readEnvVars.Load().(bool)
 }

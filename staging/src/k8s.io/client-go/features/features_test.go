@@ -30,6 +30,23 @@ func TestAddFeaturesToExistingFeatureGates(t *testing.T) {
 	require.Equal(t, defaultKubernetesFeatureGates, fakeFeatureGates.specs)
 }
 
+func TestSetFeatureGatesWithWarningIndicator(t *testing.T) {
+	fakeFeatureGates := &alwaysEnabledFakeGates{}
+	require.False(t, setFeatureGatesWithWarningIndicator(fakeFeatureGates))
+
+	defaultEnvVarGates := newEnvVarFeatureGates(nil)
+	require.False(t, setFeatureGatesWithWarningIndicator(defaultEnvVarGates))
+
+	_ = defaultEnvVarGates.getEnabledMapFromEnvVar()
+	require.True(t, setFeatureGatesWithWarningIndicator(fakeFeatureGates))
+}
+
+type alwaysEnabledFakeGates struct{}
+
+func (f *alwaysEnabledFakeGates) Enabled(Feature) bool {
+	return true
+}
+
 type fakeRegistry struct {
 	specs map[Feature]FeatureSpec
 }
