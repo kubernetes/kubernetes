@@ -40,6 +40,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3450,6 +3451,38 @@ func TestDescribeStorageClass(t *testing.T) {
 		!strings.Contains(out, "zone2") ||
 		!strings.Contains(out, "node2") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeVolumeAttributesClass(t *testing.T) {
+	expectedOut := `Name:         foo
+Annotations:  name=bar
+DriverName:   my-driver
+Parameters:   param1=value1,param2=value2
+Events:       <none>
+`
+
+	f := fake.NewSimpleClientset(&storagev1alpha1.VolumeAttributesClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "4",
+			Annotations: map[string]string{
+				"name": "bar",
+			},
+		},
+		DriverName: "my-driver",
+		Parameters: map[string]string{
+			"param1": "value1",
+			"param2": "value2",
+		},
+	})
+	s := VolumeAttributesClassDescriber{f}
+	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if out != expectedOut {
+		t.Errorf("expected:\n %s\n but got output:\n %s diff:\n%s", expectedOut, out, cmp.Diff(out, expectedOut))
 	}
 }
 

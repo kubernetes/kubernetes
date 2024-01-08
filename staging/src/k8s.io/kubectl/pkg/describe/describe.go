@@ -52,6 +52,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -227,6 +228,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: certificatesv1beta1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
 		{Group: storagev1.GroupName, Kind: "StorageClass"}:                        &StorageClassDescriber{c},
 		{Group: storagev1.GroupName, Kind: "CSINode"}:                             &CSINodeDescriber{c},
+		{Group: storagev1alpha1.GroupName, Kind: "VolumeAttributesClass"}:         &VolumeAttributesClassDescriber{c},
 		{Group: policyv1beta1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
 		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:                  &PodDisruptionBudgetDescriber{c},
 		{Group: rbacv1.GroupName, Kind: "Role"}:                                   &RoleDescriber{c},
@@ -410,6 +412,7 @@ func init() {
 		describeServiceAccount,
 		describeStatefulSet,
 		describeStorageClass,
+		describeVolumeAttributesClass,
 	)
 	if err != nil {
 		klog.Fatalf("Cannot register describers: %v", err)
@@ -4678,6 +4681,40 @@ func describeStorageClass(sc *storagev1.StorageClass, events *corev1.EventList) 
 		if sc.AllowedTopologies != nil {
 			printAllowedTopologies(w, sc.AllowedTopologies)
 		}
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+
+		return nil
+	})
+}
+
+type VolumeAttributesClassDescriber struct {
+	clientset.Interface
+}
+
+func (d *VolumeAttributesClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	vac, err := d.StorageV1alpha1().VolumeAttributesClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(d.CoreV1(), vac, describerSettings.ChunkSize)
+	}
+
+	return describeVolumeAttributesClass(vac, events)
+}
+
+func describeVolumeAttributesClass(vac *storagev1alpha1.VolumeAttributesClass, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", vac.Name)
+		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(vac.Annotations))
+		w.Write(LEVEL_0, "DriverName:\t%s\n", vac.DriverName)
+		w.Write(LEVEL_0, "Parameters:\t%s\n", labels.FormatLabels(vac.Parameters))
+
 		if events != nil {
 			DescribeEvents(events, w)
 		}
