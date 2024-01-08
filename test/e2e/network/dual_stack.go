@@ -55,6 +55,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		podClient = e2epod.NewPodClient(f)
+		ginkgo.Skip("require dualstack env")
 	})
 
 	ginkgo.It("should have ipv4 and ipv6 internal node ip", func(ctx context.Context) {
