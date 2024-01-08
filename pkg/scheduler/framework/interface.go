@@ -652,6 +652,9 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator PodNominator)
+
+	// Close calls Close method of each plugin.
+	Close() error
 }
 
 // Handle provides data and some tools that plugins can use. It is

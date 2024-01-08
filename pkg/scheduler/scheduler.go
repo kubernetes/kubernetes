@@ -416,6 +416,12 @@ func (sched *Scheduler) Run(ctx context.Context) {
 
 	<-ctx.Done()
 	sched.SchedulingQueue.Close()
+
+	// If the plugins satisfy the io.Closer interface, they are closed.
+	err := sched.Profiles.Close()
+	if err != nil {
+		logger.Error(err, "Failed to close plugins")
+	}
 }
 
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific

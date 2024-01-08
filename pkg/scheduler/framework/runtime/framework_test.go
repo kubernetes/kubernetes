@@ -54,6 +54,7 @@ const (
 	testPlugin                        = "test-plugin"
 	permitPlugin                      = "permit-plugin"
 	bindPlugin                        = "bind-plugin"
+	testCloseErrorPlugin              = "test-close-error-plugin"
 
 	testProfileName              = "test-profile"
 	testPercentageOfNodesToScore = 35
@@ -238,6 +239,25 @@ func (pl *TestPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 	return framework.NewStatus(framework.Code(pl.inj.BindStatus), injectReason)
 }
 
+func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	return &TestCloseErrorPlugin{name: testCloseErrorPlugin}, nil
+}
+
+// TestCloseErrorPlugin implements for Close test.
+type TestCloseErrorPlugin struct {
+	name string
+}
+
+func (pl *TestCloseErrorPlugin) Name() string {
+	return pl.name
+}
+
+var errClose = errors.New("close err")
+
+func (pl *TestCloseErrorPlugin) Close() error {
+	return errClose
+}
+
 // TestPreFilterPlugin only implements PreFilterPlugin interface.
 type TestPreFilterPlugin struct {
 	PreFilterCalled int
@@ -379,6 +399,7 @@ var registry = func() Registry {
 	r.Register(testPlugin, newTestPlugin)
 	r.Register(queueSortPlugin, newQueueSortPlugin)
 	r.Register(bindPlugin, newBindPlugin)
+	r.Register(testCloseErrorPlugin, newTestCloseErrorPlugin)
 	return r
 }()
 
@@ -3256,6 +3277,53 @@ func TestListPlugins(t *testing.T) {
 			got := f.ListPlugins()
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected plugins (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestClose(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins *config.Plugins
+		wantErr error
+	}{
+		{
+			name: "close doesn't return error",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin, Weight: 5},
+					},
+				},
+			},
+		},
+		{
+			name: "close returns error",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin, Weight: 5},
+						{Name: testCloseErrorPlugin},
+					},
+				},
+			},
+			wantErr: errClose,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fw, err := NewFramework(ctx, registry, &config.KubeSchedulerProfile{Plugins: tc.plugins})
+			if err != nil {
+				t.Fatalf("Unexpected error during calling NewFramework, got %v", err)
+			}
+			err = fw.Close()
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("Unexpected error from Close(), got: %v, want: %v", err, tc.wantErr)
 			}
 		})
 	}
