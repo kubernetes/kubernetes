@@ -55,7 +55,6 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utilexec "k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -1194,15 +1193,11 @@ func (proxier *Proxier) syncProxyRules() {
 			ensureChain(fwChain, tx, activeChains)
 			var sources []string
 			allowFromNode := false
-			for _, src := range svcInfo.LoadBalancerSourceRanges() {
-				_, cidr, _ := netutils.ParseCIDRSloppy(src)
-				if cidr == nil {
-					continue
-				}
+			for _, cidr := range svcInfo.LoadBalancerSourceRanges() {
 				if len(sources) > 0 {
 					sources = append(sources, ",")
 				}
-				sources = append(sources, src)
+				sources = append(sources, cidr.String())
 				if cidr.Contains(proxier.nodeIP) {
 					allowFromNode = true
 				}

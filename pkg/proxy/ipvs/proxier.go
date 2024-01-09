@@ -1187,13 +1187,13 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				proxier.ipsetList[kubeLoadBalancerFWSet].activeEntries.Insert(entry.String())
 				allowFromNode := false
-				for _, src := range svcInfo.LoadBalancerSourceRanges() {
+				for _, cidr := range svcInfo.LoadBalancerSourceRanges() {
 					// ipset call
 					entry = &utilipset.Entry{
 						IP:       ingress.String(),
 						Port:     svcInfo.Port(),
 						Protocol: protocol,
-						Net:      src,
+						Net:      cidr.String(),
 						SetType:  utilipset.HashIPPortNet,
 					}
 					// enumerate all white list source cidr
@@ -1203,8 +1203,6 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 					proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
 
-					// ignore error because it has been validated
-					_, cidr, _ := netutils.ParseCIDRSloppy(src)
 					if cidr.Contains(proxier.nodeIP) {
 						allowFromNode = true
 					}

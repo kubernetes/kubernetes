@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -1294,12 +1293,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// firewall filter based on each source range
 			allowFromNode := false
-			for _, src := range svcInfo.LoadBalancerSourceRanges() {
-				natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
-				_, cidr, err := netutils.ParseCIDRSloppy(src)
-				if err != nil {
-					klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
-				} else if cidr.Contains(proxier.nodeIP) {
+			for _, cidr := range svcInfo.LoadBalancerSourceRanges() {
+				natRules.Write(args, "-s", cidr.String(), "-j", string(externalTrafficChain))
+				if cidr.Contains(proxier.nodeIP) {
 					allowFromNode = true
 				}
 			}

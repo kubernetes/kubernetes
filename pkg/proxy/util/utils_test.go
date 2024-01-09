@@ -448,11 +448,20 @@ func TestMapCIDRsByIPFamily(t *testing.T) {
 
 			cidrMap := MapCIDRsByIPFamily(testcase.ipString)
 
-			if !reflect.DeepEqual(testcase.expectCorrect, cidrMap[ipFamily]) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, cidrMap[ipFamily])
+			var cidrStr []string
+			for _, cidr := range cidrMap[ipFamily] {
+				cidrStr = append(cidrStr, cidr.String())
 			}
-			if !reflect.DeepEqual(testcase.expectIncorrect, cidrMap[otherIPFamily]) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, cidrMap[otherIPFamily])
+			var cidrStrOther []string
+			for _, cidr := range cidrMap[otherIPFamily] {
+				cidrStrOther = append(cidrStrOther, cidr.String())
+			}
+
+			if !reflect.DeepEqual(testcase.expectCorrect, cidrStr) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, cidrStr)
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, cidrStrOther) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, cidrStrOther)
 			}
 		})
 	}

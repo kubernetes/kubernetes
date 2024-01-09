@@ -508,7 +508,7 @@ func getLocalDetector(logger klog.Logger, ipFamily v1.IPFamily, mode proxyconfig
 
 		cidrsByFamily := proxyutil.MapCIDRsByIPFamily(strings.Split(clusterCIDRs, ","))
 		if len(cidrsByFamily[ipFamily]) != 0 {
-			return proxyutiliptables.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0])
+			return proxyutiliptables.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0].String())
 		}
 
 		logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR for family", "ipFamily", ipFamily)
@@ -516,7 +516,7 @@ func getLocalDetector(logger klog.Logger, ipFamily v1.IPFamily, mode proxyconfig
 	case proxyconfigapi.LocalModeNodeCIDR:
 		cidrsByFamily := proxyutil.MapCIDRsByIPFamily(nodePodCIDRs)
 		if len(cidrsByFamily[ipFamily]) != 0 {
-			return proxyutiliptables.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0])
+			return proxyutiliptables.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0].String())
 		}
 
 		logger.Info("Detect-local-mode set to NodeCIDR, but no PodCIDR defined at node for family", "ipFamily", ipFamily)

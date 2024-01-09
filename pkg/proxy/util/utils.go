@@ -200,16 +200,22 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]net.IP {
 	return ipFamilyMap
 }
 
-// MapCIDRsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
-func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
-	ipFamilyMap := map[v1.IPFamily][]string{}
-	for _, cidr := range cidrStrings {
-		// Handle only the valid CIDRs
-		if ipFamily := getIPFamilyFromCIDR(cidr); ipFamily != v1.IPFamilyUnknown {
-			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
-		} else {
-			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
+// MapCIDRsByIPFamily maps a slice of CIDRs to their respective IP families (v4 or v6)
+func MapCIDRsByIPFamily(cidrsStrings []string) map[v1.IPFamily][]*net.IPNet {
+	ipFamilyMap := map[v1.IPFamily][]*net.IPNet{}
+	for _, cidrStrUntrimmed := range cidrsStrings {
+		cidrStr := strings.TrimSpace(cidrStrUntrimmed)
+		_, cidr, err := netutils.ParseCIDRSloppy(cidrStr)
+		if err != nil {
+			// Ignore empty strings. Same as in MapIPsByIPFamily
+			if len(cidrStr) != 0 {
+				klog.ErrorS(err, "Invalid CIDR ignored", "CIDR", cidrStr)
+			}
+			continue
 		}
+		// since we just succefully parsed the CIDR, IPFamilyOfCIDR will never return "IPFamilyUnknown"
+		ipFamily := convertToV1IPFamily(netutils.IPFamilyOfCIDR(cidr))
+		ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 	}
 	return ipFamilyMap
 }
@@ -217,11 +223,6 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 // GetIPFamilyFromIP Returns the IP family of ipStr, or IPFamilyUnknown if ipStr can't be parsed as an IP
 func GetIPFamilyFromIP(ip net.IP) v1.IPFamily {
 	return convertToV1IPFamily(netutils.IPFamilyOf(ip))
-}
-
-// Returns the IP family of cidrStr, or IPFamilyUnknown if cidrStr can't be parsed as a CIDR
-func getIPFamilyFromCIDR(cidrStr string) v1.IPFamily {
-	return convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidrStr))
 }
 
 // Convert netutils.IPFamily to v1.IPFamily

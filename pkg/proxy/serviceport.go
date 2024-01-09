@@ -19,7 +19,6 @@ package proxy
 import (
 	"fmt"
 	"net"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -47,7 +46,7 @@ type ServicePort interface {
 	// Protocol returns service protocol.
 	Protocol() v1.Protocol
 	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
-	LoadBalancerSourceRanges() []string
+	LoadBalancerSourceRanges() []*net.IPNet
 	// HealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.
 	HealthCheckNodePort() int
 	// NodePort returns a service Node port if present. If return 0, it means not present.
@@ -82,7 +81,7 @@ type BaseServicePortInfo struct {
 	sessionAffinityType      v1.ServiceAffinity
 	stickyMaxAgeSeconds      int
 	externalIPs              []net.IP
-	loadBalancerSourceRanges []string
+	loadBalancerSourceRanges []*net.IPNet
 	healthCheckNodePort      int
 	externalPolicyLocal      bool
 	internalPolicyLocal      bool
@@ -122,7 +121,7 @@ func (bsvcPortInfo *BaseServicePortInfo) Protocol() v1.Protocol {
 }
 
 // LoadBalancerSourceRanges is part of ServicePort interface
-func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerSourceRanges() []string {
+func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerSourceRanges() []*net.IPNet {
 	return bsvcPortInfo.loadBalancerSourceRanges
 }
 
@@ -208,10 +207,6 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 		info.hintsAnnotation = service.Annotations[v1.AnnotationTopologyMode]
 	}
 
-	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
-	for i, sourceRange := range service.Spec.LoadBalancerSourceRanges {
-		loadBalancerSourceRanges[i] = strings.TrimSpace(sourceRange)
-	}
 	// filter external ips, source ranges and ingress ips
 	// prior to dual stack services, this was considered an error, but with dual stack
 	// services, this is actually expected. Hence we downgraded from reporting by events
@@ -225,12 +220,12 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 			"ipFamily", ipFamily, "externalIPs", ips, "service", klog.KObj(service))
 	}
 
-	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
+	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(service.Spec.LoadBalancerSourceRanges)
 	info.loadBalancerSourceRanges = cidrFamilyMap[ipFamily]
 	// Log the CIDRs not matching the ipFamily
 	if cidrs, ok := cidrFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
-			"ipFamily", ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "loadBalancerSourceRanges", cidrs, "service", klog.KObj(service))
 	}
 
 	// Obtain Load Balancer Ingress
