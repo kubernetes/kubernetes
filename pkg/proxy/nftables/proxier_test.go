@@ -175,7 +175,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			}
 
 			endpointIP := proxyutil.IPPart(tc.endpoint)
-			_, fp := NewFakeProxier(proxyutil.GetIPFamilyFromIP(endpointIP))
+			_, fp := NewFakeProxier(proxyutil.GetIPFamilyFromIP(netutils.ParseIPSloppy(endpointIP)))
 			fp.exec = fexec
 
 			makeServiceMap(fp,

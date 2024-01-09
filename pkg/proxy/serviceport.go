@@ -19,7 +19,6 @@ package proxy
 import (
 	"fmt"
 	"net"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -40,14 +39,14 @@ type ServicePort interface {
 	SessionAffinityType() v1.ServiceAffinity
 	// StickyMaxAgeSeconds returns service max connection age
 	StickyMaxAgeSeconds() int
-	// ExternalIPStrings returns service ExternalIPs as a string array.
-	ExternalIPStrings() []string
-	// LoadBalancerVIPStrings returns service LoadBalancerIPs which are VIP mode as a string array.
-	LoadBalancerVIPStrings() []string
+	// ExternalIPs returns service ExternalIPs
+	ExternalIPs() []net.IP
+	// LoadBalancerVIPs returns service LoadBalancerIPs which are VIP mode
+	LoadBalancerVIPs() []net.IP
 	// Protocol returns service protocol.
 	Protocol() v1.Protocol
 	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
-	LoadBalancerSourceRanges() []string
+	LoadBalancerSourceRanges() []*net.IPNet
 	// HealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.
 	HealthCheckNodePort() int
 	// NodePort returns a service Node port if present. If return 0, it means not present.
@@ -78,11 +77,11 @@ type BaseServicePortInfo struct {
 	port                     int
 	protocol                 v1.Protocol
 	nodePort                 int
-	loadBalancerVIPs         []string
+	loadBalancerVIPs         []net.IP
 	sessionAffinityType      v1.ServiceAffinity
 	stickyMaxAgeSeconds      int
-	externalIPs              []string
-	loadBalancerSourceRanges []string
+	externalIPs              []net.IP
+	loadBalancerSourceRanges []*net.IPNet
 	healthCheckNodePort      int
 	externalPolicyLocal      bool
 	internalPolicyLocal      bool
@@ -122,7 +121,7 @@ func (bsvcPortInfo *BaseServicePortInfo) Protocol() v1.Protocol {
 }
 
 // LoadBalancerSourceRanges is part of ServicePort interface
-func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerSourceRanges() []string {
+func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerSourceRanges() []*net.IPNet {
 	return bsvcPortInfo.loadBalancerSourceRanges
 }
 
@@ -136,13 +135,13 @@ func (bsvcPortInfo *BaseServicePortInfo) NodePort() int {
 	return bsvcPortInfo.nodePort
 }
 
-// ExternalIPStrings is part of ServicePort interface.
-func (bsvcPortInfo *BaseServicePortInfo) ExternalIPStrings() []string {
+// ExternalIPs is part of ServicePort interface.
+func (bsvcPortInfo *BaseServicePortInfo) ExternalIPs() []net.IP {
 	return bsvcPortInfo.externalIPs
 }
 
-// LoadBalancerVIPStrings is part of ServicePort interface.
-func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerVIPStrings() []string {
+// LoadBalancerVIPs is part of ServicePort interface.
+func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerVIPs() []net.IP {
 	return bsvcPortInfo.loadBalancerVIPs
 }
 
@@ -208,34 +207,29 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 		info.hintsAnnotation = service.Annotations[v1.AnnotationTopologyMode]
 	}
 
-	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
-	for i, sourceRange := range service.Spec.LoadBalancerSourceRanges {
-		loadBalancerSourceRanges[i] = strings.TrimSpace(sourceRange)
-	}
 	// filter external ips, source ranges and ingress ips
 	// prior to dual stack services, this was considered an error, but with dual stack
 	// services, this is actually expected. Hence we downgraded from reporting by events
 	// to just log lines with high verbosity
-
 	ipFamilyMap := proxyutil.MapIPsByIPFamily(service.Spec.ExternalIPs)
 	info.externalIPs = ipFamilyMap[ipFamily]
 
 	// Log the IPs not matching the ipFamily
 	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
-			"ipFamily", ipFamily, "externalIPs", strings.Join(ips, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "externalIPs", ips, "service", klog.KObj(service))
 	}
 
-	ipFamilyMap = proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
-	info.loadBalancerSourceRanges = ipFamilyMap[ipFamily]
+	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(service.Spec.LoadBalancerSourceRanges)
+	info.loadBalancerSourceRanges = cidrFamilyMap[ipFamily]
 	// Log the CIDRs not matching the ipFamily
-	if cidrs, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
+	if cidrs, ok := cidrFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
-			"ipFamily", ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "loadBalancerSourceRanges", cidrs, "service", klog.KObj(service))
 	}
 
 	// Obtain Load Balancer Ingress
-	var invalidIPs []string
+	var invalidIPs []net.IP
 	for _, ing := range service.Status.LoadBalancer.Ingress {
 		if ing.IP == "" {
 			continue
@@ -252,15 +246,16 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 
 		// kube-proxy does not implement IP family translation, skip addresses with
 		// different IP family
-		if ingFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ingFamily == ipFamily {
-			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ing.IP)
+		ip := netutils.ParseIPSloppy(ing.IP) // (already verified as an IP-address)
+		if ingFamily := proxyutil.GetIPFamilyFromIP(ip); ingFamily == ipFamily {
+			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ip)
 		} else {
-			invalidIPs = append(invalidIPs, ing.IP)
+			invalidIPs = append(invalidIPs, ip)
 		}
 	}
 	if len(invalidIPs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
-			"ipFamily", ipFamily, "loadBalancerIngressIPs", strings.Join(invalidIPs, ", "), "service", klog.KObj(service))
+			"ipFamily", ipFamily, "loadBalancerIngressIPs", invalidIPs, "service", klog.KObj(service))
 	}
 
 	if apiservice.NeedsHealthCheck(service) {
