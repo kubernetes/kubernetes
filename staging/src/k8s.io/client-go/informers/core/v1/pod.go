@@ -56,7 +56,14 @@ func NewPodInformer(client kubernetes.Interface, namespace string, resyncPeriod 
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPodInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewFilteredNamedPodInformer(client, namespace, resyncPeriod, indexers, tweakListOptions, "")
+}
+
+// NewFilteredNamedPodInformer constructs a new informer for Pod type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredNamedPodInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc, informerName string) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -72,13 +79,20 @@ func NewFilteredPodInformer(client kubernetes.Interface, namespace string, resyn
 			},
 		},
 		&corev1.Pod{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: resyncPeriod,
+			Indexers:     indexers,
+			InformerName: informerName,
+		},
 	)
 }
 
 func (f *podInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informerName := f.factory.Name()
+	if informerName != "" {
+		informerName = informerName + ":k8s.io/api/core/v1.Pod"
+	}
+	return NewFilteredNamedPodInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions, informerName)
 }
 
 func (f *podInformer) Informer() cache.SharedIndexInformer {

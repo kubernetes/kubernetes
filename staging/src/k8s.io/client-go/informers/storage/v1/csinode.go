@@ -55,7 +55,14 @@ func NewCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration,
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewFilteredNamedCSINodeInformer(client, resyncPeriod, indexers, tweakListOptions, "")
+}
+
+// NewFilteredNamedCSINodeInformer constructs a new informer for CSINode type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredNamedCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc, informerName string) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -71,13 +78,20 @@ func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.D
 			},
 		},
 		&storagev1.CSINode{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: resyncPeriod,
+			Indexers:     indexers,
+			InformerName: informerName,
+		},
 	)
 }
 
 func (f *cSINodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCSINodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informerName := f.factory.Name()
+	if informerName != "" {
+		informerName = informerName + ":k8s.io/api/storage/v1.CSINode"
+	}
+	return NewFilteredNamedCSINodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions, informerName)
 }
 
 func (f *cSINodeInformer) Informer() cache.SharedIndexInformer {

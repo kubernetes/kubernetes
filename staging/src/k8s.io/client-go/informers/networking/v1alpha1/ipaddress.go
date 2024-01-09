@@ -55,7 +55,14 @@ func NewIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duratio
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewFilteredNamedIPAddressInformer(client, resyncPeriod, indexers, tweakListOptions, "")
+}
+
+// NewFilteredNamedIPAddressInformer constructs a new informer for IPAddress type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredNamedIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc, informerName string) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -71,13 +78,20 @@ func NewFilteredIPAddressInformer(client kubernetes.Interface, resyncPeriod time
 			},
 		},
 		&networkingv1alpha1.IPAddress{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: resyncPeriod,
+			Indexers:     indexers,
+			InformerName: informerName,
+		},
 	)
 }
 
 func (f *iPAddressInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredIPAddressInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informerName := f.factory.Name()
+	if informerName != "" {
+		informerName = informerName + ":k8s.io/api/networking/v1alpha1.IPAddress"
+	}
+	return NewFilteredNamedIPAddressInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions, informerName)
 }
 
 func (f *iPAddressInformer) Informer() cache.SharedIndexInformer {

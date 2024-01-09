@@ -56,7 +56,14 @@ func NewRoleBindingInformer(client kubernetes.Interface, namespace string, resyn
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+	return NewFilteredNamedRoleBindingInformer(client, namespace, resyncPeriod, indexers, tweakListOptions, "")
+}
+
+// NewFilteredNamedRoleBindingInformer constructs a new informer for RoleBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredNamedRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc, informerName string) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -72,13 +79,20 @@ func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace strin
 			},
 		},
 		&rbacv1.RoleBinding{},
-		resyncPeriod,
-		indexers,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: resyncPeriod,
+			Indexers:     indexers,
+			InformerName: informerName,
+		},
 	)
 }
 
 func (f *roleBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredRoleBindingInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informerName := f.factory.Name()
+	if informerName != "" {
+		informerName = informerName + ":k8s.io/api/rbac/v1.RoleBinding"
+	}
+	return NewFilteredNamedRoleBindingInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions, informerName)
 }
 
 func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {

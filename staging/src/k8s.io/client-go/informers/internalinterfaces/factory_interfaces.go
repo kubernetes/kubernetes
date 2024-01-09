@@ -32,6 +32,7 @@ type NewInformerFunc func(kubernetes.Interface, time.Duration) cache.SharedIndex
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {
+	Name() string
 	Start(stopCh <-chan struct{})
 	InformerFor(obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
 }
