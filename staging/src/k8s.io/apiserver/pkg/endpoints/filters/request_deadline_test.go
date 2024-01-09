@@ -17,11 +17,14 @@ limitations under the License.
 package filters
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -32,10 +35,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -435,6 +440,961 @@ func TestWithFailedRequestAudit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPerHandlerWriteDeadlineHTTP2WithWriteShouldReturnErrorAfterTimeout(t *testing.T) {
+	// This test documents the behavior of the per handler write
+	// deadline with a standard net http2 server.
+	//
+	// scenario: http2, write deadline is set, after timeout occurs we expect
+	// the Write method of the ResponseWriter object to return an error.
+	t.Parallel()
+	clientDoneCh, handlerDoneCh := make(chan struct{}), make(chan error, 1)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 2 {
+			t.Errorf("expected an HTTP/2.0 request, but got: %s", req.Proto)
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetWriteDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// a) the handler blocks here indefinitely
+		// b) this forces the handler write timeout
+		// to occur on the server side
+		// c) the http2 client should receive a stream error
+		// immediately after the write timeout occurs.
+		<-clientDoneCh
+
+		// NOTE: Write to the ResponseWriter object may succeed
+		// immediately after write timeout occurs, but we expect Write
+		// to return an error eventually; as soon as the underlying
+		// buffer is full, Write is expected to return an error.
+		func() {
+			now := time.Now()
+			count := 0
+			defer func() {
+				t.Logf("After timeout, Write was invoked %d times, duration: %s", count, time.Since(now))
+			}()
+
+			for {
+				count++
+				if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+					handlerDoneCh <- err
+					break
+				}
+			}
+		}()
+	}))
+
+	defer server.Close()
+	server.EnableHTTP2 = true
+	server.StartTLS()
+
+	client := server.Client()
+	func() {
+		defer close(clientDoneCh)
+		// we intentionally don't set any transport or client timeout to
+		// simulate a default client-go client.
+		_, err := client.Get(server.URL + "/foo")
+		if !responsewritertesting.IsStreamReadOrWriteTimeout(err) {
+			t.Errorf("expected a stream reset error, but got: %v", err)
+		}
+	}()
+
+	select {
+	case err := <-handlerDoneCh:
+		if err == nil {
+			t.Errorf("expected an error from Write after timeout")
+			return
+		}
+		t.Logf("Write (invoked after timeout) returned an error: %v", err)
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the request handler to have terminated")
+	}
+}
+
+func TestPerHandlerWriteDeadlineHTTP1WithWriteShouldReturnErrorAfterTimeout(t *testing.T) {
+	// This test documents the behavior of the per handler write
+	// deadline with a standard net http/1x server.
+	//
+	// scenario: http/1x, write deadline is set, after timeout occurs we expect
+	// the Write method of the ResponseWriter object to return an error.
+	t.Parallel()
+	handlerDoneCh := make(chan error, 1)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 1 {
+			t.Errorf("expected an HTTP/1x request, but got: %s", req.Proto)
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetWriteDeadline(time.Now().Add(5 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// wait for timeout to occur, 10s to eliminate flakes in ci
+		<-time.After(10 * time.Second)
+
+		// NOTE: Write to the ResponseWriter object may succeed
+		// immediately after write timeout occurs, but we expect Write
+		// to return an error eventually; as soon as the underlying
+		// buffer is full, Write is expected to return an error.
+		func() {
+			now := time.Now()
+			count := 0
+			defer func() {
+				t.Logf("After timeout, Write was invoked %d times, duration: %s", count, time.Since(now))
+			}()
+
+			for {
+				count++
+				if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+					handlerDoneCh <- err
+					break
+				}
+			}
+		}()
+	}))
+
+	defer server.Close()
+	server.StartTLS()
+
+	client := server.Client()
+	_, err := client.Get(server.URL + "/foo")
+	if err == nil {
+		t.Errorf("expected a stream reset error, but got: %v", err)
+	}
+
+	select {
+	case err := <-handlerDoneCh:
+		if err == nil {
+			t.Errorf("expected an error from Write after timeout")
+			return
+		}
+		t.Logf("Write (invoked after timeout) returned an error: %v", err)
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the request handler to have terminated")
+	}
+}
+
+func TestPerHandlerWriteDeadlineHTTP2WithTimeoutBeforeHandlerWrites(t *testing.T) {
+	// This test documents the behavior of the per handler write
+	// deadline with a standard net http2 server.
+	//
+	// scenario: http2, write deadline is set, timeout occurs before
+	// the handler writes to the ResponseWriter object.
+	t.Parallel()
+	clientDoneCh, handlerDoneCh := make(chan struct{}), make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 2 {
+			t.Errorf("expected an HTTP/2.0 request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetWriteDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// a) the handler blocks here indefinitely
+		// b) this forces the handler write timeout
+		// to occur on the server side
+		// c) the http2 client should receive a stream error
+		// immediately after the write timeout occurs.
+		<-clientDoneCh
+
+		// Write to the ResponseWriter object may succeed immediately
+		// after the timeout occurs if the underlying buffer has room.
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Logf("ResponseWriter.Write returned an error after timeout: %v", err)
+		}
+		// FlushError, on the other hand, is expected to
+		// return a timeout error immediately.
+		if err := flusher.FlushError(); !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+		}
+
+		// NOTE: the handler goroutine is expected to terminate as soon
+		// as it receives an error from either Write or FlushError. This
+		// is how we prevent a request handler from running indefinitely.
+	}))
+
+	defer server.Close()
+	server.EnableHTTP2 = true
+	server.StartTLS()
+
+	client := server.Client()
+	func() {
+		defer close(clientDoneCh)
+		_, err := client.Get(server.URL + "/foo")
+		if !responsewritertesting.IsStreamReadOrWriteTimeout(err) {
+			t.Errorf("expected a stream reset error, but got: %v", err)
+		}
+	}()
+
+	select {
+	case <-handlerDoneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the request handler to have terminated")
+	}
+}
+
+func TestPerHandlerWriteDeadlineHTTP1WithTimeoutBeforeHandlerWrites(t *testing.T) {
+	// This test documents the behavior of the per handler write
+	// deadline with a standard net http/1x server.
+	//
+	// scenario: http/1x, write deadline is set, timeout occurs before
+	// the handler writes to the ResponseWriter object.
+	t.Parallel()
+	handlerDoneCh := make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 1 {
+			t.Errorf("expected an HTTP/1x request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetWriteDeadline(time.Now().Add(1 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// NOTE: if we block the handler here, the client (not setting a
+		// transport or client timeout) will hang indefinitely, even
+		// though we have set the write deadline on the server side.
+		//
+		// this could be a problem in the real-world, for example,
+		// client-go does not set any transport or client timeout by
+		// default, and today the legacy timeout filter in the
+		// apiserver sends a timeout response to the client after 60s.
+		// In order for us to keep this behavior, we have to ensure
+		// that our request handler terminates by respecting the
+		// read/write handler deadline semantics.
+
+		// we wait long enough for the write deadline to occur
+		// TODO: wait for 10s to avoid flakiness due to overloaded
+		// ci env, is there a way to make it flake free without
+		// using a sleep?
+		<-time.After(10 * time.Second)
+
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Logf("ResponseWriter.Write returned an error: %v", err)
+		}
+		// FlushError, on the other hand, is expected to return a
+		// timeout error, the handler goroutine is expected to check for
+		// an error from FlushError and terminate accordingly.
+		// This is how we avoid a request handler running indefinitely.
+		if err := flusher.FlushError(); !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+		}
+	}))
+
+	defer server.Close()
+	server.StartTLS()
+
+	client := server.Client()
+	// we intentionally don't set any transport or client timeout to
+	// simulate a default client-go client.
+	resp, err := client.Get(server.URL + "/foo")
+	t.Logf("the server has returned response: %#v, err: %v", resp, err)
+	if err == nil {
+		t.Errorf("expected an error, but got none")
+	}
+
+	select {
+	case <-handlerDoneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the handler to have terminated")
+	}
+}
+
+func TestPerHandlerWriteDeadlineHTTP2WithTimeoutAfterHandlerWrites(t *testing.T) {
+	// This test documents the behavior of the per handler write
+	// deadline with a standard net http2 server.
+	//
+	// scenario: http2, write deadline is set, timeout occurs after
+	// the handler writes to ResponseWriter object.
+	t.Parallel()
+	clientReceivedCh, handlerDoneCh := make(chan struct{}), make(chan error, 1)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 2 {
+			t.Errorf("expected an HTTP/2.0 request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		// write and flush
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Errorf("expected no error from Write, but got: %v", err)
+			return
+		}
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("expected no error from FlushError, but got: %v", err)
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetWriteDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// a) the handler blocks here indefinitely
+		// b) this forces the write timeout to occur on the server side
+		// c) the client should receive the response written to
+		// d) wait for the client to finish reading the response body
+		// after receiving it, due to the handler write timing out
+		<-clientReceivedCh
+
+		// at this point the client has already received a response
+		if _, err := w.Write([]byte("world")); err != nil {
+			t.Logf("ResponseWriter.Write returned an error: %v", err)
+		}
+		if err := flusher.FlushError(); err != nil {
+			handlerDoneCh <- err
+		}
+	}))
+
+	defer server.Close()
+	server.EnableHTTP2 = true
+	server.StartTLS()
+
+	client := server.Client()
+	func() {
+		defer close(clientReceivedCh)
+
+		resp, err := client.Get(server.URL + "/foo")
+		if err != nil {
+			t.Errorf("unexpected connection error: %v", err)
+			return
+		}
+		// we expect OK due to the initial write and flush
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+		}
+		// we expect to a get a stream reset error while
+		// reading the body of the response.
+		defer closeResponseBody(t, resp)
+		if _, err := io.Copy(io.Discard, resp.Body); !responsewritertesting.IsStreamReadOrWriteTimeout(err) {
+			t.Errorf("expected http2 stream error, but got: %v", err)
+		}
+	}()
+
+	// now wait for the handler to terminate with the right error
+	select {
+	case err := <-handlerDoneCh:
+		if !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the handler to have terminated")
+	}
+}
+
+func TestPerHandlerWriteDeadlineHTTP1WithTimeoutAfterHandlerWrites(t *testing.T) {
+	// This test documents the behavior of the per handler write
+	// deadline with a standard net http/1x server.
+	//
+	// scenario: http/1x, write deadline is set, the handler writes partial
+	// content to the ResponseWriter object, it sets the write deadline,
+	// timeout occurs, any attempt flush the ResponseWriter object
+	// should result an error.
+	//
+	// with http/1x, a blocked handler also blocks the client indefinitely
+	// unless client-side timeout is enforced.
+	t.Parallel()
+	handlerDoneCh := make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		now := time.Now()
+		if req.ProtoMajor != 1 {
+			t.Errorf("expected an HTTP/1x request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Errorf("expected no error from Write, but got: %v", err)
+		}
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("expected no error from FlushError, but got: %v", err)
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetWriteDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetWriteDeadline, but got: %v", err)
+			return
+		}
+
+		// NOTE: if we block the handler here, the client (not setting a
+		// transport or client timeout) will hang indefinitely, even
+		// though we have set the write deadline on the server side.
+		//
+		// this could be a problem in the real-world, for example,
+		// client-go does not set any transport or client timeout by
+		// default, and today the legacy timeout filter in the
+		// apiserver sends a timeout response to the client after 60s.
+		// In order for us to keep this behavior, we have to ensure
+		// that our request handler terminates by respecting the
+		// read/write handler deadline semantics.
+
+		// keep writing until write timeout occurs
+		// TODO: is there a better way to detect a timeout here?
+		if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+			if _, err := w.Write(bytes.Repeat([]byte("foo"), 1024)); err != nil {
+				return true, nil
+			}
+			return false, nil
+		}); err != nil {
+			t.Errorf("ResponseWriter.Write never returned an error: %v", err)
+		}
+
+		if _, err := w.Write([]byte("foo")); err != nil {
+			t.Logf("ResponseWriter.Write returned an error: %v", err)
+		}
+		if err := flusher.FlushError(); !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+		}
+
+		t.Logf("the request handler ran for %s", time.Since(now))
+	}))
+
+	defer server.Close()
+	server.StartTLS()
+
+	client := server.Client()
+	resp, err := client.Get(server.URL + "/foo")
+	if err != nil {
+		t.Errorf("expected no error from client.Get, but got: %v", err)
+		return
+	}
+	// we expect OK due to the initial write and flush
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+	}
+	defer closeResponseBody(t, resp)
+	if _, err = io.ReadAll(resp.Body); err == nil {
+		t.Errorf("expected an error while reading the Response Body")
+	}
+
+	select {
+	case <-handlerDoneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the request handler to have terminated")
+	}
+}
+
+func TestPerHandlerWriteTimeoutHTTP2WithHandlerWritingIndefinitely(t *testing.T) {
+	// This test documents the behavior of the per handler write
+	// deadline with a standard net http2 server.
+	//
+	// scenario: http2, write deadline set, handler keeps
+	// writing to the ResponseWriter object.
+	t.Parallel()
+	handlerDoneCh := make(chan error, 1)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 2 {
+			t.Errorf("expected an HTTP/2.0 request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Errorf("expected no error from Write, but got: %v", err)
+			return
+		}
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("expected no error from FlushError, but got: %v", err)
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetWriteDeadline(time.Now().Add(300 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		if _, err := io.Copy(w, neverEnding('a')); err != nil {
+			handlerDoneCh <- err
+		}
+	}))
+
+	defer server.Close()
+	server.EnableHTTP2 = true
+	server.StartTLS()
+
+	client := server.Client()
+	resp, err := client.Get(server.URL + "/foo")
+	if err != nil {
+		t.Errorf("unexpected connection error: %v", err)
+		return
+	}
+	// we expect OK due to the initial write and flush
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+	}
+	defer closeResponseBody(t, resp)
+	if _, err := io.Copy(io.Discard, resp.Body); !responsewritertesting.IsStreamReadOrWriteTimeout(err) {
+		t.Errorf("expected http2 stream error, but got: %v", err)
+	}
+
+	// wait for the handler to terminate with the right error
+	select {
+	case err := <-handlerDoneCh:
+		if err == nil || !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the handler to have terminated")
+	}
+}
+
+func TestPerHandlerReadDeadlineHTTP2WithClientNotWritingToRequestBody(t *testing.T) {
+	// This test documents the behavior of the per handler read
+	// deadline with a standard net http/2.0 server.
+	//
+	// scenario: http2, read deadline is set, client does not
+	// send content, read timeout is expected.
+	t.Parallel()
+	clientDoneCh, handlerDoneCh := make(chan struct{}), make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 2 {
+			t.Errorf("expected an HTTP/2.0 request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetReadDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// without a write deadline set, if the handler blocks here with,
+		//  <-clientDoneCh
+		// it will cause the client to block indefinitely as well.
+
+		// we expect a read timeout to occur here
+		if _, err := io.Copy(io.Discard, req.Body); !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+		}
+
+		// even though read timeout has occurred, it seems we can
+		// successfully write to the ResponseWriter
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Errorf("expected no error from ResponseWriter.Write, but got: %v", err)
+		}
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("expected no error from FlushError, but got: %v", err)
+		}
+	}))
+
+	defer server.Close()
+	server.EnableHTTP2 = true
+	server.StartTLS()
+
+	reader, writer := io.Pipe()
+	defer func() {
+		if err := writer.Close(); err != nil {
+			t.Errorf("expected no error from Close, but got: %v", err)
+		}
+	}()
+
+	client := server.Client()
+	func() {
+		defer close(clientDoneCh)
+
+		resp, err := client.Post(server.URL, "text/foo", reader)
+		if err != nil {
+			t.Errorf("expected no error from Post, but got: %v", err)
+			return
+		}
+		defer closeResponseBody(t, resp)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+		}
+		if got, err := io.ReadAll(resp.Body); err != nil || string(got) != "hello" {
+			t.Errorf("expected the client to read the response: want: %q, got: %q, error: %v", "hello", string(got), err)
+		}
+	}()
+
+	select {
+	case <-handlerDoneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the handler to have terminated")
+	}
+}
+
+func TestPerHandlerReadDeadlineHTTP1WithClientNotWritingToRequestBody(t *testing.T) {
+	// This test documents the behavior of the per handler read
+	// deadline with a standard net http/1x server.
+	//
+	// scenario: http/1x, read deadline is set, client does not
+	// send content, read timeout is expected.
+	t.Parallel()
+	doneCh := make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(doneCh)
+		if req.ProtoMajor != 1 {
+			t.Errorf("expected an HTTP/1x request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetReadDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// we expect a read timeout here
+		if _, err := io.Copy(io.Discard, req.Body); !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+		}
+
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Errorf("expected no error from ResponseWriter.Write, but got: %v", err)
+		}
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("expected no error from FlushError, but got: %v", err)
+		}
+	}))
+
+	defer server.Close()
+	server.StartTLS()
+
+	reader, writer := io.Pipe()
+	defer func() {
+		if err := writer.Close(); err != nil {
+			t.Errorf("expected no error from Close, but got: %v", err)
+		}
+	}()
+
+	client := server.Client()
+	resp, err := client.Post(server.URL, "text/foo", reader)
+	if err != nil {
+		t.Errorf("expected no error from Post, but got: %v", err)
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+	}
+	defer closeResponseBody(t, resp)
+	if got, err := io.ReadAll(resp.Body); err != nil || string(got) != "hello" {
+		t.Errorf("expected the client to read the response: want: %q, got: %q, error: %v", "hello", string(got), err)
+	}
+
+	select {
+	case <-doneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the handler to have terminated")
+	}
+}
+
+func TestPerHandlerReadDeadlineHTTPWithTimeoutWhileClientIsSendingContent(t *testing.T) {
+	// This test documents the behavior of the per handler read
+	// deadline with a standard net http server.
+	//
+	// scenario: http2 or http/1x, read deadline is set, client sends some
+	// content and keeps the request Body stream open, read timeout expected
+	t.Parallel()
+	tests := []struct {
+		protoMajor int
+	}{
+		{protoMajor: 1},
+		{protoMajor: 2},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("HTTP/%d", test.protoMajor), func(t *testing.T) {
+			msg := "hello"
+			handlerDoneCh := make(chan struct{})
+			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				defer close(handlerDoneCh)
+				if req.ProtoMajor != test.protoMajor {
+					t.Errorf("expected an ProtoMajor: %d, but got: %s", test.protoMajor, req.Proto)
+					return
+				}
+				flusher, ok := w.(interface{ FlushError() error })
+				if !ok {
+					t.Errorf("expected ResponseWriter object to implement FlushError")
+					return
+				}
+
+				b := make([]byte, len(msg))
+				n, err := io.ReadFull(req.Body, b)
+				if err != nil || string(b[:n]) != msg {
+					t.Errorf("expected content in request body, want: %s, got: %s, error: %v", msg, string(b[:n]), err)
+					return
+				}
+
+				ctrl := http.NewResponseController(w)
+				if err := ctrl.SetReadDeadline(time.Now().Add(10 * time.Millisecond)); err != nil {
+					t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+					return
+				}
+
+				// at this point, there are some content in the
+				// Body of the request, and the EOF will not be
+				// reached until after this handler terminates.
+				if _, err := io.Copy(io.Discard, req.Body); !errors.Is(err, os.ErrDeadlineExceeded) {
+					t.Errorf("expected an os.ErrDeadlineExceeded, but got: %v", err)
+				}
+
+				if _, err := w.Write([]byte(msg)); err != nil {
+					t.Errorf("expected no error from ResponseWriter.Write, but got: %v", err)
+				}
+				if err := flusher.FlushError(); err != nil {
+					t.Errorf("expected no error from FlushError, but got: %v", err)
+				}
+			}))
+
+			defer server.Close()
+			if test.protoMajor == 2 {
+				server.EnableHTTP2 = true
+			}
+			server.StartTLS()
+
+			reader, writer := io.Pipe()
+			writerDoneCh := make(chan struct{})
+			go func() {
+				defer close(writerDoneCh)
+				if _, err := writer.Write([]byte(msg + "more")); err != nil {
+					t.Errorf("expected no error from Write to Body of the request, but got: %v", err)
+				}
+
+				// wait until the request handler terminates
+				// before closing the writer
+				<-handlerDoneCh
+				if err := writer.Close(); err != nil {
+					t.Errorf("expected no error from Close, but got: %v", err)
+				}
+			}()
+
+			client := server.Client()
+			resp, err := client.Post(server.URL, "test/foo", reader)
+			if err != nil {
+				t.Errorf("expected no error, but got: %v", err)
+				return
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+			}
+			defer closeResponseBody(t, resp)
+			if got, err := io.ReadAll(resp.Body); err != nil || msg != string(got) {
+				t.Errorf("expected response body: %s, but got: %s, error: %v", msg, string(got), err)
+			}
+
+			select {
+			case <-writerDoneCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("expected the request handler to have terminated")
+			}
+		})
+	}
+}
+
+func TestPerHandlerReadDeadlineHTTP2WithNoRequestBody(t *testing.T) {
+	// This test documents the behavior of the per handler read
+	// deadline with a standard net http2 server.
+	//
+	// scenario: http2, read deadline is set, client request
+	// body is empty, read timeout has no effect.
+
+	// TODO: enable the test to run when
+	//  https://github.com/golang/go/issues/58237 is fixed
+	t.Skip("the http server panics, see https://github.com/golang/go/issues/58237")
+
+	t.Parallel()
+	clientDoneCh, handlerDoneCh := make(chan struct{}), make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(handlerDoneCh)
+		if req.ProtoMajor != 2 {
+			t.Errorf("expected an HTTP/2.0 request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetReadDeadline(time.Now().Add(1 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		// without a write deadline set, if the handler blocks here with,
+		//  <-clientDoneCh
+		// it will cause the client to block indefinitely as well.
+		<-time.After(10 * time.Second)
+
+		// we expect no timeout reading from an empty body since
+		// for server requests, the Request Body is always non-nil
+		// but will return EOF immediately when no body is present.
+		t.Logf("request Body type: %T", req.Body)
+		if _, err := io.Copy(io.Discard, req.Body); err != nil {
+			t.Errorf("expected no error from reading the Body (%T) of the request, but got: %v", req.Body, err)
+		}
+
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Errorf("expected no error from ResponseWriter.Write, but got: %v", err)
+		}
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("expected no error from FlushError, but got: %v", err)
+		}
+	}))
+
+	defer server.Close()
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	client := server.Client()
+	func() {
+		defer close(clientDoneCh)
+		resp, err := client.Get(server.URL + "/foo")
+		if err != nil {
+			t.Errorf("expected no error from Post, but got: %v", err)
+			return
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+		}
+		defer closeResponseBody(t, resp)
+		if got, err := io.ReadAll(resp.Body); err != nil || string(got) != "hello" {
+			t.Errorf("expected the client to read the response: want: %q, got: %q, error: %v", "hello", string(got), err)
+		}
+	}()
+
+	select {
+	case <-handlerDoneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the handler to have terminated")
+	}
+}
+
+func TestPerHandlerReadDeadlineHTTP1WithNoRequestBody(t *testing.T) {
+	// This test documents the behavior of the per handler read
+	// deadline with a standard net http server.
+	//
+	// scenario: http/1x, read deadline is set, client request
+	// body is empty, read timeout has no effect.
+	t.Parallel()
+	doneCh := make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(doneCh)
+		if req.ProtoMajor != 1 {
+			t.Errorf("expected an HTTP/1x request, but got: %s", req.Proto)
+			return
+		}
+		flusher, ok := w.(interface{ FlushError() error })
+		if !ok {
+			t.Errorf("expected ResponseWriter object to implement FlushError")
+			return
+		}
+
+		ctrl := http.NewResponseController(w)
+		if err := ctrl.SetReadDeadline(time.Now().Add(5 * time.Millisecond)); err != nil {
+			t.Errorf("expected no error from SetReadDeadline, but got: %v", err)
+			return
+		}
+
+		<-time.After(10 * time.Second)
+
+		// we expect no timeout reading from an empty body since
+		// for server requests, the Request Body is always non-nil
+		// but will return EOF immediately when no body is present.
+		t.Logf("request Body type: %T", req.Body)
+		if _, err := io.Copy(io.Discard, req.Body); err != nil {
+			t.Errorf("expected no error from reading the empty Body (%T) of the request, but got: %v", req.Body, err)
+		}
+
+		if _, err := w.Write([]byte("hello")); err != nil {
+			t.Errorf("expected no error from ResponseWriter.Write, but got: %v", err)
+		}
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("expected no error from FlushError, but got: %v", err)
+		}
+	}))
+
+	defer server.Close()
+	server.StartTLS()
+
+	client := server.Client()
+	resp, err := client.Get(server.URL + "/foo")
+	if err != nil {
+		t.Errorf("expected no error from Post, but got: %v", err)
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected staus code: %d, but got: %d", http.StatusOK, resp.StatusCode)
+	}
+	defer closeResponseBody(t, resp)
+	if got, err := io.ReadAll(resp.Body); err != nil || string(got) != "hello" {
+		t.Errorf("expected the client to read the response: want: %q, got: %q, error: %v", "hello", string(got), err)
+	}
+
+	select {
+	case <-doneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("expected the handler to have terminated")
+	}
+
+}
+
+type neverEnding byte
+
+func (b neverEnding) Read(p []byte) (n int, err error) {
+	for i := range p {
+		p[i] = byte(b)
+	}
+	return len(p), nil
+}
+
+func closeResponseBody(t *testing.T, resp *http.Response) {
+	t.Helper()
+	if err := resp.Body.Close(); err != nil {
+		t.Errorf("unexpected error while closing the Body of the Response object: %v", err)
 	}
 }
 
