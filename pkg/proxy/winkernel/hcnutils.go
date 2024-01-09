@@ -20,7 +20,6 @@ limitations under the License.
 package winkernel
 
 import (
-	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	"k8s.io/klog/v2"
 )
@@ -121,7 +120,7 @@ func (hcnObj hcnImpl) DsrSupported() error {
 }
 
 func (hcnObj hcnImpl) DeleteAllHnsLoadBalancerPolicy() {
-	plists, err := hcsshim.HNSListPolicyListRequest()
+	plists, err := hns.HNSListPolicyListRequest()
 	if err != nil {
 		return
 	}

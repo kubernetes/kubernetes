@@ -42,11 +42,11 @@ type windowsNetworkStatsProvider interface {
 type networkStats struct{}
 
 func (s networkStats) HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error) {
-	return hcsshim.HNSListEndpointRequest()
+	return hns.HNSListEndpointRequest()
 }
 
 func (s networkStats) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
-	return hcsshim.GetHNSEndpointStats(endpointName)
+	return hns.GetHNSEndpointStats(endpointName)
 }
 
 // listContainerNetworkStats returns the network stats of all the running containers.

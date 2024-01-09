@@ -73,7 +73,7 @@ type WindowsKernelCompatTester struct{}
 
 // IsCompatible returns true if winkernel can support this mode of proxy
 func (lkct WindowsKernelCompatTester) IsCompatible() error {
-	_, err := hcsshim.HNSListPolicyListRequest()
+	_, err := hns.HNSListPolicyListRequest()
 	if err != nil {
 		return fmt.Errorf("Windows kernel is not compatible for Kernel mode")
 	}
