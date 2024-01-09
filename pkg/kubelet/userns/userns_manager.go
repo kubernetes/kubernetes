@@ -19,7 +19,6 @@ package userns
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -52,6 +51,7 @@ type userNsPodsManager interface {
 	HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error)
 	GetPodDir(podUID types.UID) string
 	ListPodsFromDisk() ([]types.UID, error)
+	GetKubeletMappings() (uint32, uint32, error)
 }
 
 type UsernsManager struct {
@@ -59,7 +59,11 @@ type UsernsManager struct {
 	usedBy       map[types.UID]uint32 // Map pod.UID to range used
 	removed      int
 	numAllocated int
-	kl           userNsPodsManager
+
+	off int
+	len int
+
+	kl userNsPodsManager
 	// This protects all members except for kl.anager
 	lock sync.Mutex
 }
@@ -130,16 +134,33 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 }
 
 func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
+	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings()
+	if err != nil {
+		return nil, err
+	}
+
+	if kubeletMappingID%userNsLength != 0 {
+		return nil, fmt.Errorf("kubelet user assigned ID %v is not a multiple of %v", kubeletMappingID, userNsLength)
+	}
+	if kubeletMappingID < userNsLength {
+		// We don't allow to map 0, as security is circumvented.
+		return nil, fmt.Errorf("kubelet user assigned ID %v must be greater or equal to %v", kubeletMappingID, userNsLength)
+	}
+	if kubeletMappingLen%userNsLength != 0 {
+		return nil, fmt.Errorf("kubelet user assigned IDs length %v is not a multiple of %v", kubeletMappingLen, userNsLength)
+	}
+	if kubeletMappingLen/userNsLength < maxPods {
+		return nil, fmt.Errorf("kubelet user assigned IDs are not enough to support %v pods", maxPods)
+	}
+	off := int(kubeletMappingID / userNsLength)
+	len := int(kubeletMappingLen / userNsLength)
+
 	m := UsernsManager{
-		// Create a bitArray for all the UID space (2^32).
-		// As a by product of that, no index param to bitArray can be out of bounds (index is uint32).
-		used:   allocator.NewAllocationMap((math.MaxUint32+1)/userNsLength, "user namespaces"),
+		used:   allocator.NewAllocationMap(len, "user namespaces"),
 		usedBy: make(map[types.UID]uint32),
 		kl:     kl,
-	}
-	// First block is reserved for the host.
-	if _, err := m.used.Allocate(0); err != nil {
-		return nil, err
+		off:    off,
+		len:    len,
 	}
 
 	// do not bother reading the list of pods if user namespaces are not enabled.
@@ -184,7 +205,10 @@ func (m *UsernsManager) recordPodMappings(pod types.UID) error {
 
 // isSet checks if the specified index is already set.
 func (m *UsernsManager) isSet(v uint32) bool {
-	index := int(v / userNsLength)
+	index := int(v/userNsLength) - m.off
+	if index < 0 || index >= m.len {
+		return true
+	}
 	return m.used.Has(index)
 }
 
@@ -212,7 +236,7 @@ func (m *UsernsManager) allocateOne(pod types.UID) (firstID uint32, length uint3
 
 	klog.V(5).InfoS("new pod user namespace allocation", "podUID", pod)
 
-	firstID = uint32(firstZero * userNsLength)
+	firstID = uint32((firstZero + m.off) * userNsLength)
 	m.usedBy[pod] = firstID
 	return firstID, userNsLength, nil
 }
@@ -229,7 +253,10 @@ func (m *UsernsManager) record(pod types.UID, from, length uint32) (err error) {
 	if found && prevFrom != from {
 		return fmt.Errorf("different user namespace range already used by pod %q", pod)
 	}
-	index := int(from / userNsLength)
+	index := int(from/userNsLength) - m.off
+	if index < 0 || index >= m.len {
+		return fmt.Errorf("id %v is out of range", from)
+	}
 	// if the pod wasn't found then verify the range is free.
 	if !found && m.used.Has(index) {
 		return fmt.Errorf("range picked for pod %q already taken", pod)
@@ -304,7 +331,7 @@ func (m *UsernsManager) releaseWithLock(pod types.UID) {
 		m.usedBy = n
 		m.removed = 0
 	}
-	m.used.Release(int(v / userNsLength))
+	_ = m.used.Release(int(v/userNsLength) - m.off)
 }
 
 func (m *UsernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) (userNs userNamespace, err error) {

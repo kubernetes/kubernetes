@@ -34,6 +34,13 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+const (
+	// skip the first block
+	minimumMappingUID = userNsLength
+	// allocate enough space for 2000 user namespaces
+	mappingLen = userNsLength * 2000
+)
+
 type testUserNsPodsManager struct {
 	podDir  string
 	podList []types.UID
@@ -59,6 +66,10 @@ func (m *testUserNsPodsManager) HandlerSupportsUserNamespaces(runtimeHandler str
 		return false, errors.New("unknown runtime")
 	}
 	return m.userns, nil
+}
+
+func (m *testUserNsPodsManager) GetKubeletMappings() (uint32, uint32, error) {
+	return minimumMappingUID, mappingLen, nil
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
@@ -97,6 +108,9 @@ func TestUserNsManagerAllocate(t *testing.T) {
 		allocated, length, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
 		assert.Equal(t, userNsLength, int(length), "length is not the expected. iter: %v", i)
 		assert.NoError(t, err)
+		assert.True(t, allocated >= minimumMappingUID)
+		// The last ID of the userns range (allocated+userNsLength) should be within bounds.
+		assert.True(t, allocated <= minimumMappingUID+mappingLen-userNsLength)
 		allocs = append(allocs, allocated)
 	}
 	for i, v := range allocs {

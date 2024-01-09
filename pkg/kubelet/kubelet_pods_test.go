@@ -6013,3 +6013,77 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 	event := <-fakeRecorder.Events
 	assert.Equal(t, event, expectedEvent)
 }
+
+func TestParseGetSubIdsOutput(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantFirstID  uint32
+		wantRangeLen uint32
+		wantErr      bool
+	}{
+		{
+			name:         "valid",
+			input:        "0: kubelet 65536 2147483648",
+			wantFirstID:  65536,
+			wantRangeLen: 2147483648,
+		},
+		{
+			name:    "multiple lines",
+			input:   "0: kubelet 1 2\n1: kubelet 3 4\n",
+			wantErr: true,
+		},
+		{
+			name:    "wrong format",
+			input:   "0: kubelet 65536",
+			wantErr: true,
+		},
+		{
+			name:    "non numeric 1",
+			input:   "0: kubelet Foo 65536",
+			wantErr: true,
+		},
+		{
+			name:    "non numeric 2",
+			input:   "0: kubelet 0 Bar",
+			wantErr: true,
+		},
+		{
+			name:    "overflow 1",
+			input:   "0: kubelet 4294967296 2147483648",
+			wantErr: true,
+		},
+		{
+			name:    "overflow 2",
+			input:   "0: kubelet 65536 4294967296",
+			wantErr: true,
+		},
+		{
+			name:    "negative value 1",
+			input:   "0: kubelet -1 2147483648",
+			wantErr: true,
+		},
+		{
+			name:    "negative value 2",
+			input:   "0: kubelet 65536 -1",
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotFirstID, gotRangeLen, err := parseGetSubIdsOutput(tc.input)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("%s: expected error, got nil", tc.name)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+				}
+				if gotFirstID != tc.wantFirstID || gotRangeLen != tc.wantRangeLen {
+					t.Errorf("%s: got (%d, %d), want (%d, %d)", tc.name, gotFirstID, gotRangeLen, tc.wantFirstID, tc.wantRangeLen)
+				}
+			}
+		})
+	}
+}
