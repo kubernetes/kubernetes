@@ -77,6 +77,11 @@ type Config struct {
 
 	// WatchListPageSize is the requested chunk size of initial and relist watch lists.
 	WatchListPageSize int64
+
+	// Name is an optional name for the controller.
+	// Name defaults to the closest source_file.go:line
+	// in the call stack that is outside this package.
+	Name string
 }
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
@@ -140,6 +145,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			TypeDescription: c.config.ObjectDescription,
 			Clock:           c.clock,
+			Name:            c.config.Name,
 		},
 	)
 	r.ShouldResync = c.config.ShouldResync

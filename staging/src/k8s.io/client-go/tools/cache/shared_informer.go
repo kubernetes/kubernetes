@@ -267,6 +267,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 	realClock := &clock.RealClock{}
 
 	return &sharedIndexInformer{
+		name:                            options.InformerName,
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
 		listerWatcher:                   lw,
@@ -291,6 +292,11 @@ type SharedIndexInformerOptions struct {
 	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
 	// underlying Reflector's type description.
 	ObjectDescription string
+
+	// InformerName identifies the informer.
+	// This may be empty, in which case it defaults to the closest source_file.go:line
+	// in the call stack that is outside this package
+	InformerName string
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -354,6 +360,7 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 // sharedProcessor, which is responsible for relaying those
 // notifications to each of the informer's clients.
 type sharedIndexInformer struct {
+	name       string
 	indexer    Indexer
 	controller Controller
 
@@ -479,6 +486,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 			Process:           s.HandleDeltas,
 			WatchErrorHandler: s.watchErrorHandler,
+			Name:              s.name,
 		}
 
 		s.controller = New(cfg)
