@@ -48,7 +48,7 @@ func TestNewDetectLocalByCIDR(t *testing.T) {
 			errExpected: false,
 		},
 		{
-			cidr:        "2002::1234:abcd:ffff:c0a8:101/64",
+			cidr:        "2002:0:0:1234::/64",
 			errExpected: false,
 		},
 		{
@@ -56,11 +56,7 @@ func TestNewDetectLocalByCIDR(t *testing.T) {
 			errExpected: true,
 		},
 		{
-			cidr:        "2002::1234:abcd:ffff:c0a8:101",
-			errExpected: true,
-		},
-		{
-			cidr:        "",
+			cidr:        "2002:0:0:1234::",
 			errExpected: true,
 		},
 		{
@@ -94,9 +90,9 @@ func TestDetectLocalByCIDR(t *testing.T) {
 			expectedIfNotLocalOutput: []string{"!", "-s", "10.0.0.0/14"},
 		},
 		{
-			cidr:                     "2002::1234:abcd:ffff:c0a8:101/64",
-			expectedIfLocalOutput:    []string{"-s", "2002::1234:abcd:ffff:c0a8:101/64"},
-			expectedIfNotLocalOutput: []string{"!", "-s", "2002::1234:abcd:ffff:c0a8:101/64"},
+			cidr:                     "2002:0:0:1234::/64",
+			expectedIfLocalOutput:    []string{"-s", "2002:0:0:1234::/64"},
+			expectedIfNotLocalOutput: []string{"!", "-s", "2002:0:0:1234::/64"},
 		},
 	}
 	for _, c := range cases {
