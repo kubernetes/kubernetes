@@ -143,12 +143,6 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 // StreamWithContext opens a protocol streamer to the server and streams until a client closes
 // the connection or the server disconnects or the context is done.
 func (e *spdyStreamExecutor) StreamWithContext(ctx context.Context, options StreamOptions) error {
-	conn, streamer, err := e.newConnectionAndStream(ctx, options)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
 	panicChan := make(chan any, 1)
 	errorChan := make(chan error, 1)
 	go func() {
@@ -157,6 +151,14 @@ func (e *spdyStreamExecutor) StreamWithContext(ctx context.Context, options Stre
 				panicChan <- p
 			}
 		}()
+
+		conn, streamer, err := e.newConnectionAndStream(ctx, options)
+		if err != nil {
+			errorChan <- err
+			return
+		}
+		defer conn.Close()
+
 		errorChan <- streamer.stream(conn)
 	}()
 
