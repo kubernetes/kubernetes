@@ -91,7 +91,7 @@ type HintProvider interface {
 	// Allocate triggers resource allocation to occur on the HintProvider after
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(pod *v1.Pod, container *v1.Container) (*TopologyHint, error)
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity

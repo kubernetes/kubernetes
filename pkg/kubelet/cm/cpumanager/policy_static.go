@@ -293,11 +293,11 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cset)
 }
 
-func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (NUMAs []int, rerr error) {
 	numCPUs := p.guaranteedCPUs(pod, container)
 	if numCPUs == 0 {
 		// container belongs in the shared pool (nothing to do; use default cpuset)
-		return nil
+		return nil, nil
 	}
 
 	klog.InfoS("Static policy: Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
@@ -321,7 +321,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 			// Just like the behaviour in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
 			// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
 			// CPUs on a physical core. Allocation of individual threads would never have to occur.
-			return SMTAlignmentError{
+			return nil, SMTAlignmentError{
 				RequestedCPUs: numCPUs,
 				CpusPerCore:   CPUsPerCore,
 			}
@@ -334,7 +334,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		// all the core siblings of the reserved CPUs as unavailable when computing the free CPUs, before to start the actual allocation.
 		// This way, by construction all possible CPUs allocation whose number is multiple of the SMT level are now correct again.
 		if numCPUs > availablePhysicalCPUs {
-			return SMTAlignmentError{
+			return nil, SMTAlignmentError{
 				RequestedCPUs:         numCPUs,
 				CpusPerCore:           CPUsPerCore,
 				AvailablePhysicalCPUs: availablePhysicalCPUs,
@@ -344,7 +344,8 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	if cpuset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
 		p.updateCPUsToReuse(pod, container, cpuset)
 		klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
-		return nil
+		NUMAs = p.topology.CPUSNUMANodeIDS(cpuset)
+		return NUMAs, nil
 	}
 
 	// Call Topology Manager to get the aligned socket affinity across all hint providers.
@@ -355,12 +356,13 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	cpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
 	if err != nil {
 		klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
-		return err
+		return nil, err
 	}
 	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
 	p.updateCPUsToReuse(pod, container, cpuset)
 
-	return nil
+	NUMAs = p.topology.CPUSNUMANodeIDS(cpuset)
+	return NUMAs, nil
 }
 
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
@@ -607,7 +609,6 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes.
 	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
-
 	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
 	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
@@ -663,7 +664,6 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 			hints[i].Preferred = true
 		}
 	}
-
 	return hints
 }
 

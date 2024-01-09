@@ -64,7 +64,7 @@ type Manager interface {
 
 	// Allocate is called to pre-allocate memory resources during Pod admission.
 	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(pod *v1.Pod, container *v1.Container) (*topologymanager.TopologyHint, error)
 
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, any memory allocated to the container is freed.
@@ -241,7 +241,7 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 }
 
 // Allocate is called to pre-allocate memory resources during Pod admission.
-func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) (*topologymanager.TopologyHint, error) {
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
@@ -255,9 +255,9 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// Call down into the policy to assign this container memory if required.
 	if err := m.policy.Allocate(m.state, pod, container); err != nil {
 		klog.ErrorS(err, "Allocate error")
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // RemoveContainer removes the container from the state

@@ -41,9 +41,9 @@ func (m *fakeManager) Policy() Policy {
 	return NewPolicyNone()
 }
 
-func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) (*topologymanager.TopologyHint, error) {
 	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
-	return nil
+	return nil, nil
 }
 
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {

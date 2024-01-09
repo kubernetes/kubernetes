@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"math"
 	"sync"
 	"time"
@@ -59,7 +60,7 @@ type Manager interface {
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
 	// e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(pod *v1.Pod, container *v1.Container) (*topologymanager.TopologyHint, error)
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the CPU allocation during the container removal
@@ -243,7 +244,7 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	return nil
 }
 
-func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
+func (m *manager) Allocate(p *v1.Pod, c *v1.Container) (*topologymanager.TopologyHint, error) {
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(p)
@@ -255,13 +256,24 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(m.state, p, c)
+	NUMAs, err := m.policy.Allocate(m.state, p, c)
 	if err != nil {
 		klog.ErrorS(err, "Allocate error")
-		return err
+		return nil, err
+	}
+	if NUMAs == nil {
+		return nil, err
 	}
 
-	return nil
+	mask, err := bitmask.NewBitMask(NUMAs...)
+	if err != nil {
+		klog.ErrorS(err, "Failed to generate NUMA bitmask")
+		return nil, nil
+	}
+	return &topologymanager.TopologyHint{
+		NUMANodeAffinity: mask,
+		Preferred:        true,
+	}, nil
 }
 
 func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {

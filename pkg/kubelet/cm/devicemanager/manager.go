@@ -318,7 +318,7 @@ func (m *ManagerImpl) Stop() error {
 
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) (*topologymanager.TopologyHint, error) {
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
@@ -338,7 +338,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
 			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
-				return err
+				return nil, err
 			}
 			if !types.IsRestartableInitContainer(&initContainer) {
 				m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
@@ -348,14 +348,14 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 				// from the devicesToReuse.
 				m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
 			}
-			return nil
+			return nil, nil
 		}
 	}
 	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
-		return err
+		return nil, err
 	}
 	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
-	return nil
+	return nil, nil
 }
 
 // UpdatePluginResources updates node resources based on devices already allocated to pods.
@@ -947,7 +947,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	}
 	if needsReAllocate {
 		klog.V(2).InfoS("Needs to re-allocate device plugin resources for pod", "pod", klog.KObj(pod), "containerName", container.Name)
-		if err := m.Allocate(pod, container); err != nil {
+		if _, err := m.Allocate(pod, container); err != nil {
 			return nil, err
 		}
 	}

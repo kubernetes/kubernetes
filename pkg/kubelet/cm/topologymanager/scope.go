@@ -149,9 +149,13 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 // but topologymanager do not track providers anymore
 func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
 	for _, provider := range s.hintProviders {
-		err := provider.Allocate(pod, container)
+		alignedHint, err := provider.Allocate(pod, container)
 		if err != nil {
 			return err
+		}
+		// update hints with previous resource
+		if alignedHint != nil {
+			s.setTopologyHints(string(pod.UID), container.Name, *alignedHint)
 		}
 	}
 	return nil

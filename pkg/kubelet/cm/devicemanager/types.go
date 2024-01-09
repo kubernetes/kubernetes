@@ -40,7 +40,7 @@ type Manager interface {
 	// owning device plugin to allow setup procedures to take place, and for
 	// the device plugin to provide runtime settings to use the device
 	// (environment variables, mount points and device files).
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(pod *v1.Pod, container *v1.Container) (*topologymanager.TopologyHint, error)
 
 	// UpdatePluginResources updates node resources based on devices already
 	// allocated to pods. The node object is provided for the device manager to

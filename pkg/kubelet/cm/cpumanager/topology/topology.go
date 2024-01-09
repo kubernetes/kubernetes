@@ -90,6 +90,28 @@ func (topo *CPUTopology) CPUNUMANodeID(cpu int) (int, error) {
 	return info.NUMANodeID, nil
 }
 
+// CPUSNUMANodeIDS returns the NUMA node IDs which the given logical CPUs belongs to.
+func (topo *CPUTopology) CPUSNUMANodeIDS(cpus cpuset.CPUSet) []int {
+	dedups := func(slice []int) []int {
+		encountered := map[int]bool{}
+		result := []int{}
+		for _, v := range slice {
+			if encountered[v] == false {
+				encountered[v] = true
+				result = append(result, v)
+			}
+		}
+		return result
+	}
+	var numaNodeIDs []int
+	for cpu, info := range topo.CPUDetails {
+		if cpus.Contains(cpu) {
+			numaNodeIDs = append(numaNodeIDs, info.NUMANodeID)
+		}
+	}
+	return dedups(numaNodeIDs)
+}
+
 // CPUInfo contains the NUMA, socket, and core IDs associated with a CPU.
 type CPUInfo struct {
 	NUMANodeID int

@@ -294,13 +294,11 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 
 func (m HintMerger) Merge() TopologyHint {
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
-
 	var bestHint *TopologyHint
 	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
 		mergedHint := mergePermutation(defaultAffinity, permutation)
-
 		// Compare the current bestHint with the candidate mergedHint and
 		// update bestHint if appropriate.
 		bestHint = m.compare(bestHint, &mergedHint)
@@ -309,7 +307,6 @@ func (m HintMerger) Merge() TopologyHint {
 	if bestHint == nil {
 		bestHint = &TopologyHint{defaultAffinity, false}
 	}
-
 	return *bestHint
 }
 

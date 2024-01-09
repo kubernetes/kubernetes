@@ -104,8 +104,8 @@ func (p *mockPolicy) Start(s state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
-	return p.err
+func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) ([]int, error) {
+	return nil, p.err
 }
 
 func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
@@ -327,7 +327,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		container := &pod.Spec.Containers[0]
 		mgr.activePods = func() []*v1.Pod { return nil }
 
-		err := mgr.Allocate(pod, container)
+		_, err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
@@ -563,7 +563,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 		cumCSet := cpuset.New()
 
 		for i := range containers {
-			err := mgr.Allocate(testCase.pod, &containers[i])
+			_, err := mgr.Allocate(testCase.pod, &containers[i])
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). unexpected error for container id: %v: %v",
 					testCase.description, containerIDs[i], err)
@@ -1330,7 +1330,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		container := &pod.Spec.Containers[0]
 		mgr.activePods = func() []*v1.Pod { return nil }
 
-		err := mgr.Allocate(pod, container)
+		_, err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
@@ -1469,7 +1469,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
 
-		_ = mgr.Allocate(pod, container)
+		mgr.Allocate(pod, container)
 
 		if !mgr.GetAllocatableCPUs().Equals(testCase.expAllocatableCPUs) {
 			t.Errorf("Policy GetAllocatableCPUs() error (%v). expected cpuset %v for container %v but got %v",

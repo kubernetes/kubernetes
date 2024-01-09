@@ -29,7 +29,7 @@ type Policy interface {
 	Name() string
 	Start(s state.State) error
 	// Allocate call is idempotent
-	Allocate(s state.State, pod *v1.Pod, container *v1.Container) error
+	Allocate(s state.State, pod *v1.Pod, container *v1.Container) ([]int, error)
 	// RemoveContainer call is idempotent
 	RemoveContainer(s state.State, podUID string, containerName string) error
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
