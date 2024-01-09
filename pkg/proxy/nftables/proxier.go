@@ -327,9 +327,10 @@ type nftablesBaseChain struct {
 var nftablesBaseChains = []nftablesBaseChain{
 	// We want our filtering rules to operate on pre-DNAT dest IPs, so our filter
 	// chains have to run before DNAT.
-	{"filter-input", knftables.FilterType, knftables.InputHook, knftables.DNATPriority + "-1"},
-	{"filter-forward", knftables.FilterType, knftables.ForwardHook, knftables.DNATPriority + "-1"},
-	{"filter-output", knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-1"},
+	{"filter-prerouting", knftables.FilterType, knftables.PreroutingHook, knftables.DNATPriority + "-10"},
+	{"filter-input", knftables.FilterType, knftables.InputHook, knftables.DNATPriority + "-10"},
+	{"filter-forward", knftables.FilterType, knftables.ForwardHook, knftables.DNATPriority + "-10"},
+	{"filter-output", knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-10"},
 	{"nat-prerouting", knftables.NATType, knftables.PreroutingHook, knftables.DNATPriority},
 	{"nat-output", knftables.NATType, knftables.OutputHook, knftables.DNATPriority},
 	{"nat-postrouting", knftables.NATType, knftables.PostroutingHook, knftables.SNATPriority},
@@ -345,15 +346,17 @@ type nftablesJumpChain struct {
 }
 
 var nftablesJumpChains = []nftablesJumpChain{
+	// We can't jump to kubeEndpointsCheckChain from filter-prerouting like
+	// kubeFirewallCheckChain because reject action is only valid in chains using the
+	// input, forward or output hooks.
 	{kubeEndpointsCheckChain, "filter-input", "ct state new"},
 	{kubeEndpointsCheckChain, "filter-forward", "ct state new"},
 	{kubeEndpointsCheckChain, "filter-output", "ct state new"},
 
 	{kubeForwardChain, "filter-forward", ""},
 
-	{kubeFirewallCheckChain, "filter-input", "ct state new"},
+	{kubeFirewallCheckChain, "filter-prerouting", "ct state new"},
 	{kubeFirewallCheckChain, "filter-output", "ct state new"},
-	{kubeFirewallCheckChain, "filter-forward", "ct state new"},
 
 	{kubeServicesChain, "nat-output", ""},
 	{kubeServicesChain, "nat-prerouting", ""},
