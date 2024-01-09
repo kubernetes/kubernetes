@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/spf13/pflag"
@@ -29,9 +30,14 @@ import (
 
 func main() {
 	klog.InitFlags(nil)
-	arguments := args.Default()
+	arguments := args.Default().WithoutDefaultFlagParsing()
 
 	pflag.CommandLine.BoolVar(&arguments.IncludeTestFiles, "include-test-files", false, "If true, include *_test.go files.")
+
+	// Collect and parse flags.
+	arguments.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 
 	if err := arguments.Execute(
 		generators.NameSystems(),
