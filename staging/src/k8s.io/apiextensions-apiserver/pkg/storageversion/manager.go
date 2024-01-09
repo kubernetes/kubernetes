@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,284 +19,281 @@ package storageversion
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
-	"sync/atomic"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
+	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/klog/v2"
 )
 
-// ResourceInfo contains the information to register the resource to the
-// storage version API.
-type ResourceInfo struct {
-	GroupResource schema.GroupResource
+const (
+	// updateQueueBufferSize is the channel buffer size for each
+	// StorageVersion updateQueue. Since the storage version manager keeps
+	// one updateQueue for each CRD UID, this means each CRD may have at
+	// most 10 pending storage version updates in the queue. When a queue
+	// is full, new storage version updates will be dropped.
+	updateQueueBufferSize = 10
+)
 
-	EncodingVersion string
-	// Used to calculate decodable versions. Can only be used after all
-	// equivalent versions are registered by InstallREST.
-	EquivalentResourceMapper runtime.EquivalentResourceRegistry
-
-	// DirectlyDecodableVersions is a list of versions that the converter for REST storage knows how to convert.  This
-	// contains items like apiextensions.k8s.io/v1beta1 even if we don't serve that version.
-	DirectlyDecodableVersions []schema.GroupVersion
-
-	// ServedVersions holds a list of all versions of GroupResource that are served.  Note that a server may be able to
-	// decode a particular version, but still not serve it.
-	ServedVersions []string
-}
-
-// Manager records the resources whose StorageVersions need updates, and provides a method to update those StorageVersions.
+// Manager provides methods for updating StorageVersion for CRDs. It does
+// goroutine management to allow CRD storage version updates running in the
+// background and not blocking the caller.
 type Manager interface {
-	// AddResourceInfo records resources whose StorageVersions need updates
-	AddResourceInfo(resources ...*ResourceInfo)
-	// UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-	UpdateStorageVersions(ctx context.Context, kubeAPIServerClientConfig *rest.Config, apiserverID string)
-	// PendingUpdate returns true if the StorageVersion of the given resource is still pending update.
-	PendingUpdate(gr schema.GroupResource) bool
-	// LastUpdateError returns the last error hit when updating the storage version of the given resource.
-	LastUpdateError(gr schema.GroupResource) error
-	// Completed returns true if updating StorageVersions of all recorded resources has completed.
-	Completed() bool
+	// EnqueueStorageVersionUpdate queues a StorageVesrion update for the given
+	// CRD and returns immediately. Optionally, the caller may specify a
+	// non-nil waitCh and/or a non-nil processedCh.
+	// A non-nil waitCh will block the StorageVersion update until waitCh is
+	// closed.
+	// The manager will close the non-nil processedCh if it finished
+	// processing the StorageVersion update (note that the update can either
+	// succeeded or failed).
+	UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition,
+		waitCh <-chan struct{}, processedCh chan<- struct{})
+	EnqueueStorageVersionUpdate(crd *apiextensionsv1.CustomResourceDefinition,
+		waitCh <-chan struct{}, processedCh chan<- struct{})
+	// TeardownFor aborts all pending updates for the given CRD UID, and
+	// stops the corresponding goroutine.
+	TeardownFor(uid types.UID)
 }
 
-var _ Manager = &defaultManager{}
-
-// defaultManager indicates if an apiserver has completed reporting its storage versions.
-type defaultManager struct {
-	completed atomic.Bool
-
-	mu sync.RWMutex
-	// managedResourceInfos records the ResourceInfos whose StorageVersions will get updated in the next
-	// UpdateStorageVersions call
-	managedResourceInfos map[*ResourceInfo]struct{}
-	// managedStatus records the update status of StorageVersion for each GroupResource. Since one
-	// ResourceInfo may expand into multiple GroupResource (e.g. ingresses.networking.k8s.io and ingresses.extensions),
-	// this map allows quick status lookup for a GroupResource, during API request handling.
-	managedStatus map[schema.GroupResource]*updateStatus
+// update represents one CRD StorageVersion update request that needs to be processed.
+type update struct {
+	crd *apiextensionsv1.CustomResourceDefinition
+	// If non-nil, wait for the channel to be closed before processing the update.
+	waitCh <-chan struct{}
+	// If non-nil, close the channel after the update process is finished.
+	processedCh chan<- struct{}
 }
 
-type updateStatus struct {
-	done    bool
-	lastErr error
+// updateQueue is a queue of StorageVersion updates. Upon creation, a goroutine
+// is also created which keeps processing pending updates in the queue, until
+// the queue is closed.
+type updateQueue struct {
+	// q is the actual queue. A user can send StorageVersion updates to the
+	// queue. A goroutine runs in the background keeps processing the
+	// pending updates and doing the actual work, until the queue is closed.
+	q chan<- *update
+	// All the updates in the queue share the same context. Calling cancel
+	// aborts all the pending updates in the queue. This function is used
+	// when a CRD is deleted and we want to release all the associated
+	// resources (channel and goroutine). The caller should also close q to
+	// stop the background goroutine.
+	cancel context.CancelFunc
 }
 
-// NewDefaultManager creates a new defaultManager.
-func NewDefaultManager() Manager {
-	s := &defaultManager{}
-	s.completed.Store(false)
-	s.managedResourceInfos = make(map[*ResourceInfo]struct{})
-	s.managedStatus = make(map[schema.GroupResource]*updateStatus)
-	return s
+// manager implements the Manager interface.
+type manager struct {
+	// lock protects updateQueues from concurrent writes, and protects
+	// individual queues from concurrent write and close().
+	lock sync.Mutex
+	// updateQueues holds a CRD UID to updateQueue map. Each CRD has its
+	// own queue of StorageVersion updates, and a goroutine which processes
+	// the pending updates in the queue. The manager sends update requests
+	// to the queue.
+	updateQueues map[types.UID]*updateQueue
+	// client is the client interface that manager uses to update
+	// StorageVersion objects.
+	client genericstorageversion.Client
+	// apiserverID is the ID of the apiserver that invokes this manager.
+	apiserverID string
 }
 
-// AddResourceInfo adds ResourceInfo to the manager.
-func (s *defaultManager) AddResourceInfo(resources ...*ResourceInfo) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, r := range resources {
-		s.managedResourceInfos[r] = struct{}{}
-		s.addPendingManagedStatusLocked(r)
+// NewManager creates a CRD StorageVersion Manager.
+func NewManager(client genericstorageversion.Client, apiserverID string) Manager {
+	return &manager{
+		updateQueues: make(map[types.UID]*updateQueue),
+		client:       client,
+		apiserverID:  apiserverID,
 	}
 }
 
-func (s *defaultManager) addPendingManagedStatusLocked(r *ResourceInfo) {
-	gvrs := r.EquivalentResourceMapper.EquivalentResourcesFor(r.GroupResource.WithVersion(""), "")
-	for _, gvr := range gvrs {
-		gr := gvr.GroupResource()
-		if _, ok := s.managedStatus[gr]; !ok {
-			s.managedStatus[gr] = &updateStatus{}
+// UpdateStorageVersion queues a StorageVersion update for the given
+// CRD and returns immediately. Optionally, the caller may specify a
+// non-nil waitCh and/or a non-nil processedCh.
+// A non-nil waitCh will block the StorageVersion update until waitCh is
+// closed.
+// The manager will close the non-nil processedCh if it finished
+// processing the StorageVersion update (note that the update can either
+// succeeded or failed).
+func (m *manager) UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition,
+	waitCh <-chan struct{}, processedCh chan<- struct{}) {
+
+	select {
+	case <-ctx.Done():
+		klog.Errorf("aborted waiting for CRD storage version update: %w", ctx.Err())
+		return
+	case <-waitCh:
+		if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
+			utilruntime.HandleError(err)
+		}
+		// close processCh after the update is done
+		if processedCh != nil {
+			close(processedCh)
 		}
 	}
 }
 
-// UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-func (s *defaultManager) UpdateStorageVersions(ctx context.Context, kubeAPIServerClientConfig *rest.Config, serverID string) {
-	clientset, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to get clientset: %v", err))
+func (m *manager) EnqueueStorageVersionUpdate(crd *apiextensionsv1.CustomResourceDefinition,
+	waitCh <-chan struct{}, processedCh chan<- struct{}) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	q := m.getOrCreateUpdateQueueLocked(crd.UID)
+	// When the channel buffer is full, writing to the channel becomes
+	// blocking. Here we give up updating storage version for this CRD and
+	// print a log, so that we can return immediately and not block the
+	// caller.
+	if len(q) == updateQueueBufferSize {
+		// TODO(roycaihw): use warning instead of info when StorageVersionAPI
+		// graduates to beta/GA
+		klog.V(2).Infof("Skipping the storage version update for CRD with UID %v due to the queue being full (queue size: %v).",
+			crd.UID, updateQueueBufferSize)
+		if processedCh != nil {
+			close(processedCh)
+		}
 		return
 	}
-	sc := clientset.InternalV1alpha1().StorageVersions()
-
-	s.mu.RLock()
-	resources := []ResourceInfo{}
-	for resource := range s.managedResourceInfos {
-		resources = append(resources, *resource)
-	}
-	s.mu.RUnlock()
-	hasFailure := false
-	// Sorting the list to make sure we have a consistent dedup result, and
-	// therefore avoid creating unnecessarily duplicated StorageVersion objects.
-	// For example, extensions.ingresses and networking.k8s.io.ingresses share
-	// the same underlying storage. Without sorting, in an HA cluster, one
-	// apiserver may dedup and update StorageVersion for extensions.ingresses,
-	// while another apiserver may dedup and update StorageVersion for
-	// networking.k8s.io.ingresses. The storage migrator (which migrates objects
-	// per GroupResource) will migrate these resources twice, since both
-	// StorageVersion objects have CommonEncodingVersion (each with one server registered).
-	sortResourceInfosByGroupResource(resources)
-	for _, r := range dedupResourceInfos(resources) {
-		decodableVersions := decodableVersions(r.DirectlyDecodableVersions, r.EquivalentResourceMapper, r.GroupResource)
-		gr := r.GroupResource
-		// Group must be a valid subdomain in DNS (RFC 1123)
-		if len(gr.Group) == 0 {
-			gr.Group = "core"
-		}
-
-		servedVersions := r.ServedVersions
-
-		if err := UpdateStorageVersionFor(ctx, sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions, nil, false); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
-			s.recordStatusFailure(&r, err)
-			hasFailure = true
-			continue
-		}
-		klog.V(2).Infof("successfully updated storage version for %v", r.GroupResource)
-		s.recordStatusSuccess(&r)
-	}
-	if hasFailure {
-		return
-	}
-	klog.V(2).Infof("storage version updates complete")
-	s.setComplete()
-}
-
-// dedupResourceInfos dedups ResourceInfos with the same underlying storage.
-// ResourceInfos from the same Group with different Versions share the same underlying storage.
-// ResourceInfos from different Groups may share the same underlying storage, e.g.
-// networking.k8s.io ingresses and extensions ingresses. The StorageVersion manager
-// only needs to update one StorageVersion for the equivalent Groups.
-func dedupResourceInfos(infos []ResourceInfo) []ResourceInfo {
-	var ret []ResourceInfo
-	seen := make(map[schema.GroupResource]struct{})
-	for _, info := range infos {
-		gr := info.GroupResource
-		if _, ok := seen[gr]; ok {
-			continue
-		}
-		gvrs := info.EquivalentResourceMapper.EquivalentResourcesFor(gr.WithVersion(""), "")
-		for _, gvr := range gvrs {
-			seen[gvr.GroupResource()] = struct{}{}
-		}
-		ret = append(ret, info)
-	}
-	return ret
-}
-
-func sortResourceInfosByGroupResource(infos []ResourceInfo) {
-	sort.Sort(byGroupResource(infos))
-}
-
-type byGroupResource []ResourceInfo
-
-func (s byGroupResource) Len() int { return len(s) }
-
-func (s byGroupResource) Less(i, j int) bool {
-	if s[i].GroupResource.Group == s[j].GroupResource.Group {
-		return s[i].GroupResource.Resource < s[j].GroupResource.Resource
-	}
-	return s[i].GroupResource.Group < s[j].GroupResource.Group
-}
-
-func (s byGroupResource) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-
-// recordStatusSuccess marks updated ResourceInfo as completed.
-func (s *defaultManager) recordStatusSuccess(r *ResourceInfo) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.recordStatusSuccessLocked(r)
-}
-
-func (s *defaultManager) recordStatusSuccessLocked(r *ResourceInfo) {
-	gvrs := r.EquivalentResourceMapper.EquivalentResourcesFor(r.GroupResource.WithVersion(""), "")
-	for _, gvr := range gvrs {
-		s.recordSuccessGroupResourceLocked(gvr.GroupResource())
+	// m.lock ensures we won't write to a closed queue.
+	q <- &update{
+		crd:         crd,
+		waitCh:      waitCh,
+		processedCh: processedCh,
 	}
 }
 
-func (s *defaultManager) recordSuccessGroupResourceLocked(gr schema.GroupResource) {
-	if _, ok := s.managedStatus[gr]; !ok {
-		return
-	}
-	s.managedStatus[gr].done = true
-	s.managedStatus[gr].lastErr = nil
-}
-
-// recordStatusFailure records latest error updating ResourceInfo.
-func (s *defaultManager) recordStatusFailure(r *ResourceInfo, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.recordStatusFailureLocked(r, err)
-}
-
-func (s *defaultManager) recordStatusFailureLocked(r *ResourceInfo, err error) {
-	gvrs := r.EquivalentResourceMapper.EquivalentResourcesFor(r.GroupResource.WithVersion(""), "")
-	for _, gvr := range gvrs {
-		s.recordErrorGroupResourceLocked(gvr.GroupResource(), err)
-	}
-}
-
-func (s *defaultManager) recordErrorGroupResourceLocked(gr schema.GroupResource, err error) {
-	if _, ok := s.managedStatus[gr]; !ok {
-		return
-	}
-	s.managedStatus[gr].lastErr = err
-}
-
-// PendingUpdate returns if the StorageVersion of a resource is still wait to be updated.
-func (s *defaultManager) PendingUpdate(gr schema.GroupResource) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if _, ok := s.managedStatus[gr]; !ok {
-		return false
-	}
-	return !s.managedStatus[gr].done
-}
-
-// LastUpdateError returns the last error hit when updating the storage version of the given resource.
-func (s *defaultManager) LastUpdateError(gr schema.GroupResource) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if _, ok := s.managedStatus[gr]; !ok {
-		return fmt.Errorf("couldn't find managed status for %v", gr)
-	}
-	return s.managedStatus[gr].lastErr
-}
-
-// setComplete marks the completion of updating StorageVersions. No write requests need to be blocked anymore.
-func (s *defaultManager) setComplete() {
-	s.completed.Store(true)
-}
-
-// Completed returns if updating StorageVersions has completed.
-func (s *defaultManager) Completed() bool {
-	return s.completed.Load()
-}
-
-func decodableVersions(directlyDecodableVersions []schema.GroupVersion, e runtime.EquivalentResourceRegistry, gr schema.GroupResource) []string {
-	var versions []string
-	for _, decodableVersions := range directlyDecodableVersions {
-		versions = append(versions, decodableVersions.String())
+// getOrCreateUpdateQueueLocked returns the channel for the given UID, or create a new
+// one and a new goroutine if necessary. The goroutine keeps processing updates
+// until the channel is closed. The caller should hold the manager's lock.
+func (m *manager) getOrCreateUpdateQueueLocked(uid types.UID) chan<- *update {
+	if queue, ok := m.updateQueues[uid]; ok {
+		return queue.q
 	}
 
-	decodingGVRs := e.EquivalentResourcesFor(gr.WithVersion(""), "")
-	for _, v := range decodingGVRs {
-		found := false
-		for _, existingVersion := range versions {
-			if existingVersion == v.GroupVersion().String() {
-				found = true
+	queue := make(chan *update, updateQueueBufferSize)
+	ctx, cancel := context.WithCancel(context.TODO())
+	m.updateQueues[uid] = &updateQueue{
+		q:      queue,
+		cancel: cancel,
+	}
+	go func() {
+		defer func() {
+			err := recover()
+			if err != nil {
+				// Log the panic and teardown the queue, so
+				// that the manager can restart a new queue.
+				utilruntime.HandleError(fmt.Errorf("panic observed in CRD storage version update queue %v: %v", uid, err))
+				m.TeardownFor(uid)
+			}
+		}()
+		for update := range queue {
+			select {
+			case <-ctx.Done():
+				// The queue was cancelled. Abort the update.
+				if update.processedCh != nil {
+					close(update.processedCh)
+				}
+				continue
+			default:
+			}
+
+			// TODO(roycaihw): there are two types of updates:
+			//   1) the ones with nil processedCh, requested by
+			//      watch events handler
+			//   2) the ones with non-nil processedCh, requested
+			//      by newly-created CRD storage
+			// An update of type 1) can be merged with a consecutive update,
+			// where the latter update's storage version is honored, and both
+			// updates' waitChs get evaluated.
+			if update.waitCh != nil {
+				<-update.waitCh
+			}
+			if err := m.updateCRDStorageVersion(ctx, update.crd); err != nil {
+				utilruntime.HandleError(err)
+			}
+			if update.processedCh != nil {
+				close(update.processedCh)
 			}
 		}
-		if found {
-			continue
-		}
-		versions = append(versions, v.GroupVersion().String())
+	}()
+	return queue
+}
+
+// TeardownFor closes the channel for the given UID. It ensures that we don't
+// leak goroutines.
+func (m *manager) TeardownFor(uid types.UID) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if queue, ok := m.updateQueues[uid]; ok {
+		// Cancel all the pending updates, so that if the CRD is
+		// re-created, the old updates won't race with the new updates.
+		// We can safely discard the old storage version updates
+		// because:
+		//   1. if the CRD is deleted forever, all CRs will be GC'ed and
+		//      the storage version doesn't matter.
+		//   2. if the CRD gets deleted and re-created in a short period
+		//      and the old CRs remain, the new CRD will update new
+		//      storage version.
+		klog.V(4).Infof("Cancelling the storage version update queue for CRD with UID %v.",
+			uid)
+		queue.cancel()
+		// Since writers to the queue acquire the same lock as we do, we
+		// make sure no one can write to a closed queue.
+		close(queue.q)
+		delete(m.updateQueues, uid)
 	}
-	return versions
+}
+
+func (m *manager) updateCRDStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
+	gr := schema.GroupResource{
+		Group:    crd.Spec.Group,
+		Resource: crd.Spec.Names.Plural,
+	}
+	storageVersion, err := apiextensionshelpers.GetCRDStorageVersion(crd)
+	if err != nil {
+		// This should never happened if crd is valid, which is true since we
+		// only update storage version for CRDs that have been written to the
+		// storage.
+		return err
+	}
+	encodingVersion := crd.Spec.Group + "/" + storageVersion
+	var decodableVersions []string
+	var servedVersions []string
+	for _, v := range crd.Spec.Versions {
+		decodableVersions = append(decodableVersions, crd.Spec.Group+"/"+v.Name)
+		if v.Served {
+			servedVersions = append(servedVersions, crd.Spec.Group+"/"+v.Name)
+		}
+	}
+
+	appendOwnerRefFunc := func(sv *apiserverinternalv1alpha1.StorageVersion) error {
+		ref := metav1.OwnerReference{
+			APIVersion: apiextensionsv1.SchemeGroupVersion.String(),
+			Kind:       "CustomResourceDefinition",
+			Name:       crd.Name,
+			UID:        crd.UID,
+		}
+		for _, r := range sv.OwnerReferences {
+			if r == ref {
+				return nil
+			}
+		}
+		sv.OwnerReferences = append(sv.OwnerReferences, ref)
+		return nil
+	}
+	return genericstorageversion.UpdateStorageVersionFor(
+		ctx,
+		m.client,
+		m.apiserverID,
+		gr,
+		encodingVersion,
+		decodableVersions,
+		servedVersions,
+		appendOwnerRefFunc,
+		true)
 }
