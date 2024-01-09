@@ -26,12 +26,16 @@ import (
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	clientgoopenapi "k8s.io/client-go/openapi"
+	"k8s.io/client-go/openapi/openapitest"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
@@ -100,7 +104,15 @@ func TestTypeChecking(t *testing.T) {
 			defer cancel()
 			policy := tc.policy.DeepCopy()
 			policy.ObjectMeta.Generation = 1 // fake storage does not do this automatically
-			client := fake.NewSimpleClientset(policy)
+			typeconverter, err := clientgoopenapi.NewTypeConverter(openapitest.NewEmbeddedFileClient(), false)
+			if err != nil {
+				t.Fatalf("Failed to create TypeConverter: %v", err)
+			}
+			fieldManager := managedfieldstest.NewFakeFieldManager(typeconverter, schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingAdmissionPolicy"})
+			if err != nil {
+				t.Fatalf("Failed to create fieldmanager: %v", err)
+			}
+			client := fake.NewSimpleClientsetWithFieldManager(fieldManager, policy)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			typeChecker := &validatingadmissionpolicy.TypeChecker{
 				SchemaResolver: resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, scheme.Scheme),

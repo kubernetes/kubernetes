@@ -418,6 +418,8 @@ func (c *Fake$.type|publicPlural$) DeleteCollection(ctx context.Context, opts $.
 var createTemplate = `
 // Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *Fake$.type|publicPlural$) Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
+
+	$.inputType|private$.Kind = "$.type|singularKind$"
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewCreateAction|raw$($.inputType|allLowercasePlural$Resource, c.ns, $.inputType|private$), &$.resultType|raw${})
 		$else$Invokes($.NewRootCreateAction|raw$($.inputType|allLowercasePlural$Resource, $.inputType|private$), &$.resultType|raw${})$end$

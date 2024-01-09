@@ -152,9 +152,6 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 
 		// Check for Apply before Patch because Apply is made of Patch.
 		case ApplyActionImpl:
-			if action.GetSubresource() != "" {
-				return true, nil, errors.NewBadRequest(fmt.Sprintf("sub-resources are not supported yet."))
-			}
 			patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 			if err := yaml.Unmarshal(action.GetPatch(), &patchObj.Object); err != nil {
 				return true, nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
