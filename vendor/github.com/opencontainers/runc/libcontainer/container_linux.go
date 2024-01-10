@@ -2268,7 +2268,7 @@ func ignoreTerminateErrors(err error) error {
 
 func requiresRootOrMappingTool(c *configs.Config) bool {
 	gidMap := []configs.IDMap{
-		{ContainerID: 0, HostID: os.Getegid(), Size: 1},
+		{ContainerID: 0, HostID: int64(os.Getegid()), Size: 1},
 	}
 	return !reflect.DeepEqual(c.GidMappings, gidMap)
 }
