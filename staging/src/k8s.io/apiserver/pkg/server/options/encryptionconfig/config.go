@@ -24,7 +24,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"sync"
@@ -522,15 +521,9 @@ func loadConfig(filepath string, reload bool) (*apiserver.EncryptionConfiguratio
 }
 
 func loadDataAndHash(filepath string) ([]byte, string, error) {
-	f, err := os.Open(filepath)
+	data, err := os.ReadFile(filepath)
 	if err != nil {
-		return nil, "", fmt.Errorf("error opening encryption provider configuration file %q: %w", filepath, err)
-	}
-	defer f.Close()
-
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return nil, "", fmt.Errorf("could not read contents: %w", err)
+		return nil, "", fmt.Errorf("error reading encryption provider configuration file %q: %w", filepath, err)
 	}
 	if len(data) == 0 {
 		return nil, "", fmt.Errorf("encryption provider configuration file %q is empty", filepath)
@@ -902,7 +895,7 @@ func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, 
 // We use a hash instead of the raw file contents when tracking changes to avoid holding any encryption keys in memory outside of their associated transformers.
 // This hash must be used in-memory and not externalized to the process because it has no cross-release stability guarantees.
 func computeEncryptionConfigHash(data []byte) string {
-	return fmt.Sprintf("%x", sha256.Sum256(data))
+	return fmt.Sprintf("k8s:enc:unstable:1:%x", sha256.Sum256(data))
 }
 
 var _ storagevalue.ResourceTransformers = &DynamicTransformers{}
