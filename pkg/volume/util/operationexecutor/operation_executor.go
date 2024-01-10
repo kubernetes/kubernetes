@@ -233,6 +233,10 @@ type ActualStateOfWorldMounterUpdater interface {
 	// IsVolumeReconstructed returns true if volume currently added to actual state of the world
 	// was found during reconstruction.
 	IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
+	// IsVolumeDeviceReconstructed returns true if volume device identified by volumeName has been
+	// found during reconstruction.
+	IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the

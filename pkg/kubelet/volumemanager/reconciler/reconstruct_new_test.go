@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -105,7 +106,7 @@ func TestReconstructVolumes(t *testing.T) {
 				os.MkdirAll(vp, 0755)
 			}
 
-			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
+			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths, nil /*custom kubeclient*/)
 			rcInstance, _ := rc.(*reconciler)
 
 			// Act
@@ -203,7 +204,7 @@ func TestCleanOrphanVolumes(t *testing.T) {
 
 			mountPaths := []string{}
 
-			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
+			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths, nil /*custom kubeclient*/)
 			rcInstance, _ := rc.(*reconciler)
 			rcInstance.volumesFailedReconstruction = tc.volumesFailedReconstruction
 
@@ -265,21 +266,31 @@ func TestReconstructVolumesMount(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 
 	tests := []struct {
-		name        string
-		volumePath  string
-		expectMount bool
+		name            string
+		volumePath      string
+		expectMount     bool
+		volumeMode      v1.PersistentVolumeMode
+		deviceMountPath string
 	}{
 		{
 			name:       "reconstructed volume is mounted",
 			volumePath: path.Join("pod1uid", "volumes", "fake-plugin", "volumename"),
 
 			expectMount: true,
+			volumeMode:  v1.PersistentVolumeFilesystem,
 		},
 		{
 			name: "reconstructed volume fails to mount",
 			// FailOnSetupVolumeName: MountDevice succeeds, SetUp fails
 			volumePath:  path.Join("pod1uid", "volumes", "fake-plugin", volumetesting.FailOnSetupVolumeName),
 			expectMount: false,
+			volumeMode:  v1.PersistentVolumeFilesystem,
+		},
+		{
+			name:            "reconstructed volume device map fails",
+			volumePath:      filepath.Join("pod1uid", "volumeDevices", "fake-plugin", volumetesting.FailMountDeviceVolumeName),
+			volumeMode:      v1.PersistentVolumeBlock,
+			deviceMountPath: filepath.Join("plugins", "fake-plugin", "volumeDevices", "pluginDependentPath"),
 		},
 	}
 	for _, tc := range tests {
@@ -299,7 +310,16 @@ func TestReconstructVolumesMount(t *testing.T) {
 			mountPaths := []string{vp}
 			os.MkdirAll(vp, 0755)
 
-			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
+			// Arrange 2 - populate DSW
+			outerName := filepath.Base(tc.volumePath)
+			pod, pv, pvc := getPodPVCAndPV(tc.volumeMode, "pod1", outerName, "pvc1")
+			volumeSpec := &volume.Spec{PersistentVolume: pv}
+			kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+				Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", outerName)),
+				DevicePath: "fake/path",
+			})
+
+			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths, kubeClient /*custom kubeclient*/)
 			rcInstance, _ := rc.(*reconciler)
 
 			// Act 1 - reconstruction
@@ -315,10 +335,6 @@ func TestReconstructVolumesMount(t *testing.T) {
 				t.Errorf("expected 1 uncertain volume in asw, got %+v", allPods)
 			}
 
-			// Arrange 2 - populate DSW
-			outerName := filepath.Base(tc.volumePath)
-			pod := getInlineFakePod("pod1", "pod1uid", outerName, outerName)
-			volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 			podName := util.GetUniquePodName(pod)
 			volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
 				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* SELinuxContext */)
@@ -341,12 +357,15 @@ func TestReconstructVolumesMount(t *testing.T) {
 			// MountDevice was attempted
 			var lastErr error
 			err = retryWithExponentialBackOff(testOperationBackOffDuration, func() (bool, error) {
-				// MountDevice should always be called and succeed
-				if err := volumetesting.VerifyMountDeviceCallCount(1, fakePlugin); err != nil {
-					lastErr = err
-					return false, nil
+				if tc.volumeMode == v1.PersistentVolumeFilesystem {
+					if err := volumetesting.VerifyMountDeviceCallCount(1, fakePlugin); err != nil {
+						lastErr = err
+						return false, nil
+					}
+					return true, nil
+				} else {
+					return true, nil
 				}
-				return true, nil
 			})
 			if err != nil {
 				t.Errorf("Error waiting for volumes to get mounted: %s: %s", err, lastErr)
@@ -376,10 +395,60 @@ func TestReconstructVolumesMount(t *testing.T) {
 				if len(allPods) != 1 {
 					t.Errorf("expected 1 mounted or uncertain volumes after reconcile, got %+v", allPods)
 				}
+				if tc.deviceMountPath != "" {
+					expectedDeviceMountPath := filepath.Join(tmpKubeletDir, tc.deviceMountPath)
+					deviceMountPath := allPods[0].DeviceMountPath
+					if expectedDeviceMountPath != deviceMountPath {
+						t.Errorf("expected deviceMountPath to be %s, got %s", expectedDeviceMountPath, deviceMountPath)
+					}
+				}
+
 			}
 
 			// Unmount was *not* attempted in any case
 			verifyTearDownCalls(fakePlugin, 0)
 		})
 	}
+}
+
+func getPodPVCAndPV(volumeMode v1.PersistentVolumeMode, podName, pvName, pvcName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pvName,
+			UID:  "pvuid",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Name: pvcName},
+			VolumeMode: &volumeMode,
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pvcName,
+			UID:  "pvcuid",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: pvName,
+			VolumeMode: &volumeMode,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc.Name,
+						},
+					},
+				},
+			},
+		},
+	}
+	return pod, pv, pvc
 }

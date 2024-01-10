@@ -391,6 +391,13 @@ func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeN
 	return foundPod
 }
 
+func (asw *actualStateOfWorld) IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+	_, ok := asw.foundDuringReconstruction[volumeName]
+	return ok
+}
+
 func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(opts operationexecutor.MarkVolumeOpts) (bool, error) {
 	asw.Lock()
 	defer asw.Unlock()
@@ -766,6 +773,7 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 			volumeObj.seLinuxMountContext = &seLinuxMountContext
 		}
 	}
+
 	asw.attachedVolumes[volumeName] = volumeObj
 	return nil
 }
