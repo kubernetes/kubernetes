@@ -53,11 +53,12 @@ const (
 	UpdateNodeLabel       // 1000
 	UpdateNodeTaint       // 10000
 	UpdateNodeCondition   // 100000
+	UpdateNodeAnnotation  // 1000000
 
-	All ActionType = 1<<iota - 1 // 111111
+	All ActionType = 1<<iota - 1 // 1111111
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.

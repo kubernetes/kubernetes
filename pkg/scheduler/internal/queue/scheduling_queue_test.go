@@ -1217,6 +1217,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 		NodeAllocatableChange,
 		NodeConditionChange,
 		NodeLabelChange,
+		NodeAnnotationChange,
 		PvcAdd,
 		PvcUpdate,
 		PvAdd,
