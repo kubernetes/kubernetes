@@ -16,7 +16,6 @@ import (
 	"go/token"
 	"go/types"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -28,8 +27,8 @@ import (
 	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/internal/gocommand"
 	"golang.org/x/tools/internal/packagesinternal"
-	"golang.org/x/tools/internal/typeparams"
 	"golang.org/x/tools/internal/typesinternal"
+	"golang.org/x/tools/internal/versions"
 )
 
 // A LoadMode controls the amount of detail to return when loading.
@@ -220,8 +219,10 @@ type driverResponse struct {
 	// lists of multiple drivers, go/packages will fall back to the next driver.
 	NotHandled bool
 
-	// Sizes, if not nil, is the types.Sizes to use when type checking.
-	Sizes *types.StdSizes
+	// Compiler and Arch are the arguments pass of types.SizesFor
+	// to get a types.Sizes to use when type checking.
+	Compiler string
+	Arch     string
 
 	// Roots is the set of package IDs that make up the root packages.
 	// We have to encode this separately because when we encode a single package
@@ -257,31 +258,52 @@ type driverResponse struct {
 // proceeding with further analysis. The PrintErrors function is
 // provided for convenient display of all errors.
 func Load(cfg *Config, patterns ...string) ([]*Package, error) {
-	l := newLoader(cfg)
-	response, err := defaultDriver(&l.Config, patterns...)
+	ld := newLoader(cfg)
+	response, external, err := defaultDriver(&ld.Config, patterns...)
 	if err != nil {
 		return nil, err
 	}
-	l.sizes = response.Sizes
-	return l.refine(response)
+
+	ld.sizes = types.SizesFor(response.Compiler, response.Arch)
+	if ld.sizes == nil && ld.Config.Mode&(NeedTypes|NeedTypesSizes|NeedTypesInfo) != 0 {
+		// Type size information is needed but unavailable.
+		if external {
+			// An external driver may fail to populate the Compiler/GOARCH fields,
+			// especially since they are relatively new (see #63700).
+			// Provide a sensible fallback in this case.
+			ld.sizes = types.SizesFor("gc", runtime.GOARCH)
+			if ld.sizes == nil { // gccgo-only arch
+				ld.sizes = types.SizesFor("gc", "amd64")
+			}
+		} else {
+			// Go list should never fail to deliver accurate size information.
+			// Reject the whole Load since the error is the same for every package.
+			return nil, fmt.Errorf("can't determine type sizes for compiler %q on GOARCH %q",
+				response.Compiler, response.Arch)
+		}
+	}
+
+	return ld.refine(response)
 }
 
 // defaultDriver is a driver that implements go/packages' fallback behavior.
 // It will try to request to an external driver, if one exists. If there's
 // no external driver, or the driver returns a response with NotHandled set,
 // defaultDriver will fall back to the go list driver.
-func defaultDriver(cfg *Config, patterns ...string) (*driverResponse, error) {
-	driver := findExternalDriver(cfg)
-	if driver == nil {
-		driver = goListDriver
+// The boolean result indicates that an external driver handled the request.
+func defaultDriver(cfg *Config, patterns ...string) (*driverResponse, bool, error) {
+	if driver := findExternalDriver(cfg); driver != nil {
+		response, err := driver(cfg, patterns...)
+		if err != nil {
+			return nil, false, err
+		} else if !response.NotHandled {
+			return response, true, nil
+		}
+		// (fall through)
 	}
-	response, err := driver(cfg, patterns...)
-	if err != nil {
-		return response, err
-	} else if response.NotHandled {
-		return goListDriver(cfg, patterns...)
-	}
-	return response, nil
+
+	response, err := goListDriver(cfg, patterns...)
+	return response, false, err
 }
 
 // A Package describes a loaded Go package.
@@ -409,12 +431,6 @@ func init() {
 	}
 	packagesinternal.GetDepsErrors = func(p interface{}) []*packagesinternal.PackageError {
 		return p.(*Package).depsErrors
-	}
-	packagesinternal.GetGoCmdRunner = func(config interface{}) *gocommand.Runner {
-		return config.(*Config).gocmdRunner
-	}
-	packagesinternal.SetGoCmdRunner = func(config interface{}, runner *gocommand.Runner) {
-		config.(*Config).gocmdRunner = runner
 	}
 	packagesinternal.SetModFile = func(config interface{}, value string) {
 		config.(*Config).modFile = value
@@ -552,7 +568,7 @@ type loaderPackage struct {
 type loader struct {
 	pkgs map[string]*loaderPackage
 	Config
-	sizes        types.Sizes
+	sizes        types.Sizes // non-nil if needed by mode
 	parseCache   map[string]*parseValue
 	parseCacheMu sync.Mutex
 	exportMu     sync.Mutex // enforces mutual exclusion of exportdata operations
@@ -677,39 +693,38 @@ func (ld *loader) refine(response *driverResponse) ([]*Package, error) {
 		}
 	}
 
-	// Materialize the import graph.
+	if ld.Mode&NeedImports != 0 {
+		// Materialize the import graph.
 
-	const (
-		white = 0 // new
-		grey  = 1 // in progress
-		black = 2 // complete
-	)
+		const (
+			white = 0 // new
+			grey  = 1 // in progress
+			black = 2 // complete
+		)
 
-	// visit traverses the import graph, depth-first,
-	// and materializes the graph as Packages.Imports.
-	//
-	// Valid imports are saved in the Packages.Import map.
-	// Invalid imports (cycles and missing nodes) are saved in the importErrors map.
-	// Thus, even in the presence of both kinds of errors, the Import graph remains a DAG.
-	//
-	// visit returns whether the package needs src or has a transitive
-	// dependency on a package that does. These are the only packages
-	// for which we load source code.
-	var stack []*loaderPackage
-	var visit func(lpkg *loaderPackage) bool
-	var srcPkgs []*loaderPackage
-	visit = func(lpkg *loaderPackage) bool {
-		switch lpkg.color {
-		case black:
-			return lpkg.needsrc
-		case grey:
-			panic("internal error: grey node")
-		}
-		lpkg.color = grey
-		stack = append(stack, lpkg) // push
-		stubs := lpkg.Imports       // the structure form has only stubs with the ID in the Imports
-		// If NeedImports isn't set, the imports fields will all be zeroed out.
-		if ld.Mode&NeedImports != 0 {
+		// visit traverses the import graph, depth-first,
+		// and materializes the graph as Packages.Imports.
+		//
+		// Valid imports are saved in the Packages.Import map.
+		// Invalid imports (cycles and missing nodes) are saved in the importErrors map.
+		// Thus, even in the presence of both kinds of errors,
+		// the Import graph remains a DAG.
+		//
+		// visit returns whether the package needs src or has a transitive
+		// dependency on a package that does. These are the only packages
+		// for which we load source code.
+		var stack []*loaderPackage
+		var visit func(lpkg *loaderPackage) bool
+		visit = func(lpkg *loaderPackage) bool {
+			switch lpkg.color {
+			case black:
+				return lpkg.needsrc
+			case grey:
+				panic("internal error: grey node")
+			}
+			lpkg.color = grey
+			stack = append(stack, lpkg) // push
+			stubs := lpkg.Imports       // the structure form has only stubs with the ID in the Imports
 			lpkg.Imports = make(map[string]*Package, len(stubs))
 			for importPath, ipkg := range stubs {
 				var importErr error
@@ -733,40 +748,39 @@ func (ld *loader) refine(response *driverResponse) ([]*Package, error) {
 				}
 				lpkg.Imports[importPath] = imp.Package
 			}
-		}
-		if lpkg.needsrc {
-			srcPkgs = append(srcPkgs, lpkg)
-		}
-		if ld.Mode&NeedTypesSizes != 0 {
-			lpkg.TypesSizes = ld.sizes
-		}
-		stack = stack[:len(stack)-1] // pop
-		lpkg.color = black
 
-		return lpkg.needsrc
-	}
+			// Complete type information is required for the
+			// immediate dependencies of each source package.
+			if lpkg.needsrc && ld.Mode&NeedTypes != 0 {
+				for _, ipkg := range lpkg.Imports {
+					ld.pkgs[ipkg.ID].needtypes = true
+				}
+			}
 
-	if ld.Mode&NeedImports == 0 {
-		// We do this to drop the stub import packages that we are not even going to try to resolve.
-		for _, lpkg := range initial {
-			lpkg.Imports = nil
+			// NeedTypeSizes causes TypeSizes to be set even
+			// on packages for which types aren't needed.
+			if ld.Mode&NeedTypesSizes != 0 {
+				lpkg.TypesSizes = ld.sizes
+			}
+			stack = stack[:len(stack)-1] // pop
+			lpkg.color = black
+
+			return lpkg.needsrc
 		}
-	} else {
+
 		// For each initial package, create its import DAG.
 		for _, lpkg := range initial {
 			visit(lpkg)
 		}
-	}
-	if ld.Mode&NeedImports != 0 && ld.Mode&NeedTypes != 0 {
-		for _, lpkg := range srcPkgs {
-			// Complete type information is required for the
-			// immediate dependencies of each source package.
-			for _, ipkg := range lpkg.Imports {
-				imp := ld.pkgs[ipkg.ID]
-				imp.needtypes = true
-			}
+
+	} else {
+		// !NeedImports: drop the stub (ID-only) import packages
+		// that we are not even going to try to resolve.
+		for _, lpkg := range initial {
+			lpkg.Imports = nil
 		}
 	}
+
 	// Load type data and syntax if needed, starting at
 	// the initial packages (roots of the import DAG).
 	if ld.Mode&NeedTypes != 0 || ld.Mode&NeedSyntax != 0 {
@@ -1000,10 +1014,11 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 		Defs:       make(map[*ast.Ident]types.Object),
 		Uses:       make(map[*ast.Ident]types.Object),
 		Implicits:  make(map[ast.Node]types.Object),
+		Instances:  make(map[*ast.Ident]types.Instance),
 		Scopes:     make(map[ast.Node]*types.Scope),
 		Selections: make(map[*ast.SelectorExpr]*types.Selection),
 	}
-	typeparams.InitInstanceInfo(lpkg.TypesInfo)
+	versions.InitFileVersions(lpkg.TypesInfo)
 	lpkg.TypesSizes = ld.sizes
 
 	importer := importerFunc(func(path string) (*types.Package, error) {
@@ -1041,7 +1056,7 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 		IgnoreFuncBodies: ld.Mode&NeedDeps == 0 && !lpkg.initial,
 
 		Error: appendError,
-		Sizes: ld.sizes,
+		Sizes: ld.sizes, // may be nil
 	}
 	if lpkg.Module != nil && lpkg.Module.GoVersion != "" {
 		typesinternal.SetGoVersion(tc, "go"+lpkg.Module.GoVersion)
@@ -1125,7 +1140,7 @@ func (ld *loader) parseFile(filename string) (*ast.File, error) {
 		var err error
 		if src == nil {
 			ioLimit <- true // wait
-			src, err = ioutil.ReadFile(filename)
+			src, err = os.ReadFile(filename)
 			<-ioLimit // signal
 		}
 		if err != nil {
