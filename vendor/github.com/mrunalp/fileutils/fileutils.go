@@ -125,6 +125,7 @@ func CopyDirectory(source string, dest string) error {
 		if err != nil {
 			return nil
 		}
+		destPath := filepath.Join(dest, relPath)
 
 		if info.IsDir() {
 			// Skip the source directory.
@@ -138,18 +139,20 @@ func CopyDirectory(source string, dest string) error {
 				uid := int(st.Uid)
 				gid := int(st.Gid)
 
-				if err := os.Mkdir(filepath.Join(dest, relPath), info.Mode()); err != nil {
+				if err := os.Mkdir(destPath, info.Mode()); err != nil {
 					return err
 				}
-
-				if err := os.Lchown(filepath.Join(dest, relPath), uid, gid); err != nil {
+				if err := os.Lchown(destPath, uid, gid); err != nil {
+					return err
+				}
+				if err := os.Chmod(destPath, info.Mode()); err != nil {
 					return err
 				}
 			}
 			return nil
 		}
 
-		return CopyFile(path, filepath.Join(dest, relPath))
+		return CopyFile(path, destPath)
 	})
 }
 
