@@ -691,6 +691,18 @@ jwt:
 						},
 					},
 				},
+				AuthenticationConfigData: `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+    audiences: [ "🐼" ]
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`,
 				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
@@ -888,15 +900,16 @@ func TestValidateOIDCOptions(t *testing.T) {
 
 func TestLoadAuthenticationConfig(t *testing.T) {
 	testCases := []struct {
-		name           string
-		file           func() string
-		expectErr      string
-		expectedConfig *apiserver.AuthenticationConfiguration
+		name                string
+		file                func() string
+		expectErr           string
+		expectedConfig      *apiserver.AuthenticationConfiguration
+		expectedContentData string
 	}{
 		{
 			name:           "empty file",
 			file:           func() string { return writeTempFile(t, ``) },
-			expectErr:      "empty config file",
+			expectErr:      "empty config data",
 			expectedConfig: nil,
 		},
 		{
@@ -916,6 +929,10 @@ func TestLoadAuthenticationConfig(t *testing.T) {
 					},
 				},
 			},
+			expectedContentData: `{
+						"apiVersion":"apiserver.config.k8s.io/v1alpha1",
+						"kind":"AuthenticationConfiguration",
+						"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
 		},
 		{
 			name:           "missing file",
@@ -989,6 +1006,10 @@ func TestLoadAuthenticationConfig(t *testing.T) {
 					},
 				},
 			},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1alpha1",
+							"kind":"AuthenticationConfiguration",
+							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
 		},
 		{
 			name: "v1alpha1 - yaml",
@@ -1020,6 +1041,17 @@ jwt:
 					},
 				},
 			},
+			expectedContentData: `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`,
 		},
 		{
 			name: "v1alpha1 - no jwt",
@@ -1029,6 +1061,9 @@ jwt:
 							"kind":"AuthenticationConfiguration"}`)
 			},
 			expectedConfig: &apiserver.AuthenticationConfiguration{},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1alpha1",
+							"kind":"AuthenticationConfiguration"}`,
 		},
 		{
 			name: "v1beta1 - json",
@@ -1047,6 +1082,10 @@ jwt:
 					},
 				},
 			},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1beta1",
+							"kind":"AuthenticationConfiguration",
+							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
 		},
 		{
 			name: "v1beta1 - yaml",
@@ -1078,6 +1117,17 @@ jwt:
 					},
 				},
 			},
+			expectedContentData: `
+apiVersion: apiserver.config.k8s.io/v1beta1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`,
 		},
 		{
 			name: "v1beta1 - no jwt",
@@ -1087,17 +1137,23 @@ jwt:
 							"kind":"AuthenticationConfiguration"}`)
 			},
 			expectedConfig: &apiserver.AuthenticationConfiguration{},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1beta1",
+							"kind":"AuthenticationConfiguration"}`,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config, err := loadAuthenticationConfig(tc.file())
+			config, contentData, err := loadAuthenticationConfig(tc.file())
 			if !strings.Contains(errString(err), tc.expectErr) {
 				t.Fatalf("expected error %q, got %v", tc.expectErr, err)
 			}
 			if !reflect.DeepEqual(config, tc.expectedConfig) {
 				t.Fatalf("unexpected config:\n%s", cmp.Diff(tc.expectedConfig, config))
+			}
+			if contentData != tc.expectedContentData {
+				t.Errorf("unexpected content data: want=%q, got=%q", tc.expectedContentData, contentData)
 			}
 		})
 	}

@@ -145,6 +145,7 @@ type claimsTest struct {
 	wantSkip            bool
 	wantErr             string
 	wantInitErr         string
+	wantHealthErrPrefix string
 	claimToResponseMap  map[string]string
 	openIDConfig        string
 	fetchKeysFromRemote bool
@@ -283,8 +284,10 @@ func (c *claimsTest) run(t *testing.T) {
 
 	expectInitErr := len(c.wantInitErr) > 0
 
+	ctx := testContext(t)
+
 	// Initialize the authenticator.
-	a, err := New(c.options)
+	a, err := New(ctx, c.options)
 	if err != nil {
 		if !expectInitErr {
 			t.Fatalf("initialize authenticator: %v", err)
@@ -296,6 +299,25 @@ func (c *claimsTest) run(t *testing.T) {
 	}
 	if expectInitErr {
 		t.Fatalf("wanted initialization error %q but got none", c.wantInitErr)
+	}
+
+	if len(c.wantHealthErrPrefix) > 0 {
+		if err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(context.Context) (bool, error) {
+			healthErr := a.HealthCheck()
+			if healthErr == nil {
+				return false, fmt.Errorf("authenticator reported healthy when it should not")
+			}
+
+			if strings.HasPrefix(healthErr.Error(), c.wantHealthErrPrefix) {
+				return true, nil
+			}
+
+			t.Logf("saw health error prefix that did not match: want=%q got=%q", c.wantHealthErrPrefix, healthErr.Error())
+			return false, nil
+		}); err != nil {
+			t.Fatalf("authenticator did not match wanted health error: %v", err)
+		}
+		return
 	}
 
 	claims := struct{}{}
@@ -313,21 +335,9 @@ func (c *claimsTest) run(t *testing.T) {
 		t.Fatalf("serialize token: %v", err)
 	}
 
-	ia, ok := a.(*instrumentedAuthenticator)
-	if !ok {
-		t.Fatalf("expected authenticator to be instrumented")
-	}
-	authenticator, ok := ia.delegate.(*Authenticator)
-	if !ok {
-		t.Fatalf("expected delegate to be Authenticator")
-	}
-	ctx := testContext(t)
-	// wait for the authenticator to be initialized
+	// wait for the authenticator to be healthy
 	err = wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
-		if v, _ := authenticator.idTokenVerifier(); v == nil {
-			return false, nil
-		}
-		return true, nil
+		return a.HealthCheck() == nil, nil
 	})
 	if err != nil {
 		t.Fatalf("failed to initialize the authenticator: %v", err)
@@ -2061,6 +2071,51 @@ func TestToken(t *testing.T) {
 			wantInitErr: "oidc: Client and CAContentProvider are mutually exclusive",
 		},
 		{
+			name: "keyset and discovery URL mutually exclusive",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com",
+						DiscoveryURL: "https://auth.example.com/foo",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String("prefix:"),
+						},
+					},
+				},
+				SupportedSigningAlgs: []string{"RS256"},
+				now:                  func() time.Time { return now },
+				KeySet:               &staticKeySet{},
+			},
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			wantInitErr: "oidc: KeySet and DiscoveryURL are mutually exclusive",
+		},
+		{
+			name: "health check failure",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://this-will-not-work.notatld",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String("prefix:"),
+						},
+					},
+				},
+				SupportedSigningAlgs: []string{"RS256"},
+			},
+			fetchKeysFromRemote: true,
+			wantHealthErrPrefix: `oidc: authenticator for issuer "https://this-will-not-work.notatld" is not healthy: Get "https://this-will-not-work.notatld/.well-known/openid-configuration": dial tcp: lookup this-will-not-work.notatld`,
+		},
+		{
 			name: "accounts.google.com issuer",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
@@ -3306,7 +3361,7 @@ func TestToken(t *testing.T) {
 	var successTestCount, failureTestCount int
 	for _, test := range tests {
 		t.Run(test.name, test.run)
-		if test.wantSkip || test.wantInitErr != "" {
+		if test.wantSkip || len(test.wantInitErr) > 0 || len(test.wantHealthErrPrefix) > 0 {
 			continue
 		}
 		// check metrics for success and failure
