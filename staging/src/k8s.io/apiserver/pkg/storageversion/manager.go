@@ -151,7 +151,7 @@ func (s *defaultManager) UpdateStorageVersions(ctx context.Context, kubeAPIServe
 
 		servedVersions := r.ServedVersions
 
-		if err := UpdateStorageVersionFor(ctx, sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions, nil, false); err != nil {
+		if err := UpdateStorageVersionFor(ctx, sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions, nil); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
 			hasFailure = true

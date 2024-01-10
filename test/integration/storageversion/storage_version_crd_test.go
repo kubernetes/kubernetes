@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -63,7 +63,8 @@ func TestStorageVersionCustomResource(t *testing.T) {
 
 	var lastErr error
 	var storageVersion apiserverinternalv1alpha1.ServerStorageVersion
-	if err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		sv, err := kubeclient.InternalV1alpha1().StorageVersions().Get(context.TODO(), gr, metav1.GetOptions{})
 		if err != nil {
 			lastErr = fmt.Errorf("failed to get storage version: %v", err)
@@ -88,8 +89,8 @@ func TestStorageVersionCustomResource(t *testing.T) {
 		t.Fatalf("failed to wait for storage version creation: %v, last error: %v", err, lastErr)
 	}
 
-	if !strings.HasPrefix(storageVersion.APIServerID, "kube-apiserver-") {
-		t.Errorf("apiserver ID doesn't contain kube-apiserver- prefix, has: %v", storageVersion.APIServerID)
+	if !strings.HasPrefix(storageVersion.APIServerID, "apiserver-") {
+		t.Errorf("apiserver ID doesn't contain apiserver- prefix, has: %v", storageVersion.APIServerID)
 	}
 	expectecdVersion := crd.Spec.Group + "/" + crd.Spec.Versions[0].Name
 	if storageVersion.EncodingVersion != expectecdVersion {
@@ -114,7 +115,7 @@ func TestStorageVersionCustomResource(t *testing.T) {
 	expectedNewVersion := crd.Spec.Group + "/" + newVersion.Name
 	expectedDecodableVersions := []string{expectecdVersion, expectedNewVersion}
 	lastErr = nil
-	if err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		sv, err := kubeclient.InternalV1alpha1().StorageVersions().Get(context.TODO(), gr, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -203,7 +204,7 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 	kubeclient := kubernetes.NewForConfigOrDie(server.ClientConfig)
 	gr := crd.Spec.Group + "." + crd.Spec.Names.Plural
 	var lastErr error
-	if err := wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err

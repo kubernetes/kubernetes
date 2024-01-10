@@ -22,14 +22,11 @@ import (
 	"time"
 
 	"k8s.io/api/apiserverinternal/v1alpha1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 )
-
-type processStorageVersionFunc func(*v1alpha1.StorageVersion) error
 
 // Client has the methods required to update the storage version.
 type Client interface {
@@ -37,6 +34,8 @@ type Client interface {
 	UpdateStatus(context.Context, *v1alpha1.StorageVersion, metav1.UpdateOptions) (*v1alpha1.StorageVersion, error)
 	Get(context.Context, string, metav1.GetOptions) (*v1alpha1.StorageVersion, error)
 }
+
+type processStorageVersionFunc func(*v1alpha1.StorageVersion) error
 
 // SetCommonEncodingVersion updates the CommonEncodingVersion and the AllEncodingVersionsEqual
 // condition based on the StorageVersions.
@@ -126,21 +125,11 @@ func setStatusCondition(conditions *[]v1alpha1.StorageVersionCondition, newCondi
 }
 
 // UpdateStorageVersionFor updates the storage version object for the resource.
-// postProcessFunc is invoked on the storage version object after the local
-// calulation is finished, and before the client sends the create/update request.
-// It allows the caller to customizes the storage version object, e.g. setting
-// an owner reference.
-func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, servedVersions []string, postProcessFunc processStorageVersionFunc, alwaysRetry bool) error {
+func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, servedVersions []string, postProcessFunc processStorageVersionFunc) error {
 	retries := 3
 	var retry int
 	var err error
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
+	for retry < retries {
 		err = singleUpdate(ctx, c, apiserverID, gr, encodingVersion, decodableVersions, servedVersions, postProcessFunc)
 		if err == nil {
 			return nil
@@ -153,9 +142,6 @@ func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, 
 			klog.Errorf("retry %d, failed to update storage version for %v: %v", retry, gr, err)
 			retry++
 			time.Sleep(1 * time.Second)
-		}
-		if !alwaysRetry && retry >= retries {
-			break
 		}
 	}
 	return err
@@ -173,7 +159,6 @@ func singleUpdate(ctx context.Context, c Client, apiserverID string, gr schema.G
 		sv = &v1alpha1.StorageVersion{}
 		sv.ObjectMeta.Name = name
 	}
-	svCopy := sv.DeepCopy()
 	updatedSV := localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions, servedVersions)
 	if postProcessFunc != nil {
 		if err := postProcessFunc(updatedSV); err != nil {
@@ -189,10 +174,6 @@ func singleUpdate(ctx context.Context, c Client, apiserverID string, gr schema.G
 		createdSV.Status = updatedSV.Status
 		_, err = c.UpdateStatus(ctx, createdSV, metav1.UpdateOptions{})
 		return err
-	}
-	if apiequality.Semantic.DeepEqual(svCopy, updatedSV) {
-		klog.V(6).Infof("Ignoring storageversion %s update because nothing changed", name)
-		return nil
 	}
 	_, err = c.UpdateStatus(ctx, updatedSV, metav1.UpdateOptions{})
 	return err
