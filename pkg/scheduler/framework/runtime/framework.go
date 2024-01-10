@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
@@ -526,7 +527,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *con
 		// - part 3: other plugins (excluded by part 1 & 2) in regular extension point.
 		newPlugins := reflect.New(reflect.TypeOf(e.slicePtr).Elem()).Elem()
 		// part 1
-		for _, name := range enabledSet.list {
+		for _, name := range slice.CopyStrings(enabledSet.list) {
 			if overridePlugins.has(name) {
 				newPlugins = reflect.Append(newPlugins, reflect.ValueOf(pluginsMap[name]))
 				enabledSet.delete(name)
