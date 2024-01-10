@@ -803,7 +803,10 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
-		klog.InfoS("Swap Value", "failSwapOn", s.FailSwapOn)
+		workloadsUseSwap := false
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+			workloadsUseSwap = true
+		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
@@ -841,6 +844,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				TopologyManagerPolicyOptions:            topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
+			workloadsUseSwap,
 			kubeDeps.Recorder,
 			kubeDeps.KubeClient,
 		)

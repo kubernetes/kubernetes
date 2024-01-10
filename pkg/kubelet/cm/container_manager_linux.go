@@ -198,7 +198,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn, workloadsUseSwap bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -224,8 +224,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 				return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
 			}
 		}
-	} else if !cgroups.IsCgroup2UnifiedMode() {
-		return nil, fmt.Errorf("failSwapOn is %v but running swap with cgroups v1 is not supported", failSwapOn)
+	}
+	if !failSwapOn && workloadsUseSwap && !cgroups.IsCgroup2UnifiedMode() {
+		return nil, fmt.Errorf("running swap with cgroups v1 is not supported. failSwapOn: %v, workloadsUseSwap %v", failSwapOn, workloadsUseSwap)
 	}
 
 	var internalCapacity = v1.ResourceList{}
