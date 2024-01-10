@@ -67,7 +67,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 	}{
 		{
 			name:                    "when invalid config is provided previous config shouldn't be changed",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -104,7 +104,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 		},
 		{
 			name:                    "when same valid config is provided previous config shouldn't be changed",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -122,13 +122,13 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 						},
 					},
 					// hash of initial "testdata/ec_config.yaml" config file before reloading
-					EncryptionFileContentHash: "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+					EncryptionFileContentHash: "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 				}, nil
 			},
 		},
 		{
 			name:                    "when transformer's health check fails previous config shouldn't be changed",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -152,7 +152,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 		},
 		{
 			name:                    "when multiple health checks are present previous config shouldn't be changed",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -179,7 +179,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 		},
 		{
 			name:                    "when invalid health check URL is provided previous config shouldn't be changed",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -202,7 +202,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 		},
 		{
 			name:                    "when config is not updated transformers are closed correctly",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -220,13 +220,13 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 						},
 					},
 					// hash of initial "testdata/ec_config.yaml" config file before reloading
-					EncryptionFileContentHash: "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+					EncryptionFileContentHash: "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 				}, nil
 			},
 		},
 		{
 			name:                    "when config hash is not updated transformers are closed correctly",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           0,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -234,7 +234,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 			wantAddRateLimitedCount: 0,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
 				// hash of initial "testdata/ec_config.yaml" config file before reloading
-				return "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3", nil
+				return "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3", nil
 			},
 			mockLoadEncryptionConfig: func(ctx context.Context, filepath string, reload bool, apiServerID string) (*encryptionconfig.EncryptionConfiguration, error) {
 				return nil, fmt.Errorf("should not be called")
@@ -242,7 +242,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 		},
 		{
 			name:                    "when config hash errors transformers are closed correctly",
-			wantECFileHash:          "6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           0,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
