@@ -863,6 +863,8 @@ spec:
 		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 	}
 
+	t.Log("Created CR:", string(result))
+
 	crdClient := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions()
 	// Migrate away from current storage version of v1beta2 to v1beta1.
 	crd, err := crdClient.Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
@@ -877,18 +879,23 @@ spec:
 		t.Fatalf("failed to update CRD: %v", err)
 	}
 
+	t.Log("\n\nUpdated CRD, migrated away from old storage version:", newCRD.Status.StoredVersions)
+
 	gvr := schema.GroupVersionResource{
 		Group:    newCRD.Spec.Group,
-		Version:  newCRD.Spec.Versions[1].Name,
+		Version:  newCRD.Spec.Versions[0].Name,
 		Resource: newCRD.Spec.Names.Plural,
 	}
-	// Migrate existing CR to new storage version by applying an
-	// empty merge patch.
-	_, err = dynamicClient.Resource(gvr).
-		Patch(context.TODO(), name, types.MergePatchType, []byte("{}"), metav1.PatchOptions{})
+	// Migrate existing CR to new storage version by applying a patch. We also change
+	// a field here so that we end up haveing 2 entries in managedFields: (1) with the
+	// old storage version (2) with the new storage version.
+	migratedCR, err := dynamicClient.Resource(gvr).
+		Patch(context.TODO(), name, types.MergePatchType, []byte(`{"spec":{"replicas":2}}`), metav1.PatchOptions{})
 	if err != nil {
 		t.Fatalf("failed to patch CR: %v", err)
 	}
+
+	t.Log("\n\nMigrated CR to new storage version after patch:", migratedCR)
 
 	// Remove old storage version from status
 	patchedCRD, err := crdClient.Patch(context.TODO(),
@@ -900,6 +907,9 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to patch CRD: %v", err)
 	}
+
+	t.Log("\n\nUpdated CRD, remove old storage version from status:", patchedCRD.Status.StoredVersions)
+
 	crd, err = crdClient.Get(context.TODO(), patchedCRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get CRD: %v", err)
@@ -912,6 +922,10 @@ spec:
 		t.Fatalf("failed to update CRD: %v", err)
 	}
 
+	// We now apply the same CR object again using SSA but with
+	// the replicas field updated (to avoid conflicts). In the
+	// end we should have 2 managedFields, both of which are
+	// converted to the new storage version of v1beta1.
 	apiVersion = noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 	yamlBody = []byte(fmt.Sprintf(`
 apiVersion: %s
@@ -920,7 +934,7 @@ metadata:
   name: %s
 spec:
   cronSpec: "* * * * */5"
-  replicas: 1
+  replicas: 2
   ports:
   - name: x
     containerPort: 80
@@ -932,8 +946,10 @@ spec:
 		Body(yamlBody).
 		Do(context.TODO())
 
-	resp, _ := new.Raw()
-	if new.Error() != nil {
-		t.Fatalf("failed to create custom resource with apply: %v:\n%v", new.Error().Error(), string(resp))
+	resp, err := new.Raw()
+	if err != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(resp))
 	}
+
+	t.Log("\n\napplying object again but with changed replicas:", string(resp))
 }
