@@ -48,20 +48,6 @@ func InitArgs(args ...string) func(*LinuxFactory) error {
 	}
 }
 
-// IntelRdtfs is an options func to configure a LinuxFactory to return
-// containers that use the Intel RDT "resource control" filesystem to
-// create and manage Intel RDT resources (e.g., L3 cache, memory bandwidth).
-func IntelRdtFs(l *LinuxFactory) error {
-	if !intelrdt.IsCATEnabled() && !intelrdt.IsMBAEnabled() {
-		l.NewIntelRdtManager = nil
-	} else {
-		l.NewIntelRdtManager = func(config *configs.Config, id string, path string) intelrdt.Manager {
-			return intelrdt.NewManager(config, id, path)
-		}
-	}
-	return nil
-}
-
 // TmpfsRoot is an option func to mount LinuxFactory.Root to tmpfs.
 func TmpfsRoot(l *LinuxFactory) error {
 	mounted, err := mountinfo.Mounted(l.Root)
@@ -136,9 +122,6 @@ type LinuxFactory struct {
 
 	// Validator provides validation to container configurations.
 	Validator validate.Validator
-
-	// NewIntelRdtManager returns an initialized Intel RDT manager for a single container.
-	NewIntelRdtManager func(config *configs.Config, id string, path string) intelrdt.Manager
 }
 
 func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, error) {
@@ -208,18 +191,16 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 		return nil, err
 	}
 	c := &linuxContainer{
-		id:            id,
-		root:          containerRoot,
-		config:        config,
-		initPath:      l.InitPath,
-		initArgs:      l.InitArgs,
-		criuPath:      l.CriuPath,
-		newuidmapPath: l.NewuidmapPath,
-		newgidmapPath: l.NewgidmapPath,
-		cgroupManager: cm,
-	}
-	if l.NewIntelRdtManager != nil {
-		c.intelRdtManager = l.NewIntelRdtManager(config, id, "")
+		id:              id,
+		root:            containerRoot,
+		config:          config,
+		initPath:        l.InitPath,
+		initArgs:        l.InitArgs,
+		criuPath:        l.CriuPath,
+		newuidmapPath:   l.NewuidmapPath,
+		newgidmapPath:   l.NewgidmapPath,
+		cgroupManager:   cm,
+		intelRdtManager: intelrdt.NewManager(config, id, ""),
 	}
 	c.state = &stoppedState{c: c}
 	return c, nil
@@ -261,11 +242,9 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 		newuidmapPath:        l.NewuidmapPath,
 		newgidmapPath:        l.NewgidmapPath,
 		cgroupManager:        cm,
+		intelRdtManager:      intelrdt.NewManager(&state.Config, id, state.IntelRdtPath),
 		root:                 containerRoot,
 		created:              state.Created,
-	}
-	if l.NewIntelRdtManager != nil {
-		c.intelRdtManager = l.NewIntelRdtManager(&state.Config, id, state.IntelRdtPath)
 	}
 	c.state = &loadedState{c: c}
 	if err := c.refreshState(); err != nil {

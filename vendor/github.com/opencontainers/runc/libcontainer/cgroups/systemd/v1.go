@@ -77,7 +77,7 @@ var legacySubsystems = []subsystem{
 func genV1ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
 	var properties []systemdDbus.Property
 
-	deviceProperties, err := generateDeviceProperties(r)
+	deviceProperties, err := generateDeviceProperties(r, systemdVersion(cm))
 	if err != nil {
 		return nil, err
 	}
@@ -417,6 +417,15 @@ func (m *legacyManager) Set(r *configs.Resources) error {
 		if err := m.doFreeze(configs.Frozen); err != nil {
 			// If freezer cgroup isn't supported, we just warn about it.
 			logrus.Infof("freeze container before SetUnitProperties failed: %v", err)
+			// skip update the cgroup while frozen failed. #3803
+			if !errors.Is(err, errSubsystemDoesNotExist) {
+				if needsThaw {
+					if thawErr := m.doFreeze(configs.Thawed); thawErr != nil {
+						logrus.Infof("thaw container after doFreeze failed: %v", thawErr)
+					}
+				}
+				return err
+			}
 		}
 	}
 	setErr := setUnitProperties(m.dbus, unitName, properties...)
