@@ -1,97 +1,104 @@
 ## Purpose
 
-- `import-boss` enforces import restrictions against all pull requests submitted to the [k/k](https://github.com/kubernetes/kubernetes) repository. There are a number of `.import-restrictions` files that in the [k/k](https://github.com/kubernetes/kubernetes) repository, all of which are defined in `YAML` (or `JSON`) format.
+`import-boss` enforces optional import restrictions between packages.  This is
+useful to manage the dependency graph within a large repository, such as
+[kubernetes](https://github.com/kubernetes/kubernetes).
 
 ## How does it work?
 
-- When a directory is verified, `import-boss` looks for a file called `.import-restrictions`. If this file is not found, `import-boss` will go up to the parent directory until it finds this `.import-restrictions` file.
+When a package is verified, `import-boss` looks for a file called
+`.import-restrictions` in the same directory and all parent directories, up to
+the module root (defined by the presence of a go.mod file).  These files
+contain rules which are evaluated against each dependency of the package in
+question.
 
-- Adding `.import-restrictions` files does not add them to CI runs. They need to be explicitly added to `hack/verify-import-boss.sh`. Once an `.import-restrictions` file is added, all of the sub-packages of this file's directory are added as well.
+Evaluation starts with the rules file closest to the package.  If that file
+makes a determination to allow or forbid the import, evaluation is done.  If
+the import does not match any rule, the next-closest rules file is consulted,
+and so forth.  If the rules files are exhausted and no determination has been
+made, the import will be flagged as an error.
+
+### What are rules files?
+
+A rules file is a JSON or YAML document with two top-level keys, both optional:
+* `Rules`
+* `InverseRules`
 
 ### What are Rules?
 
-- If an `.import-restrictions` file is found, then all imports of the package are checked against each `rule` in the file. A `rule` consists of three parts:
+A `rule` defines a policy to be enforced on packages which are depended on by
+the package in question.  It consists of three parts:
   - A `SelectorRegexp`, to select the import paths that the rule applies to.
   - A list of `AllowedPrefixes`
   - A list of `ForbiddenPrefixes`
 
-- An import is allowed if it matches at least one allowed prefix and does not match any forbidden prefixes. An example `.import-restrictions` file looks like this:
+An import is allowed if it matches at least one allowed prefix and does not
+match any forbidden prefixes.
+
+Rules also have a boolean `Transitive` option. When this option is true, the
+rule is applied to transitive imports.
+
+Example:
 
 ```json
 {
   "Rules": [
     {
-      "SelectorRegexp": "k8s[.]io",
+      "SelectorRegexp": "example[.]com",
       "AllowedPrefixes": [
-        "k8s.io/gengo/v2/examples",
-        "k8s.io/kubernetes/third_party"
+        "example.com/project/package",
+        "example.com/other/package"
       ],
       "ForbiddenPrefixes": [
-        "k8s.io/kubernetes/pkg/third_party/deprecated"
+        "example.com/legacy/package"
       ]
     },
     {
       "SelectorRegexp": "^unsafe$",
-      "AllowedPrefixes": [
-      ],
-      "ForbiddenPrefixes": [
-        ""
-      ]
+      "AllowedPrefixes": [],
+      "ForbiddenPrefixes": [ "" ],
+      "Transitive": true
     }
   ]
 }
 ```
-- Take note of `"SelectorRegexp": "k8s[.]io"` in the first block. This specifies that we are applying these rules to the `"k8s.io"` import path.
-- The second block explicitly matches the "unsafe" package, and forbids it ("" is a prefix of everything).
 
-### What are Inverse Rules?
+The `SelectorRegexp` specifies that this rule applies only to imports which
+match that regex.
 
-- In contrast to non-inverse rules, which are defined in importing packages, inverse rules are defined in imported packages.
+Note: an empty list (`[]`) matches nothing, and an empty string (`""`) is a
+prefix of everything.
 
-- Inverse rules allow for fine-grained import restrictions for "private packages" where we don't want to spread use inside of [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).
+### What are InverseRules?
 
-- If an `.import-restrictions` file is found, then all imports of the package are checked against each `inverse rule` in the file. This check will continue, climbing up the directory tree, until a match is found and accepted.
+In contrast to rules, which are defined in terms of "things this package
+depends on", inverse rules are defined in terms of "things which import this
+package".  This allows for fine-grained import restrictions for "semi-private
+packages" which are more sophisticated than Go's `internal` convention.
 
-- Inverse rules also have a boolean `transitive` option. When this option is true, the import rule is also applied to `transitive` imports.
-  - `transitive` imports are dependencies not directly depended on by the code, but are needed to run the application. Use this option if you want to apply restrictions to those indirect dependencies.
+If inverse rules are found, then all known imports of the package are checked
+against each such rule, in the same fashion as regular rules.  Note that this
+can only handle known imports, which is defined as any package which is also
+being considered by this `import-boss` run.  For most repositories, `./...` will
+suffice.
+
+Example:
 
 ```yaml
-rules:
-  - selectorRegexp: k8s[.]io
-    allowedPrefixes:
-      - k8s.io/gengo/v2/examples
-      - k8s.io/kubernetes/third_party
-    forbiddenPrefixes:
-      - k8s.io/kubernetes/pkg/third_party/deprecated
-  - selectorRegexp: ^unsafe$
-    forbiddenPrefixes:
-      - ""
 inverseRules:
-  - selectorRegexp: k8s[.]io
+  - selectorRegexp: example[.]com
     allowedPrefixes:
-      - k8s.io/same-repo
-      - k8s.io/kubernetes/pkg/legacy
+      - example.com/this-same-repo
+      - example.com/close-friend/legacy
     forbiddenPrefixes:
-      - k8s.io/kubernetes/pkg/legacy/subpkg
-  - selectorRegexp: k8s[.]io
+      - example.com/other-project
+  - selectorRegexp: example[.]com
     transitive: true
     forbiddenPrefixes:
-      - k8s.io/kubernetes/cmd/kubelet
-      - k8s.io/kubernetes/cmd/kubectl
+      - example.com/other-team
 ```
 
-## How do I run import-boss within the k/k repo?
+## How do I run import-boss?
 
-- In order to include _test.go files, make sure to pass in the `include-test-files` flag:
-  ```sh
-  hack/verify-import-boss.sh --include-test-files=true
-  ```
-
-- To include other directories, pass in a directory or directories using the `input-dirs` flag:
-  ```sh
-  hack/verify-import-boss.sh --input-dirs="k8s.io/kubernetes/test/e2e/framework/..."
-  ```
-
-## Reference
-
-- [import-boss](https://github.com/kubernetes/gengo/tree/master/examples/import-boss)
+For most scenarios, simply running `import-boss ./...` will work.  For projects
+which use Go workspaces, this can even span multiple modules.

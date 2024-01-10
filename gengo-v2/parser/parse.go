@@ -39,9 +39,6 @@ type importPathString string
 // Builder lets you add all the go files in all the packages that you care
 // about, then constructs the type source data.
 type Builder struct {
-	// If true, include *_test.go
-	includeTestFiles bool
-
 	// Map of package paths to definitions.  These keys should be canonical
 	// Go import paths (example.com/foo/bar) and not local paths (./foo/bar).
 	goPkgs map[importPathString]*packages.Package
@@ -74,14 +71,13 @@ type fileLine struct {
 }
 
 // New constructs a new builder.
-func New(includeTestFiles bool, buildTags []string) *Builder {
+func New(buildTags []string) *Builder {
 	return &Builder{
 		goPkgs:                map[importPathString]*packages.Package{},
 		userRequested:         map[importPathString]bool{},
 		fullyProcessed:        map[importPathString]bool{},
 		fset:                  token.NewFileSet(),
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
-		includeTestFiles:      includeTestFiles,
 		buildTags:             buildTags,
 	}
 }
@@ -106,6 +102,7 @@ func (b *Builder) FindPackages(patterns ...string) ([]string, error) {
 	cfg := packages.Config{
 		Mode:       packages.NeedName | packages.NeedFiles,
 		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
+		Tests:      false,
 	}
 	pkgs, err := packages.Load(&cfg, toFind...)
 	if err != nil {
@@ -193,8 +190,8 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 			b.userRequested[ip] = true
 		}
 	}
-	for _, pkgPath := range netNewPkgs {
-		ip := importPathString(pkgPath)
+	for _, pkg := range netNewPkgs {
+		ip := importPathString(pkg)
 		if !b.userRequested[ip] {
 			b.userRequested[ip] = true
 		}
@@ -208,9 +205,9 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 		Mode: packages.NeedName |
 			packages.NeedFiles | packages.NeedImports | packages.NeedDeps |
 			packages.NeedModule | packages.NeedTypes | packages.NeedSyntax,
-		Tests:      b.includeTestFiles,
 		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
 		Fset:       b.fset,
+		Tests:      false,
 	}
 
 	tBefore := time.Now()
@@ -362,6 +359,8 @@ func (b *Builder) addCommentsToType(obj tc.Object, t *types.Type) {
 func packageDir(pkg *packages.Package) (string, error) {
 	// Sometimes Module is present but has no Dir, e.g. when it is vendored.
 	if pkg.Module != nil && pkg.Module.Dir != "" {
+		// NOTE: this will not work if tests are loaded, because Go mutates the
+		// Package.PkgPath.
 		subdir := strings.TrimPrefix(pkg.PkgPath, pkg.Module.Path)
 		return filepath.Join(pkg.Module.Dir, subdir), nil
 	}

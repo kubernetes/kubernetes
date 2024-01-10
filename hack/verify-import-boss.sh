@@ -27,16 +27,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+kube::util::require-jq
 
-GOPROXY=off go install k8s.io/code-generator/cmd/import-boss
+# Doing it this way is MUCH faster than simply saying "all", and there doesn't
+# seem to be a simpler way to express "this whole workspace".
+packages=()
+kube::util::read-array packages < <(
+    go work edit -json | jq -r '.Use[].DiskPath + "/..."'
+)
 
-$(kube::util::find-binary "import-boss") \
-    -v "${KUBE_VERBOSE:-0}" \
-    --include-test-files \
-    --input-dirs "./pkg/..." \
-    --input-dirs "./cmd/..." \
-    --input-dirs "./plugin/..." \
-    --input-dirs "./test/e2e_node/..." \
-    --input-dirs "./test/e2e/framework/..." \
-    --input-dirs "./test/integration/..." \
-    --input-dirs "./staging/src/..."
+GOPROXY=off \
+    go run k8s.io/code-generator/cmd/import-boss -v "${KUBE_VERBOSE:-0}" "${packages[@]}"

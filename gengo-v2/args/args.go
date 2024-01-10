@@ -44,9 +44,6 @@ type GeneratorArgs struct {
 	// Which directories to parse.
 	InputDirs []string
 
-	// If true, include *_test.go files
-	IncludeTestFiles bool
-
 	// Any custom arguments go here
 	CustomArgs interface{}
 }
@@ -92,7 +89,7 @@ func GoBoilerplate(headerFile, buildTag, generatedBy string) ([]byte, error) {
 // NewBuilder makes a new parser.Builder and populates it with the input
 // directories.
 func (g *GeneratorArgs) NewBuilder(buildTags []string) (*parser.Builder, error) {
-	b := parser.New(g.IncludeTestFiles, buildTags)
+	b := parser.New(buildTags)
 	if err := b.LoadPackages(g.InputDirs...); err != nil {
 		return nil, err
 	}

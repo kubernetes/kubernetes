@@ -159,12 +159,6 @@ type Context struct {
 	// All the types, in case you want to look up something.
 	Universe types.Universe
 
-	// Incoming imports, i.e. packages importing the given package.
-	incomingImports map[string][]string
-
-	// Incoming transitive imports, i.e. the transitive closure of IncomingImports
-	incomingTransitiveImports map[string][]string
-
 	// All the user-specified packages.  This is after recursive expansion.
 	Inputs []string
 
@@ -208,33 +202,8 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 	return c, nil
 }
 
-// IncomingImports returns the incoming imports for each package. The map is lazily computed.
-func (c *Context) IncomingImports() map[string][]string {
-	if c.incomingImports == nil {
-		incoming := map[string][]string{}
-		for _, pkg := range c.Universe {
-			for imp := range pkg.Imports {
-				incoming[imp] = append(incoming[imp], pkg.Path)
-			}
-		}
-		c.incomingImports = incoming
-	}
-	return c.incomingImports
-}
-
-// TransitiveIncomingImports returns the transitive closure of the incoming imports for each package.
-// The map is lazily computed.
-func (c *Context) TransitiveIncomingImports() map[string][]string {
-	if c.incomingTransitiveImports == nil {
-		c.incomingTransitiveImports = transitiveClosure(c.IncomingImports())
-	}
-	return c.incomingTransitiveImports
-}
-
 // LoadPackages adds Go packages to the context.
 func (c *Context) LoadPackages(patterns ...string) ([]*types.Package, error) {
-	c.incomingImports = nil
-	c.incomingTransitiveImports = nil
 	return c.builder.LoadPackagesTo(&c.Universe, patterns...)
 }
 

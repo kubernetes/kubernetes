@@ -86,7 +86,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 func Run(g *Generator) {
 	// Roughly models gengo/v2/args.GeneratorArgs.NewBuilder.
 
-	b := parser.New(false, []string{"proto"})
+	b := parser.New([]string{"proto"})
 
 	var allInputs []string
 	if len(g.APIMachineryPackages) != 0 {
