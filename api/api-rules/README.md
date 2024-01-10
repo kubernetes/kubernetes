@@ -27,7 +27,7 @@ versions or groups without other changes, it is OK for your API reviewer to make
 exception.
 
 If you're removing violations from the exception list, or if you have good
-reasons to add new violations to this list, please update the file using:
+reasons to add new violations to this list, please update the file by using:
 
  - `UPDATE_API_KNOWN_VIOLATIONS=true ./hack/update-codegen.sh`
 
