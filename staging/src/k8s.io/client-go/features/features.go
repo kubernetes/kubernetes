@@ -17,6 +17,9 @@ limitations under the License.
 package features
 
 import (
+	"errors"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sync/atomic"
 )
 
@@ -99,8 +102,23 @@ func AddFeaturesToExistingFeatureGates(registry Registry) error {
 //	// then replace client-go's feature gates implementation with your implementation
 //	clientgofeaturegate.ReplaceFeatureGates(utilfeature.DefaultMutableFeatureGate)
 func ReplaceFeatureGates(newFeatureGates Gates) {
+	if replaceFeatureGatesWithWarningIndicator(newFeatureGates) {
+		utilruntime.HandleError(errors.New("the default feature gates implementation has already been used and now it's being overwritten. This might lead to unexpected behaviour. Check your initialization order"))
+	}
+}
+
+func replaceFeatureGatesWithWarningIndicator(newFeatureGates Gates) bool {
+	shouldProduceWarning := false
+
+	if defaultFeatureGates, ok := FeatureGates().(*envVarFeatureGates); ok {
+		if defaultFeatureGates.hasAlreadyReadEnvVar() {
+			shouldProduceWarning = true
+		}
+	}
 	wrappedFeatureGates := &featureGatesWrapper{newFeatureGates}
 	featureGates.Store(wrappedFeatureGates)
+
+	return shouldProduceWarning
 }
 
 func init() {

@@ -146,3 +146,11 @@ func TestEnvVarFeatureGatesEnabledPanic(t *testing.T) {
 	target := newEnvVarFeatureGates(nil)
 	require.PanicsWithError(t, fmt.Errorf("feature %q is not registered in FeatureGates %q", "UnknownFeature", target.callSiteName).Error(), func() { target.Enabled("UnknownFeature") })
 }
+
+func TestHasAlreadyReadEnvVar(t *testing.T) {
+	target := newEnvVarFeatureGates(nil)
+	require.False(t, target.hasAlreadyReadEnvVar())
+
+	_ = target.getEnabledMapFromEnvVar()
+	require.True(t, target.hasAlreadyReadEnvVar())
+}

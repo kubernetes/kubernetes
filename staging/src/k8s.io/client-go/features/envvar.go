@@ -77,6 +77,10 @@ type envVarFeatureGates struct {
 	// enabled holds a map[Feature]bool
 	// with values explicitly set via env var
 	enabled atomic.Value
+
+	// readEnvVars holds the boolean value which
+	// indicates whether readEnvVarsOnce has been called.
+	readEnvVars atomic.Bool
 }
 
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
@@ -116,6 +120,7 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 			}
 		}
 		f.enabled.Store(featureGatesState)
+		f.readEnvVars.Store(true)
 
 		for feature, featureSpec := range f.known {
 			if featureState, ok := featureGatesState[feature]; ok {
@@ -126,4 +131,8 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 		}
 	})
 	return f.enabled.Load().(map[Feature]bool)
+}
+
+func (f *envVarFeatureGates) hasAlreadyReadEnvVar() bool {
+	return f.readEnvVars.Load()
 }
