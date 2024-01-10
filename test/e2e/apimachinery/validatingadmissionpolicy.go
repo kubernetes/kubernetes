@@ -297,7 +297,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", frame
 			policy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "create policy")
 			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
-				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
+				return client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
 			}, policy.Name)
 		})
 		ginkgo.By("waiting for the type check to finish without warnings", func() {
@@ -330,7 +330,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", frame
 			policy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "create policy")
 			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
-				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
+				return client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
 			}, policy.Name)
 		})
 		ginkgo.By("waiting for the type check to finish with warnings", func() {
