@@ -240,6 +240,14 @@ const (
 	// that is independent of a Pod.
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
+	// owner: @pohly
+	// kep: http://kep.k8s.io/3063
+	// alpha: v1.30
+	//
+	// Enables support in ResourceQuota objects for limiting the number of
+	// ResourceClaim objects per namespace and per resource class.
+	DynamicResourceAllocationQuota featuregate.Feature = "DynamicResourceAllocationQuota"
+
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
 	// alpha: v1.25
@@ -969,6 +977,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DevicePluginCDIDevices: {Default: true, PreRelease: featuregate.Beta},
 
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
+
+	DynamicResourceAllocationQuota: {Default: false, PreRelease: featuregate.Alpha},
 
 	EventedPLEG: {Default: false, PreRelease: featuregate.Beta}, // off by default, requires CRI Runtime support
 

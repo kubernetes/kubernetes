@@ -41,3 +41,4 @@ nodes:
         v: "5"
 featureGates:
   DynamicResourceAllocation: true
+  DynamicResourceAllocationQuota: true

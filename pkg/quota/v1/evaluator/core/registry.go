@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -40,6 +42,10 @@ func NewEvaluators(f quota.ListerForResourceFunc) []quota.Evaluator {
 		NewServiceEvaluator(f),
 		NewPersistentVolumeClaimEvaluator(f),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		result = append(result, NewResourceClaimEvaluator(f))
+	}
+
 	// these evaluators require an alias for backwards compatibility
 	for gvr, alias := range legacyObjectCountAliases {
 		result = append(result,
