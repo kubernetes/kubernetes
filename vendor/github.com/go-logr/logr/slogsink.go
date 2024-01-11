@@ -17,24 +17,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package slogr
+package logr
 
 import (
 	"context"
 	"log/slog"
 	"runtime"
 	"time"
-
-	"github.com/go-logr/logr"
 )
 
 var (
-	_ logr.LogSink          = &slogSink{}
-	_ logr.CallDepthLogSink = &slogSink{}
-	_ Underlier             = &slogSink{}
+	_ LogSink          = &slogSink{}
+	_ CallDepthLogSink = &slogSink{}
+	_ Underlier        = &slogSink{}
 )
 
-// Underlier is implemented by the LogSink returned by NewLogr.
+// Underlier is implemented by the LogSink returned by NewFromLogHandler.
 type Underlier interface {
 	// GetUnderlying returns the Handler used by the LogSink.
 	GetUnderlying() slog.Handler
@@ -54,7 +52,7 @@ type slogSink struct {
 	handler   slog.Handler
 }
 
-func (l *slogSink) Init(info logr.RuntimeInfo) {
+func (l *slogSink) Init(info RuntimeInfo) {
 	l.callDepth = info.CallDepth
 }
 
@@ -62,7 +60,7 @@ func (l *slogSink) GetUnderlying() slog.Handler {
 	return l.handler
 }
 
-func (l *slogSink) WithCallDepth(depth int) logr.LogSink {
+func (l *slogSink) WithCallDepth(depth int) LogSink {
 	newLogger := *l
 	newLogger.callDepth += depth
 	return &newLogger
@@ -93,18 +91,18 @@ func (l *slogSink) log(err error, msg string, level slog.Level, kvList ...interf
 		record.AddAttrs(slog.Any(errKey, err))
 	}
 	record.Add(kvList...)
-	l.handler.Handle(context.Background(), record)
+	_ = l.handler.Handle(context.Background(), record)
 }
 
-func (l slogSink) WithName(name string) logr.LogSink {
+func (l slogSink) WithName(name string) LogSink {
 	if l.name != "" {
-		l.name = l.name + "/"
+		l.name += "/"
 	}
 	l.name += name
 	return &l
 }
 
-func (l slogSink) WithValues(kvList ...interface{}) logr.LogSink {
+func (l slogSink) WithValues(kvList ...interface{}) LogSink {
 	l.handler = l.handler.WithAttrs(kvListToAttrs(kvList...))
 	return &l
 }
