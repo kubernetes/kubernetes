@@ -71,7 +71,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
@@ -222,7 +221,7 @@ func (i *crdInfo) waitForStorageVersionUpdate(ctx context.Context) error {
 	case <-i.storageVersionUpdate.processedCh:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("aborted waiting for CRD storage version update: %v", ctx.Err())
+		return fmt.Errorf("aborted waiting for CRD storage version update: %w", ctx.Err())
 	// Unblock the requests if the storage version update takes a long time, otherwise
 	// CR requests may stack up and overwhelm the API server.
 	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
@@ -584,7 +583,7 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		processedCh := make(chan struct{})
-		ctx := genericapirequest.NewContext()
+		ctx := apirequest.NewContext()
 		r.storageVersionManager.UpdateStorageVersion(ctx, crd, tearDownFinishedCh, processedCh)
 	}
 }
@@ -632,7 +631,7 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		processedCh := make(chan struct{})
-		ctx := genericapirequest.NewContext()
+		ctx := apirequest.NewContext()
 		r.storageVersionManager.UpdateStorageVersion(ctx, newCRD, tearDownFinishedCh, processedCh)
 	}
 }
@@ -1169,7 +1168,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	if r.storageVersionManager != nil {
 		// spawn storage version update in background and use channels to make handlers wait
 		processedCh := make(chan struct{})
-		ctx := genericapirequest.NewContext()
+		ctx := apirequest.NewContext()
 		r.storageVersionManager.UpdateStorageVersion(ctx, crd, nil, processedCh)
 		ret.storageVersionUpdate = &storageVersionUpdate{
 			processedCh: processedCh,

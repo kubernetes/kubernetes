@@ -92,15 +92,15 @@ func TestStorageVersionCustomResource(t *testing.T) {
 	if !strings.HasPrefix(storageVersion.APIServerID, "apiserver-") {
 		t.Errorf("apiserver ID doesn't contain apiserver- prefix, has: %v", storageVersion.APIServerID)
 	}
-	expectecdVersion := crd.Spec.Group + "/" + crd.Spec.Versions[0].Name
-	if storageVersion.EncodingVersion != expectecdVersion {
-		t.Errorf("unexpected encoding version, expected: %v, got: %v", expectecdVersion, storageVersion.EncodingVersion)
+	expectedVersion := crd.Spec.Group + "/" + crd.Spec.Versions[0].Name
+	if storageVersion.EncodingVersion != expectedVersion {
+		t.Errorf("unexpected encoding version, expected: %v, got: %v", expectedVersion, storageVersion.EncodingVersion)
 	}
 	if len(storageVersion.DecodableVersions) != 1 {
 		t.Errorf("unexpected number of decodable versions, expected 1 version, got: %v", storageVersion.DecodableVersions)
 	}
-	if storageVersion.DecodableVersions[0] != expectecdVersion {
-		t.Errorf("unexpected decodable version, expected %v, got: %v", expectecdVersion, storageVersion.DecodableVersions[0])
+	if storageVersion.DecodableVersions[0] != expectedVersion {
+		t.Errorf("unexpected decodable version, expected %v, got: %v", expectedVersion, storageVersion.DecodableVersions[0])
 	}
 
 	// add a new version v2 to the CRD and make it the storage version
@@ -113,7 +113,7 @@ func TestStorageVersionCustomResource(t *testing.T) {
 	}
 
 	expectedNewVersion := crd.Spec.Group + "/" + newVersion.Name
-	expectedDecodableVersions := []string{expectecdVersion, expectedNewVersion}
+	expectedDecodableVersions := []string{expectedVersion, expectedNewVersion}
 	lastErr = nil
 	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		sv, err := kubeclient.InternalV1alpha1().StorageVersions().Get(context.TODO(), gr, metav1.GetOptions{})
@@ -195,7 +195,7 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 		}
 	}()
 
-	// verify new CRD creation is not blocked by storage version update of the first CRD
+	// verify new CRD creation is not blocked by the watch event.
 	newCRD := etcd.GetCustomResourceDefinitionData()[1]
 	etcd.CreateTestCRDs(t, crdClient, false, newCRD)
 
@@ -249,4 +249,76 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 		t.Errorf("failed to delete storage version: %v", err)
 	}
 
+}
+
+func TestWatchAndMutateStorageVersionCRDs(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
+	etcdConfig := framework.SharedEtcd()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
+		[]string{
+			"--runtime-config=internal.apiserver.k8s.io/v1alpha1=true",
+		},
+		etcdConfig)
+	defer server.TearDownFn()
+
+	crdClient := apiextensionsclientset.NewForConfigOrDie(server.ClientConfig)
+
+	// create a watch on CRDs
+	w, err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Watch(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Stop()
+
+	select {
+	case <-w.ResultChan():
+		t.Fatal("Watch closed before mutation requests were made")
+	default:
+	}
+
+	// verify new CRD creation is not blocked by watch event
+	crd := etcd.GetCustomResourceDefinitionData()[0]
+	etcd.CreateTestCRDs(t, crdClient, false, crd)
+
+	errCh := make(chan error)
+
+	kubeclient := kubernetes.NewForConfigOrDie(server.ClientConfig)
+	gr := crd.Spec.Group + "." + crd.Spec.Names.Plural
+	var lastErr error
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
+		}
+
+		sv, err := kubeclient.InternalV1alpha1().StorageVersions().Get(context.TODO(), gr, metav1.GetOptions{})
+		if err != nil {
+			lastErr = fmt.Errorf("failed to get storage version: %v", err)
+			return false, nil
+		}
+		storageVersion := sv.Status.StorageVersions[0]
+		expectedVersion := crd.Spec.Group + "/" + crd.Spec.Versions[0].Name
+		if storageVersion.EncodingVersion != expectedVersion {
+			t.Errorf("unexpected encoding version, expected: %v, got: %v", expectedVersion, storageVersion.EncodingVersion)
+		}
+		if len(storageVersion.DecodableVersions) != 1 {
+			t.Errorf("unexpected number of decodable versions, expected 1 version, got: %v", storageVersion.DecodableVersions)
+		}
+		if storageVersion.DecodableVersions[0] != expectedVersion {
+			t.Errorf("unexpected decodable version, expected %v, got: %v", expectedVersion, storageVersion.DecodableVersions[0])
+		}
+		return true, nil
+	}); err != nil {
+		t.Errorf("failed to wait for storage version creation: %v, last error: %v", err, lastErr)
+	}
+
+	// cleanup
+	if err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
+		t.Errorf("failed to delete crd: %v", err)
+	}
+	if err := kubeclient.InternalV1alpha1().StorageVersions().Delete(context.TODO(), gr, metav1.DeleteOptions{}); err != nil {
+		t.Errorf("failed to delete storage version: %v", err)
+	}
 }
