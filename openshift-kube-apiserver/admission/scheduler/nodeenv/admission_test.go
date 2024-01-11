@@ -25,6 +25,16 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "worker-1",
+			Namespace: "",
+			Labels: map[string]string{
+				"worker": "true",
+			},
+		},
+	}
+
 	handler := &podNodeEnvironment{}
 	pod := &kapi.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "testPod"},
@@ -34,6 +44,7 @@ func TestPodAdmission(t *testing.T) {
 		defaultNodeSelector       string
 		projectNodeSelector       string
 		podNodeSelector           map[string]string
+		podNodeName               string
 		mergedNodeSelector        map[string]string
 		ignoreProjectNodeSelector bool
 		admit                     bool
@@ -103,18 +114,58 @@ func TestPodAdmission(t *testing.T) {
 			admit:               false,
 			testName:            "Conflicting pod and project node selector, multiple labels",
 		},
+		{
+			defaultNodeSelector: "",
+			projectNodeSelector: "worker=true",
+			podNodeName:         "worker-1",
+			podNodeSelector:     nil,
+			mergedNodeSelector:  map[string]string{"worker": "true"},
+			admit:               true,
+			testName:            "node referenced in pod.nodeName does not conflict with project node selector",
+		},
+		{
+			defaultNodeSelector: "",
+			projectNodeSelector: "",
+			podNodeName:         "worker-1",
+			podNodeSelector:     map[string]string{"worker": "false"},
+			mergedNodeSelector:  map[string]string{"worker": "false"},
+			admit:               true,
+			// default to kube behavior: let this fail by kubelet
+			testName: "node referenced in pod spec.nodeName can conflict with its own node selector when no project node selector is specified",
+		},
+		{
+			defaultNodeSelector: "worker = true",
+			projectNodeSelector: "worker=false",
+			podNodeName:         "worker-1",
+			podNodeSelector:     nil,
+			mergedNodeSelector:  nil,
+			admit:               false,
+			testName:            "node referenced in pod spec.nodeName conflicts with project node selector",
+		},
+		{
+			defaultNodeSelector: "",
+			projectNodeSelector: "worker=true",
+			podNodeName:         "worker-2",
+			podNodeSelector:     nil,
+			mergedNodeSelector:  nil,
+			admit:               false,
+			testName:            "missing node referenced in pod spec.nodeName does not admit",
+		},
 	}
 	for _, test := range tests {
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		indexer.Add(namespace)
+		indexer.Add(node)
 		handler.nsLister = corev1listers.NewNamespaceLister(indexer)
 		handler.nsListerSynced = func() bool { return true }
+		handler.nodeLister = corev1listers.NewNodeLister(indexer)
+		handler.nodeListerSynced = func() bool { return true }
 		handler.defaultNodeSelector = test.defaultNodeSelector
 
 		if !test.ignoreProjectNodeSelector {
 			namespace.ObjectMeta.Annotations = map[string]string{projectv1.ProjectNodeSelector: test.projectNodeSelector}
 		}
-		pod.Spec = kapi.PodSpec{NodeSelector: test.podNodeSelector}
+		pod.Spec = kapi.PodSpec{NodeSelector: test.podNodeSelector, NodeName: test.podNodeName}
 
 		attrs := admission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "testProject", namespace.ObjectMeta.Name, kapi.Resource("pods").WithVersion("version"), "", admission.Create, nil, false, nil)
 		err := handler.Admit(context.TODO(), attrs, nil)

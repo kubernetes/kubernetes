@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
@@ -34,8 +35,10 @@ const (
 // podNodeEnvironment is an implementation of admission.MutationInterface.
 type podNodeEnvironment struct {
 	*admission.Handler
-	nsLister       corev1listers.NamespaceLister
-	nsListerSynced func() bool
+	nsLister         corev1listers.NamespaceLister
+	nsListerSynced   func() bool
+	nodeLister       corev1listers.NodeLister
+	nodeListerSynced func() bool
 	// TODO this should become a piece of config passed to the admission plugin
 	defaultNodeSelector string
 }
@@ -72,7 +75,7 @@ func (p *podNodeEnvironment) admit(ctx context.Context, a admission.Attributes, 
 		return apierrors.NewForbidden(resource, name, err)
 	}
 
-	// If scheduler.alpha.kubernetes.io/node-selector is set on the pod,
+	// If scheduler.alpha.kubernetes.io/node-selector is set on the namespace,
 	// do not process the pod further.
 	if _, ok := namespace.ObjectMeta.Annotations[kubeProjectNodeSelector]; ok {
 		return nil
@@ -82,6 +85,7 @@ func (p *podNodeEnvironment) admit(ctx context.Context, a admission.Attributes, 
 	if projectNodeSelector, ok := namespace.ObjectMeta.Annotations[projectv1.ProjectNodeSelector]; ok {
 		selector = projectNodeSelector
 	}
+	// we might consider in the future to allow advanced syntax selectors and use labels.Parse here instead
 	projectNodeSelector, err := labelselector.Parse(selector)
 	if err != nil {
 		return err
@@ -94,6 +98,20 @@ func (p *podNodeEnvironment) admit(ctx context.Context, a admission.Attributes, 
 	if !mutationAllowed && len(labelselector.Merge(projectNodeSelector, pod.Spec.NodeSelector)) != len(pod.Spec.NodeSelector) {
 		// no conflict, different size => pod.Spec.NodeSelector does not contain projectNodeSelector
 		return apierrors.NewForbidden(resource, name, fmt.Errorf("pod node label selector does not extend project node label selector"))
+	}
+
+	if len(pod.Spec.NodeName) > 0 && len(projectNodeSelector) > 0 {
+		node, err := p.nodeLister.Get(pod.Spec.NodeName)
+		if err != nil {
+			return apierrors.NewForbidden(resource, name, fmt.Errorf("cannot validate project node label selector: %v", err))
+		}
+		projectNodeSelectorAdvanced, err := labels.Parse(selector)
+		if err != nil {
+			return err
+		}
+		if !projectNodeSelectorAdvanced.Matches(labels.Set(node.Labels)) {
+			return apierrors.NewForbidden(resource, name, fmt.Errorf("pod node name conflicts with project node label selector"))
+		}
 	}
 
 	// modify pod node selector = project node selector + current pod node selector
@@ -117,14 +135,16 @@ func (p *podNodeEnvironment) SetDefaultNodeSelector(in string) {
 func (p *podNodeEnvironment) SetExternalKubeInformerFactory(kubeInformers informers.SharedInformerFactory) {
 	p.nsLister = kubeInformers.Core().V1().Namespaces().Lister()
 	p.nsListerSynced = kubeInformers.Core().V1().Namespaces().Informer().HasSynced
+	p.nodeLister = kubeInformers.Core().V1().Nodes().Lister()
+	p.nodeListerSynced = kubeInformers.Core().V1().Nodes().Informer().HasSynced
 }
 
 func (p *podNodeEnvironment) waitForSyncedStore(timeout <-chan time.Time) bool {
-	for !p.nsListerSynced() {
+	for !p.nsListerSynced() || !p.nodeListerSynced() {
 		select {
 		case <-time.After(100 * time.Millisecond):
 		case <-timeout:
-			return p.nsListerSynced()
+			return p.nsListerSynced() && p.nodeListerSynced()
 		}
 	}
 
@@ -137,6 +157,12 @@ func (p *podNodeEnvironment) ValidateInitialization() error {
 	}
 	if p.nsListerSynced == nil {
 		return fmt.Errorf("project node environment plugin needs a namespace lister synced")
+	}
+	if p.nodeLister == nil {
+		return fmt.Errorf("project node environment plugin needs a node lister")
+	}
+	if p.nodeListerSynced == nil {
+		return fmt.Errorf("project node environment plugin needs a node lister synced")
 	}
 	return nil
 }
