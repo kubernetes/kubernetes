@@ -173,7 +173,7 @@ In [It] at: wait_test.go:58 <time>
 `,
 					},
 					SystemErr: `> Enter [It] not found, retry - wait_test.go:57 <time>
-INFO: Failed inside E2E framework:
+<klog> wait_test.go:58] Failed inside E2E framework:
     k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
     	wait.go
     k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
@@ -340,7 +340,7 @@ In [It] at: wait_test.go:71 <time>
 					},
 					SystemErr: `> Enter [It] not running - wait_test.go:69 <time>
 STEP: waiting for pod pending-pod to run - wait_test.go:70 <time>
-INFO: Failed inside E2E framework:
+<klog> wait_test.go:71] Failed inside E2E framework:
     k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
     	wait.go
     k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.5()
@@ -372,7 +372,7 @@ In [It] at: wait_test.go:75 <time>
 						Type: "failed",
 					},
 					SystemErr: `> Enter [It] failed - wait_test.go:74 <time>
-INFO: Failed inside E2E framework:
+<klog> wait_test.go:75] Failed inside E2E framework:
     k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
     	wait.go
     k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.6()

@@ -2773,7 +2773,7 @@ var _ = common.SIGDescribe("Services", func() {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				framework.Logf("unexpected error trying to connect to nodeport %s : %v", healthCheckNodePortAddr, err)
 				return false, nil
 			}
 
@@ -2796,7 +2796,7 @@ var _ = common.SIGDescribe("Services", func() {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				framework.Logf("unexpected error trying to connect to nodeport %s : %v", healthCheckNodePortAddr, err)
 				return false, nil
 			}
 

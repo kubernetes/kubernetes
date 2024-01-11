@@ -492,13 +492,6 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if t.KubeTestRepoList != "" {
 		image.Init(t.KubeTestRepoList)
 	}
-	var fs flag.FlagSet
-	klog.InitFlags(&fs)
-	fs.Set("logtostderr", "false")
-	fs.Set("alsologtostderr", "false")
-	fs.Set("one_output", "true")
-	fs.Set("stderrthreshold", "10" /* higher than any of the severities -> none pass the threshold */)
-	klog.SetOutput(ginkgo.GinkgoWriter)
 
 	if t.ListImages {
 		for _, v := range image.GetImageConfigs() {
