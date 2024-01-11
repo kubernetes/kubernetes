@@ -64,16 +64,10 @@ type PodLifecycleEvent struct {
 // PodLifecycleEventGenerator contains functions for generating pod life cycle events.
 type PodLifecycleEventGenerator interface {
 	Start()
-	Watch() chan *PodLifecycleEvent
-	Healthy() (bool, error)
-	UpdateCache(*kubecontainer.Pod, types.UID) (error, bool)
-}
-
-// podLifecycleEventGeneratorHandler contains functions that are useful for different PLEGs
-// and need not be exposed to rest of the kubelet
-type podLifecycleEventGeneratorHandler interface {
-	PodLifecycleEventGenerator
 	Stop()
 	Update(relistDuration *RelistDuration)
+	Watch() chan *PodLifecycleEvent
+	Healthy() (bool, error)
 	Relist()
+	UpdateCache(*kubecontainer.Pod, types.UID) (error, bool)
 }
