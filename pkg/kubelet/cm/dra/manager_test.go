@@ -117,7 +117,7 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool) (fakeDRAServerInfo, error)
 		driverName: driverName,
 	}
 	if shouldTimeout {
-		timeout := plugin.PluginClientTimeout + 30*time.Millisecond
+		timeout := plugin.PluginClientTimeout + time.Second
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
