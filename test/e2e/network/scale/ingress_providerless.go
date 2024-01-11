@@ -1,5 +1,8 @@
+//go:build providerless
+// +build providerless
+
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +17,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package mockvmssvmclient implements the mock client for VirtualMachineScaleSetVM.
-package mockvmssvmclient // import "k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient"
+package scale
