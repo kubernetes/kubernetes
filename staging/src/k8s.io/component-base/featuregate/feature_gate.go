@@ -126,9 +126,9 @@ type featureGate struct {
 	// lock guards writes to known, enabled, and reads/writes of closed
 	lock sync.Mutex
 	// known holds a map[Feature]FeatureSpec
-	known *atomic.Value
+	known atomic.Value
 	// enabled holds a map[Feature]bool
-	enabled *atomic.Value
+	enabled atomic.Value
 	// closed is set to true when AddFlag is called, and prevents subsequent calls to Add
 	closed bool
 }
@@ -166,19 +166,13 @@ func NewFeatureGate() *featureGate {
 		known[k] = v
 	}
 
-	knownValue := &atomic.Value{}
-	knownValue.Store(known)
-
-	enabled := map[Feature]bool{}
-	enabledValue := &atomic.Value{}
-	enabledValue.Store(enabled)
-
 	f := &featureGate{
 		featureGateName: naming.GetNameFromCallsite(internalPackages...),
-		known:           knownValue,
 		special:         specialFeatures,
-		enabled:         enabledValue,
 	}
+	f.known.Store(known)
+	f.enabled.Store(map[Feature]bool{})
+
 	return f
 }
 
@@ -367,19 +361,16 @@ func (f *featureGate) DeepCopy() MutableFeatureGate {
 		enabled[k] = v
 	}
 
-	// Store copied state in new atomics.
-	knownValue := &atomic.Value{}
-	knownValue.Store(known)
-	enabledValue := &atomic.Value{}
-	enabledValue.Store(enabled)
-
 	// Construct a new featureGate around the copied state.
 	// Note that specialFeatures is treated as immutable by convention,
 	// and we maintain the value of f.closed across the copy.
-	return &featureGate{
+	fg := &featureGate{
 		special: specialFeatures,
-		known:   knownValue,
-		enabled: enabledValue,
 		closed:  f.closed,
 	}
+
+	fg.known.Store(known)
+	fg.enabled.Store(enabled)
+
+	return fg
 }
