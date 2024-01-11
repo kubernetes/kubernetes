@@ -234,7 +234,7 @@ var (
 			`\[sig-api-machinery\] AdmissionWebhook should be able to deny pod and configmap creation`,
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1745720
-			`\[sig-storage\] CSI Volumes \[Driver: pd.csi.storage.gke.io\]\[Serial\]`,
+			`\[sig-storage\] CSI Volumes \[Driver: pd.csi.storage.gke.io\]`,
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1749882
 			`\[sig-storage\] CSI Volumes CSI Topology test using GCE PD driver \[Serial\]`,
