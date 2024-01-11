@@ -38,10 +38,8 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
-
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -813,9 +811,6 @@ func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtim
 		klog.ErrorS(err, "GetContainerEvents failed to get streaming client")
 		return err
 	}
-
-	// The connection is successfully established and we have a streaming client ready for use.
-	metrics.EventedPLEGConn.Inc()
 
 	for {
 		resp, err := containerEventsStreamingClient.Recv()
