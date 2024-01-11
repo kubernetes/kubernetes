@@ -264,9 +264,15 @@ type seatDemandStats struct {
 }
 
 func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
+	stats.highWatermark = obs.Max
+	if obs.Duration <= 0 {
+		return
+	}
+	if math.IsNaN(obs.Deviation) {
+		obs.Deviation = 0
+	}
 	stats.avg = obs.Average
 	stats.stdDev = obs.Deviation
-	stats.highWatermark = obs.Max
 	envelope := obs.Average + obs.Deviation
 	stats.smoothed = math.Max(envelope, seatDemandSmoothingCoefficient*stats.smoothed+(1-seatDemandSmoothingCoefficient)*envelope)
 }
