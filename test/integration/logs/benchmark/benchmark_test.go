@@ -82,6 +82,11 @@ func BenchmarkEncoding(b *testing.B) {
 					InfoStream:  &output,
 				}
 				klog.SetOutput(&output)
+				defer func() {
+					if err := logsapi.ResetForTest(nil); err != nil {
+						b.Errorf("error resetting logsapi: %v", err)
+					}
+				}()
 				if err := logsapi.ValidateAndApplyWithOptions(c, &o, nil); err != nil {
 					b.Fatalf("Unexpected error configuring logging: %v", err)
 				}
@@ -237,6 +242,11 @@ func benchmarkOutputFormatStream(b *testing.B, config loadGeneratorConfig, disca
 	}
 
 	klog.SetOutput(o.ErrorStream)
+	defer func() {
+		if err := logsapi.ResetForTest(nil); err != nil {
+			b.Errorf("error resetting logsapi: %v", err)
+		}
+	}()
 	if err := logsapi.ValidateAndApplyWithOptions(c, &o, featureGate); err != nil {
 		b.Fatalf("Unexpected error configuring logging: %v", err)
 	}
