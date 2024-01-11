@@ -74,14 +74,16 @@ func BenchmarkEncoding(b *testing.B) {
 				state := klog.CaptureState()
 				defer state.Restore()
 
-				var output bytesWritten
+				// To make the tests a bit more realistic, at
+				// least do system calls during each write.
+				output := newBytesWritten(b, "/dev/null")
 				c := logsapi.NewLoggingConfiguration()
 				c.Format = format
 				o := logsapi.LoggingOptions{
-					ErrorStream: &output,
-					InfoStream:  &output,
+					ErrorStream: output,
+					InfoStream:  output,
 				}
-				klog.SetOutput(&output)
+				klog.SetOutput(output)
 				defer func() {
 					if err := logsapi.ResetForTest(nil); err != nil {
 						b.Errorf("error resetting logsapi: %v", err)
@@ -108,7 +110,7 @@ func BenchmarkEncoding(b *testing.B) {
 				// Report messages/s instead of ns/op because "op" varies.
 				b.ReportMetric(0, "ns/op")
 				b.ReportMetric(float64(total)/duration.Seconds(), "msgs/s")
-				fileSizes[filepath.Base(b.Name())] = int(output)
+				fileSizes[filepath.Base(b.Name())] = int(output.bytesWritten)
 			}
 
 			b.Run("printf", func(b *testing.B) {
