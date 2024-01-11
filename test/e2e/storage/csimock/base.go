@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -265,14 +266,14 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	framework.ExpectNoError(err, "while cleaning up after test")
 }
 
-func (m *mockDriverSetup) update(o utils.PatchCSIOptions) {
-	item, err := m.cs.StorageV1().CSIDrivers().Get(context.TODO(), m.config.GetUniqueDriverName(), metav1.GetOptions{})
+func (m *mockDriverSetup) update(tCtx ktesting.TContext, o utils.PatchCSIOptions) {
+	item, err := m.cs.StorageV1().CSIDrivers().Get(tCtx, m.config.GetUniqueDriverName(), metav1.GetOptions{})
 	framework.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
 
-	err = utils.PatchCSIDeployment(nil, o, item)
+	utils.PatchCSIDeployment(tCtx, o, item)
 	framework.ExpectNoError(err, "Failed to apply %v to CSIDriver object %v", o, m.config.GetUniqueDriverName())
 
-	_, err = m.cs.StorageV1().CSIDrivers().Update(context.TODO(), item, metav1.UpdateOptions{})
+	_, err = m.cs.StorageV1().CSIDrivers().Update(tCtx, item, metav1.UpdateOptions{})
 	framework.ExpectNoError(err, "Failed to update CSIDriver %v", m.config.GetUniqueDriverName())
 }
 

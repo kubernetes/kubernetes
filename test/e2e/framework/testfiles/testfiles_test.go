@@ -18,6 +18,7 @@ package testfiles
 
 import (
 	"embed"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,16 +49,17 @@ func TestEmbeddedFileSource(t *testing.T) {
 	s := getTestEmbeddedSource()
 
 	// read a file which exists and compare the contents
-	b, err := s.ReadTestFile(fooPath)
-
+	f, err := s.OpenTestFile(fooPath)
+	require.NoError(t, err)
+	b, err := io.ReadAll(f)
 	require.NoError(t, err)
 	assert.Equal(t, fooContents, string(b))
 
-	// read a non-existent file and ensure that the returned value is empty and error is nil
+	// read a non-existent file and ensure that the returned value is nil and error is nil
 	// Note: this is done so that the next file source can be tried by the caller
-	b, err = s.ReadTestFile(notExistsPath)
+	f, err = s.OpenTestFile(notExistsPath)
 	require.NoError(t, err)
-	assert.Empty(t, b)
+	assert.Empty(t, f)
 
 	// describing the test filesystem should list down all files
 	assert.Equal(t, expectedDescription, s.DescribeFiles())

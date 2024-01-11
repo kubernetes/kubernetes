@@ -24,14 +24,11 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/kobject"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -105,49 +102,13 @@ func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
 		tCtx.Fatalf("%s: parsing failed: %v", c.TemplatePath, err)
 	}
 
-	// Not caching the discovery result isn't very efficient, but good enough when
-	// createAny isn't done often.
-	discoveryCache := memory.NewMemCacheClient(tCtx.Client().Discovery())
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryCache)
-	gv, err := schema.ParseGroupVersion(obj.GetAPIVersion())
-	if err != nil {
-		tCtx.Fatalf("%s: extract group+version from object %q: %v", c.TemplatePath, klog.KObj(obj), err)
-	}
-	gk := schema.GroupKind{Group: gv.Group, Kind: obj.GetKind()}
+	tCtx = ktesting.WithNamespace(tCtx, c.Namespace)
 
-	create := func() error {
-		mapping, err := restMapper.RESTMapping(gk, gv.Version)
-		if err != nil {
-			// Cached mapping might be stale, refresh on next try.
-			restMapper.Reset()
-			return fmt.Errorf("map %q to resource: %v", gk, err)
-		}
-		resourceClient := tCtx.Dynamic().Resource(mapping.Resource)
-		options := metav1.CreateOptions{
-			// If the YAML input is invalid, then we want the
-			// apiserver to tell us via an error. This can
-			// happen because decoding into an unstructured object
-			// doesn't validate.
-			FieldValidation: "Strict",
-		}
-		if c.Namespace != "" {
-			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
-				return fmt.Errorf("namespace %q set for %q, but %q has scope %q", c.Namespace, c.TemplatePath, gk, mapping.Scope.Name())
-			}
-			_, err = resourceClient.Namespace(c.Namespace).Create(tCtx, obj, options)
-		} else {
-			if mapping.Scope.Name() != meta.RESTScopeNameRoot {
-				return fmt.Errorf("namespace not set for %q, but %q has scope %q", c.TemplatePath, gk, mapping.Scope.Name())
-			}
-			_, err = resourceClient.Create(tCtx, obj, options)
-		}
-		return err
-	}
 	// Retry, some errors (like CRD just created and type not ready for use yet) are temporary.
 	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 	defer cancel()
 	for {
-		err := create()
+		_, err := kobject.Create(tCtx, obj, metav1.CreateOptions{})
 		if err == nil {
 			return
 		}

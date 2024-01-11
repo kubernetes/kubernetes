@@ -58,6 +58,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -74,6 +75,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"google.golang.org/grpc"
 )
@@ -283,11 +285,12 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		DriverContainerArguments: []string{"--feature-gates=VolumeAttributesClass=true"},
 	})
 
-	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
+	tCtx := config.Framework.TContext(ctx)
+	tCtx = ktesting.WithStep(tCtx, fmt.Sprintf("deploy CSIDriver %s", h.driverInfo.Name))
+	tCtx = ktesting.WithNamespace(tCtx, driverns)
+	utils.CreateFromManifests(tCtx, func(tCtx ktesting.TContext, obj runtime.Object) {
 		for _, o := range patches {
-			if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
-				return err
-			}
+			utils.PatchCSIDeployment(tCtx, o, obj)
 		}
 
 		// Remove csi-external-health-monitor-agent and
@@ -297,10 +300,9 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		// tests and is causing too much overhead when
 		// running in a large cluster (see
 		// https://github.com/kubernetes/kubernetes/issues/102452#issuecomment-856991009).
-		switch item := item.(type) {
-		case *appsv1.StatefulSet:
+		if obj, ok := obj.(*appsv1.StatefulSet); ok {
 			var containers []v1.Container
-			for _, container := range item.Spec.Template.Spec.Containers {
+			for _, container := range obj.Spec.Template.Spec.Containers {
 				switch container.Name {
 				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
 					// Remove these containers.
@@ -309,14 +311,9 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 					containers = append(containers, container)
 				}
 			}
-			item.Spec.Template.Spec.Containers = containers
+			obj.Spec.Template.Spec.Containers = containers
 		}
-		return nil
 	}, h.manifests...)
-
-	if err != nil {
-		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
-	}
 
 	cleanupFunc := generateDriverCleanupFunc(
 		f,
@@ -726,18 +723,18 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 		o.Features["csi-provisioner"] = append(o.Features["csi-provisioner"], fmt.Sprintf("%s=true", features.HonorPVReclaimPolicy))
 	}
 
-	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {
-		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
-			return err
-		}
+	tCtx := f.TContext(ctx)
+	tCtx = ktesting.WithStep(tCtx, "deploy CSI mock driver")
+	tCtx = ktesting.WithNamespace(tCtx, driverns)
+	utils.CreateFromManifests(tCtx, func(tCtx ktesting.TContext, obj runtime.Object) {
+		utils.PatchCSIDeployment(tCtx, o, obj)
 
-		switch item := item.(type) {
-		case *rbacv1.ClusterRole:
-			if strings.HasPrefix(item.Name, "external-snapshotter-runner") {
+		if obj, ok := obj.(*rbacv1.ClusterRole); ok {
+			if strings.HasPrefix(obj.Name, "external-snapshotter-runner") {
 				// Re-enable access to secrets for the snapshotter sidecar for
 				// https://github.com/kubernetes/kubernetes/blob/6ede5ca95f78478fa627ecfea8136e0dff34436b/test/e2e/storage/csi_mock_volume.go#L1539-L1548
 				// It was disabled in https://github.com/kubernetes-csi/external-snapshotter/blob/501cc505846c03ee665355132f2da0ce7d5d747d/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml#L26-L32
-				item.Rules = append(item.Rules, rbacv1.PolicyRule{
+				obj.Rules = append(obj.Rules, rbacv1.PolicyRule{
 					APIGroups: []string{""},
 					Resources: []string{"secrets"},
 					Verbs:     []string{"get", "list"},
@@ -745,12 +742,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			}
 		}
 
-		return nil
 	}, m.manifests...)
-
-	if err != nil {
-		framework.Failf("deploying csi mock driver: %v", err)
-	}
 
 	driverCleanupFunc := generateDriverCleanupFunc(
 		f,
@@ -981,10 +973,10 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
-	err = utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)
-	if err != nil {
-		framework.Failf("deploying csi gce-pd driver: %v", err)
-	}
+	tCtx := f.TContext(ctx)
+	tCtx = ktesting.WithStep(tCtx, "deploy gce-pd driver")
+	tCtx = ktesting.WithNamespace(tCtx, driverns)
+	utils.CreateFromManifests(tCtx, nil, manifests...)
 
 	if err = WaitForCSIDriverRegistrationOnAllNodes(ctx, GCEPDCSIDriverName, f.ClientSet); err != nil {
 		framework.Failf("waiting for csi driver node registration on: %v", err)

@@ -111,7 +111,7 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 				ginkgo.DeferCleanup(m.cleanup)
 
 				waitUntilPodInfoInLog(ctx, m, test.oldPodInfoOnMount, false)
-				m.update(utils.PatchCSIOptions{PodInfo: &test.newPodInfoOnMount})
+				m.update(f.TContext(ctx), utils.PatchCSIOptions{PodInfo: &test.newPodInfoOnMount})
 				waitUntilPodInfoInLog(ctx, m, test.newPodInfoOnMount, false)
 			})
 		}

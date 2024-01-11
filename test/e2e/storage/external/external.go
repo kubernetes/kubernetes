@@ -41,6 +41,7 @@ import (
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/onsi/gomega"
 )
@@ -312,13 +313,14 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(ctx context.Context, 
 		framework.ExpectNoError(err, "getting storage class %s", d.StorageClass.FromExistingClassName)
 	case d.StorageClass.FromFile != "":
 		var ok bool
-		items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
-		framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
-		gomega.Expect(items).To(gomega.HaveLen(1), "exactly one item from %s", d.StorageClass.FromFile)
-		err = utils.PatchItems(f, f.Namespace, items...)
+		tCtx := f.TContext(ctx)
+		tCtx = ktesting.WithStep(tCtx, fmt.Sprintf("StorageClass in %s", d.StorageClass.FromFile))
+		objs := utils.LoadFromManifests(tCtx, d.StorageClass.FromFile)
+		gomega.Expect(objs).To(gomega.HaveLen(1), "exactly one item from %s", d.StorageClass.FromFile)
+		utils.PatchItems(tCtx, objs...)
 		framework.ExpectNoError(err, "patch items")
 
-		sc, ok = items[0].(*storagev1.StorageClass)
+		sc, ok = objs[0].(*storagev1.StorageClass)
 		if !ok {
 			framework.Failf("storage class from %s", d.StorageClass.FromFile)
 		}
@@ -450,11 +452,11 @@ func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econf
 		framework.ExpectNoError(err, "getting VolumeAttributesClass %s", d.VolumeAttributesClass.FromExistingClassName)
 	case d.VolumeAttributesClass.FromFile != "":
 		var ok bool
-		items, err := utils.LoadFromManifests(d.VolumeAttributesClass.FromFile)
-		framework.ExpectNoError(err, "load VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
+		tCtx := f.TContext(ctx)
+		tCtx = ktesting.WithStep(tCtx, fmt.Sprintf("VolumeAttributesClass in %s", d.VolumeAttributesClass.FromFile))
+		items := utils.LoadFromManifests(tCtx, d.VolumeAttributesClass.FromFile)
 		gomega.Expect(items).To(gomega.HaveLen(1), "exactly one item from %s", d.VolumeAttributesClass.FromFile)
-		err = utils.PatchItems(f, f.Namespace, items...)
-		framework.ExpectNoError(err, "patch VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
+		utils.PatchItems(tCtx, items...)
 
 		vac, ok = items[0].(*storagev1beta1.VolumeAttributesClass)
 		if !ok {

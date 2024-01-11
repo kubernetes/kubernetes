@@ -24,8 +24,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	e2eframework "k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // PatchCSIDeployment modifies the CSI driver deployment:
@@ -49,7 +51,7 @@ import (
 //
 // Driver deployments that are different will have to do the patching
 // without this function, or skip patching entirely.
-func PatchCSIDeployment(f *e2eframework.Framework, o PatchCSIOptions, object interface{}) error {
+func PatchCSIDeployment(tCtx ktesting.TContext, o PatchCSIOptions, object runtime.Object) {
 	rename := o.OldDriverName != "" && o.NewDriverName != "" &&
 		o.OldDriverName != o.NewDriverName
 
@@ -162,8 +164,6 @@ func PatchCSIDeployment(f *e2eframework.Framework, o PatchCSIOptions, object int
 			object.Spec.SELinuxMount = o.SELinuxMount
 		}
 	}
-
-	return nil
 }
 
 // PatchCSIOptions controls how PatchCSIDeployment patches the objects.

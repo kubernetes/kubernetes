@@ -28,11 +28,14 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"k8s.io/kubernetes/test/utils/ktesting/kobject"
 )
 
 var filesources []FileSource
@@ -55,7 +58,7 @@ type FileSource interface {
 	//
 	// When the file is not found, a nil slice is returned. An error is
 	// returned for all fatal errors.
-	ReadTestFile(filePath string) ([]byte, error)
+	OpenTestFile(filePath string) (kobject.NamedReadCloser, error)
 
 	// DescribeFiles returns a multi-line description of which
 	// files are available via this source. It is meant to be
@@ -67,16 +70,29 @@ type FileSource interface {
 // Read tries to retrieve the desired file content from
 // one of the registered file sources.
 func Read(filePath string) ([]byte, error) {
+	file, err := Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+	return io.ReadAll(file)
+}
+
+// Open tries to open the file from
+// one of the registered file sources.
+func Open(filePath string) (kobject.NamedReadCloser, error) {
 	if len(filesources) == 0 {
 		return nil, fmt.Errorf("no file sources registered (yet?), cannot retrieve test file %s", filePath)
 	}
 	for _, filesource := range filesources {
-		data, err := filesource.ReadTestFile(filePath)
+		file, err := filesource.OpenTestFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("fatal error retrieving test file %s: %w", filePath, err)
 		}
-		if data != nil {
-			return data, nil
+		if file != nil {
+			return file, nil
 		}
 	}
 	// Here we try to generate an error that points test authors
@@ -89,16 +105,15 @@ func Read(filePath string) ([]byte, error) {
 	return nil, errors.New(err)
 }
 
-// Exists checks whether a file could be read. Unexpected errors
-// are handled by calling the fail function, which then should
-// abort the current test.
+// Exists checks whether a file could be read.
 func Exists(filePath string) (bool, error) {
 	for _, filesource := range filesources {
-		data, err := filesource.ReadTestFile(filePath)
+		file, err := filesource.OpenTestFile(filePath)
 		if err != nil {
 			return false, err
 		}
-		if data != nil {
+		if file != nil {
+			_ = file.Close()
 			return true, nil
 		}
 	}
@@ -110,23 +125,23 @@ type RootFileSource struct {
 	Root string
 }
 
-// ReadTestFile looks for the file relative to the configured
+// OpenTestFile looks for the file relative to the configured
 // root directory. If the path is already absolute, for example
 // in a test that has its own method of determining where
 // files are, then the path will be used directly.
-func (r RootFileSource) ReadTestFile(filePath string) ([]byte, error) {
+func (r RootFileSource) OpenTestFile(filePath string) (kobject.NamedReadCloser, error) {
 	var fullPath string
 	if path.IsAbs(filePath) {
 		fullPath = filePath
 	} else {
 		fullPath = filepath.Join(r.Root, filePath)
 	}
-	data, err := os.ReadFile(fullPath)
+	file, err := os.Open(fullPath)
 	if os.IsNotExist(err) {
 		// Not an error (yet), some other provider may have the file.
 		return nil, nil
 	}
-	return data, err
+	return file, err
 }
 
 // DescribeFiles explains that it looks for files inside a certain
@@ -155,10 +170,10 @@ type EmbeddedFileSource struct {
 }
 
 // ReadTestFile looks for an embedded file with the given path.
-func (e EmbeddedFileSource) ReadTestFile(filepath string) ([]byte, error) {
+func (e EmbeddedFileSource) OpenTestFile(filepath string) (kobject.NamedReadCloser, error) {
 	relativePath := strings.TrimPrefix(filepath, fmt.Sprintf("%s/", e.Root))
 
-	b, err := e.EmbeddedFS.ReadFile(relativePath)
+	file, err := e.EmbeddedFS.Open(relativePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
@@ -166,7 +181,16 @@ func (e EmbeddedFileSource) ReadTestFile(filepath string) ([]byte, error) {
 		return nil, err
 	}
 
-	return b, nil
+	return namedFile{ReadCloser: file, name: relativePath}, nil
+}
+
+type namedFile struct {
+	io.ReadCloser
+	name string
+}
+
+func (n namedFile) Name() string {
+	return n.name
 }
 
 // DescribeFiles explains that it is looking inside an embedded filesystem

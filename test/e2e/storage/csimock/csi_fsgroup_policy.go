@@ -133,7 +133,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				ginkgo.DeferCleanup(m.cleanup)
 
 				waitUtilFSGroupInPod(ctx, m, test.oldFSGroupPolicy != storagev1.NoneFSGroupPolicy)
-				m.update(utils.PatchCSIOptions{FSGroupPolicy: &test.newFSGroupPolicy})
+				m.update(f.TContext(ctx), utils.PatchCSIOptions{FSGroupPolicy: &test.newFSGroupPolicy})
 				waitUtilFSGroupInPod(ctx, m, test.newFSGroupPolicy != storagev1.NoneFSGroupPolicy)
 
 				// The created resources will be removed by the cleanup() function,

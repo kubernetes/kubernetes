@@ -14,36 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package kobject
 
-// NamespacedName comprises a resource name, with a mandatory namespace,
-// rendered as "<namespace>/<name>". It implements NamedObject and thus can be
+// Object is a subset of metav1.Object which provides read-only access
+// to name and namespace of an object. The namespace is optional.
+type Object interface {
+	GetNamespace() string
+	GetName() string
+}
+
+// NamespacedName combines a resource name with an optional namespace,
+// rendered as "[<namespace>/]<name>". It Object and thus can be
 // used as function parameter instead of a full API object.
 type NamespacedName struct {
 	Namespace string
 	Name      string
 }
 
-var _ NamedObject = NamespacedName{}
+var _ Object = NamespacedName{}
 
-// NamedObject is a subset of metav1.Object which provides read-only access
-// to name and namespace of an object.
-type NamedObject interface {
-	GetNamespace() string
-	GetName() string
-}
-
-// GetNamespace implements NamedObject.
+// GetNamespace implements [Object.GetNamespace].
 func (n NamespacedName) GetNamespace() string {
 	return n.Namespace
 }
 
-// GetName implements NamedObject.
+// GetName implements [Object.GetName].
 func (n NamespacedName) GetName() string {
 	return n.Name
 }
 
 // String returns the general purpose string representation
 func (n NamespacedName) String() string {
-	return n.Namespace + "/" + n.Name
+	if n.Namespace != "" {
+		return n.Namespace + "/" + n.Name
+	}
+	return n.Name
 }
