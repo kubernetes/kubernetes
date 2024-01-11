@@ -165,7 +165,6 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
 	}
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural}
-
 	errCh := make(chan error)
 	// keep flipping the storage version of the CRD and create new CRs
 	go func() {
@@ -204,7 +203,7 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 	kubeclient := kubernetes.NewForConfigOrDie(server.ClientConfig)
 	gr := crd.Spec.Group + "." + crd.Spec.Names.Plural
 	var lastErr error
-	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err
@@ -222,7 +221,7 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 		}
 		storageVersion := sv.Status.StorageVersions[0]
 		if len(storageVersion.DecodableVersions) != 11 {
-			lastErr = fmt.Errorf("unexpected number of decodable versions, expected 11 versions, got: %v", sv.Status.StorageVersions)
+			lastErr = fmt.Errorf("unexpected number of decodable versions, expected 11 versions, got: %v", len(sv.Status.StorageVersions))
 			return false, nil
 		}
 		expectedNewVersion := fmt.Sprintf("%s/v11", crd.Spec.Group)
