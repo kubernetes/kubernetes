@@ -1,8 +1,8 @@
-//go:build !linux && !windows
-// +build !linux,!windows
+//go:build !windows
+// +build !windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package eviction
+package winstats
 
-// DefaultEvictionHard includes default options for hard eviction.
-var DefaultEvictionHard = map[string]string{
-	"memory.available":  "100Mi",
-	"nodefs.available":  "10%",
-	"imagefs.available": "15%",
+import "errors"
+
+func GetAvailableAndTotalPhysicalMemory() (uint64, uint64, error) {
+	return 0, 0, errors.New("GetAvailableAndTotalPhysicalMemory is not implemented on non-Windows platforms")
 }
