@@ -17,18 +17,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package slogr
+package logr
 
 import (
 	"context"
 	"log/slog"
-
-	"github.com/go-logr/logr"
 )
 
 type slogHandler struct {
 	// May be nil, in which case all logs get discarded.
-	sink logr.LogSink
+	sink LogSink
 	// Non-nil if sink is non-nil and implements SlogSink.
 	slogSink SlogSink
 
@@ -54,7 +52,7 @@ func (l *slogHandler) GetLevel() slog.Level {
 	return l.levelBias
 }
 
-func (l *slogHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (l *slogHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return l.sink != nil && (level >= slog.LevelError || l.sink.Enabled(l.levelFromSlog(level)))
 }
 
@@ -72,9 +70,7 @@ func (l *slogHandler) Handle(ctx context.Context, record slog.Record) error {
 
 	kvList := make([]any, 0, 2*record.NumAttrs())
 	record.Attrs(func(attr slog.Attr) bool {
-		if attr.Key != "" {
-			kvList = append(kvList, l.addGroupPrefix(attr.Key), attr.Value.Resolve().Any())
-		}
+		kvList = attrToKVs(attr, l.groupPrefix, kvList)
 		return true
 	})
 	if record.Level >= slog.LevelError {
@@ -90,15 +86,15 @@ func (l *slogHandler) Handle(ctx context.Context, record slog.Record) error {
 // are called by Handle, code in slog gets skipped.
 //
 // This offset currently (Go 1.21.0) works for calls through
-// slog.New(NewSlogHandler(...)).  There's no guarantee that the call
+// slog.New(ToSlogHandler(...)).  There's no guarantee that the call
 // chain won't change. Wrapping the handler will also break unwinding. It's
 // still better than not adjusting at all....
 //
-// This cannot be done when constructing the handler because NewLogr needs
+// This cannot be done when constructing the handler because FromSlogHandler needs
 // access to the original sink without this adjustment. A second copy would
 // work, but then WithAttrs would have to be called for both of them.
-func (l *slogHandler) sinkWithCallDepth() logr.LogSink {
-	if sink, ok := l.sink.(logr.CallDepthLogSink); ok {
+func (l *slogHandler) sinkWithCallDepth() LogSink {
+	if sink, ok := l.sink.(CallDepthLogSink); ok {
 		return sink.WithCallDepth(2)
 	}
 	return l.sink
@@ -109,60 +105,88 @@ func (l *slogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		return l
 	}
 
-	copy := *l
+	clone := *l
 	if l.slogSink != nil {
-		copy.slogSink = l.slogSink.WithAttrs(attrs)
-		copy.sink = copy.slogSink
+		clone.slogSink = l.slogSink.WithAttrs(attrs)
+		clone.sink = clone.slogSink
 	} else {
 		kvList := make([]any, 0, 2*len(attrs))
 		for _, attr := range attrs {
-			if attr.Key != "" {
-				kvList = append(kvList, l.addGroupPrefix(attr.Key), attr.Value.Resolve().Any())
-			}
+			kvList = attrToKVs(attr, l.groupPrefix, kvList)
 		}
-		copy.sink = l.sink.WithValues(kvList...)
+		clone.sink = l.sink.WithValues(kvList...)
 	}
-	return &copy
+	return &clone
 }
 
 func (l *slogHandler) WithGroup(name string) slog.Handler {
 	if l.sink == nil {
 		return l
 	}
-	copy := *l
-	if l.slogSink != nil {
-		copy.slogSink = l.slogSink.WithGroup(name)
-		copy.sink = l.slogSink
-	} else {
-		copy.groupPrefix = copy.addGroupPrefix(name)
+	if name == "" {
+		// slog says to inline empty groups
+		return l
 	}
-	return &copy
+	clone := *l
+	if l.slogSink != nil {
+		clone.slogSink = l.slogSink.WithGroup(name)
+		clone.sink = clone.slogSink
+	} else {
+		clone.groupPrefix = addPrefix(clone.groupPrefix, name)
+	}
+	return &clone
 }
 
-func (l *slogHandler) addGroupPrefix(name string) string {
-	if l.groupPrefix == "" {
+// attrToKVs appends a slog.Attr to a logr-style kvList.  It handle slog Groups
+// and other details of slog.
+func attrToKVs(attr slog.Attr, groupPrefix string, kvList []any) []any {
+	attrVal := attr.Value.Resolve()
+	if attrVal.Kind() == slog.KindGroup {
+		groupVal := attrVal.Group()
+		grpKVs := make([]any, 0, 2*len(groupVal))
+		prefix := groupPrefix
+		if attr.Key != "" {
+			prefix = addPrefix(groupPrefix, attr.Key)
+		}
+		for _, attr := range groupVal {
+			grpKVs = attrToKVs(attr, prefix, grpKVs)
+		}
+		kvList = append(kvList, grpKVs...)
+	} else if attr.Key != "" {
+		kvList = append(kvList, addPrefix(groupPrefix, attr.Key), attrVal.Any())
+	}
+
+	return kvList
+}
+
+func addPrefix(prefix, name string) string {
+	if prefix == "" {
 		return name
 	}
-	return l.groupPrefix + groupSeparator + name
+	if name == "" {
+		return prefix
+	}
+	return prefix + groupSeparator + name
 }
 
 // levelFromSlog adjusts the level by the logger's verbosity and negates it.
 // It ensures that the result is >= 0. This is necessary because the result is
-// passed to a logr.LogSink and that API did not historically document whether
+// passed to a LogSink and that API did not historically document whether
 // levels could be negative or what that meant.
 //
 // Some example usage:
-//     logrV0 := getMyLogger()
-//     logrV2 := logrV0.V(2)
-//     slogV2 := slog.New(slogr.NewSlogHandler(logrV2))
-//     slogV2.Debug("msg") // =~ logrV2.V(4) =~ logrV0.V(6)
-//     slogV2.Info("msg")  // =~  logrV2.V(0) =~ logrV0.V(2)
-//     slogv2.Warn("msg")  // =~ logrV2.V(-4) =~ logrV0.V(0)
+//
+//	logrV0 := getMyLogger()
+//	logrV2 := logrV0.V(2)
+//	slogV2 := slog.New(logr.ToSlogHandler(logrV2))
+//	slogV2.Debug("msg") // =~ logrV2.V(4) =~ logrV0.V(6)
+//	slogV2.Info("msg")  // =~  logrV2.V(0) =~ logrV0.V(2)
+//	slogv2.Warn("msg")  // =~ logrV2.V(-4) =~ logrV0.V(0)
 func (l *slogHandler) levelFromSlog(level slog.Level) int {
 	result := -level
-	result += l.levelBias // in case the original logr.Logger had a V level
+	result += l.levelBias // in case the original Logger had a V level
 	if result < 0 {
-		result = 0 // because logr.LogSink doesn't expect negative V levels
+		result = 0 // because LogSink doesn't expect negative V levels
 	}
 	return int(result)
 }

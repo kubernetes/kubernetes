@@ -15,8 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package textlogger contains an implementation of the logr interface
-// which is producing the exact same output as klog.
+// Package textlogger contains an implementation of the logr interface which is
+// producing the exact same output as klog. It does not route output through
+// klog (i.e. ignores [k8s.io/klog/v2.InitFlags]). Instead, all settings must be
+// configured through its own [NewConfig] and [Config.AddFlags].
 package textlogger
 
 import (
