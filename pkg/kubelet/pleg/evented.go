@@ -215,7 +215,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			if klog.V(6).Enabled() {
 				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
 			} else {
-				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID)
+				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
 			}
 		} else {
 			if klogV := klog.V(6); klogV.Enabled() {
