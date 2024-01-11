@@ -1324,7 +1324,7 @@ if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup INT
 fi
 
-KUBECTL=${KUBECTL:-"${GO_OUT}/kubectl"}
+KUBECTL=$(kube::util::find-binary "kubectl")
 
 echo "Starting services now!"
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
@@ -1391,8 +1391,8 @@ if [[ "${ENABLE_DAEMON}" = false ]]; then
 fi
 
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
-  cluster/kubectl.sh config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
-  cluster/kubectl.sh config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
-  cluster/kubectl.sh config set-context local --cluster=local --user=myself
-  cluster/kubectl.sh config use-context local
+  ${KUBECTL} config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
+  ${KUBECTL} config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
+  ${KUBECTL} config set-context local --cluster=local --user=myself
+  ${KUBECTL} config use-context local
 fi
