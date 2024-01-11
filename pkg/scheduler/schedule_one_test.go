@@ -2266,9 +2266,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin FakePreFilter2").WithPlugin("FakePreFilter2"),
-						"node2": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin FakePreFilter3").WithPlugin("FakePreFilter3"),
-						"node3": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously").WithPlugin("FakePreFilter2", "FakePreFilter3"),
+						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin FakePreFilter2").WithPlugin("FakePreFilter2"),
+						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin FakePreFilter3").WithPlugin("FakePreFilter3"),
+						"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously").WithPlugin("FakePreFilter2", "FakePreFilter3"),
 					},
 					UnschedulablePlugins: sets.New("FakePreFilter2", "FakePreFilter3"),
 					PreFilterMsg:         "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously",
@@ -2296,7 +2296,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin FakePreFilter2").WithPlugin("FakePreFilter2"),
+						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin FakePreFilter2").WithPlugin("FakePreFilter2"),
 					},
 					UnschedulablePlugins: sets.New("FakePreFilter2"),
 					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter2",
@@ -2327,8 +2327,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result"),
 						"node2": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-prefilter").WithPlugin("FakeFilter"),
 					},
-					UnschedulablePlugins: sets.New("FakeFilter"),
-					PreFilterMsg:         "",
+					UnschedulablePlugins: sets.New("FakeFilter", "FakePreFilter"),
+					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter",
 				},
 			},
 		},

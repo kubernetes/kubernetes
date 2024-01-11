@@ -595,7 +595,7 @@ type Framework interface {
 	// cycle is aborted.
 	// It also returns a PreFilterResult, which may influence what or how many nodes to
 	// evaluate downstream.
-	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (*PreFilterResult, *Status)
+	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, diagnosis *Diagnosis, allNodes []*NodeInfo) (*PreFilterResult, *Status)
 
 	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
 	// PostFilter plugins can either be informational, in which case should be configured

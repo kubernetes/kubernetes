@@ -381,12 +381,10 @@ func TestPostFilter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 
 			state := framework.NewCycleState()
 			// Ensure <state> is populated.
-			if _, status := f.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+			if _, status := f.RunPreFilterPlugins(ctx, state, tt.pod, &diagnosis, allNodes); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
@@ -1142,8 +1140,6 @@ func TestDryRunPreemption(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 
 			// Using 4 as a seed source to test getOffsetAndNumCandidates() deterministically.
 			// However, we need to do it after informerFactory.WaitforCacheSync() which might
@@ -1153,7 +1149,7 @@ func TestDryRunPreemption(t *testing.T) {
 			for cycle, pod := range tt.testPods {
 				state := framework.NewCycleState()
 				// Some tests rely on PreFilter plugin to compute its CycleState.
-				if _, status := fwk.RunPreFilterPlugins(ctx, state, pod); !status.IsSuccess() {
+				if _, status := fwk.RunPreFilterPlugins(ctx, state, pod, &diagnosis, allNodes); !status.IsSuccess() {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
 				pe := preemption.Evaluator{
@@ -1387,11 +1383,9 @@ func TestSelectBestCandidate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, status := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+			if _, status := fwk.RunPreFilterPlugins(ctx, state, tt.pod, &diagnosis, allNodes); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 			nodeInfos, err := snapshot.NodeInfos().List()
@@ -1781,11 +1775,9 @@ func TestPreempt(t *testing.T) {
 			diagnosis := framework.Diagnosis{
 				NodeToStatusMap: make(framework.NodeToStatusMap),
 			}
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, s := fwk.RunPreFilterPlugins(ctx, state, test.pod); !s.IsSuccess() {
+			if _, s := fwk.RunPreFilterPlugins(ctx, state, test.pod, &diagnosis, allNodes); !s.IsSuccess() {
 				t.Errorf("Unexpected preFilterStatus: %v", s)
 			}
 			// Call preempt and check the expected results.

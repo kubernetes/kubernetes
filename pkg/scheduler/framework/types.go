@@ -326,13 +326,21 @@ func (d *Diagnosis) AddPluginStatus(sts *Status) {
 		if d.UnschedulablePlugins == nil {
 			d.UnschedulablePlugins = sets.New[string]()
 		}
-		d.UnschedulablePlugins.Insert(sts.Plugin()...)
+		for _, plugin := range sts.plugins {
+			if !d.UnschedulablePlugins.Has(plugin) {
+				d.UnschedulablePlugins.Insert(plugin)
+			}
+		}
 	}
 	if sts.Code() == Pending {
 		if d.PendingPlugins == nil {
 			d.PendingPlugins = sets.New[string]()
 		}
-		d.PendingPlugins.Insert(sts.Plugin()...)
+		for _, plugin := range sts.plugins {
+			if !d.PendingPlugins.Has(plugin) {
+				d.PendingPlugins.Insert(plugin)
+			}
+		}
 	}
 }
 

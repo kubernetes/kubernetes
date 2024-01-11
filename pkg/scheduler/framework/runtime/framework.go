@@ -676,17 +676,9 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 // When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 // and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 // If a non-success status is returned, then the scheduling cycle is aborted.
-func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
+func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, diagnosis *framework.Diagnosis, allNodes []*framework.NodeInfo) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
-	diagnosis, ok := ctx.Value(framework.PrefilterContextKey("diagnosis")).(*framework.Diagnosis)
-	if !ok {
-		return nil, framework.AsStatus(errors.New("can not get diagnosis from context"))
-	}
-	nodes, ok := ctx.Value(framework.PrefilterContextKey("nodes")).([]*framework.NodeInfo)
-	if !ok {
-		return nil, framework.AsStatus(errors.New("can not get nodes from context"))
-	}
 	message := func(plugins []string) string {
 		if len(plugins) == 0 {
 			return ""
@@ -697,34 +689,31 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		}
 		return msg
 	}
+	preFilterNodeToStatusMap := framework.NodeToStatusMap{}
+	plugins := sets.Set[string]{}
 	defer func() {
 		state.SkipFilterPlugins = skipPlugins
-		pluginsWithNodes := make(map[string]bool)
-		preFilterMsg := ""
-		for _, pluginStatus := range diagnosis.NodeToStatusMap {
-			diagnosis.AddPluginStatus(pluginStatus)
+		var preFilterMsg string
+		for node, pluginStatus := range preFilterNodeToStatusMap {
 			if len(pluginStatus.Reasons()) == 0 {
 				pluginStatus.AppendReason(message(pluginStatus.Plugin()))
 			} else {
 				preFilterMsg = pluginStatus.Message()
 			}
-			for _, pluginName := range pluginStatus.Plugin() {
-				pluginsWithNodes[pluginName] = true
-			}
+			plugins.Insert(pluginStatus.Plugin()...)
+			diagnosis.AddPluginStatus(pluginStatus)
+			diagnosis.NodeToStatusMap[node] = pluginStatus
+
 		}
 		if len(preFilterMsg) == 0 {
-			plugins := []string{}
-			for plugin := range pluginsWithNodes {
-				plugins = append(plugins, plugin)
-			}
-			preFilterMsg = message(plugins)
+			preFilterMsg = message(plugins.UnsortedList())
 		}
 		diagnosis.PreFilterMsg = preFilterMsg
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	allNodes := sets.Set[string]{}
-	for _, node := range nodes {
-		allNodes.Insert(node.Node().Name)
+	nodes := sets.Set[string]{}
+	for _, node := range allNodes {
+		nodes.Insert(node.Node().Name)
 	}
 	var result *framework.PreFilterResult
 	logger := klog.FromContext(ctx)
@@ -746,10 +735,10 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		}
 		if !s.IsSuccess() {
 			s.SetPlugin(pl.Name())
+			f.registerPreFilterPlugins(nodes, sets.Set[string]{}, preFilterNodeToStatusMap, pl, s)
 			if s.Code() == framework.UnschedulableAndUnresolvable {
 				// In this case, the preemption shouldn't happen in this scheduling cycle.
 				// So, no need to execute all PreFilter.
-				f.registerPreFilterPlugins(allNodes, sets.Set[string]{}, diagnosis, pl, s)
 				return nil, s
 			}
 			if s.Code() == framework.Unschedulable {
@@ -762,11 +751,12 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name())
 		}
 		if !r.AllNodes() {
-			f.registerPreFilterPlugins(allNodes, r.NodeNames, diagnosis, pl, nil)
+			f.registerPreFilterPlugins(nodes, r.NodeNames, preFilterNodeToStatusMap, pl, nil)
 		}
 		result = result.Merge(r)
 		if !result.AllNodes() && len(result.NodeNames) == 0 {
-			return nil, framework.NewStatus(framework.Unschedulable)
+			// When PreFilterResult filters out Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
+			return result, framework.NewStatus(framework.UnschedulableAndUnresolvable, message(plugins.UnsortedList()))
 		}
 	}
 	return result, returnStatus
@@ -1673,17 +1663,17 @@ func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 }
 
 func (f *frameworkImpl) registerPreFilterPlugins(nodes sets.Set[string], legalNodes sets.Set[string],
-	diagnosis *framework.Diagnosis, pl framework.PreFilterPlugin, pluginStatus *framework.Status) {
+	nodeToStatusMap framework.NodeToStatusMap, pl framework.PreFilterPlugin, pluginStatus *framework.Status) {
 	filteredNodes := nodes.SymmetricDifference(legalNodes)
 	for _, filteredNode := range filteredNodes.UnsortedList() {
-		if status, ok := diagnosis.NodeToStatusMap[filteredNode]; ok {
+		if status, ok := nodeToStatusMap[filteredNode]; ok {
 			status.AppendPlugin(pl.Name())
 		} else {
 			newStatus := pluginStatus
 			if newStatus == nil {
-				newStatus = framework.NewStatus(framework.Unschedulable).WithPlugin(pl.Name())
+				newStatus = framework.NewStatus(framework.UnschedulableAndUnresolvable).WithPlugin(pl.Name())
 			}
-			diagnosis.NodeToStatusMap[filteredNode] = newStatus
+			nodeToStatusMap[filteredNode] = newStatus
 		}
 	}
 }

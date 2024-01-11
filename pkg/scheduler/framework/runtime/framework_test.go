@@ -1535,9 +1535,7 @@ func TestPreFilterPlugins(t *testing.T) {
 			NodeToStatusMap: make(framework.NodeToStatusMap),
 		}
 		var allNodes []*framework.NodeInfo
-		ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-		ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
-		f.RunPreFilterPlugins(ctx, state, nil)
+		f.RunPreFilterPlugins(ctx, state, nil, &diagnosis, allNodes)
 		f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
 		f.RunPreFilterExtensionRemovePod(ctx, state, nil, nil, nil)
 
@@ -1728,10 +1726,8 @@ func TestRunPreFilterPlugins(t *testing.T) {
 				NodeToStatusMap: make(framework.NodeToStatusMap),
 			}
 			var allNodes []*framework.NodeInfo
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
 			state := framework.NewCycleState()
-			result, status := f.RunPreFilterPlugins(ctx, state, nil)
+			result, status := f.RunPreFilterPlugins(ctx, state, nil, &diagnosis, allNodes)
 			if d := cmp.Diff(result, tt.wantPreFilterResult); d != "" {
 				t.Errorf("wrong status. got: %v, want: %v, diff: %s", result, tt.wantPreFilterResult, d)
 			}
@@ -2847,7 +2843,10 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 func TestRecordingMetrics(t *testing.T) {
 	state := &framework.CycleState{}
 	state.SetRecordPluginMetrics(true)
-
+	var allNodes []*framework.NodeInfo
+	diagnosis := framework.Diagnosis{
+		NodeToStatusMap: make(framework.NodeToStatusMap),
+	}
 	tests := []struct {
 		name               string
 		action             func(f framework.Framework, ctx context.Context)
@@ -2856,8 +2855,10 @@ func TestRecordingMetrics(t *testing.T) {
 		wantStatus         framework.Code
 	}{
 		{
-			name:               "PreFilter - Success",
-			action:             func(f framework.Framework, ctx context.Context) { f.RunPreFilterPlugins(ctx, state, pod) },
+			name: "PreFilter - Success",
+			action: func(f framework.Framework, ctx context.Context) {
+				f.RunPreFilterPlugins(ctx, state, pod, &diagnosis, allNodes)
+			},
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         framework.Success,
 		},
@@ -2913,8 +2914,10 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 
 		{
-			name:               "PreFilter - Error",
-			action:             func(f framework.Framework, ctx context.Context) { f.RunPreFilterPlugins(ctx, state, pod) },
+			name: "PreFilter - Error",
+			action: func(f framework.Framework, ctx context.Context) {
+				f.RunPreFilterPlugins(ctx, state, pod, &diagnosis, allNodes)
+			},
 			inject:             injectedResult{PreFilterStatus: int(framework.Error)},
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         framework.Error,
@@ -3011,13 +3014,6 @@ func TestRecordingMetrics(t *testing.T) {
 				cancel()
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
-			diagnosis := framework.Diagnosis{
-				NodeToStatusMap: make(framework.NodeToStatusMap),
-			}
-			var allNodes []*framework.NodeInfo
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-			ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
-
 			tt.action(f, ctx)
 
 			// Stop the goroutine which records metrics and ensure it's stopped.

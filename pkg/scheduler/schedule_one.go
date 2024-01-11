@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -32,7 +33,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -450,9 +450,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		return nil, diagnosis, err
 	}
 	// Run "prefilter" plugins.
-	ctx = context.WithValue(ctx, framework.PrefilterContextKey("diagnosis"), &diagnosis)
-	ctx = context.WithValue(ctx, framework.PrefilterContextKey("nodes"), allNodes)
-	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
+	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod, &diagnosis, allNodes)
 	if !s.IsSuccess() {
 		if !s.IsRejected() {
 			return nil, diagnosis, s.AsError()
