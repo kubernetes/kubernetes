@@ -17,17 +17,21 @@ limitations under the License.
 package transport
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/metrics"
+	"k8s.io/klog/v2"
 )
 
 // TlsTransportCache caches TLS http.RoundTrippers different configurations. The
@@ -35,7 +39,7 @@ import (
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
 	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports map[tlsCacheKey]*reloadableTransport
 }
 
 // DialerStopCh is stop channel that is passed down to dynamic cert dialer.
@@ -45,7 +49,7 @@ var DialerStopCh = wait.NeverStop
 
 const idleConnsPerHost = 25
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*reloadableTransport)}
 
 type tlsCacheKey struct {
 	insecure           bool
@@ -60,6 +64,20 @@ type tlsCacheKey struct {
 	// these functions are wrapped to allow them to be used as map keys
 	getCert *GetCertHolder
 	dial    *DialHolder
+}
+
+var _ utilnet.RoundTripperWrapper = &reloadableTransport{}
+
+type reloadableTransport struct {
+	rt *atomic.Pointer[http.Transport]
+}
+
+func (r *reloadableTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return r.rt.Load().RoundTrip(req)
+}
+
+func (r *reloadableTransport) WrappedRoundTripper() http.RoundTripper {
+	return r.rt.Load()
 }
 
 func (t tlsCacheKey) String() string {
@@ -92,6 +110,9 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	} else {
 		metrics.TransportCreateCalls.Increment("uncacheable")
 	}
+
+	// check here because TLSConfigFor likes to mutate the config
+	shouldReloadCA := len(config.TLS.CAData) == 0 && len(config.TLS.CAFile) > 0
 
 	// Get the TLS options for this client config
 	tlsConfig, err := TLSConfigFor(config)
@@ -127,14 +148,47 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		proxy = config.Proxy
 	}
 
-	transport := utilnet.SetTransportDefaults(&http.Transport{
+	transport := buildReloadableTransport(utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
 		DialContext:         dial,
 		DisableCompression:  config.DisableCompression,
-	})
+	}))
+
+	if shouldReloadCA {
+		caFile := config.TLS.CAFile
+		caData := config.TLS.CAData
+		baseRT := transport.rt.Load().Clone()
+		go wait.UntilWithContext(wait.ContextForChannel(DialerStopCh), func(_ context.Context) {
+			data, err := os.ReadFile(caFile)
+			if err != nil {
+				klog.ErrorS(err, "failed to read CA file", "file", caFile)
+				return
+			}
+
+			if len(data) == 0 {
+				klog.InfoS("CA file is empty", "file", caFile)
+				return
+			}
+
+			if bytes.Equal(data, caData) {
+				return
+			}
+
+			rootCAs, err := rootCertPool(data)
+			if err != nil {
+				klog.ErrorS(err, "failed to build pool from CA file", "file", caFile)
+				return
+			}
+
+			newRT := baseRT.Clone()
+			newRT.TLSClientConfig.RootCAs = rootCAs
+
+			transport.rt.Store(newRT)
+		}, time.Hour)
+	}
 
 	if canCache {
 		// Cache a single transport for these options
@@ -175,4 +229,10 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	}
 
 	return k, true, nil
+}
+
+func buildReloadableTransport(rt *http.Transport) *reloadableTransport {
+	out := &reloadableTransport{rt: &atomic.Pointer[http.Transport]{}}
+	out.rt.Store(rt)
+	return out
 }
