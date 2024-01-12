@@ -28,8 +28,7 @@ cd "${KUBE_ROOT}"
 find_files() {
   find . -not \( \
       \( \
-        -wholename './output' \
-        -o -wholename './.git' \
+        -wholename './.git' \
         -o -wholename './_output' \
         -o -wholename './release' \
         -o -wholename './target' \

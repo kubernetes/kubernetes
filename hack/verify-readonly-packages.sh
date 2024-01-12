@@ -31,8 +31,7 @@ readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 find_files() {
   find . -not \( \
       \( \
-        -wholename './output' \
-        -o -wholename './_output' \
+        -wholename './_output' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
