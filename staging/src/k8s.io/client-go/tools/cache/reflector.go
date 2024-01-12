@@ -434,7 +434,8 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			}
 		}
 
-		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
+		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+			r.setLastSyncResourceVersion, r.LastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
 		w = nil
@@ -654,6 +655,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 		bookmarkReceived := pointer.Bool(false)
 		err = watchHandler(start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
 			func(rv string) { resourceVersion = rv },
+			r.LastSyncResourceVersion,
 			bookmarkReceived,
 			r.clock, make(chan error), stopCh)
 		if err != nil {
@@ -707,12 +709,14 @@ func watchHandler(start time.Time,
 	name string,
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
+	lastSyncResourceVersion func() string,
 	exitOnInitialEventsEndBookmark *bool,
 	clock clock.Clock,
 	errc chan error,
 	stopCh <-chan struct{},
 ) error {
 	eventCount := 0
+	firstSyncResourceVersion := lastSyncResourceVersion()
 	if exitOnInitialEventsEndBookmark != nil {
 		// set it to false just in case somebody
 		// made it positive
@@ -787,7 +791,8 @@ loop:
 			eventCount++
 			if exitOnInitialEventsEndBookmark != nil && *exitOnInitialEventsEndBookmark {
 				watchDuration := clock.Since(start)
-				klog.V(4).Infof("exiting %v Watch because received the bookmark that marks the end of initial events stream, total %v items received in %v", name, eventCount, watchDuration)
+				klog.V(4).Infof("exiting %v Watch because received the bookmark that marks the end of initial events stream, "+
+					"total %v items received in %v, resourceVersion in [$v, %v]", name, eventCount, watchDuration, firstSyncResourceVersion, lastSyncResourceVersion())
 				return nil
 			}
 		}
@@ -797,7 +802,7 @@ loop:
 	if watchDuration < 1*time.Second && eventCount == 0 {
 		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
 	}
-	klog.V(4).Infof("%s: Watch close - %v total %v items received", name, expectedTypeName, eventCount)
+	klog.V(4).Infof("%s: Watch close - %v total %v items received, resourceVersion in [%v, %v]", name, expectedTypeName, eventCount, firstSyncResourceVersion, lastSyncResourceVersion())
 	return nil
 }
 
