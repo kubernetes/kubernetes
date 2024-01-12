@@ -60,6 +60,26 @@ func ClearEntriesForIP(execer exec.Interface, ip string, protocol v1.Protocol) e
 	return nil
 }
 
+// ClearEntriesForIPNoNAT uses the conntrack tool to delete the conntrack entries
+// for the UDP connections that use the given service IP as destination IP and
+// don't get DNATed. It's used in the following scenario:
+// When a packet arrives, the rules for the service IP may not be installed yet,
+// the packet will be forwarded without NAT, producing a conntrack entry which
+// keeps black hole subsequent packets of the connection even after the rules for
+// the service IP are installed. The conntrack entry must be deleted to make it go
+// thought NAT again so that an endpoint can be selected.
+func ClearEntriesForIPNoNAT(execer exec.Interface, ip string, protocol v1.Protocol) error {
+	parameters := parametersWithFamily(utilnet.IsIPv6String(ip), "-D", "--orig-dst", ip, "--reply-src", ip, "-p", protoStr(protocol))
+	err := Exec(execer, parameters...)
+	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
+		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
+		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
+		// is expensive to baby-sit all udp connections to kubernetes services.
+		return fmt.Errorf("error deleting connection tracking state for UDP service IP: %s, error: %v", ip, err)
+	}
+	return nil
+}
+
 // Exec executes the conntrack tool using the given parameters
 func Exec(execer exec.Interface, parameters ...string) error {
 	conntrackPath, err := execer.LookPath("conntrack")
@@ -81,11 +101,11 @@ func Exec(execer exec.Interface, parameters ...string) error {
 // The solution is clearing the conntrack. Known issues:
 // https://github.com/docker/docker/issues/8795
 // https://github.com/kubernetes/kubernetes/issues/31983
-func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol v1.Protocol) error {
+func ClearEntriesForPortNoNAT(execer exec.Interface, port int, isIPv6 bool, protocol v1.Protocol) error {
 	if port <= 0 {
 		return fmt.Errorf("wrong port number. The port number must be greater than zero")
 	}
-	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
+	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--reply-port-src", strconv.Itoa(port))
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
