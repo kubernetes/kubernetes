@@ -288,6 +288,11 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
 	}
 
+	// Writes the environment file with dynamic flags for the kubelet down to disk so the upgraded kubelet can start with fresh flags
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.ClusterConfiguration, &cfg.NodeRegistration, false, kubeletDir); err != nil {
+		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
+	}
+
 	if dryRun { // Print what contents would be written
 		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
 		if err != nil {
