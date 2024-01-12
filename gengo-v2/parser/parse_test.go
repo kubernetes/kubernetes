@@ -73,7 +73,7 @@ func pkgPathsFromSlice(pkgs []*packages.Package) []string {
 	return sorted(paths...)
 }
 
-func pkgPathsFromMap(pkgs map[importPathString]*packages.Package) []string {
+func pkgPathsFromMap(pkgs map[string]*packages.Package) []string {
 	paths := []string{}
 	for _, pkg := range pkgs {
 		paths = append(paths, pkg.PkgPath)
@@ -276,18 +276,18 @@ func TestLoadPackagesInternal(t *testing.T) {
 		}
 
 		for _, path := range expectedDirect {
-			if !b.userRequested[importPathString(path)] {
+			if !b.userRequested[path] {
 				t.Errorf("expected .userRequested[%q] to be set", path)
 			}
-			if b.fullyProcessed[importPathString(path)] {
+			if b.fullyProcessed[path] {
 				t.Errorf("expected .fullyProcessed[%q] to be unset", path)
 			}
 		}
 		for _, path := range expectedIndirect {
-			if b.userRequested[importPathString(path)] {
+			if b.userRequested[path] {
 				t.Errorf("expected .userRequested[%q] to be unset", path)
 			}
-			if b.fullyProcessed[importPathString(path)] {
+			if b.fullyProcessed[path] {
 				t.Errorf("expected .fullyProcessed[%q] to be unset", path)
 			}
 		}
@@ -325,7 +325,7 @@ func TestLoadPackagesInternal(t *testing.T) {
 		if want, got := expected, pkgPathsFromSlice(pkgs); !sliceEq(want, got) {
 			t.Errorf("wrong pkgs:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 		}
-		if b.goPkgs[importPathString(expected[0])] == nil {
+		if b.goPkgs[expected[0]] == nil {
 			t.Errorf("package not found in .goPkgs: %v", expected[0])
 		}
 	}
@@ -491,19 +491,19 @@ func TestAddOnePkgToUniverse(t *testing.T) {
 		// and combinations of things that are not covered.
 
 		// verify the depth of processing
-		if !b.fullyProcessed[importPathString(direct)] {
+		if !b.fullyProcessed[direct] {
 			t.Errorf("expected .fullyProcessed[%q] to be set", direct)
 		}
-		if b.fullyProcessed[importPathString(indirect)] {
+		if b.fullyProcessed[indirect] {
 			t.Errorf("expected .fullyProcessed[%q] to be unset", indirect)
 		}
 
 		// verify their existence
-		pd := b.goPkgs[importPathString(direct)]
+		pd := b.goPkgs[direct]
 		if pd == nil {
 			t.Fatalf("expected non-nil from .goPkgs")
 		}
-		pi := b.goPkgs[importPathString(indirect)]
+		pi := b.goPkgs[indirect]
 		if pi == nil {
 			t.Fatalf("expected non-nil from .goPkgs")
 		}

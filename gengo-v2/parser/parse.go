@@ -33,22 +33,19 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// This clarifies when a pkg path has been canonicalized.
-type importPathString string
-
 // Builder lets you add all the go files in all the packages that you care
 // about, then constructs the type source data.
 type Builder struct {
 	// Map of package paths to definitions.  These keys should be canonical
 	// Go import paths (example.com/foo/bar) and not local paths (./foo/bar).
-	goPkgs map[importPathString]*packages.Package
+	goPkgs map[string]*packages.Package
 
 	// Keep track of which packages were directly requested (as opposed to
 	// those which are transitively loaded).
-	userRequested map[importPathString]bool
+	userRequested map[string]bool
 
 	// Keep track of which packages have already been scanned for types.
-	fullyProcessed map[importPathString]bool
+	fullyProcessed map[string]bool
 
 	// Build tags to set when loading packages.
 	buildTags []string
@@ -73,9 +70,9 @@ type fileLine struct {
 // New constructs a new builder.
 func New(buildTags []string) *Builder {
 	return &Builder{
-		goPkgs:                map[importPathString]*packages.Package{},
-		userRequested:         map[importPathString]bool{},
-		fullyProcessed:        map[importPathString]bool{},
+		goPkgs:                map[string]*packages.Package{},
+		userRequested:         map[string]bool{},
+		fullyProcessed:        map[string]bool{},
 		fset:                  token.NewFileSet(),
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
 		buildTags:             buildTags,
@@ -88,8 +85,7 @@ func (b *Builder) FindPackages(patterns ...string) ([]string, error) {
 	toFind := make([]string, 0, len(patterns))
 	results := make([]string, 0, len(patterns))
 	for _, pat := range patterns {
-		ip := importPathString(pat)
-		if pkg := b.goPkgs[ip]; pkg != nil {
+		if pkg := b.goPkgs[pat]; pkg != nil {
 			results = append(results, pkg.PkgPath)
 		} else {
 			toFind = append(toFind, pat)
@@ -185,15 +181,13 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 
 	// If these were not user-requested before, they are now.
 	for _, pkg := range existingPkgs {
-		ip := importPathString(pkg.PkgPath)
-		if !b.userRequested[ip] {
-			b.userRequested[ip] = true
+		if !b.userRequested[pkg.PkgPath] {
+			b.userRequested[pkg.PkgPath] = true
 		}
 	}
 	for _, pkg := range netNewPkgs {
-		ip := importPathString(pkg)
-		if !b.userRequested[ip] {
-			b.userRequested[ip] = true
+		if !b.userRequested[pkg] {
+			b.userRequested[pkg] = true
 		}
 	}
 
@@ -236,8 +230,7 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 
 	// Finish integrating packages into our state.
 	absorbPkg := func(pkg *packages.Package) error {
-		pkgPath := importPathString(pkg.PkgPath)
-		b.goPkgs[pkgPath] = pkg
+		b.goPkgs[pkg.PkgPath] = pkg
 
 		for _, f := range pkg.Syntax {
 			for _, c := range f.Comments {
@@ -277,8 +270,7 @@ func (b *Builder) alreadyLoaded(patterns ...string) ([]*packages.Package, []stri
 		return nil, nil, err
 	} else {
 		for _, pkgPath := range pkgPaths {
-			ip := importPathString(pkgPath)
-			if pkg := b.goPkgs[ip]; pkg != nil {
+			if pkg := b.goPkgs[pkgPath]; pkg != nil {
 				existingPkgs = append(existingPkgs, pkg)
 			} else {
 				netNewPkgs = append(netNewPkgs, pkgPath)
@@ -339,7 +331,7 @@ func (b *Builder) NewUniverse() (types.Universe, error) {
 
 	pkgs := []*packages.Package{}
 	for _, path := range b.UserRequestedPackages() {
-		pkgs = append(pkgs, b.goPkgs[importPathString(path)])
+		pkgs = append(pkgs, b.goPkgs[path])
 	}
 	if err := b.addPkgsToUniverse(pkgs, &u); err != nil {
 		return nil, err
@@ -391,7 +383,7 @@ func (b *Builder) addPkgsToUniverse(pkgs []*packages.Package, u *types.Universe)
 // addPkgToUniverse adds one package to the universe and (if needed) searches
 // through it for types.
 func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) error {
-	pkgPath := importPathString(pkg.PkgPath)
+	pkgPath := pkg.PkgPath
 	if b.fullyProcessed[pkgPath] {
 		return nil
 	}
@@ -413,7 +405,7 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	}
 
 	// This will get-or-create the Package.
-	gengoPkg := u.Package(string(pkgPath))
+	gengoPkg := u.Package(pkgPath)
 	gengoPkg.Path = pkg.PkgPath
 	gengoPkg.SourcePath = absPath
 
