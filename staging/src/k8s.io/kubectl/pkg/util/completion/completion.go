@@ -128,6 +128,20 @@ func ContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, s
 	}
 }
 
+// PortNumberCompletionFunc Returns a completion function that completes port numbers for pods and services.
+func PortNumberCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var comps []string
+		directive := cobra.ShellCompDirectiveNoFileComp
+		resourceType := args[0]
+		resourceName := args[1]
+		if len(args) > 0 {
+			comps = CompGetPortsFromResource(f, resourceType, resourceName, toComplete)
+		}
+		return comps, directive
+	}
+}
+
 // ContextCompletionFunc is a completion function that completes as a first argument the
 // context names that match the toComplete prefix
 func ContextCompletionFunc(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -165,6 +179,18 @@ func CompGetResource(f cmdutil.Factory, resourceName string, toComplete string) 
 func CompGetContainers(f cmdutil.Factory, podName string, toComplete string) []string {
 	template := "{{ range .spec.initContainers }}{{ .name }} {{end}}{{ range .spec.containers  }}{{ .name }} {{ end }}"
 	return CompGetFromTemplate(&template, f, "", []string{"pod", podName}, toComplete)
+}
+
+// CompGetPortsFromResource gets the list of ports of the specified resource which begin with `toComplete`.
+func CompGetPortsFromResource(f cmdutil.Factory, resourceType, resourceName, toComplete string) []string {
+	var template string
+	switch resourceType {
+	case "pod":
+		template = "{{ range .spec.containers }}{{ range .ports }}{{ .containerPort }} {{ end }}{{ end }}"
+	case "service":
+		template = "{{ range .spec.ports }}{{ .port }} {{end}}"
+	}
+	return CompGetFromTemplate(&template, f, "", []string{resourceType, resourceName}, toComplete)
 }
 
 // CompGetFromTemplate executes a Get operation using the specified template and args and returns the results
