@@ -269,7 +269,7 @@ func getOOMTargetContainerWithoutLimit(name string) v1.Container {
 	}
 }
 
-var _ = SIGDescribe("OOMKiller with LimitedSwap", framework.WithSerial(), framework.WithFeature("LimitedSwap"), func() {
+var _ = SIGDescribe("OOMKiller with LimitedSwap", framework.WithSerial(), framework.WithFeature("Swap"), func() {
 	f := framework.NewDefaultFramework("oomkiller-limitedswap-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

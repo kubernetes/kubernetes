@@ -118,6 +118,7 @@ var (
 	StatefulUpgrade                         = framework.WithFeature(framework.ValidFeatures.Add("StatefulUpgrade"))
 	StorageProvider                         = framework.WithFeature(framework.ValidFeatures.Add("StorageProvider"))
 	StorageVersionAPI                       = framework.WithFeature(framework.ValidFeatures.Add("StorageVersionAPI"))
+	Swap                                    = framework.WithFeature(framework.ValidFeatures.Add("Swap"))
 	TopologyHints                           = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
 	TopologyManager                         = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
 	UDP                                     = framework.WithFeature(framework.ValidFeatures.Add("UDP"))
