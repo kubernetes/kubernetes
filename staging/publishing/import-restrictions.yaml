@@ -51,6 +51,7 @@
 - baseImportPath: "./staging/src/k8s.io/code-generator"
   ignoredSubTrees:
   - "./staging/src/k8s.io/code-generator/examples"
+  - "./staging/src/k8s.io/code-generator/cmd/defaulter-gen/output_tests"
   allowedImports:
   - k8s.io/gengo
   - k8s.io/code-generator

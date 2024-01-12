@@ -27,21 +27,13 @@ import (
 	"strconv"
 	"strings"
 
+	defaulterargs "k8s.io/code-generator/cmd/defaulter-gen/args"
 	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
 	"k8s.io/klog/v2"
 )
-
-// CustomArgs is used tby the go2idl framework to pass args specific to this
-// generator.
-type CustomArgs struct {
-	OutputFile    string
-	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
-	GoHeaderFile  string
-}
 
 var typeZeroValue = map[string]interface{}{
 	"uint":        0.,
@@ -230,7 +222,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 }
 
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*CustomArgs)
+	customArgs := arguments.CustomArgs.(*defaulterargs.CustomArgs)
 
 	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
 	if err != nil {
@@ -535,13 +527,13 @@ func getNestedDefault(t *types.Type) string {
 var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
 var refREIdentIndex = refRE.SubexpIndex("reference")
 
-// ParseSymbolReference looks for strings that match one of the following:
+// parseSymbolReference looks for strings that match one of the following:
 //   - ref(Ident)
 //   - ref(pkgpath.Ident)
 //     If the input string matches either of these, it will return the (optional)
 //     pkgpath, the Ident, and true.  Otherwise it will return empty strings and
 //     false.
-func ParseSymbolReference(s, sourcePackage string) (types.Name, bool) {
+func parseSymbolReference(s, sourcePackage string) (types.Name, bool) {
 	matches := refRE.FindStringSubmatch(s)
 	if len(matches) < refREIdentIndex || matches[refREIdentIndex] == "" {
 		return types.Name{}, false
@@ -574,7 +566,7 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 	}
 	var symbolReference types.Name
 	var defaultValue interface{}
-	if id, ok := ParseSymbolReference(defaultString, commentPackage); ok {
+	if id, ok := parseSymbolReference(defaultString, commentPackage); ok {
 		symbolReference = id
 		defaultString = ""
 	} else if err := json.Unmarshal([]byte(defaultString), &defaultValue); err != nil {
@@ -621,7 +613,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		parent.elem = true
 	}
 
-	defaults, _ := c.existingDefaulters[t]
+	defaults := c.existingDefaulters[t]
 	newDefaults, generated := c.newDefaulters[t]
 	switch {
 	case !root && generated && newDefaults.object != nil:
@@ -714,7 +706,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		}
 	}
 	if len(parent.children) == 0 && len(parent.call) == 0 {
-		//klog.V(6).Infof("decided type %s needs no generation", t.Name)
+		// klog.V(6).Infof("decided type %s needs no generation", t.Name)
 		return nil
 	}
 	return parent
@@ -1004,7 +996,7 @@ func (n *callNode) writeCalls(varName string, isVarPointer bool, sw *generator.S
 func getTypeZeroValue(t string) (interface{}, error) {
 	defaultZero, ok := typeZeroValue[t]
 	if !ok {
-		return nil, fmt.Errorf("Cannot find zero value for type %v in typeZeroValue", t)
+		return nil, fmt.Errorf("cannot find zero value for type %v in typeZeroValue", t)
 	}
 
 	// To generate the code for empty string, they must be quoted

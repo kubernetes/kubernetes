@@ -23,10 +23,10 @@ import (
 	"io"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
-	defaultergen "k8s.io/gengo/v2/examples/defaulter-gen/generators"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -575,13 +575,38 @@ func defaultFromComments(comments []string, commentPath string, t *types.Type) (
 	}
 
 	var i interface{}
-	if id, ok := defaultergen.ParseSymbolReference(tag, commentPath); ok {
+	if id, ok := parseSymbolReference(tag, commentPath); ok {
 		klog.Errorf("%v, %v", id, commentPath)
 		return nil, &id, nil
 	} else if err := json.Unmarshal([]byte(tag), &i); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal default: %v", err)
 	}
 	return i, nil, nil
+}
+
+var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
+var refREIdentIndex = refRE.SubexpIndex("reference")
+
+// ParseSymbolReference looks for strings that match one of the following:
+//   - ref(Ident)
+//   - ref(pkgpath.Ident)
+//     If the input string matches either of these, it will return the (optional)
+//     pkgpath, the Ident, and true.  Otherwise it will return empty strings and
+//     false.
+//
+// This is borrowed from k8s.io/code-generator.
+func parseSymbolReference(s, sourcePackage string) (types.Name, bool) {
+	matches := refRE.FindStringSubmatch(s)
+	if len(matches) < refREIdentIndex || matches[refREIdentIndex] == "" {
+		return types.Name{}, false
+	}
+
+	contents := matches[refREIdentIndex]
+	name := types.ParseFullyQualifiedName(contents)
+	if len(name.Package) == 0 {
+		name.Package = sourcePackage
+	}
+	return name, true
 }
 
 func implementsCustomUnmarshalling(t *types.Type) bool {

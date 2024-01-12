@@ -21,17 +21,20 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/gengo/v2/args"
-	"k8s.io/gengo/v2/examples/defaulter-gen/generators"
 )
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs generators.CustomArgs
+type CustomArgs struct {
+	OutputFile    string
+	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
+	GoHeaderFile  string
+}
 
 // NewDefaults returns default arguments for the generator.
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs := args.Default()
 	customArgs := &CustomArgs{}
-	genericArgs.CustomArgs = (*generators.CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
+	genericArgs.CustomArgs = (*CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
 	return genericArgs, customArgs
 }
 
@@ -47,7 +50,7 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	custom := genericArgs.CustomArgs.(*generators.CustomArgs)
+	custom := genericArgs.CustomArgs.(*CustomArgs)
 
 	if len(custom.OutputFile) == 0 {
 		return fmt.Errorf("--output-file must be specified")
