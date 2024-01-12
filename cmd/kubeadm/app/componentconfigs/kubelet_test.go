@@ -58,11 +58,13 @@ func TestKubeletDefault(t *testing.T) {
 	tests := []struct {
 		name       string
 		clusterCfg kubeadmapi.ClusterConfiguration
+		nodeCfg    kubeadmapi.NodeRegistrationOptions
 		expected   kubeletConfig
 	}{
 		{
 			name:       "No specific defaulting works",
 			clusterCfg: kubeadmapi.ClusterConfiguration{},
+			nodeCfg:    kubeadmapi.NodeRegistrationOptions{},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
@@ -97,6 +99,7 @@ func TestKubeletDefault(t *testing.T) {
 					ServiceSubnet: "192.168.0.0/16",
 				},
 			},
+			nodeCfg: kubeadmapi.NodeRegistrationOptions{},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
@@ -131,6 +134,7 @@ func TestKubeletDefault(t *testing.T) {
 					ServiceSubnet: "192.168.0.0/16",
 				},
 			},
+			nodeCfg: kubeadmapi.NodeRegistrationOptions{},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
@@ -165,6 +169,7 @@ func TestKubeletDefault(t *testing.T) {
 					DNSDomain: "example.com",
 				},
 			},
+			nodeCfg: kubeadmapi.NodeRegistrationOptions{},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
@@ -198,6 +203,7 @@ func TestKubeletDefault(t *testing.T) {
 			clusterCfg: kubeadmapi.ClusterConfiguration{
 				CertificatesDir: "/path/to/certs",
 			},
+			nodeCfg: kubeadmapi.NodeRegistrationOptions{},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
@@ -225,6 +231,40 @@ func TestKubeletDefault(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "ContainerRuntimeEndpoint defaulting works",
+			clusterCfg: kubeadmapi.ClusterConfiguration{},
+			nodeCfg: kubeadmapi.NodeRegistrationOptions{
+				CRISocket: "unix:///var/run/containerd/containerd.sock",
+			},
+			expected: kubeletConfig{
+				config: kubeletconfig.KubeletConfiguration{
+					FeatureGates:  map[string]bool{},
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
+					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
+					Authentication: kubeletconfig.KubeletAuthentication{
+						X509: kubeletconfig.KubeletX509Authentication{
+							ClientCAFile: constants.CACertName,
+						},
+						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
+						},
+						Webhook: kubeletconfig.KubeletWebhookAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
+						},
+					},
+					Authorization: kubeletconfig.KubeletAuthorization{
+						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
+					},
+					HealthzBindAddress:       kubeletHealthzBindAddress,
+					HealthzPort:              ptr.To[int32](constants.KubeletHealthzPort),
+					RotateCertificates:       kubeletRotateCertificates,
+					ResolverConfig:           resolverConfig,
+					CgroupDriver:             constants.CgroupDriverSystemd,
+					ContainerRuntimeEndpoint: "unix:///var/run/containerd/containerd.sock",
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -238,7 +278,7 @@ func TestKubeletDefault(t *testing.T) {
 					GroupVersion: kubeletconfig.SchemeGroupVersion,
 				},
 			}
-			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{}, &kubeadmapi.NodeRegistrationOptions{})
+			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{}, &test.nodeCfg)
 
 			if !reflect.DeepEqual(got, &expected) {
 				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, *got)

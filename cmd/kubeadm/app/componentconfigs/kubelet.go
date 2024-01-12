@@ -210,6 +210,10 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 			}
 		}
 	}
+
+	if kc.config.ContainerRuntimeEndpoint == "" {
+		kc.config.ContainerRuntimeEndpoint = nodeRegOpts.CRISocket
+	}
 }
 
 // isServiceActive checks whether the given service exists and is running
