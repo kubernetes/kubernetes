@@ -896,7 +896,7 @@ const (
 	UserNamespacesPodSecurityStandards featuregate.Feature = "UserNamespacesPodSecurityStandards"
 
 	// owner: @ahutsunshine
-	// beta: v1.29
+	// beta: v1.30
 	//
 	// Allows namespace indexer for namespace scope resources in apiserver cache to accelerate list operations.
 	StorageNamespaceIndex featuregate.Feature = "StorageNamespaceIndex"
