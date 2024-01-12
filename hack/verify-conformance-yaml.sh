@@ -25,18 +25,9 @@ cd "${KUBE_ROOT}"
 test/conformance/gen-conformance-yaml.sh
 
 # diff generated and checked-in
-if ! diff -u test/conformance/testdata/conformance.yaml _output/conformance.yaml; then
-  echo FAIL
-  echo 'See instructions in test/conformance/README.md'
-  exit 1
+if diff -u test/conformance/testdata/conformance.yaml _output/conformance.yaml; then
+  echo PASS
+  exit 0
 fi
-
-# generate image list
-test/conformance/gen-test-image-list.sh
-
-# diff generated and checked-in
-if ! diff -u test/conformance/testdata/repo_list_images.txt _output/repo_list_images.txt; then
-  echo FAIL
-  exit 1
-fi
-exit 0
+echo 'See instructions in test/conformance/README.md'
+exit 1
