@@ -1022,12 +1022,13 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 		reservedMemory := int(float64(0.5) * float64(memAllocatableMb))
 		ginkgo.DeferCleanup(ReserveMemoryWithSchedulerName(ctx, f, "memory-reservation", replicaCount, reservedMemory, false, 1, nonExistingBypassedSchedulerName))
 		// Verify that cluster size is the same
-		ginkgo.By(fmt.Sprintf("Waiting for scale up hoping it won't happen, sleep for %s", scaleUpTimeout.String()))
-		time.Sleep(scaleUpTimeout)
+		ginkgo.By(fmt.Sprintf("Waiting for scale up hoping it won't happen, polling cluster size for %s", scaleUpTimeout.String()))
 		sizeFunc := func(size int) bool {
 			return size == nodeCount
 		}
-		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(ctx, f.ClientSet, sizeFunc, time.Second, 0))
+		gomega.Consistently(ctx, func() error {
+			return WaitForClusterSizeFunc(ctx, f.ClientSet, sizeFunc, time.Second)
+		}).WithTimeout(scaleUpTimeout).WithPolling(framework.Poll).ShouldNot(gomega.HaveOccurred())
 	})
 	f.It("shouldn't scale up when unprocessed pod is created and scheduler is not specified to be bypassed", feature.ClusterScaleUpBypassScheduler, func(ctx context.Context) {
 		// 70% of allocatable memory of a single node * replica count, forcing a scale up in case of normal pods
@@ -1036,12 +1037,13 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 		schedulerName := "non-existent-scheduler-" + f.UniqueName
 		ginkgo.DeferCleanup(ReserveMemoryWithSchedulerName(ctx, f, "memory-reservation", replicaCount, reservedMemory, false, 1, schedulerName))
 		// Verify that cluster size is the same
-		ginkgo.By(fmt.Sprintf("Waiting for scale up hoping it won't happen, sleep for %s", scaleUpTimeout.String()))
-		time.Sleep(scaleUpTimeout)
+		ginkgo.By(fmt.Sprintf("Waiting for scale up hoping it won't happen, polling cluster size for %s", scaleUpTimeout.String()))
 		sizeFunc := func(size int) bool {
 			return size == nodeCount
 		}
-		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(ctx, f.ClientSet, sizeFunc, time.Second, 0))
+		gomega.Consistently(ctx, func() error {
+			return WaitForClusterSizeFunc(ctx, f.ClientSet, sizeFunc, time.Second)
+		}).WithTimeout(scaleUpTimeout).WithPolling(framework.Poll).ShouldNot(gomega.HaveOccurred())
 	})
 })
 
