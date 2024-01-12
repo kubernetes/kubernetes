@@ -164,11 +164,11 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 	}
 	svcCount := 0
 	for _, tc := range testCases {
-		err := ClearEntriesForPort(fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
+		err := ClearEntriesForPortNoNAT(fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: Unexpected error: %v", tc.name, err)
 		}
-		expectCommand := fmt.Sprintf("conntrack -D -p udp --dport %d", tc.port) + familyParamStr(tc.isIPv6)
+		expectCommand := fmt.Sprintf("conntrack -D -p udp --dport %d --reply-port-src %d", tc.port, tc.port) + familyParamStr(tc.isIPv6)
 		execCommand := strings.Join(fcmd.CombinedOutputLog[svcCount], " ")
 		if expectCommand != execCommand {
 			t.Errorf("%s test case: Expect command: %s, but executed %s", tc.name, expectCommand, execCommand)

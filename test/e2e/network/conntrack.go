@@ -97,6 +97,20 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 	}
 
+	logContainsSinceFn := func(text, podName string, since time.Time) wait.ConditionWithContextFunc {
+		return func(ctx context.Context) (bool, error) {
+			logs, err := e2epod.GetPodLogsSince(ctx, cs, ns, podName, podName, since)
+			if err != nil {
+				// Retry the error next time.
+				return false, nil
+			}
+			if !strings.Contains(string(logs), text) {
+				return false, nil
+			}
+			return true, nil
+		}
+	}
+
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = fr.ClientSet
 		ns = fr.Namespace.Name
@@ -429,6 +443,86 @@ var _ = common.SIGDescribe("Conntrack", func() {
 			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs: %s", logs)
 			framework.Failf("Failed to connect to backend pod")
+		}
+
+	})
+
+	// 1. Create a UDP Service
+	// 2. Client Pod sending traffic to the UDP service
+	// 3. Create a UDP server associated to the Service created in 1. A conntrack entry will be generated forwarding
+	//    subsequent traffic to the UDP server.
+	// 4. Create another UDP server associated to the Service created in 1.
+	// 5. Restart kube-proxy.
+	// 6. The UDP connection should be preserved and ensure Client Pod connected to the same UDP server.
+	fr.It("should be able to preserve UDP connection after restarting kube-proxy", fr.WithDisruptive(), func(ctx context.Context) {
+
+		// Create a ClusterIP service
+		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
+		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in " + ns)
+		udpService, err := udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		// Create a pod in one node to create the UDP traffic against the ClusterIP service every 5 seconds
+		ginkgo.By("creating a client pod for probing the service " + serviceName)
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
+		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
+		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
+		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		clientPod.Spec.Containers[0].Name = podClient
+		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
+
+		// Read the client pod logs
+		logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod client logs: %s", logs)
+
+		// Add a backend pod to the service in the other node
+		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod1.Labels = udpJig.Labels
+		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
+		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
+		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
+
+		// Note that the fact that Endpoints object already exists, does NOT mean
+		// that iptables (or whatever else is used) was already programmed.
+		// Additionally take into account that UDP conntrack entries timeout is
+		// 30 seconds by default.
+		// Based on the above check if the pod receives the traffic.
+		ginkgo.By("checking client pod connected to the backend on Cluster IP " + udpService.Spec.ClusterIP)
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend1, podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend pod")
+		}
+
+		ginkgo.By("creating a backend pod " + podBackend2 + " for the service " + serviceName)
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod2.Labels = udpJig.Labels
+		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
+		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod2)
+		// wait until the endpoints are ready
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}, podBackend2: {80}})
+
+		// Restart kube-proxy, the established connection should be preserved.
+		if err := restartComponent(ctx, cs, kubeProxyLabelName, metav1.NamespaceSystem, map[string]string{clusterAddonLabelKey: kubeProxyLabelName}); err != nil {
+			framework.Failf("error restarting kube-proxy: %v", err)
+		}
+
+		ginkgo.By("checking client pod connected to the same backend on Cluster IP " + udpService.Spec.ClusterIP)
+		since := time.Now()
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsSinceFn(podBackend1, podClient, since)); err != nil {
+			logs, err = e2epod.GetPodLogsSince(ctx, cs, ns, podClient, podClient, since)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to the same backend pod")
 		}
 
 	})

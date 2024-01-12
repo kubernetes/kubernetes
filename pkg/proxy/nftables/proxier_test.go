@@ -221,7 +221,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 				// First clear conntrack entries for the clusterIP when the
 				// endpoint is first added.
-				expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", tc.svcIP)
+				expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --reply-src %s -p udp", tc.svcIP, tc.svcIP)
 				if fp.ipFamily == v1.IPv6Protocol {
 					expectCommand += " -f ipv6"
 				}
@@ -2867,13 +2867,13 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	// the order is not guaranteed so we have to compare the strings in any order
 	expectedCommands := []string{
 		// Delete ClusterIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", svcIP, strings.ToLower(string((v1.ProtocolUDP)))),
+		fmt.Sprintf("conntrack -D --orig-dst %s --reply-src %s -p %s", svcIP, svcIP, strings.ToLower(string((v1.ProtocolUDP)))),
 		// Delete ExternalIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", extIP, strings.ToLower(string((v1.ProtocolUDP)))),
+		fmt.Sprintf("conntrack -D --orig-dst %s --reply-src %s -p %s", extIP, extIP, strings.ToLower(string((v1.ProtocolUDP)))),
 		// Delete LoadBalancerIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", lbIngressIP, strings.ToLower(string((v1.ProtocolUDP)))),
+		fmt.Sprintf("conntrack -D --orig-dst %s --reply-src %s -p %s", lbIngressIP, lbIngressIP, strings.ToLower(string((v1.ProtocolUDP)))),
 		// Delete NodePort Conntrack entrie
-		fmt.Sprintf("conntrack -D -p %s --dport %d", strings.ToLower(string((v1.ProtocolUDP))), nodePort),
+		fmt.Sprintf("conntrack -D -p %s --dport %d --reply-port-src %d", strings.ToLower(string((v1.ProtocolUDP))), nodePort, nodePort),
 	}
 	actualCommands := []string{
 		strings.Join(fcmd.CombinedOutputLog[0], " "),

@@ -41,7 +41,14 @@ func CleanStaleEntries(isIPv6 bool, exec utilexec.Interface, svcPortMap proxy.Se
 // may create "black hole" entries for that IP+port. When the service gets endpoints we
 // need to delete those entries so further traffic doesn't get dropped.
 func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, svcPortMap proxy.ServicePortMap, serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
-	conntrackCleanupServiceIPs := serviceUpdateResult.DeletedUDPClusterIPs
+	klog.V(4).InfoS("Deleting conntrack stale entries for deleted services", "IPs", serviceUpdateResult.DeletedUDPClusterIPs.UnsortedList())
+	for _, svcIP := range serviceUpdateResult.DeletedUDPClusterIPs.UnsortedList() {
+		if err := ClearEntriesForIP(exec, svcIP, v1.ProtocolUDP); err != nil {
+			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP)
+		}
+	}
+
+	conntrackCleanupServiceIPs := sets.New[string]()
 	conntrackCleanupServiceNodePorts := sets.New[int]()
 
 	// merge newly active services gathered from endpointsUpdateResult
@@ -63,15 +70,15 @@ func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, sv
 		}
 	}
 
-	klog.V(4).InfoS("Deleting conntrack stale entries for services", "IPs", conntrackCleanupServiceIPs.UnsortedList())
+	klog.V(4).InfoS("Deleting conntrack stale entries for newly active services", "IPs", conntrackCleanupServiceIPs.UnsortedList())
 	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
-		if err := ClearEntriesForIP(exec, svcIP, v1.ProtocolUDP); err != nil {
+		if err := ClearEntriesForIPNoNAT(exec, svcIP, v1.ProtocolUDP); err != nil {
 			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP)
 		}
 	}
-	klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
+	klog.V(4).InfoS("Deleting conntrack stale entries for newly active services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
 	for _, nodePort := range conntrackCleanupServiceNodePorts.UnsortedList() {
-		err := ClearEntriesForPort(exec, nodePort, isIPv6, v1.ProtocolUDP)
+		err := ClearEntriesForPortNoNAT(exec, nodePort, isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			klog.ErrorS(err, "Failed to clear udp conntrack", "nodePort", nodePort)
 		}
