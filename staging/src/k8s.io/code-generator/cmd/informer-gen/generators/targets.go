@@ -118,8 +118,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 	externalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	internalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	groupGoNames := make(map[string]string)
-	for _, inputDir := range arguments.InputDirs {
-		p := context.Universe.Package(inputDir)
+	for _, inputPkg := range context.Inputs {
+		p := context.Universe.Package(inputPkg)
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {

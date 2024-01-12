@@ -63,7 +63,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, customArgs.OutputPkg)
+	pkgTypes := packageTypesForInputs(context, customArgs.OutputPkg)
 	initialTypes := customArgs.ExternalApplyConfigurations
 	refs := refGraphForReachableTypes(context.Universe, pkgTypes, initialTypes)
 	typeModels, err := newTypeModels(customArgs.OpenAPISchemaFilePath, pkgTypes)
@@ -251,9 +251,9 @@ func goName(gv clientgentypes.GroupVersion, p *types.Package) string {
 	return goName
 }
 
-func packageTypesForInputDirs(context *generator.Context, inputDirs []string, outPkgBase string) map[string]*types.Package {
+func packageTypesForInputs(context *generator.Context, outPkgBase string) map[string]*types.Package {
 	pkgTypes := map[string]*types.Package{}
-	for _, inputDir := range inputDirs {
+	for _, inputDir := range context.Inputs {
 		p := context.Universe.Package(inputDir)
 		internal := isInternalPackage(p)
 		if internal {
