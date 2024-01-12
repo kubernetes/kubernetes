@@ -23,21 +23,13 @@ import (
 	"sort"
 	"strings"
 
+	deepcopyargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
 	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
 	"k8s.io/klog/v2"
 )
-
-// CustomArgs is used tby the go2idl framework to pass args specific to this
-// generator.
-type CustomArgs struct {
-	OutputFile   string
-	BoundingDirs []string // Only deal with types rooted under these dirs.
-	GoHeaderFile string
-}
 
 // This is the comment tag that carries parameters for deep-copy generation.
 const (
@@ -127,7 +119,7 @@ func DefaultNameSystem() string {
 }
 
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*CustomArgs)
+	customArgs := arguments.CustomArgs.(*deepcopyargs.CustomArgs)
 
 	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
 	if err != nil {
@@ -268,17 +260,6 @@ func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
 	return true
 }
 
-func (g *genDeepCopy) copyableAndInBounds(t *types.Type) bool {
-	if !copyableType(t) {
-		return false
-	}
-	// Only packages within the restricted range can be processed.
-	if !isRootedUnder(t.Name.Package, g.boundingDirs) {
-		return false
-	}
-	return true
-}
-
 // deepCopyMethod returns the signature of a DeepCopy() method, nil or an error
 // if the type does not match. This allows more efficient deep copy
 // implementations to be defined by the type's author.  The correct signature
@@ -378,18 +359,6 @@ func deepCopyIntoMethodOrDie(t *types.Type) *types.Signature {
 		klog.Fatal(err)
 	}
 	return ret
-}
-
-func isRootedUnder(pkg string, roots []string) bool {
-	// Add trailing / to avoid false matches, e.g. foo/bar vs foo/barn.  This
-	// assumes that bounding dirs do not have trailing slashes.
-	pkg = pkg + "/"
-	for _, root := range roots {
-		if strings.HasPrefix(pkg, root+"/") {
-			return true
-		}
-	}
-	return false
 }
 
 func copyableType(t *types.Type) bool {
