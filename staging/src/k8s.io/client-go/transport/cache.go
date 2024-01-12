@@ -157,7 +157,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		DisableCompression:  config.DisableCompression,
 	}))
 
-	if shouldReloadCA {
+	if shouldReloadCA && tlsConfig != nil {
 		caFile := config.TLS.CAFile
 		caData := config.TLS.CAData
 		baseRT := transport.rt.Load().Clone()
