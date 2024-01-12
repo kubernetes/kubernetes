@@ -24,10 +24,10 @@ import (
 	// build script dependencies
 	_ "github.com/onsi/ginkgo/v2/ginkgo"
 	_ "k8s.io/code-generator/cmd/deepcopy-gen"
+	_ "k8s.io/code-generator/cmd/defaulter-gen"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
 	_ "k8s.io/code-generator/cmd/import-boss"
-	_ "k8s.io/gengo/v2/examples/defaulter-gen/generators"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
 
 	// submodule test dependencies
