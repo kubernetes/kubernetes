@@ -68,8 +68,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 	}
 
 	var targetList []generator.Target
-	for _, inputDir := range arguments.InputDirs {
-		p := context.Universe.Package(inputDir)
+	for _, inputPkg := range context.Inputs {
+		p := context.Universe.Package(inputPkg)
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {

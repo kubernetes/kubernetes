@@ -25,8 +25,6 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/types"
 )
 
-var DefaultInputDirs = []string{}
-
 // CustomArgs is a wrapper for arguments to client-gen.
 type CustomArgs struct {
 	// The directory for the generated results.
@@ -78,7 +76,6 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 		ApplyConfigurationPackage: "",
 	}
 	genericArgs.CustomArgs = customArgs
-	genericArgs.InputDirs = DefaultInputDirs
 
 	return genericArgs, customArgs
 }
