@@ -29,7 +29,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 kube::etcd::install
 
-make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
+GOPROXY=off go install ./cmd/kube-apiserver
 
 SPECROOT="${KUBE_ROOT}/api/openapi-spec"
 SPECV3PATH="${SPECROOT}/v3"

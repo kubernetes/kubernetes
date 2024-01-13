@@ -22,6 +22,7 @@ source hack/lib/util.sh
 
 kube::util::require-jq
 kube::util::ensure_clean_working_dir
+kube::golang::setup_env
 
 PUBLISHED_RELEASES=$(curl -sL 'http://api.github.com/repos/kubernetes-sigs/kustomize/releases?per_page=100' | jq '[ .[] | select(.draft == false and .prerelease == false) | { "tag_name": .tag_name, "published_at": .published_at } ]')
 
@@ -62,7 +63,7 @@ git add .
 git commit -a -m "Update kubectl kustomize to kyaml/$LATEST_KYAML, cmd/config/$LATEST_CONFIG, api/$LATEST_API, kustomize/$LATEST_KUSTOMIZE"
 
 echo -e "\n${color_blue:?}Verifying kubectl kustomize version${color_norm:?}"
-make WHAT=cmd/kubectl
+GOPROXY=off go install ./cmd/kubectl
 
 if [[ $(_output/bin/kubectl version --client -o json | jq -r '.kustomizeVersion') != "$LATEST_KUSTOMIZE" ]]; then
   echo -e "${color_red:?}Unexpected kubectl kustomize version${color_norm:?}"
