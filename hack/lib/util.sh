@@ -243,59 +243,6 @@ kube::util::find-binary() {
   kube::util::find-binary-for-platform "$1" "$(kube::util::host_platform)"
 }
 
-# Run all known doc generators (today gendocs and genman for kubectl)
-# $1 is the directory to put those generated documents
-kube::util::gen-docs() {
-  local dest="$1"
-
-  # Find binary
-  gendocs=$(kube::util::find-binary "gendocs")
-  genkubedocs=$(kube::util::find-binary "genkubedocs")
-  genman=$(kube::util::find-binary "genman")
-  genyaml=$(kube::util::find-binary "genyaml")
-
-  mkdir -p "${dest}/docs/user-guide/kubectl/"
-  "${gendocs}" "${dest}/docs/user-guide/kubectl/"
-  mkdir -p "${dest}/docs/admin/"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
-  "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
-  "${genkubedocs}" "${dest}/docs/admin/" "kubeadm"
-
-  mkdir -p "${dest}/docs/man/man1/"
-  "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
-  "${genman}" "${dest}/docs/man/man1/" "kube-controller-manager"
-  "${genman}" "${dest}/docs/man/man1/" "kube-proxy"
-  "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
-  "${genman}" "${dest}/docs/man/man1/" "kubelet"
-  "${genman}" "${dest}/docs/man/man1/" "kubectl"
-  "${genman}" "${dest}/docs/man/man1/" "kubeadm"
-
-  mkdir -p "${dest}/docs/yaml/kubectl/"
-  "${genyaml}" "${dest}/docs/yaml/kubectl/"
-
-  # create the list of generated files
-  pushd "${dest}" > /dev/null || return 1
-  touch docs/.generated_docs
-  find . -type f | cut -sd / -f 2- | LC_ALL=C sort > docs/.generated_docs
-  popd > /dev/null || return 1
-}
-
-# Removes previously generated docs-- we don't want to check them in. $KUBE_ROOT
-# must be set.
-kube::util::remove-gen-docs() {
-  if [ -e "${KUBE_ROOT}/docs/.generated_docs" ]; then
-    # remove all of the old docs; we don't want to check them in.
-    while read -r file; do
-      rm "${KUBE_ROOT}/${file}" 2>/dev/null || true
-    done <"${KUBE_ROOT}/docs/.generated_docs"
-    # The docs/.generated_docs file lists itself, so we don't need to explicitly
-    # delete it.
-  fi
-}
-
 # Takes a group/version and returns the path to its location on disk, sans
 # "pkg". E.g.:
 # * default behavior: extensions/v1beta1 -> apis/extensions/v1beta1
