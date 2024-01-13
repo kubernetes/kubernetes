@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-hack/make-rules/build.sh ./cmd/clicheck
+GOPROXY=off go install ./cmd/clicheck
 
 if ! output=$(clicheck 2>&1)
 then

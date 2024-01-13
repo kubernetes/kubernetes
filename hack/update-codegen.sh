@@ -142,10 +142,6 @@ function codegen::deepcopy() {
     # The result file, in each pkg, of deep-copy generation.
     local output_file="${GENERATED_FILE_PREFIX}deepcopy.go"
 
-    # The tool used to generate deep copies.
-    local gen_deepcopy_bin
-    gen_deepcopy_bin="$(kube::util::find-binary "deepcopy-gen")"
-
     # Find all the directories that request deep-copy generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: finding all +k8s:deepcopy-gen tags"
@@ -166,7 +162,7 @@ function codegen::deepcopy() {
 
     kube::log::status "Generating deepcopy code for ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${gen_deepcopy_bin} for:"
+        kube::log::status "DBG: running deepcopy-gen for:"
         for dir in "${tag_dirs[@]}"; do
             kube::log::status "DBG:     $dir"
         done
@@ -174,7 +170,7 @@ function codegen::deepcopy() {
 
     git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
-    "${gen_deepcopy_bin}" \
+    deepcopy-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
@@ -192,17 +188,13 @@ function codegen::deepcopy() {
 # $2: Path to the directory where types.go for that group version exists. This
 # is the directory where the file will be generated.
 function gen_types_swagger_doc() {
-    # The tool used to generate swagger code.
-    local swagger_bin
-    swagger_bin="$(kube::util::find-binary "genswaggertypedocs")"
-
     local group_version="$1"
     local gv_dir="$2"
     local tmpfile
     tmpfile="${TMPDIR:-/tmp}/types_swagger_doc_generated.$(date +%s).go"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${swagger_bin} for ${group_version} at ${gv_dir}"
+        kube::log::status "DBG: running genswaggertypedocs for ${group_version} at ${gv_dir}"
     fi
 
     {
@@ -227,7 +219,7 @@ function gen_types_swagger_doc() {
 EOF
     } > "${tmpfile}"
 
-    "${swagger_bin}" \
+    genswaggertypedocs \
         -s \
         "${gv_dir}/types.go" \
         -f - \
@@ -274,10 +266,6 @@ function codegen::prerelease() {
     # The result file, in each pkg, of prerelease-lifecycle generation.
     local output_file="${GENERATED_FILE_PREFIX}prerelease-lifecycle.go"
 
-    # The tool used to generate prerelease-lifecycle code.
-    local gen_prerelease_bin
-    gen_prerelease_bin="$(kube::util::find-binary "prerelease-lifecycle-gen")"
-
     # Find all the directories that request prerelease-lifecycle generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: finding all +k8s:prerelease-lifecycle-gen tags"
@@ -298,7 +286,7 @@ function codegen::prerelease() {
 
     kube::log::status "Generating prerelease-lifecycle code for ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${gen_prerelease_bin} for:"
+        kube::log::status "DBG: running prerelease-lifecycle-gen for:"
         for dir in "${tag_dirs[@]}"; do
             kube::log::status "DBG:     $dir"
         done
@@ -306,7 +294,7 @@ function codegen::prerelease() {
 
     git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
-    "${gen_prerelease_bin}" \
+    prerelease-lifecycle-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
@@ -342,10 +330,6 @@ function codegen::defaults() {
     # The result file, in each pkg, of defaulter generation.
     local output_file="${GENERATED_FILE_PREFIX}defaults.go"
 
-    # The tool used to generate defaulters.
-    local gen_defaulter_bin
-    gen_defaulter_bin="$(kube::util::find-binary "defaulter-gen")"
-
     # All directories that request any form of defaulter generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: finding all +k8s:defaulter-gen tags"
@@ -366,7 +350,7 @@ function codegen::defaults() {
 
     kube::log::status "Generating defaulter code for ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${gen_defaulter_bin} for:"
+        kube::log::status "DBG: running defaulter-gen for:"
         for dir in "${tag_dirs[@]}"; do
             kube::log::status "DBG:     $dir"
         done
@@ -374,7 +358,7 @@ function codegen::defaults() {
 
     git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
-    "${gen_defaulter_bin}" \
+    defaulter-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
@@ -415,10 +399,6 @@ function codegen::conversions() {
     # The result file, in each pkg, of conversion generation.
     local output_file="${GENERATED_FILE_PREFIX}conversion.go"
 
-    # The tool used to generate conversions.
-    local gen_conversion_bin
-    gen_conversion_bin="$(kube::util::find-binary "conversion-gen")"
-
     # All directories that request any form of conversion generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: finding all +k8s:conversion-gen tags"
@@ -445,7 +425,7 @@ function codegen::conversions() {
 
     kube::log::status "Generating conversion code for ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${gen_conversion_bin} for:"
+        kube::log::status "DBG: running conversion-gen for:"
         for dir in "${tag_dirs[@]}"; do
             kube::log::status "DBG:     $dir"
         done
@@ -453,7 +433,7 @@ function codegen::conversions() {
 
     git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
-    "${gen_conversion_bin}" \
+    conversion-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
@@ -497,10 +477,6 @@ function codegen::openapi() {
     # The result file, in each pkg, of open-api generation.
     local output_file="${GENERATED_FILE_PREFIX}openapi.go"
 
-    # The tool used to generate open apis.
-    local gen_openapi_bin
-    gen_openapi_bin="$(kube::util::find-binary "openapi-gen")"
-
     local output_dir="pkg/generated/openapi"
     local output_pkg="k8s.io/kubernetes/${output_dir}"
     local known_violations_file="${API_KNOWN_VIOLATIONS_DIR}/violation_exceptions.list"
@@ -540,7 +516,7 @@ function codegen::openapi() {
 
     kube::log::status "Generating openapi code"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${gen_openapi_bin} for:"
+        kube::log::status "DBG: running openapi-gen for:"
         for dir in "${tag_dirs[@]}"; do
             kube::log::status "DBG:     $dir"
         done
@@ -548,7 +524,7 @@ function codegen::openapi() {
 
     git_find -z ':(glob)pkg/generated/**'/"${output_file}" | xargs -0 rm -f
 
-    "${gen_openapi_bin}" \
+    openapi-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
@@ -576,11 +552,6 @@ function codegen::applyconfigs() {
         k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema \
         k8s.io/code-generator/cmd/applyconfiguration-gen
 
-    local modelsschema
-    modelsschema=$(kube::util::find-binary "models-schema")
-    local applyconfigurationgen
-    applyconfigurationgen=$(kube::util::find-binary "applyconfiguration-gen")
-
     local ext_apis=()
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
@@ -591,7 +562,7 @@ function codegen::applyconfigs() {
 
     kube::log::status "Generating apply-config code for ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${applyconfigurationgen} for:"
+        kube::log::status "DBG: running applyconfiguration-gen for:"
         for api in "${ext_apis[@]}"; do
             kube::log::status "DBG:     $api"
         done
@@ -604,9 +575,9 @@ function codegen::applyconfigs() {
         || true) \
         | xargs -0 rm -f
 
-    "${applyconfigurationgen}" \
+    applyconfiguration-gen \
         -v "${KUBE_VERBOSE}" \
-        --openapi-schema <("${modelsschema}") \
+        --openapi-schema <(models-schema) \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
         --output-pkg "${APPLYCONFIG_PKG}" \
@@ -621,9 +592,6 @@ function codegen::applyconfigs() {
 function codegen::clients() {
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/client-gen
-
-    local clientgen
-    clientgen=$(kube::util::find-binary "client-gen")
 
     IFS=" " read -r -a group_versions <<< "${KUBE_AVAILABLE_GROUP_VERSIONS}"
     local gv_dirs=()
@@ -645,7 +613,7 @@ function codegen::clients() {
 
     kube::log::status "Generating client code for ${#gv_dirs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${clientgen} for:"
+        kube::log::status "DBG: running client-gen for:"
         for dir in "${gv_dirs[@]}"; do
             kube::log::status "DBG:     $dir"
         done
@@ -658,7 +626,7 @@ function codegen::clients() {
         || true) \
         | xargs -0 rm -f
 
-    "${clientgen}" \
+    client-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go" \
@@ -678,9 +646,6 @@ function codegen::listers() {
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/lister-gen
 
-    local listergen
-    listergen=$(kube::util::find-binary "lister-gen")
-
     local ext_apis=()
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
@@ -690,7 +655,7 @@ function codegen::listers() {
 
     kube::log::status "Generating lister code for ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${listergen} for:"
+        kube::log::status "DBG: running lister-gen for:"
         for api in "${ext_apis[@]}"; do
             kube::log::status "DBG:     $api"
         done
@@ -703,7 +668,7 @@ function codegen::listers() {
         || true) \
         | xargs -0 rm -f
 
-    "${listergen}" \
+    lister-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
@@ -720,9 +685,6 @@ function codegen::informers() {
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/informer-gen
 
-    local informergen
-    informergen=$(kube::util::find-binary "informer-gen")
-
     local ext_apis=()
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
@@ -732,7 +694,7 @@ function codegen::informers() {
 
     kube::log::status "Generating informer code for ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
-        kube::log::status "DBG: running ${informergen} for:"
+        kube::log::status "DBG: running informer-gen for:"
         for api in "${ext_apis[@]}"; do
             kube::log::status "DBG:     $api"
         done
@@ -745,7 +707,7 @@ function codegen::informers() {
         || true) \
         | xargs -0 rm -f
 
-    "${informergen}" \
+    informer-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/informers" \

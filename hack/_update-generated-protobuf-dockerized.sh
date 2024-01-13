@@ -33,14 +33,12 @@ kube::golang::setup_env
 GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf
 GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
-gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
-
 # requires the 'proto' tag to build (will remove when ready)
 # searches for the protoc-gen-gogo extension in the output directory
 # satisfies import of github.com/gogo/protobuf/gogoproto/gogo.proto and the
 # core Google protobuf types
 PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
-  "${gotoprotobuf}" \
+  go-to-protobuf \
   -v "${KUBE_VERBOSE}" \
   --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
   --output-dir="${KUBE_ROOT}/staging/src" \

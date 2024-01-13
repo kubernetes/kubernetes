@@ -28,12 +28,12 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 BINS=(
-	cmd/gendocs
-	cmd/genkubedocs
-	cmd/genman
-	cmd/genyaml
+	./cmd/gendocs
+	./cmd/genkubedocs
+	./cmd/genman
+	./cmd/genyaml
 )
-make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
+GOPROXY=off go install "${BINS[@]}"
 
 kube::util::ensure-temp-dir
 
