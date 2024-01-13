@@ -144,14 +144,6 @@ func diffNFTablesChain(nft *knftables.Fake, chain, expected string) string {
 	return cmp.Diff(expected, result)
 }
 
-// assertNFTablesChainEqual asserts that the indicated chain in nft's table contains
-// exactly the rules in expected (in that order).
-func assertNFTablesChainEqual(t *testing.T, line string, nft *knftables.Fake, chain, expected string) {
-	if diff := diffNFTablesChain(nft, chain, expected); diff != "" {
-		t.Errorf("rules do not match%s:\ndiff:\n%s", line, diff)
-	}
-}
-
 // nftablesTracer holds data used while virtually tracing a packet through a set of
 // iptables rules
 type nftablesTracer struct {
@@ -310,10 +302,6 @@ var ignoredRegexp = regexp.MustCompile(strings.Join(
 		// The trace tests only check new connections, so for our purposes, this
 		// check always succeeds (and thus can be ignored).
 		`^ct state new`,
-
-		// Likewise, this rule never matches and thus never drops anything, and so
-		// can be ignored.
-		`^ct state invalid drop$`,
 	},
 	"|",
 ))
@@ -640,8 +628,6 @@ func runPacketFlowTests(t *testing.T, line string, nft *knftables.Fake, nodeIPs 
 var testInput = dedent.Dedent(`
 	add table ip testing { comment "rules for kube-proxy" ; }
 
-	add chain ip testing forward
-	add rule ip testing forward ct state invalid drop
 	add chain ip testing mark-for-masquerade
 	add rule ip testing mark-for-masquerade mark set mark or 0x4000
 	add chain ip testing masquerading
@@ -697,7 +683,6 @@ var testExpected = dedent.Dedent(`
 	add chain ip testing external-42NFTM6N-ns2/svc2/tcp/p80
 	add chain ip testing firewall-allow-check
 	add chain ip testing firewall-check
-	add chain ip testing forward
 	add chain ip testing mark-for-masquerade
 	add chain ip testing masquerading
 	add chain ip testing service-42NFTM6N-ns2/svc2/tcp/p80
@@ -712,7 +697,6 @@ var testExpected = dedent.Dedent(`
 	add rule ip testing firewall-allow-check ip daddr . meta l4proto . th dport . ip saddr @firewall-allow return
 	add rule ip testing firewall-allow-check drop
 	add rule ip testing firewall-check ip daddr . meta l4proto . th dport @firewall jump firewall-allow-check
-	add rule ip testing forward ct state invalid drop
 	add rule ip testing mark-for-masquerade mark set mark or 0x4000
 	add rule ip testing masquerading mark and 0x4000 == 0 return
 	add rule ip testing masquerading mark set mark xor 0x4000

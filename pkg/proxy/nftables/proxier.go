@@ -84,12 +84,7 @@ const (
 	// masquerading
 	kubeMarkMasqChain     = "mark-for-masquerade"
 	kubeMasqueradingChain = "masquerading"
-
-	// chain for special filtering rules
-	kubeForwardChain = "forward"
 )
-
-const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal"
 
 // internal struct for string service information
 type servicePortInfo struct {
@@ -176,9 +171,6 @@ type Proxier struct {
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxierHealthServer
 
-	// conntrackTCPLiberal indicates whether the system sets the kernel nf_conntrack_tcp_be_liberal
-	conntrackTCPLiberal bool
-
 	// nodePortAddresses selects the interfaces where nodePort works.
 	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
@@ -210,15 +202,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	initOnly bool,
 ) (*Proxier, error) {
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
-
-	// Be conservative in what you do, be liberal in what you accept from others.
-	// If it's non-zero, we mark only out of window RST segments as INVALID.
-	// Ref: https://docs.kernel.org/networking/nf_conntrack-sysctl.html
-	conntrackTCPLiberal := false
-	if val, err := sysctl.GetSysctl(sysctlNFConntrackTCPBeLiberal); err == nil && val != 0 {
-		conntrackTCPLiberal = true
-		klog.InfoS("nf_conntrack_tcp_be_liberal set, not installing DROP rules for INVALID packets")
-	}
 
 	if initOnly {
 		klog.InfoS("System initialized and --init-only specified")
@@ -262,7 +245,6 @@ func NewProxier(ipFamily v1.IPFamily,
 		healthzServer:       healthzServer,
 		nodePortAddresses:   nodePortAddresses,
 		networkInterfacer:   proxyutil.RealNetwork{},
-		conntrackTCPLiberal: conntrackTCPLiberal,
 		staleChains:         make(map[string]time.Time),
 	}
 
@@ -353,8 +335,6 @@ var nftablesJumpChains = []nftablesJumpChain{
 	{kubeEndpointsCheckChain, "filter-forward", "ct state new"},
 	{kubeEndpointsCheckChain, "filter-output", "ct state new"},
 
-	{kubeForwardChain, "filter-forward", ""},
-
 	{kubeFirewallCheckChain, "filter-prerouting", "ct state new"},
 	{kubeFirewallCheckChain, "filter-output", "ct state new"},
 
@@ -419,7 +399,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{kubeServicesChain, kubeForwardChain, kubeMasqueradingChain, kubeMarkMasqChain} {
+	for _, chain := range []string{kubeServicesChain, kubeMasqueradingChain, kubeMarkMasqChain} {
 		ensureChain(chain, tx, createdChains)
 	}
 
@@ -448,17 +428,6 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Chain: kubeMasqueradingChain,
 		Rule:  "masquerade fully-random",
 	})
-
-	// Drop the packets in INVALID state, which would potentially cause
-	// unexpected connection reset if nf_conntrack_tcp_be_liberal is not set.
-	// Ref: https://github.com/kubernetes/kubernetes/issues/74839
-	// Ref: https://github.com/kubernetes/kubernetes/issues/117924
-	if !proxier.conntrackTCPLiberal {
-		tx.Add(&knftables.Rule{
-			Chain: kubeForwardChain,
-			Rule:  "ct state invalid drop",
-		})
-	}
 
 	// Fill in nodeport-ips set if needed (or delete it if not). (We do "add+delete"
 	// rather than just "delete" when we want to ensure the set doesn't exist, because
