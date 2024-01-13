@@ -1201,13 +1201,13 @@ func (path callPath) String() string {
 			}
 		case p.index:
 			if len(parts) > 0 {
-				parts[last] = parts[last] + "[i]"
+				parts[last] += "[i]"
 			} else {
 				parts = append(parts, "[i]")
 			}
 		case p.key:
 			if len(parts) > 0 {
-				parts[last] = parts[last] + "[key]"
+				parts[last] += "[key]"
 			} else {
 				parts = append(parts, "[key]")
 			}

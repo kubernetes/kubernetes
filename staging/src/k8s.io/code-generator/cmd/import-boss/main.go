@@ -429,7 +429,7 @@ func hasPathPrefix(path, prefix string) bool {
 		return true
 	}
 	if !strings.HasSuffix(path, string(filepath.Separator)) {
-		prefix = prefix + string(filepath.Separator)
+		prefix += string(filepath.Separator)
 	}
 	return strings.HasPrefix(path, prefix)
 }
