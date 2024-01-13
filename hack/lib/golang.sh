@@ -868,6 +868,10 @@ kube::golang::build_binaries() {
     gogcflags="${GOGCFLAGS:-}"
     goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
 
+    # We keep the module cache local (GOMODCACHE), which breaks `make clean`
+    # (because Go makes it read-only).
+    goflags+=("-modcacherw")
+
     if [[ "${DBG:-}" == 1 ]]; then
         # Debugging - disable optimizations and inlining and trimPath
         gogcflags="${gogcflags} all=-N -l"
