@@ -118,7 +118,11 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 				return err
 			}
 
-			data := c.(*initData)
+			data, ok := c.(*initData)
+			if !ok {
+				return errors.New("invalid data struct")
+			}
+
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
 			return initRunner.Run(args)
