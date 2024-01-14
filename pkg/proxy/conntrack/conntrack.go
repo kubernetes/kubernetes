@@ -56,8 +56,8 @@ type execCT struct {
 
 var _ Interface = &execCT{}
 
-// NoConnectionToDelete is the error string returned by conntrack when no matching connections are found
-const NoConnectionToDelete = "0 flow entries have been deleted"
+// noConnectionToDelete is the error string returned by conntrack when no matching connections are found
+const noConnectionToDelete = "0 flow entries have been deleted"
 
 func protoStr(proto v1.Protocol) string {
 	return strings.ToLower(string(proto))
@@ -89,7 +89,7 @@ func (ct *execCT) exec(parameters ...string) error {
 func (ct *execCT) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
 	parameters := parametersWithFamily(utilnet.IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", protoStr(protocol))
 	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
+	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
 		// is expensive to baby-sit all udp connections to kubernetes services.
@@ -105,7 +105,7 @@ func (ct *execCT) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protoco
 	}
 	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
 	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
+	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
 	}
 	return nil
@@ -116,7 +116,7 @@ func (ct *execCT) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) 
 	parameters := parametersWithFamily(utilnet.IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest,
 		"-p", protoStr(protocol))
 	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
+	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
 		// is expensive to baby sit all udp connections to kubernetes services.
@@ -132,7 +132,7 @@ func (ct *execCT) ClearEntriesForPortNAT(dest string, port int, protocol v1.Prot
 	}
 	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
 	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
+	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
 	}
 	return nil
