@@ -1043,7 +1043,10 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 // may make pending pods with matching affinity terms schedulable.
 func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Lock()
-	p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsToMoveViaPodEvent(logger, pod), AssignedPodAdd, nil, pod)
+
+	// Pre-filter Pods to move by getUnschedulablePodsWithCrossNodeTerm
+	// because Pod related events shouldn't make Pods that rejected by single-node scheduling requirement schedulable.
+	p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossNodeTerm(logger, pod), AssignedPodAdd, nil, pod)
 	p.lock.Unlock()
 }
 
@@ -1066,9 +1069,13 @@ func isPodResourcesResizedDown(pod *v1.Pod) bool {
 func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	if isPodResourcesResizedDown(newPod) {
+		// This case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossNodeTerm
+		// because Pod related events maybe make Pods that rejected by NodeResourceFit schedulable.
 		p.moveAllToActiveOrBackoffQueue(logger, AssignedPodUpdate, oldPod, newPod, nil)
 	} else {
-		p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsToMoveViaPodEvent(logger, newPod), AssignedPodUpdate, oldPod, newPod)
+		// Pre-filter Pods to move by getUnschedulablePodsWithCrossNodeTerm
+		// because Pod related events shouldn't make Pods that rejected by single-node scheduling requirement schedulable.
+		p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossNodeTerm(logger, newPod), AssignedPodUpdate, oldPod, newPod)
 	}
 	p.lock.Unlock()
 }
@@ -1179,11 +1186,11 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 	}
 }
 
-// getUnschedulablePodsToMoveViaPodEvent returns unschedulable pods which either of following conditions is met:
+// getUnschedulablePodsWithCrossNodeTerm returns unschedulable pods which either of following conditions is met:
 // - have any affinity term that matches "pod".
 // - rejected by PodTopologySpread plugin.
 // NOTE: this function assumes lock has been acquired in caller.
-func (p *PriorityQueue) getUnschedulablePodsToMoveViaPodEvent(logger klog.Logger, pod *v1.Pod) []*framework.QueuedPodInfo {
+func (p *PriorityQueue) getUnschedulablePodsWithCrossNodeTerm(logger klog.Logger, pod *v1.Pod) []*framework.QueuedPodInfo {
 	nsLabels := interpodaffinity.GetNamespaceLabelsSnapshot(logger, pod.Namespace, p.nsLister)
 
 	var podsToMove []*framework.QueuedPodInfo
