@@ -1656,6 +1656,7 @@ Requires=network-online.target
 After=network-online.target
 
 [Service]
+Type=notify
 Restart=always
 RestartSec=10
 EnvironmentFile=${kubelet_env_file}
