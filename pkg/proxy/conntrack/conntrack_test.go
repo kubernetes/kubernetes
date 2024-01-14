@@ -34,7 +34,13 @@ var nothingToDelete = func() ([]byte, []byte, error) {
 	return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
 }
 
-func makeCT(result fakeexec.FakeAction) (*fakeexec.FakeExec, *fakeexec.FakeCmd) {
+type testCT struct {
+	execCT
+
+	fcmd *fakeexec.FakeCmd
+}
+
+func makeCT(result fakeexec.FakeAction) *testCT {
 	fcmd := &fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{result},
 	}
@@ -45,18 +51,18 @@ func makeCT(result fakeexec.FakeAction) (*fakeexec.FakeExec, *fakeexec.FakeCmd) 
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 
-	return fexec, fcmd
+	return &testCT{execCT{fexec}, fcmd}
 }
 
-// Gets the command that fexec executed. (If it didn't execute any commands, this will
+// Gets the command that ct executed. (If it didn't execute any commands, this will
 // return "".)
-func getExecutedCommand(fexec *fakeexec.FakeExec, fcmd *fakeexec.FakeCmd) string {
+func (ct *testCT) getExecutedCommand() string {
 	// FakeExec panics if you try to run more commands than you set it up for. So the
 	// only possibilities here are that we ran 1 command or we ran 0.
-	if fexec.CommandCalls != 1 {
+	if ct.execer.(*fakeexec.FakeExec).CommandCalls != 1 {
 		return ""
 	}
-	return strings.Join(fcmd.CombinedOutputLog[0], " ")
+	return strings.Join(ct.fcmd.CombinedOutputLog[0], " ")
 }
 
 func TestExec(t *testing.T) {
@@ -78,8 +84,8 @@ func TestExec(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fexec, fcmd := makeCT(tc.result)
-		err := Exec(fexec, tc.args...)
+		ct := makeCT(tc.result)
+		err := ct.exec(tc.args...)
 		if tc.expectErr {
 			if err == nil {
 				t.Errorf("expected err, got %v", err)
@@ -90,7 +96,7 @@ func TestExec(t *testing.T) {
 			}
 		}
 
-		execCmd := getExecutedCommand(fexec, fcmd)
+		execCmd := ct.getExecutedCommand()
 		expectCmd := "conntrack " + strings.Join(tc.args, " ")
 		if execCmd != expectCmd {
 			t.Errorf("expect execute command: %s, but got: %s", expectCmd, execCmd)
@@ -120,17 +126,17 @@ func TestClearEntriesForIP(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fexec, fcmd := makeCT(success)
-		if err := ClearEntriesForIP(fexec, tc.ip, v1.ProtocolUDP); err != nil {
+		ct := makeCT(success)
+		if err := ct.ClearEntriesForIP(tc.ip, v1.ProtocolUDP); err != nil {
 			t.Errorf("%s/success: Unexpected error: %v", tc.name, err)
 		}
-		execCommand := getExecutedCommand(fexec, fcmd)
+		execCommand := ct.getExecutedCommand()
 		if tc.expectCommand != execCommand {
 			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
 		}
 
-		fexec, _ = makeCT(nothingToDelete)
-		if err := ClearEntriesForIP(fexec, tc.ip, v1.ProtocolUDP); err != nil {
+		ct = makeCT(nothingToDelete)
+		if err := ct.ClearEntriesForIP(tc.ip, v1.ProtocolUDP); err != nil {
 			t.Errorf("%s/nothing to delete: Unexpected error: %v", tc.name, err)
 		}
 	}
@@ -161,18 +167,18 @@ func TestClearEntriesForPort(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fexec, fcmd := makeCT(success)
-		err := ClearEntriesForPort(fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
+		ct := makeCT(success)
+		err := ct.ClearEntriesForPort(tc.port, tc.isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s/success: Unexpected error: %v", tc.name, err)
 		}
-		execCommand := getExecutedCommand(fexec, fcmd)
+		execCommand := ct.getExecutedCommand()
 		if tc.expectCommand != execCommand {
 			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
 		}
 
-		fexec, _ = makeCT(nothingToDelete)
-		err = ClearEntriesForPort(fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
+		ct = makeCT(nothingToDelete)
+		err = ct.ClearEntriesForPort(tc.port, tc.isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s/nothing to delete: Unexpected error: %v", tc.name, err)
 		}
@@ -204,18 +210,18 @@ func TestClearEntriesForNAT(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fexec, fcmd := makeCT(success)
-		err := ClearEntriesForNAT(fexec, tc.origin, tc.dest, v1.ProtocolUDP)
+		ct := makeCT(success)
+		err := ct.ClearEntriesForNAT(tc.origin, tc.dest, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s/success: unexpected error: %v", tc.name, err)
 		}
-		execCommand := getExecutedCommand(fexec, fcmd)
+		execCommand := ct.getExecutedCommand()
 		if tc.expectCommand != execCommand {
 			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
 		}
 
-		fexec, _ = makeCT(nothingToDelete)
-		err = ClearEntriesForNAT(fexec, tc.origin, tc.dest, v1.ProtocolUDP)
+		ct = makeCT(nothingToDelete)
+		err = ct.ClearEntriesForNAT(tc.origin, tc.dest, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s/nothing to delete: unexpected error: %v", tc.name, err)
 		}
@@ -247,18 +253,18 @@ func TestClearEntriesForPortNAT(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fexec, fcmd := makeCT(success)
-		err := ClearEntriesForPortNAT(fexec, tc.dest, tc.port, v1.ProtocolUDP)
+		ct := makeCT(success)
+		err := ct.ClearEntriesForPortNAT(tc.dest, tc.port, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s/success: unexpected error: %v", tc.name, err)
 		}
-		execCommand := getExecutedCommand(fexec, fcmd)
+		execCommand := ct.getExecutedCommand()
 		if tc.expectCommand != execCommand {
 			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
 		}
 
-		fexec, _ = makeCT(nothingToDelete)
-		err = ClearEntriesForPortNAT(fexec, tc.dest, tc.port, v1.ProtocolUDP)
+		ct = makeCT(nothingToDelete)
+		err = ct.ClearEntriesForPortNAT(tc.dest, tc.port, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s/nothing to delete: unexpected error: %v", tc.name, err)
 		}
