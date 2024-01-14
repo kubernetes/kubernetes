@@ -126,7 +126,7 @@ function kube::codegen::gen_helpers() {
             -e '+k8s:deepcopy-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | xargs -0 -n1 dirname \
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
           | LC_ALL=C sort -u
     )
 
@@ -160,7 +160,7 @@ function kube::codegen::gen_helpers() {
             -e '+k8s:defaulter-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | xargs -0 -n1 dirname \
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
           | LC_ALL=C sort -u
     )
 
@@ -194,7 +194,7 @@ function kube::codegen::gen_helpers() {
             -e '+k8s:conversion-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | xargs -0 -n1 dirname \
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
           | LC_ALL=C sort -u
     )
 
@@ -355,7 +355,7 @@ function kube::codegen::gen_openapi() {
             -e '+k8s:openapi-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | xargs -0 -n1 dirname \
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
           | LC_ALL=C sort -u
     )
 
@@ -563,7 +563,7 @@ function kube::codegen::gen_client() {
             -e '+genclient' \
             ":(glob)${in_root}${one_input_api}"/'**/*.go' \
             || true \
-        ) | xargs -0 -n1 dirname \
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
           | LC_ALL=C sort -u
     )
 
