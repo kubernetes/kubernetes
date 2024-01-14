@@ -77,14 +77,27 @@ func NewConfig(opts options.CompletedOptions) (*Config, error) {
 	}
 	c.ControlPlane = controlPlane
 
-	apiExtensions, err := apiserver.CreateAPIExtensionsConfig(*controlPlane.GenericConfig, controlPlane.ExtraConfig.VersionedInformers, pluginInitializer, opts.CompletedOptions, opts.MasterCount,
-		serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(controlPlane.ExtraConfig.ProxyTransport, controlPlane.GenericConfig.EgressSelector, controlPlane.GenericConfig.LoopbackClientConfig, controlPlane.GenericConfig.TracerProvider))
+	apiExtensions, err := apiserver.CreateAPIExtensionsConfig(
+		*controlPlane.GenericConfig,
+		controlPlane.ExtraConfig.VersionedInformers,
+		pluginInitializer,
+		opts.CompletedOptions,
+		opts.MasterCount,
+		serviceResolver,
+		webhook.NewDefaultAuthenticationInfoResolverWrapper(controlPlane.ExtraConfig.ProxyTransport, controlPlane.GenericConfig.EgressSelector, controlPlane.GenericConfig.LoopbackClientConfig, controlPlane.GenericConfig.TracerProvider))
 	if err != nil {
 		return nil, err
 	}
 	c.ApiExtensions = apiExtensions
 
-	aggregator, err := createAggregatorConfig(*controlPlane.GenericConfig, opts.CompletedOptions, controlPlane.ExtraConfig.VersionedInformers, serviceResolver, controlPlane.ExtraConfig.ProxyTransport, controlPlane.ExtraConfig.PeerProxy, pluginInitializer)
+	aggregator, err := createAggregatorConfig(
+		*controlPlane.GenericConfig,
+		opts.CompletedOptions,
+		controlPlane.ExtraConfig.VersionedInformers,
+		serviceResolver,
+		controlPlane.ExtraConfig.ProxyTransport,
+		controlPlane.ExtraConfig.PeerProxy,
+		pluginInitializer)
 	if err != nil {
 		return nil, err
 	}
