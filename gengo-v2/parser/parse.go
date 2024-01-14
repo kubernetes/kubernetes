@@ -388,26 +388,29 @@ func (p *Parser) addPkgToUniverse(pkg *packages.Package, u *types.Universe) erro
 		return nil
 	}
 
-	// We're keeping this package, though we might not fully process it.
-	if vlog := klog.V(5); vlog.Enabled() {
-		why := "user-requested"
-		if !p.userRequested[pkgPath] {
-			why = "dependency"
-		}
-		vlog.Infof("addPkgToUniverse %q (%s)", pkgPath, why)
-	}
-
-	absPath := ""
-	if dir, err := packageDir(pkg); err != nil {
-		return err
-	} else {
-		absPath = dir
-	}
-
 	// This will get-or-create the Package.
 	gengoPkg := u.Package(pkgPath)
-	gengoPkg.Path = pkg.PkgPath
-	gengoPkg.Dir = absPath
+
+	if gengoPkg.Dir == "" {
+		// We're keeping this package, though we might not fully process it.
+		if vlog := klog.V(5); vlog.Enabled() {
+			why := "user-requested"
+			if !p.userRequested[pkgPath] {
+				why = "dependency"
+			}
+			vlog.Infof("addPkgToUniverse %q (%s)", pkgPath, why)
+		}
+
+		absPath := ""
+		if dir, err := packageDir(pkg); err != nil {
+			return err
+		} else {
+			absPath = dir
+		}
+
+		gengoPkg.Path = pkg.PkgPath
+		gengoPkg.Dir = absPath
+	}
 
 	// If the package was not user-requested, we can stop here.
 	if !p.userRequested[pkgPath] {
