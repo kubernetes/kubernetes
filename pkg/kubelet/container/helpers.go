@@ -91,6 +91,7 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 		return true
 	}
 	if status.State == ContainerStateCreated {
+		klog.V(4).InfoS("Container state is Created, and it will be decided whether to restart based on the specific situation.", "pod", klog.KObj(pod), "containerName", container.Name, "restartOnCreatedState", restartOnCreatedState)
 		// we don't retart the container directly as the CREATED event will always be triggered
 		// but for next syncpod, we should handle the containers failed to be started which is in CREATED state.
 		return restartOnCreatedState
