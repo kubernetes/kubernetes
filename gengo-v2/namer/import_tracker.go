@@ -99,7 +99,7 @@ func (tracker *DefaultImportTracker) ImportLines() []string {
 	for path := range tracker.pathToName {
 		importPaths = append(importPaths, path)
 	}
-	sort.Sort(sort.StringSlice(importPaths))
+	sort.Strings(importPaths)
 	out := []string{}
 	for _, path := range importPaths {
 		out = append(out, tracker.PrintImport(path, tracker.pathToName[path]))

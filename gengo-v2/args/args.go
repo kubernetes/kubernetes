@@ -21,7 +21,6 @@ import (
 	"bytes"
 	goflag "flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -111,18 +110,18 @@ func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
 
 // LoadGoBoilerplate loads the boilerplate file passed to --go-header-file.
 func (g *GeneratorArgs) LoadGoBoilerplate() ([]byte, error) {
-	b, err := ioutil.ReadFile(g.GoHeaderFilePath)
+	b, err := os.ReadFile(g.GoHeaderFilePath)
 	if err != nil {
 		return nil, err
 	}
-	b = bytes.Replace(b, []byte("YEAR"), []byte(strconv.Itoa(time.Now().UTC().Year())), -1)
+	b = bytes.ReplaceAll(b, []byte("YEAR"), []byte(strconv.Itoa(time.Now().UTC().Year())))
 
 	if g.GeneratedByCommentTemplate != "" {
 		if len(b) != 0 {
 			b = append(b, byte('\n'))
 		}
 		generatorName := path.Base(os.Args[0])
-		generatedByComment := strings.Replace(g.GeneratedByCommentTemplate, "GENERATOR_NAME", generatorName, -1)
+		generatedByComment := strings.ReplaceAll(g.GeneratedByCommentTemplate, "GENERATOR_NAME", generatorName)
 		s := fmt.Sprintf("%s\n\n", generatedByComment)
 		b = append(b, []byte(s)...)
 	}
@@ -176,7 +175,7 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 
 	b, err := g.NewBuilder()
 	if err != nil {
-		return fmt.Errorf("Failed making a parser: %v", err)
+		return fmt.Errorf("failed making a parser: %v", err)
 	}
 
 	// pass through the flag on whether to include *_test.go files
@@ -184,7 +183,7 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 
 	c, err := generator.NewContext(b, nameSystems, defaultSystem)
 	if err != nil {
-		return fmt.Errorf("Failed making a context: %v", err)
+		return fmt.Errorf("failed making a context: %v", err)
 	}
 
 	c.TrimPathPrefix = g.TrimPathPrefix
@@ -192,7 +191,7 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 	c.Verify = g.VerifyOnly
 	packages := pkgs(c, g)
 	if err := c.ExecutePackages(g.OutputBase, packages); err != nil {
-		return fmt.Errorf("Failed executing generator: %v", err)
+		return fmt.Errorf("failed executing generator: %v", err)
 	}
 
 	return nil

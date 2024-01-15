@@ -217,43 +217,43 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 }
 
 // IncomingImports returns the incoming imports for each package. The map is lazily computed.
-func (ctxt *Context) IncomingImports() map[string][]string {
-	if ctxt.incomingImports == nil {
+func (c *Context) IncomingImports() map[string][]string {
+	if c.incomingImports == nil {
 		incoming := map[string][]string{}
-		for _, pkg := range ctxt.Universe {
+		for _, pkg := range c.Universe {
 			for imp := range pkg.Imports {
 				incoming[imp] = append(incoming[imp], pkg.Path)
 			}
 		}
-		ctxt.incomingImports = incoming
+		c.incomingImports = incoming
 	}
-	return ctxt.incomingImports
+	return c.incomingImports
 }
 
 // TransitiveIncomingImports returns the transitive closure of the incoming imports for each package.
 // The map is lazily computed.
-func (ctxt *Context) TransitiveIncomingImports() map[string][]string {
-	if ctxt.incomingTransitiveImports == nil {
-		ctxt.incomingTransitiveImports = transitiveClosure(ctxt.IncomingImports())
+func (c *Context) TransitiveIncomingImports() map[string][]string {
+	if c.incomingTransitiveImports == nil {
+		c.incomingTransitiveImports = transitiveClosure(c.IncomingImports())
 	}
-	return ctxt.incomingTransitiveImports
+	return c.incomingTransitiveImports
 }
 
 // AddDir adds a Go package to the context. The specified path must be a single
 // go package import path.  GOPATH, GOROOT, and the location of your go binary
 // (`which go`) will all be searched, in the normal Go fashion.
 // Deprecated. Please use AddDirectory.
-func (ctxt *Context) AddDir(path string) error {
-	ctxt.incomingImports = nil
-	ctxt.incomingTransitiveImports = nil
-	return ctxt.builder.AddDirTo(path, &ctxt.Universe)
+func (c *Context) AddDir(path string) error {
+	c.incomingImports = nil
+	c.incomingTransitiveImports = nil
+	return c.builder.AddDirTo(path, &c.Universe)
 }
 
 // AddDirectory adds a Go package to the context. The specified path must be a
 // single go package import path.  GOPATH, GOROOT, and the location of your go
 // binary (`which go`) will all be searched, in the normal Go fashion.
-func (ctxt *Context) AddDirectory(path string) (*types.Package, error) {
-	ctxt.incomingImports = nil
-	ctxt.incomingTransitiveImports = nil
-	return ctxt.builder.AddDirectoryTo(path, &ctxt.Universe)
+func (c *Context) AddDirectory(path string) (*types.Package, error) {
+	c.incomingImports = nil
+	c.incomingTransitiveImports = nil
+	return c.builder.AddDirectoryTo(path, &c.Universe)
 }

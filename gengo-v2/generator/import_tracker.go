@@ -69,11 +69,11 @@ func golangTrackerLocalName(tracker namer.ImportTracker, t types.Name) string {
 	for n := len(dirs) - 1; n >= 0; n-- {
 		// follow kube convention of not having anything between directory names
 		name := strings.Join(dirs[n:], "")
-		name = strings.Replace(name, "_", "", -1)
+		name = strings.ReplaceAll(name, "_", "")
 		// These characters commonly appear in import paths for go
 		// packages, but aren't legal go names. So we'll sanitize.
-		name = strings.Replace(name, ".", "", -1)
-		name = strings.Replace(name, "-", "", -1)
+		name = strings.ReplaceAll(name, ".", "")
+		name = strings.ReplaceAll(name, "-", "")
 		if _, found := tracker.PathOf(name); found {
 			// This name collides with some other package
 			continue

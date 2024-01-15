@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,7 +52,7 @@ func (c *Context) ExecutePackages(outDir string, packages Packages) error {
 		}
 	}
 	if len(errors) > 0 {
-		return fmt.Errorf("some packages had errors:\n%v\n", strings.Join(errs2strings(errors), "\n"))
+		return fmt.Errorf("some packages had errors:\n%v", strings.Join(errs2strings(errors), "\n"))
 	}
 	return nil
 }
@@ -78,7 +77,7 @@ func (ft DefaultFileType) AssembleFile(f *File, pathname string) error {
 		return et.Error()
 	}
 	if formatted, err := ft.Format(b.Bytes()); err != nil {
-		err = fmt.Errorf("unable to format file %q (%v).", pathname, err)
+		err = fmt.Errorf("unable to format file %q (%v)", pathname, err)
 		// Write the file anyway, so they can see what's going wrong and fix the generator.
 		if _, err2 := destFile.Write(b.Bytes()); err2 != nil {
 			return err2
@@ -103,11 +102,11 @@ func (ft DefaultFileType) VerifyFile(f *File, pathname string) error {
 	if err != nil {
 		return fmt.Errorf("unable to format the output for %q: %v", friendlyName, err)
 	}
-	existing, err := ioutil.ReadFile(pathname)
+	existing, err := os.ReadFile(pathname)
 	if err != nil {
 		return fmt.Errorf("unable to read file %q for comparison: %v", friendlyName, err)
 	}
-	if bytes.Compare(formatted, existing) == 0 {
+	if bytes.Equal(formatted, existing) {
 		return nil
 	}
 	// Be nice and find the first place where they differ
@@ -257,10 +256,8 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 				Imports:           map[string]struct{}{},
 			}
 			files[f.Name] = f
-		} else {
-			if f.FileType != g.FileType() {
-				return fmt.Errorf("file %q already has type %q, but generator %q wants to use type %q", f.Name, f.FileType, g.Name(), g.FileType())
-			}
+		} else if f.FileType != g.FileType() {
+			return fmt.Errorf("file %q already has type %q, but generator %q wants to use type %q", f.Name, f.FileType, g.Name(), g.FileType())
 		}
 
 		if vars := g.PackageVars(genContext); len(vars) > 0 {
@@ -307,7 +304,7 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 		}
 	}
 	if len(errors) > 0 {
-		return fmt.Errorf("errors in package %q:\n%v\n", p.Path(), strings.Join(errs2strings(errors), "\n"))
+		return fmt.Errorf("errors in package %q:\n%v", p.Path(), strings.Join(errs2strings(errors), "\n"))
 	}
 	return nil
 }

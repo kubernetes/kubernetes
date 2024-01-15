@@ -24,7 +24,6 @@ import (
 	"go/parser"
 	"go/token"
 	tc "go/types"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -358,7 +357,7 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 			continue
 		}
 		absPath := filepath.Join(buildPkg.Dir, file)
-		data, err := ioutil.ReadFile(absPath)
+		data, err := os.ReadFile(absPath)
 		if err != nil {
 			return fmt.Errorf("while loading %q: %v", absPath, err)
 		}
@@ -465,7 +464,7 @@ func (b *Builder) typeCheckPackage(pkgPath importPathString, logErr bool) (*tc.P
 	}
 	parsedFiles, ok := b.parsed[pkgPath]
 	if !ok {
-		return nil, fmt.Errorf("No files for pkg %q", pkgPath)
+		return nil, fmt.Errorf("no files for pkg %q", pkgPath)
 	}
 	files := make([]*ast.File, len(parsedFiles))
 	for i := range parsedFiles {
