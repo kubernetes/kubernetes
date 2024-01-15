@@ -20,6 +20,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+
+	cbordirect "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+
+	"github.com/fxamacker/cbor/v2"
 )
 
 func (re *RawExtension) UnmarshalJSON(in []byte) error {
@@ -47,5 +52,16 @@ func (re RawExtension) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 	// TODO: Check whether ContentType is actually JSON before returning it.
+	return re.Raw, nil
+}
+
+func (re *RawExtension) UnmarshalCBOR(in []byte) error {
+	return cbordirect.Unmarshal(in, (*cbor.RawMessage)(&re.Raw))
+}
+
+func (re RawExtension) MarshalCBOR() ([]byte, error) {
+	if err := cbor.Wellformed(re.Raw); err != nil {
+		return nil, fmt.Errorf("raw bytes are not well-formed: %w", err)
+	}
 	return re.Raw, nil
 }

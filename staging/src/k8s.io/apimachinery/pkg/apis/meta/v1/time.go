@@ -19,6 +19,8 @@ package v1
 import (
 	"encoding/json"
 	"time"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -116,6 +118,24 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// todo
+func (t *Time) UnmarshalCBOR(b []byte) error {
+	var s *string
+	if err := cbor.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == nil {
+		t.Time = time.Time{}
+		return nil
+	}
+	pt, err := time.Parse(time.RFC3339, *s)
+	if err != nil {
+		return err
+	}
+	t.Time = pt.Local()
+	return nil
+}
+
 // UnmarshalQueryParameter converts from a URL query parameter value to an object
 func (t *Time) UnmarshalQueryParameter(str string) error {
 	if len(str) == 0 {
@@ -149,6 +169,12 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	buf = t.UTC().AppendFormat(buf, time.RFC3339)
 	buf = append(buf, '"')
 	return buf, nil
+}
+
+// todo
+func (t Time) MarshalCBOR() ([]byte, error) {
+	s := t.UTC().Format(time.RFC3339)
+	return cbor.Marshal(s)
 }
 
 // ToUnstructured implements the value.UnstructuredConverter interface.

@@ -17,6 +17,8 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -29,9 +31,13 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -131,6 +137,121 @@ func TestRoundTrip(t *testing.T) {
 				break
 			}
 		}
+	}
+}
+
+// TestRoundtripToUnstructured verifies the roundtrip faithfulness of all external types from native
+// to unstructured and back using both JSON and CBOR. The intermediate unstructured objects produced
+// by both encodings must be identical.
+func TestRoundtripToUnstructured(t *testing.T) {
+	var buf bytes.Buffer
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if nonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+
+		subtestName := fmt.Sprintf("%s.%s/%s", gvk.Version, gvk.Group, gvk.Kind)
+		if gvk.Group == "" {
+			subtestName = fmt.Sprintf("%s/%s", gvk.Version, gvk.Kind)
+		}
+
+		t.Run(subtestName, func(t *testing.T) {
+			for i := 0; i < 50; i++ {
+				// We do fuzzing on the internal version of the object, and only then
+				// convert to the external version. This is because custom fuzzing
+				// function are only supported for internal objects.
+				internalObj, err := legacyscheme.Scheme.New(schema.GroupVersion{Group: gvk.Group, Version: runtime.APIVersionInternal}.WithKind(gvk.Kind))
+				if err != nil {
+					t.Fatalf("couldn't create internal object %v: %v", gvk.Kind, err)
+				}
+				seed := rand.Int63()
+				fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs).
+					// We are explicitly overwriting custom fuzzing functions, to ensure
+					// that InitContainers and their statuses are not generated. This is
+					// because in this test we are simply doing json operations, in which
+					// those disappear.
+					Funcs(
+						func(s *api.PodSpec, c fuzz.Continue) {
+							c.FuzzNoCustom(s)
+							s.InitContainers = nil
+						},
+						func(s *api.PodStatus, c fuzz.Continue) {
+							c.FuzzNoCustom(s)
+							s.InitContainerStatuses = nil
+						},
+					).Fuzz(internalObj)
+
+				item, err := legacyscheme.Scheme.New(gvk)
+				if err != nil {
+					t.Fatalf("couldn't create external object %v: %v", gvk.Kind, err)
+				}
+				if err := legacyscheme.Scheme.Convert(internalObj, item, nil); err != nil {
+					t.Fatalf("conversion for %v failed: %v", gvk.Kind, err)
+				}
+
+				// Decoding into Unstructured requires that apiVersion and kind be
+				// serialized, so populate TypeMeta.
+				item.GetObjectKind().SetGroupVersionKind(gvk)
+
+				buf.Reset()
+				js := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, jsonserializer.SerializerOptions{})
+				if err := js.Encode(item, &buf); err != nil {
+					t.Fatalf("error encoding native to json: %v", err)
+				}
+
+				var uJSON runtime.Object = &unstructured.Unstructured{}
+				uJSON, _, err = js.Decode(buf.Bytes(), &gvk, uJSON)
+				if err != nil {
+					t.Fatalf("error decoding json to unstructured: %v", err)
+				}
+
+				buf.Reset()
+				cs := cbor.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme)
+				if err := cs.Encode(item, &buf); err != nil {
+					t.Fatalf("error encoding native to cbor: %v", err)
+				}
+
+				var uCBOR runtime.Object = &unstructured.Unstructured{}
+				uCBOR, _, err = cs.Decode(buf.Bytes(), &gvk, uCBOR)
+				if err != nil {
+					diag, _ := direct.Diagnose(buf.Bytes())
+					t.Fatalf("error decoding cbor to unstructured: %v, diag: %s", err, diag)
+				}
+
+				if !apiequality.Semantic.DeepEqual(uJSON, uCBOR) {
+					t.Fatalf("unstructured via json differed from unstructured via cbor: %v", cmp.Diff(uJSON, uCBOR))
+				}
+
+				buf.Reset()
+				if err := cs.Encode(uCBOR, &buf); err != nil {
+					t.Fatalf("error encoding unstructured to cbor: %v", err)
+				}
+				finalCBOR, _, err := cs.Decode(buf.Bytes(), &gvk, nil)
+				if err != nil {
+					diag, _ := direct.Diagnose(buf.Bytes())
+					t.Fatalf("error decoding cbor to native: %v, diag: %s", err, diag)
+				}
+
+				buf.Reset()
+				if err := js.Encode(uJSON, &buf); err != nil {
+					t.Fatalf("error encoding unstructured to json: %v", err)
+				}
+				finalJSON, _, err := js.Decode(buf.Bytes(), &gvk, nil)
+				if err != nil {
+					t.Fatalf("error decoding json to native: %v", err)
+				}
+
+				if !apiequality.Semantic.DeepEqual(item, finalJSON) {
+					t.Errorf("object changed during native-json-unstructured-json-native roundtrip, diff: %s", cmp.Diff(item, finalJSON))
+				}
+				if !apiequality.Semantic.DeepEqual(item, finalCBOR) {
+					t.Errorf("object changed during native-cbor-unstructured-cbor-native roundtrip, diff: %s", cmp.Diff(item, finalCBOR))
+				}
+			}
+		})
 	}
 }
 
