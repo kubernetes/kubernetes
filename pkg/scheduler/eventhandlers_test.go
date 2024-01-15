@@ -575,6 +575,12 @@ func TestNodeSchedulingPropertiesChange(t *testing.T) {
 			wantEvents: []framework.ClusterEvent{queue.NodeTaintChange},
 		},
 		{
+			name:       "only node annotation changed",
+			newNode:    st.MakeNode().Annotation("foo", "bar").Obj(),
+			oldNode:    st.MakeNode().Annotation("foo", "fuz").Obj(),
+			wantEvents: []framework.ClusterEvent{queue.NodeAnnotationChange},
+		},
+		{
 			name:    "only node condition changed",
 			newNode: st.MakeNode().Obj(),
 			oldNode: st.MakeNode().Condition(

@@ -19,12 +19,12 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -540,20 +540,23 @@ func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framew
 	if nodeConditionsChanged(newNode, oldNode) {
 		events = append(events, queue.NodeConditionChange)
 	}
+	if nodeAnnotationsChanged(newNode, oldNode) {
+		events = append(events, queue.NodeAnnotationChange)
+	}
 
 	return events
 }
 
 func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
+	return !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
 }
 
 func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
+	return !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
 }
 
 func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
+	return !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
 }
 
 func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
@@ -564,11 +567,15 @@ func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 		}
 		return conditionStatuses
 	}
-	return !reflect.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
+	return !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
 }
 
 func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable
+}
+
+func nodeAnnotationsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations())
 }
 
 func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
