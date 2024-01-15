@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
+	"k8s.io/gengo/v2/args"
 )
 
 // DefaultBasePeerDirs are the peer-dirs nearly everybody will use, i.e. those coming from

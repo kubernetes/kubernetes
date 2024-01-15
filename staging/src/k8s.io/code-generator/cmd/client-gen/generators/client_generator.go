@@ -29,10 +29,10 @@ import (
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	codegennamer "k8s.io/code-generator/pkg/namer"
 	genutil "k8s.io/code-generator/pkg/util"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/klog/v2"
 )

@@ -17,7 +17,7 @@ limitations under the License.
 package generators
 
 import (
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
