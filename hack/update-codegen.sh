@@ -185,8 +185,8 @@ function codegen::deepcopy() {
     ./hack/run-in-gopath.sh "${gen_deepcopy_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_file}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         --bounding-dirs "${PRJ_SRC_PATH},k8s.io/api" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -318,8 +318,8 @@ function codegen::prerelease() {
     ./hack/run-in-gopath.sh "${gen_prerelease_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_file}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
@@ -387,8 +387,8 @@ function codegen::defaults() {
     ./hack/run-in-gopath.sh "${gen_defaulter_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_file}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -468,8 +468,8 @@ function codegen::conversions() {
     ./hack/run-in-gopath.sh "${gen_conversion_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_file}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         $(printf -- " --extra-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
@@ -564,10 +564,10 @@ function codegen::openapi() {
     ./hack/run-in-gopath.sh "${gen_openapi_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_file}" \
-        -p "${PRJ_SRC_PATH}/${output_dir}" \
-        -r "${report_file}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
+        --output-package "${PRJ_SRC_PATH}/${output_dir}" \
+        --report-filename "${report_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
