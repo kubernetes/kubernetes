@@ -17,8 +17,40 @@ limitations under the License.
 package testing
 
 import (
+	"net/http/httptest"
 	"strings"
+	"time"
 )
+
+// WithFakeResponseController extends a given httptest.ResponseRecorder object
+// with a fake implementation of http.ResonseController.
+// NOTE: use this function for testing purposes only.
+//
+// httptest.ResponseRecorder does not implement SetReadDeadline or
+// SetWriteDeadline, see https://github.com/golang/go/issues/60229
+// for more details.
+// TODO: once https://github.com/golang/go/issues/60229 is fixed
+// we can remove this function.
+func WithFakeResponseController(w *httptest.ResponseRecorder) *FakeResponseRecorder {
+	return &FakeResponseRecorder{ResponseRecorder: w}
+}
+
+type FakeResponseRecorder struct {
+	*httptest.ResponseRecorder
+
+	ReadDeadlines  []time.Time
+	WriteDeadlines []time.Time
+}
+
+func (w *FakeResponseRecorder) SetReadDeadline(deadline time.Time) error {
+	w.ReadDeadlines = append(w.ReadDeadlines, deadline)
+	return nil
+}
+
+func (w *FakeResponseRecorder) SetWriteDeadline(deadline time.Time) error {
+	w.WriteDeadlines = append(w.WriteDeadlines, deadline)
+	return nil
+}
 
 func IsStreamReadOrWriteTimeout(err error) bool {
 	if err == nil {

@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -322,7 +323,10 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 			t.Errorf("failed to write response: %v", err)
 		}
 	}), c)
-	w := httptest.NewRecorder()
+
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 
 	h.ServeHTTP(w, httptest.NewRequest("GET", "https://ignored.com", nil))
 

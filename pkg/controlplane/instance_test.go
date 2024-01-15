@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
@@ -217,7 +218,9 @@ func TestVersion(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	req, _ := http.NewRequest("GET", "/version", nil)
-	resp := httptest.NewRecorder()
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	resp := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 	s.GenericAPIServer.Handler.ServeHTTP(resp, req)
 	if resp.Code != 200 {
 		t.Fatalf("expected http 200, got: %d", resp.Code)

@@ -200,7 +200,9 @@ func TestWithRequestDeadline(t *testing.T) {
 				t.Fatalf("test setup failed, expected the new HTTP request context to have no deadline but got: %s", remaning)
 			}
 
-			w := httptest.NewRecorder()
+			// TODO: remove WithFakeResponseController once
+			//  https://github.com/golang/go/issues/60229 is fixed.
+			w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 			withDeadline.ServeHTTP(w, testRequest)
 
 			if test.handlerCallCountExpected != callCount {
@@ -248,7 +250,9 @@ func TestWithRequestDeadlineWithClock(t *testing.T) {
 	// the request has arrived just now.
 	testRequest = testRequest.WithContext(request.WithReceivedTimestamp(testRequest.Context(), time.Now()))
 
-	w := httptest.NewRecorder()
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 	withDeadline.ServeHTTP(w, testRequest)
 
 	if !hasDeadlineGot {
@@ -274,7 +278,9 @@ func TestWithRequestDeadlineWithInvalidTimeoutIsAudited(t *testing.T) {
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
 	testRequest := newRequest(t, "/api/v1/namespaces?timeout=foo")
-	w := httptest.NewRecorder()
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 	withDeadline.ServeHTTP(w, testRequest)
 
 	if handlerInvoked {
@@ -316,7 +322,9 @@ func TestWithRequestDeadlineWithPanic(t *testing.T) {
 	})
 
 	testRequest := newRequest(t, "/api/v1/namespaces?timeout=1s")
-	w := httptest.NewRecorder()
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 	withPanicRecovery.ServeHTTP(w, testRequest)
 
 	if panicErrExpected != panicErrGot {
@@ -347,7 +355,9 @@ func TestWithRequestDeadlineWithRequestTimesOut(t *testing.T) {
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
 	testRequest := newRequest(t, fmt.Sprintf("/api/v1/namespaces?timeout=%s", timeout))
-	w := httptest.NewRecorder()
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 	withDeadline.ServeHTTP(w, testRequest)
 
 	if errGot != context.DeadlineExceeded {
@@ -393,7 +403,9 @@ func TestWithFailedRequestAudit(t *testing.T) {
 
 			withAudit := withFailedRequestAudit(errorHandler, test.statusErr, fakeSink, fakeRuleEvaluator)
 
-			w := httptest.NewRecorder()
+			// TODO: remove WithFakeResponseController once
+			//  https://github.com/golang/go/issues/60229 is fixed.
+			w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 			testRequest := newRequest(t, "/apis/v1/namespaces/default/pods")
 			info := request.RequestInfo{}
 			testRequest = testRequest.WithContext(request.WithRequestInfo(testRequest.Context(), &info))
