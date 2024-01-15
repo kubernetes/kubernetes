@@ -151,7 +151,7 @@ func TestNewInitData(t *testing.T) {
 						},
 					},
 				}
-				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(initData{}), cmpopts.IgnoreFields(initData{}, "client", "cfg.ClusterConfiguration", "cfg.NodeRegistration.Taints")); diff != "" {
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(initData{}), cmpopts.IgnoreFields(initData{}, "client", "cfg.ClusterConfiguration", "cfg.NodeRegistration.Taints", "cfg.Timeouts")); diff != "" {
 					t.Fatalf("newInitData returned data (-want,+got):\n%s", diff)
 				}
 			},

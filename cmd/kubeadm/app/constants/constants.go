@@ -28,7 +28,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apimachinery/pkg/util/wait"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	componentversion "k8s.io/component-base/version"
 	netutils "k8s.io/utils/net"
@@ -209,29 +208,43 @@ const (
 	// built-in ClusterRole.
 	ClusterAdminsGroupAndClusterRoleBinding = "kubeadm:cluster-admins"
 
-	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
-	APICallRetryInterval = 500 * time.Millisecond
+	// KubernetesAPICallTimeout specifies how long kubeadm should wait for API calls
+	KubernetesAPICallTimeout = 1 * time.Minute
+	// KubernetesAPICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
+	KubernetesAPICallRetryInterval = 500 * time.Millisecond
+
+	// DiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
+	DiscoveryTimeout = 5 * time.Minute
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the control-plane when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
-	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the control-plane before timing out
-	PatchNodeTimeout = 2 * time.Minute
+
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 5 * time.Minute
 	// TLSBootstrapRetryInterval specifies how long kubeadm should wait before retrying the TLS Bootstrap check
 	TLSBootstrapRetryInterval = 1 * time.Second
-	// APICallWithWriteTimeout specifies how long kubeadm should wait for api calls with at least one write
-	APICallWithWriteTimeout = 40 * time.Second
-	// APICallWithReadTimeout specifies how long kubeadm should wait for api calls with only reads
-	APICallWithReadTimeout = 15 * time.Second
+
+	// StaticPodMirroringTimeout specifies how much time kubeadm should wait for the static pods
+	// to be mirrored on the API server.
+	StaticPodMirroringTimeout = 30 * time.Second
+	// StaticPodMirroringRetryInterval specifies how often to check if static pods are mirrored at the
+	// API server.
+	StaticPodMirroringRetryInterval = 500 * time.Millisecond
+
+	// EtcdAPICallTimeout specifies how much time to wait for completion of requests against the etcd API.
+	EtcdAPICallTimeout = 2 * time.Minute
+	// EtcdAPICallRetryInterval specifies how frequently to retry requests against the etcd API.
+	EtcdAPICallRetryInterval = 500 * time.Millisecond
+
+	// ControlPlaneComponentHealthCheckTimeout specifies the default control plane component health check timeout
+	ControlPlaneComponentHealthCheckTimeout = 4 * time.Minute
+
+	// KubeletHealthCheckTimeout specifies the default kubelet timeout
+	KubeletHealthCheckTimeout = 4 * time.Minute
+
 	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
 	PullImageRetry = 5
 	// RemoveContainerRetry specifies how many times ContainerRuntime retries when removing container failed
 	RemoveContainerRetry = 5
-
-	// DefaultControlPlaneTimeout specifies the default control plane (actually API Server) timeout for use by kubeadm
-	DefaultControlPlaneTimeout = 4 * time.Minute
-	// DefaultKubeletTimeout specifies the default kubelet timeout
-	DefaultKubeletTimeout = 4 * time.Minute
 
 	// MinimumAddressesInServiceSubnet defines minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
@@ -480,15 +493,6 @@ var (
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
 	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
 	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
-
-	// StaticPodMirroringDefaultRetry is used a backoff strategy for
-	// waiting for static pods to be mirrored to the apiserver.
-	StaticPodMirroringDefaultRetry = wait.Backoff{
-		Steps:    30,
-		Duration: 1 * time.Second,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}
 
 	// defaultKubernetesPlaceholderVersion is a placeholder version in case the component-base
 	// version was not populated during build.

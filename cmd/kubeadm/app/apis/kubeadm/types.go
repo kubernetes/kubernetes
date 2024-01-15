@@ -69,6 +69,9 @@ type InitConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during
 	// "kubeadm init".
 	Patches *Patches
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	Timeouts *Timeouts
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -343,6 +346,9 @@ type JoinConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during
 	// "kubeadm join".
 	Patches *Patches
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	Timeouts *Timeouts
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
@@ -527,6 +533,9 @@ type ResetConfiguration struct {
 	// directories during "reset". A flag can be one of: MNT_FORCE, MNT_DETACH, MNT_EXPIRE, UMOUNT_NOFOLLOW.
 	// By default this list is empty.
 	UnmountFlags []string
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	Timeouts *Timeouts
 }
 
 const (
@@ -563,3 +572,30 @@ const (
 	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
 	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
 )
+
+// Timeouts holds various timeouts that apply to kubeadm commands.
+type Timeouts struct {
+	// ControlPlaneComponentHealthCheck is the amount of time to wait for a control plane
+	// component, such as the API server, to be healthy during "kubeadm init" and "kubeadm join".
+	ControlPlaneComponentHealthCheck *metav1.Duration
+
+	// KubeletHealthCheck is the amount of time to wait for the kubelet to be healthy
+	// during "kubeadm init" and "kubeadm join".
+	KubeletHealthCheck *metav1.Duration
+
+	// KubernetesAPICall is the amount of time to wait for the kubeadm client to complete a request to
+	// the API server. This applies to all types of methods (GET, POST, etc).
+	KubernetesAPICall *metav1.Duration
+
+	// EtcdAPICall is the amount of time to wait for the kubeadm etcd client to complete a request to
+	// the etcd cluster.
+	EtcdAPICall *metav1.Duration
+
+	// TLSBootstrap is the amount of time to wait for the kubelet to complete TLS bootstrap
+	// for a joining node.
+	TLSBootstrap *metav1.Duration
+
+	// Discovery is the amount of time to wait for kubeadm to validate the API server identity
+	// for a joining node.
+	Discovery *metav1.Duration
+}

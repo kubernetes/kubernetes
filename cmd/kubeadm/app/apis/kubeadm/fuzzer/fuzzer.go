@@ -25,7 +25,6 @@ import (
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -65,6 +64,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Patches = nil
 	obj.DryRun = false
+	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -85,7 +85,7 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.KubernetesVersion = "qux"
 	obj.CIKubernetesVersion = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
-		Duration: constants.DefaultControlPlaneTimeout,
+		Duration: 0,
 	}
 	obj.ControllerManager.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.APIServer.ExtraEnvs = []kubeadm.EnvVar{}
@@ -128,12 +128,13 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	obj.Discovery = kubeadm.Discovery{
 		BootstrapToken:    &kubeadm.BootstrapTokenDiscovery{Token: "baz"},
 		TLSBootstrapToken: "qux",
-		Timeout:           &metav1.Duration{Duration: 1234},
+		Timeout:           &metav1.Duration{},
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Patches = nil
 	obj.DryRun = false
+	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
@@ -145,4 +146,5 @@ func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "/tmp"
+	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }

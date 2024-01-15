@@ -72,6 +72,10 @@ type InitConfiguration struct {
 	// "kubeadm init".
 	// +optional
 	Patches *Patches `json:"patches,omitempty"`
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	// +optional
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -176,10 +180,6 @@ type APIServer struct {
 	// CertSANs sets extra Subject Alternative Names for the API Server signing cert.
 	// +optional
 	CertSANs []string `json:"certSANs,omitempty"`
-
-	// TimeoutForControlPlane controls the timeout that we use for API server to appear
-	// +optional
-	TimeoutForControlPlane *metav1.Duration `json:"timeoutForControlPlane,omitempty"`
 }
 
 // DNS defines the DNS addon that should be used in the cluster
@@ -379,6 +379,10 @@ type JoinConfiguration struct {
 	// "kubeadm join".
 	// +optional
 	Patches *Patches `json:"patches,omitempty"`
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	// +optional
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
@@ -411,10 +415,6 @@ type Discovery struct {
 	// If .File is set, this field **must be set** in case the KubeConfigFile does not contain any other authentication information
 	// +optional
 	TLSBootstrapToken string `json:"tlsBootstrapToken,omitempty" datapolicy:"token"`
-
-	// Timeout modifies the discovery timeout
-	// +optional
-	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
 
 // BootstrapTokenDiscovery is used to set the options for bootstrap token based discovery
@@ -523,6 +523,10 @@ type ResetConfiguration struct {
 	// By default this list is empty.
 	// +optional
 	UnmountFlags []string `json:"unmountFlags,omitempty"`
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	// +optional
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
 }
 
 // Arg represents an argument with a name and a value.
@@ -545,3 +549,42 @@ const (
 	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
 	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
 )
+
+// Timeouts holds various timeouts that apply to kubeadm commands.
+type Timeouts struct {
+	// ControlPlaneComponentHealthCheck is the amount of time to wait for a control plane
+	// component, such as the API server, to be healthy during "kubeadm init" and "kubeadm join".
+	// Default: 4m
+	// +optional
+	ControlPlaneComponentHealthCheck *metav1.Duration `json:"controlPlaneComponentHealthCheck,omitempty"`
+
+	// KubeletHealthCheck is the amount of time to wait for the kubelet to be healthy
+	// during "kubeadm init" and "kubeadm join".
+	// Default: 4m
+	// +optional
+	KubeletHealthCheck *metav1.Duration `json:"kubeletHealthCheck,omitempty"`
+
+	// KubernetesAPICall is the amount of time to wait for the kubeadm client to complete a request to
+	// the API server. This applies to all types of methods (GET, POST, etc).
+	// Default: 1m
+	// +optional
+	KubernetesAPICall *metav1.Duration `json:"kubernetesAPICall,omitempty"`
+
+	// EtcdAPICall is the amount of time to wait for the kubeadm etcd client to complete a request to
+	// the etcd cluster.
+	// Default: 2m
+	// +optional
+	EtcdAPICall *metav1.Duration `json:"etcdAPICall,omitempty"`
+
+	// TLSBootstrap is the amount of time to wait for the kubelet to complete TLS bootstrap
+	// for a joining node.
+	// Default: 5m
+	// +optional
+	TLSBootstrap *metav1.Duration `json:"tlsBootstrap,omitempty"`
+
+	// Discovery is the amount of time to wait for kubeadm to validate the API server identity
+	// for a joining node.
+	// Default: 5m
+	// +optional
+	Discovery *metav1.Duration `json:"discovery,omitempty"`
+}

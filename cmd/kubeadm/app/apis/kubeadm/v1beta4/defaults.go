@@ -18,7 +18,6 @@ package v1beta4
 
 import (
 	"net/url"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,8 +54,6 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
-	DefaultDiscoveryTimeout = 5 * time.Minute
 
 	// DefaultImagePullPolicy is the default image pull policy in kubeadm
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
@@ -74,6 +71,10 @@ func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
 }
 
 // SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
@@ -107,16 +108,6 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 	}
 
 	SetDefaults_Etcd(obj)
-	SetDefaults_APIServer(&obj.APIServer)
-}
-
-// SetDefaults_APIServer assigns default values for the API Server
-func SetDefaults_APIServer(obj *APIServer) {
-	if obj.TimeoutForControlPlane == nil {
-		obj.TimeoutForControlPlane = &metav1.Duration{
-			Duration: constants.DefaultControlPlaneTimeout,
-		}
-	}
 }
 
 // SetDefaults_Etcd assigns default values for the proxy
@@ -140,6 +131,10 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	SetDefaults_JoinControlPlane(obj.ControlPlane)
 	SetDefaults_Discovery(&obj.Discovery)
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
 }
 
 // SetDefaults_JoinControlPlane assigns default values for a joining control plane node
@@ -153,12 +148,6 @@ func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
 func SetDefaults_Discovery(obj *Discovery) {
 	if len(obj.TLSBootstrapToken) == 0 && obj.BootstrapToken != nil {
 		obj.TLSBootstrapToken = obj.BootstrapToken.Token
-	}
-
-	if obj.Timeout == nil {
-		obj.Timeout = &metav1.Duration{
-			Duration: DefaultDiscoveryTimeout,
-		}
 	}
 
 	if obj.File != nil {
@@ -212,6 +201,10 @@ func SetDefaults_ResetConfiguration(obj *ResetConfiguration) {
 	if obj.CertificatesDir == "" {
 		obj.CertificatesDir = DefaultCertificatesDir
 	}
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
 }
 
 // SetDefaults_EnvVar assigns default values for EnvVar.
@@ -222,6 +215,40 @@ func SetDefaults_EnvVar(obj *EnvVar) {
 			if obj.ValueFrom.FieldRef.APIVersion == "" {
 				obj.ValueFrom.FieldRef.APIVersion = "v1"
 			}
+		}
+	}
+}
+
+// SetDefaults_Timeouts assigns default values for timeouts.
+func SetDefaults_Timeouts(obj *Timeouts) {
+	if obj.ControlPlaneComponentHealthCheck == nil {
+		obj.ControlPlaneComponentHealthCheck = &metav1.Duration{
+			Duration: constants.ControlPlaneComponentHealthCheckTimeout,
+		}
+	}
+	if obj.KubeletHealthCheck == nil {
+		obj.KubeletHealthCheck = &metav1.Duration{
+			Duration: constants.KubeletHealthCheckTimeout,
+		}
+	}
+	if obj.KubernetesAPICall == nil {
+		obj.KubernetesAPICall = &metav1.Duration{
+			Duration: constants.KubernetesAPICallTimeout,
+		}
+	}
+	if obj.EtcdAPICall == nil {
+		obj.EtcdAPICall = &metav1.Duration{
+			Duration: constants.EtcdAPICallTimeout,
+		}
+	}
+	if obj.TLSBootstrap == nil {
+		obj.TLSBootstrap = &metav1.Duration{
+			Duration: constants.TLSBootstrapTimeout,
+		}
+	}
+	if obj.Discovery == nil {
+		obj.Discovery = &metav1.Duration{
+			Duration: constants.DiscoveryTimeout,
 		}
 	}
 }
