@@ -26,10 +26,8 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/fake"
 	"k8s.io/code-generator/cmd/client-gen/generators/scheme"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/code-generator/cmd/client-gen/path"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	codegennamer "k8s.io/code-generator/pkg/namer"
-	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -279,7 +277,7 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 	// Create a map from "old GV" to "new GV" so we know what changes we need to make.
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
 	for gv, inputDir := range customArgs.GroupVersionPackages() {
-		p := universe.Package(genutil.Vendorless(inputDir))
+		p := universe.Package(inputDir)
 		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			newGV := clientgentypes.GroupVersion{
 				Group:   clientgentypes.Group(override[0]),
@@ -324,7 +322,7 @@ func sanitizePackagePaths(context *generator.Context, ca *clientgenargs.CustomAr
 		for j := range pkg.Versions {
 			ver := &pkg.Versions[j]
 			input := ver.Package
-			p := context.Universe[path.Vendorless(input)]
+			p := context.Universe[input]
 			if p == nil || p.Name == "" {
 				pkgs, err := context.FindPackages(input)
 				if err != nil {
@@ -362,7 +360,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
 	groupGoNames := make(map[clientgentypes.GroupVersion]string)
 	for gv, inputDir := range customArgs.GroupVersionPackages() {
-		p := context.Universe.Package(path.Vendorless(inputDir))
+		p := context.Universe.Package(inputDir)
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults
@@ -371,7 +369,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			groupGoNames[gv] = namer.IC(override[0])
 		}
 
-		// Package are indexed with the vendor prefix stripped
 		for n, t := range p.Types {
 			// filter out types which are not included in user specified overrides.
 			typesOverride, ok := includedTypesOverrides[gv]
