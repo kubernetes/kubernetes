@@ -17,22 +17,56 @@ limitations under the License.
 package features
 
 import (
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"testing"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
+	"k8s.io/component-base/featuregate"
 )
 
-func TestKubeFeatures(t *testing.T) {
-	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+// TestKubeFeaturesRegistered tests that all kube features are registered.
+func TestKubeFeaturesRegistered(t *testing.T) {
+	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
 
-	for i := range features {
-		featureName := string(i)
-
-		if featureName == "AllAlpha" || featureName == "AllBeta" {
-			continue
+	for featureName := range defaultKubernetesFeatureGates {
+		if _, ok := registeredFeatures[featureName]; !ok {
+			t.Errorf("The feature gate %q is not registered in the DefaultFeatureGate", featureName)
 		}
+	}
+}
 
-		if _, ok := defaultKubernetesFeatureGates[i]; !ok {
-			t.Errorf("The feature gate %q is not registered", featureName)
+// TestClientFeaturesRegistered tests that all client features are registered.
+func TestClientFeaturesRegistered(t *testing.T) {
+	onlyClientFg := featuregate.NewFeatureGate()
+	if err := clientfeatures.AddFeaturesToExistingFeatureGates(&clientAdapter{onlyClientFg}); err != nil {
+		t.Fatal(err)
+	}
+	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+
+	for featureName := range onlyClientFg.GetAll() {
+		if _, ok := registeredFeatures[featureName]; !ok {
+			t.Errorf("The client-go's feature gate %q is not registered in the DefaultFeatureGate", featureName)
+		}
+	}
+}
+
+// TestAllRegisteredFeaturesExpected tests that the set of features actually registered does not
+// include any features other than those on the list in this package or in client-go's feature
+// package.
+func TestAllRegisteredFeaturesExpected(t *testing.T) {
+	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	knownFeatureGates := featuregate.NewFeatureGate()
+	if err := clientfeatures.AddFeaturesToExistingFeatureGates(&clientAdapter{knownFeatureGates}); err != nil {
+		t.Fatal(err)
+	}
+	if err := knownFeatureGates.Add(defaultKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	knownFeatures := knownFeatureGates.GetAll()
+
+	for registeredFeature := range registeredFeatures {
+		if _, ok := knownFeatures[registeredFeature]; !ok {
+			t.Errorf("The feature gate %q is not from known feature gates", registeredFeature)
 		}
 	}
 }
