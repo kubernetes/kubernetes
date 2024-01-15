@@ -2751,6 +2751,7 @@ type Container struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.TerminationMessagePathDefault)
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
 	// Indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
@@ -2760,6 +2761,7 @@ type Container struct {
 	// Defaults to File.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.TerminationMessageReadFile)
 	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
@@ -4371,6 +4373,7 @@ type EphemeralContainerCommon struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.TerminationMessagePathDefault)
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
 	// Indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
@@ -4380,6 +4383,7 @@ type EphemeralContainerCommon struct {
 	// Defaults to File.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.TerminationMessageReadFile)
 	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
@@ -4680,12 +4684,14 @@ type ReplicationControllerSpec struct {
 	// Defaults to 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
 	// +optional
+	// +default=1
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	// +optional
+	// +default=0
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
 
 	// Selector is a label query over pods that should match the Replicas count.
@@ -5099,6 +5105,7 @@ type ServiceSpec struct {
 	// Several other fields do not apply to ExternalName services.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.ServiceTypeClusterIP)
 	Type ServiceType `json:"type,omitempty" protobuf:"bytes,4,opt,name=type,casttype=ServiceType"`
 
 	// externalIPs is a list of IP addresses for which nodes in the cluster
@@ -5116,6 +5123,7 @@ type ServiceSpec struct {
 	// Defaults to None.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.ServiceAffinityNone)
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" protobuf:"bytes,7,opt,name=sessionAffinity,casttype=ServiceAffinity"`
 
 	// Only applies to Service Type: LoadBalancer.
@@ -5181,6 +5189,7 @@ type ServiceSpec struct {
 	// Pods themselves are not. Agents which consume only Kubernetes generated endpoints
 	// through the Endpoints or EndpointSlice resources can safely assume this behavior.
 	// +optional
+	// +default=false
 	PublishNotReadyAddresses bool `json:"publishNotReadyAddresses,omitempty" protobuf:"varint,13,opt,name=publishNotReadyAddresses"`
 
 	// sessionAffinityConfig contains the configurations of session affinity.
@@ -5269,8 +5278,8 @@ type ServicePort struct {
 
 	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
 	// Default is TCP.
-	// +default="TCP"
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.ProtocolTCP)
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
 	// The application protocol for this port.

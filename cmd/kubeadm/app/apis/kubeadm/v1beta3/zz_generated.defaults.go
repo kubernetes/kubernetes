@@ -36,23 +36,23 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
-	SetDefaults_ClusterConfiguration(in)
 	SetDefaults_APIServer(&in.APIServer)
+	SetDefaults_ClusterConfiguration(in)
 }
 
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
-	SetDefaults_InitConfiguration(in)
 	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
+	SetDefaults_InitConfiguration(in)
 }
 
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
-	SetDefaults_JoinConfiguration(in)
-	SetDefaults_Discovery(&in.Discovery)
 	if in.Discovery.File != nil {
 		SetDefaults_FileDiscovery(in.Discovery.File)
 	}
+	SetDefaults_Discovery(&in.Discovery)
 	if in.ControlPlane != nil {
-		SetDefaults_JoinControlPlane(in.ControlPlane)
 		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
+		SetDefaults_JoinControlPlane(in.ControlPlane)
 	}
+	SetDefaults_JoinConfiguration(in)
 }

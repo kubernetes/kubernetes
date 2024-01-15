@@ -23,8 +23,9 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/apps/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -39,69 +40,67 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
-	SetDefaults_Deployment(in)
-	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
+		corev1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			corev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
 		}
 		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			corev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
+			corev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			corev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			corev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							corev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
 				}
 				if b.ServiceAccountToken != nil {
-					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					corev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 				}
 			}
+			corev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
-				v1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
 			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -112,16 +111,15 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -129,11 +127,11 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -141,11 +139,11 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -153,23 +151,30 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.StartupProbe)
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -180,16 +185,15 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -197,11 +201,11 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -209,11 +213,11 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -221,23 +225,30 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.StartupProbe)
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
-		v1.SetDefaults_EphemeralContainer(a)
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			if b.Protocol == "" {
@@ -248,16 +259,15 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 			b := &a.EphemeralContainerCommon.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -265,11 +275,11 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -277,11 +287,11 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -289,21 +299,30 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
-	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
+	SetDefaults_Deployment(in)
 }
 
 func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
@@ -314,69 +333,67 @@ func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
 }
 
 func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
-	SetDefaults_StatefulSet(in)
-	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
+		corev1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			corev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
 		}
 		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			corev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
+			corev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			corev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			corev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							corev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
 				}
 				if b.ServiceAccountToken != nil {
-					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					corev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 				}
 			}
+			corev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
-				v1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
 			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -387,16 +404,15 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -404,11 +420,11 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -416,11 +432,11 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -428,23 +444,30 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.StartupProbe)
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -455,16 +478,15 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -472,11 +494,11 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -484,11 +506,11 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -496,23 +518,30 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.StartupProbe)
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
-		v1.SetDefaults_EphemeralContainer(a)
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			if b.Protocol == "" {
@@ -523,16 +552,15 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 			b := &a.EphemeralContainerCommon.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -540,11 +568,11 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -552,11 +580,11 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -564,30 +592,39 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
-	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
-		v1.SetDefaults_PersistentVolumeClaim(a)
-		v1.SetDefaults_PersistentVolumeClaimSpec(&a.Spec)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
-		v1.SetDefaults_ResourceList(&a.Status.Capacity)
-		v1.SetDefaults_ResourceList(&a.Status.AllocatedResources)
+		corev1.SetDefaults_PersistentVolumeClaim(a)
+		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+		corev1.SetDefaults_PersistentVolumeClaimSpec(&a.Spec)
+		corev1.SetDefaults_ResourceList(&a.Status.Capacity)
+		corev1.SetDefaults_ResourceList(&a.Status.AllocatedResources)
 	}
+	SetDefaults_StatefulSet(in)
 }
 
 func SetObjectDefaults_StatefulSetList(in *v1beta1.StatefulSetList) {

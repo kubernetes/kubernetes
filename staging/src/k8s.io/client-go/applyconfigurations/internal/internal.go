@@ -4616,9 +4616,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: terminationMessagePath
       type:
         scalar: string
+      default: /dev/termination-log
     - name: terminationMessagePolicy
       type:
         scalar: string
+      default: File
     - name: tty
       type:
         scalar: boolean
@@ -5036,9 +5038,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: terminationMessagePath
       type:
         scalar: string
+      default: /dev/termination-log
     - name: terminationMessagePolicy
       type:
         scalar: string
+      default: File
     - name: tty
       type:
         scalar: boolean
@@ -6991,9 +6995,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minReadySeconds
       type:
         scalar: numeric
+      default: 0
     - name: replicas
       type:
         scalar: numeric
+      default: 1
     - name: selector
       type:
         map:
@@ -7534,6 +7540,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: publishNotReadyAddresses
       type:
         scalar: boolean
+      default: false
     - name: selector
       type:
         map:
@@ -7543,12 +7550,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: sessionAffinity
       type:
         scalar: string
+      default: None
     - name: sessionAffinityConfig
       type:
         namedType: io.k8s.api.core.v1.SessionAffinityConfig
     - name: type
       type:
         scalar: string
+      default: ClusterIP
 - name: io.k8s.api.core.v1.ServiceStatus
   map:
     fields:

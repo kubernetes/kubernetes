@@ -842,6 +842,7 @@ message Container {
   // Defaults to /dev/termination-log.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessagePathDefault)
   optional string terminationMessagePath = 13;
 
   // Indicate how the termination message should be populated. File will use the contents of
@@ -852,6 +853,7 @@ message Container {
   // Defaults to File.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessageReadFile)
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.
@@ -1512,6 +1514,7 @@ message EphemeralContainerCommon {
   // Defaults to /dev/termination-log.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessagePathDefault)
   optional string terminationMessagePath = 13;
 
   // Indicate how the termination message should be populated. File will use the contents of
@@ -1522,6 +1525,7 @@ message EphemeralContainerCommon {
   // Defaults to File.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessageReadFile)
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.
@@ -4783,12 +4787,14 @@ message ReplicationControllerSpec {
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
   // +optional
+  // +default=1
   optional int32 replicas = 1;
 
   // Minimum number of seconds for which a newly created pod should be ready
   // without any of its container crashing, for it to be considered available.
   // Defaults to 0 (pod will be considered available as soon as it is ready)
   // +optional
+  // +default=0
   optional int32 minReadySeconds = 4;
 
   // Selector is a label query over pods that should match the Replicas count.
@@ -5481,8 +5487,8 @@ message ServicePort {
 
   // The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
   // Default is TCP.
-  // +default="TCP"
   // +optional
+  // +default=ref(k8s.io/api/core/v1.ProtocolTCP)
   optional string protocol = 2;
 
   // The application protocol for this port.
@@ -5624,6 +5630,7 @@ message ServiceSpec {
   // Several other fields do not apply to ExternalName services.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   // +optional
+  // +default=ref(k8s.io/api/core/v1.ServiceTypeClusterIP)
   optional string type = 4;
 
   // externalIPs is a list of IP addresses for which nodes in the cluster
@@ -5641,6 +5648,7 @@ message ServiceSpec {
   // Defaults to None.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
   // +optional
+  // +default=ref(k8s.io/api/core/v1.ServiceAffinityNone)
   optional string sessionAffinity = 7;
 
   // Only applies to Service Type: LoadBalancer.
@@ -5706,6 +5714,7 @@ message ServiceSpec {
   // Pods themselves are not. Agents which consume only Kubernetes generated endpoints
   // through the Endpoints or EndpointSlice resources can safely assume this behavior.
   // +optional
+  // +default=false
   optional bool publishNotReadyAddresses = 13;
 
   // sessionAffinityConfig contains the configurations of session affinity.

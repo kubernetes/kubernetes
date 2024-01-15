@@ -24,7 +24,8 @@ limitations under the License.
 package openapi
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19127,6 +19128,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"terminationMessagePath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Default:     v1.TerminationMessagePathDefault,
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19134,6 +19136,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"terminationMessagePolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.\n\nPossible enum values:\n - `\"FallbackToLogsOnError\"` will read the most recent contents of the container logs for the container status message when the container exits with an error and the terminationMessagePath has no contents.\n - `\"File\"` is the default behavior and will set the container status message to the contents of the container's terminationMessagePath when the container exits.",
+							Default:     v1.TerminationMessageReadFile,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"FallbackToLogsOnError", "File"},
@@ -20353,6 +20356,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					"terminationMessagePath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Default:     v1.TerminationMessagePathDefault,
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -20360,6 +20364,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					"terminationMessagePolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.\n\nPossible enum values:\n - `\"FallbackToLogsOnError\"` will read the most recent contents of the container logs for the container status message when the container exits with an error and the terminationMessagePath has no contents.\n - `\"File\"` is the default behavior and will set the container status message to the contents of the container's terminationMessagePath when the container exits.",
+							Default:     v1.TerminationMessageReadFile,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"FallbackToLogsOnError", "File"},
@@ -20661,6 +20666,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					"terminationMessagePath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Default:     v1.TerminationMessagePathDefault,
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -20668,6 +20674,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					"terminationMessagePolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.\n\nPossible enum values:\n - `\"FallbackToLogsOnError\"` will read the most recent contents of the container logs for the container status message when the container exits with an error and the terminationMessagePath has no contents.\n - `\"File\"` is the default behavior and will set the container status message to the contents of the container's terminationMessagePath when the container exits.",
+							Default:     v1.TerminationMessageReadFile,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"FallbackToLogsOnError", "File"},
@@ -27308,6 +27315,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerSpec(ref common.ReferenceCall
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller",
+							Default:     1,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -27315,6 +27323,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerSpec(ref common.ReferenceCall
 					"minReadySeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28857,7 +28866,7 @@ func schema_k8sio_api_core_v1_ServicePort(ref common.ReferenceCallback) common.O
 					"protocol": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The IP protocol for this port. Supports \"TCP\", \"UDP\", and \"SCTP\". Default is TCP.\n\nPossible enum values:\n - `\"SCTP\"` is the SCTP protocol.\n - `\"TCP\"` is the TCP protocol.\n - `\"UDP\"` is the UDP protocol.",
-							Default:     "TCP",
+							Default:     v1.ProtocolTCP,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"SCTP", "TCP", "UDP"},
@@ -29017,6 +29026,7 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 					"type": {
 						SchemaProps: spec.SchemaProps{
 							Description: "type determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer. \"ClusterIP\" allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined by the selector or if that is not specified, by manual construction of an Endpoints object or EndpointSlice objects. If clusterIP is \"None\", no virtual IP is allocated and the endpoints are published as a set of endpoints rather than a virtual IP. \"NodePort\" builds on ClusterIP and allocates a port on every node which routes to the same endpoints as the clusterIP. \"LoadBalancer\" builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the same endpoints as the clusterIP. \"ExternalName\" aliases this service to the specified externalName. Several other fields do not apply to ExternalName services. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types\n\nPossible enum values:\n - `\"ClusterIP\"` means a service will only be accessible inside the cluster, via the cluster IP.\n - `\"ExternalName\"` means a service consists of only a reference to an external name that kubedns or equivalent will return as a CNAME record, with no exposing or proxying of any pods involved.\n - `\"LoadBalancer\"` means a service will be exposed via an external load balancer (if the cloud provider supports it), in addition to 'NodePort' type.\n - `\"NodePort\"` means a service will be exposed on one port of every node, in addition to 'ClusterIP' type.",
+							Default:     v1.ServiceTypeClusterIP,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"ClusterIP", "ExternalName", "LoadBalancer", "NodePort"},
@@ -29045,6 +29055,7 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 					"sessionAffinity": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies\n\nPossible enum values:\n - `\"ClientIP\"` is the Client IP based.\n - `\"None\"` - no session affinity.",
+							Default:     v1.ServiceAffinityNone,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"ClientIP", "None"},
@@ -29102,6 +29113,7 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 					"publishNotReadyAddresses": {
 						SchemaProps: spec.SchemaProps{
 							Description: "publishNotReadyAddresses indicates that any agent which deals with endpoints for this Service should disregard any indications of ready/not-ready. The primary use case for setting this field is for a StatefulSet's Headless Service to propagate SRV DNS records for its Pods for the purpose of peer discovery. The Kubernetes controllers that generate Endpoints and EndpointSlice resources for Services interpret this to mean that all endpoints are considered \"ready\" even if the Pods themselves are not. Agents which consume only Kubernetes generated endpoints through the Endpoints or EndpointSlice resources can safely assume this behavior.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -47781,8 +47793,8 @@ func schema_pkg_apis_apiextensions_v1_JSON(ref common.ReferenceCallback) common.
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
-				Type:        v1.JSON{}.OpenAPISchemaType(),
-				Format:      v1.JSON{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSON{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSON{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -48195,8 +48207,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrArray(ref common.Referenc
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps or an array of JSONSchemaProps. Mainly here for serialization purposes.",
-				Type:        v1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -48207,8 +48219,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrBool(ref common.Reference
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value. Defaults to true for the boolean property.",
-				Type:        v1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -48219,8 +48231,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrStringArray(ref common.Re
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.",
-				Type:        v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
 			},
 		},
 	}

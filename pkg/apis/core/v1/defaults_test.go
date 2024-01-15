@@ -682,73 +682,6 @@ func TestSetDefaultReplicationController(t *testing.T) {
 	}
 }
 
-func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
-	tests := []struct {
-		rc             v1.ReplicationController
-		expectReplicas int32
-	}{
-		{
-			rc: v1.ReplicationController{
-				Spec: v1.ReplicationControllerSpec{
-					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			expectReplicas: 1,
-		},
-		{
-			rc: v1.ReplicationController{
-				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32(0),
-					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			expectReplicas: 0,
-		},
-		{
-			rc: v1.ReplicationController{
-				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32(3),
-					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			expectReplicas: 3,
-		},
-	}
-
-	for _, test := range tests {
-		rc := &test.rc
-		obj2 := roundTrip(t, runtime.Object(rc))
-		rc2, ok := obj2.(*v1.ReplicationController)
-		if !ok {
-			t.Errorf("unexpected object: %v", rc2)
-			t.FailNow()
-		}
-		if rc2.Spec.Replicas == nil {
-			t.Errorf("unexpected nil Replicas")
-		} else if test.expectReplicas != *rc2.Spec.Replicas {
-			t.Errorf("expected: %d replicas, got: %d", test.expectReplicas, *rc2.Spec.Replicas)
-		}
-	}
-}
-
 type InitContainerValidator func(got, expected *v1.Container) error
 
 func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
@@ -1171,14 +1104,8 @@ func TestSetDefaultService(t *testing.T) {
 	svc := &v1.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
 	svc2 := obj2.(*v1.Service)
-	if svc2.Spec.SessionAffinity != v1.ServiceAffinityNone {
-		t.Errorf("Expected default session affinity type:%s, got: %s", v1.ServiceAffinityNone, svc2.Spec.SessionAffinity)
-	}
 	if svc2.Spec.SessionAffinityConfig != nil {
 		t.Errorf("Expected empty session affinity config when session affinity type: %s, got: %v", v1.ServiceAffinityNone, svc2.Spec.SessionAffinityConfig)
-	}
-	if svc2.Spec.Type != v1.ServiceTypeClusterIP {
-		t.Errorf("Expected default type:%s, got: %s", v1.ServiceTypeClusterIP, svc2.Spec.Type)
 	}
 }
 

@@ -80,9 +80,7 @@ func SetObjectDefaults_MutatingWebhookConfigurationList(in *v1beta1.MutatingWebh
 }
 
 func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1beta1.ValidatingAdmissionPolicy) {
-	SetDefaults_ValidatingAdmissionPolicySpec(&in.Spec)
 	if in.Spec.MatchConstraints != nil {
-		SetDefaults_MatchResources(in.Spec.MatchConstraints)
 		for i := range in.Spec.MatchConstraints.ResourceRules {
 			a := &in.Spec.MatchConstraints.ResourceRules[i]
 			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
@@ -91,12 +89,13 @@ func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1beta1.ValidatingAdmission
 			a := &in.Spec.MatchConstraints.ExcludeResourceRules[i]
 			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
 		}
+		SetDefaults_MatchResources(in.Spec.MatchConstraints)
 	}
+	SetDefaults_ValidatingAdmissionPolicySpec(&in.Spec)
 }
 
 func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1beta1.ValidatingAdmissionPolicyBinding) {
 	if in.Spec.MatchResources != nil {
-		SetDefaults_MatchResources(in.Spec.MatchResources)
 		for i := range in.Spec.MatchResources.ResourceRules {
 			a := &in.Spec.MatchResources.ResourceRules[i]
 			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
@@ -105,6 +104,7 @@ func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1beta1.ValidatingAd
 			a := &in.Spec.MatchResources.ExcludeResourceRules[i]
 			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
 		}
+		SetDefaults_MatchResources(in.Spec.MatchResources)
 	}
 }
 
