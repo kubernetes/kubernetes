@@ -2265,38 +2265,39 @@ func verifyStatefulSetPVCsExist(ctx context.Context, c clientset.Interface, ss *
 	for _, id := range claimIds {
 		idSet[id] = struct{}{}
 	}
-	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
-		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
-		if err != nil {
-			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
-			return false, nil
-		}
-		for _, claim := range ss.Spec.VolumeClaimTemplates {
-			pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
-			seenPVCs := map[int]struct{}{}
-			for _, pvc := range pvcList.Items {
-				matches := pvcNameRE.FindStringSubmatch(pvc.Name)
-				if len(matches) != 2 {
-					continue
+	return wait.PollUntilContextTimeout(context.Background(), e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+			if err != nil {
+				framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
+				return false, nil
+			}
+			for _, claim := range ss.Spec.VolumeClaimTemplates {
+				pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
+				seenPVCs := map[int]struct{}{}
+				for _, pvc := range pvcList.Items {
+					matches := pvcNameRE.FindStringSubmatch(pvc.Name)
+					if len(matches) != 2 {
+						continue
+					}
+					ordinal, err := strconv.ParseInt(matches[1], 10, 32)
+					if err != nil {
+						framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
+						return false, err
+					}
+					if _, found := idSet[int(ordinal)]; !found {
+						return false, nil // Retry until the PVCs are consistent.
+					} else {
+						seenPVCs[int(ordinal)] = struct{}{}
+					}
 				}
-				ordinal, err := strconv.ParseInt(matches[1], 10, 32)
-				if err != nil {
-					framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
-					return false, err
-				}
-				if _, found := idSet[int(ordinal)]; !found {
+				if len(seenPVCs) != len(idSet) {
+					framework.Logf("Found %d of %d PVCs", len(seenPVCs), len(idSet))
 					return false, nil // Retry until the PVCs are consistent.
-				} else {
-					seenPVCs[int(ordinal)] = struct{}{}
 				}
 			}
-			if len(seenPVCs) != len(idSet) {
-				framework.Logf("Found %d of %d PVCs", len(seenPVCs), len(idSet))
-				return false, nil // Retry until the PVCs are consistent.
-			}
-		}
-		return true, nil
-	})
+			return true, nil
+		})
 }
 
 // verifyStatefulSetPVCsExistWithOwnerRefs works as verifyStatefulSetPVCsExist, but also waits for the ownerRefs to match.
@@ -2310,61 +2311,62 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.In
 	if setUID == "" {
 		framework.Failf("Statefulset %s missing UID", ss.Name)
 	}
-	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
-		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
-		if err != nil {
-			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
-			return false, nil
-		}
-		for _, claim := range ss.Spec.VolumeClaimTemplates {
-			pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
-			seenPVCs := map[int]struct{}{}
-			for _, pvc := range pvcList.Items {
-				matches := pvcNameRE.FindStringSubmatch(pvc.Name)
-				if len(matches) != 2 {
-					continue
+	return wait.PollUntilContextTimeout(context.Background(), e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+			if err != nil {
+				framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
+				return false, nil
+			}
+			for _, claim := range ss.Spec.VolumeClaimTemplates {
+				pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
+				seenPVCs := map[int]struct{}{}
+				for _, pvc := range pvcList.Items {
+					matches := pvcNameRE.FindStringSubmatch(pvc.Name)
+					if len(matches) != 2 {
+						continue
+					}
+					ordinal, err := strconv.ParseInt(matches[1], 10, 32)
+					if err != nil {
+						framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
+						return false, err
+					}
+					if _, found := indexSet[int(ordinal)]; !found {
+						framework.Logf("Unexpected, retrying")
+						return false, nil // Retry until the PVCs are consistent.
+					}
+					var foundSetRef, foundPodRef bool
+					for _, ref := range pvc.GetOwnerReferences() {
+						if ref.Kind == "StatefulSet" && ref.UID == setUID {
+							foundSetRef = true
+						}
+						if ref.Kind == "Pod" {
+							podName := fmt.Sprintf("%s-%d", ss.Name, ordinal)
+							pod, err := c.CoreV1().Pods(ss.Namespace).Get(ctx, podName, metav1.GetOptions{})
+							if err != nil {
+								framework.Logf("Pod %s not found, retrying (%v)", podName, err)
+								return false, nil
+							}
+							podUID := pod.GetUID()
+							if podUID == "" {
+								framework.Failf("Pod %s is missing UID", pod.Name)
+							}
+							if ref.UID == podUID {
+								foundPodRef = true
+							}
+						}
+					}
+					if foundSetRef == wantSetRef && foundPodRef == wantPodRef {
+						seenPVCs[int(ordinal)] = struct{}{}
+					}
 				}
-				ordinal, err := strconv.ParseInt(matches[1], 10, 32)
-				if err != nil {
-					framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
-					return false, err
-				}
-				if _, found := indexSet[int(ordinal)]; !found {
-					framework.Logf("Unexpected, retrying")
+				if len(seenPVCs) != len(indexSet) {
+					framework.Logf("Only %d PVCs, retrying", len(seenPVCs))
 					return false, nil // Retry until the PVCs are consistent.
 				}
-				var foundSetRef, foundPodRef bool
-				for _, ref := range pvc.GetOwnerReferences() {
-					if ref.Kind == "StatefulSet" && ref.UID == setUID {
-						foundSetRef = true
-					}
-					if ref.Kind == "Pod" {
-						podName := fmt.Sprintf("%s-%d", ss.Name, ordinal)
-						pod, err := c.CoreV1().Pods(ss.Namespace).Get(ctx, podName, metav1.GetOptions{})
-						if err != nil {
-							framework.Logf("Pod %s not found, retrying (%v)", podName, err)
-							return false, nil
-						}
-						podUID := pod.GetUID()
-						if podUID == "" {
-							framework.Failf("Pod %s is missing UID", pod.Name)
-						}
-						if ref.UID == podUID {
-							foundPodRef = true
-						}
-					}
-				}
-				if foundSetRef == wantSetRef && foundPodRef == wantPodRef {
-					seenPVCs[int(ordinal)] = struct{}{}
-				}
 			}
-			if len(seenPVCs) != len(indexSet) {
-				framework.Logf("Only %d PVCs, retrying", len(seenPVCs))
-				return false, nil // Retry until the PVCs are consistent.
-			}
-		}
-		return true, nil
-	})
+			return true, nil
+		})
 }
 
 // expectPodNames compares the names of the pods from actualPods with expectedPodNames.

@@ -830,13 +830,14 @@ func IsSaturated(deployment *apps.Deployment, rs *apps.ReplicaSet) bool {
 // Returns error if polling timesout.
 func WaitForObservedDeployment(getDeploymentFunc func() (*apps.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	// TODO: This should take clientset.Interface when all code is updated to use clientset. Keeping it this way allows the function to be used by callers who have client.Interface.
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := getDeploymentFunc()
-		if err != nil {
-			return false, err
-		}
-		return deployment.Status.ObservedGeneration >= desiredGeneration, nil
-	})
+	return wait.PollUntilContextTimeout(context.Background(), interval, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			deployment, err := getDeploymentFunc()
+			if err != nil {
+				return false, err
+			}
+			return deployment.Status.ObservedGeneration >= desiredGeneration, nil
+		})
 }
 
 // ResolveFenceposts resolves both maxSurge and maxUnavailable. This needs to happen in one

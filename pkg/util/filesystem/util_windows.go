@@ -20,6 +20,7 @@ limitations under the License.
 package filesystem
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -60,8 +61,8 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 	// on the Unix Domain socket working on the very first try, hence the potential need to
 	// dial multiple times
 	var lastSocketErr error
-	err := wait.PollImmediate(socketDialRetryPeriod, socketDialTimeout,
-		func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), socketDialRetryPeriod, socketDialTimeout, true,
+		func(ctx context.Context) (bool, error) {
 			klog.V(6).InfoS("Dialing the socket", "filePath", filePath)
 			var c net.Conn
 			c, lastSocketErr = net.Dial("unix", filePath)
@@ -76,7 +77,7 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 			return false, nil
 		})
 
-	// PollImmediate will return "timed out waiting for the condition" if the function it
+	// PollUntilContextTimeout will return "timed out waiting for the condition" if the function it
 	// invokes never returns true
 	if err != nil {
 		klog.V(2).InfoS("Failed all attempts to dial the socket so marking it as a non-Unix Domain socket. Last socket error along with the error from PollImmediate follow",

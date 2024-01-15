@@ -689,7 +689,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	var zoneToNodeConditionsLock sync.Mutex
 	zoneToNodeConditions := map[string][]*v1.NodeCondition{}
 	updateNodeFunc := func(piece int) {
-		start := nc.now()
+		start = nc.now()
 		defer func() {
 			updateNodeHealthDuration.Observe(time.Since(start.Time).Seconds())
 		}()
@@ -698,20 +698,20 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		var currentReadyCondition *v1.NodeCondition
 		node := nodes[piece].DeepCopy()
 
-		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) {
-			var err error
-			_, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(ctx, node)
-			if err == nil {
-				return true, nil
-			}
-			name := node.Name
-			node, err = nc.kubeClient.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
-			if err != nil {
-				logger.Error(nil, "Failed while getting a Node to retry updating node health. Probably Node was deleted", "node", klog.KRef("", name))
-				return false, err
-			}
-			return false, nil
-		}); err != nil {
+		if err = wait.PollUntilContextTimeout(context.Background(), retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, true,
+			func(ctx context.Context) (bool, error) {
+				_, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(ctx, node)
+				if err == nil {
+					return true, nil
+				}
+				name := node.Name
+				node, err = nc.kubeClient.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					logger.Error(nil, "Failed while getting a Node to retry updating node health. Probably Node was deleted", "node", klog.KRef("", name))
+					return false, err
+				}
+				return false, nil
+			}); err != nil {
 			logger.Error(err, "Update health of Node from Controller error, Skipping - no pods will be evicted", "node", klog.KObj(node))
 			return
 		}

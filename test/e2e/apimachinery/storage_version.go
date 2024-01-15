@@ -69,18 +69,19 @@ var _ = SIGDescribe("StorageVersion resources", feature.StorageVersionAPI, func(
 
 		// wait for sv to be GC'ed
 		framework.Logf("Waiting for storage version %v to be garbage collected", createdSV.Name)
-		err = wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-			_, err := client.InternalV1alpha1().StorageVersions().Get(
-				ctx, createdSV.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			if err != nil {
-				return false, err
-			}
-			framework.Logf("The storage version %v hasn't been garbage collected yet. Retrying", createdSV.Name)
-			return false, nil
-		})
+		err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				_, err := client.InternalV1alpha1().StorageVersions().Get(
+					ctx, createdSV.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				if err != nil {
+					return false, err
+				}
+				framework.Logf("The storage version %v hasn't been garbage collected yet. Retrying", createdSV.Name)
+				return false, nil
+			})
 		framework.ExpectNoError(err, "garbage-collecting storage version")
 	})
 })

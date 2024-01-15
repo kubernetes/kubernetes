@@ -160,15 +160,20 @@ func (m *Stub) Start() error {
 	}()
 
 	var lastDialErr error
-	wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
-		var conn *grpc.ClientConn
-		_, conn, lastDialErr = dial(m.socket)
-		if lastDialErr != nil {
-			return false, nil
-		}
-		conn.Close()
-		return true, nil
-	})
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			var conn *grpc.ClientConn
+			_, conn, lastDialErr = dial(m.socket)
+			if lastDialErr != nil {
+				return false, nil
+			}
+			conn.Close()
+			return true, nil
+		})
+
+	if err != nil {
+		return err
+	}
 	if lastDialErr != nil {
 		return lastDialErr
 	}

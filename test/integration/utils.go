@@ -55,16 +55,17 @@ var (
 
 // WaitForPodToDisappear polls the API server if the pod has been deleted.
 func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, interval, timeout time.Duration) error {
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
-		if err == nil {
-			return false, nil
-		}
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	})
+	return wait.PollUntilContextTimeout(context.Background(), interval, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			_, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
+			if err == nil {
+				return false, nil
+			}
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		})
 }
 
 // GetEtcdClients returns an initialized  clientv3.Client and clientv3.KV.
