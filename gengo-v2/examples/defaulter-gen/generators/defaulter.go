@@ -282,6 +282,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var peerPkgs []string
 	if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
 		for _, pkg := range customArgs.ExtraPeerDirs {
+			// In case someone specifies a peer as a path into vendor, convert
+			// it to its "real" package path.
 			if i := strings.Index(pkg, "/vendor/"); i != -1 {
 				pkg = pkg[i+len("/vendor/"):]
 			}
@@ -313,8 +315,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		// typesPkg is where the types that needs defaulter are defined.
 		// Sometimes it is different from pkg. For example, kubernetes core/v1
-		// types are defined in vendor/k8s.io/api/core/v1, while pkg is at
-		// pkg/api/v1.
+		// types are defined in k8s.io/api/core/v1, while the pkg which holds
+		// defaulter code is at k/k/pkg/api/v1.
 		typesPkg := pkg
 
 		// Add defaulting functions.
@@ -422,25 +424,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			klog.V(5).Infof("no defaulters in package %s", pkg.Name)
 		}
 
-		path := pkg.Path
-		// if the source path is within a /vendor/ directory (for example,
-		// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-		// generation to output to the proper relative path (under vendor).
-		// Otherwise, the generator will create the file in the wrong location
-		// in the output directory.
-		// TODO: build a more fundamental concept in gengo for dealing with modifications
-		// to vendored packages.
-		if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
-			expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
-			if strings.Contains(expandedPath, "/vendor/") {
-				path = expandedPath
-			}
-		}
-
 		packages = append(packages,
 			&generator.DefaultPackage{
 				PackageName: filepath.Base(pkg.Path),
-				PackagePath: path,
+				PackagePath: pkg.Path,
 				Source:      pkg.SourcePath, // output pkg is the same as the input
 				HeaderText:  header,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {

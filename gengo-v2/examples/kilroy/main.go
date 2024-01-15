@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/spf13/pflag"
 	"k8s.io/gengo/v2/args"
@@ -130,25 +129,9 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 			continue
 		}
 
-		path := pkg.Path
-		// if the source path is within a /vendor/ directory (for example,
-		// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-		// generation to output to the proper relative path (under vendor).
-		// Otherwise, the generator will create the file in the wrong location
-		// in the output directory.
-		// TODO: build a more fundamental concept in gengo for dealing with modifications
-		// to vendored packages.
-		if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
-			expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
-			expandedPath = strings.TrimPrefix(expandedPath, "/")
-			if strings.Contains(expandedPath, "/vendor/") {
-				path = expandedPath
-			}
-		}
-
 		pkgs = append(pkgs, &generator.DefaultPackage{
 			PackageName: pkg.Name,
-			PackagePath: path,           // output pkg is the same as the input
+			PackagePath: pkg.Path,       // output pkg is the same as the input
 			Source:      pkg.SourcePath, // output pkg is the same as the input
 			HeaderText:  header,
 			// FilterFunc returns true if this Package cares about this type.
