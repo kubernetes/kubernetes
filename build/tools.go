@@ -28,7 +28,6 @@ import (
 	_ "k8s.io/gengo/examples/deepcopy-gen/generators"
 	_ "k8s.io/gengo/examples/defaulter-gen/generators"
 	_ "k8s.io/gengo/examples/import-boss/generators"
-	_ "k8s.io/gengo/examples/set-gen/generators"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
 
 	// submodule test dependencies
