@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kube-openapi/pkg/util/sets"
 
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 )
 
 var (
