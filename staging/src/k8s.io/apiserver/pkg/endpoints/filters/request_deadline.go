@@ -32,6 +32,8 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -93,8 +95,27 @@ func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.Pol
 			started = requestStartedTimestamp
 		}
 
-		ctx, cancel := context.WithDeadline(ctx, started.Add(timeout))
+		deadline := started.Add(timeout)
+		ctx, cancel := context.WithDeadline(ctx, deadline)
 		defer cancel()
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PerHandlerReadWriteTimeout) {
+			// per handler read and write timeout deadline,
+			// they are set to the overall request timeout.
+			ctrl := http.NewResponseController(w)
+			// TODO: once https://github.com/golang/go/issues/58237
+			// is fixed, we can remove the content length check
+			if req.ContentLength != 0 {
+				if err := ctrl.SetReadDeadline(deadline); err != nil {
+					handleError(w, req, http.StatusInternalServerError, "failed to set request read deadline", err)
+					return
+				}
+			}
+			if err := ctrl.SetWriteDeadline(deadline); err != nil {
+				handleError(w, req, http.StatusInternalServerError, "failed to set request write deadline", err)
+				return
+			}
+		}
 
 		req = req.WithContext(ctx)
 		handler.ServeHTTP(w, req)

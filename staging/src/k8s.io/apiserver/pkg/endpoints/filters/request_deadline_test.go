@@ -41,6 +41,9 @@ import (
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -440,6 +443,130 @@ func TestWithFailedRequestAudit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWithRequestDeadlineWithPerHandlerReadWriteTimeoutNonLongRunningRequest(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, true)()
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	// we want a non long-running request
+	fakeReqResolver := &fakeRequestResolver{reqInfo: &request.RequestInfo{Verb: "get"}}
+	longRunningFn := func(_ *http.Request, _ *request.RequestInfo) bool { return false }
+	timeoutWant := time.Second
+
+	var invoked bool
+	var deadlineWant time.Time
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		invoked = true
+		ctx := r.Context()
+
+		reqInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			t.Errorf("expected the request context to have a RequestInfo associated")
+			return
+		}
+		if isLongRunning := longRunningFn(r, reqInfo); isLongRunning {
+			t.Errorf("wrong test setup, wanted a non long-running request, but got long-running: %t, request-info: %#v", isLongRunning, reqInfo)
+			return
+		}
+		receivedAt, ok := request.ReceivedTimestampFrom(ctx)
+		if !ok {
+			t.Errorf("expected the request context to have a received at timestamp, but got: %s", receivedAt)
+		}
+		deadlineWant, ok = ctx.Deadline()
+		if !ok {
+			t.Errorf("expected the request context to have a deadline")
+		}
+		if timeoutGot := deadlineWant.Sub(receivedAt); timeoutWant != timeoutGot {
+			t.Errorf("expected the request context to have a deadline of: %s, but got: %s", timeoutWant, timeoutGot)
+		}
+	})
+	handler := withRequestDeadline(h, &fakeAuditSink{}, fakeRuleEvaluator, longRunningFn, newSerializer(), time.Minute, fakeClock)
+	handler = WithRequestInfo(handler, fakeReqResolver)
+	handler = withRequestReceivedTimestampWithClock(handler, fakeClock)
+	handler = WithAuditInit(handler)
+
+	bodyReader := strings.NewReader("request with a body")
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/ping?timeout=%s", timeoutWant), bodyReader)
+	if err != nil {
+		t.Errorf("failed to create a new http request - %v", err)
+		return
+	}
+
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
+	handler.ServeHTTP(w, req)
+
+	if !invoked {
+		t.Errorf("expected the request handler to have been invoked")
+	}
+	if len(w.ReadDeadlines) == 0 || w.ReadDeadlines[0] != deadlineWant || len(w.ReadDeadlines) > 1 {
+		t.Errorf("expected the read timeout to be set at %s, but got: %v", deadlineWant, w.ReadDeadlines)
+	}
+	if len(w.WriteDeadlines) == 0 || w.WriteDeadlines[0] != deadlineWant || len(w.WriteDeadlines) > 1 {
+		t.Errorf("expected the write timeout to be set at %s, but got: %v", deadlineWant, w.WriteDeadlines)
+	}
+}
+
+func TestWithRequestDeadlineWithPerHandlerReadWriteTimeoutWatchRequest(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, true)()
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	// we want a WATCH request
+	fakeReqResolver := &fakeRequestResolver{reqInfo: &request.RequestInfo{Verb: "watch"}}
+	longRunningFn := func(_ *http.Request, _ *request.RequestInfo) bool { return true }
+
+	var invoked bool
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		invoked = true
+		ctx := r.Context()
+
+		reqInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			t.Errorf("expected the request context to have a RequestInfo associated")
+			return
+		}
+		if isLongRunning := longRunningFn(r, reqInfo); !isLongRunning || reqInfo.Verb != "watch" {
+			t.Errorf("wrong test setup, wanted a watch request, but got long-running: %t, request-info: %#v", isLongRunning, reqInfo)
+			return
+		}
+		receivedAt, ok := request.ReceivedTimestampFrom(ctx)
+		if !ok {
+			t.Errorf("expected the request context to have a received at timestamp, but got: %s", receivedAt)
+		}
+		if _, ok = ctx.Deadline(); ok {
+			t.Errorf("did not expect the request context to have a deadline")
+		}
+	})
+	handler := withRequestDeadline(h, &fakeAuditSink{}, fakeRuleEvaluator, longRunningFn, newSerializer(), time.Minute, fakeClock)
+	handler = WithRequestInfo(handler, fakeReqResolver)
+	handler = withRequestReceivedTimestampWithClock(handler, fakeClock)
+	handler = WithAuditInit(handler)
+
+	bodyReader := strings.NewReader("request with a body")
+	req, err := http.NewRequest(http.MethodGet, "/ping?timeout=10s&watch=1&timeoutSeconds=10", bodyReader)
+	if err != nil {
+		t.Errorf("failed to create a new http request - %v", err)
+		return
+	}
+
+	// TODO: remove WithFakeResponseController once
+	//  https://github.com/golang/go/issues/60229 is fixed.
+	w := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
+	handler.ServeHTTP(w, req)
+
+	if !invoked {
+		t.Errorf("expected the request handler to have been invoked")
+	}
+	if len(w.ReadDeadlines) != 0 {
+		t.Errorf("did not expect the read timeout to be set, but got: %v", w.ReadDeadlines)
+	}
+	if len(w.WriteDeadlines) != 0 {
+		t.Errorf("did not expect the write timeout to be set, but got: %v", w.WriteDeadlines)
 	}
 }
 
@@ -1420,9 +1547,14 @@ func newSerializer() runtime.NegotiatedSerializer {
 	return serializer.NewCodecFactory(scheme).WithoutConversion()
 }
 
-type fakeRequestResolver struct{}
+type fakeRequestResolver struct {
+	reqInfo *request.RequestInfo
+}
 
 func (r fakeRequestResolver) NewRequestInfo(req *http.Request) (*request.RequestInfo, error) {
+	if r.reqInfo != nil {
+		return r.reqInfo, nil
+	}
 	return &request.RequestInfo{}, nil
 }
 
