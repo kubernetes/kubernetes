@@ -33,7 +33,7 @@ function kube::codegen::internal::git_find() {
 function kube::codegen::internal::git_grep() {
     # We want to include modified and untracked files because this might be
     # running against code which is not tracked by git yet.
-    git grep --untracked "$@"
+    git grep --untracked "$@" ":(exclude)vendor/"
 }
 
 # Generate tagged helper code: conversions, deepcopy, and defaults
