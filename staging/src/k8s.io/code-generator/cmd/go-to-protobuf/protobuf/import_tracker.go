@@ -17,8 +17,8 @@ limitations under the License.
 package protobuf
 
 import (
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 type ImportTracker struct {
