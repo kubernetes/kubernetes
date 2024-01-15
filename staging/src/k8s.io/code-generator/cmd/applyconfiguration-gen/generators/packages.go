@@ -158,9 +158,6 @@ func friendlyName(name string) string {
 
 func typeName(t *types.Type) string {
 	typePackage := t.Name.Package
-	if strings.Contains(typePackage, "/vendor/") {
-		typePackage = typePackage[strings.Index(typePackage, "/vendor/")+len("/vendor/"):]
-	}
 	return fmt.Sprintf("%s.%s", typePackage, t.Name.Name)
 }
 

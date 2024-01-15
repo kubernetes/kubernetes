@@ -33,7 +33,6 @@ import (
 	"k8s.io/klog/v2"
 
 	conversionargs "k8s.io/code-generator/cmd/conversion-gen/args"
-	genutil "k8s.io/code-generator/pkg/util"
 )
 
 // These are the comment tags that carry parameters for conversion generation.
@@ -273,19 +272,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	// Make sure explicit peer-packages are added.
-	var sanitizedPeerPkgs []string
 	if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
-		all := append(customArgs.BasePeerDirs, customArgs.ExtraPeerDirs...)
-		for _, pkg := range all {
-			// if the source path is within a /vendor/ directory (for example,
-			// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-			// generation to output to the proper relative path (under vendor).
-			// Otherwise, the generator will create the file in the wrong location
-			// in the output directory.
-			pkg = genutil.Vendorless(pkg)
-			sanitizedPeerPkgs = append(sanitizedPeerPkgs, pkg)
-		}
-		if expanded, err := context.FindPackages(sanitizedPeerPkgs...); err != nil {
+		peers := append(customArgs.BasePeerDirs, customArgs.ExtraPeerDirs...)
+		if expanded, err := context.FindPackages(peers...); err != nil {
 			klog.Fatalf("cannot find peer packages: %v", err)
 		} else {
 			otherPkgs = append(otherPkgs, expanded...)
@@ -326,7 +315,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		pkg := context.Universe[i]
 		// typesPkg is where the versioned types are defined. Sometimes it is
 		// different from pkg. For example, kubernetes core/v1 types are defined
-		// in vendor/k8s.io/api/core/v1, while pkg is at pkg/api/v1.
+		// in k8s.io/api/core/v1, while pkg is at pkg/api/v1.
 		typesPkg := pkg
 
 		// Add conversion and defaulting functions.
@@ -341,29 +330,15 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			unsafeEquality = noEquality{}
 		}
 
-		path := pkg.Path
-		// if the source path is within a /vendor/ directory (for example,
-		// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-		// generation to output to the proper relative path (under vendor).
-		// Otherwise, the generator will create the file in the wrong location
-		// in the output directory.
-		// TODO: build a more fundamental concept in gengo for dealing with modifications
-		// to vendored packages.
-		if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
-			expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
-			if strings.Contains(expandedPath, "/vendor/") {
-				path = expandedPath
-			}
-		}
 		packages = append(packages,
 			&generator.DefaultPackage{
 				PackageName: filepath.Base(pkg.Path),
-				PackagePath: path,
+				PackagePath: pkg.Path,
 				Source:      pkg.SourcePath, // output pkg is the same as the input
 				HeaderText:  header,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
-						NewGenConversion(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, manualConversions, pkgToPeers[path], unsafeEquality),
+						NewGenConversion(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, manualConversions, pkgToPeers[pkg.Path], unsafeEquality),
 					}
 				},
 				FilterFunc: func(c *generator.Context, t *types.Type) bool {

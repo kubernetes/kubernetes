@@ -122,7 +122,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	internalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	groupGoNames := make(map[string]string)
 	for _, inputDir := range arguments.InputDirs {
-		p := context.Universe.Package(genutil.Vendorless(inputDir))
+		p := context.Universe.Package(inputDir)
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {

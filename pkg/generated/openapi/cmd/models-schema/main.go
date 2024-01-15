@@ -76,7 +76,7 @@ func output() error {
 	return nil
 }
 
-// From vendor/k8s.io/apiserver/pkg/endpoints/openapi/openapi.go
+// From k8s.io/apiserver/pkg/endpoints/openapi/openapi.go
 func friendlyName(name string) string {
 	nameParts := strings.Split(name, "/")
 	// Reverse first part. e.g., io.k8s... instead of k8s.io...

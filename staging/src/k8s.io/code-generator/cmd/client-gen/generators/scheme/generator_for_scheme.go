@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/code-generator/cmd/client-gen/path"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -70,10 +69,10 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 				}
 				packagePath = filepath.Join(packagePath, "install")
 
-				imports = append(imports, fmt.Sprintf("%s \"%s\"", groupAlias, path.Vendorless(packagePath)))
+				imports = append(imports, fmt.Sprintf("%s \"%s\"", groupAlias, packagePath))
 				break
 			} else {
-				imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.Version.NonEmpty()), path.Vendorless(packagePath)))
+				imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.Version.NonEmpty()), packagePath))
 			}
 		}
 	}
