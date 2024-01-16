@@ -104,8 +104,7 @@ func Run(g *Generator) {
 
 	// Roughly models gengo/v2/args.GeneratorArgs.NewBuilder.
 
-	b := parser.New()
-	b.AddBuildTags("proto")
+	b := parser.NewWithOptions(parser.Options{BuildTags: []string{"proto"}})
 
 	var allInputs []string
 	if len(g.APIMachineryPackages) != 0 {
