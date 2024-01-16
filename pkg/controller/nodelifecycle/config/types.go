@@ -22,11 +22,11 @@ import (
 
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
-	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
+	// NodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
 	NodeEvictionRate float32
-	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy
+	// SecondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy
 	SecondaryNodeEvictionRate float32
-	// nodeStartupGracePeriod is the amount of time which we allow starting a node to
+	// NodeStartupGracePeriod is the amount of time which we allow starting a node to
 	// be unresponsive before marking it unhealthy.
 	NodeStartupGracePeriod metav1.Duration
 	// NodeMonitorGracePeriod is the amount of time which we allow a running node to be
@@ -34,9 +34,9 @@ type NodeLifecycleControllerConfiguration struct {
 	// nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet
 	// to post node status.
 	NodeMonitorGracePeriod metav1.Duration
-	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
+	// LargeClusterSizeThreshold is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
 	LargeClusterSizeThreshold int32
-	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
-	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
+	// UnhealthyZoneThreshold defines the threshold at which a zone is treated as unhealthy in NodeEvictionRate and SecondaryNodeEvictionRate.
+	// It occurs when at least UnhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
 }
