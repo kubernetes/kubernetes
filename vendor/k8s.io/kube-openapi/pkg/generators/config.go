@@ -74,12 +74,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	return generator.Packages{
-		&generator.DefaultPackage{
-			PackageName: filepath.Base(arguments.OutputBase),
-			PackagePath: customArgs.OutputPackage,
-			Source:      arguments.OutputBase,
-			HeaderText:  header,
-			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		&generator.SimplePackage{
+			PkgName:       filepath.Base(arguments.OutputBase),
+			PkgPath:       customArgs.OutputPackage,
+			PkgDir:        arguments.OutputBase,
+			HeaderComment: header,
+			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newOpenAPIGen(
 						arguments.OutputFileBaseName,
