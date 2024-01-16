@@ -180,6 +180,7 @@ func AddHandlers(h printers.PrintHandler) {
 	cronJobColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Schedule", Type: "string", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["schedule"]},
+		{Name: "Timezone", Type: "string", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["timeZone"]},
 		{Name: "Suspend", Type: "boolean", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["suspend"]},
 		{Name: "Active", Type: "integer", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["active"]},
 		{Name: "Last Schedule", Type: "string", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["lastScheduleTime"]},
@@ -1185,7 +1186,12 @@ func printCronJob(obj *batch.CronJob, options printers.GenerateOptions) ([]metav
 		lastScheduleTime = translateTimestampSince(*obj.Status.LastScheduleTime)
 	}
 
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestampSince(obj.CreationTimestamp))
+	timeZone := "<none>"
+	if obj.Spec.TimeZone != nil {
+		timeZone = *obj.Spec.TimeZone
+	}
+
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, timeZone, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector))
