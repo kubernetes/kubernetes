@@ -184,7 +184,7 @@ func Run(g *Generator) {
 	}
 
 	protobufNames := NewProtobufNamer()
-	outputPackages := []generator.Package{}
+	outputPackages := []generator.Target{}
 	nonOutputPackages := map[string]struct{}{}
 
 	for _, input := range c.Inputs {
@@ -230,7 +230,7 @@ func Run(g *Generator) {
 	}
 	sort.Sort(positionOrder{topologicalPos, protobufNames.packages})
 
-	var localOutputPackages []generator.Package
+	var localOutputPackages []generator.Target
 	for _, p := range protobufNames.packages {
 		if _, ok := nonOutputPackages[p.Name()]; ok {
 			// if we're not outputting the package, don't include it in either package list
@@ -243,7 +243,7 @@ func Run(g *Generator) {
 		log.Fatalf("Failed to identify Common types: %v", err)
 	}
 
-	if err := c.ExecutePackages(localOutputPackages); err != nil {
+	if err := c.ExecuteTargets(localOutputPackages); err != nil {
 		log.Fatalf("Failed executing local generator: %v", err)
 	}
 
@@ -337,7 +337,7 @@ func Run(g *Generator) {
 			p := outputPackage.(*protobufPackage)
 			p.OmitGogo = true
 		}
-		if err := c.ExecutePackages(localOutputPackages); err != nil {
+		if err := c.ExecuteTargets(localOutputPackages); err != nil {
 			log.Fatalf("Failed executing local generator: %v", err)
 		}
 	}

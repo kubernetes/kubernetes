@@ -42,14 +42,14 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-// Packages makes packages to generate.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
+// GetTargets makes targets to generate.
+func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	packages := []generator.Package{}
+	targets := []generator.Target{}
 	for _, input := range context.Inputs {
 		pkg := context.Universe.Package(input)
 		internal, err := isInternal(pkg)
@@ -99,8 +99,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 			}
 		}
 
-		packages = append(packages,
-			&generator.SimplePackage{
+		targets = append(targets,
+			&generator.SimpleTarget{
 				PkgName:       pkg.Name,
 				PkgPath:       pkg.Path,       // output to same pkg as input
 				PkgDir:        pkg.SourcePath, // output to same pkg as input
@@ -121,7 +121,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 			})
 	}
 
-	return packages
+	return targets
 }
 
 // isInternal determines whether the given package

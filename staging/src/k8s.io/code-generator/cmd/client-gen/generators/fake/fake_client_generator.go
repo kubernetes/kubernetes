@@ -29,14 +29,14 @@ import (
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
-func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetDir, clientsetPkg string, groupPkgName string, groupGoName string, inputPkg string, applyBuilderPackage string, boilerplate []byte) generator.Package {
+func TargetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetDir, clientsetPkg string, groupPkgName string, groupGoName string, inputPkg string, applyBuilderPackage string, boilerplate []byte) generator.Target {
 	// TODO: should make this a function, called by here and in client-generator.go
 	subdir := filepath.Join("typed", strings.ToLower(groupPkgName), strings.ToLower(gv.Version.NonEmpty()))
 	outputDir := filepath.Join(clientsetDir, subdir, "fake")
 	outputPkg := filepath.Join(clientsetPkg, subdir, "fake")
 	realClientPkg := filepath.Join(clientsetPkg, subdir)
 
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       "fake",
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,
@@ -87,8 +87,8 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	}
 }
 
-func PackageForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
-	return &generator.SimplePackage{
+func TargetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
+	return &generator.SimpleTarget{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
 		PkgName:       "fake",

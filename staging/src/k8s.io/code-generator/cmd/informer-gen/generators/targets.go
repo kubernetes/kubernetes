@@ -92,8 +92,8 @@ func subdirForInternalInterfaces(base string) string {
 	return filepath.Join(base, "internalinterfaces")
 }
 
-// Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
+// GetTargets makes the client target definition.
+func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -115,7 +115,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 		externalVersionOutputPkg = filepath.Join(externalVersionOutputPkg, "externalversions")
 	}
 
-	var packageList []generator.Package
+	var targetList []generator.Target
 	typesForGroupVersion := make(map[clientgentypes.GroupVersion][]*types.Type)
 
 	externalGroupVersions := make(map[string]clientgentypes.GroupVersions)
@@ -198,15 +198,15 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
 		if internal {
-			packageList = append(packageList,
-				versionPackage(
+			targetList = append(targetList,
+				versionTarget(
 					internalVersionOutputDir, internalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
 					customArgs.InternalClientSetPackage, customArgs.ListersPackage))
 		} else {
-			packageList = append(packageList,
-				versionPackage(
+			targetList = append(targetList,
+				versionTarget(
 					externalVersionOutputDir, externalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
@@ -215,41 +215,41 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 	}
 
 	if len(externalGroupVersions) != 0 {
-		packageList = append(packageList,
-			factoryInterfacePackage(
+		targetList = append(targetList,
+			factoryInterfaceTarget(
 				externalVersionOutputDir, externalVersionOutputPkg,
 				boilerplate, customArgs.VersionedClientSetPackage))
-		packageList = append(packageList,
-			factoryPackage(
+		targetList = append(targetList,
+			factoryTarget(
 				externalVersionOutputDir, externalVersionOutputPkg,
 				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
 				externalGroupVersions, customArgs.VersionedClientSetPackage, typesForGroupVersion))
 		for _, gvs := range externalGroupVersions {
-			packageList = append(packageList,
-				groupPackage(externalVersionOutputDir, externalVersionOutputPkg, gvs, boilerplate))
+			targetList = append(targetList,
+				groupTarget(externalVersionOutputDir, externalVersionOutputPkg, gvs, boilerplate))
 		}
 	}
 
 	if len(internalGroupVersions) != 0 {
-		packageList = append(packageList,
-			factoryInterfacePackage(internalVersionOutputDir, internalVersionOutputPkg, boilerplate, customArgs.InternalClientSetPackage))
-		packageList = append(packageList,
-			factoryPackage(
+		targetList = append(targetList,
+			factoryInterfaceTarget(internalVersionOutputDir, internalVersionOutputPkg, boilerplate, customArgs.InternalClientSetPackage))
+		targetList = append(targetList,
+			factoryTarget(
 				internalVersionOutputDir, internalVersionOutputPkg,
 				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
 				internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion))
 		for _, gvs := range internalGroupVersions {
-			packageList = append(packageList,
-				groupPackage(internalVersionOutputDir, internalVersionOutputPkg, gvs, boilerplate))
+			targetList = append(targetList,
+				groupTarget(internalVersionOutputDir, internalVersionOutputPkg, gvs, boilerplate))
 		}
 	}
 
-	return packageList
+	return targetList
 }
 
-func factoryPackage(outputDirBase, outputPkgBase string, boilerplate []byte, groupGoNames, pluralExceptions map[string]string, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string,
-	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
-	return &generator.SimplePackage{
+func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, groupGoNames, pluralExceptions map[string]string, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string,
+	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Target {
+	return &generator.SimpleTarget{
 		PkgName:       filepath.Base(outputDirBase),
 		PkgPath:       outputPkgBase,
 		PkgDir:        outputDirBase,
@@ -284,11 +284,11 @@ func factoryPackage(outputDirBase, outputPkgBase string, boilerplate []byte, gro
 	}
 }
 
-func factoryInterfacePackage(outputDirBase, outputPkgBase string, boilerplate []byte, clientSetPackage string) generator.Package {
+func factoryInterfaceTarget(outputDirBase, outputPkgBase string, boilerplate []byte, clientSetPackage string) generator.Target {
 	outputDir := subdirForInternalInterfaces(outputDirBase)
 	outputPkg := subdirForInternalInterfaces(outputPkgBase)
 
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       filepath.Base(outputDir),
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,
@@ -308,12 +308,12 @@ func factoryInterfacePackage(outputDirBase, outputPkgBase string, boilerplate []
 	}
 }
 
-func groupPackage(outputDirBase, outputPackageBase string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Package {
+func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Target {
 	outputDir := filepath.Join(outputDirBase, groupVersions.PackageName)
 	outputPkg := filepath.Join(outputPackageBase, groupVersions.PackageName)
 	groupPkgName := strings.Split(string(groupVersions.PackageName), ".")[0]
 
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       groupPkgName,
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,
@@ -337,12 +337,12 @@ func groupPackage(outputDirBase, outputPackageBase string, groupVersions clientg
 	}
 }
 
-func versionPackage(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
+func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Target {
 	subdir := filepath.Join(groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
 	outputDir := filepath.Join(outputDirBase, subdir)
 	outputPkg := filepath.Join(outputPkgBase, subdir)
 
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       strings.ToLower(gv.Version.NonEmpty()),
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,

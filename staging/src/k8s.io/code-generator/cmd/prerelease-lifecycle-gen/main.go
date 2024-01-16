@@ -61,7 +61,7 @@ func main() {
 	if err := genericArgs.Execute(
 		statusgenerators.NameSystems(),
 		statusgenerators.DefaultNameSystem(),
-		statusgenerators.Packages,
+		statusgenerators.GetTargets,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
