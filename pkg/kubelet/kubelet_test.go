@@ -1655,7 +1655,7 @@ func TestCheckpointContainer(t *testing.T) {
 				test.containerName,
 				options,
 			)
-			require.Equal(t, status, test.expectedStatus)
+			require.Equal(t, test.expectedStatus, status)
 
 			if status != nil {
 				return
