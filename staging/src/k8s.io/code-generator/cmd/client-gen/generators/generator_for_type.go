@@ -31,7 +31,7 @@ import (
 
 // genClientForType produces a file for each top-level type.
 type genClientForType struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage             string // must be a Go import-path
 	inputPackage              string
 	clientsetPackage          string // must be a Go import-path

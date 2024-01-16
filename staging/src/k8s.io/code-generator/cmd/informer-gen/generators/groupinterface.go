@@ -29,7 +29,7 @@ import (
 
 // groupInterfaceGenerator generates the per-group interface file.
 type groupInterfaceGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage             string
 	imports                   namer.ImportTracker
 	groupVersions             clientgentypes.GroupVersions

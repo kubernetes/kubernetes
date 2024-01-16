@@ -175,8 +175,8 @@ func (p *protobufPackage) generatorsFunc(c *generator.Context) []generator.Gener
 	p.Imports.AddNullable()
 
 	generators = append(generators, &genProtoIDL{
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "generated",
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "generated", // the extension is added later
 		},
 		localPackage:   types.Name{Package: p.Name(), Path: p.Path()},
 		localGoPackage: types.Name{Package: p.Path(), Name: p.GoPackageName()},

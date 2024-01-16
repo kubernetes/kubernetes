@@ -256,8 +256,8 @@ func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, grou
 		HeaderComment: boilerplate,
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "factory",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "factory.go",
 				},
 				outputPackage:             outputPkgBase,
 				imports:                   generator.NewImportTracker(),
@@ -268,8 +268,8 @@ func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, grou
 			})
 
 			generators = append(generators, &genericGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "generic",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "generic.go",
 				},
 				outputPackage:        outputPkgBase,
 				imports:              generator.NewImportTracker(),
@@ -295,8 +295,8 @@ func factoryInterfaceTarget(outputDirBase, outputPkgBase string, boilerplate []b
 		HeaderComment: boilerplate,
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryInterfaceGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "factory_interfaces",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "factory_interfaces.go",
 				},
 				outputPackage:    outputPkg,
 				imports:          generator.NewImportTracker(),
@@ -320,8 +320,8 @@ func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientge
 		HeaderComment: boilerplate,
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &groupInterfaceGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "interface",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "interface.go",
 				},
 				outputPackage:             outputPkg,
 				groupVersions:             groupVersions,
@@ -349,8 +349,8 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 		HeaderComment: boilerplate,
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &versionInterfaceGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "interface",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "interface.go",
 				},
 				outputPackage:             outputPkg,
 				imports:                   generator.NewImportTracker(),
@@ -360,8 +360,8 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 
 			for _, t := range typesToGenerate {
 				generators = append(generators, &informerGenerator{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: strings.ToLower(t.Name.Name),
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: strings.ToLower(t.Name.Name) + ".go",
 					},
 					outputPackage:             outputPkg,
 					groupPkgName:              groupPkgName,

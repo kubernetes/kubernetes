@@ -34,7 +34,7 @@ import (
 // informerGenerator produces a file of listers for a given GroupVersion and
 // type.
 type informerGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage             string
 	groupPkgName              string
 	groupVersion              clientgentypes.GroupVersion

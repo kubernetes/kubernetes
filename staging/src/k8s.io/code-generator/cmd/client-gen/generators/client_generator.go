@@ -143,14 +143,14 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
-				generator.DefaultGen{OptionalName: "doc"},
+				generator.GoGenerator{OutputFilename: "doc.go"},
 			}
 			// Since we want a file per type that we generate a client for, we
 			// have to provide a function for this.
 			for _, t := range typeList {
 				generators = append(generators, &genClientForType{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: strings.ToLower(c.Namers["private"].Name(t)),
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: strings.ToLower(c.Namers["private"].Name(t)) + ".go",
 					},
 					outputPackage:             gvPkg,
 					inputPackage:              inputPkg,
@@ -165,8 +165,8 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 			}
 
 			generators = append(generators, &genGroup{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: groupPkgName + "_client",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: groupPkgName + "_client.go",
 				},
 				outputPackage:    gvPkg,
 				inputPackage:     inputPkg,
@@ -179,11 +179,11 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 				imports:          generator.NewImportTracker(),
 			})
 
-			expansionFileName := "generated_expansion"
+			expansionFileName := "generated_expansion.go"
 			generators = append(generators, &genExpansion{
 				groupPackagePath: gvDir,
-				DefaultGen: generator.DefaultGen{
-					OptionalName: expansionFileName,
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: expansionFileName,
 				},
 				types: typeList,
 			})
@@ -207,8 +207,8 @@ func targetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				&genClientset{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: "clientset",
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: "clientset.go",
 					},
 					groups:           customArgs.Groups,
 					groupGoNames:     groupGoNames,
@@ -248,11 +248,11 @@ NextGroup:
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
-				generator.DefaultGen{OptionalName: "doc"},
+				generator.GoGenerator{OutputFilename: "doc.go"},
 
 				&scheme.GenScheme{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: "register",
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: "register.go",
 					},
 					InputPackages:  customArgs.GroupVersionPackages(),
 					OutputPackage:  schemePkg,

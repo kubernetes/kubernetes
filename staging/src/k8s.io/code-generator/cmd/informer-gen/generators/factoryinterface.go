@@ -29,7 +29,7 @@ import (
 // factoryInterfaceGenerator produces a file of interfaces used to break a dependency cycle for
 // informer registration
 type factoryInterfaceGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage    string
 	imports          namer.ImportTracker
 	clientSetPackage string

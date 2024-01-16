@@ -140,7 +140,7 @@ function codegen::deepcopy() {
         k8s.io/code-generator/cmd/deepcopy-gen
 
     # The result file, in each pkg, of deep-copy generation.
-    local output_file="${GENERATED_FILE_PREFIX}deepcopy"
+    local output_file="${GENERATED_FILE_PREFIX}deepcopy.go"
 
     # The tool used to generate deep copies.
     local gen_deepcopy_bin
@@ -172,7 +172,7 @@ function codegen::deepcopy() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
     "${gen_deepcopy_bin}" \
         -v "${KUBE_VERBOSE}" \
@@ -272,7 +272,7 @@ function codegen::prerelease() {
         k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 
     # The result file, in each pkg, of prerelease-lifecycle generation.
-    local output_file="${GENERATED_FILE_PREFIX}prerelease-lifecycle"
+    local output_file="${GENERATED_FILE_PREFIX}prerelease-lifecycle.go"
 
     # The tool used to generate prerelease-lifecycle code.
     local gen_prerelease_bin
@@ -304,7 +304,7 @@ function codegen::prerelease() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
     "${gen_prerelease_bin}" \
         -v "${KUBE_VERBOSE}" \
@@ -340,7 +340,7 @@ function codegen::defaults() {
         k8s.io/code-generator/cmd/defaulter-gen
 
     # The result file, in each pkg, of defaulter generation.
-    local output_file="${GENERATED_FILE_PREFIX}defaults"
+    local output_file="${GENERATED_FILE_PREFIX}defaults.go"
 
     # The tool used to generate defaulters.
     local gen_defaulter_bin
@@ -372,7 +372,7 @@ function codegen::defaults() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
     "${gen_defaulter_bin}" \
         -v "${KUBE_VERBOSE}" \
@@ -413,7 +413,7 @@ function codegen::conversions() {
         k8s.io/code-generator/cmd/conversion-gen
 
     # The result file, in each pkg, of conversion generation.
-    local output_file="${GENERATED_FILE_PREFIX}conversion"
+    local output_file="${GENERATED_FILE_PREFIX}conversion.go"
 
     # The tool used to generate conversions.
     local gen_conversion_bin
@@ -451,7 +451,7 @@ function codegen::conversions() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
 
     "${gen_conversion_bin}" \
         -v "${KUBE_VERBOSE}" \
@@ -495,7 +495,7 @@ function codegen::openapi() {
         k8s.io/code-generator/cmd/openapi-gen
 
     # The result file, in each pkg, of open-api generation.
-    local output_file="${GENERATED_FILE_PREFIX}openapi"
+    local output_file="${GENERATED_FILE_PREFIX}openapi.go"
 
     # The tool used to generate open apis.
     local gen_openapi_bin
@@ -546,7 +546,7 @@ function codegen::openapi() {
         done
     fi
 
-    git_find -z ':(glob)pkg/generated/**'/"${output_file}.go" | xargs -0 rm -f
+    git_find -z ':(glob)pkg/generated/**'/"${output_file}" | xargs -0 rm -f
 
     "${gen_openapi_bin}" \
         -v "${KUBE_VERBOSE}" \

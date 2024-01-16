@@ -30,7 +30,7 @@ import (
 
 // genericGenerator generates the generic informer.
 type genericGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage        string
 	imports              namer.ImportTracker
 	groupVersions        map[string]clientgentypes.GroupVersions

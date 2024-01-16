@@ -29,7 +29,7 @@ import (
 
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genGroup struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage string
 	group         string
 	version       string

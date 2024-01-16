@@ -31,7 +31,7 @@ import (
 
 // expansionGenerator produces a file for a expansion interfaces.
 type expansionGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPath string
 	types      []*types.Type
 }

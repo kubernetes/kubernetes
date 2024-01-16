@@ -34,7 +34,9 @@ import (
 
 // genProtoIDL produces a .proto IDL.
 type genProtoIDL struct {
-	generator.DefaultGen
+	// This base type is close enough to what we need, if we redefine some
+	// methods.
+	generator.GoGenerator
 	localPackage   types.Name
 	localGoPackage types.Name
 	imports        namer.ImportTracker
@@ -63,8 +65,11 @@ func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 		fmt.Sprintf("option go_package = %q;", g.localGoPackage.Package),
 	}
 }
-func (g *genProtoIDL) Filename() string { return g.OptionalName + ".proto" }
+
+func (g *genProtoIDL) Filename() string { return g.OutputFilename + ".proto" }
+
 func (g *genProtoIDL) FileType() string { return "protoidl" }
+
 func (g *genProtoIDL) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
 		// The local namer returns the correct protobuf name for a proto type

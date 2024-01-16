@@ -30,7 +30,7 @@ import (
 
 // genClientset generates a package for a clientset.
 type genClientset struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	groups             []clientgentypes.GroupVersions
 	groupGoNames       map[clientgentypes.GroupVersion]string
 	clientsetPackage   string // must be a Go import-path

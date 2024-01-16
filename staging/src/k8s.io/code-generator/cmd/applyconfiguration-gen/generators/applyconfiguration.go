@@ -32,7 +32,7 @@ import (
 
 // applyConfigurationGenerator produces apply configurations for a given GroupVersion and type.
 type applyConfigurationGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	// outPkgBase is the base package, under which the "internal" and GV-specific subdirs live
 	outPkgBase   string // must be a Go import-path
 	groupVersion clientgentypes.GroupVersion

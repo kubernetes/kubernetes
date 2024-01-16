@@ -47,14 +47,14 @@ func TargetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
-				generator.DefaultGen{OptionalName: "doc"},
+				generator.GoGenerator{OutputFilename: "doc.go"},
 			}
 			// Since we want a file per type that we generate a client for, we
 			// have to provide a function for this.
 			for _, t := range typeList {
 				generators = append(generators, &genFakeForType{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: "fake_" + strings.ToLower(c.Namers["private"].Name(t)),
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: "fake_" + strings.ToLower(c.Namers["private"].Name(t)) + ".go",
 					},
 					outputPackage:             outputPkg,
 					inputPackage:              inputPkg,
@@ -68,8 +68,8 @@ func TargetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 			}
 
 			generators = append(generators, &genFakeForGroup{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "fake_" + groupPkgName + "_client",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "fake_" + groupPkgName + "_client.go",
 				},
 				outputPackage:     outputPkg,
 				realClientPackage: realClientPkg,
@@ -101,11 +101,11 @@ func TargetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
-				generator.DefaultGen{OptionalName: "doc"},
+				generator.GoGenerator{OutputFilename: "doc.go"},
 
 				&genClientset{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: "clientset_generated",
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: "clientset_generated.go",
 					},
 					groups:               customArgs.Groups,
 					groupGoNames:         groupGoNames,
@@ -114,8 +114,8 @@ func TargetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 					realClientsetPackage: clientsetPkg,
 				},
 				&scheme.GenScheme{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: "register",
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: "register.go",
 					},
 					InputPackages: customArgs.GroupVersionPackages(),
 					OutputPackage: clientsetPkg,

@@ -27,7 +27,7 @@ import (
 )
 
 type registerExternalGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage   string
 	gv              clientgentypes.GroupVersion
 	typesToGenerate []*types.Type

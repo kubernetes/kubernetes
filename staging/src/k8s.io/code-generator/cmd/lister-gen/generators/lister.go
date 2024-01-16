@@ -134,8 +134,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 			},
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				generators = append(generators, &expansionGenerator{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: "expansion_generated",
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: "expansion_generated.go",
 					},
 					outputPath: outputDir,
 					types:      typesToGenerate,
@@ -143,8 +143,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 				for _, t := range typesToGenerate {
 					generators = append(generators, &listerGenerator{
-						DefaultGen: generator.DefaultGen{
-							OptionalName: strings.ToLower(t.Name.Name),
+						GoGenerator: generator.GoGenerator{
+							OutputFilename: strings.ToLower(t.Name.Name) + ".go",
 						},
 						outputPackage:  outputPkg,
 						groupVersion:   gv,
@@ -191,7 +191,7 @@ func isInternal(m types.Member) bool {
 // listerGenerator produces a file of listers for a given GroupVersion and
 // type.
 type listerGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage  string
 	groupVersion   clientgentypes.GroupVersion
 	internalGVPkg  string
