@@ -180,13 +180,13 @@ func DefaultNameSystem() string {
 }
 
 // Packages makes the package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	packages := generator.Packages{}
+	packages := []generator.Package{}
 	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 
 	for _, i := range context.Inputs {

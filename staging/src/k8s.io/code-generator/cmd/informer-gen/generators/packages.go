@@ -93,7 +93,7 @@ func subdirForInternalInterfaces(base string) string {
 }
 
 // Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -115,7 +115,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		externalVersionOutputPkg = filepath.Join(externalVersionOutputPkg, "externalversions")
 	}
 
-	var packageList generator.Packages
+	var packageList []generator.Package
 	typesForGroupVersion := make(map[clientgentypes.GroupVersion][]*types.Type)
 
 	externalGroupVersions := make(map[string]clientgentypes.GroupVersions)

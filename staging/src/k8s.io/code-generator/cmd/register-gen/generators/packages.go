@@ -43,13 +43,13 @@ func DefaultNameSystem() string {
 }
 
 // Packages makes packages to generate.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	packages := generator.Packages{}
+	packages := []generator.Package{}
 	for _, input := range context.Inputs {
 		pkg := context.Universe.Package(input)
 		internal, err := isInternal(pkg)

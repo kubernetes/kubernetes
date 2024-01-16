@@ -340,7 +340,7 @@ func sanitizePackagePaths(context *generator.Context, ca *clientgenargs.CustomAr
 }
 
 // Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -413,7 +413,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
 	if customArgs.ClientsetOnly {
-		return generator.Packages(packageList)
+		return []generator.Package(packageList)
 	}
 
 	orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
@@ -435,5 +435,5 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 	}
 
-	return generator.Packages(packageList)
+	return []generator.Package(packageList)
 }
