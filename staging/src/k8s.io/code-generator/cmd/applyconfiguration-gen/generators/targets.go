@@ -54,8 +54,8 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-// Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
+// GetTargets makes the client target definition.
+func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -75,7 +75,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 	groupGoNames := make(map[string]string)
 	applyConfigsForGroupVersion := make(map[clientgentypes.GroupVersion][]applyConfig)
 
-	var packageList []generator.Package
+	var targetList []generator.Target
 	for pkg, p := range pkgTypes {
 		gv := groupVersion(p)
 
@@ -107,8 +107,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 		pkgSubdir := strings.TrimPrefix(pkg, customArgs.OutputPackage+"/")
 
 		// generate the apply configurations
-		packageList = append(packageList,
-			generatorForApplyConfigurationsPackage(
+		targetList = append(targetList,
+			targetForApplyConfigurationsPackage(
 				arguments.OutputBase, customArgs.OutputPackage, pkgSubdir,
 				boilerplate, gv, toGenerate, refs, typeModels))
 
@@ -132,15 +132,15 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 	}
 
 	// generate ForKind() utility function
-	packageList = append(packageList,
-		generatorForUtils(arguments.OutputBase, customArgs.OutputPackage,
+	targetList = append(targetList,
+		targetForUtils(arguments.OutputBase, customArgs.OutputPackage,
 			boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames))
 	// generate internal embedded schema, required for generated Extract functions
-	packageList = append(packageList,
-		generatorForInternal(arguments.OutputBase, customArgs.OutputPackage,
+	targetList = append(targetList,
+		targetForInternal(arguments.OutputBase, customArgs.OutputPackage,
 			boilerplate, typeModels))
 
-	return packageList
+	return targetList
 }
 
 func friendlyName(name string) string {
@@ -161,11 +161,11 @@ func typeName(t *types.Type) string {
 	return fmt.Sprintf("%s.%s", typePackage, t.Name.Name)
 }
 
-func generatorForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir string, boilerplate []byte, gv clientgentypes.GroupVersion, typesToGenerate []applyConfig, refs refGraph, models *typeModels) generator.Package {
+func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir string, boilerplate []byte, gv clientgentypes.GroupVersion, typesToGenerate []applyConfig, refs refGraph, models *typeModels) generator.Target {
 	outputDir := filepath.Join(outputDirBase, pkgSubdir)
 	outputPkg := filepath.Join(outputPkgBase, pkgSubdir)
 
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       gv.Version.PackageName(),
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,
@@ -199,8 +199,8 @@ func generatorForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSub
 	}
 }
 
-func generatorForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, applyConfigsForGroupVersion map[clientgentypes.GroupVersion][]applyConfig, groupGoNames map[string]string) generator.Package {
-	return &generator.SimplePackage{
+func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, applyConfigsForGroupVersion map[clientgentypes.GroupVersion][]applyConfig, groupGoNames map[string]string) generator.Target {
+	return &generator.SimpleTarget{
 		PkgName:       filepath.Base(outputPkgBase),
 		PkgPath:       outputPkgBase,
 		PkgDir:        outputDirBase,
@@ -221,10 +221,10 @@ func generatorForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, 
 	}
 }
 
-func generatorForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, models *typeModels) generator.Package {
+func targetForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, models *typeModels) generator.Target {
 	outputDir := filepath.Join(outputDirBase, "internal")
 	outputPkg := filepath.Join(outputPkgBase, "internal")
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       filepath.Base(outputPkg),
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,

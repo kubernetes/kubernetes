@@ -58,8 +58,8 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-// Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
+// GetTargets makes the client target definition.
+func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -67,7 +67,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 
 	customArgs := arguments.CustomArgs.(*listergenargs.CustomArgs)
 
-	var packageList []generator.Package
+	var targetList []generator.Target
 	for _, inputDir := range arguments.InputDirs {
 		p := context.Universe.Package(inputDir)
 
@@ -123,7 +123,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 		subdir := filepath.Join(groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
 		outputDir := filepath.Join(arguments.OutputBase, subdir)
 		outputPkg := filepath.Join(customArgs.OutputPackage, subdir)
-		packageList = append(packageList, &generator.SimplePackage{
+		targetList = append(targetList, &generator.SimpleTarget{
 			PkgName:       strings.ToLower(gv.Version.NonEmpty()),
 			PkgPath:       outputPkg,
 			PkgDir:        outputDir,
@@ -159,7 +159,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 		})
 	}
 
-	return packageList
+	return targetList
 }
 
 // objectMetaForPackage returns the type of ObjectMeta used by package p.

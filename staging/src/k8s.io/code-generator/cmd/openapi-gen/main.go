@@ -50,7 +50,7 @@ func main() {
 	if err := genericArgs.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
-		generators.Packages,
+		generators.GetTargets,
 	); err != nil {
 		log.Fatalf("OpenAPI code generation error: %v", err)
 	}

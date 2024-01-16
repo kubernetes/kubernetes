@@ -31,7 +31,7 @@ import (
 
 func newProtobufPackage(packagePath, packageDir, packageName string, generateAll bool, omitFieldTypes map[types.Name]struct{}) *protobufPackage {
 	pkg := &protobufPackage{
-		SimplePackage: generator.SimplePackage{
+		SimpleTarget: generator.SimpleTarget{
 			// The protobuf package name (foo.bar.baz)
 			PkgName:       packageName,
 			PkgPath:       packagePath,
@@ -49,7 +49,7 @@ func newProtobufPackage(packagePath, packageDir, packageName string, generateAll
 
 // protobufPackage contains the protobuf implementation of Package.
 type protobufPackage struct {
-	generator.SimplePackage
+	generator.SimpleTarget
 
 	// If true, generate protobuf serializations for all public types.
 	// If false, only generate protobuf serializations for structs that
@@ -201,5 +201,5 @@ func (p *protobufPackage) OutputPath() string {
 }
 
 var (
-	_ = generator.Package(&protobufPackage{})
+	_ = generator.Target(&protobufPackage{})
 )

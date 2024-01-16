@@ -127,12 +127,12 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetDir, clientsetPkg string, groupPkgName string, groupGoName string, apiPath string, inputPkg string, applyBuilderPkg string, boilerplate []byte) generator.Package {
+func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetDir, clientsetPkg string, groupPkgName string, groupGoName string, apiPath string, inputPkg string, applyBuilderPkg string, boilerplate []byte) generator.Target {
 	subdir := filepath.Join("typed", strings.ToLower(groupPkgName), strings.ToLower(gv.Version.NonEmpty()))
 	gvDir := filepath.Join(clientsetDir, subdir)
 	gvPkg := filepath.Join(clientsetPkg, subdir)
 
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       strings.ToLower(gv.Version.NonEmpty()),
 		PkgPath:       gvPkg,
 		PkgDir:        gvDir,
@@ -196,8 +196,8 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	}
 }
 
-func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
-	return &generator.SimplePackage{
+func targetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
+	return &generator.SimpleTarget{
 		PkgName:       customArgs.ClientsetName,
 		PkgPath:       clientsetPkg,
 		PkgDir:        clientsetDir,
@@ -221,7 +221,7 @@ func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, cli
 	}
 }
 
-func packageForScheme(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
+func targetForScheme(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
 	schemeDir := filepath.Join(clientsetDir, "scheme")
 	schemePkg := filepath.Join(clientsetPkg, "scheme")
 
@@ -237,7 +237,7 @@ NextGroup:
 		}
 	}
 
-	return &generator.SimplePackage{
+	return &generator.SimpleTarget{
 		PkgName:       "scheme",
 		PkgPath:       schemePkg,
 		PkgDir:        schemeDir,
@@ -339,8 +339,8 @@ func sanitizePackagePaths(context *generator.Context, ca *clientgenargs.CustomAr
 	return nil
 }
 
-// Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
+// GetTargets makes the client target definition.
+func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -400,20 +400,20 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 	clientsetDir := filepath.Join(arguments.OutputBase, customArgs.ClientsetName)
 	clientsetPkg := filepath.Join(customArgs.OutputPackage, customArgs.ClientsetName)
 
-	var packageList []generator.Package
+	var targetList []generator.Target
 
-	packageList = append(packageList,
-		packageForClientset(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
-	packageList = append(packageList,
-		packageForScheme(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
+	targetList = append(targetList,
+		targetForClientset(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
+	targetList = append(targetList,
+		targetForScheme(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
 	if customArgs.FakeClient {
-		packageList = append(packageList,
-			fake.PackageForClientset(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
+		targetList = append(targetList,
+			fake.TargetForClientset(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
 	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
 	if customArgs.ClientsetOnly {
-		return []generator.Package(packageList)
+		return []generator.Target(targetList)
 	}
 
 	orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
@@ -423,17 +423,17 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 			gv := clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}
 			types := gvToTypes[gv]
 			inputPath := gvPackages[gv]
-			packageList = append(packageList,
-				packageForGroup(
+			targetList = append(targetList,
+				targetForGroup(
 					gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg,
 					group.PackageName, groupGoNames[gv], customArgs.ClientsetAPIPath,
 					inputPath, customArgs.ApplyConfigurationPackage, boilerplate))
 			if customArgs.FakeClient {
-				packageList = append(packageList,
-					fake.PackageForGroup(gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg, group.PackageName, groupGoNames[gv], inputPath, customArgs.ApplyConfigurationPackage, boilerplate))
+				targetList = append(targetList,
+					fake.TargetForGroup(gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg, group.PackageName, groupGoNames[gv], inputPath, customArgs.ApplyConfigurationPackage, boilerplate))
 			}
 		}
 	}
 
-	return []generator.Package(packageList)
+	return targetList
 }
