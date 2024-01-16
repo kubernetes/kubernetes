@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	clientsetretry "k8s.io/client-go/util/retry"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -336,17 +337,15 @@ func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Nod
 func GetConfigMapWithRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
 	var cm *v1.ConfigMap
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(),
-		constants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
-		true, func(ctx context.Context) (bool, error) {
-			var err error
-			cm, err = client.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
-			if err == nil {
-				return true, nil
-			}
-			lastError = err
-			return false, nil
-		})
+	err := wait.ExponentialBackoff(clientsetretry.DefaultBackoff, func() (bool, error) {
+		var err error
+		cm, err = client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err == nil {
+			return true, nil
+		}
+		lastError = err
+		return false, nil
+	})
 	if err == nil {
 		return cm, nil
 	}
