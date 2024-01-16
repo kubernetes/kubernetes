@@ -19,6 +19,7 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -331,13 +332,14 @@ func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Nod
 	return lastError
 }
 
-// GetConfigMapWithRetry tries to retrieve a ConfigMap using the given client,
-// retrying if we get an unexpected error.
-func GetConfigMapWithRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
+// GetConfigMapWithShortRetry tries to retrieve a ConfigMap using the given client, retrying for a short
+// time if it gets an unexpected error. The main usage of this function is in areas of the code that
+// fallback to a default ConfigMap value in case the one from the API cannot be quickly obtained.
+func GetConfigMapWithShortRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
 	var cm *v1.ConfigMap
 	var lastError error
 	err := wait.PollUntilContextTimeout(context.Background(),
-		constants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		time.Millisecond*50, time.Millisecond*350,
 		true, func(ctx context.Context) (bool, error) {
 			var err error
 			cm, err = client.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
