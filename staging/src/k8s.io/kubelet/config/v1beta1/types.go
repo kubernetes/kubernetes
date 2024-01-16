@@ -348,6 +348,12 @@ type KubeletConfiguration struct {
 	// Default: "None"
 	// +optional
 	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
+	// singleProcessOOMKill, if set, will prevent the `memory.oom.group` flag from being set for container
+	// cgroups in cgroups v2. This causes processes in the container to be OOM killed individually instead of as
+	// a group.
+	// Default: false
+	// +optional
+	SingleProcessOOMKill bool `json:"singleProcessOOMKill,omitempty"`
 	// cpuManagerPolicyOptions is a set of key=value which 	allows to set extra options
 	// to fine tune the behaviour of the cpu manager policies.
 	// Requires  both the "CPUManager" and "CPUManagerPolicyOptions" feature gates to be enabled.

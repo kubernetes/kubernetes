@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -36,9 +37,11 @@ import (
 )
 
 type testCase struct {
-	name                   string
-	podSpec                *v1.Pod
-	oomTargetContainerName string
+	name                    string
+	podSpec                 *v1.Pod
+	oomTargetContainerName  string
+	enableSingleProcessKill bool
+	expectPodRunning        bool
 }
 
 // KubeReservedMemory is default fraction value of node capacity memory to
@@ -63,7 +66,7 @@ var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [
 	}
 })
 
-var _ = SIGDescribe("OOMKiller [LinuxOnly]", framework.WithNodeConformance(), func() {
+var _ = SIGDescribe("OOMKiller [LinuxOnly]", framework.WithNodeConformance(), framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -91,6 +94,15 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly]", framework.WithNodeConformance(), fu
 			podSpec: getOOMTargetPod("oomkill-target-pod", "oomkill-multi-target-container",
 				getOOMTargetContainerMultiProcess),
 		})
+
+		testCases = append(testCases, testCase{
+			name:                   "multi process container (single process kill enabled)",
+			oomTargetContainerName: "oomkill-multi-target-container",
+			podSpec: getOOMTargetPod("oomkill-target-pod", "oomkill-multi-target-container",
+				getOOMTargetContainerMultiProcess),
+			enableSingleProcessKill: true,
+			expectPodRunning:        true,
+		})
 	}
 	for _, tc := range testCases {
 		runOomKillerTest(f, tc, 0)
@@ -98,6 +110,10 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly]", framework.WithNodeConformance(), fu
 })
 
 func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMemory float64) {
+	if kubeReservedMemory > 0 && testCase.enableSingleProcessKill {
+		framework.Failf("only one of kubeReservedMemory and enableSingleProcessKill can be set")
+	}
+
 	ginkgo.Context(testCase.name, func() {
 		// Update KubeReservedMemory in KubeletConfig.
 		if kubeReservedMemory > 0 {
@@ -112,36 +128,50 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 				initialConfig.KubeReserved["memory"] = fmt.Sprintf("%d", int(kubeReservedMemory*getLocalNode(context.TODO(), f).Status.Capacity.Memory().AsApproximateFloat64()))
 			})
 		}
+		if testCase.enableSingleProcessKill {
+			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+				initialConfig.SingleProcessOOMKill = true
+			})
+		}
 
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("setting up the pod to be used in the test")
 			e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
 		})
 
-		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
-			cfg, configErr := getCurrentKubeletConfig(context.TODO())
-			framework.ExpectNoError(configErr)
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-				// If Swap is enabled, we should test OOM with LimitedSwap.
-				// UnlimitedSwap allows for workloads to use unbounded swap which
-				// makes testing OOM challenging.
-				// We are not able to change the default for these conformance tests,
-				// so we will skip these tests if swap is enabled.
-				if cfg.MemorySwap.SwapBehavior == "" || cfg.MemorySwap.SwapBehavior == "UnlimitedSwap" {
-					ginkgo.Skip("OOMKiller should not run with UnlimitedSwap")
+		if testCase.expectPodRunning {
+			ginkgo.It("The containers should not be OOMKilled", func() {
+				ginkgo.By("Waiting to ensure the pod is still running")
+				time.Sleep(10 * time.Second)
+				err := e2epod.WaitForPodsRunningReady(context.TODO(), f.ClientSet, testCase.podSpec.Name, 1, 0, 30*time.Second)
+				framework.ExpectNoError(err)
+			})
+		} else {
+			ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
+				cfg, configErr := getCurrentKubeletConfig(context.TODO())
+				framework.ExpectNoError(configErr)
+				if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+					// If Swap is enabled, we should test OOM with LimitedSwap.
+					// UnlimitedSwap allows for workloads to use unbounded swap which
+					// makes testing OOM challenging.
+					// We are not able to change the default for these conformance tests,
+					// so we will skip these tests if swap is enabled.
+					if cfg.MemorySwap.SwapBehavior == "" || cfg.MemorySwap.SwapBehavior == "UnlimitedSwap" {
+						ginkgo.Skip("OOMKiller should not run with UnlimitedSwap")
+					}
 				}
-			}
-			ginkgo.By("Waiting for the pod to be failed")
-			err := e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, testCase.podSpec.Name, "", f.Namespace.Name)
-			framework.ExpectNoError(err, "Failed waiting for pod to terminate, %s/%s", f.Namespace.Name, testCase.podSpec.Name)
+				ginkgo.By("Waiting for the pod to be failed")
+				err := e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, testCase.podSpec.Name, "", f.Namespace.Name)
+				framework.ExpectNoError(err, "Failed waiting for pod to terminate, %s/%s", f.Namespace.Name, testCase.podSpec.Name)
 
-			ginkgo.By("Fetching the latest pod status")
-			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), testCase.podSpec.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "Failed to get the recent pod object for name: %q", pod.Name)
+				ginkgo.By("Fetching the latest pod status")
+				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), testCase.podSpec.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to get the recent pod object for name: %q", pod.Name)
 
-			ginkgo.By("Verifying the OOM target container has the expected reason")
-			verifyReasonForOOMKilledContainer(pod, testCase.oomTargetContainerName)
-		})
+				ginkgo.By("Verifying the OOM target container has the expected reason")
+				verifyReasonForOOMKilledContainer(pod, testCase.oomTargetContainerName)
+			})
+		}
 
 		ginkgo.AfterEach(func() {
 			ginkgo.By(fmt.Sprintf("deleting pod: %s", testCase.podSpec.Name))

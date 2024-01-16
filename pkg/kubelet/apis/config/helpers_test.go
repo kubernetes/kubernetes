@@ -222,6 +222,7 @@ var (
 		"Logging.Options.JSON.SplitStream",
 		"Logging.VModule[*].FilePattern",
 		"Logging.VModule[*].Verbosity",
+		"SingleProcessOOMKill",
 		"Logging.Verbosity",
 		"TLSCipherSuites[*]",
 		"TLSMinVersion",

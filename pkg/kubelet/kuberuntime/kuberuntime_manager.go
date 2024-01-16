@@ -121,6 +121,10 @@ type kubeGenericRuntimeManager struct {
 	readinessManager proberesults.Manager
 	startupManager   proberesults.Manager
 
+	// If false, pass "memory.oom.group" to container cgroups when using cgroups v2 to cause processes
+	// in those cgroups to be killed as a unit by the OOM killer.
+	singleProcessOOMKill bool
+
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
 
@@ -197,6 +201,7 @@ func NewKubeGenericRuntimeManager(
 	imagePullBurst int,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
+	singleProcessOOMKill bool,
 	cpuCFSQuota bool,
 	cpuCFSQuotaPeriod metav1.Duration,
 	runtimeService internalapi.RuntimeService,
@@ -217,6 +222,7 @@ func NewKubeGenericRuntimeManager(
 	tracer := tracerProvider.Tracer(instrumentationScope)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
+		singleProcessOOMKill:   singleProcessOOMKill,
 		cpuCFSQuota:            cpuCFSQuota,
 		cpuCFSQuotaPeriod:      cpuCFSQuotaPeriod,
 		seccompProfileRoot:     filepath.Join(rootDirectory, "seccomp"),
