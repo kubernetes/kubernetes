@@ -1053,7 +1053,7 @@ message ContainerConfig {
     // container, and the runtime should leverage this to ensure correct
     // operation. The runtime may also use this information to improve UX, such
     // as by constructing a readable name.
-    ContainerMetadata metadata = 1 ;
+    ContainerMetadata metadata = 1;
     // Image to use.
     ImageSpec image = 2;
     // Command to execute (i.e., entrypoint for docker)
