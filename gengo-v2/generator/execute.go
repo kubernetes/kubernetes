@@ -31,18 +31,18 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// ExecutePackages runs the generators for the provided packages.
-func (c *Context) ExecutePackages(packages []Package) error {
-	klog.V(5).Infof("ExecutePackages: %d packages", len(packages))
+// ExecuteTargets runs the generators for the provided targets.
+func (c *Context) ExecuteTargets(targets []Target) error {
+	klog.V(5).Infof("ExecuteTargets: %d targets", len(targets))
 
 	var errs []error
-	for _, p := range packages {
-		if err := c.ExecutePackage(p); err != nil {
+	for _, tgt := range targets {
+		if err := c.ExecuteTarget(tgt); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("some packages had errors: %w", errors.Join(errs...))
+		return fmt.Errorf("some targets had errors: %w", errors.Join(errs...))
 	}
 	return nil
 }
@@ -199,16 +199,16 @@ func (c *Context) addNameSystems(namers namer.NameSystems) *Context {
 	return &c2
 }
 
-// ExecutePackages runs the generators for a single package.
-func (c *Context) ExecutePackage(p Package) error {
-	path := p.SourcePath()
+// ExecuteTargets runs the generators for a single target.
+func (c *Context) ExecuteTarget(tgt Target) error {
+	path := tgt.SourcePath()
 	if path == "" {
-		return fmt.Errorf("no source-path for package %s", p.Path())
+		return fmt.Errorf("no source-path for target %s", tgt.Path())
 	}
-	klog.V(5).Infof("Executing package %q (%q)", p.Name(), path)
+	klog.V(5).Infof("Executing target %q (%q)", tgt.Name(), path)
 
 	// Filter out any types the *package* doesn't care about.
-	packageContext := c.filteredBy(p.Filter)
+	packageContext := c.filteredBy(tgt.Filter)
 
 	if !c.Verify {
 		if err := os.MkdirAll(path, 0755); err != nil {
@@ -217,7 +217,7 @@ func (c *Context) ExecutePackage(p Package) error {
 	}
 
 	files := map[string]*File{}
-	for _, g := range p.Generators(packageContext) {
+	for _, g := range tgt.Generators(packageContext) {
 		// Filter out types the *generator* doesn't care about.
 		genContext := packageContext.filteredBy(g.Filter)
 		// Now add any extra name systems defined by this generator
@@ -233,10 +233,10 @@ func (c *Context) ExecutePackage(p Package) error {
 			f = &File{
 				Name:              g.Filename(),
 				FileType:          fileType,
-				PackageName:       p.Name(),
-				PackagePath:       p.Path(),
-				PackageSourcePath: p.SourcePath(),
-				Header:            p.Header(g.Filename()),
+				PackageName:       tgt.Name(),
+				PackagePath:       tgt.Path(),
+				PackageSourcePath: tgt.SourcePath(),
+				Header:            tgt.Header(g.Filename()),
 				Imports:           map[string]struct{}{},
 			}
 			files[f.Name] = f
@@ -288,7 +288,7 @@ func (c *Context) ExecutePackage(p Package) error {
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("errors in package %q: %w", p.Path(), errors.Join(errs...))
+		return fmt.Errorf("errors in target %q: %w", tgt.Path(), errors.Join(errs...))
 	}
 	return nil
 }

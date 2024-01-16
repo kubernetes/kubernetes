@@ -55,16 +55,16 @@ func DefaultNameSystem() string {
 	return "raw"
 }
 
-// Packages makes the import-boss package definition.
-func Packages(c *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
-	pkgs := []generator.Package{}
+// GetTargets makes the import-boss target definition.
+func GetTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
+	targets := []generator.Target{}
 	c.FileTypes = map[string]generator.FileType{
 		importBossFileType: importRuleFile{c},
 	}
 
 	for _, pkgPath := range c.Inputs {
 		pkg := c.Universe[pkgPath]
-		pkgs = append(pkgs, &generator.SimplePackage{
+		targets = append(targets, &generator.SimpleTarget{
 			PkgName: pkg.Name,
 			PkgPath: pkg.Path,
 			PkgDir:  pkg.SourcePath,
@@ -81,7 +81,7 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) []generator.P
 		})
 	}
 
-	return pkgs
+	return targets
 }
 
 // A single import restriction rule.

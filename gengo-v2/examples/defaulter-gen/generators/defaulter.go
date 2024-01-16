@@ -227,13 +227,13 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 	}
 }
 
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
+func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	packages := []generator.Package{}
+	targets := []generator.Target{}
 	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 
 	// Accumulate pre-existing default functions.
@@ -424,8 +424,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 			klog.V(5).Infof("no defaulters in package %s", pkg.Name)
 		}
 
-		packages = append(packages,
-			&generator.SimplePackage{
+		targets = append(targets,
+			&generator.SimpleTarget{
 				PkgName:       filepath.Base(pkg.Path),
 				PkgPath:       pkg.Path,
 				PkgDir:        pkg.SourcePath, // output pkg is the same as the input
@@ -442,7 +442,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) []gener
 				},
 			})
 	}
-	return packages
+	return targets
 }
 
 // callTreeForType contains fields necessary to build a tree for types.

@@ -137,7 +137,7 @@ func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 // Execute implements main().
 // If you don't need any non-default behavior, use as:
 // args.Default().Execute(...)
-func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, pkgs func(*generator.Context, *GeneratorArgs) []generator.Package) error {
+func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, getTargets func(*generator.Context, *GeneratorArgs) []generator.Target) error {
 	if g.defaultCommandLineFlags {
 		g.AddFlags(pflag.CommandLine)
 		pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
@@ -155,8 +155,8 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 	}
 
 	c.Verify = g.VerifyOnly
-	packages := pkgs(c, g)
-	if err := c.ExecutePackages(packages); err != nil {
+	targets := getTargets(c, g)
+	if err := c.ExecuteTargets(targets); err != nil {
 		return fmt.Errorf("failed executing generator: %v", err)
 	}
 

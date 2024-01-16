@@ -25,8 +25,9 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-// Package contains the contract for generating a package.
-type Package interface {
+// Target describes a Go package into which code will be generated.  A single
+// Target may have many Generators, each of which emits one file.
+type Target interface {
 	// Name returns the package short name.
 	Name() string
 	// Path returns the package import path.
@@ -107,7 +108,7 @@ type Generator interface {
 
 	// Init should write an init function, and any other content that's not
 	// generated per-type. (It's not intended for generator specific
-	// initialization! Do that when your Package constructs the
+	// initialization! Do that when your Target constructs the
 	// Generators.)
 	Init(*Context, io.Writer) error
 
@@ -167,7 +168,7 @@ type Context struct {
 	Inputs []string
 
 	// The canonical ordering of the types (will be filtered by both the
-	// Package's and Generator's Filter methods).
+	// Target's and Generator's Filter methods).
 	Order []*types.Type
 
 	// A set of types this context can process. If this is empty or nil,

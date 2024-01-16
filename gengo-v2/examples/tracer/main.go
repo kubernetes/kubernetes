@@ -36,7 +36,7 @@ func main() {
 	arguments := args.Default()
 
 	// Gengo apps start with arguments.
-	if err := arguments.Execute(getNameSystems(), getDefaultNameSystem(), getPackages); err != nil {
+	if err := arguments.Execute(getNameSystems(), getDefaultNameSystem(), getTargets); err != nil {
 		klog.ErrorS(err, "fatal error")
 		os.Exit(1)
 	}
@@ -63,18 +63,18 @@ func getDefaultNameSystem() string {
 	return "raw"
 }
 
-// getPackages is called after the inputs have been loaded.  It is expected to
+// getTargets is called after the inputs have been loaded.  It is expected to
 // examine the provided context and return a list of Packages which will be
 // executed further.
-func getPackages(c *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
-	trace("getPackages")
+func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
+	trace("getTargets")
 
 	// Make sure we don't actually write a file.
 	c.FileTypes = map[string]generator.FileType{
 		"null": nullFile{},
 	}
 
-	pkgs := []generator.Package{}
+	targets := []generator.Target{}
 	for _, input := range c.Inputs {
 		klog.V(2).InfoS("processing", "pkg", input)
 
@@ -83,7 +83,7 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) []generato
 			continue
 		}
 
-		pkgs = append(pkgs, &generator.SimplePackage{
+		targets = append(targets, &generator.SimpleTarget{
 			PkgName: pkg.Name,
 			PkgPath: pkg.Path,
 			PkgDir:  pkg.SourcePath,
@@ -115,7 +115,7 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) []generato
 		})
 	}
 
-	return pkgs
+	return targets
 }
 
 // Our custom Generator type.

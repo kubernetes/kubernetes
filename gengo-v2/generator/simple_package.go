@@ -20,9 +20,9 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-// SimplePackage is implements Package in terms of static configuration.
+// SimpleTarget is implements Target in terms of static configuration.
 // The package name, path, and dir are required to be non-empty.
-type SimplePackage struct {
+type SimpleTarget struct {
 	// PkgName is the name of the resulting package (as in "package xxxx").
 	// Required.
 	PkgName string
@@ -40,38 +40,38 @@ type SimplePackage struct {
 	// Optional.
 	PkgDocComment []byte
 
-	// FilterFunc will be called to implement Package.Filter. Optional.
+	// FilterFunc will be called to implement Target.Filter. Optional.
 	FilterFunc func(*Context, *types.Type) bool
 
-	// GeneratorsFunc will be called to implement Package.Generators. Optional.
+	// GeneratorsFunc will be called to implement Target.Generators. Optional.
 	GeneratorsFunc func(*Context) []Generator
 }
 
-func (d SimplePackage) Name() string       { return d.PkgName }
-func (d SimplePackage) Path() string       { return d.PkgPath }
-func (d SimplePackage) SourcePath() string { return d.PkgDir }
+func (st SimpleTarget) Name() string       { return st.PkgName }
+func (st SimpleTarget) Path() string       { return st.PkgPath }
+func (st SimpleTarget) SourcePath() string { return st.PkgDir }
 
-func (d SimplePackage) Filter(c *Context, t *types.Type) bool {
-	if d.FilterFunc != nil {
-		return d.FilterFunc(c, t)
+func (st SimpleTarget) Filter(c *Context, t *types.Type) bool {
+	if st.FilterFunc != nil {
+		return st.FilterFunc(c, t)
 	}
 	return true
 }
 
-func (d SimplePackage) Generators(c *Context) []Generator {
-	if d.GeneratorsFunc != nil {
-		return d.GeneratorsFunc(c)
+func (st SimpleTarget) Generators(c *Context) []Generator {
+	if st.GeneratorsFunc != nil {
+		return st.GeneratorsFunc(c)
 	}
 	return nil
 }
 
-func (d SimplePackage) Header(filename string) []byte {
+func (st SimpleTarget) Header(filename string) []byte {
 	if filename == "doc.go" {
-		return append(d.HeaderComment, d.PkgDocComment...)
+		return append(st.HeaderComment, st.PkgDocComment...)
 	}
-	return d.HeaderComment
+	return st.HeaderComment
 }
 
 var (
-	_ = Package(SimplePackage{})
+	_ = Target(SimpleTarget{})
 )
