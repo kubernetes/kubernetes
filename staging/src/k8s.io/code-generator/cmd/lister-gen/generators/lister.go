@@ -59,7 +59,7 @@ func DefaultNameSystem() string {
 }
 
 // Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -67,7 +67,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	customArgs := arguments.CustomArgs.(*listergenargs.CustomArgs)
 
-	var packageList generator.Packages
+	var packageList []generator.Package
 	for _, inputDir := range arguments.InputDirs {
 		p := context.Universe.Package(inputDir)
 

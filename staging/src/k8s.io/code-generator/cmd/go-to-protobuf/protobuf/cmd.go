@@ -184,7 +184,7 @@ func Run(g *Generator) {
 	}
 
 	protobufNames := NewProtobufNamer()
-	outputPackages := generator.Packages{}
+	outputPackages := []generator.Package{}
 	nonOutputPackages := map[string]struct{}{}
 
 	for _, input := range c.Inputs {
@@ -230,7 +230,7 @@ func Run(g *Generator) {
 	}
 	sort.Sort(positionOrder{topologicalPos, protobufNames.packages})
 
-	var localOutputPackages generator.Packages
+	var localOutputPackages []generator.Package
 	for _, p := range protobufNames.packages {
 		if _, ok := nonOutputPackages[p.Name()]; ok {
 			// if we're not outputting the package, don't include it in either package list
