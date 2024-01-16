@@ -111,14 +111,7 @@ func getDefaultNameSystem() string {
 func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
 	header := []byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag))
 
-	methodName := ""
-	if args, ok := arguments.CustomArgs.(*toolArgs); ok {
-		methodName = args.methodName
-	} else {
-		// Should be impossible.
-		klog.ErrorS(nil, "custom args are the wrong type: %T", arguments.CustomArgs)
-		os.Exit(1)
-	}
+	args := arguments.CustomArgs.(*toolArgs)
 
 	targets := []generator.Target{}
 	for _, input := range c.Inputs {
@@ -148,7 +141,7 @@ func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator
 			// may write to the same one).
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
-					newKilroyGenerator(arguments.OutputFileBaseName, pkg, methodName),
+					newKilroyGenerator(arguments.OutputFileBaseName, pkg, args.methodName),
 				}
 			},
 		})

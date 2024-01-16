@@ -133,16 +133,16 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 	targets := []generator.Target{}
 	header := append([]byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag)), boilerplate...)
 
+	customArgs := arguments.CustomArgs.(*CustomArgs)
+
 	boundingDirs := []string{}
-	if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
-		if customArgs.BoundingDirs == nil {
-			customArgs.BoundingDirs = context.Inputs
-		}
-		for i := range customArgs.BoundingDirs {
-			// Strip any trailing slashes - they are not exactly "correct" but
-			// this is friendlier.
-			boundingDirs = append(boundingDirs, strings.TrimRight(customArgs.BoundingDirs[i], "/"))
-		}
+	if customArgs.BoundingDirs == nil {
+		customArgs.BoundingDirs = context.Inputs
+	}
+	for i := range customArgs.BoundingDirs {
+		// Strip any trailing slashes - they are not exactly "correct" but
+		// this is friendlier.
+		boundingDirs = append(boundingDirs, strings.TrimRight(customArgs.BoundingDirs[i], "/"))
 	}
 
 	for _, i := range context.Inputs {

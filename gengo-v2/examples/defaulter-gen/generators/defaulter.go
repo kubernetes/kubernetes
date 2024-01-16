@@ -278,24 +278,24 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		}
 	}
 
+	customArgs := arguments.CustomArgs.(*CustomArgs)
+
 	// Make sure explicit peer-packages are added.
 	var peerPkgs []string
-	if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
-		for _, pkg := range customArgs.ExtraPeerDirs {
-			// In case someone specifies a peer as a path into vendor, convert
-			// it to its "real" package path.
-			if i := strings.Index(pkg, "/vendor/"); i != -1 {
-				pkg = pkg[i+len("/vendor/"):]
-			}
-			peerPkgs = append(peerPkgs, pkg)
+	for _, pkg := range customArgs.ExtraPeerDirs {
+		// In case someone specifies a peer as a path into vendor, convert
+		// it to its "real" package path.
+		if i := strings.Index(pkg, "/vendor/"); i != -1 {
+			pkg = pkg[i+len("/vendor/"):]
 		}
-		if expanded, err := context.FindPackages(peerPkgs...); err != nil {
-			klog.Fatalf("cannot find peer packages: %v", err)
-		} else {
-			peerPkgs = expanded // now in fully canonical form
-		}
-		inputPkgs = append(inputPkgs, peerPkgs...)
+		peerPkgs = append(peerPkgs, pkg)
 	}
+	if expanded, err := context.FindPackages(peerPkgs...); err != nil {
+		klog.Fatalf("cannot find peer packages: %v", err)
+	} else {
+		peerPkgs = expanded // now in fully canonical form
+	}
+	inputPkgs = append(inputPkgs, peerPkgs...)
 
 	if len(inputPkgs) > 0 {
 		if _, err := context.LoadPackages(inputPkgs...); err != nil {
