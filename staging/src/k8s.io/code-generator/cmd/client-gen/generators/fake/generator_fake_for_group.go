@@ -31,7 +31,7 @@ import (
 
 // genFakeForGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genFakeForGroup struct {
-	generator.DefaultGen
+	generator.GolangGenerator
 	outputPackage     string // must be a Go import-path
 	realClientPackage string // must be a Go import-path
 	group             string

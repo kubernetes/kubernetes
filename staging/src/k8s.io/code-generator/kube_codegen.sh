@@ -144,7 +144,7 @@ function kube::codegen::gen_helpers() {
         done
         "${gobin}/deepcopy-gen" \
             -v "${v}" \
-            --output-file-base zz_generated.deepcopy \
+            --output-file-base zz_generated.deepcopy.go \
             --go-header-file "${boilerplate}" \
             "${input_args[@]}"
     fi
@@ -180,7 +180,7 @@ function kube::codegen::gen_helpers() {
         done
         "${gobin}/defaulter-gen" \
             -v "${v}" \
-            --output-file-base zz_generated.defaults \
+            --output-file-base zz_generated.defaults.go \
             --go-header-file "${boilerplate}" \
             "${input_args[@]}"
     fi
@@ -220,7 +220,7 @@ function kube::codegen::gen_helpers() {
         done
         "${gobin}/conversion-gen" \
             -v "${v}" \
-            --output-file-base zz_generated.conversion \
+            --output-file-base zz_generated.conversion.go \
             --go-header-file "${boilerplate}" \
             "${extra_peer_args[@]:+"${extra_peer_args[@]}"}" \
             "${input_args[@]}"
@@ -373,7 +373,7 @@ function kube::codegen::gen_openapi() {
         done
         "${gobin}/openapi-gen" \
             -v "${v}" \
-            --output-file-base zz_generated.openapi \
+            --output-file-base zz_generated.openapi.go \
             --go-header-file "${boilerplate}" \
             --output-base "${out_dir}" \
             --output-package "${out_pkg}" \

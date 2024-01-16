@@ -31,7 +31,7 @@ import (
 // factoryGenerator produces a file of listers for a given GroupVersion and
 // type.
 type factoryGenerator struct {
-	generator.DefaultGen
+	generator.GolangGenerator
 	outputPackage             string
 	imports                   namer.ImportTracker
 	groupVersions             map[string]clientgentypes.GroupVersions

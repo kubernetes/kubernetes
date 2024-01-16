@@ -108,8 +108,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
 						&registerExternalGenerator{
-							DefaultGen: generator.DefaultGen{
-								OptionalName: arguments.OutputFileBaseName,
+							GolangGenerator: generator.GolangGenerator{
+								OutputFilename: arguments.OutputFileBaseName,
 							},
 							gv:              gv,
 							typesToGenerate: typesToRegister,

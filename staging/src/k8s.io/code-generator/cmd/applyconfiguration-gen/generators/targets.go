@@ -183,8 +183,8 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 				}
 
 				generators = append(generators, &applyConfigurationGenerator{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: strings.ToLower(toGenerate.Type.Name.Name),
+					GolangGenerator: generator.GolangGenerator{
+						OutputFilename: strings.ToLower(toGenerate.Type.Name.Name) + ".go",
 					},
 					outPkgBase:   outputPkgBase,
 					groupVersion: gv,
@@ -207,8 +207,8 @@ func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, gro
 		HeaderComment: boilerplate,
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &utilGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "utils",
+				GolangGenerator: generator.GolangGenerator{
+					OutputFilename: "utils.go",
 				},
 				outputPackage:        outputPkgBase,
 				imports:              generator.NewImportTracker(),
@@ -231,8 +231,8 @@ func targetForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, 
 		HeaderComment: boilerplate,
 		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &internalGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "internal",
+				GolangGenerator: generator.GolangGenerator{
+					OutputFilename: "internal.go",
 				},
 				outputPackage: outputPkgBase,
 				imports:       generator.NewImportTracker(),
