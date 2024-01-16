@@ -21,9 +21,24 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
+
+var (
+	eventedPLEGUsage   = false
+	eventedPLEGUsageMu = sync.RWMutex{}
+)
+
+func IsEventedPLEGInUse() bool {
+	eventedPLEGUsageMu.RLock()
+	defer eventedPLEGUsageMu.RUnlock()
+	return eventedPLEGUsage
+}
+
+func SetEventedPLEGUsage(enable bool) {
+	eventedPLEGUsageMu.Lock()
+	defer eventedPLEGUsageMu.Unlock()
+	eventedPLEGUsage = enable
+}
 
 // Cache stores the PodStatus for the pods. It represents *all* the visible
 // pods/containers in the container runtime. All cache entries are at least as
@@ -103,7 +118,9 @@ func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.T
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+	// if false {
+	// if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && IsEventedPLEGInUse() {
+	if IsEventedPLEGInUse() {
 		// Set the value in the cache only if it's not present already
 		// or the timestamp in the cache is older than the current update timestamp
 		if cachedVal, ok := c.pods[id]; ok && cachedVal.modified.After(timestamp) {
