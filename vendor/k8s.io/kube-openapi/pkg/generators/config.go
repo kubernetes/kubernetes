@@ -51,7 +51,7 @@ func DefaultNameSystem() string {
 	return "sorting_namer"
 }
 
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
@@ -73,7 +73,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		unmangledPath: reportPath,
 	}
 
-	return generator.Packages{
+	return []generator.Package{
 		&generator.SimplePackage{
 			PkgName:       filepath.Base(arguments.OutputBase),
 			PkgPath:       customArgs.OutputPackage,
