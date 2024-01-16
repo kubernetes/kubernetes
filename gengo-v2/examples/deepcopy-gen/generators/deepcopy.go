@@ -195,18 +195,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		if pkgNeedsGeneration {
 			klog.V(3).Infof("Package %q needs generation", i)
 			packages = append(packages,
-				&generator.DefaultPackage{
-					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
-					PackagePath: pkg.Path,
-					Source:      pkg.SourcePath, // output pkg is the same as the input
-					HeaderText:  header,
-					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+				&generator.SimplePackage{
+					PkgName:       strings.Split(filepath.Base(pkg.Path), ".")[0],
+					PkgPath:       pkg.Path,
+					PkgDir:        pkg.SourcePath, // output pkg is the same as the input
+					HeaderComment: header,
+					FilterFunc: func(c *generator.Context, t *types.Type) bool {
+						return t.Name.Package == pkg.Path
+					},
+					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
 							NewGenDeepCopy(arguments.OutputFileBaseName, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister),
 						}
-					},
-					FilterFunc: func(c *generator.Context, t *types.Type) bool {
-						return t.Name.Package == pkg.Path
 					},
 				})
 		}

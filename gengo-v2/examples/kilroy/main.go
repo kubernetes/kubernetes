@@ -129,11 +129,12 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 			continue
 		}
 
-		pkgs = append(pkgs, &generator.DefaultPackage{
-			PackageName: pkg.Name,
-			PackagePath: pkg.Path,       // output pkg is the same as the input
-			Source:      pkg.SourcePath, // output pkg is the same as the input
-			HeaderText:  header,
+		pkgs = append(pkgs, &generator.SimplePackage{
+			PkgName:       pkg.Name,
+			PkgPath:       pkg.Path,       // output pkg is the same as the input
+			PkgDir:        pkg.SourcePath, // output pkg is the same as the input
+			HeaderComment: header,
+
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked
 			// subsequently.  This will be called for every type in every
@@ -141,10 +142,11 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 			FilterFunc: func(c *generator.Context, t *types.Type) bool {
 				return t.Name.Package == pkg.Path
 			},
-			// GeneratorFunc returns a list of Generators, each of which is
+
+			// GeneratorsFunc returns a list of Generators, each of which is
 			// responsible for a single output file (though multiple generators
 			// may write to the same one).
-			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newKilroyGenerator(arguments.OutputFileBaseName, pkg, methodName),
 				}

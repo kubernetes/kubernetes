@@ -129,11 +129,13 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 			continue
 		}
 
-		pkgs = append(pkgs, &generator.DefaultPackage{
-			PackageName: pkg.Name,
-			PackagePath: filepath.Join(toolArgs.OutputPackage, pkg.Name),
-			Source:      filepath.Join(arguments.OutputBase, filepath.Base(pkg.Path)),
-			HeaderText:  header,
+		pkgs = append(pkgs, &generator.SimplePackage{
+			PkgName: pkg.Name,
+			PkgPath: filepath.Join(toolArgs.OutputPackage, pkg.Name),
+			PkgDir:  filepath.Join(arguments.OutputBase, filepath.Base(pkg.Path)),
+
+			HeaderComment: header,
+
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked
 			// subsequently.  This will be called for every type in every
@@ -142,10 +144,11 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 				// Only consider types in our inputs
 				return t.Name.Package == pkg.Path
 			},
-			// GeneratorFunc returns a list of Generators, each of which is
+
+			// GeneratorsFunc returns a list of Generators, each of which is
 			// responsible for a single output file (though multiple generators
 			// may write to the same one).
-			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newPointuhGenerator(arguments.OutputFileBaseName, pkg),
 				}

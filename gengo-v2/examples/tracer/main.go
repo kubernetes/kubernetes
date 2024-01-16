@@ -83,11 +83,11 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 			continue
 		}
 
-		// generator.DefaultPackage is a wrapper for common cases.
-		pkgs = append(pkgs, &generator.DefaultPackage{
-			PackageName: pkg.Name,
-			PackagePath: pkg.Path,
-			Source:      pkg.SourcePath,
+		pkgs = append(pkgs, &generator.SimplePackage{
+			PkgName: pkg.Name,
+			PkgPath: pkg.Path,
+			PkgDir:  pkg.SourcePath,
+
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked
 			// subsequently.  This will be called for every type in every
@@ -102,11 +102,12 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 				}
 				return false
 			},
-			// GeneratorFunc returns a list of Generators, each of which is
+
+			// GeneratorsFunc returns a list of Generators, each of which is
 			// responsible for a single output file (though multiple generators
 			// may write to the same one).
-			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
-				trace("GeneratorFunc{%s}", pkg.Path)
+			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
+				trace("GeneratorsFunc{%s}", pkg.Path)
 				return []generator.Generator{
 					&tracerGenerator{myPackage: pkg},
 				}

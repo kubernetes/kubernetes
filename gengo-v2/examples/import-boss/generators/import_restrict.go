@@ -64,19 +64,19 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 
 	for _, pkgPath := range c.Inputs {
 		pkg := c.Universe[pkgPath]
-		pkgs = append(pkgs, &generator.DefaultPackage{
-			PackageName: pkg.Name,
-			PackagePath: pkg.Path,
-			Source:      pkg.SourcePath,
-			// GeneratorFunc returns a list of generators. Each generator makes a
-			// single file.
-			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		pkgs = append(pkgs, &generator.SimplePackage{
+			PkgName: pkg.Name,
+			PkgPath: pkg.Path,
+			PkgDir:  pkg.SourcePath,
+
+			FilterFunc: func(c *generator.Context, t *types.Type) bool {
+				return false
+			},
+
+			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{&importRules{
 					myPackage: pkg,
 				}}
-			},
-			FilterFunc: func(c *generator.Context, t *types.Type) bool {
-				return false
 			},
 		})
 	}
