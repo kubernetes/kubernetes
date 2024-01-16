@@ -346,10 +346,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	customArgs, ok := arguments.CustomArgs.(*clientgenargs.CustomArgs)
-	if !ok {
-		klog.Fatalf("cannot convert arguments.CustomArgs to clientgenargs.CustomArgs")
-	}
+	customArgs := arguments.CustomArgs.(*clientgenargs.CustomArgs)
+
 	includedTypesOverrides := customArgs.IncludedTypesOverrides
 
 	if err := sanitizePackagePaths(context, customArgs); err != nil {

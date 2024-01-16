@@ -271,17 +271,17 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		}
 	}
 
+	customArgs := arguments.CustomArgs.(*conversionargs.CustomArgs)
+
 	// Make sure explicit peer-packages are added.
-	if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
-		peers := append(customArgs.BasePeerDirs, customArgs.ExtraPeerDirs...)
-		if expanded, err := context.FindPackages(peers...); err != nil {
-			klog.Fatalf("cannot find peer packages: %v", err)
-		} else {
-			otherPkgs = append(otherPkgs, expanded...)
-			// for each pkg, add these extras, too
-			for k := range pkgToPeers {
-				pkgToPeers[k] = append(pkgToPeers[k], expanded...)
-			}
+	peers := append(customArgs.BasePeerDirs, customArgs.ExtraPeerDirs...)
+	if expanded, err := context.FindPackages(peers...); err != nil {
+		klog.Fatalf("cannot find peer packages: %v", err)
+	} else {
+		otherPkgs = append(otherPkgs, expanded...)
+		// for each pkg, add these extras, too
+		for k := range pkgToPeers {
+			pkgToPeers[k] = append(pkgToPeers[k], expanded...)
 		}
 	}
 
@@ -303,11 +303,6 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		getManualConversionFunctions(context, p, manualConversions)
 	}
 
-	skipUnsafe := false
-	if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
-		skipUnsafe = customArgs.SkipUnsafe
-	}
-
 	// We are generating conversions only for packages that are explicitly
 	// passed as InputDir.
 	for _, i := range filteredInputs {
@@ -326,7 +321,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		typesPkg = context.Universe[externalTypes]
 
 		unsafeEquality := TypesEqual(memoryEquivalentTypes)
-		if skipUnsafe {
+		if customArgs.SkipUnsafe {
 			unsafeEquality = noEquality{}
 		}
 
