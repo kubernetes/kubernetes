@@ -185,6 +185,13 @@ func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 			RejectMethods: proxy.MakeRegexpArrayOrDie(o.rejectMethods),
 		}
 	}
+	if o.address == "0.0.0.0" {
+		klog.Warning("kubectl proxy will serve on all network interfaces (0.0.0.0), which may expose cluster access via the proxy to anyone who can access your network.")
+	}
+	// string contains will use exact match, not regex.
+	if strings.Contains(o.acceptHosts, ".*") {
+		klog.Warning("--accept-hosts will accept any host, which may expose cluster access via the proxy to anyone who can access your network.")
+	}
 	return nil
 }
 
