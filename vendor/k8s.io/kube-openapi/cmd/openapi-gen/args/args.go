@@ -68,10 +68,8 @@ func Validate(genericArgs *args.GeneratorArgs) error {
 		return fmt.Errorf("--output-file-base cannot be empty")
 	}
 
-	c, ok := genericArgs.CustomArgs.(*CustomArgs)
-	if !ok {
-		return fmt.Errorf("input arguments don't contain valid custom arguments")
-	}
+	c := genericArgs.CustomArgs.(*CustomArgs)
+
 	if len(c.OutputPackage) == 0 {
 		return fmt.Errorf("--output-package must be specified")
 	}
