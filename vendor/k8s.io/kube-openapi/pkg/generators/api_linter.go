@@ -94,7 +94,7 @@ func newAPIViolationGen() *apiViolationGen {
 }
 
 type apiViolationGen struct {
-	generator.DefaultGen
+	generator.GolangGenerator
 
 	linter *apiLinter
 }
