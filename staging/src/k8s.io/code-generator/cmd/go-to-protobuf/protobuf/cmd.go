@@ -195,8 +195,8 @@ func Run(g *Generator) {
 		pkg := c.Universe[input]
 		protopkg := newProtobufPackage(pkg.Path, pkg.SourcePath, mod.name, mod.allTypes, omitTypes)
 		header := append([]byte{}, boilerplate...)
-		header = append(header, protopkg.HeaderText...)
-		protopkg.HeaderText = header
+		header = append(header, protopkg.HeaderComment...)
+		protopkg.HeaderComment = header
 		protobufNames.Add(protopkg)
 		if mod.output {
 			outputPackages = append(outputPackages, protopkg)
@@ -291,7 +291,7 @@ func Run(g *Generator) {
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
 			log.Println(string(out))
-			log.Fatalf("Unable to run protoc on %s: %v", p.PackageName, err)
+			log.Fatalf("Unable to run protoc on %s: %v", p.Name(), err)
 		}
 
 		if g.SkipGeneratedRewrite {
@@ -312,7 +312,7 @@ func Run(g *Generator) {
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
-			log.Fatalf("Unable to rewrite imports for %s: %v", p.PackageName, err)
+			log.Fatalf("Unable to rewrite imports for %s: %v", p.Name(), err)
 		}
 
 		// format and simplify the generated file
@@ -323,7 +323,7 @@ func Run(g *Generator) {
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
-			log.Fatalf("Unable to apply gofmt for %s: %v", p.PackageName, err)
+			log.Fatalf("Unable to apply gofmt for %s: %v", p.Name(), err)
 		}
 	}
 
@@ -349,7 +349,7 @@ func Run(g *Generator) {
 			continue
 		}
 
-		pattern := filepath.Join(g.OutputBase, p.PackagePath, "*.go")
+		pattern := filepath.Join(g.OutputBase, p.Path(), "*.go")
 		files, err := filepath.Glob(pattern)
 		if err != nil {
 			log.Fatalf("Can't glob pattern %q: %v", pattern, err)
@@ -369,13 +369,13 @@ func Run(g *Generator) {
 func deps(c *generator.Context, pkgs []*protobufPackage) map[string][]string {
 	ret := map[string][]string{}
 	for _, p := range pkgs {
-		pkg, ok := c.Universe[p.PackagePath]
+		pkg, ok := c.Universe[p.Path()]
 		if !ok {
-			log.Fatalf("Unrecognized package: %s", p.PackagePath)
+			log.Fatalf("Unrecognized package: %s", p.Path())
 		}
 
 		for _, d := range pkg.Imports {
-			ret[p.PackagePath] = append(ret[p.PackagePath], d.Path)
+			ret[p.Path()] = append(ret[p.Path()], d.Path)
 		}
 	}
 	return ret
@@ -460,7 +460,7 @@ func (o positionOrder) Len() int {
 }
 
 func (o positionOrder) Less(i, j int) bool {
-	return o.pos[o.elements[i].PackagePath] < o.pos[o.elements[j].PackagePath]
+	return o.pos[o.elements[i].Path()] < o.pos[o.elements[j].Path()]
 }
 
 func (o positionOrder) Swap(i, j int) {

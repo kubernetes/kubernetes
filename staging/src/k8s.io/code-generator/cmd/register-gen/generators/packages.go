@@ -100,12 +100,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		packages = append(packages,
-			&generator.DefaultPackage{
-				PackageName: pkg.Name,
-				PackagePath: pkg.Path,       // output to same pkg as input
-				Source:      pkg.SourcePath, // output to same pkg as input
-				HeaderText:  boilerplate,
-				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			&generator.SimplePackage{
+				PkgName:       pkg.Name,
+				PkgPath:       pkg.Path,       // output to same pkg as input
+				PkgDir:        pkg.SourcePath, // output to same pkg as input
+				HeaderComment: boilerplate,
+				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
 						&registerExternalGenerator{
 							DefaultGen: generator.DefaultGen{

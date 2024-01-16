@@ -249,12 +249,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 func factoryPackage(outputDirBase, outputPkgBase string, boilerplate []byte, groupGoNames, pluralExceptions map[string]string, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string,
 	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
-	return &generator.DefaultPackage{
-		PackageName: filepath.Base(outputDirBase),
-		PackagePath: outputPkgBase,
-		Source:      outputDirBase,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+	return &generator.SimplePackage{
+		PkgName:       filepath.Base(outputDirBase),
+		PkgPath:       outputPkgBase,
+		PkgDir:        outputDirBase,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryGenerator{
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "factory",
@@ -288,12 +288,12 @@ func factoryInterfacePackage(outputDirBase, outputPkgBase string, boilerplate []
 	outputDir := subdirForInternalInterfaces(outputDirBase)
 	outputPkg := subdirForInternalInterfaces(outputPkgBase)
 
-	return &generator.DefaultPackage{
-		PackageName: filepath.Base(outputDir),
-		PackagePath: outputPkg,
-		Source:      outputDir,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+	return &generator.SimplePackage{
+		PkgName:       filepath.Base(outputDir),
+		PkgPath:       outputPkg,
+		PkgDir:        outputDir,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryInterfaceGenerator{
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "factory_interfaces",
@@ -313,12 +313,12 @@ func groupPackage(outputDirBase, outputPackageBase string, groupVersions clientg
 	outputPkg := filepath.Join(outputPackageBase, groupVersions.PackageName)
 	groupPkgName := strings.Split(string(groupVersions.PackageName), ".")[0]
 
-	return &generator.DefaultPackage{
-		PackageName: groupPkgName,
-		PackagePath: outputPkg,
-		Source:      outputDir,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+	return &generator.SimplePackage{
+		PkgName:       groupPkgName,
+		PkgPath:       outputPkg,
+		PkgDir:        outputDir,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &groupInterfaceGenerator{
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "interface",
@@ -342,12 +342,12 @@ func versionPackage(outputDirBase, outputPkgBase string, groupPkgName string, gv
 	outputDir := filepath.Join(outputDirBase, subdir)
 	outputPkg := filepath.Join(outputPkgBase, subdir)
 
-	return &generator.DefaultPackage{
-		PackageName: strings.ToLower(gv.Version.NonEmpty()),
-		PackagePath: outputPkg,
-		Source:      outputDir,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+	return &generator.SimplePackage{
+		PkgName:       strings.ToLower(gv.Version.NonEmpty()),
+		PkgPath:       outputPkg,
+		PkgDir:        outputDir,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &versionInterfaceGenerator{
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "interface",

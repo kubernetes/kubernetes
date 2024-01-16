@@ -123,12 +123,16 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		subdir := filepath.Join(groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
 		outputDir := filepath.Join(arguments.OutputBase, subdir)
 		outputPkg := filepath.Join(customArgs.OutputPackage, subdir)
-		packageList = append(packageList, &generator.DefaultPackage{
-			PackageName: strings.ToLower(gv.Version.NonEmpty()),
-			PackagePath: outputPkg,
-			Source:      outputDir,
-			HeaderText:  boilerplate,
-			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		packageList = append(packageList, &generator.SimplePackage{
+			PkgName:       strings.ToLower(gv.Version.NonEmpty()),
+			PkgPath:       outputPkg,
+			PkgDir:        outputDir,
+			HeaderComment: boilerplate,
+			FilterFunc: func(c *generator.Context, t *types.Type) bool {
+				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+				return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
+			},
+			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				generators = append(generators, &expansionGenerator{
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "expansion_generated",
@@ -151,10 +155,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 					})
 				}
 				return generators
-			},
-			FilterFunc: func(c *generator.Context, t *types.Type) bool {
-				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
-				return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
 			},
 		})
 	}

@@ -36,17 +36,15 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	outputPkg := filepath.Join(clientsetPkg, subdir, "fake")
 	realClientPkg := filepath.Join(clientsetPkg, subdir)
 
-	return &generator.DefaultPackage{
-		PackageName: "fake",
-		PackagePath: outputPkg,
-		Source:      outputDir,
-		HeaderText:  boilerplate,
-		PackageDocumentation: []byte(
-			`// Package fake has the automatically generated clients.
-`),
-		// GeneratorFunc returns a list of generators. Each generator makes a
+	return &generator.SimplePackage{
+		PkgName:       "fake",
+		PkgPath:       outputPkg,
+		PkgDir:        outputDir,
+		HeaderComment: boilerplate,
+		PkgDocComment: []byte("// Package fake has the automatically generated clients.\n"),
+		// GeneratorsFunc returns a list of generators. Each generator makes a
 		// single file.
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
 				generator.DefaultGen{OptionalName: "doc"},
@@ -90,19 +88,17 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 }
 
 func PackageForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
-	return &generator.DefaultPackage{
+	return &generator.SimplePackage{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
-		PackageName: "fake",
-		PackagePath: filepath.Join(clientsetPkg, "fake"),
-		Source:      filepath.Join(clientsetDir, "fake"),
-		HeaderText:  boilerplate,
-		PackageDocumentation: []byte(
-			`// This package has the automatically generated fake clientset.
-`),
-		// GeneratorFunc returns a list of generators. Each generator generates a
+		PkgName:       "fake",
+		PkgPath:       filepath.Join(clientsetPkg, "fake"),
+		PkgDir:        filepath.Join(clientsetDir, "fake"),
+		HeaderComment: boilerplate,
+		PkgDocComment: []byte("// This package has the automatically generated fake clientset.\n"),
+		// GeneratorsFunc returns a list of generators. Each generator generates a
 		// single file.
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
 				generator.DefaultGen{OptionalName: "doc"},
