@@ -40,7 +40,7 @@ type importPathString string
 // about, then constructs the type source data.
 type Builder struct {
 	// If true, include *_test.go
-	IncludeTestFiles bool
+	includeTestFiles bool
 
 	// Map of package paths to definitions.  These keys should be canonical
 	// Go import paths (example.com/foo/bar) and not local paths (./foo/bar).
@@ -74,19 +74,16 @@ type fileLine struct {
 }
 
 // New constructs a new builder.
-func New() *Builder {
+func New(includeTestFiles bool, buildTags []string) *Builder {
 	return &Builder{
 		goPkgs:                map[importPathString]*packages.Package{},
 		userRequested:         map[importPathString]bool{},
 		fullyProcessed:        map[importPathString]bool{},
 		fset:                  token.NewFileSet(),
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
+		includeTestFiles:      includeTestFiles,
+		buildTags:             buildTags,
 	}
-}
-
-// AddBuildTags adds the specified build tags for subsequent package loads.
-func (b *Builder) AddBuildTags(tags ...string) {
-	b.buildTags = append(b.buildTags, tags...)
 }
 
 // FindPackages expands the provided patterns into a list of Go import-paths,
@@ -211,7 +208,7 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 		Mode: packages.NeedName |
 			packages.NeedFiles | packages.NeedImports | packages.NeedDeps |
 			packages.NeedModule | packages.NeedTypes | packages.NeedSyntax,
-		Tests:      b.IncludeTestFiles,
+		Tests:      b.includeTestFiles,
 		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
 		Fset:       b.fset,
 	}

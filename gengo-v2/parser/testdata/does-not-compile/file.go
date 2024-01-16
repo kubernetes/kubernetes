@@ -1,3 +1,3 @@
-package doesnotparse
+package doesnotcompile
 
 var X = UndefinedOtherVariable

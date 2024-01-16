@@ -28,7 +28,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	b := New()
+	b := New(false, nil)
 	if b.goPkgs == nil {
 		t.Errorf("expected .goPkgs to be initialized")
 	}
@@ -123,26 +123,22 @@ func keys[T any](m map[string]T) []string {
 func TestAddBuildTags(t *testing.T) {
 	testTags := []string{"foo", "bar", "qux"}
 
-	b := New()
+	b := New(false, nil)
 	if len(b.buildTags) != 0 {
 		t.Errorf("expected no default build tags, got %v", b.buildTags)
 	}
-	b.AddBuildTags(testTags[0])
+	b = New(false, testTags[0:1])
 	if want, got := testTags[0:1], b.buildTags; !sliceEq(want, got) {
 		t.Errorf("wrong build tags:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 	}
-	b.AddBuildTags(testTags[1], testTags[2])
-	if want, got := testTags, b.buildTags; !sliceEq(want, got) {
-		t.Errorf("wrong build tags:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
-	}
-	b.AddBuildTags()
+	b = New(false, testTags)
 	if want, got := testTags, b.buildTags; !sliceEq(want, got) {
 		t.Errorf("wrong build tags:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 	}
 }
 
 func TestFindPackages(t *testing.T) {
-	b := New()
+	b := New(false, nil)
 
 	// Proper packages with deps.
 	if pkgs, err := b.FindPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
@@ -198,7 +194,7 @@ func TestAlreadyLoaded(t *testing.T) {
 		}
 	}
 
-	b := New()
+	b := New(false, nil)
 
 	// Test loading something we don't have.
 	if existing, netNew, err := b.alreadyLoaded("./testdata/root1"); err != nil {
@@ -247,7 +243,7 @@ func TestAlreadyLoaded(t *testing.T) {
 }
 
 func TestLoadPackagesInternal(t *testing.T) {
-	b := New()
+	b := New(false, nil)
 
 	// Proper packages with deps.
 	if pkgs, err := b.loadPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
@@ -333,10 +329,17 @@ func TestLoadPackagesInternal(t *testing.T) {
 			t.Errorf("package not found in .goPkgs: %v", expected[0])
 		}
 	}
+
+	// Packages with only test files are not an error.
+	if pkgs, err := b.loadPackages("./testdata/only-test-files"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if len(pkgs[0].GoFiles) > 0 {
+		t.Errorf("expected 0 GoFiles, got %q", pkgs[0].GoFiles)
+	}
 }
 
 func TestLoadPackagesTo(t *testing.T) {
-	b := New()
+	b := New(false, nil)
 	u := types.Universe{}
 
 	// Proper packages with deps.
@@ -441,7 +444,7 @@ func TestForEachPackageRecursive(t *testing.T) {
 }
 
 func TestUserRequestedPackages(t *testing.T) {
-	b := New()
+	b := New(false, nil)
 
 	// Proper packages with deps.
 	if err := b.LoadPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
@@ -466,7 +469,7 @@ func TestUserRequestedPackages(t *testing.T) {
 }
 
 func TestAddOnePkgToUniverse(t *testing.T) {
-	b := New()
+	b := New(false, nil)
 
 	// Proper packages with deps.
 	if pkgs, err := b.loadPackages("./testdata/root2"); err != nil {
