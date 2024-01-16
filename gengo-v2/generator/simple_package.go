@@ -47,9 +47,9 @@ type SimpleTarget struct {
 	GeneratorsFunc func(*Context) []Generator
 }
 
-func (st SimpleTarget) Name() string       { return st.PkgName }
-func (st SimpleTarget) Path() string       { return st.PkgPath }
-func (st SimpleTarget) SourcePath() string { return st.PkgDir }
+func (st SimpleTarget) Name() string { return st.PkgName }
+func (st SimpleTarget) Path() string { return st.PkgPath }
+func (st SimpleTarget) Dir() string  { return st.PkgDir }
 
 func (st SimpleTarget) Filter(c *Context, t *types.Type) bool {
 	if st.FilterFunc != nil {

@@ -201,17 +201,17 @@ func (c *Context) addNameSystems(namers namer.NameSystems) *Context {
 
 // ExecuteTargets runs the generators for a single target.
 func (c *Context) ExecuteTarget(tgt Target) error {
-	path := tgt.SourcePath()
-	if path == "" {
-		return fmt.Errorf("no source-path for target %s", tgt.Path())
+	tgtDir := tgt.Dir()
+	if tgtDir == "" {
+		return fmt.Errorf("no directory for target %s", tgt.Path())
 	}
-	klog.V(5).Infof("Executing target %q (%q)", tgt.Name(), path)
+	klog.V(5).Infof("Executing target %q (%q)", tgt.Name(), tgtDir)
 
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(tgt.Filter)
 
 	if !c.Verify {
-		if err := os.MkdirAll(path, 0755); err != nil {
+		if err := os.MkdirAll(tgtDir, 0755); err != nil {
 			return err
 		}
 	}
@@ -235,7 +235,7 @@ func (c *Context) ExecuteTarget(tgt Target) error {
 				FileType:          fileType,
 				PackageName:       tgt.Name(),
 				PackagePath:       tgt.Path(),
-				PackageSourcePath: tgt.SourcePath(),
+				PackageSourcePath: tgt.Dir(),
 				Header:            tgt.Header(g.Filename()),
 				Imports:           map[string]struct{}{},
 			}
@@ -272,7 +272,7 @@ func (c *Context) ExecuteTarget(tgt Target) error {
 
 	var errs []error
 	for _, f := range files {
-		finalPath := filepath.Join(path, f.Name)
+		finalPath := filepath.Join(tgtDir, f.Name)
 		assembler, ok := c.FileTypes[f.FileType]
 		if !ok {
 			return fmt.Errorf("the file type %q registered for file %q does not exist in the context", f.FileType, f.Name)

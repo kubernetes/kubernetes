@@ -28,12 +28,14 @@ import (
 // Target describes a Go package into which code will be generated.  A single
 // Target may have many Generators, each of which emits one file.
 type Target interface {
-	// Name returns the package short name.
+	// Name returns the package short name (as in `package foo`).
 	Name() string
-	// Path returns the package import path.
+	// Path returns the package import path (as in `import "example.com/foo"`).
 	Path() string
-	// SourcePath returns the location of the package on disk.
-	SourcePath() string
+	// Dir returns the location of the resulting package on disk.  This may be
+	// the same directory as an input package (when generating code in-place)
+	// or a different directory entirely.
+	Dir() string
 
 	// Filter should return true if this package cares about this type.
 	// Otherwise, this type will be omitted from the type ordering for
