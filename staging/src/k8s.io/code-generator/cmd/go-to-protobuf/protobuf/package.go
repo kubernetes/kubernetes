@@ -81,7 +81,7 @@ type protobufPackage struct {
 
 func (p *protobufPackage) Clean() error {
 	for _, s := range []string{p.ImportPath(), p.OutputPath()} {
-		if err := os.Remove(filepath.Join(p.SourcePath(), filepath.Base(s))); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(filepath.Join(p.Dir(), filepath.Base(s))); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}
