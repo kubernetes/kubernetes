@@ -99,10 +99,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	customArgs, ok := arguments.CustomArgs.(*informergenargs.CustomArgs)
-	if !ok {
-		klog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
-	}
+	customArgs := arguments.CustomArgs.(*informergenargs.CustomArgs)
 
 	internalVersionOutputDir := arguments.OutputBase
 	internalVersionOutputPkg := customArgs.OutputPackage
