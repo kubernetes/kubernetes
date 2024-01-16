@@ -56,8 +56,8 @@ func DefaultNameSystem() string {
 }
 
 // Packages makes the import-boss package definition.
-func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
-	pkgs := generator.Packages{}
+func Packages(c *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
+	pkgs := []generator.Package{}
 	c.FileTypes = map[string]generator.FileType{
 		importBossFileType: importRuleFile{c},
 	}

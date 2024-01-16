@@ -227,13 +227,13 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 	}
 }
 
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	packages := generator.Packages{}
+	packages := []generator.Package{}
 	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 
 	// Accumulate pre-existing default functions.

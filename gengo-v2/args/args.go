@@ -137,7 +137,7 @@ func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 // Execute implements main().
 // If you don't need any non-default behavior, use as:
 // args.Default().Execute(...)
-func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, pkgs func(*generator.Context, *GeneratorArgs) generator.Packages) error {
+func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, pkgs func(*generator.Context, *GeneratorArgs) []generator.Package) error {
 	if g.defaultCommandLineFlags {
 		g.AddFlags(pflag.CommandLine)
 		pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

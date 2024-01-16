@@ -32,7 +32,7 @@ import (
 )
 
 // ExecutePackages runs the generators for the provided packages.
-func (c *Context) ExecutePackages(packages Packages) error {
+func (c *Context) ExecutePackages(packages []Package) error {
 	klog.V(5).Infof("ExecutePackages: %d packages", len(packages))
 
 	var errs []error

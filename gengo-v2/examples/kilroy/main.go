@@ -108,7 +108,7 @@ func getDefaultNameSystem() string {
 // getPackages is called after the inputs have been loaded.  It is expected to
 // examine the provided context and return a list of Packages which will be
 // executed further.
-func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func getPackages(c *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	header := []byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag))
 
 	methodName := ""
@@ -120,7 +120,7 @@ func getPackages(c *generator.Context, arguments *args.GeneratorArgs) generator.
 		os.Exit(1)
 	}
 
-	pkgs := generator.Packages{}
+	pkgs := []generator.Package{}
 	for _, input := range c.Inputs {
 		klog.V(2).InfoS("processing", "pkg", input)
 

@@ -124,13 +124,13 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	packages := generator.Packages{}
+	packages := []generator.Package{}
 	header := append([]byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag)), boilerplate...)
 
 	boundingDirs := []string{}
