@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -959,7 +960,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// If container does not exist, or is not running, check whether we
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus, false) {
+			// when Evented PLEG is in use, don't restart
+			// for Generic PLEG, restart as is
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus, !pleg.IsEventedPLEGInUse()) {
 				klog.V(3).InfoS("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
@@ -974,9 +977,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 						reason: reasonUnknown,
 					}
 				}
-			} else if containerStatus.State == kubecontainer.ContainerStateCreated {
-				// keep CREATED container
-				keepCount ++
+			} else if pleg.IsEventedPLEGInUse() && containerStatus.State == kubecontainer.ContainerStateCreated {
+				// keep CREATED container when evented PLEG is in use
+				keepCount++
 			}
 			continue
 		}
@@ -1463,7 +1466,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
 
-		if idx == 0 && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		if idx == 0 && pleg.IsEventedPLEGInUse() {
 			if resp.Timestamp == 0 {
 				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
 				// then the pod status we get will not have the timestamp set.
@@ -1490,7 +1493,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+	if !pleg.IsEventedPLEGInUse() {
 		// Get statuses of all containers visible in the pod.
 		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
 		if err != nil {
