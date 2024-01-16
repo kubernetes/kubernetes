@@ -132,15 +132,15 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	gvDir := filepath.Join(clientsetDir, subdir)
 	gvPkg := filepath.Join(clientsetPkg, subdir)
 
-	return &generator.DefaultPackage{
-		PackageName:          strings.ToLower(gv.Version.NonEmpty()),
-		PackagePath:          gvPkg,
-		Source:               gvDir,
-		HeaderText:           boilerplate,
-		PackageDocumentation: []byte("// This package has the automatically generated typed clients.\n"),
-		// GeneratorFunc returns a list of generators. Each generator makes a
+	return &generator.SimplePackage{
+		PkgName:       strings.ToLower(gv.Version.NonEmpty()),
+		PkgPath:       gvPkg,
+		PkgDir:        gvDir,
+		HeaderComment: boilerplate,
+		PkgDocComment: []byte("// This package has the automatically generated typed clients.\n"),
+		// GeneratorsFunc returns a list of generators. Each generator makes a
 		// single file.
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
 				generator.DefaultGen{OptionalName: "doc"},
@@ -197,14 +197,14 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 }
 
 func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
-	return &generator.DefaultPackage{
-		PackageName: customArgs.ClientsetName,
-		PackagePath: clientsetPkg,
-		Source:      clientsetDir,
-		HeaderText:  boilerplate,
-		// GeneratorFunc returns a list of generators. Each generator generates a
+	return &generator.SimplePackage{
+		PkgName:       customArgs.ClientsetName,
+		PkgPath:       clientsetPkg,
+		PkgDir:        clientsetDir,
+		HeaderComment: boilerplate,
+		// GeneratorsFunc returns a list of generators. Each generator generates a
 		// single file.
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				&genClientset{
 					DefaultGen: generator.DefaultGen{
@@ -237,15 +237,15 @@ NextGroup:
 		}
 	}
 
-	return &generator.DefaultPackage{
-		PackageName:          "scheme",
-		PackagePath:          schemePkg,
-		Source:               schemeDir,
-		HeaderText:           boilerplate,
-		PackageDocumentation: []byte("// This package contains the scheme of the automatically generated clientset.\n"),
-		// GeneratorFunc returns a list of generators. Each generator generates a
+	return &generator.SimplePackage{
+		PkgName:       "scheme",
+		PkgPath:       schemePkg,
+		PkgDir:        schemeDir,
+		HeaderComment: boilerplate,
+		PkgDocComment: []byte("// This package contains the scheme of the automatically generated clientset.\n"),
+		// GeneratorsFunc returns a list of generators. Each generator generates a
 		// single file.
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = []generator.Generator{
 				// Always generate a "doc.go" file.
 				generator.DefaultGen{OptionalName: "doc"},

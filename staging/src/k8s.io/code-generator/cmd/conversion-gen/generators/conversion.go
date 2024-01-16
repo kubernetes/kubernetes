@@ -331,18 +331,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		packages = append(packages,
-			&generator.DefaultPackage{
-				PackageName: filepath.Base(pkg.Path),
-				PackagePath: pkg.Path,
-				Source:      pkg.SourcePath, // output pkg is the same as the input
-				HeaderText:  header,
-				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			&generator.SimplePackage{
+				PkgName:       filepath.Base(pkg.Path),
+				PkgPath:       pkg.Path,
+				PkgDir:        pkg.SourcePath, // output pkg is the same as the input
+				HeaderComment: header,
+				FilterFunc: func(c *generator.Context, t *types.Type) bool {
+					return t.Name.Package == typesPkg.Path
+				},
+				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
 						NewGenConversion(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, manualConversions, pkgToPeers[pkg.Path], unsafeEquality),
 					}
-				},
-				FilterFunc: func(c *generator.Context, t *types.Type) bool {
-					return t.Name.Package == typesPkg.Path
 				},
 			})
 	}
