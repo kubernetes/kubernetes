@@ -71,7 +71,7 @@ const (
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
 // Node disk pressure is induced by consuming all inodes on the node.
-var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+var _ = SIGDescribe("SeparateDiskTest", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -113,7 +113,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 
 // ImageGCNoEviction tests that the node does not evict pods when inodes are consumed by images
 // Disk pressure is induced by pulling large images
-var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+var _ = SIGDescribe("SeparateDiskTest", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("image-gc-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
