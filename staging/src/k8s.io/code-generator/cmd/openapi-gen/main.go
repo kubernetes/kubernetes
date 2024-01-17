@@ -51,6 +51,7 @@ func main() {
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
 		args.StdBuildTag,
+		pflag.Args(),
 	); err != nil {
 		log.Fatalf("OpenAPI code generation error: %v", err)
 	}

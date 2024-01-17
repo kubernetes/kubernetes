@@ -64,6 +64,7 @@ func main() {
 		statusgenerators.DefaultNameSystem(),
 		statusgenerators.GetTargets,
 		args.StdBuildTag,
+		pflag.Args(),
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
