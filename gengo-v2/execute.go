@@ -77,12 +77,12 @@ func Execute(nameSystems namer.NameSystems, defaultSystem string, getTargets fun
 		buildTags = append(buildTags, buildTag)
 	}
 
-	b := parser.New(buildTags)
-	if err := b.LoadPackages(patterns...); err != nil {
+	p := parser.New(buildTags)
+	if err := p.LoadPackages(patterns...); err != nil {
 		return fmt.Errorf("failed making a parser: %v", err)
 	}
 
-	c, err := generator.NewContext(b, nameSystems, defaultSystem)
+	c, err := generator.NewContext(p, nameSystems, defaultSystem)
 	if err != nil {
 		return fmt.Errorf("failed making a context: %v", err)
 	}

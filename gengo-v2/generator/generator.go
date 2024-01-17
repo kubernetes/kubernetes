@@ -171,13 +171,13 @@ type Context struct {
 	FileTypes map[string]FileType
 
 	// Allows generators to add packages at runtime.
-	builder *parser.Builder
+	parser *parser.Parser
 }
 
-// NewContext generates a context from the given builder, naming systems, and
+// NewContext generates a context from the given parser, naming systems, and
 // the naming system you wish to construct the canonical ordering from.
-func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrderName string) (*Context, error) {
-	universe, err := b.NewUniverse()
+func NewContext(p *parser.Parser, nameSystems namer.NameSystems, canonicalOrderName string) (*Context, error) {
+	universe, err := p.NewUniverse()
 	if err != nil {
 		return nil, err
 	}
@@ -185,11 +185,11 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 	c := &Context{
 		Namers:   namer.NameSystems{},
 		Universe: universe,
-		Inputs:   b.UserRequestedPackages(),
+		Inputs:   p.UserRequestedPackages(),
 		FileTypes: map[string]FileType{
 			GolangFileType: NewGolangFile(),
 		},
-		builder: b,
+		parser: p,
 	}
 
 	for name, systemNamer := range nameSystems {
@@ -204,11 +204,11 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 
 // LoadPackages adds Go packages to the context.
 func (c *Context) LoadPackages(patterns ...string) ([]*types.Package, error) {
-	return c.builder.LoadPackagesTo(&c.Universe, patterns...)
+	return c.parser.LoadPackagesTo(&c.Universe, patterns...)
 }
 
 // FindPackages expands Go package patterns into a list of package import
 // paths, akin to `go list -find`.
 func (c *Context) FindPackages(patterns ...string) ([]string, error) {
-	return c.builder.FindPackages(patterns...)
+	return c.parser.FindPackages(patterns...)
 }

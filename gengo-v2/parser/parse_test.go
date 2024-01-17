@@ -28,20 +28,20 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	b := New(nil)
-	if b.goPkgs == nil {
+	parser := New(nil)
+	if parser.goPkgs == nil {
 		t.Errorf("expected .goPkgs to be initialized")
 	}
-	if b.userRequested == nil {
+	if parser.userRequested == nil {
 		t.Errorf("expected .userRequested to be initialized")
 	}
-	if b.fullyProcessed == nil {
+	if parser.fullyProcessed == nil {
 		t.Errorf("expected .fullyProcessed to be initialized")
 	}
-	if b.fset == nil {
+	if parser.fset == nil {
 		t.Errorf("expected .fset to be initialized")
 	}
-	if b.endLineToCommentGroup == nil {
+	if parser.endLineToCommentGroup == nil {
 		t.Errorf("expected .endLineToCommentGroup to be initialized")
 	}
 }
@@ -123,25 +123,25 @@ func keys[T any](m map[string]T) []string {
 func TestAddBuildTags(t *testing.T) {
 	testTags := []string{"foo", "bar", "qux"}
 
-	b := New(nil)
-	if len(b.buildTags) != 0 {
-		t.Errorf("expected no default build tags, got %v", b.buildTags)
+	parser := New(nil)
+	if len(parser.buildTags) != 0 {
+		t.Errorf("expected no default build tags, got %v", parser.buildTags)
 	}
-	b = New(testTags[0:1])
-	if want, got := testTags[0:1], b.buildTags; !sliceEq(want, got) {
+	parser = New(testTags[0:1])
+	if want, got := testTags[0:1], parser.buildTags; !sliceEq(want, got) {
 		t.Errorf("wrong build tags:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 	}
-	b = New(testTags)
-	if want, got := testTags, b.buildTags; !sliceEq(want, got) {
+	parser = New(testTags)
+	if want, got := testTags, parser.buildTags; !sliceEq(want, got) {
 		t.Errorf("wrong build tags:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 	}
 }
 
 func TestFindPackages(t *testing.T) {
-	b := New(nil)
+	parser := New(nil)
 
 	// Proper packages with deps.
-	if pkgs, err := b.FindPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
+	if pkgs, err := parser.FindPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		expected := sorted(
@@ -157,23 +157,23 @@ func TestFindPackages(t *testing.T) {
 		if want, got := expected, sorted(pkgs...); !sliceEq(want, got) {
 			t.Errorf("wrong pkgs:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 		}
-		if len(b.goPkgs) != 0 {
-			t.Errorf("expected no added .goPkgs, got %v", pretty(pkgPathsFromMap(b.goPkgs)))
+		if len(parser.goPkgs) != 0 {
+			t.Errorf("expected no added .goPkgs, got %v", pretty(pkgPathsFromMap(parser.goPkgs)))
 		}
 	}
 
 	// Non-existent packages should be an error.
-	if pkgs, err := b.FindPackages("./testdata/does-not-exist"); err == nil {
+	if pkgs, err := parser.FindPackages("./testdata/does-not-exist"); err == nil {
 		t.Errorf("unexpected success: %v", pkgs)
 	}
 
 	// Packages without .go files should be an error.
-	if pkgs, err := b.FindPackages("./testdata/has-no-gofiles"); err == nil {
+	if pkgs, err := parser.FindPackages("./testdata/has-no-gofiles"); err == nil {
 		t.Errorf("unexpected success: %v", pkgs)
 	}
 
 	// Invalid go files are not an error.
-	if pkgs, err := b.FindPackages("./testdata/does-not-parse"); err != nil {
+	if pkgs, err := parser.FindPackages("./testdata/does-not-parse"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		expected := []string{
@@ -194,10 +194,10 @@ func TestAlreadyLoaded(t *testing.T) {
 		}
 	}
 
-	b := New(nil)
+	parser := New(nil)
 
 	// Test loading something we don't have.
-	if existing, netNew, err := b.alreadyLoaded("./testdata/root1"); err != nil {
+	if existing, netNew, err := parser.alreadyLoaded("./testdata/root1"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		if len(existing) > 0 {
@@ -211,8 +211,8 @@ func TestAlreadyLoaded(t *testing.T) {
 	}
 
 	// Test loading something already present.
-	b.goPkgs["k8s.io/gengo/v2/parser/testdata/root1"] = newPkg("k8s.io/gengo/v2/parser/testdata/root1")
-	if existing, netNew, err := b.alreadyLoaded("./testdata/root1"); err != nil {
+	parser.goPkgs["k8s.io/gengo/v2/parser/testdata/root1"] = newPkg("k8s.io/gengo/v2/parser/testdata/root1")
+	if existing, netNew, err := parser.alreadyLoaded("./testdata/root1"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		if len(existing) != 1 {
@@ -226,7 +226,7 @@ func TestAlreadyLoaded(t *testing.T) {
 	}
 
 	// Test loading something partly present.
-	if existing, netNew, err := b.alreadyLoaded("./testdata/root1/..."); err != nil {
+	if existing, netNew, err := parser.alreadyLoaded("./testdata/root1/..."); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		if len(existing) != 1 {
@@ -243,10 +243,10 @@ func TestAlreadyLoaded(t *testing.T) {
 }
 
 func TestLoadPackagesInternal(t *testing.T) {
-	b := New(nil)
+	parser := New(nil)
 
 	// Proper packages with deps.
-	if pkgs, err := b.loadPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
+	if pkgs, err := parser.loadPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		expectedDirect := sorted(
@@ -271,52 +271,52 @@ func TestLoadPackagesInternal(t *testing.T) {
 		if want, got := expectedDirect, pkgPathsFromSlice(pkgs); !sliceEq(want, got) {
 			t.Errorf("wrong pkgs returned:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 		}
-		if want, got := expectedAll, pkgPathsFromMap(b.goPkgs); !sliceEq(want, got) {
+		if want, got := expectedAll, pkgPathsFromMap(parser.goPkgs); !sliceEq(want, got) {
 			t.Errorf("wrong pkgs in .goPkgs:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 		}
 
 		for _, path := range expectedDirect {
-			if !b.userRequested[path] {
+			if !parser.userRequested[path] {
 				t.Errorf("expected .userRequested[%q] to be set", path)
 			}
-			if b.fullyProcessed[path] {
+			if parser.fullyProcessed[path] {
 				t.Errorf("expected .fullyProcessed[%q] to be unset", path)
 			}
 		}
 		for _, path := range expectedIndirect {
-			if b.userRequested[path] {
+			if parser.userRequested[path] {
 				t.Errorf("expected .userRequested[%q] to be unset", path)
 			}
-			if b.fullyProcessed[path] {
+			if parser.fullyProcessed[path] {
 				t.Errorf("expected .fullyProcessed[%q] to be unset", path)
 			}
 		}
 
 		// There is a comment is at this fixed location.
-		pos := fileLine{b.goPkgs["k8s.io/gengo/v2/parser/testdata/root1"].GoFiles[0], 9}
-		if b.endLineToCommentGroup[pos] == nil {
+		pos := fileLine{parser.goPkgs["k8s.io/gengo/v2/parser/testdata/root1"].GoFiles[0], 9}
+		if parser.endLineToCommentGroup[pos] == nil {
 			t.Errorf("expected a comment-group ending at %v", pos)
-			t.Errorf("%v", b.endLineToCommentGroup)
+			t.Errorf("%v", parser.endLineToCommentGroup)
 		}
 	}
 
 	// Non-existent packages should be an error.
-	if pkgs, err := b.loadPackages("./testdata/does-not-exist"); err == nil {
+	if pkgs, err := parser.loadPackages("./testdata/does-not-exist"); err == nil {
 		t.Errorf("unexpected success: %v", pkgs)
 	}
 
 	// Packages without .go files should be an error.
-	if pkgs, err := b.loadPackages("./testdata/has-no-gofiles"); err == nil {
+	if pkgs, err := parser.loadPackages("./testdata/has-no-gofiles"); err == nil {
 		t.Errorf("unexpected success: %v", pkgs)
 	}
 
 	// Invalid go files are an error.
-	if pkgs, err := b.loadPackages("./testdata/does-not-parse"); err == nil {
+	if pkgs, err := parser.loadPackages("./testdata/does-not-parse"); err == nil {
 		t.Errorf("unexpected success: %v", pkgs)
 	}
 
 	// Packages which parse but do not compile are NOT an error.
-	if pkgs, err := b.loadPackages("./testdata/does-not-compile"); err != nil {
+	if pkgs, err := parser.loadPackages("./testdata/does-not-compile"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		expected := []string{
@@ -325,13 +325,13 @@ func TestLoadPackagesInternal(t *testing.T) {
 		if want, got := expected, pkgPathsFromSlice(pkgs); !sliceEq(want, got) {
 			t.Errorf("wrong pkgs:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
 		}
-		if b.goPkgs[expected[0]] == nil {
+		if parser.goPkgs[expected[0]] == nil {
 			t.Errorf("package not found in .goPkgs: %v", expected[0])
 		}
 	}
 
 	// Packages with only test files are not an error.
-	if pkgs, err := b.loadPackages("./testdata/only-test-files"); err != nil {
+	if pkgs, err := parser.loadPackages("./testdata/only-test-files"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if len(pkgs[0].GoFiles) > 0 {
 		t.Errorf("expected 0 GoFiles, got %q", pkgs[0].GoFiles)
@@ -339,11 +339,11 @@ func TestLoadPackagesInternal(t *testing.T) {
 }
 
 func TestLoadPackagesTo(t *testing.T) {
-	b := New(nil)
+	parser := New(nil)
 	u := types.Universe{}
 
 	// Proper packages with deps.
-	if pkgs, err := b.LoadPackagesTo(&u, "./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
+	if pkgs, err := parser.LoadPackagesTo(&u, "./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		expectedDirect := sorted(
@@ -444,10 +444,10 @@ func TestForEachPackageRecursive(t *testing.T) {
 }
 
 func TestUserRequestedPackages(t *testing.T) {
-	b := New(nil)
+	parser := New(nil)
 
 	// Proper packages with deps.
-	if err := b.LoadPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
+	if err := parser.LoadPackages("./testdata/root1", "./testdata/root2", "./testdata/roots345/..."); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		want := sorted(
@@ -460,7 +460,7 @@ func TestUserRequestedPackages(t *testing.T) {
 			"k8s.io/gengo/v2/parser/testdata/roots345/root5",
 			"k8s.io/gengo/v2/parser/testdata/roots345/root5/lib5",
 		)
-		got := b.UserRequestedPackages() // should be sorted!
+		got := parser.UserRequestedPackages() // should be sorted!
 
 		if !sliceEq(want, got) {
 			t.Errorf("wrong pkgs returned:\nwant: %v\ngot:  %v", pretty(want), pretty(got))
@@ -469,10 +469,10 @@ func TestUserRequestedPackages(t *testing.T) {
 }
 
 func TestAddOnePkgToUniverse(t *testing.T) {
-	b := New(nil)
+	parser := New(nil)
 
 	// Proper packages with deps.
-	if pkgs, err := b.loadPackages("./testdata/root2"); err != nil {
+	if pkgs, err := parser.loadPackages("./testdata/root2"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else {
 		direct := "k8s.io/gengo/v2/parser/testdata/root2"
@@ -483,7 +483,7 @@ func TestAddOnePkgToUniverse(t *testing.T) {
 		}
 
 		u := types.Universe{}
-		if err := b.addPkgToUniverse(pkgs[0], &u); err != nil {
+		if err := parser.addPkgToUniverse(pkgs[0], &u); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 
@@ -491,19 +491,19 @@ func TestAddOnePkgToUniverse(t *testing.T) {
 		// and combinations of things that are not covered.
 
 		// verify the depth of processing
-		if !b.fullyProcessed[direct] {
+		if !parser.fullyProcessed[direct] {
 			t.Errorf("expected .fullyProcessed[%q] to be set", direct)
 		}
-		if b.fullyProcessed[indirect] {
+		if parser.fullyProcessed[indirect] {
 			t.Errorf("expected .fullyProcessed[%q] to be unset", indirect)
 		}
 
 		// verify their existence
-		pd := b.goPkgs[direct]
+		pd := parser.goPkgs[direct]
 		if pd == nil {
 			t.Fatalf("expected non-nil from .goPkgs")
 		}
-		pi := b.goPkgs[indirect]
+		pi := parser.goPkgs[indirect]
 		if pi == nil {
 			t.Fatalf("expected non-nil from .goPkgs")
 		}

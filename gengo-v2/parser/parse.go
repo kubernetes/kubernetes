@@ -33,9 +33,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Builder lets you add all the go files in all the packages that you care
+// Parser lets you add all the go files in all the packages that you care
 // about, then constructs the type source data.
-type Builder struct {
+type Parser struct {
 	// Map of package paths to definitions.  These keys should be canonical
 	// Go import paths (example.com/foo/bar) and not local paths (./foo/bar).
 	goPkgs map[string]*packages.Package
@@ -68,8 +68,8 @@ type fileLine struct {
 }
 
 // New constructs a new builder.
-func New(buildTags []string) *Builder {
-	return &Builder{
+func New(buildTags []string) *Parser {
+	return &Parser{
 		goPkgs:                map[string]*packages.Package{},
 		userRequested:         map[string]bool{},
 		fullyProcessed:        map[string]bool{},
@@ -81,11 +81,11 @@ func New(buildTags []string) *Builder {
 
 // FindPackages expands the provided patterns into a list of Go import-paths,
 // much like `go list -find`.
-func (b *Builder) FindPackages(patterns ...string) ([]string, error) {
+func (p *Parser) FindPackages(patterns ...string) ([]string, error) {
 	toFind := make([]string, 0, len(patterns))
 	results := make([]string, 0, len(patterns))
 	for _, pat := range patterns {
-		if pkg := b.goPkgs[pat]; pkg != nil {
+		if pkg := p.goPkgs[pat]; pkg != nil {
 			results = append(results, pkg.PkgPath)
 		} else {
 			toFind = append(toFind, pat)
@@ -97,7 +97,7 @@ func (b *Builder) FindPackages(patterns ...string) ([]string, error) {
 
 	cfg := packages.Config{
 		Mode:       packages.NeedName | packages.NeedFiles,
-		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
+		BuildFlags: []string{"-tags", strings.Join(p.buildTags, ",")},
 		Tests:      false,
 	}
 	pkgs, err := packages.Load(&cfg, toFind...)
@@ -127,8 +127,8 @@ func (b *Builder) FindPackages(patterns ...string) ([]string, error) {
 // LoadPackages loads and parses the specified Go packages.  Specifically
 // named packages (without a trailing "/...") which do not exist or have no Go
 // files are an error.
-func (b *Builder) LoadPackages(patterns ...string) error {
-	_, err := b.loadPackages(patterns...)
+func (p *Parser) LoadPackages(patterns ...string) error {
+	_, err := p.loadPackages(patterns...)
 	return err
 }
 
@@ -136,15 +136,15 @@ func (b *Builder) LoadPackages(patterns ...string) error {
 // into the specified Universe. It returns the packages which match the
 // patterns, but loads all packages and their imports, recursively, into the
 // universe.  See NewUniverse for more.
-func (b *Builder) LoadPackagesTo(u *types.Universe, patterns ...string) ([]*types.Package, error) {
+func (p *Parser) LoadPackagesTo(u *types.Universe, patterns ...string) ([]*types.Package, error) {
 	// Load Packages.
-	pkgs, err := b.loadPackages(patterns...)
+	pkgs, err := p.loadPackages(patterns...)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load types in all packages (it will internally filter).
-	if err := b.addPkgsToUniverse(pkgs, u); err != nil {
+	if err := p.addPkgsToUniverse(pkgs, u); err != nil {
 		return nil, err
 	}
 
@@ -157,12 +157,12 @@ func (b *Builder) LoadPackagesTo(u *types.Universe, patterns ...string) ([]*type
 	return ret, nil
 }
 
-func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) {
+func (p *Parser) loadPackages(patterns ...string) ([]*packages.Package, error) {
 	klog.V(5).Infof("loadPackages %q", patterns)
 
 	// Loading packages is slow - only do ones we know we have not already done
 	// (e.g. if a tool calls LoadPackages itself).
-	existingPkgs, netNewPkgs, err := b.alreadyLoaded(patterns...)
+	existingPkgs, netNewPkgs, err := p.alreadyLoaded(patterns...)
 	if err != nil {
 		return nil, err
 	}
@@ -181,13 +181,13 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 
 	// If these were not user-requested before, they are now.
 	for _, pkg := range existingPkgs {
-		if !b.userRequested[pkg.PkgPath] {
-			b.userRequested[pkg.PkgPath] = true
+		if !p.userRequested[pkg.PkgPath] {
+			p.userRequested[pkg.PkgPath] = true
 		}
 	}
 	for _, pkg := range netNewPkgs {
-		if !b.userRequested[pkg] {
-			b.userRequested[pkg] = true
+		if !p.userRequested[pkg] {
+			p.userRequested[pkg] = true
 		}
 	}
 
@@ -199,8 +199,8 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 		Mode: packages.NeedName |
 			packages.NeedFiles | packages.NeedImports | packages.NeedDeps |
 			packages.NeedModule | packages.NeedTypes | packages.NeedSyntax,
-		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
-		Fset:       b.fset,
+		BuildFlags: []string{"-tags", strings.Join(p.buildTags, ",")},
+		Fset:       p.fset,
 		Tests:      false,
 	}
 
@@ -230,7 +230,7 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 
 	// Finish integrating packages into our state.
 	absorbPkg := func(pkg *packages.Package) error {
-		b.goPkgs[pkg.PkgPath] = pkg
+		p.goPkgs[pkg.PkgPath] = pkg
 
 		for _, f := range pkg.Syntax {
 			for _, c := range f.Comments {
@@ -245,8 +245,8 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 				// dep) and might have stored pointers into it.  Doing a
 				// thorough "reload" without invalidating all those pointers is
 				// a problem for another day.
-				position := b.fset.Position(c.End()) // Fset is synchronized
-				b.endLineToCommentGroup[fileLine{position.Filename, position.Line}] = c
+				position := p.fset.Position(c.End()) // Fset is synchronized
+				p.endLineToCommentGroup[fileLine{position.Filename, position.Line}] = c
 			}
 		}
 
@@ -261,16 +261,16 @@ func (b *Builder) loadPackages(patterns ...string) ([]*packages.Package, error) 
 
 // alreadyLoaded figures out which of the specified patterns have already been loaded
 // and which have not, and returns those respectively.
-func (b *Builder) alreadyLoaded(patterns ...string) ([]*packages.Package, []string, error) {
+func (p *Parser) alreadyLoaded(patterns ...string) ([]*packages.Package, []string, error) {
 	existingPkgs := make([]*packages.Package, 0, len(patterns))
 	netNewPkgs := make([]string, 0, len(patterns))
 
 	// Expand and canonicalize the requested patterns.  This should be fast.
-	if pkgPaths, err := b.FindPackages(patterns...); err != nil {
+	if pkgPaths, err := p.FindPackages(patterns...); err != nil {
 		return nil, nil, err
 	} else {
 		for _, pkgPath := range pkgPaths {
-			if pkg := b.goPkgs[pkgPath]; pkg != nil {
+			if pkg := p.goPkgs[pkgPath]; pkg != nil {
 				existingPkgs = append(existingPkgs, pkg)
 			} else {
 				netNewPkgs = append(netNewPkgs, pkgPath)
@@ -311,10 +311,10 @@ func recursePackage(pkg *packages.Package, fn func(pkg *packages.Package) error,
 }
 
 // UserRequestedPackages fetches a list of the user-imported packages.
-func (b *Builder) UserRequestedPackages() []string {
+func (p *Parser) UserRequestedPackages() []string {
 	// Iterate packages in a predictable order.
-	pkgPaths := make([]string, 0, len(b.userRequested))
-	for k := range b.userRequested {
+	pkgPaths := make([]string, 0, len(p.userRequested))
+	for k := range p.userRequested {
 		pkgPaths = append(pkgPaths, string(k))
 	}
 	sort.Strings(pkgPaths)
@@ -326,14 +326,14 @@ func (b *Builder) UserRequestedPackages() []string {
 // entry for each Go package that has been loaded, including all of their
 // dependencies, recursively.  It also has one entry, whose key is "", which
 // represents "builtin" types.
-func (b *Builder) NewUniverse() (types.Universe, error) {
+func (p *Parser) NewUniverse() (types.Universe, error) {
 	u := types.Universe{}
 
 	pkgs := []*packages.Package{}
-	for _, path := range b.UserRequestedPackages() {
-		pkgs = append(pkgs, b.goPkgs[path])
+	for _, path := range p.UserRequestedPackages() {
+		pkgs = append(pkgs, p.goPkgs[path])
 	}
-	if err := b.addPkgsToUniverse(pkgs, &u); err != nil {
+	if err := p.addPkgsToUniverse(pkgs, &u); err != nil {
 		return nil, err
 	}
 
@@ -342,9 +342,9 @@ func (b *Builder) NewUniverse() (types.Universe, error) {
 
 // addCommentsToType takes any accumulated comment lines prior to obj and
 // attaches them to the type t.
-func (b *Builder) addCommentsToType(obj gotypes.Object, t *types.Type) {
-	t.CommentLines = b.docComment(obj.Pos())
-	t.SecondClosestCommentLines = b.priorDetachedComment(obj.Pos())
+func (p *Parser) addCommentsToType(obj gotypes.Object, t *types.Type) {
+	t.CommentLines = p.docComment(obj.Pos())
+	t.SecondClosestCommentLines = p.priorDetachedComment(obj.Pos())
 }
 
 // packageDir tries to figure out the directory of the specified package.
@@ -367,9 +367,9 @@ func packageDir(pkg *packages.Package) (string, error) {
 
 // addPkgsToUniverse adds the packages, and all of their deps, recursively, to
 // the universe and (if needed) searches through them for types.
-func (b *Builder) addPkgsToUniverse(pkgs []*packages.Package, u *types.Universe) error {
+func (p *Parser) addPkgsToUniverse(pkgs []*packages.Package, u *types.Universe) error {
 	addOne := func(pkg *packages.Package) error {
-		if err := b.addPkgToUniverse(pkg, u); err != nil {
+		if err := p.addPkgToUniverse(pkg, u); err != nil {
 			return err
 		}
 		return nil
@@ -382,16 +382,16 @@ func (b *Builder) addPkgsToUniverse(pkgs []*packages.Package, u *types.Universe)
 
 // addPkgToUniverse adds one package to the universe and (if needed) searches
 // through it for types.
-func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) error {
+func (p *Parser) addPkgToUniverse(pkg *packages.Package, u *types.Universe) error {
 	pkgPath := pkg.PkgPath
-	if b.fullyProcessed[pkgPath] {
+	if p.fullyProcessed[pkgPath] {
 		return nil
 	}
 
 	// We're keeping this package, though we might not fully process it.
 	if vlog := klog.V(5); vlog.Enabled() {
 		why := "user-requested"
-		if !b.userRequested[pkgPath] {
+		if !p.userRequested[pkgPath] {
 			why = "dependency"
 		}
 		vlog.Infof("addPkgToUniverse %q (%s)", pkgPath, why)
@@ -410,12 +410,12 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	gengoPkg.SourcePath = absPath
 
 	// If the package was not user-requested, we can stop here.
-	if !b.userRequested[pkgPath] {
+	if !p.userRequested[pkgPath] {
 		return nil
 	}
 
 	// Mark it as done, so we don't ever re-process it.
-	b.fullyProcessed[pkgPath] = true
+	p.fullyProcessed[pkgPath] = true
 	gengoPkg.Name = pkg.Name
 
 	// For historical reasons we treat files named "doc.go" specially.
@@ -425,7 +425,7 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	for _, f := range pkg.Syntax {
 		// This gets the filename for the ast.File.  Iterating pkg.GoFiles is
 		// documented as unreliable.
-		pos := b.fset.Position(f.FileStart)
+		pos := p.fset.Position(f.FileStart)
 		if filepath.Base(pos.Filename) == "doc.go" {
 			gengoPkg.Comments = []string{}
 			for i := range f.Comments {
@@ -442,22 +442,22 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	for _, n := range s.Names() {
 		switch obj := s.Lookup(n).(type) {
 		case *gotypes.TypeName:
-			t := b.walkType(*u, nil, obj.Type())
-			b.addCommentsToType(obj, t)
+			t := p.walkType(*u, nil, obj.Type())
+			p.addCommentsToType(obj, t)
 		case *gotypes.Func:
 			// We only care about functions, not concrete/abstract methods.
 			if obj.Type() != nil && obj.Type().(*gotypes.Signature).Recv() == nil {
-				t := b.addFunction(*u, nil, obj)
-				b.addCommentsToType(obj, t)
+				t := p.addFunction(*u, nil, obj)
+				p.addCommentsToType(obj, t)
 			}
 		case *gotypes.Var:
 			if !obj.IsField() {
-				t := b.addVariable(*u, nil, obj)
-				b.addCommentsToType(obj, t)
+				t := p.addVariable(*u, nil, obj)
+				p.addCommentsToType(obj, t)
 			}
 		case *gotypes.Const:
-			t := b.addConstant(*u, nil, obj)
-			b.addCommentsToType(obj, t)
+			t := p.addConstant(*u, nil, obj)
+			p.addCommentsToType(obj, t)
 		default:
 			klog.Infof("addPkgToUniverse %q: unhandled object: %v", pkgPath, obj)
 		}
@@ -466,7 +466,7 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 	// Add all of this package's imports.
 	importedPkgs := []string{}
 	for _, imp := range pkg.Imports {
-		if err := b.addPkgToUniverse(imp, u); err != nil {
+		if err := p.addPkgToUniverse(imp, u); err != nil {
 			return err
 		}
 		importedPkgs = append(importedPkgs, imp.PkgPath)
@@ -478,37 +478,37 @@ func (b *Builder) addPkgToUniverse(pkg *packages.Package, u *types.Universe) err
 }
 
 // If the specified position has a "doc comment", return that.
-func (b *Builder) docComment(pos token.Pos) []string {
+func (p *Parser) docComment(pos token.Pos) []string {
 	// An object's doc comment always ends on the line before the object's own
 	// declaration.
-	c1 := b.priorCommentLines(pos, 1)
+	c1 := p.priorCommentLines(pos, 1)
 	return splitLines(c1.Text()) // safe even if c1 is nil
 }
 
 // If there is a detached (not immediately before a declaration) comment,
 // return that.
-func (b *Builder) priorDetachedComment(pos token.Pos) []string {
+func (p *Parser) priorDetachedComment(pos token.Pos) []string {
 	// An object's doc comment always ends on the line before the object's own
 	// declaration.
-	c1 := b.priorCommentLines(pos, 1)
+	c1 := p.priorCommentLines(pos, 1)
 
 	// Using a literal "2" here is brittle in theory (it means literally 2
 	// lines), but in practice Go code is gofmt'ed (which elides repeated blank
 	// lines), so it works.
 	var c2 *ast.CommentGroup
 	if c1 == nil {
-		c2 = b.priorCommentLines(pos, 2)
+		c2 = p.priorCommentLines(pos, 2)
 	} else {
-		c2 = b.priorCommentLines(c1.List[0].Slash, 2)
+		c2 = p.priorCommentLines(c1.List[0].Slash, 2)
 	}
 	return splitLines(c2.Text()) // safe even if c1 is nil
 }
 
 // If there's a comment block which ends nlines before pos, return it.
-func (b *Builder) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup {
-	position := b.fset.Position(pos)
+func (p *Parser) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup {
+	position := p.fset.Position(pos)
 	key := fileLine{position.Filename, position.Line - lines}
-	return b.endLineToCommentGroup[key]
+	return p.endLineToCommentGroup[key]
 }
 
 func splitLines(str string) []string {
@@ -555,25 +555,25 @@ func goNameToName(in string) types.Name {
 	return name
 }
 
-func (b *Builder) convertSignature(u types.Universe, t *gotypes.Signature) *types.Signature {
+func (p *Parser) convertSignature(u types.Universe, t *gotypes.Signature) *types.Signature {
 	signature := &types.Signature{}
 	for i := 0; i < t.Params().Len(); i++ {
-		signature.Parameters = append(signature.Parameters, b.walkType(u, nil, t.Params().At(i).Type()))
+		signature.Parameters = append(signature.Parameters, p.walkType(u, nil, t.Params().At(i).Type()))
 		signature.ParameterNames = append(signature.ParameterNames, t.Params().At(i).Name())
 	}
 	for i := 0; i < t.Results().Len(); i++ {
-		signature.Results = append(signature.Results, b.walkType(u, nil, t.Results().At(i).Type()))
+		signature.Results = append(signature.Results, p.walkType(u, nil, t.Results().At(i).Type()))
 		signature.ResultNames = append(signature.ResultNames, t.Results().At(i).Name())
 	}
 	if r := t.Recv(); r != nil {
-		signature.Receiver = b.walkType(u, nil, r.Type())
+		signature.Receiver = p.walkType(u, nil, r.Type())
 	}
 	signature.Variadic = t.Variadic()
 	return signature
 }
 
 // walkType adds the type, and any necessary child types.
-func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Type) *types.Type {
+func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type) *types.Type {
 	// Most of the cases are underlying types of the named type.
 	name := goNameToName(in.String())
 	if useName != nil {
@@ -593,8 +593,8 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 				Name:         f.Name(),
 				Embedded:     f.Anonymous(),
 				Tags:         t.Tag(i),
-				Type:         b.walkType(u, nil, f.Type()),
-				CommentLines: b.docComment(f.Pos()),
+				Type:         p.walkType(u, nil, f.Type()),
+				CommentLines: p.docComment(f.Pos()),
 			}
 			out.Members = append(out.Members, m)
 		}
@@ -605,8 +605,8 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			return out
 		}
 		out.Kind = types.Map
-		out.Elem = b.walkType(u, nil, t.Elem())
-		out.Key = b.walkType(u, nil, t.Key())
+		out.Elem = p.walkType(u, nil, t.Elem())
+		out.Key = p.walkType(u, nil, t.Key())
 		return out
 	case *gotypes.Pointer:
 		out := u.Type(name)
@@ -614,7 +614,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			return out
 		}
 		out.Kind = types.Pointer
-		out.Elem = b.walkType(u, nil, t.Elem())
+		out.Elem = p.walkType(u, nil, t.Elem())
 		return out
 	case *gotypes.Slice:
 		out := u.Type(name)
@@ -622,7 +622,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			return out
 		}
 		out.Kind = types.Slice
-		out.Elem = b.walkType(u, nil, t.Elem())
+		out.Elem = p.walkType(u, nil, t.Elem())
 		return out
 	case *gotypes.Array:
 		out := u.Type(name)
@@ -630,7 +630,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			return out
 		}
 		out.Kind = types.Array
-		out.Elem = b.walkType(u, nil, t.Elem())
+		out.Elem = p.walkType(u, nil, t.Elem())
 		out.Len = in.(*gotypes.Array).Len()
 		return out
 	case *gotypes.Chan:
@@ -639,7 +639,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			return out
 		}
 		out.Kind = types.Chan
-		out.Elem = b.walkType(u, nil, t.Elem())
+		out.Elem = p.walkType(u, nil, t.Elem())
 		// TODO: need to store direction, otherwise raw type name
 		// cannot be properly written.
 		return out
@@ -659,7 +659,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			return out
 		}
 		out.Kind = types.Func
-		out.Signature = b.convertSignature(u, t)
+		out.Signature = p.convertSignature(u, t)
 		return out
 	case *gotypes.Interface:
 		out := u.Type(name)
@@ -674,8 +674,8 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			}
 			method := t.Method(i)
 			name := goNameToName(method.String())
-			mt := b.walkType(u, &name, method.Type())
-			mt.CommentLines = b.docComment(method.Pos())
+			mt := p.walkType(u, &name, method.Type())
+			mt.CommentLines = p.docComment(method.Pos())
 			out.Methods[method.Name()] = mt
 		}
 		return out
@@ -689,7 +689,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 				return out
 			}
 			out.Kind = types.Alias
-			out.Underlying = b.walkType(u, nil, t.Underlying())
+			out.Underlying = p.walkType(u, nil, t.Underlying())
 		default:
 			// gotypes package makes everything "named" with an
 			// underlying anonymous type--we remove that annoying
@@ -699,7 +699,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 			if out := u.Type(name); out.Kind != types.Unknown {
 				return out // short circuit if we've already made this.
 			}
-			out = b.walkType(u, &name, t.Underlying())
+			out = p.walkType(u, &name, t.Underlying())
 		}
 		// If the underlying type didn't already add methods, add them.
 		// (Interface types will have already added methods.)
@@ -710,8 +710,8 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 				}
 				method := t.Method(i)
 				name := goNameToName(method.String())
-				mt := b.walkType(u, &name, method.Type())
-				mt.CommentLines = b.docComment(method.Pos())
+				mt := p.walkType(u, &name, method.Type())
+				mt.CommentLines = p.docComment(method.Pos())
 				out.Methods[method.Name()] = mt
 			}
 		}
@@ -727,36 +727,36 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in gotypes.Typ
 	}
 }
 
-func (b *Builder) addFunction(u types.Universe, useName *types.Name, in *gotypes.Func) *types.Type {
+func (p *Parser) addFunction(u types.Universe, useName *types.Name, in *gotypes.Func) *types.Type {
 	name := goFuncNameToName(in.String())
 	if useName != nil {
 		name = *useName
 	}
 	out := u.Function(name)
 	out.Kind = types.DeclarationOf
-	out.Underlying = b.walkType(u, nil, in.Type())
+	out.Underlying = p.walkType(u, nil, in.Type())
 	return out
 }
 
-func (b *Builder) addVariable(u types.Universe, useName *types.Name, in *gotypes.Var) *types.Type {
+func (p *Parser) addVariable(u types.Universe, useName *types.Name, in *gotypes.Var) *types.Type {
 	name := goVarNameToName(in.String())
 	if useName != nil {
 		name = *useName
 	}
 	out := u.Variable(name)
 	out.Kind = types.DeclarationOf
-	out.Underlying = b.walkType(u, nil, in.Type())
+	out.Underlying = p.walkType(u, nil, in.Type())
 	return out
 }
 
-func (b *Builder) addConstant(u types.Universe, useName *types.Name, in *gotypes.Const) *types.Type {
+func (p *Parser) addConstant(u types.Universe, useName *types.Name, in *gotypes.Const) *types.Type {
 	name := goVarNameToName(in.String())
 	if useName != nil {
 		name = *useName
 	}
 	out := u.Constant(name)
 	out.Kind = types.DeclarationOf
-	out.Underlying = b.walkType(u, nil, in.Type())
+	out.Underlying = p.walkType(u, nil, in.Type())
 
 	var constval string
 
