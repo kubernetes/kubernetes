@@ -32,6 +32,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -85,10 +86,23 @@ type dummyStorage struct {
 	err       error
 	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
 	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+
+	// use getRequestWatchProgressCounter when reading
+	// the value of the counter
+	requestWatchProgressCounter int
 }
 
 func (d *dummyStorage) RequestWatchProgress(ctx context.Context) error {
+	d.Lock()
+	defer d.Unlock()
+	d.requestWatchProgressCounter++
 	return nil
+}
+
+func (d *dummyStorage) getRequestWatchProgressCounter() int {
+	d.RLock()
+	defer d.RUnlock()
+	return d.requestWatchProgressCounter
 }
 
 type dummyWatch struct {
@@ -1605,48 +1619,156 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
 
-	opts := storage.ListOptions{
-		Predicate:         storage.Everything,
-		SendInitialEvents: pointer.Bool(true),
-		ResourceVersion:   "105",
-	}
-	opts.Predicate.AllowWatchBookmarks = true
-
-	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
-	require.NoError(t, err, "failed to create watch: %v")
-	defer w.Stop()
-	verifyEvents(t, w, []watch.Event{
+	scenarios := []struct {
+		name               string
+		opts               storage.ListOptions
+		backingStorage     *dummyStorage
+		verifyBackingStore func(t *testing.T, s *dummyStorage)
+	}{
 		{
-			Type: watch.Error,
-			Object: &metav1.Status{
-				Status:  metav1.StatusFailure,
-				Message: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).Error(),
-				Details: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).(*apierrors.StatusError).Status().Details,
-				Reason:  metav1.StatusReasonTimeout,
-				Code:    504,
+			name: "allowWatchBookmarks=true, sendInitialEvents=true, RV=105",
+			opts: storage.ListOptions{
+				Predicate: func() storage.SelectionPredicate {
+					p := storage.Everything
+					p.AllowWatchBookmarks = true
+					return p
+				}(),
+				SendInitialEvents: pointer.Bool(true),
+				ResourceVersion:   "105",
+			},
+			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
+				require.NotEqual(t, 0, s.requestWatchProgressCounter, "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
 			},
 		},
-	}, true)
 
-	go func() {
-		cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
-	}()
-	w, err = cacher.Watch(context.Background(), "pods/ns", opts)
-	require.NoError(t, err, "failed to create watch: %v")
-	defer w.Stop()
-	verifyEvents(t, w, []watch.Event{
 		{
-			Type:   watch.Added,
-			Object: makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}),
+			name: "legacy: allowWatchBookmarks=false, sendInitialEvents=true, RV=unset",
+			opts: storage.ListOptions{
+				Predicate: func() storage.SelectionPredicate {
+					p := storage.Everything
+					p.AllowWatchBookmarks = false
+					return p
+				}(),
+				SendInitialEvents: pointer.Bool(true),
+			},
+			backingStorage: func() *dummyStorage {
+				hasBeenPrimed := false
+				s := &dummyStorage{}
+				s.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+					listAccessor, err := meta.ListAccessor(listObj)
+					if err != nil {
+						return err
+					}
+					// the first call to this function
+					// primes the cacher
+					if !hasBeenPrimed {
+						listAccessor.SetResourceVersion("100")
+						hasBeenPrimed = true
+						return nil
+					}
+					listAccessor.SetResourceVersion("105")
+					return nil
+				}
+				return s
+			}(),
+			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
+				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+			},
 		},
-	}, true)
+
+		{
+			name: "allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			opts: storage.ListOptions{
+				Predicate: func() storage.SelectionPredicate {
+					p := storage.Everything
+					p.AllowWatchBookmarks = true
+					return p
+				}(),
+				SendInitialEvents: pointer.Bool(true),
+			},
+			backingStorage: func() *dummyStorage {
+				hasBeenPrimed := false
+				s := &dummyStorage{}
+				s.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+					listAccessor, err := meta.ListAccessor(listObj)
+					if err != nil {
+						return err
+					}
+					// the first call to this function
+					// primes the cacher
+					if !hasBeenPrimed {
+						listAccessor.SetResourceVersion("100")
+						hasBeenPrimed = true
+						return nil
+					}
+					listAccessor.SetResourceVersion("105")
+					return nil
+				}
+				return s
+			}(),
+			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
+				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			var backingStorage *dummyStorage
+			if scenario.backingStorage != nil {
+				backingStorage = scenario.backingStorage
+			} else {
+				backingStorage = &dummyStorage{}
+			}
+			cacher, _, err := newTestCacher(backingStorage)
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			defer cacher.Stop()
+			if err := cacher.ready.wait(context.Background()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready")
+			}
+
+			w, err := cacher.Watch(context.Background(), "pods/ns", scenario.opts)
+			require.NoError(t, err, "failed to create watch: %v")
+			defer w.Stop()
+			var expectedErr *apierrors.StatusError
+			if !errors.As(storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds), &expectedErr) {
+				t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
+			}
+			verifyEvents(t, w, []watch.Event{
+				{
+					Type: watch.Error,
+					Object: &metav1.Status{
+						Status:  metav1.StatusFailure,
+						Message: expectedErr.Error(),
+						Details: expectedErr.ErrStatus.Details,
+						Reason:  metav1.StatusReasonTimeout,
+						Code:    504,
+					},
+				},
+			}, true)
+
+			go func(t *testing.T) {
+				err := cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
+				require.NoError(t, err, "failed adding a pod to the watchCache")
+			}(t)
+			w, err = cacher.Watch(context.Background(), "pods/ns", scenario.opts)
+			require.NoError(t, err, "failed to create watch: %v")
+			defer w.Stop()
+			verifyEvents(t, w, []watch.Event{
+				{
+					Type:   watch.Added,
+					Object: makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}),
+				},
+			}, true)
+			if scenario.verifyBackingStore != nil {
+				scenario.verifyBackingStore(t, backingStorage)
+			}
+		})
+	}
 }
 
 type fakeStorage struct {
