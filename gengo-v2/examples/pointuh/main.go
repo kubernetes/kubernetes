@@ -64,6 +64,7 @@ func main() {
 
 // toolArgs is used by the gengo framework to pass args specific to this generator.
 type toolArgs struct {
+	OutputDir     string // must be a directory path
 	OutputPackage string // must be a Go import-path
 }
 
@@ -78,21 +79,23 @@ func getArgs() (*args.GeneratorArgs, *toolArgs) {
 
 // AddFlags add the generator flags to the flag set.
 func (ta *toolArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&ta.OutputDir, "output-dir", "",
+		"the base directory under which to generate results")
 	fs.StringVar(&ta.OutputPackage, "output-package", "",
 		"the base Go import-path under which to generate results")
 }
 
 // validateArgs checks the given arguments.
 func validateArgs(stdArgs *args.GeneratorArgs) error {
-	if len(stdArgs.OutputBase) == 0 {
-		return fmt.Errorf("--output-base must be specified")
-	}
 	if len(stdArgs.OutputFileBaseName) == 0 {
 		return fmt.Errorf("--output-file-base must be specified")
 	}
 
 	toolArgs := stdArgs.CustomArgs.(*toolArgs)
 
+	if len(toolArgs.OutputDir) == 0 {
+		return fmt.Errorf("--output-dir must be specified")
+	}
 	if len(toolArgs.OutputPackage) == 0 {
 		return fmt.Errorf("--output-package must be specified")
 	}
@@ -132,7 +135,7 @@ func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator
 		targets = append(targets, &generator.SimpleTarget{
 			PkgName: pkg.Name,
 			PkgPath: filepath.Join(toolArgs.OutputPackage, pkg.Name),
-			PkgDir:  filepath.Join(arguments.OutputBase, filepath.Base(pkg.Path)),
+			PkgDir:  filepath.Join(toolArgs.OutputDir, filepath.Base(pkg.Path)),
 
 			HeaderComment: header,
 
