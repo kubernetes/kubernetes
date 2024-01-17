@@ -128,9 +128,6 @@ func getTargets(c *generator.Context, args *Args) []generator.Target {
 		klog.V(2).InfoS("processing", "pkg", input)
 
 		pkg := c.Universe[input]
-		if pkg == nil { // e.g. the input had no Go files
-			continue
-		}
 
 		targets = append(targets, &generator.SimpleTarget{
 			PkgName: pkg.Name,
