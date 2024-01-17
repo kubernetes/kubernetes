@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -141,7 +142,7 @@ func parseEmbeddedUnion(t *types.Type) ([]union, []error) {
 // embedded types.
 func parseUnionStruct(t *types.Type) (*union, []error) {
 	errors := []error{}
-	if types.ExtractCommentTags("+", t.CommentLines)[tagUnionMember] == nil {
+	if gengo.ExtractCommentTags("+", t.CommentLines)[tagUnionMember] == nil {
 		return nil, nil
 	}
 
@@ -156,11 +157,11 @@ func parseUnionStruct(t *types.Type) (*union, []error) {
 			errors = append(errors, fmt.Errorf("union structures can't have embedded fields: %v.%v", t.Name, m.Name))
 			continue
 		}
-		if types.ExtractCommentTags("+", m.CommentLines)[tagUnionDeprecated] != nil {
+		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDeprecated] != nil {
 			errors = append(errors, fmt.Errorf("union struct can't have unionDeprecated members: %v.%v", t.Name, m.Name))
 			continue
 		}
-		if types.ExtractCommentTags("+", m.CommentLines)[tagUnionDiscriminator] != nil {
+		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDiscriminator] != nil {
 			errors = append(errors, u.setDiscriminator(jsonName)...)
 		} else {
 			if !hasOptionalTag(&m) {
@@ -186,14 +187,14 @@ func parseUnionMembers(t *types.Type) (*union, []error) {
 		if shouldInlineMembers(&m) {
 			continue
 		}
-		if types.ExtractCommentTags("+", m.CommentLines)[tagUnionDiscriminator] != nil {
+		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDiscriminator] != nil {
 			errors = append(errors, u.setDiscriminator(jsonName)...)
 		}
-		if types.ExtractCommentTags("+", m.CommentLines)[tagUnionMember] != nil {
+		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionMember] != nil {
 			errors = append(errors, fmt.Errorf("union tag is not accepted on struct members: %v.%v", t.Name, m.Name))
 			continue
 		}
-		if types.ExtractCommentTags("+", m.CommentLines)[tagUnionDeprecated] != nil {
+		if gengo.ExtractCommentTags("+", m.CommentLines)[tagUnionDeprecated] != nil {
 			if !hasOptionalTag(&m) {
 				errors = append(errors, fmt.Errorf("union members must be optional: %v.%v", t.Name, m.Name))
 			}

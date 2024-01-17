@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -54,11 +55,11 @@ var tempPatchTags = [...]string{
 }
 
 func getOpenAPITagValue(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[tagName]
+	return gengo.ExtractCommentTags("+", comments)[tagName]
 }
 
 func getSingleTagsValue(comments []string, tag string) (string, error) {
-	tags, ok := types.ExtractCommentTags("+", comments)[tag]
+	tags, ok := gengo.ExtractCommentTags("+", comments)[tag]
 	if !ok || len(tags) == 0 {
 		return "", nil
 	}
@@ -81,7 +82,7 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 // hasOptionalTag returns true if the member has +optional in its comments or
 // omitempty in its json tags.
 func hasOptionalTag(m *types.Member) bool {
-	hasOptionalCommentTag := types.ExtractCommentTags(
+	hasOptionalCommentTag := gengo.ExtractCommentTags(
 		"+", m.CommentLines)[tagOptional] != nil
 	hasOptionalJsonTag := strings.Contains(
 		reflect.StructTag(m.Tags).Get("json"), "omitempty")

@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 )
@@ -155,7 +156,7 @@ func isEnumType(stringType *types.Type, t *types.Type) bool {
 }
 
 func hasEnumTag(t *types.Type) bool {
-	return types.ExtractCommentTags("+", t.CommentLines)[tagEnumType] != nil
+	return gengo.ExtractCommentTags("+", t.CommentLines)[tagEnumType] != nil
 }
 
 // whitespaceRegex is the regex for consecutive whitespaces.
