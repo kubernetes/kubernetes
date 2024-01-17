@@ -244,10 +244,6 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.V(5).Infof("considering pkg %q", i)
 
 		pkg := context.Universe[i]
-		if pkg == nil {
-			// If the input had no Go files, for example.
-			continue
-		}
 
 		// if the types are not in the same package where the defaulter functions to be generated
 		inputTags := extractInputTag(pkg.Comments)
@@ -299,10 +295,6 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 	for _, i := range context.Inputs {
 		pkg := context.Universe[i]
-		if pkg == nil {
-			// If the input had no Go files, for example.
-			continue
-		}
 
 		// typesPkg is where the types that needs defaulter are defined.
 		// Sometimes it is different from pkg. For example, kubernetes core/v1

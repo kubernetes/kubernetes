@@ -225,10 +225,6 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.V(3).Infof("pre-processing pkg %q", i)
 
 		pkg := context.Universe[i]
-		if pkg == nil {
-			// If the input had no Go files, for example.
-			continue
-		}
 
 		// Only generate conversions for packages which explicitly request it
 		// by specifying one or more "+k8s:conversion-gen=<peer-pkg>"
