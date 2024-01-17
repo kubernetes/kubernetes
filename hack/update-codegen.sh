@@ -472,7 +472,7 @@ function k8s_tag_files_except() {
 function codegen::openapi() {
     # Build the tool.
     GOPROXY=off go install \
-        k8s.io/code-generator/cmd/openapi-gen
+        k8s.io/kube-openapi/cmd/openapi-gen
 
     # The result file, in each pkg, of open-api generation.
     local output_file="${GENERATED_FILE_PREFIX}openapi.go"

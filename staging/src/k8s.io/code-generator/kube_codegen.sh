@@ -327,7 +327,7 @@ function kube::codegen::gen_openapi() {
             openapi-gen
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
-        GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
+        GO111MODULE=on go install $(printf "k8s.io/kube-openapi/cmd/%s " "${BINS[@]}")
     )
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
     gobin="${GOBIN:-$(go env GOPATH)/bin}"
