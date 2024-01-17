@@ -1,9 +1,0 @@
-rules:
-  - selectorRegexp: k8s[.]io
-    allowedPrefixes:
-      - k8s.io/code-generator/cmd/import-boss/testdata/nested-fwd/bbb
-      - k8s.io/code-generator/cmd/import-boss/testdata/nested-fwd/allowed-by-sub
-      - k8s.io/code-generator/cmd/import-boss/testdata/nested-fwd/allowed-by-both
-    forbiddenPrefixes:
-      - k8s.io/code-generator/cmd/import-boss/testdata/nested-fwd/forbidden-by-sub
-      - k8s.io/code-generator/cmd/import-boss/testdata/nested-fwd/forbidden-by-both

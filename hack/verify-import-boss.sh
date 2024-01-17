@@ -37,4 +37,4 @@ kube::util::read-array packages < <(
 )
 
 GOPROXY=off \
-    go run k8s.io/code-generator/cmd/import-boss -v "${KUBE_VERBOSE:-0}" "${packages[@]}"
+    go run ./cmd/import-boss -v "${KUBE_VERBOSE:-0}" "${packages[@]}"
