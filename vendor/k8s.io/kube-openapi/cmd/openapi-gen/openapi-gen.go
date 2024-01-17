@@ -25,7 +25,7 @@ import (
 	"log"
 
 	"github.com/spf13/pflag"
-	gengo "k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/cmd/openapi-gen/args"
