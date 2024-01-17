@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog/v2"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	registerargs "k8s.io/code-generator/cmd/register-gen/args"
 	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -49,22 +50,24 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
+	customArgs := arguments.CustomArgs.(*registerargs.CustomArgs)
+
 	targets := []generator.Target{}
 	for _, input := range context.Inputs {
 		pkg := context.Universe.Package(input)
 		internal, err := isInternal(pkg)
 		if err != nil {
-			klog.V(5).Infof("skipping the generation of %s file, due to err %v", arguments.OutputFileBaseName, err)
+			klog.V(5).Infof("skipping the generation of %s file, due to err %v", customArgs.OutputFile, err)
 			continue
 		}
 		if internal {
-			klog.V(5).Infof("skipping the generation of %s file because %s package contains internal types, note that internal types don't have \"json\" tags", arguments.OutputFileBaseName, pkg.Name)
+			klog.V(5).Infof("skipping the generation of %s file because %s package contains internal types, note that internal types don't have \"json\" tags", customArgs.OutputFile, pkg.Name)
 			continue
 		}
 		registerFileName := "register.go"
 		searchPath := path.Join(pkg.SourcePath, registerFileName)
 		if _, err := os.Stat(path.Join(searchPath)); err == nil {
-			klog.V(5).Infof("skipping the generation of %s file because %s already exists in the path %s", arguments.OutputFileBaseName, registerFileName, searchPath)
+			klog.V(5).Infof("skipping the generation of %s file because %s already exists in the path %s", customArgs.OutputFile, registerFileName, searchPath)
 			continue
 		} else if err != nil && !os.IsNotExist(err) {
 			klog.Fatalf("an error %v has occurred while checking if %s exists", err, registerFileName)
@@ -109,7 +112,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 					return []generator.Generator{
 						&registerExternalGenerator{
 							GoGenerator: generator.GoGenerator{
-								OutputFilename: arguments.OutputFileBaseName,
+								OutputFilename: customArgs.OutputFile,
 							},
 							gv:              gv,
 							typesToGenerate: typesToRegister,

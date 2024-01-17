@@ -33,6 +33,7 @@ import (
 
 // CustomArgs is used tby the go2idl framework to pass args specific to this generator.
 type CustomArgs struct {
+	OutputFile string
 }
 
 // This is the comment tag that carries parameters for API status generation.  Because the cadence is fixed, we can predict
@@ -229,6 +230,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 			}
 		}
 
+		customArgs := arguments.CustomArgs.(*CustomArgs)
+
 		if pkgNeedsGeneration {
 			targets = append(targets,
 				&generator.SimpleTarget{
@@ -241,7 +244,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 					},
 					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
-							NewPrereleaseLifecycleGen(arguments.OutputFileBaseName, pkg.Path),
+							NewPrereleaseLifecycleGen(customArgs.OutputFile, pkg.Path),
 						}
 					},
 				})

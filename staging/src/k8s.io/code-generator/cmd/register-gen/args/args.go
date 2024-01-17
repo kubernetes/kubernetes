@@ -19,19 +19,31 @@ package args
 import (
 	"fmt"
 
+	"github.com/spf13/pflag"
 	"k8s.io/gengo/v2/args"
 )
+
+type CustomArgs struct {
+	OutputFile string
+}
 
 // NewDefaults returns default arguments for the generator.
 func NewDefaults() *args.GeneratorArgs {
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	genericArgs.OutputFileBaseName = "zz_generated.register"
+	genericArgs.CustomArgs = &CustomArgs{}
 	return genericArgs
+}
+
+// AddFlags add the generator flags to the flag set.
+func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&ca.OutputFile, "output-file", "generated.register.go",
+		"the name of the file to be generated")
 }
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	if len(genericArgs.OutputFileBaseName) == 0 {
+	custom := genericArgs.CustomArgs.(*CustomArgs)
+	if len(custom.OutputFile) == 0 {
 		return fmt.Errorf("output file base name cannot be empty")
 	}
 

@@ -336,7 +336,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 				},
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
-						NewGenConversion(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, manualConversions, pkgToPeers[pkg.Path], unsafeEquality),
+						NewGenConversion(customArgs.OutputFile, typesPkg.Path, pkg.Path, manualConversions, pkgToPeers[pkg.Path], unsafeEquality),
 					}
 				},
 			})
