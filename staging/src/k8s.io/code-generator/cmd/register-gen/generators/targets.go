@@ -26,7 +26,7 @@ import (
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/code-generator/cmd/register-gen/args"
-	gengo "k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"

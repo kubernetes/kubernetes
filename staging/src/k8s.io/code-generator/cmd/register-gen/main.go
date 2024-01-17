@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/code-generator/cmd/register-gen/args"
 	"k8s.io/code-generator/cmd/register-gen/generators"
-	gengo "k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
 )

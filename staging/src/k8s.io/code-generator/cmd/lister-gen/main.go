@@ -23,7 +23,7 @@ import (
 	"k8s.io/code-generator/cmd/lister-gen/args"
 	"k8s.io/code-generator/cmd/lister-gen/generators"
 	"k8s.io/code-generator/pkg/util"
-	gengo "k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
 )

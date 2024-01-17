@@ -29,7 +29,7 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/parser"
@@ -82,9 +82,9 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.StringVar(&g.DropEmbeddedFields, "drop-embedded-fields", g.DropEmbeddedFields, "Comma-delimited list of embedded Go types to omit from generated protobufs")
 }
 
-// This roughly models gengo/v2/args.GeneratorArgs.Execute.
+// This roughly models gengo/v2.Execute.
 func Run(g *Generator) {
-	// Roughly models gengo/v2/args.GeneratorArgs.NewBuilder.
+	// Roughly models gengo/v2.newBuilder.
 
 	b := parser.NewWithOptions(parser.Options{BuildTags: []string{"proto"}})
 
@@ -150,10 +150,10 @@ func Run(g *Generator) {
 
 	c.FileTypes["protoidl"] = NewProtoFile()
 
-	// Roughly models gengo/v2/args.GeneratorArgs.Execute calling the
-	// tool-provided Packages() callback.
+	// Roughly models gengo/v2.Execute calling the
+	// tool-provided Targets() callback.
 
-	boilerplate, err := args.GoBoilerplate(g.GoHeaderFile, "", "")
+	boilerplate, err := gengo.GoBoilerplate(g.GoHeaderFile, "", "")
 	if err != nil {
 		log.Fatalf("Failed loading boilerplate (consider using the go-header-file flag): %v", err)
 	}
