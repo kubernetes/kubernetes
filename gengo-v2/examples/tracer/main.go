@@ -36,7 +36,7 @@ func main() {
 	arguments := args.Default()
 
 	// Gengo apps start with arguments.
-	if err := arguments.Execute(getNameSystems(), getDefaultNameSystem(), getTargets); err != nil {
+	if err := arguments.Execute(getNameSystems(), getDefaultNameSystem(), getTargets, ""); err != nil {
 		klog.ErrorS(err, "fatal error")
 		os.Exit(1)
 	}

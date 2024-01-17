@@ -36,6 +36,7 @@ import (
 type CustomArgs struct {
 	OutputFile   string
 	BoundingDirs []string // Only deal with types rooted under these dirs.
+	GoHeaderFile string
 }
 
 // This is the comment tag that carries parameters for deep-copy generation.
@@ -126,15 +127,12 @@ func DefaultNameSystem() string {
 }
 
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	customArgs := arguments.CustomArgs.(*CustomArgs)
+
+	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
-
-	targets := []generator.Target{}
-	header := append([]byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag)), boilerplate...)
-
-	customArgs := arguments.CustomArgs.(*CustomArgs)
 
 	boundingDirs := []string{}
 	if customArgs.BoundingDirs == nil {
@@ -145,6 +143,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		// this is friendlier.
 		boundingDirs = append(boundingDirs, strings.TrimRight(customArgs.BoundingDirs[i], "/"))
 	}
+
+	targets := []generator.Target{}
 
 	for _, i := range context.Inputs {
 		klog.V(3).Infof("Considering pkg %q", i)
@@ -200,7 +200,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 					PkgName:       strings.Split(filepath.Base(pkg.Path), ".")[0],
 					PkgPath:       pkg.Path,
 					PkgDir:        pkg.SourcePath, // output pkg is the same as the input
-					HeaderComment: header,
+					HeaderComment: boilerplate,
 					FilterFunc: func(c *generator.Context, t *types.Type) bool {
 						return t.Name.Package == pkg.Path
 					},

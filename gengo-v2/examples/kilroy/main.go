@@ -51,6 +51,7 @@ func main() {
 		getNameSystems(),
 		getDefaultNameSystem(),
 		getTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.ErrorS(err, "fatal error")
 		os.Exit(1)
@@ -60,8 +61,9 @@ func main() {
 
 // toolArgs is used by the gengo framework to pass args specific to this generator.
 type toolArgs struct {
-	outputFile string
-	methodName string
+	outputFile   string
+	methodName   string
+	goHeaderFile string
 }
 
 // getArgs returns default arguments for the generator.
@@ -78,6 +80,8 @@ func (ta *toolArgs) AddFlags(fs *pflag.FlagSet) {
 		"the name of the file to be generated")
 	fs.StringVar(&ta.methodName, "method-name", "KilroyWasHere",
 		"the name of the method to add")
+	fs.StringVar(&ta.goHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // validateArgs checks the given arguments.
@@ -110,9 +114,12 @@ func getDefaultNameSystem() string {
 // examine the provided context and return a list of Packages which will be
 // executed further.
 func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	header := []byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag))
+	toolArgs := arguments.CustomArgs.(*toolArgs)
 
-	args := arguments.CustomArgs.(*toolArgs)
+	boilerplate, err := args.GoBoilerplate(toolArgs.goHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
+	if err != nil {
+		klog.Fatalf("failed loading boilerplate: %v", err)
+	}
 
 	targets := []generator.Target{}
 	for _, input := range c.Inputs {
@@ -127,7 +134,7 @@ func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator
 			PkgName:       pkg.Name,
 			PkgPath:       pkg.Path,       // output pkg is the same as the input
 			PkgDir:        pkg.SourcePath, // output pkg is the same as the input
-			HeaderComment: header,
+			HeaderComment: boilerplate,
 
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked
@@ -142,7 +149,7 @@ func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator
 			// may write to the same one).
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
-					newKilroyGenerator(args.outputFile, pkg, args.methodName),
+					newKilroyGenerator(toolArgs.outputFile, pkg, toolArgs.methodName),
 				}
 			},
 		})

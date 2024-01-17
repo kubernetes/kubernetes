@@ -55,6 +55,7 @@ func main() {
 		getNameSystems(),
 		getDefaultNameSystem(),
 		getTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.ErrorS(err, "fatal error")
 		os.Exit(1)
@@ -64,9 +65,10 @@ func main() {
 
 // toolArgs is used by the gengo framework to pass args specific to this generator.
 type toolArgs struct {
-	outputDir  string // must be a directory path
-	outputPkg  string // must be a Go import-path
-	outputFile string
+	outputDir    string // must be a directory path
+	outputPkg    string // must be a Go import-path
+	outputFile   string
+	goHeaderFile string
 }
 
 // getArgs returns default arguments for the generator.
@@ -85,6 +87,8 @@ func (ta *toolArgs) AddFlags(fs *pflag.FlagSet) {
 		"the base Go import-path under which to generate results")
 	fs.StringVar(&ta.outputFile, "output-file", "generated.pointuh.go",
 		"the name of the file to be generated")
+	fs.StringVar(&ta.goHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // validateArgs checks the given arguments.
@@ -121,8 +125,12 @@ func getDefaultNameSystem() string {
 // examine the provided context and return a list of Packages which will be
 // executed further.
 func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	header := []byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag))
 	toolArgs := arguments.CustomArgs.(*toolArgs)
+
+	boilerplate, err := args.GoBoilerplate(toolArgs.goHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
+	if err != nil {
+		klog.Fatalf("failed loading boilerplate: %v", err)
+	}
 
 	var targets []generator.Target
 	for _, input := range c.Inputs {
@@ -138,7 +146,7 @@ func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator
 			PkgPath: filepath.Join(toolArgs.outputPkg, pkg.Name),
 			PkgDir:  filepath.Join(toolArgs.outputDir, filepath.Base(pkg.Path)),
 
-			HeaderComment: header,
+			HeaderComment: boilerplate,
 
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked

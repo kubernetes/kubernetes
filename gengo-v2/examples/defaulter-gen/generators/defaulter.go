@@ -40,6 +40,7 @@ import (
 type CustomArgs struct {
 	OutputFile    string
 	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
+	GoHeaderFile  string
 }
 
 var typeZeroValue = map[string]interface{}{
@@ -229,13 +230,14 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 }
 
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	customArgs := arguments.CustomArgs.(*CustomArgs)
+
+	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	targets := []generator.Target{}
-	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 
 	// Accumulate pre-existing default functions.
 	// TODO: This is too ad-hoc.  We need a better way.
@@ -278,8 +280,6 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 			pkgToInput[i] = i
 		}
 	}
-
-	customArgs := arguments.CustomArgs.(*CustomArgs)
 
 	// Make sure explicit peer-packages are added.
 	var peerPkgs []string
@@ -430,7 +430,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 				PkgName:       filepath.Base(pkg.Path),
 				PkgPath:       pkg.Path,
 				PkgDir:        pkg.SourcePath, // output pkg is the same as the input
-				HeaderComment: header,
+				HeaderComment: boilerplate,
 
 				FilterFunc: func(c *generator.Context, t *types.Type) bool {
 					return t.Name.Package == typesPkg.Path
