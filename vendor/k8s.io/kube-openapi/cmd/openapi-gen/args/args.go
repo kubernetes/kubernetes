@@ -25,6 +25,7 @@ import (
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
+	OutputDir     string // must be a directory path
 	OutputPackage string // must be a Go import-path
 
 	// ReportFilename is added to CustomArgs for specifying name of report file used
@@ -53,6 +54,8 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 
 // AddFlags add the generator flags to the flag set.
 func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&c.OutputDir, "output-dir", "",
+		"the base directory under which to generate results")
 	fs.StringVar(&c.OutputPackage, "output-package", "",
 		"the base Go import-path under which to generate results")
 	fs.StringVarP(&c.ReportFilename, "report-filename", "r", "-",
@@ -61,15 +64,15 @@ func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	if len(genericArgs.OutputBase) == 0 {
-		return fmt.Errorf("--output-base must be specified")
-	}
 	if len(genericArgs.OutputFileBaseName) == 0 {
 		return fmt.Errorf("--output-file-base cannot be empty")
 	}
 
 	c := genericArgs.CustomArgs.(*CustomArgs)
 
+	if len(c.OutputDir) == 0 {
+		return fmt.Errorf("--output-dir must be specified")
+	}
 	if len(c.OutputPackage) == 0 {
 		return fmt.Errorf("--output-package must be specified")
 	}

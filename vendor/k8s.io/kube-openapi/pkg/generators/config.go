@@ -75,9 +75,9 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	return []generator.Target{
 		&generator.SimpleTarget{
-			PkgName:       filepath.Base(arguments.OutputBase),
+			PkgName:       filepath.Base(customArgs.OutputDir),
 			PkgPath:       customArgs.OutputPackage,
-			PkgDir:        arguments.OutputBase,
+			PkgDir:        customArgs.OutputDir,
 			HeaderComment: header,
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
