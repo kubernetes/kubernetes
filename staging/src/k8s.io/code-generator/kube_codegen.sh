@@ -375,7 +375,7 @@ function kube::codegen::gen_openapi() {
             -v "${v}" \
             --output-file-base zz_generated.openapi.go \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_dir}" \
+            --output-dir "${out_dir}" \
             --output-package "${out_pkg}" \
             --report-filename "${new_report}" \
             --input-dirs "k8s.io/apimachinery/pkg/apis/meta/v1" \
@@ -611,7 +611,7 @@ function kube::codegen::gen_client() {
         "${gobin}/applyconfiguration-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_dir}/${applyconfig_subdir}" \
+            --output-dir "${out_dir}/${applyconfig_subdir}" \
             --output-package "${applyconfig_pkg}" \
             --external-applyconfigurations "${applyconfig_external}" \
             "${inputs[@]}"
@@ -633,7 +633,7 @@ function kube::codegen::gen_client() {
      "${gobin}/client-gen" \
         -v "${v}" \
         --go-header-file "${boilerplate}" \
-        --output-base "${out_dir}/${clientset_subdir}" \
+        --output-dir "${out_dir}/${clientset_subdir}" \
         --output-package "${out_pkg}/${clientset_subdir}" \
         --clientset-name "${clientset_versioned_name}" \
         --apply-configuration-package "${applyconfig_pkg}" \
@@ -658,7 +658,7 @@ function kube::codegen::gen_client() {
         "${gobin}/lister-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_dir}/${listers_subdir}" \
+            --output-dir "${out_dir}/${listers_subdir}" \
             --output-package "${out_pkg}/${listers_subdir}" \
             --plural-exceptions "${plural_exceptions}" \
             "${inputs[@]}"
@@ -679,7 +679,7 @@ function kube::codegen::gen_client() {
         "${gobin}/informer-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
-            --output-base "${out_dir}/${informers_subdir}" \
+            --output-dir "${out_dir}/${informers_subdir}" \
             --output-package "${out_pkg}/${informers_subdir}" \
             --versioned-clientset-package "${out_pkg}/${clientset_subdir}/${clientset_versioned_name}" \
             --listers-package "${out_pkg}/${listers_subdir}" \

@@ -26,6 +26,7 @@ import (
 
 // CustomArgs is a wrapper for arguments to applyconfiguration-gen.
 type CustomArgs struct {
+	OutputDir     string // must be a directory path
 	OutputPackage string // must be a Go import-path
 
 	// ExternalApplyConfigurations provides the locations of externally generated
@@ -65,7 +66,10 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 }
 
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
-	fs.StringVar(&ca.OutputPackage, "output-package", ca.OutputPackage, "the Go import-path of the generated results")
+	fs.StringVar(&ca.OutputDir, "output-dir", "",
+		"the base directory under which to generate results")
+	fs.StringVar(&ca.OutputPackage, "output-package", ca.OutputPackage,
+		"the Go import-path of the generated results")
 	fs.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
@@ -75,12 +79,11 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	if len(genericArgs.OutputBase) == 0 {
-		return fmt.Errorf("--output-base must be specified")
-	}
-
 	customArgs := genericArgs.CustomArgs.(*CustomArgs)
 
+	if len(customArgs.OutputDir) == 0 {
+		return fmt.Errorf("--output-dir must be specified")
+	}
 	if len(customArgs.OutputPackage) == 0 {
 		return fmt.Errorf("--output-package must be specified")
 	}

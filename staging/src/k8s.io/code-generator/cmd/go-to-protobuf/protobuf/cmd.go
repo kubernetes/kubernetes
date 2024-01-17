@@ -40,7 +40,7 @@ type Generator struct {
 	Common               args.GeneratorArgs
 	APIMachineryPackages string
 	Packages             string
-	OutputBase           string
+	OutputDir            string
 	ProtoImport          []string
 	Conditional          string
 	Clean                bool
@@ -52,12 +52,8 @@ type Generator struct {
 
 func New() *Generator {
 	defaultSourceTree := "."
-	common := args.GeneratorArgs{
-		OutputBase: defaultSourceTree,
-	}
 	return &Generator{
-		Common:     common,
-		OutputBase: defaultSourceTree,
+		OutputDir: defaultSourceTree,
 		APIMachineryPackages: strings.Join([]string{
 			`+k8s.io/apimachinery/pkg/util/intstr`,
 			`+k8s.io/apimachinery/pkg/api/resource`,
@@ -77,7 +73,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.BoolVar(&g.Common.VerifyOnly, "verify-only", g.Common.VerifyOnly, "If true, only verify existing output, do not write anything.")
 	flag.StringVarP(&g.Packages, "packages", "p", g.Packages, "comma-separated list of directories to get input types from. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVar(&g.APIMachineryPackages, "apimachinery-packages", g.APIMachineryPackages, "comma-separated list of directories to get apimachinery input types from which are needed by any API. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
-	flag.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to $GOPATH/src/")
+	flag.StringVar(&g.OutputDir, "output-dir", g.OutputDir, "The base directory under which to generate results.")
 	flag.StringSliceVar(&g.ProtoImport, "proto-import", g.ProtoImport, "A search path for imported protobufs (may be repeated).")
 	flag.StringVar(&g.Conditional, "conditional", g.Conditional, "An optional Golang build tag condition to add to the generated Go code")
 	flag.BoolVar(&g.Clean, "clean", g.Clean, "If true, remove all generated files for the specified Packages.")
@@ -255,7 +251,7 @@ func Run(g *Generator) {
 		log.Fatalf("Unable to find 'protoc': %v", err)
 	}
 
-	searchArgs := []string{"-I", ".", "-I", g.OutputBase}
+	searchArgs := []string{"-I", ".", "-I", g.OutputDir}
 	if len(g.ProtoImport) != 0 {
 		for _, s := range g.ProtoImport {
 			searchArgs = append(searchArgs, "-I", s)
@@ -266,12 +262,12 @@ func Run(g *Generator) {
 	// doesn't. Given example.com/foo/bar.proto (found in one of the -I paths
 	// above), the output becomes
 	// $output_base/example.com/foo/example.com/foo/bar.pb.go - basically
-	// useless.  Users should set the output-base to a single dir under which
+	// useless.  Users should set the output-dir to a single dir under which
 	// all the packages in question live (e.g. staging/src in kubernetes).
 	// Alternately, we could generate into a temp path and then move the
 	// resulting file back to the input dir, but that seems brittle in other
 	// ways.
-	args := append(searchArgs, fmt.Sprintf("--gogo_out=%s", g.OutputBase))
+	args := append(searchArgs, fmt.Sprintf("--gogo_out=%s", g.OutputDir))
 
 	buf := &bytes.Buffer{}
 	if len(g.Conditional) > 0 {
@@ -282,8 +278,8 @@ func Run(g *Generator) {
 	for _, outputPackage := range outputPackages {
 		p := outputPackage.(*protobufPackage)
 
-		path := filepath.Join(g.OutputBase, p.ImportPath())
-		outputPath := filepath.Join(g.OutputBase, p.OutputPath())
+		path := filepath.Join(g.OutputDir, p.ImportPath())
+		outputPath := filepath.Join(g.OutputDir, p.OutputPath())
 
 		// generate the gogoprotobuf protoc
 		cmd := exec.Command("protoc", append(args, path)...)
@@ -349,7 +345,7 @@ func Run(g *Generator) {
 			continue
 		}
 
-		pattern := filepath.Join(g.OutputBase, p.Path(), "*.go")
+		pattern := filepath.Join(g.OutputDir, p.Path(), "*.go")
 		files, err := filepath.Glob(pattern)
 		if err != nil {
 			log.Fatalf("Can't glob pattern %q: %v", pattern, err)

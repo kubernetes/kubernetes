@@ -121,7 +121,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
 		subdir := filepath.Join(groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
-		outputDir := filepath.Join(arguments.OutputBase, subdir)
+		outputDir := filepath.Join(customArgs.OutputDir, subdir)
 		outputPkg := filepath.Join(customArgs.OutputPackage, subdir)
 		targetList = append(targetList, &generator.SimpleTarget{
 			PkgName:       strings.ToLower(gv.Version.NonEmpty()),

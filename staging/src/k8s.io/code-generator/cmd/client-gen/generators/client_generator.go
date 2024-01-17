@@ -395,7 +395,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		}
 	}
 
-	clientsetDir := filepath.Join(arguments.OutputBase, customArgs.ClientsetName)
+	clientsetDir := filepath.Join(customArgs.OutputDir, customArgs.ClientsetName)
 	clientsetPkg := filepath.Join(customArgs.OutputPackage, customArgs.ClientsetName)
 
 	var targetList []generator.Target
