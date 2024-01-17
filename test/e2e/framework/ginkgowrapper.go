@@ -526,6 +526,21 @@ func withLabel(label string) interface{} {
 	return newLabel(label)
 }
 
+// WithFlaky specifies that a certain test or group of tests are failing randomly.
+// These tests are usually filtered out and ran separately from other tests.
+func WithFlaky() interface{} {
+	return withFlaky()
+}
+
+// WithFlaky is a shorthand for the corresponding package function.
+func (f *Framework) WithFlaky() interface{} {
+	return withFlaky()
+}
+
+func withFlaky() interface{} {
+	return newLabel("Flaky")
+}
+
 type label struct {
 	// parts get concatenated with ":" to build the full label.
 	parts []string
