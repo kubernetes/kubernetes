@@ -296,7 +296,7 @@ func TestJSONPatch(t *testing.T) {
 					Finalizers: []string{"foo", "bar", "test"},
 				},
 			},
-			fragment: `[ {"op": "replace", "path": "/metadata/finalizers/-1", "value": "foo"} ]`,
+			fragment: `[ {"op": "replace", "path": "/metadata/finalizers/-1", "value": "baz"} ]`,
 			expected: &corev1.Pod{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Pod",
@@ -304,7 +304,7 @@ func TestJSONPatch(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "foo",
-					Finalizers: []string{"foo", "bar", "foo"},
+					Finalizers: []string{"foo", "bar", "baz"},
 				},
 				Spec: corev1.PodSpec{},
 			},
