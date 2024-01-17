@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package types contains go type information, packaged in a way that makes
-// auto-generation convenient, whether by template or straight go functions.
-package types
+package gengo
 
 import (
 	"fmt"
