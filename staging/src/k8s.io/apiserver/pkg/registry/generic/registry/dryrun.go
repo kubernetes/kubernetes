@@ -67,6 +67,10 @@ func (s *DryRunnableStorage) Get(ctx context.Context, key string, opts storage.G
 	return s.Storage.Get(ctx, key, opts, objPtr)
 }
 
+func (s *DryRunnableStorage) Exists(ctx context.Context, key string) (bool, error) {
+	return s.Storage.Exists(ctx, key)
+}
+
 func (s *DryRunnableStorage) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	return s.Storage.GetList(ctx, key, opts, listObj)
 }

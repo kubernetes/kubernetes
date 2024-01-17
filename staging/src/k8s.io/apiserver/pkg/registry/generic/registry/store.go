@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -48,8 +50,6 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-
 	"k8s.io/klog/v2"
 )
 
@@ -397,6 +397,12 @@ func finishNothing(context.Context, bool) {}
 // hooks).  Tests which call this might want to call DeepCopy if they expect to
 // be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	// TODO: The second most obvious place to handle generated name conflicts
+	// would be with a retry loop of this Create function.
+	// Pros:
+	// - only need to retry in the rare case of a conflict
+	// Cons:
+	// - need to rerun all of admission, which may invalidate a lot of system assumptions
 	var finishCreate FinishFunc = finishNothing
 
 	// Init metadata as early as possible.
@@ -405,7 +411,29 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	} else {
 		rest.FillObjectMetaSystemFields(objectMeta)
 		if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
-			objectMeta.SetName(e.CreateStrategy.GenerateName(objectMeta.GetGenerateName()))
+			// TODO: the most obvious place to check if the generated name is already
+			// claimed is here.
+			// Pros:
+			// - If it is claimed, its cheap and easy to claim another one and retry
+			// Cons:
+			// - Requires an additional request to storage for ALL creates that use generateName
+			// TODO: This could be mitigated by:
+			// - only checking the watch cache (this is tricky to do though...)
+			// - maintaining known names in a set or bloom filter
+			foundNonConflict := false
+			for i := 0; i < 10 && !foundNonConflict; i++ {
+				name := e.CreateStrategy.GenerateName(objectMeta.GetGenerateName())
+				objectMeta.SetName(name)
+				key, err := e.KeyFunc(ctx, name)
+				if err != nil {
+					return nil, err
+				}
+				exists, err := e.Storage.Exists(ctx, key)
+				if err != nil {
+					return nil, err
+				}
+				foundNonConflict = !exists
+			}
 		}
 	}
 

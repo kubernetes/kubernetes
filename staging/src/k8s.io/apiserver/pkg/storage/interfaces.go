@@ -190,6 +190,8 @@ type Interface interface {
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
+	Exists(ctx context.Context, key string) (bool, error)
+
 	// GetList unmarshalls objects found at key into a *List api object (an object
 	// that satisfies runtime.IsList definition).
 	// If 'opts.Recursive' is false, 'key' is used as an exact match. If `opts.Recursive'

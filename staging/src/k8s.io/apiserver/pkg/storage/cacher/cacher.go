@@ -714,6 +714,11 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	return nil
 }
 
+// Exists implements storage.Interface.
+func (c *Cacher) Exists(ctx context.Context, key string) (bool, error) {
+	return c.storage.Exists(ctx, key)
+}
+
 // NOTICE: Keep in sync with shouldListFromStorage function in
 //
 //	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go

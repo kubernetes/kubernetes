@@ -183,6 +183,21 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	return nil
 }
 
+// Exists implements storage.Interface.Exists.
+func (s *store) Exists(ctx context.Context, key string) (bool, error) {
+	preparedKey, err := s.prepareKey(key)
+	if err != nil {
+		return false, err
+	}
+	startTime := time.Now()
+	getResp, err := s.client.KV.Get(ctx, preparedKey, clientv3.WithCountOnly())
+	metrics.RecordEtcdRequest("exists", s.groupResourceString, err, startTime)
+	if err != nil {
+		return false, err
+	}
+	return getResp.Count > 0, nil
+}
+
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	preparedKey, err := s.prepareKey(key)
