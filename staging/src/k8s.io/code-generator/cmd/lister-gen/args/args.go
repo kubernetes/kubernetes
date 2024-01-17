@@ -25,8 +25,8 @@ import (
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
-	OutputDir     string // must be a directory path
-	OutputPackage string // must be a Go import-path
+	OutputDir string // must be a directory path
+	OutputPkg string // must be a Go import-path
 
 	// PluralExceptions specify list of exceptions used when pluralizing certain types.
 	// For example 'Endpoints:Endpoints', otherwise the pluralizer will generate 'Endpointes'.
@@ -48,7 +48,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&ca.OutputDir, "output-dir", "",
 		"the base directory under which to generate results")
-	fs.StringVar(&ca.OutputPackage, "output-package", "",
+	fs.StringVar(&ca.OutputPkg, "output-pkg", "",
 		"the base Go import-path under which to generate results")
 	fs.StringSliceVar(&ca.PluralExceptions, "plural-exceptions", ca.PluralExceptions,
 		"list of comma separated plural exception definitions in Type:PluralizedType format")
@@ -61,8 +61,8 @@ func Validate(genericArgs *args.GeneratorArgs) error {
 	if len(custom.OutputDir) == 0 {
 		return fmt.Errorf("--output-dir must be specified")
 	}
-	if len(custom.OutputPackage) == 0 {
-		return fmt.Errorf("--output-package must be specified")
+	if len(custom.OutputPkg) == 0 {
+		return fmt.Errorf("--output-pkg must be specified")
 	}
 
 	return nil
