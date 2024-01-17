@@ -68,7 +68,7 @@ type CustomArgs struct {
 }
 
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
+	genericArgs := args.Default()
 	customArgs := &CustomArgs{
 		ClientsetName:             "internalclientset",
 		ClientsetAPIPath:          "/apis",

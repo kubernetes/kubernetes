@@ -29,7 +29,7 @@ type CustomArgs statusgenerators.CustomArgs
 
 // NewDefaults returns default arguments for the generator.
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
+	genericArgs := args.Default()
 	customArgs := &CustomArgs{}
 	genericArgs.CustomArgs = (*statusgenerators.CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
 	return genericArgs, customArgs

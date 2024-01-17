@@ -30,7 +30,7 @@ import (
 
 func main() {
 	klog.InitFlags(nil)
-	arguments := args.Default().WithoutDefaultFlagParsing()
+	arguments := args.Default()
 
 	pflag.CommandLine.BoolVar(&arguments.IncludeTestFiles, "include-test-files", false, "If true, include *_test.go files.")
 
