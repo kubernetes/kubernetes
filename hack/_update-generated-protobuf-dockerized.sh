@@ -43,7 +43,7 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
   -v "${KUBE_VERBOSE}" \
   --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
-  --output-base="${KUBE_ROOT}/staging/src" \
+  --output-dir="${KUBE_ROOT}/staging/src" \
   --proto-import="${KUBE_ROOT}/staging/src" \
   --proto-import="${KUBE_ROOT}/vendor" `# required for gogo.proto` \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \

@@ -552,7 +552,7 @@ function codegen::openapi() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
-        --output-base "${output_dir}" \
+        --output-dir "${output_dir}" \
         --output-package "${output_pkg}" \
         --report-filename "${report_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
@@ -608,7 +608,7 @@ function codegen::applyconfigs() {
         -v "${KUBE_VERBOSE}" \
         --openapi-schema <("${modelsschema}") \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
+        --output-dir "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
         --output-package "${APPLYCONFIG_PKG}" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
@@ -661,7 +661,7 @@ function codegen::clients() {
     "${clientgen}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go" \
+        --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go" \
         --output-package="k8s.io/client-go" \
         --clientset-name="kubernetes" \
         --input-base="k8s.io/api" \
@@ -706,7 +706,7 @@ function codegen::listers() {
     "${listergen}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
+        --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
         --output-package "k8s.io/client-go/listers" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
@@ -748,7 +748,7 @@ function codegen::informers() {
     "${informergen}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-base "${KUBE_ROOT}/staging/src/k8s.io/client-go/informers" \
+        --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/informers" \
         --output-package "k8s.io/client-go/informers" \
         --single-directory \
         --versioned-clientset-package "k8s.io/client-go/kubernetes" \

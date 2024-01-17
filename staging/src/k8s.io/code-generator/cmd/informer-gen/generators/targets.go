@@ -101,9 +101,9 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	customArgs := arguments.CustomArgs.(*informergenargs.CustomArgs)
 
-	internalVersionOutputDir := arguments.OutputBase
+	internalVersionOutputDir := customArgs.OutputDir
 	internalVersionOutputPkg := customArgs.OutputPackage
-	externalVersionOutputDir := arguments.OutputBase
+	externalVersionOutputDir := customArgs.OutputDir
 	externalVersionOutputPkg := customArgs.OutputPackage
 	if !customArgs.SingleDirectory {
 		internalVersionOutputDir = filepath.Join(internalVersionOutputDir, "internalversion")

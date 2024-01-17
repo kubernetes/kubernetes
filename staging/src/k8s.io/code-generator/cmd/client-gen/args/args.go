@@ -29,6 +29,9 @@ var DefaultInputDirs = []string{}
 
 // CustomArgs is a wrapper for arguments to client-gen.
 type CustomArgs struct {
+	// The directory for the generated results.
+	OutputDir string
+
 	// The Go import-path of the generated results.
 	OutputPackage string
 
@@ -78,7 +81,10 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	gvsBuilder := NewGroupVersionsBuilder(&ca.Groups)
-	fs.StringVar(&ca.OutputPackage, "output-package", ca.OutputPackage, "the Go import-path of the generated results")
+	fs.StringVar(&ca.OutputDir, "output-dir", "",
+		"the base directory under which to generate results")
+	fs.StringVar(&ca.OutputPackage, "output-package", ca.OutputPackage,
+		"the Go import-path of the generated results")
 	fs.Var(NewGVPackagesValue(gvsBuilder, nil), "input", "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
 	fs.Var(NewGVTypesValue(&ca.IncludedTypesOverrides, []string{}), "included-types-overrides", "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
 	fs.Var(NewInputBasePathValue(gvsBuilder, inputBase), "input-base", "base path to look for the api group.")
@@ -95,12 +101,11 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 }
 
 func Validate(genericArgs *args.GeneratorArgs) error {
-	if len(genericArgs.OutputBase) == 0 {
-		return fmt.Errorf("--output-base must be specified")
-	}
-
 	customArgs := genericArgs.CustomArgs.(*CustomArgs)
 
+	if len(customArgs.OutputDir) == 0 {
+		return fmt.Errorf("--output-dir must be specified")
+	}
 	if len(customArgs.OutputPackage) == 0 {
 		return fmt.Errorf("--output-package must be specified")
 	}

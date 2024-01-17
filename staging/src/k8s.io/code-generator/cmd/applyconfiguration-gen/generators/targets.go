@@ -109,7 +109,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		// generate the apply configurations
 		targetList = append(targetList,
 			targetForApplyConfigurationsPackage(
-				arguments.OutputBase, customArgs.OutputPackage, pkgSubdir,
+				customArgs.OutputDir, customArgs.OutputPackage, pkgSubdir,
 				boilerplate, gv, toGenerate, refs, typeModels))
 
 		// group all the generated apply configurations by gv so ForKind() can be generated
@@ -133,11 +133,11 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	// generate ForKind() utility function
 	targetList = append(targetList,
-		targetForUtils(arguments.OutputBase, customArgs.OutputPackage,
+		targetForUtils(customArgs.OutputDir, customArgs.OutputPackage,
 			boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames))
 	// generate internal embedded schema, required for generated Extract functions
 	targetList = append(targetList,
-		targetForInternal(arguments.OutputBase, customArgs.OutputPackage,
+		targetForInternal(customArgs.OutputDir, customArgs.OutputPackage,
 			boilerplate, typeModels))
 
 	return targetList
