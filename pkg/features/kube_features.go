@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -904,6 +905,15 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+
+	// Register all client-go features with kube's feature gate instance and make all client-go
+	// feature checks use kube's instance. The effect is that for kube binaries, client-go
+	// features are wired to the existing --feature-gates flag just as all other features
+	// are. Further, client-go features automatically support the existing mechanisms for
+	// feature enablement metrics and test overrides.
+	ca := &clientAdapter{utilfeature.DefaultMutableFeatureGate}
+	runtime.Must(clientfeatures.AddFeaturesToExistingFeatureGates(ca))
+	clientfeatures.ReplaceFeatureGates(ca)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
