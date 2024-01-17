@@ -19,7 +19,6 @@ package args
 
 import (
 	"bytes"
-	goflag "flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,9 +36,7 @@ import (
 // Default returns a defaulted GeneratorArgs. You may change the defaults
 // before calling AddFlags.
 func Default() *GeneratorArgs {
-	return &GeneratorArgs{
-		defaultCommandLineFlags: true,
-	}
+	return &GeneratorArgs{}
 }
 
 // GeneratorArgs has arguments that are passed to generators.
@@ -52,15 +49,6 @@ type GeneratorArgs struct {
 
 	// Any custom arguments go here
 	CustomArgs interface{}
-
-	// Whether to use default command line flags
-	defaultCommandLineFlags bool
-}
-
-// WithoutDefaultFlagParsing disables implicit addition of command line flags and parsing.
-func (g *GeneratorArgs) WithoutDefaultFlagParsing() *GeneratorArgs {
-	g.defaultCommandLineFlags = false
-	return g
 }
 
 func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
@@ -115,12 +103,6 @@ func (g *GeneratorArgs) NewBuilder(buildTags []string) (*parser.Builder, error) 
 // If you don't need any non-default behavior, use as:
 // args.Default().Execute(...)
 func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, getTargets func(*generator.Context, *GeneratorArgs) []generator.Target, buildTag string) error {
-	if g.defaultCommandLineFlags {
-		g.AddFlags(pflag.CommandLine)
-		pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-		pflag.Parse()
-	}
-
 	var buildTags []string
 	if buildTag != "" {
 		buildTags = append(buildTags, buildTag)

@@ -68,7 +68,7 @@ type toolArgs struct {
 
 // getArgs returns default arguments for the generator.
 func getArgs() (*args.GeneratorArgs, *toolArgs) {
-	stdArgs := args.Default().WithoutDefaultFlagParsing()
+	stdArgs := args.Default()
 	toolArgs := &toolArgs{}
 	stdArgs.CustomArgs = toolArgs
 	return stdArgs, toolArgs
