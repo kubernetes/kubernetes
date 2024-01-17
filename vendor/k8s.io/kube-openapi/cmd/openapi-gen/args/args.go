@@ -41,9 +41,7 @@ type CustomArgs struct {
 // of using default flag parsing allows registering custom arguments afterwards
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	// Default() sets a couple of flag default values for example the boilerplate.
-	// WithoutDefaultFlagParsing() disables implicit addition of command line flags and parsing,
-	// which allows registering custom arguments afterwards
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
+	genericArgs := args.Default()
 	customArgs := &CustomArgs{}
 	genericArgs.CustomArgs = customArgs
 
