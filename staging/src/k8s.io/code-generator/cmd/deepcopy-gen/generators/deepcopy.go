@@ -189,7 +189,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				&generator.SimpleTarget{
 					PkgName:       strings.Split(filepath.Base(pkg.Path), ".")[0],
 					PkgPath:       pkg.Path,
-					PkgDir:        pkg.SourcePath, // output pkg is the same as the input
+					PkgDir:        pkg.Dir, // output pkg is the same as the input
 					HeaderComment: boilerplate,
 					FilterFunc: func(c *generator.Context, t *types.Type) bool {
 						return t.Name.Package == pkg.Path
