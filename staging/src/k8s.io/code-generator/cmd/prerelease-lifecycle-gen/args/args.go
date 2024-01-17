@@ -20,34 +20,29 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	statusgenerators "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/prerelease-lifecycle-generators"
-	"k8s.io/gengo/v2/args"
 )
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs statusgenerators.CustomArgs
+type Args struct {
+	OutputFile   string
+	GoHeaderFile string
+}
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default()
-	customArgs := &CustomArgs{}
-	genericArgs.CustomArgs = (*statusgenerators.CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
-	return genericArgs, customArgs
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{}
 }
 
 // AddFlags add the generator flags to the flag set.
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&ca.OutputFile, "output-file", "generated.prerelease_lifecycle.go",
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputFile, "output-file", "generated.prerelease_lifecycle.go",
 		"the name of the file to be generated")
-	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	custom := genericArgs.CustomArgs.(*statusgenerators.CustomArgs)
-
-	if len(custom.OutputFile) == 0 {
+func (args *Args) Validate() error {
+	if len(args.OutputFile) == 0 {
 		return fmt.Errorf("--output-file must be specified")
 	}
 

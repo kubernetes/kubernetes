@@ -27,8 +27,8 @@ import (
 	"strconv"
 	"strings"
 
-	defaulterargs "k8s.io/code-generator/cmd/defaulter-gen/args"
-	"k8s.io/gengo/v2/args"
+	"k8s.io/code-generator/cmd/defaulter-gen/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -221,10 +221,8 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 	}
 }
 
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*defaulterargs.CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
@@ -275,7 +273,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	// Make sure explicit peer-packages are added.
 	var peerPkgs []string
-	for _, pkg := range customArgs.ExtraPeerDirs {
+	for _, pkg := range args.ExtraPeerDirs {
 		// In case someone specifies a peer as a path into vendor, convert
 		// it to its "real" package path.
 		if i := strings.Index(pkg, "/vendor/"); i != -1 {
@@ -430,7 +428,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
-						NewGenDefaulter(customArgs.OutputFile, typesPkg.Path, pkg.Path, existingDefaulters, newDefaulters, peerPkgs),
+						NewGenDefaulter(args.OutputFile, typesPkg.Path, pkg.Path, existingDefaulters, newDefaulters, peerPkgs),
 					}
 				},
 			})

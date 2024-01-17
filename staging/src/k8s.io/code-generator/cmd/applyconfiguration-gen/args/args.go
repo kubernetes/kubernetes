@@ -20,12 +20,11 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/types"
 )
 
-// CustomArgs is a wrapper for arguments to applyconfiguration-gen.
-type CustomArgs struct {
+// Args is a wrapper for arguments to applyconfiguration-gen.
+type Args struct {
 	OutputDir string // must be a directory path
 	OutputPkg string // must be a Go import-path
 
@@ -46,10 +45,9 @@ type CustomArgs struct {
 	OpenAPISchemaFilePath string
 }
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default()
-	customArgs := &CustomArgs{
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{
 		ExternalApplyConfigurations: map[types.Name]string{
 			// Always include the applyconfigurations we've generated in client-go. They are sufficient for the vast majority of use cases.
 			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "Condition"}:                "k8s.io/client-go/applyconfigurations/meta/v1",
@@ -62,35 +60,29 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:                 "k8s.io/client-go/applyconfigurations/meta/v1",
 		},
 	}
-	genericArgs.CustomArgs = customArgs
-
-	return genericArgs, customArgs
 }
 
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
-	fs.StringVar(&ca.OutputDir, "output-dir", "",
+func (args *Args) AddFlags(fs *pflag.FlagSet, inputBase string) {
+	fs.StringVar(&args.OutputDir, "output-dir", "",
 		"the base directory under which to generate results")
-	fs.StringVar(&ca.OutputPkg, "output-pkg", ca.OutputPkg,
+	fs.StringVar(&args.OutputPkg, "output-pkg", args.OutputPkg,
 		"the Go import-path of the generated results")
-	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
-	fs.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
+	fs.Var(NewExternalApplyConfigurationValue(&args.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
-	fs.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
+	fs.StringVar(&args.OpenAPISchemaFilePath, "openapi-schema", "",
 		"path to the openapi schema containing all the types that apply configurations will be generated for")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	customArgs := genericArgs.CustomArgs.(*CustomArgs)
-
-	if len(customArgs.OutputDir) == 0 {
+func (args *Args) Validate() error {
+	if len(args.OutputDir) == 0 {
 		return fmt.Errorf("--output-dir must be specified")
 	}
-	if len(customArgs.OutputPkg) == 0 {
+	if len(args.OutputPkg) == 0 {
 		return fmt.Errorf("--output-pkg must be specified")
 	}
-
 	return nil
 }

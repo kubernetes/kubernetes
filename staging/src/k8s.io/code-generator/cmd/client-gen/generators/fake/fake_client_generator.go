@@ -23,7 +23,7 @@ import (
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 
-	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
+	"k8s.io/code-generator/cmd/client-gen/args"
 	scheme "k8s.io/code-generator/cmd/client-gen/generators/scheme"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
@@ -87,7 +87,7 @@ func TargetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 	}
 }
 
-func TargetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
+func TargetForClientset(args *args.Args, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
 	return &generator.SimpleTarget{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
@@ -107,7 +107,7 @@ func TargetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 					GoGenerator: generator.GoGenerator{
 						OutputFilename: "clientset_generated.go",
 					},
-					groups:               customArgs.Groups,
+					groups:               args.Groups,
 					groupGoNames:         groupGoNames,
 					fakeClientsetPackage: clientsetPkg,
 					imports:              generator.NewImportTracker(),
@@ -117,9 +117,9 @@ func TargetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 					GoGenerator: generator.GoGenerator{
 						OutputFilename: "register.go",
 					},
-					InputPackages: customArgs.GroupVersionPackages(),
+					InputPackages: args.GroupVersionPackages(),
 					OutputPkg:     clientsetPkg,
-					Groups:        customArgs.Groups,
+					Groups:        args.Groups,
 					GroupGoNames:  groupGoNames,
 					ImportTracker: generator.NewImportTracker(),
 					PrivateScheme: true,

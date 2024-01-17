@@ -23,19 +23,14 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/gengo/v2/args"
+	"k8s.io/code-generator/cmd/prerelease-lifecycle-gen/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 
 	"k8s.io/klog/v2"
 )
-
-// CustomArgs is used tby the go2idl framework to pass args specific to this generator.
-type CustomArgs struct {
-	OutputFile   string
-	GoHeaderFile string
-}
 
 // This is the comment tag that carries parameters for API status generation.  Because the cadence is fixed, we can predict
 // with near certainty when this lifecycle happens as the API is introduced.
@@ -182,10 +177,8 @@ func DefaultNameSystem() string {
 }
 
 // GetTargets makes the target definition.
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
@@ -244,7 +237,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 					},
 					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
-							NewPrereleaseLifecycleGen(customArgs.OutputFile, pkg.Path),
+							NewPrereleaseLifecycleGen(args.OutputFile, pkg.Path),
 						}
 					},
 				})

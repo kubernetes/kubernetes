@@ -22,13 +22,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
+	"k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators/fake"
 	"k8s.io/code-generator/cmd/client-gen/generators/scheme"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	codegennamer "k8s.io/code-generator/pkg/namer"
-	"k8s.io/gengo/v2/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -196,9 +196,9 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 	}
 }
 
-func targetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
+func targetForClientset(args *args.Args, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
 	return &generator.SimpleTarget{
-		PkgName:       customArgs.ClientsetName,
+		PkgName:       args.ClientsetName,
 		PkgPath:       clientsetPkg,
 		PkgDir:        clientsetDir,
 		HeaderComment: boilerplate,
@@ -210,7 +210,7 @@ func targetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 					GoGenerator: generator.GoGenerator{
 						OutputFilename: "clientset.go",
 					},
-					groups:           customArgs.Groups,
+					groups:           args.Groups,
 					groupGoNames:     groupGoNames,
 					clientsetPackage: clientsetPkg,
 					imports:          generator.NewImportTracker(),
@@ -221,14 +221,14 @@ func targetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 	}
 }
 
-func targetForScheme(customArgs *clientgenargs.CustomArgs, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
+func targetForScheme(args *args.Args, clientsetDir, clientsetPkg string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Target {
 	schemeDir := filepath.Join(clientsetDir, "scheme")
 	schemePkg := filepath.Join(clientsetPkg, "scheme")
 
 	// create runtime.Registry for internal client because it has to know about group versions
 	internalClient := false
 NextGroup:
-	for _, group := range customArgs.Groups {
+	for _, group := range args.Groups {
 		for _, v := range group.Versions {
 			if v.String() == "" {
 				internalClient = true
@@ -254,10 +254,10 @@ NextGroup:
 					GoGenerator: generator.GoGenerator{
 						OutputFilename: "register.go",
 					},
-					InputPackages:  customArgs.GroupVersionPackages(),
+					InputPackages:  args.GroupVersionPackages(),
 					OutputPkg:      schemePkg,
 					OutputPath:     schemeDir,
-					Groups:         customArgs.Groups,
+					Groups:         args.Groups,
 					GroupGoNames:   groupGoNames,
 					ImportTracker:  generator.NewImportTracker(),
 					CreateRegistry: internalClient,
@@ -273,10 +273,10 @@ NextGroup:
 // first field (somegroup) as the name of the group in Go code, e.g. as the func name in a clientset.
 //
 // If the first field of the groupName is not unique within the clientset, use "// +groupName=unique
-func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.CustomArgs) {
+func applyGroupOverrides(universe types.Universe, args *args.Args) {
 	// Create a map from "old GV" to "new GV" so we know what changes we need to make.
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
-	for gv, inputDir := range customArgs.GroupVersionPackages() {
+	for gv, inputDir := range args.GroupVersionPackages() {
 		p := universe.Package(inputDir)
 		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			newGV := clientgentypes.GroupVersion{
@@ -287,9 +287,9 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 		}
 	}
 
-	// Modify customArgs.Groups based on the groupName overrides.
-	newGroups := make([]clientgentypes.GroupVersions, 0, len(customArgs.Groups))
-	for _, gvs := range customArgs.Groups {
+	// Modify args.Groups based on the groupName overrides.
+	newGroups := make([]clientgentypes.GroupVersions, 0, len(args.Groups))
+	for _, gvs := range args.Groups {
 		gv := clientgentypes.GroupVersion{
 			Group:   gvs.Group,
 			Version: gvs.Versions[0].Version, // we only need a version, and the first will do
@@ -307,7 +307,7 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 			newGroups = append(newGroups, gvs)
 		}
 	}
-	customArgs.Groups = newGroups
+	args.Groups = newGroups
 }
 
 // Because we try to assemble inputs from an input-base and a set of
@@ -316,9 +316,9 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 //
 // TODO: Change this tool to just take inputs as Go "patterns" like every other
 // gengo tool, then extract GVs from those.
-func sanitizePackagePaths(context *generator.Context, ca *clientgenargs.CustomArgs) error {
-	for i := range ca.Groups {
-		pkg := &ca.Groups[i]
+func sanitizePackagePaths(context *generator.Context, args *args.Args) error {
+	for i := range args.Groups {
+		pkg := &args.Groups[i]
 		for j := range pkg.Versions {
 			ver := &pkg.Versions[j]
 			input := ver.Package
@@ -340,24 +340,22 @@ func sanitizePackagePaths(context *generator.Context, ca *clientgenargs.CustomAr
 }
 
 // GetTargets makes the client target definition.
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*clientgenargs.CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, "", args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, "", gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	includedTypesOverrides := customArgs.IncludedTypesOverrides
+	includedTypesOverrides := args.IncludedTypesOverrides
 
-	if err := sanitizePackagePaths(context, customArgs); err != nil {
+	if err := sanitizePackagePaths(context, args); err != nil {
 		klog.Fatalf("cannot sanitize inputs: %v", err)
 	}
-	applyGroupOverrides(context.Universe, customArgs)
+	applyGroupOverrides(context.Universe, args)
 
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
 	groupGoNames := make(map[clientgentypes.GroupVersion]string)
-	for gv, inputDir := range customArgs.GroupVersionPackages() {
+	for gv, inputDir := range args.GroupVersionPackages() {
 		p := context.Universe.Package(inputDir)
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
@@ -395,28 +393,28 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		}
 	}
 
-	clientsetDir := filepath.Join(customArgs.OutputDir, customArgs.ClientsetName)
-	clientsetPkg := filepath.Join(customArgs.OutputPkg, customArgs.ClientsetName)
+	clientsetDir := filepath.Join(args.OutputDir, args.ClientsetName)
+	clientsetPkg := filepath.Join(args.OutputPkg, args.ClientsetName)
 
 	var targetList []generator.Target
 
 	targetList = append(targetList,
-		targetForClientset(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
+		targetForClientset(args, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
 	targetList = append(targetList,
-		targetForScheme(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
-	if customArgs.FakeClient {
+		targetForScheme(args, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
+	if args.FakeClient {
 		targetList = append(targetList,
-			fake.TargetForClientset(customArgs, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
+			fake.TargetForClientset(args, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
 	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
-	if customArgs.ClientsetOnly {
+	if args.ClientsetOnly {
 		return []generator.Target(targetList)
 	}
 
 	orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
-	gvPackages := customArgs.GroupVersionPackages()
-	for _, group := range customArgs.Groups {
+	gvPackages := args.GroupVersionPackages()
+	for _, group := range args.Groups {
 		for _, version := range group.Versions {
 			gv := clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}
 			types := gvToTypes[gv]
@@ -424,11 +422,11 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 			targetList = append(targetList,
 				targetForGroup(
 					gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg,
-					group.PackageName, groupGoNames[gv], customArgs.ClientsetAPIPath,
-					inputPath, customArgs.ApplyConfigurationPackage, boilerplate))
-			if customArgs.FakeClient {
+					group.PackageName, groupGoNames[gv], args.ClientsetAPIPath,
+					inputPath, args.ApplyConfigurationPackage, boilerplate))
+			if args.FakeClient {
 				targetList = append(targetList,
-					fake.TargetForGroup(gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg, group.PackageName, groupGoNames[gv], inputPath, customArgs.ApplyConfigurationPackage, boilerplate))
+					fake.TargetForGroup(gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg, group.PackageName, groupGoNames[gv], inputPath, args.ApplyConfigurationPackage, boilerplate))
 			}
 		}
 	}

@@ -22,16 +22,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/gengo/v2/args"
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	"k8s.io/code-generator/cmd/informer-gen/args"
+	genutil "k8s.io/code-generator/pkg/util"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
-
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	informergenargs "k8s.io/code-generator/cmd/informer-gen/args"
-	genutil "k8s.io/code-generator/pkg/util"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -93,19 +92,17 @@ func subdirForInternalInterfaces(base string) string {
 }
 
 // GetTargets makes the client target definition.
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*informergenargs.CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, "", args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, "", gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	internalVersionOutputDir := customArgs.OutputDir
-	internalVersionOutputPkg := customArgs.OutputPkg
-	externalVersionOutputDir := customArgs.OutputDir
-	externalVersionOutputPkg := customArgs.OutputPkg
-	if !customArgs.SingleDirectory {
+	internalVersionOutputDir := args.OutputDir
+	internalVersionOutputPkg := args.OutputPkg
+	externalVersionOutputDir := args.OutputDir
+	externalVersionOutputPkg := args.OutputPkg
+	if !args.SingleDirectory {
 		internalVersionOutputDir = filepath.Join(internalVersionOutputDir, "internalversion")
 		internalVersionOutputPkg = filepath.Join(internalVersionOutputPkg, "internalversion")
 		externalVersionOutputDir = filepath.Join(externalVersionOutputDir, "externalversions")
@@ -200,14 +197,14 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 					internalVersionOutputDir, internalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
-					customArgs.InternalClientSetPackage, customArgs.ListersPackage))
+					args.InternalClientSetPackage, args.ListersPackage))
 		} else {
 			targetList = append(targetList,
 				versionTarget(
 					externalVersionOutputDir, externalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
-					customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
+					args.VersionedClientSetPackage, args.ListersPackage))
 		}
 	}
 
@@ -215,12 +212,12 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		targetList = append(targetList,
 			factoryInterfaceTarget(
 				externalVersionOutputDir, externalVersionOutputPkg,
-				boilerplate, customArgs.VersionedClientSetPackage))
+				boilerplate, args.VersionedClientSetPackage))
 		targetList = append(targetList,
 			factoryTarget(
 				externalVersionOutputDir, externalVersionOutputPkg,
-				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
-				externalGroupVersions, customArgs.VersionedClientSetPackage, typesForGroupVersion))
+				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(args.PluralExceptions),
+				externalGroupVersions, args.VersionedClientSetPackage, typesForGroupVersion))
 		for _, gvs := range externalGroupVersions {
 			targetList = append(targetList,
 				groupTarget(externalVersionOutputDir, externalVersionOutputPkg, gvs, boilerplate))
@@ -229,12 +226,12 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	if len(internalGroupVersions) != 0 {
 		targetList = append(targetList,
-			factoryInterfaceTarget(internalVersionOutputDir, internalVersionOutputPkg, boilerplate, customArgs.InternalClientSetPackage))
+			factoryInterfaceTarget(internalVersionOutputDir, internalVersionOutputPkg, boilerplate, args.InternalClientSetPackage))
 		targetList = append(targetList,
 			factoryTarget(
 				internalVersionOutputDir, internalVersionOutputPkg,
-				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions),
-				internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion))
+				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(args.PluralExceptions),
+				internalGroupVersions, args.InternalClientSetPackage, typesForGroupVersion))
 		for _, gvs := range internalGroupVersions {
 			targetList = append(targetList,
 				groupTarget(internalVersionOutputDir, internalVersionOutputPkg, gvs, boilerplate))

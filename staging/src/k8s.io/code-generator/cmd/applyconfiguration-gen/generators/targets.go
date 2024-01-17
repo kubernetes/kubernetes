@@ -23,13 +23,13 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/v2/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 
-	applygenargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
+	"k8s.io/code-generator/cmd/applyconfiguration-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
@@ -55,20 +55,18 @@ func DefaultNameSystem() string {
 }
 
 // GetTargets makes the client target definition.
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*applygenargs.CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, "", args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, "", gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	pkgTypes := packageTypesForInputs(context, customArgs.OutputPkg)
-	initialTypes := customArgs.ExternalApplyConfigurations
+	pkgTypes := packageTypesForInputs(context, args.OutputPkg)
+	initialTypes := args.ExternalApplyConfigurations
 	refs := refGraphForReachableTypes(context.Universe, pkgTypes, initialTypes)
-	typeModels, err := newTypeModels(customArgs.OpenAPISchemaFilePath, pkgTypes)
+	typeModels, err := newTypeModels(args.OpenAPISchemaFilePath, pkgTypes)
 	if err != nil {
-		klog.Fatalf("Failed build type models from typeModels %s: %v", customArgs.OpenAPISchemaFilePath, err)
+		klog.Fatalf("Failed build type models from typeModels %s: %v", args.OpenAPISchemaFilePath, err)
 	}
 
 	groupVersions := make(map[string]clientgentypes.GroupVersions)
@@ -103,13 +101,13 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		// Apparently we allow the groupName to be overridden in a way that it
 		// no longer maps to a Go package by name.  So we have to figure out
 		// the offset of this particular output package (pkg) from the base
-		// output package (customArgs.OutputPkg).
-		pkgSubdir := strings.TrimPrefix(pkg, customArgs.OutputPkg+"/")
+		// output package (args.OutputPkg).
+		pkgSubdir := strings.TrimPrefix(pkg, args.OutputPkg+"/")
 
 		// generate the apply configurations
 		targetList = append(targetList,
 			targetForApplyConfigurationsPackage(
-				customArgs.OutputDir, customArgs.OutputPkg, pkgSubdir,
+				args.OutputDir, args.OutputPkg, pkgSubdir,
 				boilerplate, gv, toGenerate, refs, typeModels))
 
 		// group all the generated apply configurations by gv so ForKind() can be generated
@@ -133,11 +131,11 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	// generate ForKind() utility function
 	targetList = append(targetList,
-		targetForUtils(customArgs.OutputDir, customArgs.OutputPkg,
+		targetForUtils(args.OutputDir, args.OutputPkg,
 			boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames))
 	// generate internal embedded schema, required for generated Extract functions
 	targetList = append(targetList,
-		targetForInternal(customArgs.OutputDir, customArgs.OutputPkg,
+		targetForInternal(args.OutputDir, args.OutputPkg,
 			boilerplate, typeModels))
 
 	return targetList

@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	listergenargs "k8s.io/code-generator/cmd/lister-gen/args"
-	"k8s.io/gengo/v2/args"
+	"k8s.io/code-generator/cmd/lister-gen/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -59,10 +59,8 @@ func DefaultNameSystem() string {
 }
 
 // GetTargets makes the client target definition.
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*listergenargs.CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, "", args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, "", gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
@@ -121,8 +119,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
 		subdir := filepath.Join(groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
-		outputDir := filepath.Join(customArgs.OutputDir, subdir)
-		outputPkg := filepath.Join(customArgs.OutputPkg, subdir)
+		outputDir := filepath.Join(args.OutputDir, subdir)
+		outputPkg := filepath.Join(args.OutputPkg, subdir)
 		targetList = append(targetList, &generator.SimpleTarget{
 			PkgName:       strings.ToLower(gv.Version.NonEmpty()),
 			PkgPath:       outputPkg,

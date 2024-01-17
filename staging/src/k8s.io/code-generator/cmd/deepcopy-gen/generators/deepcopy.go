@@ -23,8 +23,8 @@ import (
 	"sort"
 	"strings"
 
-	deepcopyargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
-	"k8s.io/gengo/v2/args"
+	"k8s.io/code-generator/cmd/deepcopy-gen/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -118,22 +118,20 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*deepcopyargs.CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	boundingDirs := []string{}
-	if customArgs.BoundingDirs == nil {
-		customArgs.BoundingDirs = context.Inputs
+	if args.BoundingDirs == nil {
+		args.BoundingDirs = context.Inputs
 	}
-	for i := range customArgs.BoundingDirs {
+	for i := range args.BoundingDirs {
 		// Strip any trailing slashes - they are not exactly "correct" but
 		// this is friendlier.
-		boundingDirs = append(boundingDirs, strings.TrimRight(customArgs.BoundingDirs[i], "/"))
+		boundingDirs = append(boundingDirs, strings.TrimRight(args.BoundingDirs[i], "/"))
 	}
 
 	targets := []generator.Target{}
@@ -198,7 +196,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 					},
 					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
-							NewGenDeepCopy(customArgs.OutputFile, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister),
+							NewGenDeepCopy(args.OutputFile, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister),
 						}
 					},
 				})
