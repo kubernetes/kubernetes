@@ -86,7 +86,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 func Run(g *Generator) {
 	// Roughly models gengo/v2.newBuilder.
 
-	b := parser.New([]string{"proto"})
+	parser := parser.New([]string{"proto"})
 
 	var allInputs []string
 	if len(g.APIMachineryPackages) != 0 {
@@ -133,12 +133,12 @@ func Run(g *Generator) {
 	}
 
 	// Load all the packages at once.
-	if err := b.LoadPackages(packages...); err != nil {
+	if err := parser.LoadPackages(packages...); err != nil {
 		log.Fatalf("Unable to load packages: %v", err)
 	}
 
 	c, err := generator.NewContext(
-		b,
+		parser,
 		namer.NameSystems{
 			"public": namer.NewPublicNamer(3),
 		},
