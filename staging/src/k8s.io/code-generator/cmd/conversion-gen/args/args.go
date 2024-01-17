@@ -63,7 +63,7 @@ type CustomArgs struct {
 
 // NewDefaults returns default arguments for the generator.
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
+	genericArgs := args.Default()
 	customArgs := &CustomArgs{
 		BasePeerDirs: DefaultBasePeerDirs,
 		SkipUnsafe:   false,

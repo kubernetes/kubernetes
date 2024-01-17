@@ -48,7 +48,7 @@ type CustomArgs struct {
 
 // NewDefaults returns default arguments for the generator.
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
+	genericArgs := args.Default()
 	customArgs := &CustomArgs{
 		ExternalApplyConfigurations: map[types.Name]string{
 			// Always include the applyconfigurations we've generated in client-go. They are sufficient for the vast majority of use cases.

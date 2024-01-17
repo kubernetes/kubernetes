@@ -30,7 +30,7 @@ type CustomArgs struct {
 
 // NewDefaults returns default arguments for the generator.
 func NewDefaults() *args.GeneratorArgs {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
+	genericArgs := args.Default()
 	genericArgs.CustomArgs = &CustomArgs{}
 	return genericArgs
 }
