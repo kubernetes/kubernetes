@@ -24,12 +24,11 @@ import (
 	"flag"
 	"log"
 
+	"github.com/spf13/pflag"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/klog/v2"
 	generatorargs "k8s.io/kube-openapi/cmd/openapi-gen/args"
 	"k8s.io/kube-openapi/pkg/generators"
-
-	"github.com/spf13/pflag"
-
-	"k8s.io/klog/v2"
 )
 
 func main() {
@@ -51,6 +50,7 @@ func main() {
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		log.Fatalf("OpenAPI code generation error: %v", err)
 	}

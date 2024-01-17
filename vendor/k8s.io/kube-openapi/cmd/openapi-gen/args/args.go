@@ -29,6 +29,8 @@ type CustomArgs struct {
 	OutputPkg  string // must be a Go import-path
 	OutputFile string
 
+	GoHeaderFile string
+
 	// ReportFilename is added to CustomArgs for specifying name of report file used
 	// by API linter. If specified, API rule violations will be printed to report file.
 	// Otherwise default value "-" will be used which indicates stdout.
@@ -59,6 +61,8 @@ func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 		"the base Go import-path under which to generate results")
 	fs.StringVar(&c.OutputFile, "output-file", "generated.openapi.go",
 		"the name of the file to be generated")
+	fs.StringVar(&c.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.StringVarP(&c.ReportFilename, "report-filename", "r", "-",
 		"Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
 }
