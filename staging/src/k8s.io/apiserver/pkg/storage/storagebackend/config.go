@@ -89,6 +89,9 @@ type Config struct {
 	// StorageObjectCountTracker is used to keep track of the total
 	// number of objects in the storage per resource.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+
+	// StorageCompression is the compression algorithm used for storage.
+	StorageCompression string
 }
 
 // ConfigForResource is a Config specialized to a particular `schema.GroupResource`
@@ -118,5 +121,6 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		ReadycheckTimeout:    DefaultReadinessTimeout,
 		LeaseManagerConfig:   etcd3.NewDefaultLeaseManagerConfig(),
 		Transport:            TransportConfig{TracerProvider: oteltrace.NewNoopTracerProvider()},
+		StorageCompression:   "none",
 	}
 }

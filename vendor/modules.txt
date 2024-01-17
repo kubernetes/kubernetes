@@ -304,6 +304,9 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
+# github.com/golang/snappy v0.0.3
+## explicit
+github.com/golang/snappy
 # github.com/google/btree v1.0.1
 ## explicit; go 1.12
 github.com/google/btree
@@ -1582,6 +1585,10 @@ k8s.io/apiserver/pkg/storage/storagebackend
 k8s.io/apiserver/pkg/storage/storagebackend/factory
 k8s.io/apiserver/pkg/storage/testing
 k8s.io/apiserver/pkg/storage/value
+k8s.io/apiserver/pkg/storage/value/compression
+k8s.io/apiserver/pkg/storage/value/compression/none
+k8s.io/apiserver/pkg/storage/value/compression/registry
+k8s.io/apiserver/pkg/storage/value/compression/snappy
 k8s.io/apiserver/pkg/storage/value/encrypt/aes
 k8s.io/apiserver/pkg/storage/value/encrypt/envelope
 k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2

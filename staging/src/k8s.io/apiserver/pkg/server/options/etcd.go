@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/compression"
 	"k8s.io/klog/v2"
 )
 
@@ -175,6 +175,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
+
+	fs.StringVar(&s.StorageConfig.StorageCompression, "storage-compression", s.StorageConfig.StorageCompression,
+		"The compression algorithm used for storage. Options: 'none' (default), 'snappy'.")
 
 	fs.StringSliceVar(&s.StorageConfig.Transport.ServerList, "etcd-servers", s.StorageConfig.Transport.ServerList,
 		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
@@ -497,8 +500,12 @@ func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*s
 
 	configCopy := *config
 	resourceConfig := configCopy.Config
-	resourceConfig.Transformer = t.resourceTransformers.TransformerForResource(resource)
 	configCopy.Config = resourceConfig
+
+	resourceConfig.Transformer = compression.NewNegotiateCompressionTransformer(
+		configCopy.Config.StorageCompression,
+		t.resourceTransformers.TransformerForResource(resource),
+	)
 
 	return &configCopy, nil
 }
