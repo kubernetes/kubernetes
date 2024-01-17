@@ -38,6 +38,7 @@ func main() {
 	// Collect and parse flags.
 	stdArgs.AddFlags(pflag.CommandLine)
 	myArgs.AddFlags(pflag.CommandLine)
+	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
@@ -52,6 +53,7 @@ func main() {
 		getDefaultNameSystem(),
 		getTargets,
 		args.StdBuildTag,
+		pflag.Args(),
 	); err != nil {
 		klog.ErrorS(err, "fatal error")
 		os.Exit(1)

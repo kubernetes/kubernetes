@@ -56,6 +56,7 @@ func main() {
 		getDefaultNameSystem(),
 		getTargets,
 		args.StdBuildTag,
+		pflag.Args(),
 	); err != nil {
 		klog.ErrorS(err, "fatal error")
 		os.Exit(1)
