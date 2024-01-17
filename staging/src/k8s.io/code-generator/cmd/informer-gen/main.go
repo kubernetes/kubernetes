@@ -20,33 +20,37 @@ import (
 	"flag"
 
 	"github.com/spf13/pflag"
-	generatorargs "k8s.io/code-generator/cmd/informer-gen/args"
+	"k8s.io/code-generator/cmd/informer-gen/args"
 	"k8s.io/code-generator/cmd/informer-gen/generators"
 	"k8s.io/code-generator/pkg/util"
-	"k8s.io/gengo/v2/args"
+	gengo "k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
 )
 
 func main() {
 	klog.InitFlags(nil)
-	genericArgs, customArgs := generatorargs.NewDefaults()
+	args := args.New()
 
-	genericArgs.AddFlags(pflag.CommandLine)
-	customArgs.AddFlags(pflag.CommandLine)
+	args.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	if err := generatorargs.Validate(genericArgs); err != nil {
+	if err := args.Validate(); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
 
+	myTargets := func(context *generator.Context) []generator.Target {
+		return generators.GetTargets(context, args)
+	}
+
 	// Run it.
-	if err := genericArgs.Execute(
-		generators.NameSystems(util.PluralExceptionListToMapOrDie(customArgs.PluralExceptions)),
+	if err := gengo.Execute(
+		generators.NameSystems(util.PluralExceptionListToMapOrDie(args.PluralExceptions)),
 		generators.DefaultNameSystem(),
-		generators.GetTargets,
-		args.StdBuildTag,
+		myTargets,
+		gengo.StdBuildTag,
 		pflag.Args(),
 	); err != nil {
 		klog.Fatalf("Error: %v", err)

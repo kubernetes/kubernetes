@@ -20,11 +20,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/v2/args"
 )
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
+// Args is used by the gengo framework to pass args specific to this generator.
+type Args struct {
 	OutputDir    string // must be a directory path
 	OutputPkg    string // must be a Go import-path
 	GoHeaderFile string
@@ -34,39 +33,32 @@ type CustomArgs struct {
 	PluralExceptions []string
 }
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default()
-	customArgs := &CustomArgs{
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{
 		PluralExceptions: []string{"Endpoints:Endpoints"},
 	}
-	genericArgs.CustomArgs = customArgs
-
-	return genericArgs, customArgs
 }
 
 // AddFlags add the generator flags to the flag set.
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&ca.OutputDir, "output-dir", "",
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputDir, "output-dir", "",
 		"the base directory under which to generate results")
-	fs.StringVar(&ca.OutputPkg, "output-pkg", "",
+	fs.StringVar(&args.OutputPkg, "output-pkg", "",
 		"the base Go import-path under which to generate results")
-	fs.StringSliceVar(&ca.PluralExceptions, "plural-exceptions", ca.PluralExceptions,
+	fs.StringSliceVar(&args.PluralExceptions, "plural-exceptions", args.PluralExceptions,
 		"list of comma separated plural exception definitions in Type:PluralizedType format")
-	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	custom := genericArgs.CustomArgs.(*CustomArgs)
-
-	if len(custom.OutputDir) == 0 {
+func (args *Args) Validate() error {
+	if len(args.OutputDir) == 0 {
 		return fmt.Errorf("--output-dir must be specified")
 	}
-	if len(custom.OutputPkg) == 0 {
+	if len(args.OutputPkg) == 0 {
 		return fmt.Errorf("--output-pkg must be specified")
 	}
-
 	return nil
 }
