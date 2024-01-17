@@ -187,11 +187,8 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 	for _, i := range context.Inputs {
 		klog.V(5).Infof("Considering pkg %q", i)
+
 		pkg := context.Universe[i]
-		if pkg == nil {
-			// If the input had no Go files, for example.
-			continue
-		}
 
 		ptag := extractTag(tagEnabledName, pkg.Comments)
 		pkgNeedsGeneration := false
