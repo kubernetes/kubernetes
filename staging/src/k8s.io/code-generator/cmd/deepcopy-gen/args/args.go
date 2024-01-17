@@ -32,22 +32,23 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
 	customArgs := &CustomArgs{}
 	genericArgs.CustomArgs = (*generators.CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
-	genericArgs.OutputFileBaseName = "deepcopy_generated"
 	return genericArgs, customArgs
 }
 
 // AddFlags add the generator flags to the flag set.
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&ca.OutputFile, "output-file", "generated.deepcopy.go",
+		"the name of the file to be generated")
 	fs.StringSliceVar(&ca.BoundingDirs, "bounding-dirs", ca.BoundingDirs,
 		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
 }
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*generators.CustomArgs)
+	custom := genericArgs.CustomArgs.(*generators.CustomArgs)
 
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
+	if len(custom.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
 	}
 
 	return nil

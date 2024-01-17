@@ -177,7 +177,7 @@ function codegen::deepcopy() {
     "${gen_deepcopy_bin}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-file-base "${output_file}" \
+        --output-file "${output_file}" \
         --bounding-dirs "k8s.io/kubernetes,k8s.io/api" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -309,7 +309,7 @@ function codegen::prerelease() {
     "${gen_prerelease_bin}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-file-base "${output_file}" \
+        --output-file "${output_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
@@ -377,7 +377,7 @@ function codegen::defaults() {
     "${gen_defaulter_bin}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-file-base "${output_file}" \
+        --output-file "${output_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
@@ -456,7 +456,7 @@ function codegen::conversions() {
     "${gen_conversion_bin}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-file-base "${output_file}" \
+        --output-file "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -551,7 +551,7 @@ function codegen::openapi() {
     "${gen_openapi_bin}" \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
-        --output-file-base "${output_file}" \
+        --output-file "${output_file}" \
         --output-dir "${output_dir}" \
         --output-pkg "${output_pkg}" \
         --report-filename "${report_file}" \

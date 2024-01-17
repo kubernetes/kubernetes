@@ -32,20 +32,21 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
 	customArgs := &CustomArgs{}
 	genericArgs.CustomArgs = (*statusgenerators.CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
-	genericArgs.OutputFileBaseName = "zz_prerelease_lifecycle_generated"
 	return genericArgs, customArgs
 }
 
 // AddFlags add the generator flags to the flag set.
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&ca.OutputFile, "output-file", "generated.prerelease_lifecycle.go",
+		"the name of the file to be generated")
 }
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*statusgenerators.CustomArgs)
+	custom := genericArgs.CustomArgs.(*statusgenerators.CustomArgs)
 
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
+	if len(custom.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
 	}
 
 	return nil

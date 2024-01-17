@@ -33,6 +33,9 @@ var DefaultBasePeerDirs = []string{
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
+	// The filename of the generated results.
+	OutputFile string
+
 	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core. Peer dirs
 	// are declared to make the generator pick up manually written conversion funcs from external
 	// packages.
@@ -62,12 +65,13 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 		SkipUnsafe:   false,
 	}
 	genericArgs.CustomArgs = customArgs
-	genericArgs.OutputFileBaseName = "conversion_generated"
 	return genericArgs, customArgs
 }
 
 // AddFlags add the generator flags to the flag set.
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&ca.OutputFile, "output-file", "generated.conversion.go",
+		"the name of the file to be generated")
 	fs.StringSliceVar(&ca.BasePeerDirs, "base-peer-dirs", ca.BasePeerDirs,
 		"Comma-separated list of apimachinery import paths which are considered, after tag-specified peers, for conversions. Only change these if you have very good reasons.")
 	fs.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
@@ -80,10 +84,10 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*CustomArgs)
+	custom := genericArgs.CustomArgs.(*CustomArgs)
 
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
+	if len(custom.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
 	}
 
 	return nil
