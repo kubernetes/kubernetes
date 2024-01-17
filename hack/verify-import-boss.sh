@@ -33,7 +33,6 @@ GOPROXY=off go install k8s.io/code-generator/cmd/import-boss
 $(kube::util::find-binary "import-boss") \
     -v "${KUBE_VERBOSE:-0}" \
     --include-test-files \
-    --verify-only \
     --input-dirs "./pkg/..." \
     --input-dirs "./cmd/..." \
     --input-dirs "./plugin/..." \

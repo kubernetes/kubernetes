@@ -70,7 +70,6 @@ func New() *Generator {
 
 func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.StringVarP(&g.Common.GoHeaderFilePath, "go-header-file", "h", g.Common.GoHeaderFilePath, "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
-	flag.BoolVar(&g.Common.VerifyOnly, "verify-only", g.Common.VerifyOnly, "If true, only verify existing output, do not write anything.")
 	flag.StringVarP(&g.Packages, "packages", "p", g.Packages, "comma-separated list of directories to get input types from. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVar(&g.APIMachineryPackages, "apimachinery-packages", g.APIMachineryPackages, "comma-separated list of directories to get apimachinery input types from which are needed by any API. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVar(&g.OutputDir, "output-dir", g.OutputDir, "The base directory under which to generate results.")
@@ -85,11 +84,6 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 
 // This roughly models gengo/v2/args.GeneratorArgs.Execute.
 func Run(g *Generator) {
-	if g.Common.VerifyOnly {
-		g.OnlyIDL = true
-		g.Clean = false
-	}
-
 	// Roughly models gengo/v2/args.GeneratorArgs.NewBuilder.
 
 	b := parser.NewWithOptions(parser.Options{BuildTags: []string{"proto"}})
@@ -154,7 +148,6 @@ func Run(g *Generator) {
 		log.Fatalf("Failed making a context: %v", err)
 	}
 
-	c.Verify = g.Common.VerifyOnly
 	c.FileTypes["protoidl"] = NewProtoFile()
 
 	// Roughly models gengo/v2/args.GeneratorArgs.Execute calling the
@@ -202,11 +195,9 @@ func Run(g *Generator) {
 	}
 	c.Namers["proto"] = protobufNames
 
-	if !g.Common.VerifyOnly {
-		for _, p := range outputPackages {
-			if err := p.(*protobufPackage).Clean(); err != nil {
-				log.Fatalf("Unable to clean package %s: %v", p.Name(), err)
-			}
+	for _, p := range outputPackages {
+		if err := p.(*protobufPackage).Clean(); err != nil {
+			log.Fatalf("Unable to clean package %s: %v", p.Name(), err)
 		}
 	}
 
