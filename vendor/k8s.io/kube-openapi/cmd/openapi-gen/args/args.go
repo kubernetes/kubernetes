@@ -25,8 +25,9 @@ import (
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
-	OutputDir string // must be a directory path
-	OutputPkg string // must be a Go import-path
+	OutputDir  string // must be a directory path
+	OutputPkg  string // must be a Go import-path
+	OutputFile string
 
 	// ReportFilename is added to CustomArgs for specifying name of report file used
 	// by API linter. If specified, API rule violations will be printed to report file.
@@ -46,8 +47,6 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 
 	// Default value for report filename is "-", which stands for stdout
 	customArgs.ReportFilename = "-"
-	// Default value for output file base name
-	genericArgs.OutputFileBaseName = "openapi_generated"
 
 	return genericArgs, customArgs
 }
@@ -58,16 +57,14 @@ func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 		"the base directory under which to generate results")
 	fs.StringVar(&c.OutputPkg, "output-pkg", "",
 		"the base Go import-path under which to generate results")
+	fs.StringVar(&c.OutputFile, "output-file", "generated.openapi.go",
+		"the name of the file to be generated")
 	fs.StringVarP(&c.ReportFilename, "report-filename", "r", "-",
 		"Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
 }
 
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("--output-file-base cannot be empty")
-	}
-
 	c := genericArgs.CustomArgs.(*CustomArgs)
 
 	if len(c.OutputDir) == 0 {
@@ -75,6 +72,9 @@ func Validate(genericArgs *args.GeneratorArgs) error {
 	}
 	if len(c.OutputPkg) == 0 {
 		return fmt.Errorf("--output-pkg must be specified")
+	}
+	if len(c.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
 	}
 	if len(c.ReportFilename) == 0 {
 		return fmt.Errorf("--report-filename must be specified (use \"-\" for stdout)")

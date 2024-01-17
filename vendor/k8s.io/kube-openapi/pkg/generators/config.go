@@ -82,7 +82,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newOpenAPIGen(
-						arguments.OutputFileBaseName,
+						customArgs.OutputFile,
 						customArgs.OutputPkg,
 					),
 					newAPIViolationGen(),
