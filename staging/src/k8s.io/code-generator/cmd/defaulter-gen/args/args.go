@@ -41,6 +41,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 		"the name of the file to be generated")
 	fs.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.

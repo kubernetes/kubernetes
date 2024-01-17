@@ -37,7 +37,7 @@ import (
 )
 
 type Generator struct {
-	Common               args.GeneratorArgs
+	GoHeaderFile         string
 	APIMachineryPackages string
 	Packages             string
 	OutputDir            string
@@ -69,7 +69,7 @@ func New() *Generator {
 }
 
 func (g *Generator) BindFlags(flag *flag.FlagSet) {
-	flag.StringVarP(&g.Common.GoHeaderFilePath, "go-header-file", "h", g.Common.GoHeaderFilePath, "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
+	flag.StringVarP(&g.GoHeaderFile, "go-header-file", "h", "", "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
 	flag.StringVarP(&g.Packages, "packages", "p", g.Packages, "comma-separated list of directories to get input types from. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVar(&g.APIMachineryPackages, "apimachinery-packages", g.APIMachineryPackages, "comma-separated list of directories to get apimachinery input types from which are needed by any API. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVar(&g.OutputDir, "output-dir", g.OutputDir, "The base directory under which to generate results.")
@@ -153,7 +153,7 @@ func Run(g *Generator) {
 	// Roughly models gengo/v2/args.GeneratorArgs.Execute calling the
 	// tool-provided Packages() callback.
 
-	boilerplate, err := g.Common.LoadGoBoilerplate()
+	boilerplate, err := args.GoBoilerplate(g.GoHeaderFile, "", "")
 	if err != nil {
 		log.Fatalf("Failed loading boilerplate (consider using the go-header-file flag): %v", err)
 	}

@@ -198,13 +198,14 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 }
 
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	customArgs := arguments.CustomArgs.(*conversionargs.CustomArgs)
+
+	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	targets := []generator.Target{}
-	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 
 	// Accumulate pre-existing conversion functions.
 	// TODO: This is too ad-hoc.  We need a better way.
@@ -271,8 +272,6 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		}
 	}
 
-	customArgs := arguments.CustomArgs.(*conversionargs.CustomArgs)
-
 	// Make sure explicit peer-packages are added.
 	peers := append(customArgs.BasePeerDirs, customArgs.ExtraPeerDirs...)
 	if expanded, err := context.FindPackages(peers...); err != nil {
@@ -330,7 +329,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 				PkgName:       filepath.Base(pkg.Path),
 				PkgPath:       pkg.Path,
 				PkgDir:        pkg.SourcePath, // output pkg is the same as the input
-				HeaderComment: header,
+				HeaderComment: boilerplate,
 				FilterFunc: func(c *generator.Context, t *types.Type) bool {
 					return t.Name.Package == typesPkg.Path
 				},

@@ -56,12 +56,12 @@ func DefaultNameSystem() string {
 
 // GetTargets makes the client target definition.
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	customArgs := arguments.CustomArgs.(*applygenargs.CustomArgs)
+
+	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, "", args.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
-
-	customArgs := arguments.CustomArgs.(*applygenargs.CustomArgs)
 
 	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, customArgs.OutputPkg)
 	initialTypes := customArgs.ExternalApplyConfigurations

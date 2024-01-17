@@ -26,6 +26,7 @@ import (
 	generatorargs "k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators"
 	"k8s.io/code-generator/pkg/util"
+	"k8s.io/gengo/v2/args"
 )
 
 func main() {
@@ -53,6 +54,7 @@ func main() {
 		generators.NameSystems(util.PluralExceptionListToMapOrDie(customArgs.PluralExceptions)),
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

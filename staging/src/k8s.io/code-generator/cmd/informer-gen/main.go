@@ -20,11 +20,11 @@ import (
 	"flag"
 
 	"github.com/spf13/pflag"
+	generatorargs "k8s.io/code-generator/cmd/informer-gen/args"
 	"k8s.io/code-generator/cmd/informer-gen/generators"
 	"k8s.io/code-generator/pkg/util"
+	"k8s.io/gengo/v2/args"
 	"k8s.io/klog/v2"
-
-	generatorargs "k8s.io/code-generator/cmd/informer-gen/args"
 )
 
 func main() {
@@ -46,6 +46,7 @@ func main() {
 		generators.NameSystems(util.PluralExceptionListToMapOrDie(customArgs.PluralExceptions)),
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

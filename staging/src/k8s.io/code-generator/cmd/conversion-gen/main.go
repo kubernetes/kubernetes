@@ -102,6 +102,7 @@ import (
 
 	generatorargs "k8s.io/code-generator/cmd/conversion-gen/args"
 	"k8s.io/code-generator/cmd/conversion-gen/generators"
+	"k8s.io/gengo/v2/args"
 )
 
 func main() {
@@ -132,6 +133,7 @@ func main() {
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

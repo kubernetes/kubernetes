@@ -55,6 +55,10 @@ type CustomArgs struct {
 	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
 	// allow structs that are identical to be assigned to each other.
 	SkipUnsafe bool
+
+	// GoHeaderFile is the path to a boilerplate header file for generated
+	// code.
+	GoHeaderFile string
 }
 
 // NewDefaults returns default arguments for the generator.
@@ -80,6 +84,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 		"Application specific comma-separated list of import paths which are loaded and considered for callable conversions, but are not considered peers for conversion.")
 	fs.BoolVar(&ca.SkipUnsafe, "skip-unsafe", ca.SkipUnsafe,
 		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.
