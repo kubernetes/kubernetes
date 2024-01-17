@@ -421,9 +421,9 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 			// - only checking the watch cache (this is tricky to do though...)
 			// - maintaining known names in a set or bloom filter
 			foundNonConflict := false
+			var name string
 			for i := 0; i < 10 && !foundNonConflict; i++ {
-				name := e.CreateStrategy.GenerateName(objectMeta.GetGenerateName())
-				objectMeta.SetName(name)
+				name = e.CreateStrategy.GenerateName(objectMeta.GetGenerateName())
 				key, err := e.KeyFunc(ctx, name)
 				if err != nil {
 					return nil, err
@@ -434,6 +434,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 				}
 				foundNonConflict = !exists
 			}
+			objectMeta.SetName(name)
 		}
 	}
 

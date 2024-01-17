@@ -236,6 +236,63 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	}
 }
 
+func RunTestExists(ctx context.Context, t *testing.T, store storage.Interface) {
+	// create an object to test
+	key, createdObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
+	// update the object once to allow get by exact resource version to be tested
+	updateObj := createdObj.DeepCopy()
+	updateObj.Annotations = map[string]string{"test-annotation": "1"}
+	storedObj := &example.Pod{}
+	err := store.GuaranteedUpdate(ctx, key, storedObj, true, nil,
+		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			ttl := uint64(1)
+			return updateObj, &ttl, nil
+		}, nil)
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	// create an additional object to increment the resource version for pods above the resource version of the foo object
+	secondObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test-ns"}}
+	lastUpdatedObj := &example.Pod{}
+	if err := store.Create(ctx, computePodKey(secondObj), secondObj, lastUpdatedObj, 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	tests := []struct {
+		name         string
+		key          string
+		expectExists bool
+	}{{
+		name:         "get existing",
+		key:          key,
+		expectExists: true,
+	}, {
+		name: "get non-existing",
+		key:  "/non-existing",
+	}}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// For some asynchronous implementations of storage interface (in particular watchcache),
+			// certain requests may impact result of further requests. As an example, if we first
+			// ensure that watchcache is synchronized up to ResourceVersion X (using Get/List requests
+			// with NotOlderThan semantic), the further requests (even specifying earlier resource
+			// version) will also return the result synchronized to at least ResourceVersion X.
+			// By parallelizing test cases we ensure that the order in which test cases are defined
+			// doesn't automatically preclude some scenarios from happening.
+			t.Parallel()
+
+			exists, err := store.Exists(ctx, tt.key)
+			if err != nil {
+				t.Fatalf("Get failed: %v", err)
+			}
+			if tt.expectExists != exists {
+				t.Errorf("expecting exists=%t, but got: %t", tt.expectExists, exists)
+			}
+		})
+	}
+}
+
 func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 

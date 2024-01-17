@@ -106,6 +106,12 @@ func TestGet(t *testing.T) {
 	storagetesting.RunTestGet(ctx, t, cacher)
 }
 
+func TestExists(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestExists(ctx, t, cacher)
+}
+
 func TestUnconditionalDelete(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)

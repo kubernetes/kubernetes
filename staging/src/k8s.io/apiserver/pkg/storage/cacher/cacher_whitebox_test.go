@@ -131,6 +131,12 @@ func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ 
 
 	return d.err
 }
+func (d *dummyStorage) Exists(_ context.Context, _ string) (bool, error) {
+	d.RLock()
+	defer d.RUnlock()
+
+	return false, d.err
+}
 func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
 	if d.getListFn != nil {
 		return d.getListFn(ctx, resPrefix, opts, listObj)
