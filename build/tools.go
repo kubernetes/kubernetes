@@ -27,7 +27,6 @@ import (
 	_ "k8s.io/code-generator/cmd/defaulter-gen"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
-	_ "k8s.io/code-generator/cmd/import-boss"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
 
 	// submodule test dependencies

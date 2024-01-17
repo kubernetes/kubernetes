@@ -1,0 +1,6 @@
+rules:
+  - selectorRegexp: k8s[.]io
+    allowedPrefixes:
+      - k8s.io/kubernetes/cmd/import-boss/testdata/simple-fwd/allowed
+    forbiddenPrefixes:
+      - k8s.io/kubernetes/cmd/import-boss/testdata/simple-fwd/forbidden
