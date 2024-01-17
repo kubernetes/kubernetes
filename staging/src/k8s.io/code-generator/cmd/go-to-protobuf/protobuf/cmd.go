@@ -182,7 +182,7 @@ func Run(g *Generator) {
 			log.Fatalf("BUG: can't find input modifiers for %q", input)
 		}
 		pkg := c.Universe[input]
-		protopkg := newProtobufPackage(pkg.Path, pkg.SourcePath, mod.name, mod.allTypes, omitTypes)
+		protopkg := newProtobufPackage(pkg.Path, pkg.Dir, mod.name, mod.allTypes, omitTypes)
 		header := append([]byte{}, boilerplate...)
 		header = append(header, protopkg.HeaderComment...)
 		protopkg.HeaderComment = header

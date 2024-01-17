@@ -63,7 +63,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			continue
 		}
 		registerFileName := "register.go"
-		searchPath := path.Join(pkg.SourcePath, registerFileName)
+		searchPath := path.Join(pkg.Dir, registerFileName)
 		if _, err := os.Stat(path.Join(searchPath)); err == nil {
 			klog.V(5).Infof("skipping the generation of %s file because %s already exists in the path %s", args.OutputFile, registerFileName, searchPath)
 			continue
@@ -103,8 +103,8 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		targets = append(targets,
 			&generator.SimpleTarget{
 				PkgName:       pkg.Name,
-				PkgPath:       pkg.Path,       // output to same pkg as input
-				PkgDir:        pkg.SourcePath, // output to same pkg as input
+				PkgPath:       pkg.Path, // output to same pkg as input
+				PkgDir:        pkg.Dir,  // output to same pkg as input
 				HeaderComment: boilerplate,
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
