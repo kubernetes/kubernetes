@@ -97,7 +97,7 @@ func extractRemovedTag(t *types.Type) (*tagValue, int, int, error) {
 func extractReplacementTag(t *types.Type) (group, version, kind string, hasReplacement bool, err error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
 
-	tagVals := types.ExtractCommentTags("+", comments)[replacementTagName]
+	tagVals := gengo.ExtractCommentTags("+", comments)[replacementTagName]
 	if len(tagVals) == 0 {
 		// No match for the tag.
 		return "", "", "", false, nil
@@ -131,7 +131,7 @@ func extractReplacementTag(t *types.Type) (group, version, kind string, hasRepla
 }
 
 func extractTag(tagName string, comments []string) *tagValue {
-	tagVals := types.ExtractCommentTags("+", comments)[tagName]
+	tagVals := gengo.ExtractCommentTags("+", comments)[tagName]
 	if tagVals == nil {
 		// No match for the tag.
 		return nil

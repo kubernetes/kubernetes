@@ -243,7 +243,7 @@ func targetForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, 
 
 func goName(gv clientgentypes.GroupVersion, p *types.Package) string {
 	goName := namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
-	if override := types.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
+	if override := gengo.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
 		goName = namer.IC(override[0])
 	}
 	return goName
@@ -277,7 +277,7 @@ func groupVersion(p *types.Package) (gv clientgentypes.GroupVersion) {
 	// If there's a comment of the form "// +groupName=somegroup" or
 	// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 	// group when generating.
-	if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
+	if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 		gv.Group = clientgentypes.Group(override[0])
 	}
 	return gv

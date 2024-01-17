@@ -49,24 +49,24 @@ const (
 )
 
 func extractTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[tagName]
+	return gengo.ExtractCommentTags("+", comments)[tagName]
 }
 
 func extractExplicitFromTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[explicitFromTagName]
+	return gengo.ExtractCommentTags("+", comments)[explicitFromTagName]
 }
 
 func extractExternalTypesTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[externalTypesTagName]
+	return gengo.ExtractCommentTags("+", comments)[externalTypesTagName]
 }
 
 func isCopyOnly(comments []string) bool {
-	values := types.ExtractCommentTags("+", comments)["k8s:conversion-fn"]
+	values := gengo.ExtractCommentTags("+", comments)["k8s:conversion-fn"]
 	return len(values) == 1 && values[0] == "copy-only"
 }
 
 func isDrop(comments []string) bool {
-	values := types.ExtractCommentTags("+", comments)["k8s:conversion-fn"]
+	values := gengo.ExtractCommentTags("+", comments)["k8s:conversion-fn"]
 	return len(values) == 1 && values[0] == "drop"
 }
 
