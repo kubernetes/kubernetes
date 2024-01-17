@@ -72,7 +72,7 @@ import pkg/i18n
 translated := i18n.T("Your message in english here")
 
 // Get a translated plural string
-translated := i18n.T("You had % items", items)
+translated := i18n.T("You had %d items", items)
 
 // Translated error
 return i18n.Error("Something bad happened")
