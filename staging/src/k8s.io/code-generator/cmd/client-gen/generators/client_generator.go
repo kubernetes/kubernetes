@@ -341,12 +341,12 @@ func sanitizePackagePaths(context *generator.Context, ca *clientgenargs.CustomAr
 
 // GetTargets makes the client target definition.
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	customArgs := arguments.CustomArgs.(*clientgenargs.CustomArgs)
+
+	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, "", args.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
-
-	customArgs := arguments.CustomArgs.(*clientgenargs.CustomArgs)
 
 	includedTypesOverrides := customArgs.IncludedTypesOverrides
 

@@ -49,10 +49,10 @@ import (
 	"flag"
 
 	"github.com/spf13/pflag"
+	generatorargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
+	"k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/examples/deepcopy-gen/generators"
 	"k8s.io/klog/v2"
-
-	generatorargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
 )
 
 func main() {
@@ -74,6 +74,7 @@ func main() {
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

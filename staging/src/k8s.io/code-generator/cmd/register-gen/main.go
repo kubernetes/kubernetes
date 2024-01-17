@@ -20,10 +20,10 @@ import (
 	"flag"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
-
 	generatorargs "k8s.io/code-generator/cmd/register-gen/args"
 	"k8s.io/code-generator/cmd/register-gen/generators"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/klog/v2"
 )
 
 func main() {
@@ -42,6 +42,7 @@ func main() {
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

@@ -40,6 +40,7 @@ import (
 	"github.com/spf13/pflag"
 	generatorargs "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/args"
 	statusgenerators "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/prerelease-lifecycle-generators"
+	"k8s.io/gengo/v2/args"
 	"k8s.io/klog/v2"
 )
 
@@ -62,6 +63,7 @@ func main() {
 		statusgenerators.NameSystems(),
 		statusgenerators.DefaultNameSystem(),
 		statusgenerators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

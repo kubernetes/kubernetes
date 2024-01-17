@@ -25,6 +25,7 @@ import (
 
 	generatorargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
 	"k8s.io/code-generator/cmd/applyconfiguration-gen/generators"
+	"k8s.io/gengo/v2/args"
 )
 
 func main() {
@@ -47,6 +48,7 @@ func main() {
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
+		args.StdBuildTag,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

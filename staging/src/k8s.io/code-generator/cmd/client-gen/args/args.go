@@ -35,6 +35,9 @@ type CustomArgs struct {
 	// The Go import-path of the generated results.
 	OutputPkg string
 
+	// The boilerplate header for Go files.
+	GoHeaderFile string
+
 	// A sorted list of group versions to generate. For each of them the package path is found
 	// in GroupVersionToInputPath.
 	Groups []types.GroupVersions
@@ -85,6 +88,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 		"the base directory under which to generate results")
 	fs.StringVar(&ca.OutputPkg, "output-pkg", ca.OutputPkg,
 		"the Go import-path of the generated results")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.Var(NewGVPackagesValue(gvsBuilder, nil), "input", "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
 	fs.Var(NewGVTypesValue(&ca.IncludedTypesOverrides, []string{}), "included-types-overrides", "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
 	fs.Var(NewInputBasePathValue(gvsBuilder, inputBase), "input-base", "base path to look for the api group.")

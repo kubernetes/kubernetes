@@ -33,7 +33,8 @@ import (
 
 // CustomArgs is used tby the go2idl framework to pass args specific to this generator.
 type CustomArgs struct {
-	OutputFile string
+	OutputFile   string
+	GoHeaderFile string
 }
 
 // This is the comment tag that carries parameters for API status generation.  Because the cadence is fixed, we can predict
@@ -182,13 +183,14 @@ func DefaultNameSystem() string {
 
 // GetTargets makes the target definition.
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	customArgs := arguments.CustomArgs.(*CustomArgs)
+
+	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	targets := []generator.Target{}
-	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 
 	for _, i := range context.Inputs {
 		klog.V(5).Infof("Considering pkg %q", i)
@@ -230,15 +232,13 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 			}
 		}
 
-		customArgs := arguments.CustomArgs.(*CustomArgs)
-
 		if pkgNeedsGeneration {
 			targets = append(targets,
 				&generator.SimpleTarget{
 					PkgName:       strings.Split(filepath.Base(pkg.Path), ".")[0],
 					PkgPath:       pkg.Path,
 					PkgDir:        pkg.SourcePath, // output pkg is the same as the input
-					HeaderComment: header,
+					HeaderComment: boilerplate,
 					FilterFunc: func(c *generator.Context, t *types.Type) bool {
 						return t.Name.Package == pkg.Path
 					},

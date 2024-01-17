@@ -24,7 +24,8 @@ import (
 )
 
 type CustomArgs struct {
-	OutputFile string
+	OutputFile   string
+	GoHeaderFile string
 }
 
 // NewDefaults returns default arguments for the generator.
@@ -38,6 +39,8 @@ func NewDefaults() *args.GeneratorArgs {
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&ca.OutputFile, "output-file", "generated.register.go",
 		"the name of the file to be generated")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.

@@ -41,6 +41,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 		"the name of the file to be generated")
 	fs.StringSliceVar(&ca.BoundingDirs, "bounding-dirs", ca.BoundingDirs,
 		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.

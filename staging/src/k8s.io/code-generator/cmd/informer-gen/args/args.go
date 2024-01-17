@@ -27,6 +27,7 @@ import (
 type CustomArgs struct {
 	OutputDir                 string // must be a directory path
 	OutputPkg                 string // must be a Go import-path
+	GoHeaderFile              string
 	VersionedClientSetPackage string // must be a Go import-path
 	InternalClientSetPackage  string // must be a Go import-path
 	ListersPackage            string // must be a Go import-path
@@ -55,6 +56,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 		"the base directory under which to generate results")
 	fs.StringVar(&ca.OutputPkg, "output-pkg", ca.OutputPkg,
 		"the Go import-path of the generated results")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.StringVar(&ca.InternalClientSetPackage, "internal-clientset-package", ca.InternalClientSetPackage, "the Go import-path of the internal clientset to use")
 	fs.StringVar(&ca.VersionedClientSetPackage, "versioned-clientset-package", ca.VersionedClientSetPackage, "the Go import-path of the versioned clientset to use")
 	fs.StringVar(&ca.ListersPackage, "listers-package", ca.ListersPackage, "the Go import-path of the listers to use")

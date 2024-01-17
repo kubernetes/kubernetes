@@ -45,12 +45,12 @@ func DefaultNameSystem() string {
 
 // GetTargets makes targets to generate.
 func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	customArgs := arguments.CustomArgs.(*registerargs.CustomArgs)
+
+	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
-
-	customArgs := arguments.CustomArgs.(*registerargs.CustomArgs)
 
 	targets := []generator.Target{}
 	for _, input := range context.Inputs {

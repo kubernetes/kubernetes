@@ -39,6 +39,8 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&ca.OutputFile, "output-file", "generated.prerelease_lifecycle.go",
 		"the name of the file to be generated")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.

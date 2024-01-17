@@ -29,6 +29,8 @@ type CustomArgs struct {
 	OutputDir string // must be a directory path
 	OutputPkg string // must be a Go import-path
 
+	GoHeaderFile string
+
 	// ExternalApplyConfigurations provides the locations of externally generated
 	// apply configuration types for types referenced by the go structs provided as input.
 	// Locations are provided as a comma separated list of <package>.<typeName>:<applyconfiguration-package>
@@ -70,6 +72,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 		"the base directory under which to generate results")
 	fs.StringVar(&ca.OutputPkg, "output-pkg", ca.OutputPkg,
 		"the Go import-path of the generated results")
+	fs.StringVar(&ca.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
