@@ -26,8 +26,8 @@ import (
 
 // CustomArgs is a wrapper for arguments to applyconfiguration-gen.
 type CustomArgs struct {
-	OutputDir     string // must be a directory path
-	OutputPackage string // must be a Go import-path
+	OutputDir string // must be a directory path
+	OutputPkg string // must be a Go import-path
 
 	// ExternalApplyConfigurations provides the locations of externally generated
 	// apply configuration types for types referenced by the go structs provided as input.
@@ -68,7 +68,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	fs.StringVar(&ca.OutputDir, "output-dir", "",
 		"the base directory under which to generate results")
-	fs.StringVar(&ca.OutputPackage, "output-package", ca.OutputPackage,
+	fs.StringVar(&ca.OutputPkg, "output-pkg", ca.OutputPkg,
 		"the Go import-path of the generated results")
 	fs.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
@@ -84,8 +84,8 @@ func Validate(genericArgs *args.GeneratorArgs) error {
 	if len(customArgs.OutputDir) == 0 {
 		return fmt.Errorf("--output-dir must be specified")
 	}
-	if len(customArgs.OutputPackage) == 0 {
-		return fmt.Errorf("--output-package must be specified")
+	if len(customArgs.OutputPkg) == 0 {
+		return fmt.Errorf("--output-pkg must be specified")
 	}
 
 	return nil

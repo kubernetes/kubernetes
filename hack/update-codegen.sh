@@ -553,7 +553,7 @@ function codegen::openapi() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file-base "${output_file}" \
         --output-dir "${output_dir}" \
-        --output-package "${output_pkg}" \
+        --output-pkg "${output_pkg}" \
         --report-filename "${report_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -609,7 +609,7 @@ function codegen::applyconfigs() {
         --openapi-schema <("${modelsschema}") \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
-        --output-package "${APPLYCONFIG_PKG}" \
+        --output-pkg "${APPLYCONFIG_PKG}" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
 
@@ -662,7 +662,7 @@ function codegen::clients() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go" \
-        --output-package="k8s.io/client-go" \
+        --output-pkg="k8s.io/client-go" \
         --clientset-name="kubernetes" \
         --input-base="k8s.io/api" \
         --apply-configuration-package "${APPLYCONFIG_PKG}" \
@@ -707,7 +707,7 @@ function codegen::listers() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
-        --output-package "k8s.io/client-go/listers" \
+        --output-pkg "k8s.io/client-go/listers" \
         $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
         "$@"
 
@@ -749,7 +749,7 @@ function codegen::informers() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/informers" \
-        --output-package "k8s.io/client-go/informers" \
+        --output-pkg "k8s.io/client-go/informers" \
         --single-directory \
         --versioned-clientset-package "k8s.io/client-go/kubernetes" \
         --listers-package "k8s.io/client-go/listers" \

@@ -118,7 +118,7 @@ func TargetForClientset(customArgs *clientgenargs.CustomArgs, clientsetDir, clie
 						OutputFilename: "register.go",
 					},
 					InputPackages: customArgs.GroupVersionPackages(),
-					OutputPackage: clientsetPkg,
+					OutputPkg:     clientsetPkg,
 					Groups:        customArgs.Groups,
 					GroupGoNames:  groupGoNames,
 					ImportTracker: generator.NewImportTracker(),

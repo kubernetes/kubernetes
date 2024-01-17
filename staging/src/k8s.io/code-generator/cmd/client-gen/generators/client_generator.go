@@ -255,7 +255,7 @@ NextGroup:
 						OutputFilename: "register.go",
 					},
 					InputPackages:  customArgs.GroupVersionPackages(),
-					OutputPackage:  schemePkg,
+					OutputPkg:      schemePkg,
 					OutputPath:     schemeDir,
 					Groups:         customArgs.Groups,
 					GroupGoNames:   groupGoNames,
@@ -396,7 +396,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 	}
 
 	clientsetDir := filepath.Join(customArgs.OutputDir, customArgs.ClientsetName)
-	clientsetPkg := filepath.Join(customArgs.OutputPackage, customArgs.ClientsetName)
+	clientsetPkg := filepath.Join(customArgs.OutputPkg, customArgs.ClientsetName)
 
 	var targetList []generator.Target
 

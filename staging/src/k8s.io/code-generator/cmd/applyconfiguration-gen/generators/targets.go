@@ -63,7 +63,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	customArgs := arguments.CustomArgs.(*applygenargs.CustomArgs)
 
-	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, customArgs.OutputPackage)
+	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, customArgs.OutputPkg)
 	initialTypes := customArgs.ExternalApplyConfigurations
 	refs := refGraphForReachableTypes(context.Universe, pkgTypes, initialTypes)
 	typeModels, err := newTypeModels(customArgs.OpenAPISchemaFilePath, pkgTypes)
@@ -103,13 +103,13 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 		// Apparently we allow the groupName to be overridden in a way that it
 		// no longer maps to a Go package by name.  So we have to figure out
 		// the offset of this particular output package (pkg) from the base
-		// output package (customArgs.OutputPackage).
-		pkgSubdir := strings.TrimPrefix(pkg, customArgs.OutputPackage+"/")
+		// output package (customArgs.OutputPkg).
+		pkgSubdir := strings.TrimPrefix(pkg, customArgs.OutputPkg+"/")
 
 		// generate the apply configurations
 		targetList = append(targetList,
 			targetForApplyConfigurationsPackage(
-				customArgs.OutputDir, customArgs.OutputPackage, pkgSubdir,
+				customArgs.OutputDir, customArgs.OutputPkg, pkgSubdir,
 				boilerplate, gv, toGenerate, refs, typeModels))
 
 		// group all the generated apply configurations by gv so ForKind() can be generated
@@ -133,11 +133,11 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	// generate ForKind() utility function
 	targetList = append(targetList,
-		targetForUtils(customArgs.OutputDir, customArgs.OutputPackage,
+		targetForUtils(customArgs.OutputDir, customArgs.OutputPkg,
 			boilerplate, groupVersions, applyConfigsForGroupVersion, groupGoNames))
 	// generate internal embedded schema, required for generated Extract functions
 	targetList = append(targetList,
-		targetForInternal(customArgs.OutputDir, customArgs.OutputPackage,
+		targetForInternal(customArgs.OutputDir, customArgs.OutputPkg,
 			boilerplate, typeModels))
 
 	return targetList

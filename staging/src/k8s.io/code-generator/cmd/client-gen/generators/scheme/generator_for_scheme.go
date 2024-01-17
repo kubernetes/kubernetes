@@ -32,7 +32,7 @@ import (
 // GenScheme produces a package for a clientset with the scheme, codecs and parameter codecs.
 type GenScheme struct {
 	generator.GoGenerator
-	OutputPackage   string // Must be a Go import-path
+	OutputPkg       string // Must be a Go import-path
 	OutputPath      string // optional
 	Groups          []clientgentypes.GroupVersions
 	GroupGoNames    map[clientgentypes.GroupVersion]string
@@ -45,7 +45,7 @@ type GenScheme struct {
 
 func (g *GenScheme) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.OutputPackage, g.ImportTracker),
+		"raw": namer.NewRawNamer(g.OutputPkg, g.ImportTracker),
 	}
 }
 
