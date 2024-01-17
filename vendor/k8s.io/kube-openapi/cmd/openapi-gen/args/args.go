@@ -25,8 +25,8 @@ import (
 
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
-	OutputDir     string // must be a directory path
-	OutputPackage string // must be a Go import-path
+	OutputDir string // must be a directory path
+	OutputPkg string // must be a Go import-path
 
 	// ReportFilename is added to CustomArgs for specifying name of report file used
 	// by API linter. If specified, API rule violations will be printed to report file.
@@ -56,7 +56,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.OutputDir, "output-dir", "",
 		"the base directory under which to generate results")
-	fs.StringVar(&c.OutputPackage, "output-package", "",
+	fs.StringVar(&c.OutputPkg, "output-pkg", "",
 		"the base Go import-path under which to generate results")
 	fs.StringVarP(&c.ReportFilename, "report-filename", "r", "-",
 		"Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
@@ -73,8 +73,8 @@ func Validate(genericArgs *args.GeneratorArgs) error {
 	if len(c.OutputDir) == 0 {
 		return fmt.Errorf("--output-dir must be specified")
 	}
-	if len(c.OutputPackage) == 0 {
-		return fmt.Errorf("--output-package must be specified")
+	if len(c.OutputPkg) == 0 {
+		return fmt.Errorf("--output-pkg must be specified")
 	}
 	if len(c.ReportFilename) == 0 {
 		return fmt.Errorf("--report-filename must be specified (use \"-\" for stdout)")

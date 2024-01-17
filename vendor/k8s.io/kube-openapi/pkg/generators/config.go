@@ -76,14 +76,14 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 	return []generator.Target{
 		&generator.SimpleTarget{
 			PkgName:       filepath.Base(customArgs.OutputDir),
-			PkgPath:       customArgs.OutputPackage,
+			PkgPath:       customArgs.OutputPkg,
 			PkgDir:        customArgs.OutputDir,
 			HeaderComment: header,
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newOpenAPIGen(
 						arguments.OutputFileBaseName,
-						customArgs.OutputPackage,
+						customArgs.OutputPkg,
 					),
 					newAPIViolationGen(),
 				}
