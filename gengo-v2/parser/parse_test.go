@@ -520,14 +520,14 @@ func TestAddOnePkgToUniverse(t *testing.T) {
 		if want, got := pd.PkgPath, ud.Path; want != got {
 			t.Errorf("expected .Path %q, got %q", want, got)
 		}
-		if want, got := filepath.Dir(pd.GoFiles[0]), ud.SourcePath; want != got {
-			t.Errorf("expected .SourcePath %q, got %q", want, got)
+		if want, got := filepath.Dir(pd.GoFiles[0]), ud.Dir; want != got {
+			t.Errorf("expected .Dir %q, got %q", want, got)
 		}
 		if want, got := pi.PkgPath, ui.Path; want != got {
 			t.Errorf("expected .Path %q, got %q", want, got)
 		}
-		if want, got := filepath.Dir(pi.GoFiles[0]), ui.SourcePath; want != got {
-			t.Errorf("expected .SourcePath %q, got %q", want, got)
+		if want, got := filepath.Dir(pi.GoFiles[0]), ui.Dir; want != got {
+			t.Errorf("expected .Dir %q, got %q", want, got)
 		}
 
 		// verify doc.go handling

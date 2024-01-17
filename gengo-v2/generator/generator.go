@@ -55,16 +55,16 @@ type Target interface {
 }
 
 type File struct {
-	Name              string
-	FileType          string
-	PackageName       string
-	Header            []byte
-	PackagePath       string
-	PackageSourcePath string
-	Imports           map[string]struct{}
-	Vars              bytes.Buffer
-	Consts            bytes.Buffer
-	Body              bytes.Buffer
+	Name        string
+	FileType    string
+	PackageName string
+	Header      []byte
+	PackagePath string
+	PackageDir  string
+	Imports     map[string]struct{}
+	Vars        bytes.Buffer
+	Consts      bytes.Buffer
+	Body        bytes.Buffer
 }
 
 type FileType interface {

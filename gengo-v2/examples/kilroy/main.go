@@ -124,8 +124,8 @@ func getTargets(c *generator.Context, args *Args) []generator.Target {
 
 		targets = append(targets, &generator.SimpleTarget{
 			PkgName:       pkg.Name,
-			PkgPath:       pkg.Path,       // output pkg is the same as the input
-			PkgDir:        pkg.SourcePath, // output pkg is the same as the input
+			PkgPath:       pkg.Path, // output pkg is the same as the input
+			PkgDir:        pkg.Dir,  // output pkg is the same as the input
 			HeaderComment: boilerplate,
 
 			// FilterFunc returns true if this Package cares about this type.

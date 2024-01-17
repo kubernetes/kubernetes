@@ -108,14 +108,13 @@ const (
 // templates (for example). But it is strongly encouraged for code to build by
 // using the provided functions.
 type Package struct {
-	// Canonical name of this package-- its path.
+	// Canonical import-path of this package.
 	Path string
 
-	// The location this package was loaded from
-	SourcePath string
+	// The location (on disk) of this package.
+	Dir string
 
-	// Short name of this package; the name that appears in the
-	// 'package x' line.
+	// Short name of this package, as in the 'package x' line.
 	Name string
 
 	// The comment right above the package declaration in doc.go, if any.

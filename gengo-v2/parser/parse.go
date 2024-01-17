@@ -407,7 +407,7 @@ func (p *Parser) addPkgToUniverse(pkg *packages.Package, u *types.Universe) erro
 	// This will get-or-create the Package.
 	gengoPkg := u.Package(pkgPath)
 	gengoPkg.Path = pkg.PkgPath
-	gengoPkg.SourcePath = absPath
+	gengoPkg.Dir = absPath
 
 	// If the package was not user-requested, we can stop here.
 	if !p.userRequested[pkgPath] {

@@ -92,7 +92,7 @@ func getTargets(c *generator.Context) []generator.Target {
 		targets = append(targets, &generator.SimpleTarget{
 			PkgName: pkg.Name,
 			PkgPath: pkg.Path,
-			PkgDir:  pkg.SourcePath,
+			PkgDir:  pkg.Dir,
 
 			// FilterFunc returns true if this Package cares about this type.
 			// Each Generator has its own Filter method which will be checked

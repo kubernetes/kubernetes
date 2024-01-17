@@ -193,13 +193,13 @@ func (c *Context) ExecuteTarget(tgt Target) error {
 		if f == nil {
 			// This is the first generator to reference this file, so start it.
 			f = &File{
-				Name:              g.Filename(),
-				FileType:          fileType,
-				PackageName:       tgt.Name(),
-				PackagePath:       tgt.Path(),
-				PackageSourcePath: tgt.Dir(),
-				Header:            tgt.Header(g.Filename()),
-				Imports:           map[string]struct{}{},
+				Name:        g.Filename(),
+				FileType:    fileType,
+				PackageName: tgt.Name(),
+				PackagePath: tgt.Path(),
+				PackageDir:  tgt.Dir(),
+				Header:      tgt.Header(g.Filename()),
+				Imports:     map[string]struct{}{},
 			}
 			files[f.Name] = f
 		} else if f.FileType != g.FileType() {
