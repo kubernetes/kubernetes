@@ -71,7 +71,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
 func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get config map")
 	}
