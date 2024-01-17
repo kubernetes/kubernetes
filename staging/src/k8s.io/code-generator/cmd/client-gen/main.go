@@ -40,9 +40,10 @@ func main() {
 	pflag.Parse()
 
 	// add group version package as input dirs for gengo
+	inputPkgs := []string{}
 	for _, pkg := range customArgs.Groups {
 		for _, v := range pkg.Versions {
-			genericArgs.InputDirs = append(genericArgs.InputDirs, v.Package)
+			inputPkgs = append(inputPkgs, v.Package)
 		}
 	}
 
@@ -55,6 +56,7 @@ func main() {
 		generators.DefaultNameSystem(),
 		generators.GetTargets,
 		args.StdBuildTag,
+		inputPkgs,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

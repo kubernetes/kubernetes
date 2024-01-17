@@ -138,15 +138,11 @@ function kube::codegen::gen_helpers() {
             -name zz_generated.deepcopy.go \
             | xargs -0 rm -f
 
-        local input_args=()
-        for arg in "${input_pkgs[@]}"; do
-            input_args+=("--input-dirs" "$arg")
-        done
         "${gobin}/deepcopy-gen" \
             -v "${v}" \
             --output-file zz_generated.deepcopy.go \
             --go-header-file "${boilerplate}" \
-            "${input_args[@]}"
+            "${input_pkgs[@]}"
     fi
 
     # Defaults
@@ -174,15 +170,11 @@ function kube::codegen::gen_helpers() {
             -name zz_generated.defaults.go \
             | xargs -0 rm -f
 
-        local input_args=()
-        for arg in "${input_pkgs[@]}"; do
-            input_args+=("--input-dirs" "$arg")
-        done
         "${gobin}/defaulter-gen" \
             -v "${v}" \
             --output-file zz_generated.defaults.go \
             --go-header-file "${boilerplate}" \
-            "${input_args[@]}"
+            "${input_pkgs[@]}"
     fi
 
     # Conversions
@@ -210,10 +202,6 @@ function kube::codegen::gen_helpers() {
             -name zz_generated.conversion.go \
             | xargs -0 rm -f
 
-        local input_args=()
-        for arg in "${input_pkgs[@]}"; do
-            input_args+=("--input-dirs" "$arg")
-        done
         local extra_peer_args=()
         for arg in "${extra_peers[@]:+"${extra_peers[@]}"}"; do
             extra_peer_args+=("--extra-peer-dirs" "$arg")
@@ -223,7 +211,7 @@ function kube::codegen::gen_helpers() {
             --output-file zz_generated.conversion.go \
             --go-header-file "${boilerplate}" \
             "${extra_peer_args[@]:+"${extra_peer_args[@]}"}" \
-            "${input_args[@]}"
+            "${input_pkgs[@]}"
     fi
 }
 
@@ -367,10 +355,6 @@ function kube::codegen::gen_openapi() {
             -name zz_generated.openapi.go \
             | xargs -0 rm -f
 
-        local inputs=()
-        for arg in "${input_pkgs[@]}"; do
-            inputs+=("--input-dirs" "$arg")
-        done
         "${gobin}/openapi-gen" \
             -v "${v}" \
             --output-file zz_generated.openapi.go \
@@ -378,10 +362,10 @@ function kube::codegen::gen_openapi() {
             --output-dir "${out_dir}" \
             --output-pkg "${out_pkg}" \
             --report-filename "${new_report}" \
-            --input-dirs "k8s.io/apimachinery/pkg/apis/meta/v1" \
-            --input-dirs "k8s.io/apimachinery/pkg/runtime" \
-            --input-dirs "k8s.io/apimachinery/pkg/version" \
-            "${inputs[@]}"
+            "k8s.io/apimachinery/pkg/apis/meta/v1" \
+            "k8s.io/apimachinery/pkg/runtime" \
+            "k8s.io/apimachinery/pkg/version" \
+            "${input_pkgs[@]}"
     fi
 
     touch "${report}" # in case it doesn't exist yet
@@ -604,17 +588,13 @@ function kube::codegen::gen_client() {
             || true \
         ) | xargs -0 rm -f
 
-        local inputs=()
-        for arg in "${input_pkgs[@]}"; do
-            inputs+=("--input-dirs" "$arg")
-        done
         "${gobin}/applyconfiguration-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
             --output-dir "${out_dir}/${applyconfig_subdir}" \
             --output-pkg "${applyconfig_pkg}" \
             --external-applyconfigurations "${applyconfig_external}" \
-            "${inputs[@]}"
+            "${input_pkgs[@]}"
     fi
 
     echo "Generating client code for ${#group_versions[@]} targets"
@@ -651,17 +631,13 @@ function kube::codegen::gen_client() {
             || true \
         ) | xargs -0 rm -f
 
-        local inputs=()
-        for arg in "${input_pkgs[@]}"; do
-            inputs+=("--input-dirs" "$arg")
-        done
         "${gobin}/lister-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
             --output-dir "${out_dir}/${listers_subdir}" \
             --output-pkg "${out_pkg}/${listers_subdir}" \
             --plural-exceptions "${plural_exceptions}" \
-            "${inputs[@]}"
+            "${input_pkgs[@]}"
 
         echo "Generating informer code for ${#input_pkgs[@]} targets"
 
@@ -672,10 +648,6 @@ function kube::codegen::gen_client() {
             || true \
         ) | xargs -0 rm -f
 
-        local inputs=()
-        for arg in "${input_pkgs[@]}"; do
-            inputs+=("--input-dirs" "$arg")
-        done
         "${gobin}/informer-gen" \
             -v "${v}" \
             --go-header-file "${boilerplate}" \
@@ -684,6 +656,6 @@ function kube::codegen::gen_client() {
             --versioned-clientset-package "${out_pkg}/${clientset_subdir}/${clientset_versioned_name}" \
             --listers-package "${out_pkg}/${listers_subdir}" \
             --plural-exceptions "${plural_exceptions}" \
-            "${inputs[@]}"
+            "${input_pkgs[@]}"
     fi
 }

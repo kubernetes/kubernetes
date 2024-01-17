@@ -179,7 +179,7 @@ function codegen::deepcopy() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
         --bounding-dirs "k8s.io/kubernetes,k8s.io/api" \
-        $(printf -- " -i %s" "${tag_pkgs[@]}") \
+        "${tag_pkgs[@]}" \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -310,7 +310,7 @@ function codegen::prerelease() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        $(printf -- " -i %s" "${tag_pkgs[@]}") \
+        "${tag_pkgs[@]}" \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -378,7 +378,7 @@ function codegen::defaults() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        $(printf -- " -i %s" "${tag_pkgs[@]}") \
+        "${tag_pkgs[@]}" \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -458,7 +458,7 @@ function codegen::conversions() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
-        $(printf -- " -i %s" "${tag_pkgs[@]}") \
+        "${tag_pkgs[@]}" \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -555,7 +555,7 @@ function codegen::openapi() {
         --output-dir "${output_dir}" \
         --output-pkg "${output_pkg}" \
         --report-filename "${report_file}" \
-        $(printf -- " -i %s" "${tag_pkgs[@]}") \
+        "${tag_pkgs[@]}" \
         "$@"
 
     touch "${report_file}"
@@ -610,7 +610,7 @@ function codegen::applyconfigs() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
         --output-pkg "${APPLYCONFIG_PKG}" \
-        $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
+        "${ext_apis[@]}" \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -708,7 +708,7 @@ function codegen::listers() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
         --output-pkg "k8s.io/client-go/listers" \
-        $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
+        "${ext_apis[@]}" \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -753,7 +753,7 @@ function codegen::informers() {
         --single-directory \
         --versioned-clientset-package "k8s.io/client-go/kubernetes" \
         --listers-package "k8s.io/client-go/listers" \
-        $(printf -- " --input-dirs %s" "${ext_apis[@]}") \
+        "${ext_apis[@]}" \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
