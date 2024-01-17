@@ -24,7 +24,7 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/v2/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -33,26 +33,29 @@ import (
 
 func main() {
 	klog.InitFlags(nil)
-	stdArgs, myArgs := getArgs()
+	args := &Args{}
 
 	// Collect and parse flags.
-	stdArgs.AddFlags(pflag.CommandLine)
-	myArgs.AddFlags(pflag.CommandLine)
+	args.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	if err := validateArgs(stdArgs); err != nil {
+	if err := args.Validate(); err != nil {
 		klog.ErrorS(err, "fatal error")
 		os.Exit(1)
 	}
 
+	myTargets := func(context *generator.Context) []generator.Target {
+		return getTargets(context, args)
+	}
+
 	// Run the tool.
-	if err := stdArgs.Execute(
+	if err := gengo.Execute(
 		getNameSystems(),
 		getDefaultNameSystem(),
-		getTargets,
-		args.StdBuildTag,
+		myTargets,
+		gengo.StdBuildTag,
 		pflag.Args(),
 	); err != nil {
 		klog.ErrorS(err, "fatal error")
@@ -61,41 +64,30 @@ func main() {
 	klog.V(2).InfoS("completed successfully")
 }
 
-// toolArgs is used by the gengo framework to pass args specific to this generator.
-type toolArgs struct {
+type Args struct {
 	outputFile   string
 	methodName   string
 	goHeaderFile string
 }
 
-// getArgs returns default arguments for the generator.
-func getArgs() (*args.GeneratorArgs, *toolArgs) {
-	stdArgs := args.Default()
-	toolArgs := &toolArgs{}
-	stdArgs.CustomArgs = toolArgs
-	return stdArgs, toolArgs
-}
-
 // AddFlags adds this tool's flags to the flagset.
-func (ta *toolArgs) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&ta.outputFile, "output-file", "generated.kilroy.go",
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.outputFile, "output-file", "generated.kilroy.go",
 		"the name of the file to be generated")
-	fs.StringVar(&ta.methodName, "method-name", "KilroyWasHere",
+	fs.StringVar(&args.methodName, "method-name", "KilroyWasHere",
 		"the name of the method to add")
-	fs.StringVar(&ta.goHeaderFile, "go-header-file", "",
+	fs.StringVar(&args.goHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
-// validateArgs checks the given arguments.
-func validateArgs(stdArgs *args.GeneratorArgs) error {
-	toolArgs := stdArgs.CustomArgs.(*toolArgs)
-	if len(toolArgs.outputFile) == 0 {
+// Validate checks the arguments.
+func (args *Args) Validate() error {
+	if args.outputFile == "" {
 		return fmt.Errorf("--output-file must be specified")
 	}
-	if len(toolArgs.methodName) == 0 {
+	if args.methodName == "" {
 		return fmt.Errorf("--method-name must be specified")
 	}
-
 	return nil
 }
 
@@ -115,10 +107,8 @@ func getDefaultNameSystem() string {
 // getTargets is called after the inputs have been loaded.  It is expected to
 // examine the provided context and return a list of Packages which will be
 // executed further.
-func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	toolArgs := arguments.CustomArgs.(*toolArgs)
-
-	boilerplate, err := args.GoBoilerplate(toolArgs.goHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
+func getTargets(c *generator.Context, args *Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.goHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("failed loading boilerplate: %v", err)
 	}
@@ -151,7 +141,7 @@ func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator
 			// may write to the same one).
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
-					newKilroyGenerator(toolArgs.outputFile, pkg, toolArgs.methodName),
+					newKilroyGenerator(args.outputFile, pkg, args.methodName),
 				}
 			},
 		})
