@@ -25,11 +25,11 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog/v2"
-
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
+	"k8s.io/klog/v2"
 )
 
 // genProtoIDL produces a .proto IDL.
@@ -80,7 +80,7 @@ func (g *genProtoIDL) Namers(c *generator.Context) namer.NameSystems {
 
 // Filter ignores types that are identified as not exportable.
 func (g *genProtoIDL) Filter(c *generator.Context, t *types.Type) bool {
-	tagVals := types.ExtractCommentTags("+", t.CommentLines)["protobuf"]
+	tagVals := gengo.ExtractCommentTags("+", t.CommentLines)["protobuf"]
 	if tagVals != nil {
 		if tagVals[0] == "false" {
 			// Type specified "false".
@@ -308,7 +308,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 	var alias *types.Type
 	var fields []protoField
 	options := []string{}
-	allOptions := types.ExtractCommentTags("+", b.t.CommentLines)
+	allOptions := gengo.ExtractCommentTags("+", b.t.CommentLines)
 	for k, v := range allOptions {
 		switch {
 		case strings.HasPrefix(k, "protobuf.options."):

@@ -53,7 +53,7 @@ func extractEnabledTypeTag(t *types.Type) *enabledTagValue {
 }
 
 func extractEnabledTag(comments []string) *enabledTagValue {
-	tagVals := types.ExtractCommentTags("+", comments)[tagEnabledName]
+	tagVals := gengo.ExtractCommentTags("+", comments)[tagEnabledName]
 	if tagVals == nil {
 		// No match for the tag.
 		return nil
@@ -454,7 +454,7 @@ func (g *genDeepCopy) needsGeneration(t *types.Type) bool {
 func extractInterfacesTag(t *types.Type) []string {
 	var result []string
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
-	values := types.ExtractCommentTags("+", comments)[interfacesTagName]
+	values := gengo.ExtractCommentTags("+", comments)[interfacesTagName]
 	for _, v := range values {
 		if len(v) == 0 {
 			continue
@@ -472,7 +472,7 @@ func extractInterfacesTag(t *types.Type) []string {
 
 func extractNonPointerInterfaces(t *types.Type) (bool, error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
-	values := types.ExtractCommentTags("+", comments)[interfacesNonPointerTagName]
+	values := gengo.ExtractCommentTags("+", comments)[interfacesNonPointerTagName]
 	if len(values) == 0 {
 		return false, nil
 	}

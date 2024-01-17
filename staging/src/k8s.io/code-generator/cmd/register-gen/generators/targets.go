@@ -83,7 +83,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 			// if there is a comment of the form "// +groupName=somegroup" or "// +groupName=somegroup.foo.bar.io",
 			// extract the fully qualified API group name from it and overwrite the group inferred from the package path
-			if override := types.ExtractCommentTags("+", pkg.Comments)["groupName"]; override != nil {
+			if override := gengo.ExtractCommentTags("+", pkg.Comments)["groupName"]; override != nil {
 				groupName := override[0]
 				klog.V(5).Infof("overriding the group name with = %s", groupName)
 				gv.Group = clientgentypes.Group(groupName)

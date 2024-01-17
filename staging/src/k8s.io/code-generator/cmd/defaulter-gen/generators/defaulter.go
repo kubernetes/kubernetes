@@ -65,19 +65,19 @@ const inputTagName = "k8s:defaulter-gen-input"
 const defaultTagName = "default"
 
 func extractDefaultTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[defaultTagName]
+	return gengo.ExtractCommentTags("+", comments)[defaultTagName]
 }
 
 func extractTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[tagName]
+	return gengo.ExtractCommentTags("+", comments)[tagName]
 }
 
 func extractInputTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[inputTagName]
+	return gengo.ExtractCommentTags("+", comments)[inputTagName]
 }
 
 func checkTag(comments []string, require ...string) bool {
-	values := types.ExtractCommentTags("+", comments)[tagName]
+	values := gengo.ExtractCommentTags("+", comments)[tagName]
 	if len(require) == 0 {
 		return len(values) == 1 && values[0] == ""
 	}
