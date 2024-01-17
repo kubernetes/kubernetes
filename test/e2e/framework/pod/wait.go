@@ -518,11 +518,6 @@ func WaitForPodSuccessInNamespace(ctx context.Context, c clientset.Interface, po
 	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, podStartTimeout)
 }
 
-// WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
-func WaitForPodSuccessInNamespaceSlow(ctx context.Context, c clientset.Interface, podName string, namespace string) error {
-	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, slowPodStartTimeout)
-}
-
 // WaitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.
 // Unlike `waitForPodTerminatedInNamespace`, the pod's Phase and Reason are ignored. If the pod Get
 // api returns IsNotFound then the wait stops and nil is returned. If the Get api returns an error other
