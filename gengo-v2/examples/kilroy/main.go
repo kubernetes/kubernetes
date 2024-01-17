@@ -60,13 +60,13 @@ func main() {
 
 // toolArgs is used by the gengo framework to pass args specific to this generator.
 type toolArgs struct {
+	outputFile string
 	methodName string
 }
 
 // getArgs returns default arguments for the generator.
 func getArgs() (*args.GeneratorArgs, *toolArgs) {
 	stdArgs := args.Default().WithoutDefaultFlagParsing()
-	stdArgs.OutputFileBaseName = "kilroy_generated"
 	toolArgs := &toolArgs{}
 	stdArgs.CustomArgs = toolArgs
 	return stdArgs, toolArgs
@@ -74,19 +74,20 @@ func getArgs() (*args.GeneratorArgs, *toolArgs) {
 
 // AddFlags adds this tool's flags to the flagset.
 func (ta *toolArgs) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&ta.outputFile, "output-file", "generated.kilroy.go",
+		"the name of the file to be generated")
 	fs.StringVar(&ta.methodName, "method-name", "KilroyWasHere",
-		"The name of the method to add")
+		"the name of the method to add")
 }
 
 // validateArgs checks the given arguments.
 func validateArgs(stdArgs *args.GeneratorArgs) error {
-	if len(stdArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name must be specified")
-	}
-
 	toolArgs := stdArgs.CustomArgs.(*toolArgs)
+	if len(toolArgs.outputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
+	}
 	if len(toolArgs.methodName) == 0 {
-		return fmt.Errorf("method name must be specified")
+		return fmt.Errorf("--method-name must be specified")
 	}
 
 	return nil
@@ -141,7 +142,7 @@ func getTargets(c *generator.Context, arguments *args.GeneratorArgs) []generator
 			// may write to the same one).
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
-					newKilroyGenerator(arguments.OutputFileBaseName, pkg, args.methodName),
+					newKilroyGenerator(args.outputFile, pkg, args.methodName),
 				}
 			},
 		})

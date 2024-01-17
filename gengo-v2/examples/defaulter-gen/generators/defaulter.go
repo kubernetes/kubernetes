@@ -38,6 +38,7 @@ import (
 // CustomArgs is used tby the go2idl framework to pass args specific to this
 // generator.
 type CustomArgs struct {
+	OutputFile    string
 	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
 }
 
@@ -437,7 +438,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
-						NewGenDefaulter(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, existingDefaulters, newDefaulters, peerPkgs),
+						NewGenDefaulter(customArgs.OutputFile, typesPkg.Path, pkg.Path, existingDefaulters, newDefaulters, peerPkgs),
 					}
 				},
 			})

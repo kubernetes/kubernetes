@@ -34,6 +34,7 @@ import (
 // CustomArgs is used tby the go2idl framework to pass args specific to this
 // generator.
 type CustomArgs struct {
+	OutputFile   string
 	BoundingDirs []string // Only deal with types rooted under these dirs.
 }
 
@@ -205,7 +206,7 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 					},
 					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
-							NewGenDeepCopy(arguments.OutputFileBaseName, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister),
+							NewGenDeepCopy(customArgs.OutputFile, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister),
 						}
 					},
 				})
