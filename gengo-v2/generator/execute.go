@@ -80,42 +80,6 @@ func (ft DefaultFileType) AssembleFile(f *File, pathname string) error {
 	}
 }
 
-func (ft DefaultFileType) VerifyFile(f *File, pathname string) error {
-	klog.V(5).Infof("Verifying file %q", pathname)
-
-	friendlyName := filepath.Join(f.PackageName, f.Name)
-	b := &bytes.Buffer{}
-	et := NewErrorTracker(b)
-	ft.Assemble(et, f)
-	if et.Error() != nil {
-		return et.Error()
-	}
-	formatted, err := ft.Format(b.Bytes())
-	if err != nil {
-		return fmt.Errorf("unable to format the output for %q: %v", friendlyName, err)
-	}
-	existing, err := os.ReadFile(pathname)
-	if err != nil {
-		return fmt.Errorf("unable to read file %q for comparison: %v", friendlyName, err)
-	}
-	if bytes.Equal(formatted, existing) {
-		return nil
-	}
-	// Be nice and find the first place where they differ
-	i := 0
-	for i < len(formatted) && i < len(existing) && formatted[i] == existing[i] {
-		i++
-	}
-	eDiff, fDiff := existing[i:], formatted[i:]
-	if len(eDiff) > 100 {
-		eDiff = eDiff[:100]
-	}
-	if len(fDiff) > 100 {
-		fDiff = fDiff[:100]
-	}
-	return fmt.Errorf("output for %q differs; first existing/expected diff: \n  %q\n  %q", friendlyName, string(eDiff), string(fDiff))
-}
-
 func assembleGolangFile(w io.Writer, f *File) {
 	w.Write(f.Header)
 	fmt.Fprintf(w, "package %v\n\n", f.PackageName)
@@ -210,10 +174,8 @@ func (c *Context) ExecuteTarget(tgt Target) error {
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(tgt.Filter)
 
-	if !c.Verify {
-		if err := os.MkdirAll(tgtDir, 0755); err != nil {
-			return err
-		}
+	if err := os.MkdirAll(tgtDir, 0755); err != nil {
+		return err
 	}
 
 	files := map[string]*File{}
@@ -277,13 +239,7 @@ func (c *Context) ExecuteTarget(tgt Target) error {
 		if !ok {
 			return fmt.Errorf("the file type %q registered for file %q does not exist in the context", f.FileType, f.Name)
 		}
-		var err error
-		if c.Verify {
-			err = assembler.VerifyFile(f, finalPath)
-		} else {
-			err = assembler.AssembleFile(f, finalPath)
-		}
-		if err != nil {
+		if err := assembler.AssembleFile(f, finalPath); err != nil {
 			errs = append(errs, err)
 		}
 	}

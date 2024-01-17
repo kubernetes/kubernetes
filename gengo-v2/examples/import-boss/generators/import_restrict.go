@@ -143,10 +143,6 @@ type importRuleFile struct {
 	context *generator.Context
 }
 
-func (irf importRuleFile) AssembleFile(f *generator.File, path string) error {
-	return irf.VerifyFile(f, path)
-}
-
 // TODO: make a flag to enable this, or expose this information in some other way.
 func (importRuleFile) listEntireImportTree(f *generator.File, path string) error {
 	// If the file exists, populate its current imports. This is mostly to help
@@ -212,7 +208,7 @@ func recursiveRead(path string) ([]*fileFormat, error) {
 	return restrictionFiles, nil
 }
 
-func (irf importRuleFile) VerifyFile(f *generator.File, path string) error {
+func (irf importRuleFile) AssembleFile(f *generator.File, path string) error {
 	restrictionFiles, err := recursiveRead(filepath.Join(f.PackageSourcePath, f.Name))
 	if err != nil {
 		return fmt.Errorf("error finding rules file: %v", err)

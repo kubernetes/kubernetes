@@ -193,4 +193,3 @@ type nullFile struct{}
 var _ generator.FileType = nullFile{}
 
 func (nullFile) AssembleFile(*generator.File, string) error { return nil }
-func (nullFile) VerifyFile(*generator.File, string) error   { return nil }
