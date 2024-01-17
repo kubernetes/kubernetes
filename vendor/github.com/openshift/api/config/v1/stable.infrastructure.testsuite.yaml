@@ -12,6 +12,176 @@ tests:
       apiVersion: config.openshift.io/v1
       kind: Infrastructure
       spec: {}
+  - name: Should be able to pass 2 IP addresses to apiServerInternalIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            apiServerInternalIPs:
+              - 192.0.2.1
+              - "2001:db8::1"
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            apiServerInternalIPs:
+              - 192.0.2.1
+              - "2001:db8::1"
+  - name: Should not be able to pass not-an-IP to apiServerInternalIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            apiServerInternalIPs:
+              - not-an-ip-address
+    expectedError: "Invalid value: \"not-an-ip-address\""
+  - name: Should not be able to pass 2 IPv4 addresses to apiServerInternalIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            apiServerInternalIPs:
+              - 192.0.2.1
+              - 192.0.2.2
+    expectedError: "apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
+  - name: Should not be able to pass 2 IPv6 addresses to apiServerInternalIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            apiServerInternalIPs:
+              - "2001:db8::1"
+              - "2001:db8::2"
+    expectedError: "apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
+  - name: Should not be able to pass more than 2 entries to apiServerInternalIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            apiServerInternalIPs:
+              - 192.0.2.1
+              - "2001:db8::1"
+              - 192.0.2.2
+    expectedError: "Too many: 3: must have at most 2 items"
+  - name: Should be able to pass 2 IP addresses to ingressIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            ingressIPs:
+              - 192.0.2.1
+              - "2001:db8::1"
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            ingressIPs:
+              - 192.0.2.1
+              - "2001:db8::1"
+  - name: Should not be able to pass not-an-IP to ingressIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            ingressIPs:
+              - not-an-ip-address
+    expectedError: "Invalid value: \"not-an-ip-address\""
+  - name: Should not be able to pass 2 IPv4 addresses to ingressIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            ingressIPs:
+              - 192.0.2.1
+              - 192.0.2.2
+    expectedError: "ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
+  - name: Should not be able to pass 2 IPv6 addresses to ingressIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            ingressIPs:
+              - "2001:db8::1"
+              - "2001:db8::2"
+    expectedError: "ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
+  - name: Should not be able to pass more than 2 entries to ingressIPs in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            ingressIPs:
+              - 192.0.2.1
+              - "2001:db8::1"
+              - 192.0.2.2
+    expectedError: "Too many: 3: must have at most 2 items"
+  - name: Should be able to pass 2 IP subnets addresses to machineNetworks in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            machineNetworks:
+              - "192.0.2.0/24"
+              - "2001:db8::0/32"
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            machineNetworks:
+              - "192.0.2.0/24"
+              - "2001:db8::0/32"
+  - name: Should not be able to pass not-a-CIDR to machineNetworks in the platform spec
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec:
+        platformSpec:
+          type: BareMetal
+          baremetal:
+            machineNetworks:
+              - 192.0.2.1
+    expectedError: "Invalid value: \"192.0.2.1\""
   onUpdate:
     - name: Should be able to change External platformName from unknown to something else
       initial: |

@@ -84,6 +84,7 @@ const (
 	IBMVPCBlockCSIDriver     CSIDriverName = "vpc.block.csi.ibm.io"
 	IBMPowerVSBlockCSIDriver CSIDriverName = "powervs.csi.ibm.com"
 	SecretsStoreCSIDriver    CSIDriverName = "secrets-store.csi.k8s.io"
+	SambaCSIDriver           CSIDriverName = "smb.csi.k8s.io"
 )
 
 // ClusterCSIDriverSpec is the desired behavior of CSI driver operator

@@ -130,6 +130,8 @@ type AuthenticationList struct {
 	Items []Authentication `json:"items"`
 }
 
+// +openshift:validation:FeatureSetAwareEnum:featureSet=Default,enum="";None;IntegratedOAuth
+// +openshift:validation:FeatureSetAwareEnum:featureSet=CustomNoUpgrade;TechPreviewNoUpgrade,enum="";None;IntegratedOAuth;OIDC
 type AuthenticationType string
 
 const (

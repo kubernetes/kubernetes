@@ -213,7 +213,7 @@ message RouteIngress {
 // router.
 message RouteIngressCondition {
   // Type is the type of the condition.
-  // Currently only Admitted.
+  // Currently only Admitted or UnservableInFutureVersions.
   optional string type = 1;
 
   // Status is the status of the condition.
