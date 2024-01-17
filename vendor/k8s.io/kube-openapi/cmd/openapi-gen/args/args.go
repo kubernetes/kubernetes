@@ -20,65 +20,58 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/v2/args"
 )
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
+type Args struct {
 	OutputDir  string // must be a directory path
 	OutputPkg  string // must be a Go import-path
 	OutputFile string
 
 	GoHeaderFile string
 
-	// ReportFilename is added to CustomArgs for specifying name of report file used
+	// ReportFilename is added to Args for specifying name of report file used
 	// by API linter. If specified, API rule violations will be printed to report file.
 	// Otherwise default value "-" will be used which indicates stdout.
 	ReportFilename string
 }
 
-// NewDefaults returns default arguments for the generator. Returning the arguments instead
+// New returns default arguments for the generator. Returning the arguments instead
 // of using default flag parsing allows registering custom arguments afterwards
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	// Default() sets a couple of flag default values for example the boilerplate.
-	genericArgs := args.Default()
-	customArgs := &CustomArgs{}
-	genericArgs.CustomArgs = customArgs
+func New() *Args {
+	args := &Args{}
 
 	// Default value for report filename is "-", which stands for stdout
-	customArgs.ReportFilename = "-"
+	args.ReportFilename = "-"
 
-	return genericArgs, customArgs
+	return args
 }
 
 // AddFlags add the generator flags to the flag set.
-func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&c.OutputDir, "output-dir", "",
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputDir, "output-dir", "",
 		"the base directory under which to generate results")
-	fs.StringVar(&c.OutputPkg, "output-pkg", "",
+	fs.StringVar(&args.OutputPkg, "output-pkg", "",
 		"the base Go import-path under which to generate results")
-	fs.StringVar(&c.OutputFile, "output-file", "generated.openapi.go",
+	fs.StringVar(&args.OutputFile, "output-file", "generated.openapi.go",
 		"the name of the file to be generated")
-	fs.StringVar(&c.GoHeaderFile, "go-header-file", "",
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
-	fs.StringVarP(&c.ReportFilename, "report-filename", "r", "-",
+	fs.StringVarP(&args.ReportFilename, "report-filename", "r", "-",
 		"Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	c := genericArgs.CustomArgs.(*CustomArgs)
-
-	if len(c.OutputDir) == 0 {
+func (args *Args) Validate() error {
+	if len(args.OutputDir) == 0 {
 		return fmt.Errorf("--output-dir must be specified")
 	}
-	if len(c.OutputPkg) == 0 {
+	if len(args.OutputPkg) == 0 {
 		return fmt.Errorf("--output-pkg must be specified")
 	}
-	if len(c.OutputFile) == 0 {
+	if len(args.OutputFile) == 0 {
 		return fmt.Errorf("--output-file must be specified")
 	}
-	if len(c.ReportFilename) == 0 {
+	if len(args.ReportFilename) == 0 {
 		return fmt.Errorf("--report-filename must be specified (use \"-\" for stdout)")
 	}
 	return nil

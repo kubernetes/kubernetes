@@ -19,13 +19,12 @@ package generators
 import (
 	"path/filepath"
 
-	"k8s.io/gengo/v2/args"
+	gengo "k8s.io/gengo/v2/args"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
-
-	generatorargs "k8s.io/kube-openapi/cmd/openapi-gen/args"
+	"k8s.io/kube-openapi/cmd/openapi-gen/args"
 )
 
 type identityNamer struct{}
@@ -50,17 +49,15 @@ func DefaultNameSystem() string {
 	return "sorting_namer"
 }
 
-func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []generator.Target {
-	customArgs := arguments.CustomArgs.(*generatorargs.CustomArgs)
-
-	boilerplate, err := args.GoBoilerplate(customArgs.GoHeaderFile, args.StdBuildTag, args.StdGeneratedBy)
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	reportPath := "-"
-	if customArgs.ReportFilename != "" {
-		reportPath = customArgs.ReportFilename
+	if args.ReportFilename != "" {
+		reportPath = args.ReportFilename
 	}
 	context.FileTypes[apiViolationFileType] = apiViolationFile{
 		unmangledPath: reportPath,
@@ -68,15 +65,15 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 
 	return []generator.Target{
 		&generator.SimpleTarget{
-			PkgName:       filepath.Base(customArgs.OutputDir),
-			PkgPath:       customArgs.OutputPkg,
-			PkgDir:        customArgs.OutputDir,
+			PkgName:       filepath.Base(args.OutputDir),
+			PkgPath:       args.OutputPkg,
+			PkgDir:        args.OutputDir,
 			HeaderComment: boilerplate,
 			GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newOpenAPIGen(
-						customArgs.OutputFile,
-						customArgs.OutputPkg,
+						args.OutputFile,
+						args.OutputPkg,
 					),
 					newAPIViolationGen(),
 				}
