@@ -26,7 +26,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators"
 	"k8s.io/code-generator/pkg/util"
-	gengo "k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 )
 
