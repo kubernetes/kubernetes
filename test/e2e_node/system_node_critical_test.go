@@ -41,7 +41,6 @@ var _ = SIGDescribe("SystemNodeCriticalPod", framework.WithSlow(), framework.Wit
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
-
 	ginkgo.AfterEach(func() {
 		if framework.TestContext.PrepullImages {
 			// The test may cause the prepulled images to be evicted,
@@ -70,14 +69,19 @@ var _ = SIGDescribe("SystemNodeCriticalPod", framework.WithSlow(), framework.Wit
 			ns := kubeapi.NamespaceSystem
 
 			ginkgo.BeforeEach(func(ctx context.Context) {
-				ginkgo.By("create a static system-node-critical pod")
+				summary := eventuallyGetSummary(ctx)
+				availableBytesImageFs := *(summary.Node.Runtime.ImageFs.AvailableBytes)
+
+				// Compute upper limit for static pods
+				// the upper limit is (iterations)=  AvailableBytes / 10485760
+				iterations := int(availableBytesImageFs / 10485760)
+				ginkgo.By(fmt.Sprintf("create a static system-node-critical pod with %d iterations", iterations))
 				staticPodName = "static-disk-hog-" + string(uuid.NewUUID())
 				mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 				podPath = kubeletCfg.StaticPodPath
 				// define a static pod consuming disk gradually
-				// the upper limit is 1024 (iterations) * 10485760 bytes (10MB) = 10GB
 				err := createStaticSystemNodeCriticalPod(
-					podPath, staticPodName, ns, busyboxImage, v1.RestartPolicyNever, 1024,
+					podPath, staticPodName, ns, busyboxImage, v1.RestartPolicyNever, iterations,
 					"dd if=/dev/urandom of=file${i} bs=10485760 count=1 2>/dev/null; sleep .1;",
 				)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
