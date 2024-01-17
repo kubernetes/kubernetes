@@ -42,7 +42,7 @@ var SimpleNameGenerator NameGenerator = simpleNameGenerator{}
 const (
 	// TODO: make this flexible for non-core resources with alternate naming rules.
 	maxNameLength          = 63
-	randomLength           = 5
+	randomLength           = 1
 	MaxGeneratedNameLength = maxNameLength - randomLength
 )
 

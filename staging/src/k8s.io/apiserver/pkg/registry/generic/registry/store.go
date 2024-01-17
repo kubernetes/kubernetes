@@ -392,17 +392,13 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 // finishNothing is a do-nothing FinishFunc.
 func finishNothing(context.Context, bool) {}
 
+const maxGenerateNameRetries = 10
+
 // Create inserts a new item according to the unique key from the object.
 // Note that registries may mutate the input object (e.g. in the strategy
 // hooks).  Tests which call this might want to call DeepCopy if they expect to
 // be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	// TODO: The second most obvious place to handle generated name conflicts
-	// would be with a retry loop of this Create function.
-	// Pros:
-	// - only need to retry in the rare case of a conflict
-	// Cons:
-	// - need to rerun all of admission, which may invalidate a lot of system assumptions
 	var finishCreate FinishFunc = finishNothing
 
 	// Init metadata as early as possible.
@@ -411,29 +407,27 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	} else {
 		rest.FillObjectMetaSystemFields(objectMeta)
 		if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
-			// TODO: the most obvious place to check if the generated name is already
-			// claimed is here.
-			// Pros:
-			// - If it is claimed, its cheap and easy to claim another one and retry
-			// Cons:
-			// - Requires an additional request to storage for ALL creates that use generateName
-			// TODO: This could be mitigated by:
-			// - only checking the watch cache (this is tricky to do though...)
-			// - maintaining known names in a set or bloom filter
+			// Generate a name and check if the name conflicts with an
+			// existing resource.  If the name conflicts, retry generating
+			// a different name and checking it until max retries is exceeded.
 			foundNonConflict := false
 			var name string
-			for i := 0; i < 10 && !foundNonConflict; i++ {
+			for i := 0; i < maxGenerateNameRetries && !foundNonConflict; i++ {
+				klog.V(1).Infof("Generating name, attempt: %d", i)
 				name = e.CreateStrategy.GenerateName(objectMeta.GetGenerateName())
 				key, err := e.KeyFunc(ctx, name)
 				if err != nil {
+					klog.V(1).Infof("Generate name error: %v", err)
 					return nil, err
 				}
 				exists, err := e.Storage.Exists(ctx, key)
 				if err != nil {
+					klog.V(1).Infof("Generate name exists check error: %v", err)
 					return nil, err
 				}
 				foundNonConflict = !exists
 			}
+			klog.V(1).Infof("Generated name: %s, foundNonConflict: %t", name, foundNonConflict)
 			objectMeta.SetName(name)
 		}
 	}
