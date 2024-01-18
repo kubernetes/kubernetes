@@ -1100,17 +1100,17 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   cat <<EOF
 
   export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
-  cluster/kubectl.sh
+  hack/kubectl.sh
 
 Alternatively, you can write to the default kubeconfig:
 
   export KUBERNETES_PROVIDER=local
 
-  cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-  cluster/kubectl.sh config set-credentials myself ${AUTH_ARGS}
-  cluster/kubectl.sh config set-context local --cluster=local --user=myself
-  cluster/kubectl.sh config use-context local
-  cluster/kubectl.sh
+  hack/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
+  hack/kubectl.sh config set-credentials myself ${AUTH_ARGS}
+  hack/kubectl.sh config set-context local --cluster=local --user=myself
+  hack/kubectl.sh config use-context local
+  hack/kubectl.sh
 EOF
 else
   cat <<EOF
