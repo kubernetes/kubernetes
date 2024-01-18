@@ -317,7 +317,7 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationMemoryBackedVolumeEviction", f
 })
 
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
-var _ = SIGDescribe("SeparateDiskTest LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolation, nodefeature.Eviction, func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolation, nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	evictionTestTimeout := 10 * time.Minute
@@ -430,7 +430,7 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), fram
 // PriorityLocalStorageEvictionOrdering tests that the node responds to node disk pressure by evicting pods.
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
-var _ = SIGDescribe("SeparateDiskTest PriorityLocalStorageEvictionOrdering", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("priority-disk-eviction-ordering-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeDiskPressure
