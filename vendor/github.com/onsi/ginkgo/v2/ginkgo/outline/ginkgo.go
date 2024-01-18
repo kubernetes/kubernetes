@@ -1,10 +1,11 @@
 package outline
 
 import (
-	"github.com/onsi/ginkgo/v2/types"
 	"go/ast"
 	"go/token"
 	"strconv"
+
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 const (
