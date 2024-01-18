@@ -19,6 +19,7 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -346,7 +347,13 @@ func GetConfigMapWithShortRetry(client clientset.Interface, namespace, name stri
 			if err == nil {
 				return true, nil
 			}
-			lastError = err
+			// If some code is about to go over the context deadline, "x/time/rate/rate.go" would return
+			// and untyped error with the string "would exceed context deadline". If some code already exceeded
+			// the deadline the error would be of type DeadlineExceeded. Ignore such context errors and only store
+			// API and connectivity errors.
+			if !strings.Contains(err.Error(), "would exceed context deadline") && !errors.Is(err, context.DeadlineExceeded) {
+				lastError = err
+			}
 			return false, nil
 		})
 	if err == nil {
