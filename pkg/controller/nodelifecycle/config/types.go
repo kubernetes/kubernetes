@@ -37,6 +37,6 @@ type NodeLifecycleControllerConfiguration struct {
 	// LargeClusterSizeThreshold is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
 	LargeClusterSizeThreshold int32
 	// UnhealthyZoneThreshold defines the threshold at which a zone is treated as unhealthy in NodeEvictionRate and SecondaryNodeEvictionRate.
-	// It occurs when at least UnhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
+	// This threshold value is compared to the fraction of nodes in the zone that are NotReady (minimum 3)
 	UnhealthyZoneThreshold float32
 }
