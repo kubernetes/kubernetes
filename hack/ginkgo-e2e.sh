@@ -51,7 +51,7 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 # make DBG=1 WHAT=test/e2e/e2e.test
 E2E_TEST_DEBUG_TOOL=${E2E_TEST_DEBUG_TOOL:-}
 
-: "${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}"
+: "${KUBECTL:="${KUBE_ROOT}/hack/kubectl.sh"}"
 : "${KUBE_CONFIG_FILE:="config-test.sh"}"
 
 export KUBECTL KUBE_CONFIG_FILE
@@ -62,13 +62,13 @@ function detect-master-from-kubeconfig() {
     export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
     local cc
-    cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+    cc=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.current-context}")
     if [[ -n "${KUBE_CONTEXT:-}" ]]; then
       cc="${KUBE_CONTEXT}"
     fi
     local cluster
-    cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
-    KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
+    cluster=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
+    KUBE_MASTER_URL=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
 }
 
 # ---- Do cloud-provider-specific setup

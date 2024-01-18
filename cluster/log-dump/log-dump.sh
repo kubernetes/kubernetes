@@ -566,7 +566,7 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${manifest_yaml}"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
-  KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+  KUBECTL="${KUBE_ROOT}/hack/kubectl.sh"
   if ! "${KUBECTL}" create -f "${manifest_yaml}"; then
     echo 'Failed to create logexporter daemonset.. falling back to logdump through SSH'
     "${KUBECTL}" delete namespace "${logexporter_namespace}" || true

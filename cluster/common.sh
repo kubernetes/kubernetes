@@ -67,7 +67,7 @@ export KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][
 #   CA_CERT
 function create-kubeconfig() {
   KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local kubectl="${KUBE_ROOT}/hack/kubectl.sh"
   SECONDARY_KUBECONFIG=${SECONDARY_KUBECONFIG:-}
   OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
 
@@ -151,7 +151,7 @@ function clear-kubeconfig() {
       CONTEXT=$OVERRIDE_CONTEXT
   fi
 
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local kubectl="${KUBE_ROOT}/hack/kubectl.sh"
   # Unset the current-context before we delete it, as otherwise kubectl errors.
   local cc
   cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
@@ -181,12 +181,12 @@ function get-kubeconfig-basicauth() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
   local cc
-  cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+  cc=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.current-context}")
   if [[ -n "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
   local user
-  user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  user=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
   get-kubeconfig-user-basicauth "${user}"
 
   if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
@@ -210,8 +210,8 @@ function get-kubeconfig-basicauth() {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-kubeconfig-user-basicauth() {
-  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.username}")
-  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.password}")
+  KUBE_USER=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.username}")
+  KUBE_PASSWORD=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.password}")
 }
 
 # Generate basic auth user and password.
@@ -238,13 +238,13 @@ function get-kubeconfig-bearertoken() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
   local cc
-  cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+  cc=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.current-context}")
   if [[ -n "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
   local user
-  user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
-  KUBE_BEARER_TOKEN=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.token}")
+  user=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  KUBE_BEARER_TOKEN=$("${KUBE_ROOT}/hack/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.token}")
 }
 
 # Generate bearer token.
@@ -507,7 +507,7 @@ EOF
 # If KUBERNETES_SKIP_CONFIRM is set to y, we'll automatically download binaries
 # without prompting.
 function verify-kube-binaries() {
-  if ! "${KUBE_ROOT}/cluster/kubectl.sh" version --client >&/dev/null; then
+  if ! "${KUBE_ROOT}/hack/kubectl.sh" version --client >&/dev/null; then
     echo "!!! kubectl appears to be broken or missing"
     download-release-binaries
   fi

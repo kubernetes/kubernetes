@@ -91,7 +91,7 @@ func (tk *TestKubeconfig) KubectlCmd(args ...string) *exec.Cmd {
 	}
 	kubectlArgs := append(defaultArgs, args...)
 
-	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
+	//We allow users to specify path to kubectl, so you can test either "kubectl" or "hack/kubectl.sh"
 	//and so on.
 	cmd := exec.Command(tk.KubectlPath, kubectlArgs...)
 

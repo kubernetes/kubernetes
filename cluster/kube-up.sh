@@ -73,7 +73,7 @@ if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
 fi
 
 echo -e "Done, listing cluster services:\n" >&2
-"${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
+"${KUBE_ROOT}/hack/kubectl.sh" cluster-info
 echo
 
 exit 0

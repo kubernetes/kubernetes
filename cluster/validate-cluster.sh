@@ -36,7 +36,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 # Run kubectl and retry upon failure.
 function kubectl_retry() {
   tries=3
-  while ! "${KUBE_ROOT}/cluster/kubectl.sh" "$@"; do
+  while ! "${KUBE_ROOT}/hack/kubectl.sh" "$@"; do
     tries=$((tries-1))
     if [[ ${tries} -le 0 ]]; then
       echo "('kubectl $*' failed, giving up)" >&2

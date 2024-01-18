@@ -31,7 +31,6 @@ set -o pipefail
 
 
 KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
-source "${KUBE_ROOT}/cluster/kube-util.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 
@@ -62,16 +61,6 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
   exit 1
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
-
-if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
-  detect-project &> /dev/null
-elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
-  detect-master > /dev/null
-  config=(
-    "--server=http://${KUBE_MASTER_IP}:8080"
-  )
-fi
-
 
 if false; then
   # disable these debugging messages by default
