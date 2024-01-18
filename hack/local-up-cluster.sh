@@ -127,7 +127,20 @@ DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
 # START_MODE can be 'all', 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
-START_MODE=${START_MODE:-"all"}
+if [[ -z "${START_MODE:-}" ]]; then
+    case "$(uname -s)" in
+      Darwin)
+        START_MODE=nokubelet,nokubeproxy
+        ;;
+      Linux)
+        START_MODE=all
+        ;;
+      *)
+        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+        exit 1
+        ;;
+    esac
+fi
 
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
@@ -189,7 +202,14 @@ do
 done
 
 if [ -z "${GO_OUT}" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
+    binaries_to_build="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kube-scheduler"
+    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
+      binaries_to_build="${binaries_to_build} cmd/kubelet"
+    fi
+    if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
+      binaries_to_build="${binaries_to_build} cmd/kube-proxy"
+    fi
+    make -C "${KUBE_ROOT}" WHAT="${binaries_to_build}"
 else
     echo "skipped the build because GO_OUT was set (${GO_OUT})"
 fi
