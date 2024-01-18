@@ -20,7 +20,7 @@ package options
 // This should probably be part of some configuration fed into the build for a
 // given binary target.
 import (
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
+	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	// Admission policies
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"

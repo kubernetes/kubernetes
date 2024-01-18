@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package validating
 
 import (
 	"context"
@@ -37,9 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
-	celmetrics "k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/internal/generic"
+	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/validating/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/validatingadmissionpolicy/matching"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/warning"
