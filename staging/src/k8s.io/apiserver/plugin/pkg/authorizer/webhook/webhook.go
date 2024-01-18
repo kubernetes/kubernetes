@@ -359,6 +359,9 @@ type subjectAccessReviewV1Client struct {
 func (t *subjectAccessReviewV1Client) Create(ctx context.Context, subjectAccessReview *authorizationv1.SubjectAccessReview, opts metav1.CreateOptions) (result *authorizationv1.SubjectAccessReview, statusCode int, err error) {
 	result = &authorizationv1.SubjectAccessReview{}
 
+	ctx, cancel := context.WithTimeout(ctx, 5000*time.Millisecond)
+	defer cancel()
+
 	restResult := t.client.Post().
 		Resource("subjectaccessreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
