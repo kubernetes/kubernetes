@@ -29,8 +29,6 @@ KUBECTL_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/kubectl && echo $(LOCAL_OUTPUT
 E2E_TEST_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/e2e.test && echo $(LOCAL_OUTPUT_PATH)/e2e.test || echo $(DOCKERIZED_OUTPUT_PATH)/e2e.test)
 E2E_GO_RUNNER_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/go-runner && echo $(LOCAL_OUTPUT_PATH)/go-runner || echo $(DOCKERIZED_OUTPUT_PATH)/go-runner)
 
-CLUSTER_DIR?=$(shell pwd)/../../../cluster/
-
 # This is defined in root Makefile, but some build contexts do not refer to them
 KUBE_BASE_IMAGE_REGISTRY?=registry.k8s.io
 BASE_IMAGE_VERSION?=bookworm-v1.0.0
@@ -51,7 +49,6 @@ endif
 	cp ${KUBECTL_BIN} ${TEMP_DIR}
 	cp ${E2E_TEST_BIN} ${TEMP_DIR}
 	cp ${E2E_GO_RUNNER_BIN} ${TEMP_DIR}/gorunner
-	cp -r ${CLUSTER_DIR} ${TEMP_DIR}/cluster
 
 	chmod a+rx ${TEMP_DIR}/ginkgo
 	chmod a+rx ${TEMP_DIR}/kubectl

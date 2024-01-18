@@ -20,8 +20,6 @@ dependencies:
   - name: "cni"
     version: 1.4.0
     refPaths:
-    - path: cluster/gce/config-common.sh
-      match: WINDOWS_CNI_VERSION=
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CNI_VERSION=
     - path: test/e2e_node/remote/utils.go
@@ -200,8 +198,6 @@ dependencies:
   - name: "registry.k8s.io/pause: dependents"
     version: 3.9
     refPaths:
-    - path: cluster/gce/config-common.sh
-      match: registry.k8s.io\/pause:\d+\.\d+
     - path: cluster/gce/gci/configure-helper.sh
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: cluster/gce/windows/smoke-test.sh

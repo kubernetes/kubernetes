@@ -15,7 +15,6 @@
 ARG RUNNERIMAGE
 FROM ${RUNNERIMAGE}
 
-COPY cluster /kubernetes/cluster
 COPY ginkgo /usr/local/bin/
 COPY e2e.test /usr/local/bin/
 COPY kubectl /usr/local/bin/

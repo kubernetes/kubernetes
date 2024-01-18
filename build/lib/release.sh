@@ -46,7 +46,6 @@ function kube::release::package_tarballs() {
   mkdir -p "${RELEASE_TARS}"
   kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
-  kube::release::package_kube_manifests_tarball &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   # _node and _server tarballs depend on _src tarball
@@ -380,46 +379,6 @@ function kube::release::create_docker_images_for_server() {
 
 }
 
-# This will pack kube-system manifests files for distros such as COS.
-function kube::release::package_kube_manifests_tarball() {
-  kube::log::status "Building tarball: manifests"
-
-  local src_dir="${KUBE_ROOT}/cluster/gce/manifests"
-
-  local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
-  rm -rf "${release_stage}"
-
-  local dst_dir="${release_stage}/gci-trusty"
-  mkdir -p "${dst_dir}"
-  cp "${src_dir}/kube-proxy.manifest" "${dst_dir}/"
-  cp "${src_dir}/cluster-autoscaler.manifest" "${dst_dir}/"
-  cp "${src_dir}/etcd.manifest" "${dst_dir}"
-  cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
-  cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
-  cp "${src_dir}/konnectivity-server.yaml" "${dst_dir}"
-  cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
-  cp "${src_dir}/cloud-controller-manager.manifest" "${dst_dir}"
-  cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
-  cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
-  cp "${src_dir}/glbc.manifest" "${dst_dir}"
-  find "${src_dir}" -name 'internal-*' -exec cp {} "${dst_dir}" \;
-  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
-  if [[ -e "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
-    cp "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
-  fi
-  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
-  # Merge GCE-specific addons with general purpose addons.
-  for d in cluster/addons cluster/gce/addons; do
-    find "${KUBE_ROOT}/${d}" \( \( -name \*.yaml -o -name \*.yaml.in -o -name \*.json \) -a ! \( -name \*demo\* \) \) -print0 | "${TAR}" c --transform "s|${KUBE_ROOT#/*}/${d}||" --null -T - | "${TAR}" x -C "${dst_dir}"
-  done
-
-  kube::release::clean_cruft
-
-  local package_name="${RELEASE_TARS}/kubernetes-manifests.tar.gz"
-  kube::release::create_tarball "${package_name}" "${release_stage}/.."
-}
-
 # Builds tarballs for each test platform containing the appropriate binaries.
 function kube::release::package_test_platform_tarballs() {
   local platform
@@ -508,9 +467,6 @@ Client binaries are no longer included in the Kubernetes final tarball.
 
 Run cluster/get-kube-binaries.sh to download client and server binaries.
 EOF
-
-  # We want everything in /cluster.
-  cp -R "${KUBE_ROOT}/cluster" "${release_stage}/"
 
   mkdir -p "${release_stage}/server"
   cp "${RELEASE_TARS}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
