@@ -94,17 +94,23 @@ func (l *tlogger) Error(err error, msg string, kvList ...interface{}) {
 func (l *tlogger) print(err error, s severity.Severity, msg string, kvList []interface{}) {
 	// Determine caller.
 	// +1 for this frame, +1 for Info/Error.
-	_, file, line, ok := runtime.Caller(l.callDepth + 2)
-	if !ok {
+	skip := l.callDepth + 2
+	file, line := l.config.co.unwind(skip)
+	if file == "" {
 		file = "???"
 		line = 1
-	} else {
-		if slash := strings.LastIndex(file, "/"); slash >= 0 {
-			file = file[slash+1:]
-		}
+	} else if slash := strings.LastIndex(file, "/"); slash >= 0 {
+		file = file[slash+1:]
 	}
-
 	l.printWithInfos(file, line, time.Now(), err, s, msg, kvList)
+}
+
+func runtimeBacktrace(skip int) (string, int) {
+	_, file, line, ok := runtime.Caller(skip + 1)
+	if !ok {
+		return "", 0
+	}
+	return file, line
 }
 
 func (l *tlogger) printWithInfos(file string, line int, now time.Time, err error, s severity.Severity, msg string, kvList []interface{}) {

@@ -10,7 +10,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
-	k8s.io/klog/v2 v2.120.0
+	k8s.io/klog/v2 v2.120.1
 	k8s.io/kube-openapi v0.0.0-20231113174909-778a5567bc1e
 )
 
