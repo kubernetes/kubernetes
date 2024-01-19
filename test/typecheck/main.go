@@ -294,11 +294,7 @@ func main() {
 			}()
 
 			f := false
-			if len(args) != 0 {
-				serialFprintf(os.Stdout, "type-checking %s against %s\n", plat, args)
-			} else {
-				serialFprintf(os.Stdout, "type-checking %s\n", plat)
-			}
+			serialFprintf(os.Stdout, "type-checking %s\n", plat)
 			errors, err := c.verify(plat)
 			if err != nil {
 				serialFprintf(os.Stderr, "ERROR(%s): failed to verify: %v\n", plat, err)
