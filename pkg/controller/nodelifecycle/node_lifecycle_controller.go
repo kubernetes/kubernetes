@@ -623,6 +623,11 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 				return false, 50 * time.Millisecond
 			}
 			_, condition := controllerutil.GetNodeCondition(&node.Status, v1.NodeReady)
+			if condition == nil {
+				logger.Info("Failed to get NodeCondition from the node status", "node", klog.KRef("", value.Value))
+				// retry in 50 millisecond
+				return false, 50 * time.Millisecond
+			}
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
 			oppositeTaint := v1.Taint{}
