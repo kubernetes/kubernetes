@@ -18,6 +18,7 @@ package userns
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -359,4 +360,39 @@ func TestRecordMaxPods(t *testing.T) {
 	// The next allocation should fail, hitting maxPods.
 	err = m.record(types.UID(fmt.Sprintf("%d", maxPods+1)), uint32((maxPods+1)*65536), 65536)
 	assert.Error(t, err)
+}
+
+type failingUserNsPodsManager struct {
+	testUserNsPodsManager
+}
+
+func (m *failingUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
+	return nil, os.ErrPermission
+}
+
+func TestMakeUserNsManagerFailsListPod(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+
+	testUserNsPodsManager := &failingUserNsPodsManager{}
+	_, err := MakeUserNsManager(testUserNsPodsManager)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "read pods from disk")
+}
+
+func TestMakeUserNsManagerFailsPodRecord(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+
+	testUserNsPodsManager := &testUserNsPodsManager{
+		podList: []types.UID{"pod-1", "pod-2"},
+		podDir:  t.TempDir(),
+	}
+
+	// Remove read/execute permissions from this directory.
+	if err := os.Chmod(testUserNsPodsManager.podDir, 0222); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := MakeUserNsManager(testUserNsPodsManager)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "record pod mappings")
 }
