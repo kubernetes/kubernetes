@@ -1677,6 +1677,9 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name, "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
+		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name, "dst,dst", "-j", "RETURN")
+	proxier.filterRules.Write(
+		"-A", string(kubeIPVSFilterChain),
 		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
