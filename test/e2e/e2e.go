@@ -183,9 +183,7 @@ func setupSuite(ctx context.Context) {
 	}
 
 	c, err := framework.LoadClientset()
-	if err != nil {
-		klog.Fatal("Error loading client: ", err)
-	}
+	framework.ExpectNoError(err, "Error loading client")
 
 	// Delete any namespaces except those created by the system. This ensures no
 	// lingering resources are left over from a previous test run.
@@ -380,9 +378,7 @@ func setupSuitePerGinkgoNode(ctx context.Context) {
 	// the dual stack clusters can be ipv4-ipv6 or ipv6-ipv4, order matters,
 	// and services use the primary IP family by default
 	c, err := framework.LoadClientset()
-	if err != nil {
-		klog.Fatal("Error loading client: ", err)
-	}
+	framework.ExpectNoError(err, "Error loading client")
 	framework.TestContext.IPFamily = getDefaultClusterIPFamily(ctx, c)
 	framework.Logf("Cluster IP family: %s", framework.TestContext.IPFamily)
 }

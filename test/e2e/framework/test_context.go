@@ -549,9 +549,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if len(t.BearerToken) == 0 {
 		var err error
 		t.BearerToken, err = GenerateSecureToken(16)
-		if err != nil {
-			klog.Fatalf("Failed to generate bearer token: %v", err)
-		}
+		ExpectNoError(err, "Failed to generate bearer token")
 	}
 
 	// Allow 1% of nodes to be unready (statistically) - relevant for large clusters.
