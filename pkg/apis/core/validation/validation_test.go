@@ -24590,18 +24590,6 @@ func TestValidateDownwardAPIHostIPs(t *testing.T) {
 			featureEnabled: true,
 			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
 		},
-		{
-			name:           "has no hostIPs field, featuregate disabled",
-			expectError:    false,
-			featureEnabled: false,
-			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
-		},
-		{
-			name:           "has hostIPs field, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
-		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {

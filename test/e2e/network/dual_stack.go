@@ -112,7 +112,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
-	f.It("should create pod, add ipv6 and ipv4 ip to host ips", feature.PodHostIPs, func(ctx context.Context) {
+	f.It("should create pod, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
 		podName := "pod-dualstack-ips"
 
 		pod := &v1.Pod{

@@ -31,7 +31,6 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -49,55 +48,7 @@ var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeat
 	f := framework.NewDefaultFramework("dualstack")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.Context("when creating a Pod, it has no PodHostIPs feature", func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): false,
-			}
-		})
-		ginkgo.It("should create pod, add host ips is empty", func(ctx context.Context) {
-
-			podName := "pod-dualstack-host-ips"
-
-			pod := genPodHostIPs(podName+string(uuid.NewUUID()), false)
-
-			ginkgo.By("submitting the pod to kubernetes")
-			podClient := e2epod.NewPodClient(f)
-			p := podClient.CreateSync(ctx, pod)
-
-			gomega.Expect(p.Status.HostIP).ShouldNot(gomega.BeEquivalentTo(""))
-			gomega.Expect(p.Status.HostIPs).Should(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
-		})
-
-		ginkgo.It("should create pod with hostNetwork, add host ips is empty", func(ctx context.Context) {
-
-			podName := "pod-dualstack-host-ips"
-
-			pod := genPodHostIPs(podName+string(uuid.NewUUID()), true)
-
-			ginkgo.By("submitting the pod to kubernetes")
-			podClient := e2epod.NewPodClient(f)
-			p := podClient.CreateSync(ctx, pod)
-
-			gomega.Expect(p.Status.HostIP).ShouldNot(gomega.BeEquivalentTo(""))
-			gomega.Expect(p.Status.HostIPs).Should(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
-		})
-	})
-
-	ginkgo.Context("when creating a Pod, it has PodHostIPs feature", func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): true,
-			}
-		})
+	ginkgo.Context("when creating a Pod", func() {
 		ginkgo.It("should create pod, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
 
 			podName := "pod-dualstack-host-ips"
@@ -205,63 +156,6 @@ var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeat
 			}
 
 			testDownwardAPI(ctx, f, podName, env, expectations)
-		})
-	})
-
-	ginkgo.Context("when feature rollback", func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): true,
-			}
-		})
-		ginkgo.It("should able upgrade and rollback", func(ctx context.Context) {
-			podName := "pod-dualstack-host-ips"
-
-			pod := genPodHostIPs(podName+string(uuid.NewUUID()), false)
-
-			ginkgo.By("submitting the pod to kubernetes")
-			podClient := e2epod.NewPodClient(f)
-			p := podClient.CreateSync(ctx, pod)
-
-			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
-
-			ginkgo.By("Disable PodHostIPs feature")
-			cfg, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
-
-			newCfg := cfg.DeepCopy()
-			newCfg.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): false,
-			}
-
-			updateKubeletConfig(ctx, f, newCfg, true)
-
-			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
-
-			ginkgo.By("recreate pod")
-			pod = genPodHostIPs(podName+string(uuid.NewUUID()), false)
-			p = podClient.CreateSync(ctx, pod)
-			// Feature PodHostIPs is disabled, HostIPs should be nil
-			gomega.Expect(p.Status.HostIPs).Should(gomega.BeNil())
-
-			newCfg.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): true,
-			}
-
-			updateKubeletConfig(ctx, f, newCfg, true)
-
-			p, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			// Feature PodHostIPs is enabled, HostIPs should not be nil
-			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
 		})
 	})
 })
