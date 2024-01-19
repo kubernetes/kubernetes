@@ -258,9 +258,9 @@ var _ = SIGDescribe("SeparateDiskTest LocalStorageSoftEviction", framework.WithS
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
 			ginkgo.By(fmt.Sprintf("EvictionSoftSettings %s", initialConfig.EvictionSoft))
+			ginkgo.By(fmt.Sprintf("DiskTestInMb %d", diskTestInMb))
 
 		})
-		ginkgo.By(fmt.Sprintf("DiskTestInMb %d", diskTestInMb))
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
