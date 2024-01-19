@@ -949,7 +949,8 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(ctx context.C
 func (ctrl *PersistentVolumeController) assignDefaultStorageClass(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
 	logger := klog.FromContext(ctx)
 
-	if storagehelpers.GetPersistentVolumeClaimClass(claim) != "" {
+	if storagehelpers.PersistentVolumeClaimHasClass(claim) {
+		// The user asked for a class.
 		return false, nil
 	}
 
