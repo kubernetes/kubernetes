@@ -201,6 +201,10 @@ type KubeProxyConfiguration struct {
 	EnableProfiling bool `json:"enableProfiling"`
 	// showHiddenMetricsForVersion is the version for which you want to show hidden metrics.
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
+	// The value for the "service.kubernetes.io/service-proxy-name" label that this
+	// kube-proxy instance shall handle. If unset (default), kube-proxy will handle
+	// any service that has NOT set this label.
+	ServiceProxyName string `json:"serviceProxyName,omitempty"`
 
 	// mode specifies which proxy mode to use.
 	Mode ProxyMode `json:"mode"`

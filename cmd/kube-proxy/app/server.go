@@ -159,6 +159,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&o.config.ClientConnection.Burst, "kube-api-burst", o.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
 
+	fs.StringVar(&o.config.ServiceProxyName, "service-proxy-name", o.config.ServiceProxyName, "The value for the \"service.kubernetes.io/service-proxy-name\" label that shall be handled. If empty, all services that has NOT set the label are handled")
 	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will be used as the name of the Node that kube-proxy is running on. If unset, the node name is assumed to be the same as the node's hostname.")
 	fs.Var(&utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "Overrides kube-proxy's idea of what its node's primary IP is. Note that the name is a historical artifact, and kube-proxy does not actually bind any sockets to this IP. This parameter is ignored if a config file is specified by --config.")
 	fs.Var(&utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on, defaulting to \"0.0.0.0:10256\". This parameter is ignored if a config file is specified by --config.")
@@ -950,7 +951,14 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// Start up a metrics server if requested
 	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, metricsErrCh)
 
-	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
+	var err error
+	var proxyName *labels.Requirement
+	if s.Config.ServiceProxyName == "" {
+		proxyName, err = labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
+	} else {
+		klog.InfoS("Will only serve", "service.kubernetes.io/service-proxy-name", s.Config.ServiceProxyName)
+		proxyName, err = labels.NewRequirement(apis.LabelServiceProxyName, selection.Equals, []string{s.Config.ServiceProxyName})
+	}
 	if err != nil {
 		return err
 	}
@@ -961,7 +969,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	}
 
 	labelSelector := labels.NewSelector()
-	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
+	labelSelector = labelSelector.Add(*proxyName, *noHeadlessEndpoints)
 
 	// Make informers that filter out objects that want a non-default service proxy.
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,

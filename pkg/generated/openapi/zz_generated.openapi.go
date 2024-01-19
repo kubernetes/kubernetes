@@ -58989,6 +58989,13 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 							Format:      "",
 						},
 					},
+					"serviceProxyName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The value for the \"service.kubernetes.io/service-proxy-name\" label that this kube-proxy instance shall handle. If unset (default), kube-proxy will handle any service that has NOT set this label.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"mode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "mode specifies which proxy mode to use.",
