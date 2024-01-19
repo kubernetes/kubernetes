@@ -157,7 +157,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	for _, podUID := range found {
 		klog.V(5).InfoS("reading pod from disk for user namespace", "podUID", podUID)
 		if err := m.recordPodMappings(podUID); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("record pod mappings: %w", err)
 		}
 	}
 
