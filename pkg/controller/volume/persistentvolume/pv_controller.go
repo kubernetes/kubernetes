@@ -937,7 +937,8 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *v1.Pe
 // Ignores claims that already have a storage class.
 // TODO: if resync is ever changed to a larger period, we might need to change how we set the default class on existing unbound claims
 func (ctrl *PersistentVolumeController) assignDefaultStorageClass(claim *v1.PersistentVolumeClaim) (bool, error) {
-	if storagehelpers.GetPersistentVolumeClaimClass(claim) != "" {
+	if storagehelpers.PersistentVolumeClaimHasClass(claim) {
+		// The user asked for a class.
 		return false, nil
 	}
 
