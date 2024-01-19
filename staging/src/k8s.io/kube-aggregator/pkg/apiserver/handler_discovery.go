@@ -67,9 +67,9 @@ type DiscoveryAggregationController interface {
 	// Thread-safe
 	RemoveAPIService(apiServiceName string)
 
-	// Spwans a worker which waits for added/updated apiservices and updates
+	// Spawns a worker which waits for added/updated apiservices and updates
 	// the unified discovery document by contacting the aggregated api services
-	Run(stopCh <-chan struct{})
+	Run(stopCh <-chan struct{}, discoverySyncedCh chan<- struct{})
 }
 
 type discoveryManager struct {
@@ -406,13 +406,44 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	return nil
 }
 
-// Spwans a goroutune which waits for added/updated apiservices and updates
+func (dm *discoveryManager) getAPIServiceKeys() []string {
+	dm.servicesLock.RLock()
+	defer dm.servicesLock.RUnlock()
+	keys := []string{}
+	for key := range dm.apiServices {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+// Spawns a goroutine which waits for added/updated apiservices and updates
 // the discovery document accordingly
-func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
+func (dm *discoveryManager) Run(stopCh <-chan struct{}, discoverySyncedCh chan<- struct{}) {
 	klog.Info("Starting ResourceDiscoveryManager")
 
 	// Shutdown the queue since stopCh was signalled
 	defer dm.dirtyAPIServiceQueue.ShutDown()
+
+	// Ensure that apiregistration.k8s.io is the first group in the discovery group.
+	dm.mergedDiscoveryHandler.WithSource(discoveryendpoint.BuiltinSource).SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
+
+	// Ensure that all APIServices are present before readiness check succeeds
+	var wg sync.WaitGroup
+	// Iterate on a copy of the keys to be thread safe with syncAPIService
+	keys := dm.getAPIServiceKeys()
+
+	for _, key := range keys {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			// If an error was returned, the APIService will still have been
+			// added but marked as stale. Ignore the return value here
+			_ = dm.syncAPIService(k)
+		}(key)
+	}
+	wg.Wait()
+
+	close(discoverySyncedCh)
 
 	// Spawn workers
 	// These workers wait for APIServices to be marked dirty.
@@ -439,9 +470,6 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 			}
 		}()
 	}
-
-	// Ensure that apiregistration.k8s.io is the first group in the discovery group.
-	dm.mergedDiscoveryHandler.WithSource(discoveryendpoint.BuiltinSource).SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
 
 	wait.PollUntil(1*time.Minute, func() (done bool, err error) {
 		dm.servicesLock.Lock()
