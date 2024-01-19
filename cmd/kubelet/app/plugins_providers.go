@@ -21,7 +21,6 @@ package app
 
 import (
 	// Credential providers
-	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 
 	"k8s.io/component-base/featuregate"
