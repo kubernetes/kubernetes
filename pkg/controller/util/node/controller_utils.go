@@ -30,7 +30,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -42,7 +41,7 @@ import (
 // DeletePods will delete all pods from master running on given node,
 // and return true if any pods were deleted, or were found pending
 // deletion.
-func DeletePods(ctx context.Context, kubeClient clientset.Interface, pods []*v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
+func DeletePods(ctx context.Context, kubeClient clientset.Interface, pods []*v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string) (bool, error) {
 	remaining := false
 	var updateErrList []error
 	logger := klog.FromContext(ctx)
@@ -70,11 +69,6 @@ func DeletePods(ctx context.Context, kubeClient clientset.Interface, pods []*v1.
 		// if the pod has already been marked for deletion, we still return true that there are remaining pods.
 		if pod.DeletionGracePeriodSeconds != nil {
 			remaining = true
-			continue
-		}
-		// if the pod is managed by a daemonset, ignore it
-		if _, err := daemonStore.GetPodDaemonSets(pod); err == nil {
-			// No error means at least one daemonset was found
 			continue
 		}
 

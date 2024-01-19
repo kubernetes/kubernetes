@@ -38,13 +38,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	coordlisters "k8s.io/client-go/listers/coordination/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -244,9 +242,6 @@ type Controller struct {
 
 	zoneStates map[string]ZoneState
 
-	daemonSetStore          appsv1listers.DaemonSetLister
-	daemonSetInformerSynced cache.InformerSynced
-
 	leaseLister         coordlisters.LeaseLister
 	leaseInformerSynced cache.InformerSynced
 	nodeLister          corelisters.NodeLister
@@ -305,13 +300,12 @@ type Controller struct {
 	podUpdateQueue  workqueue.TypedRateLimitingInterface[podUpdateItem]
 }
 
-// NewNodeLifecycleController returns a new taint controller.
+// NewNodeLifecycleController returns a new node life cycle controller.
 func NewNodeLifecycleController(
 	ctx context.Context,
 	leaseInformer coordinformers.LeaseInformer,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
-	daemonSetInformer appsv1informers.DaemonSetInformer,
 	kubeClient clientset.Interface,
 	nodeMonitorPeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
@@ -449,11 +443,7 @@ func NewNodeLifecycleController(
 
 	nc.leaseLister = leaseInformer.Lister()
 	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
-
 	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
-
-	nc.daemonSetStore = daemonSetInformer.Lister()
-	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
 
 	return nc, nil
 }
@@ -479,7 +469,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	logger.Info("Starting node controller")
 	defer logger.Info("Shutting down node controller")
 
-	if !cache.WaitForNamedCacheSync("taint", ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !cache.WaitForNamedCacheSync("taint", ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced) {
 		return
 	}
 

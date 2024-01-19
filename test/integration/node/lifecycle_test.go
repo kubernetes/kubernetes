@@ -130,7 +130,6 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
-				externalInformers.Apps().V1().DaemonSets(),
 				cs,
 				1*time.Second,    // Node monitor grace period
 				time.Minute,      // Node startup grace period
@@ -342,7 +341,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
-				externalInformers.Apps().V1().DaemonSets(),
 				cs,
 				1*time.Second,    // Node monitor grace period
 				time.Minute,      // Node startup grace period

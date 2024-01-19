@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
-	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -82,9 +81,8 @@ func fakeGetPodsAssignedToNode(c *fake.Clientset) func(string) ([]*v1.Pod, error
 
 type nodeLifecycleController struct {
 	*Controller
-	leaseInformer     coordinformers.LeaseInformer
-	nodeInformer      coreinformers.NodeInformer
-	daemonSetInformer appsinformers.DaemonSetInformer
+	leaseInformer coordinformers.LeaseInformer
+	nodeInformer  coreinformers.NodeInformer
 }
 
 func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1.Lease {
@@ -137,14 +135,12 @@ func newNodeLifecycleControllerFromClient(
 
 	leaseInformer := factory.Coordination().V1().Leases()
 	nodeInformer := factory.Core().V1().Nodes()
-	daemonSetInformer := factory.Apps().V1().DaemonSets()
 
 	nc, err := NewNodeLifecycleController(
 		ctx,
 		leaseInformer,
 		factory.Core().V1().Pods(),
 		nodeInformer,
-		daemonSetInformer,
 		kubeClient,
 		nodeMonitorPeriod,
 		nodeStartupGracePeriod,
@@ -161,9 +157,8 @@ func newNodeLifecycleControllerFromClient(
 	nc.leaseInformerSynced = alwaysReady
 	nc.podInformerSynced = alwaysReady
 	nc.nodeInformerSynced = alwaysReady
-	nc.daemonSetInformerSynced = alwaysReady
 
-	return &nodeLifecycleController{nc, leaseInformer, nodeInformer, daemonSetInformer}, nil
+	return &nodeLifecycleController{nc, leaseInformer, nodeInformer}, nil
 }
 
 func TestMonitorNodeHealth(t *testing.T) {
@@ -972,7 +967,7 @@ func TestPodStatusChange(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				controllerutil.DeletePods(ctx, item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
+				controllerutil.DeletePods(ctx, item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID)
 				return true, 0
 			})
 		}

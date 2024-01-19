@@ -206,7 +206,6 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 		controllerContext.InformerFactory.Coordination().V1().Leases(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
-		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		// node lifecycle controller uses existing cluster role from node-controller
 		controllerContext.ClientBuilder.ClientOrDie("node-controller"),
 		controllerContext.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
