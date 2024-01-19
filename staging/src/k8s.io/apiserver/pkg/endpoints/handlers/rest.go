@@ -79,7 +79,7 @@ type RequestScope struct {
 	// Used only by CRDs which do not yet support Protobuf.
 	StandardSerializers []runtime.SerializerInfo
 
-	Creater         runtime.ObjectCreater
+	Creator         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
 	Defaulter       runtime.ObjectDefaulter
 	Typer           runtime.ObjectTyper
