@@ -19,7 +19,6 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -341,19 +340,16 @@ func GetConfigMapWithShortRetry(client clientset.Interface, namespace, name stri
 	var lastError error
 	err := wait.PollUntilContextTimeout(context.Background(),
 		time.Millisecond*50, time.Millisecond*350,
-		true, func(ctx context.Context) (bool, error) {
+		true, func(_ context.Context) (bool, error) {
 			var err error
-			cm, err = client.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+			// Intentionally pass a new context to this API call. This will let the API call run
+			// independently of the parent context timeout, which is quite short and can cause the API
+			// call to return abruptly.
+			cm, err = client.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
 			if err == nil {
 				return true, nil
 			}
-			// If some code is about to go over the context deadline, "x/time/rate/rate.go" would return
-			// and untyped error with the string "would exceed context deadline". If some code already exceeded
-			// the deadline the error would be of type DeadlineExceeded. Ignore such context errors and only store
-			// API and connectivity errors.
-			if !strings.Contains(err.Error(), "would exceed context deadline") && !errors.Is(err, context.DeadlineExceeded) {
-				lastError = err
-			}
+			lastError = err
 			return false, nil
 		})
 	if err == nil {
