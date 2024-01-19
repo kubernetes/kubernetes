@@ -236,12 +236,14 @@ var _ = SIGDescribe("SeparateDiskTest LocalStorageSoftEviction", framework.WithS
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
+	diskTestInMb := 10240
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			summary := eventuallyGetSummary(ctx)
 			diskConsumed := *summary.Node.Runtime.ImageFs.AvailableBytes / 10
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			availableBytesImageFs := *(summary.Node.Runtime.ImageFs.AvailableBytes)
+			diskTestInMb = int(availableBytesImageFs-diskConsumed) / 125000
 			if availableBytes <= diskConsumed && availableBytesImageFs <= diskConsumed {
 				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
 			}
@@ -258,10 +260,11 @@ var _ = SIGDescribe("SeparateDiskTest LocalStorageSoftEviction", framework.WithS
 			ginkgo.By(fmt.Sprintf("EvictionSoftSettings %s", initialConfig.EvictionSoft))
 
 		})
+		ginkgo.By(fmt.Sprintf("DiskTestInMb %d", diskTestInMb))
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
-				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, nil, v1.ResourceRequirements{}),
+				pod:              diskConsumingPod("container-disk-hog", diskTestInMb, nil, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0,
