@@ -48,6 +48,11 @@ var (
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=2079958
 			`\[sig-network\] \[Feature:Topology Hints\] should distribute endpoints evenly`,
+
+			// Tests require SSH configuration and is part of the parallel suite, which does not create the bastion
+			// host. Enabling the test would result in the  bastion being created for every parallel test execution.
+			// Given that we have existing oc and WMCO tests that cover this functionality, we can safely disable it.
+			`\[Feature:NodeLogQuery\]`,
 		},
 		// tests that are known broken and need to be fixed upstream or in openshift
 		// always add an issue here
@@ -141,9 +146,6 @@ var (
 			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`,
 			`\[sig-network\] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod`, // TODO(network): simple test in k8s 1.27, needs investigation
 			`\[sig-cli\] Kubectl client Kubectl prune with applyset should apply and prune objects`,                    // TODO(workloads): alpha feature in k8s 1.27. It's failing with `error: unknown flag: --applyset`. Needs investigation
-
-			// https://issues.redhat.com/browse/OCPBUGS-16760
-			`\[Feature:NodeLogQuery\]`,
 
 			// https://issues.redhat.com/browse/OCPBUGS-17194
 			`\[sig-node\] ImageCredentialProvider \[Feature:KubeletCredentialProviders\] should be able to create pod with image credentials fetched from external credential provider`,
