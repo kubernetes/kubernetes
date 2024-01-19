@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -106,7 +106,7 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 	tests := []struct {
 		name                     string
 		resources                []metav1.APIResource
-		wantAPIResourceDiscovery []apidiscoveryv2beta1.APIResourceDiscovery
+		wantAPIResourceDiscovery []apidiscoveryv2.APIResourceDiscovery
 		wantErr                  bool
 	}{
 		{
@@ -121,10 +121,10 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "pods",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					ResponseKind: &metav1.GroupVersionKind{
 						Kind: "Pod",
 					},
@@ -146,10 +146,10 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "cronjobs",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					ResponseKind: &metav1.GroupVersionKind{
 						Group:   "batch",
 						Version: "v1",
@@ -182,10 +182,10 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "cronjobs",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					ResponseKind: &metav1.GroupVersionKind{
 						Group:   "batch",
 						Version: "v1",
@@ -193,7 +193,7 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					},
 					ShortNames: []string{"cj"},
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+					Subresources: []apidiscoveryv2.APISubresourceDiscovery{{
 						Subresource: "status",
 						ResponseKind: &metav1.GroupVersionKind{
 							Group:   "batch",
@@ -245,10 +245,10 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "cronjobs",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					ResponseKind: &metav1.GroupVersionKind{
 						Group:   "batch",
 						Version: "v1",
@@ -256,7 +256,7 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					},
 					ShortNames: []string{"cj"},
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+					Subresources: []apidiscoveryv2.APISubresourceDiscovery{{
 						Subresource: "status",
 						ResponseKind: &metav1.GroupVersionKind{
 							Group:   "batch",
@@ -267,7 +267,7 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					}},
 				}, {
 					Resource: "deployments",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					ResponseKind: &metav1.GroupVersionKind{
 						Group:   "apps",
 						Version: "v1",
@@ -275,7 +275,7 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					},
 					ShortNames: []string{"deploy"},
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+					Subresources: []apidiscoveryv2.APISubresourceDiscovery{{
 						Subresource: "status",
 						ResponseKind: &metav1.GroupVersionKind{
 							Group:   "apps",
@@ -298,13 +298,13 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "cronjobs",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					// populated to avoid nil panics
 					ResponseKind: &metav1.GroupVersionKind{},
-					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+					Subresources: []apidiscoveryv2.APISubresourceDiscovery{{
 						Subresource: "status",
 						ResponseKind: &metav1.GroupVersionKind{
 							Group:   "batch",
@@ -327,13 +327,13 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "cronjobs",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					// populated to avoid nil panics
 					ResponseKind: &metav1.GroupVersionKind{},
-					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+					Subresources: []apidiscoveryv2.APISubresourceDiscovery{{
 						Subresource: "status",
 						// populated to avoid nil panics
 						ResponseKind: &metav1.GroupVersionKind{},
@@ -364,7 +364,7 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{},
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{},
 			wantErr:                  true,
 		},
 		{
@@ -378,10 +378,10 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "nodes",
-					Scope:    apidiscoveryv2beta1.ScopeCluster,
+					Scope:    apidiscoveryv2.ScopeCluster,
 					ResponseKind: &metav1.GroupVersionKind{
 						Kind: "Node",
 					},
@@ -401,10 +401,10 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource: "nodes",
-					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					Scope:    apidiscoveryv2.ScopeNamespace,
 					ResponseKind: &metav1.GroupVersionKind{
 						Kind: "Node",
 					},
@@ -424,11 +424,11 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:        []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{
 				{
 					Resource:         "nodes",
 					SingularResource: "node",
-					Scope:            apidiscoveryv2beta1.ScopeCluster,
+					Scope:            apidiscoveryv2.ScopeCluster,
 					ResponseKind: &metav1.GroupVersionKind{
 						Kind: "Node",
 					},

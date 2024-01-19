@@ -20,8 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var AggregatedDiscoveryGV = schema.GroupVersion{Group: "apidiscovery.k8s.io", Version: "v2beta1"}
-
 // Interface is from "k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 
 // DiscoveryEndpointRestrictions allows requests to /apis to provide a Content Negotiation GVK for aggregated discovery.
@@ -39,7 +37,7 @@ func (discoveryEndpointRestrictions) AllowsStreamSchema(s string) bool { return 
 // IsAggregatedDiscoveryGVK checks if a provided GVK is the GVK for serving aggregated discovery.
 func IsAggregatedDiscoveryGVK(gvk *schema.GroupVersionKind) bool {
 	if gvk != nil {
-		return gvk.Group == "apidiscovery.k8s.io" && gvk.Version == "v2beta1" && gvk.Kind == "APIGroupDiscoveryList"
+		return gvk.Group == "apidiscovery.k8s.io" && (gvk.Version == "v2beta1" || gvk.Version == "v2") && gvk.Kind == "APIGroupDiscoveryList"
 	}
 	return false
 }

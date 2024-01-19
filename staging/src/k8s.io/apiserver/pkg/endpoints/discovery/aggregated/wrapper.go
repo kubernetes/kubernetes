@@ -19,8 +19,10 @@ package aggregated
 import (
 	"net/http"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/emicklei/go-restful/v3"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,10 +71,11 @@ func (wrapped *WrappedHandler) GenerateWebService(prefix string, returnType inte
 // WrapAggregatedDiscoveryToHandler wraps a handler with an option to
 // emit the aggregated discovery by passing in the aggregated
 // discovery type in content negotiation headers: eg: (Accept:
-// application/json;v=v2beta1;g=apidiscovery.k8s.io;as=APIGroupDiscoveryList)
+// application/json;v=v2;g=apidiscovery.k8s.io;as=APIGroupDiscoveryList)
 func WrapAggregatedDiscoveryToHandler(handler http.Handler, aggHandler http.Handler) *WrappedHandler {
 	scheme := runtime.NewScheme()
-	apidiscoveryv2beta1.AddToScheme(scheme)
+	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
+	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
 	return &WrappedHandler{codecs, handler, aggHandler}
 }
