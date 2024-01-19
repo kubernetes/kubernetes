@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -40,7 +41,9 @@ import (
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/mux"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -48,6 +51,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
@@ -684,9 +688,12 @@ func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) 
 		perHandlerReadWriteTimeoutEnabled bool
 	}{
 		{perHandlerReadWriteTimeoutEnabled: false},
+		{perHandlerReadWriteTimeoutEnabled: true},
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s=%t", "PerHandlerReadWriteTimeoutEnabled", test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
+
 			const (
 				userName                                              = "alice"
 				fsName                                                = "test-fs"
@@ -766,12 +773,15 @@ func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T)
 
 	tests := []struct {
 		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
 	}{
-		{perHandlerReadWriteTimeoutEnabled: false},
+		{perHandlerReadWriteTimeoutEnabled: false, statusCodeExpected: http.StatusGatewayTimeout},
+		{perHandlerReadWriteTimeoutEnabled: true}, // we expect a stream reset error
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s=%t", "PerHandlerReadWriteTimeoutEnabled", test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
-			t.Parallel()
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
+
 			const (
 				userName                                              = "alice"
 				fsName                                                = "test-fs"
@@ -797,9 +807,9 @@ func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T)
 				}
 			})
 
-			// NOTE: the server will enforce a 5s timeout on every
+			// NOTE: the server will enforce a 1s timeout on every
 			//  incoming request, and the client enforces a timeout of 1m.
-			handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
 			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
 			defer server.Close()
 
@@ -827,7 +837,12 @@ func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T)
 				t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
 			}
 
-			expectStatusCode(t, http.StatusGatewayTimeout, rquestTimesOutPath, response, err)
+			switch {
+			case test.statusCodeExpected > 0:
+				expectStatusCode(t, test.statusCodeExpected, rquestTimesOutPath, response, err)
+			default:
+				expectStreamResetError(t, err)
+			}
 
 			close(stopCh)
 			t.Log("Waiting for the controller to shutdown")
@@ -850,13 +865,24 @@ func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) 
 
 	tests := []struct {
 		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
+		writeErrContains                  string
 	}{
-		{perHandlerReadWriteTimeoutEnabled: false},
+		{
+			perHandlerReadWriteTimeoutEnabled: false,
+			statusCodeExpected:                http.StatusGatewayTimeout,
+			writeErrContains:                  "http: Handler timeout",
+		},
+		{
+			// we expect a stream reset error, no http status code
+			perHandlerReadWriteTimeoutEnabled: true,
+			writeErrContains:                  "i/o timeout",
+		},
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s=%t", "PerHandlerReadWriteTimeoutEnabled", test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
 
-			t.Parallel()
 			const (
 				userName                                              = "alice"
 				fsName                                                = "test-fs"
@@ -877,18 +903,29 @@ func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) 
 				if r.URL.Path == rquestTimesOutPath {
 					<-callerRoundTripDoneCh
 
-					// we expect the timeout handler to have timed out this request by now and any attempt
-					// to write to the response should return a http.ErrHandlerTimeout error.
-					_, innerHandlerWriteErr := w.Write([]byte("foo"))
-					reqHandlerErrCh <- innerHandlerWriteErr
-
+					// a) with the timeout filter, we expect
+					// the timeout handler to have timed out
+					// this request by now and any attempt
+					// to write to the ResponseWriter should
+					// return a http.ErrHandlerTimeout error.
+					// b) with per handler read/write timeout
+					// write will eventually return error.
+					if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+							reqHandlerErrCh <- err
+							return true, nil
+						}
+						return false, nil
+					}); err != nil {
+						t.Errorf("timeout while waiting for ResponseWriter.Write to return an error: %v", err)
+						reqHandlerErrCh <- err
+					}
 					panic(http.ErrAbortHandler)
 				}
 			})
-
-			// NOTE: the server will enforce a 5s timeout on every
+			// NOTE: the server will enforce a 1s timeout on every
 			//  incoming request, and the client enforces a timeout of 1m.
-			handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
 			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
 			defer server.Close()
 
@@ -911,14 +948,19 @@ func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) 
 			t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
 			select {
 			case innerHandlerWriteErr := <-reqHandlerErrCh:
-				if innerHandlerWriteErr != http.ErrHandlerTimeout {
+				if innerHandlerWriteErr == nil || !strings.Contains(innerHandlerWriteErr.Error(), test.writeErrContains) {
 					t.Errorf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, innerHandlerWriteErr)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
 			}
 
-			expectStatusCode(t, http.StatusGatewayTimeout, rquestTimesOutPath, response, err)
+			switch {
+			case test.statusCodeExpected > 0:
+				expectStatusCode(t, test.statusCodeExpected, rquestTimesOutPath, response, err)
+			default:
+				expectStreamResetError(t, err)
+			}
 
 			close(stopCh)
 			t.Log("Waiting for the controller to shutdown")
@@ -941,13 +983,26 @@ func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T)
 
 	tests := []struct {
 		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
+		writeErrContains                  string
 	}{
-		{perHandlerReadWriteTimeoutEnabled: false},
+		{
+			// we expect a stream reset error, no http status code
+			// since the handler writes to the ResponseWriter
+			// before the timeout filter times out the request.
+			perHandlerReadWriteTimeoutEnabled: false,
+			writeErrContains:                  "http: Handler timeout",
+		},
+		{
+			// we expect a stream reset error, no http status code
+			perHandlerReadWriteTimeoutEnabled: true,
+			writeErrContains:                  "i/o timeout",
+		},
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s=%t", "PerHandlerReadWriteTimeoutEnabled", test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
 
-			t.Parallel()
 			const (
 				userName                                              = "alice"
 				fsName                                                = "test-fs"
@@ -973,16 +1028,29 @@ func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T)
 					}
 					<-callerRoundTripDoneCh
 
-					// we expect the timeout handler to have timed out this request by now and any attempt
-					// to write to the response should return a http.ErrHandlerTimeout error.
-					_, innerHandlerWriteErr := w.Write([]byte("foo"))
-					reqHandlerErrCh <- innerHandlerWriteErr
+					// a) with the timeout filter, we expect
+					// the timeout handler to have timed out
+					// this request by now and any attempt
+					// to write to the ResponseWriter should
+					// return a http.ErrHandlerTimeout error.
+					// b) with per handler read/write timeout
+					// write will eventually return error.
+					if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+							reqHandlerErrCh <- err
+							return true, nil
+						}
+						return false, nil
+					}); err != nil {
+						t.Errorf("timeout while waiting for ResponseWriter.Write to return an error: %v", err)
+						reqHandlerErrCh <- err
+					}
 				}
 			})
 
-			// NOTE: the server will enforce a 5s timeout on every
+			// NOTE: the server will enforce a 1s timeout on every
 			//  incoming request, and the client enforces a timeout of 1m.
-			handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
 			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
 			defer server.Close()
 
@@ -1003,7 +1071,7 @@ func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T)
 			t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
 			select {
 			case innerHandlerWriteErr := <-reqHandlerErrCh:
-				if innerHandlerWriteErr != http.ErrHandlerTimeout {
+				if innerHandlerWriteErr == nil || !strings.Contains(innerHandlerWriteErr.Error(), test.writeErrContains) {
 					t.Errorf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, innerHandlerWriteErr)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
@@ -1040,13 +1108,23 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 
 	tests := []struct {
 		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
+		writeErrContains                  string
 	}{
-		{perHandlerReadWriteTimeoutEnabled: false},
+		{
+			perHandlerReadWriteTimeoutEnabled: false,
+			statusCodeExpected:                http.StatusGatewayTimeout,
+			writeErrContains:                  "http: Handler timeout",
+		},
+		{
+			// we expect a stream reset error, no http status code
+			perHandlerReadWriteTimeoutEnabled: true,
+			writeErrContains:                  "i/o timeout",
+		},
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s=%t", "PerHandlerReadWriteTimeoutEnabled", test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
-
-			t.Parallel()
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
 
 			const (
 				userName                                                           = "alice"
@@ -1074,20 +1152,32 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 					// ensure that second request never has a chance to be executed (to avoid flakes)
 					<-secondReqRoundTripDoneCh
 
-					// we expect the timeout handler to have timed out this request by now and any attempt
-					// to write to the response should return a http.ErrHandlerTimeout error.
-					_, firstRequestInnerHandlerWriteErr := w.Write([]byte("foo"))
-					firstReqHandlerErrCh <- firstRequestInnerHandlerWriteErr
-
+					// a) with the timeout filter, we expect
+					// the timeout handler to have timed out
+					// this request by now and any attempt
+					// to write to the ResponseWriter should
+					// return a http.ErrHandlerTimeout error.
+					// b) with per handler read/write timeout
+					// write will eventually return error.
+					if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+							firstReqHandlerErrCh <- err
+							return true, nil
+						}
+						return false, nil
+					}); err != nil {
+						t.Errorf("timeout while waiting for ResponseWriter.Write to return an error: %v", err)
+						firstReqHandlerErrCh <- err
+					}
 				case r.URL.Path == secondRequestEnqueuedPath:
 					// we expect the concurrency to be set to 1 and so this request should never be executed.
 					t.Errorf("Expected second request to be enqueued: %q", secondRequestEnqueuedPath)
 				}
 			})
 
-			// NOTE: the server will enforce a 5s timeout on every
+			// NOTE: the server will enforce a 1s timeout on every
 			//  incoming request, and the client enforces a timeout of 1m.
-			handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
 			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
 			defer server.Close()
 
@@ -1138,16 +1228,22 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 			t.Logf("Waiting for the inner handler of the request: %q to complete", firstRequestTimesOutPath)
 			select {
 			case firstRequestInnerHandlerWriteErr := <-firstReqHandlerErrCh:
-				if firstRequestInnerHandlerWriteErr != http.ErrHandlerTimeout {
-					t.Errorf("Expected error: %#v, but got: %s", http.ErrHandlerTimeout, fmtError(firstRequestInnerHandlerWriteErr))
+				if firstRequestInnerHandlerWriteErr == nil || !strings.Contains(firstRequestInnerHandlerWriteErr.Error(), test.writeErrContains) {
+					t.Errorf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, fmtError(firstRequestInnerHandlerWriteErr))
 				}
 			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("Expected the server handler to have completed: %q", firstRequestTimesOutPath)
 			}
 
-			// first request is expected to time out with
-			// an http.StatusGatewayTimeout, not with a stream reset error.
-			expectStatusCode(t, http.StatusGatewayTimeout, firstRequestTimesOutPath, firstReqResult.response, firstReqResult.err)
+			// first request is expected to time out:
+			// a) with legacy timeout filter we expect an http.StatusGatewayTimeout code
+			// b) with per handler read/write timeout, a stream reset error.
+			switch {
+			case test.statusCodeExpected > 0:
+				expectStatusCode(t, test.statusCodeExpected, firstRequestTimesOutPath, firstReqResult.response, firstReqResult.err)
+			default:
+				expectStreamResetError(t, firstReqResult.err)
+			}
 
 			secondReqResult := <-secondReqResultCh
 			if isClientTimeout(secondReqResult.err) {
@@ -1292,7 +1388,9 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 		apfHandler.ServeHTTP(w, r)
 	})
 
-	handler = WithTimeoutForNonLongRunningRequests(handler, longRunningRequestCheck)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PerHandlerReadWriteTimeout) {
+		handler = WithTimeoutForNonLongRunningRequests(handler, longRunningRequestCheck)
+	}
 	// we don't have any request with invalid timeout, so leaving audit policy and sink nil.
 	handler = apifilters.WithRequestDeadline(handler, nil, nil, longRunningRequestCheck, nil, requestTimeout)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
