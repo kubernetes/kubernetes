@@ -297,6 +297,7 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			testUserNsPodsManager := &testUserNsPodsManager{
+				podDir:  t.TempDir(),
 				podList: tc.listPods,
 			}
 			m, err := MakeUserNsManager(testUserNsPodsManager)
