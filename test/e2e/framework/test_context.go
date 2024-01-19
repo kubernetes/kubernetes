@@ -465,10 +465,10 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
-// GenerateSecureToken returns a string of length tokenLen, consisting
+// generateSecureToken returns a string of length tokenLen, consisting
 // of random bytes encoded as base64 for use as a Bearer Token during
 // communication with an APIServer
-func GenerateSecureToken(tokenLen int) (string, error) {
+func generateSecureToken(tokenLen int) (string, error) {
 	// Number of bytes to be tokenLen when base64 encoded.
 	tokenSize := math.Ceil(float64(tokenLen) * 6 / 8)
 	rawToken := make([]byte, int(tokenSize))
@@ -548,7 +548,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 	if len(t.BearerToken) == 0 {
 		var err error
-		t.BearerToken, err = GenerateSecureToken(16)
+		t.BearerToken, err = generateSecureToken(16)
 		ExpectNoError(err, "Failed to generate bearer token")
 	}
 
