@@ -248,7 +248,7 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 
 var (
 	tagRe                 = regexp.MustCompile(`\[.*?\]`)
-	deprecatedTags        = sets.New("Conformance", "NodeConformance", "Disruptive", "Serial", "Slow")
+	deprecatedTags        = sets.New("Conformance", "Flaky", "NodeConformance", "Disruptive", "Serial", "Slow")
 	deprecatedTagPrefixes = sets.New("Environment", "Feature", "NodeFeature", "FeatureGate")
 	deprecatedStability   = sets.New("Alpha", "Beta")
 )
