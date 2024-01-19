@@ -147,6 +147,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.ServiceProxyName = in.ServiceProxyName
 	out.Mode = config.ProxyMode(in.Mode)
 	if err := Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {
 		return err
@@ -193,6 +194,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.ServiceProxyName = in.ServiceProxyName
 	out.Mode = v1alpha1.ProxyMode(in.Mode)
 	if err := Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {
 		return err
