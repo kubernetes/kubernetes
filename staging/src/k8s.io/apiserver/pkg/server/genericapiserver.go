@@ -53,7 +53,9 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -238,6 +240,11 @@ type GenericAPIServer struct {
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
+	// EffectiveVersion determines which apis and features are available
+	// based on when the api/feature lifecyle.
+	EffectiveVersion utilversion.EffectiveVersion
+	// FeatureGate is a way to plumb feature gate through if you have them.
+	FeatureGate featuregate.FeatureGate
 
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals

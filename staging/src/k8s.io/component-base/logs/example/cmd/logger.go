@@ -67,7 +67,7 @@ func NewLoggerCommand() *cobra.Command {
 		},
 	}
 	logsapi.AddFeatureGates(featureGate)
-	featureGate.AddFlag(cmd.Flags())
+	featureGate.AddFlag(cmd.Flags(), "")
 	logsapi.AddFlags(c, cmd.Flags())
 	return cmd
 }

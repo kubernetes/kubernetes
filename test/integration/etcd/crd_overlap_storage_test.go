@@ -32,9 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 // TestOverlappingBuiltInResources ensures the list of group-resources the custom resource finalizer should skip is up to date
@@ -69,7 +71,9 @@ func TestOverlappingBuiltInResources(t *testing.T) {
 
 // TestOverlappingCustomResourceAPIService ensures creating and deleting a custom resource overlapping with APIServices does not destroy APIService data
 func TestOverlappingCustomResourceAPIService(t *testing.T) {
-	apiServer := StartRealAPIServerOrDie(t)
+	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
+		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("1.30")
+	})
 	defer apiServer.Cleanup()
 
 	apiServiceClient, err := apiregistrationclient.NewForConfig(apiServer.Config)
@@ -231,7 +235,9 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 
 // TestOverlappingCustomResourceCustomResourceDefinition ensures creating and deleting a custom resource overlapping with CustomResourceDefinition does not destroy CustomResourceDefinition data
 func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
-	apiServer := StartRealAPIServerOrDie(t)
+	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
+		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("1.30")
+	})
 	defer apiServer.Cleanup()
 
 	crdClient, err := crdclient.NewForConfig(apiServer.Config)

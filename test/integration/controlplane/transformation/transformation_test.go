@@ -115,7 +115,9 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(tb, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
+	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
+		tb, &kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "0.0"},
+		e.getEncryptionOptions(reload), e.storageConfig); err != nil {
 		e.cleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
 	}

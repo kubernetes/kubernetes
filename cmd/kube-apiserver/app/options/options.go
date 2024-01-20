@@ -26,6 +26,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	cliflag "k8s.io/component-base/cli/flag"
 
+	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -63,10 +65,10 @@ type Extra struct {
 	MasterCount int
 }
 
-// NewServerRunOptions creates a new ServerRunOptions object with default parameters
-func NewServerRunOptions() *ServerRunOptions {
+// NewServerRunOptions creates and returns ServerRunOptions according to the given featureGate and effectiveVersion of the server binary to run.
+func NewServerRunOptions(featureGate featuregate.FeatureGate, effectiveVersion utilversion.EffectiveVersion) *ServerRunOptions {
 	s := ServerRunOptions{
-		Options:       controlplaneapiserver.NewOptions(),
+		Options:       controlplaneapiserver.NewOptions(featureGate, effectiveVersion),
 		CloudProvider: kubeoptions.NewCloudProviderOptions(),
 
 		Extra: Extra{

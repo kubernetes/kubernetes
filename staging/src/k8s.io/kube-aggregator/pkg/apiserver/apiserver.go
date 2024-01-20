@@ -247,7 +247,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	// used later  to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*c.GenericConfig.Version)
+	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(s.GenericAPIServer.EffectiveVersion.EmulationVersion())
 	if err != nil {
 		return nil, err
 	}
