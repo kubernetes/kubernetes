@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/version"
@@ -247,7 +248,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	// used later  to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*c.GenericConfig.Version)
+	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(serverversion.Effective.EmulationVersion())
 	if err != nil {
 		return nil, err
 	}

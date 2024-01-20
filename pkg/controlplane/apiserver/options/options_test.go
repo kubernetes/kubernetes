@@ -30,9 +30,11 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	netutils "k8s.io/utils/net"
@@ -43,6 +45,8 @@ import (
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
 	s := NewOptions()
+	featureGate := featuregate.NewFeatureGate()
+	s.GenericServerRunOptions.FeatureGate = featureGate
 	var fss cliflag.NamedFlagSets
 	s.AddFlags(&fss)
 	for _, f := range fss.FlagSets {
@@ -108,6 +112,7 @@ func TestAddFlags(t *testing.T) {
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
 		"--lease-reuse-duration-seconds=100",
+		"--emulated-version=1.31",
 	}
 	fs.Parse(args)
 
@@ -122,6 +127,7 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
+			FeatureGate:                 featureGate,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -290,5 +296,9 @@ func TestAddFlags(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
+	}
+
+	if serverversion.Effective.EmulationVersion().String() != "1.31.0" {
+		t.Errorf("Got emulation version %s, wanted %s", serverversion.Effective.EmulationVersion().String(), "1.31.0")
 	}
 }

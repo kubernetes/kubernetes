@@ -27,6 +27,7 @@ import (
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -98,7 +99,7 @@ type CompletedOptions struct {
 // NewOptions creates a new ServerRunOptions object with default parameters
 func NewOptions() *Options {
 	s := Options{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(utilfeature.DefaultMutableFeatureGate),
 		Etcd:                    genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
 		SecureServing:           kubeoptions.NewSecureServingOptions(),
 		Audit:                   genericoptions.NewAuditOptions(),
@@ -197,6 +198,11 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 
 	completed := completedOptions{
 		Options: *o,
+	}
+
+	// set feature gate emulation version first.
+	if err := completed.GenericServerRunOptions.Complete(); err != nil {
+		return CompletedOptions{}, err
 	}
 
 	// set defaults

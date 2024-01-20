@@ -69,6 +69,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -677,9 +678,8 @@ type RESTStorageProvider interface {
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	nonLegacy := []*genericapiserver.APIGroupInfo{}
-
 	// used later in the loop to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*m.GenericAPIServer.Version)
+	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(serverversion.Effective.EmulationVersion())
 	if err != nil {
 		return err
 	}

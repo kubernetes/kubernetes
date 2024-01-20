@@ -460,7 +460,7 @@ func fakeVersion() version.Info {
 	return version.Info{
 		Major:        "42",
 		Minor:        "42",
-		GitVersion:   "42",
+		GitVersion:   "42.42",
 		GitCommit:    "34973274ccef6ab4dfaaf86599792fa9c3fe4689",
 		GitTreeState: "Dirty",
 	}

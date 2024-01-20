@@ -30,6 +30,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -90,7 +91,7 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(utilfeature.DefaultMutableFeatureGate),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
@@ -115,7 +116,7 @@ func (o AggregatorOptions) Validate(args []string) error {
 
 // Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // RunAggregator runs the API Aggregator.

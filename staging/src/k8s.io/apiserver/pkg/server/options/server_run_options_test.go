@@ -23,10 +23,12 @@ import (
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/component-base/featuregate"
 	netutils "k8s.io/utils/net"
 )
 
 func TestServerRunOptionsValidate(t *testing.T) {
+	featureGate := featuregate.NewFeatureGate()
 	testCases := []struct {
 		name        string
 		testOptions *ServerRunOptions
@@ -43,6 +45,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "--max-requests-inflight can not be negative value",
 		},
@@ -57,6 +60,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "--max-mutating-requests-inflight can not be negative value",
 		},
@@ -71,6 +75,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "--request-timeout can not be negative value",
 		},
@@ -85,6 +90,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           -1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "--min-request-timeout can not be negative value",
 		},
@@ -99,6 +105,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       -10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "ServerRunOptions.JSONPatchMaxCopyBytes can not be negative value",
 		},
@@ -113,6 +120,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         -10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "ServerRunOptions.MaxRequestBodyBytes can not be negative value",
 		},
@@ -128,6 +136,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				LivezGracePeriod:            -time.Second,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "--livez-grace-period can not be a negative value",
 		},
@@ -143,6 +152,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				ShutdownDelayDuration:       -time.Second,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "--shutdown-delay-duration can not be negative value",
 		},
@@ -158,6 +168,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 			expectErr: "--strict-transport-security-directives invalid, allowed values: max-age=expireTime, includeSubDomains, preload. see https://tools.ietf.org/html/rfc6797#section-6.1 for more information",
 		},
@@ -173,6 +184,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				FeatureGate:                 featureGate,
 			},
 		},
 	}
@@ -239,7 +251,7 @@ func TestValidateCorsAllowedOriginList(t *testing.T) {
 	for _, test := range tests {
 		for _, regexp := range test.regexp {
 			t.Run(fmt.Sprintf("regexp/%s", regexp), func(t *testing.T) {
-				options := NewServerRunOptions()
+				options := NewServerRunOptions(featuregate.NewFeatureGate())
 				if errs := options.Validate(); len(errs) != 0 {
 					t.Fatalf("wrong test setup: %#v", errs)
 				}
@@ -271,13 +283,13 @@ func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
 		{
 			name: "default should be valid",
 			optionsFn: func() *ServerRunOptions {
-				return NewServerRunOptions()
+				return NewServerRunOptions(featuregate.NewFeatureGate())
 			},
 		},
 		{
 			name: "negative not allowed",
 			optionsFn: func() *ServerRunOptions {
-				o := NewServerRunOptions()
+				o := NewServerRunOptions(featuregate.NewFeatureGate())
 				o.ShutdownWatchTerminationGracePeriod = -time.Second
 				return o
 			},
@@ -304,7 +316,7 @@ func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
 	}
 
 	t.Run("default should be zero", func(t *testing.T) {
-		options := NewServerRunOptions()
+		options := NewServerRunOptions(featuregate.NewFeatureGate())
 		if options.ShutdownWatchTerminationGracePeriod != time.Duration(0) {
 			t.Errorf("expected default of ShutdownWatchTerminationGracePeriod to be zero, but got: %s", options.ShutdownWatchTerminationGracePeriod)
 		}
