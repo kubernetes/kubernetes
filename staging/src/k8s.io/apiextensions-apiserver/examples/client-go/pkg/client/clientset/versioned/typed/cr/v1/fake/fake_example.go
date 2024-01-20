@@ -44,22 +44,24 @@ var examplesKind = v1.SchemeGroupVersion.WithKind("Example")
 
 // Get takes name of the example, and returns the corresponding example object, and an error if there is any.
 func (c *FakeExamples) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Example, err error) {
+	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(examplesResource, c.ns, name), &v1.Example{})
+		Invokes(testing.NewGetAction(examplesResource, c.ns, name), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Example), err
 }
 
 // List takes label and field selectors, and returns the list of Examples that match those selectors.
 func (c *FakeExamples) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ExampleList, err error) {
+	emptyResult := &v1.ExampleList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(examplesResource, examplesKind, c.ns, opts), &v1.ExampleList{})
+		Invokes(testing.NewListAction(examplesResource, examplesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -84,22 +86,24 @@ func (c *FakeExamples) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 
 // Create takes the representation of a example and creates it.  Returns the server's representation of the example, and an error, if there is any.
 func (c *FakeExamples) Create(ctx context.Context, example *v1.Example, opts metav1.CreateOptions) (result *v1.Example, err error) {
+	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(examplesResource, c.ns, example), &v1.Example{})
+		Invokes(testing.NewCreateAction(examplesResource, c.ns, example), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Example), err
 }
 
 // Update takes the representation of a example and updates it. Returns the server's representation of the example, and an error, if there is any.
 func (c *FakeExamples) Update(ctx context.Context, example *v1.Example, opts metav1.UpdateOptions) (result *v1.Example, err error) {
+	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(examplesResource, c.ns, example), &v1.Example{})
+		Invokes(testing.NewUpdateAction(examplesResource, c.ns, example), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Example), err
 }
@@ -122,11 +126,12 @@ func (c *FakeExamples) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 
 // Patch applies the patch and returns the patched example.
 func (c *FakeExamples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Example, err error) {
+	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, name, pt, data, subresources...), &v1.Example{})
+		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, name, pt, data, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Example), err
 }
@@ -144,11 +149,12 @@ func (c *FakeExamples) Apply(ctx context.Context, example *crv1.ExampleApplyConf
 	if name == nil {
 		return nil, fmt.Errorf("example.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, *name, types.ApplyPatchType, data), &v1.Example{})
+		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Example), err
 }
