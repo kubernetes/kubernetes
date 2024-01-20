@@ -38,11 +38,12 @@ var localsubjectaccessreviewsKind = v1beta1.SchemeGroupVersion.WithKind("LocalSu
 
 // Create takes the representation of a localSubjectAccessReview and creates it.  Returns the server's representation of the localSubjectAccessReview, and an error, if there is any.
 func (c *FakeLocalSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *v1beta1.LocalSubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.LocalSubjectAccessReview, err error) {
+	emptyResult := &v1beta1.LocalSubjectAccessReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(localsubjectaccessreviewsResource, c.ns, localSubjectAccessReview), &v1beta1.LocalSubjectAccessReview{})
+		Invokes(testing.NewCreateAction(localsubjectaccessreviewsResource, c.ns, localSubjectAccessReview), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.LocalSubjectAccessReview), err
 }
