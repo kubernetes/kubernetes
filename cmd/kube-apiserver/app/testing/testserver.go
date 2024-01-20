@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	clientgotransport "k8s.io/client-go/transport"
@@ -98,6 +99,9 @@ type TestServerInstanceOptions struct {
 	// We specify this as on option to pass a common proxyCA to multiple apiservers to simulate
 	// an apiserver version skew scenario where all apiservers use the same proxyCA to verify client connections.
 	ProxyCA *ProxyCA
+	// Set the BinaryVersion of server effective version.
+	// Default to 1.31
+	BinaryVersion string
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -177,10 +181,21 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	s := options.NewServerRunOptions()
+	featureGate := utilfeature.DefaultMutableFeatureGate
+	binaryVersion := utilversion.DefaultKubeEffectiveVersion().BinaryVersion().String()
+	if instanceOptions.BinaryVersion != "" {
+		binaryVersion = instanceOptions.BinaryVersion
+	}
+	effectiveVersion := utilversion.NewEffectiveVersion(binaryVersion)
+	_ = utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.ComponentGenericAPIServer, effectiveVersion, featureGate, true)
+
+	s := options.NewServerRunOptions(featureGate, effectiveVersion)
+
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
+	featureGate.AddFlag(fs, "")
+	effectiveVersion.AddFlags(fs, "")
 
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {
@@ -318,6 +333,10 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	if err := fs.Parse(customFlags); err != nil {
+		return result, err
+	}
+
+	if err := utilversion.DefaultComponentGlobalsRegistry.SetAllComponents(); err != nil {
 		return result, err
 	}
 

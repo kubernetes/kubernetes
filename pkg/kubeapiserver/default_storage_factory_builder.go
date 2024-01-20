@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -93,6 +94,7 @@ type StorageFactoryConfig struct {
 	Serializer                runtime.StorageSerializer
 	ResourceEncodingOverrides []schema.GroupVersionResource
 	EtcdServersOverrides      []string
+	CurrentVersion            version.EffectiveVersion
 }
 
 // Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.

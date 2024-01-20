@@ -17,6 +17,8 @@ limitations under the License.
 package apiserver
 
 import (
+	"strconv"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/install"
 	wardleregistry "k8s.io/sample-apiserver/pkg/registry"
@@ -37,7 +40,8 @@ var (
 	Scheme = runtime.NewScheme()
 	// Codecs provides methods for retrieving codecs and serializers for specific
 	// versions and content types.
-	Codecs = serializer.NewCodecFactory(Scheme)
+	Codecs              = serializer.NewCodecFactory(Scheme)
+	WardleComponentName = "wardle-server"
 )
 
 func init() {
@@ -90,10 +94,10 @@ func (cfg *Config) Complete() CompletedConfig {
 		cfg.GenericConfig.Complete(),
 		&cfg.ExtraConfig,
 	}
-
+	wardleEffectiveVersion := utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(WardleComponentName)
 	c.GenericConfig.Version = &version.Info{
-		Major: "1",
-		Minor: "0",
+		Major: strconv.Itoa(int(wardleEffectiveVersion.BinaryVersion().Major())),
+		Minor: strconv.Itoa(int(wardleEffectiveVersion.BinaryVersion().Minor())),
 	}
 
 	return CompletedConfig{&c}

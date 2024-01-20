@@ -29,6 +29,8 @@ import (
 	netutils "k8s.io/utils/net"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -63,7 +65,9 @@ func NewAPIServer(storageConfig storagebackend.Config) *APIServer {
 func (a *APIServer) Start(ctx context.Context) error {
 	const tokenFilePath = "known_tokens.csv"
 
-	o := options.NewServerRunOptions()
+	featureGate := utilfeature.DefaultFeatureGate
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	o := options.NewServerRunOptions(featureGate, effectiveVersion)
 	o.Etcd.StorageConfig = a.storageConfig
 	_, ipnet, err := netutils.ParseCIDRSloppy(clusterIPRange)
 	if err != nil {

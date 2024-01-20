@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -75,6 +76,7 @@ func TestEtcdStoragePath(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
+		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("0.0")
 	})
 	defer apiServer.Cleanup()
 	defer dumpEtcdKVOnFailure(t, apiServer.KV)

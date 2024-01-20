@@ -31,6 +31,9 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -58,10 +61,15 @@ type AggregatorOptions struct {
 // with a default AggregatorOptions.
 func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions) *cobra.Command {
 	o := *defaults
+	featureGate := o.ServerRunOptions.FeatureGate.(featuregate.MutableVersionedFeatureGate)
+	effectiveVersion := o.ServerRunOptions.EffectiveVersion.(utilversion.MutableEffectiveVersion)
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
 		RunE: func(c *cobra.Command, args []string) error {
+			if err := utilversion.DefaultComponentGlobalsRegistry.SetAllComponents(); err != nil {
+				return err
+			}
 			if err := o.Complete(); err != nil {
 				return err
 			}
@@ -76,7 +84,11 @@ func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions)
 	}
 	cmd.SetContext(ctx)
 
-	o.AddFlags(cmd.Flags())
+	fs := cmd.Flags()
+	featureGate.AddFlag(fs, "")
+	effectiveVersion.AddFlags(fs, "")
+
+	o.AddFlags(fs)
 	return cmd
 }
 
@@ -91,8 +103,13 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
+	// effectiveVersion is used to set what apis and feature gates the generic api server is compatible with.
+	// You can also have the flag setting the effectiveVersion of the aggregator apiserver, and
+	// having a mapping from the aggregator apiserver version to generic apiserver version.
+	effectiveVersion, featureGate := utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	o := &AggregatorOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(featureGate, effectiveVersion),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
@@ -117,7 +134,7 @@ func (o AggregatorOptions) Validate(args []string) error {
 
 // Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // RunAggregator runs the API Aggregator.

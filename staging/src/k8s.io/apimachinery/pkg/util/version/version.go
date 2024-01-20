@@ -145,6 +145,43 @@ func MustParseGeneric(str string) *Version {
 	return v
 }
 
+// Parse tries to do ParseSemantic first to keep more information.
+// If ParseSemantic fails, it would just do ParseGeneric.
+func Parse(str string) (*Version, error) {
+	v, err := parse(str, true)
+	if err != nil {
+		return parse(str, false)
+	}
+	return v, err
+}
+
+// MustParse is like Parse except that it panics on error
+func MustParse(str string) *Version {
+	v, err := Parse(str)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// ParseMajorMinor parses a "generic" version string and returns a version with the major and minor version.
+func ParseMajorMinor(str string) (*Version, error) {
+	v, err := ParseGeneric(str)
+	if err != nil {
+		return nil, err
+	}
+	return MajorMinor(v.Major(), v.Minor()), nil
+}
+
+// MustParseMajorMinor is like ParseMajorMinor except that it panics on error
+func MustParseMajorMinor(str string) *Version {
+	v, err := ParseMajorMinor(str)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // ParseSemantic parses a version string that exactly obeys the syntax and semantics of
 // the "Semantic Versioning" specification (http://semver.org/) (although it ignores
 // leading and trailing whitespace, and allows the version to be preceded by "v"). For
@@ -215,6 +252,21 @@ func (v *Version) WithMinor(minor uint) *Version {
 	return &result
 }
 
+// SubtractMinor returns the version diff minor versions back, with the same major and no patch.
+// If diff >= current minor, the minor would be 0.
+func (v *Version) SubtractMinor(diff uint) *Version {
+	var minor uint
+	if diff < v.Minor() {
+		minor = v.Minor() - diff
+	}
+	return MajorMinor(v.Major(), minor)
+}
+
+// AddMinor returns the version diff minor versions forward, with the same major and no patch.
+func (v *Version) AddMinor(diff uint) *Version {
+	return MajorMinor(v.Major(), v.Minor()+diff)
+}
+
 // WithPatch returns copy of the version object with requested patch number
 func (v *Version) WithPatch(patch uint) *Version {
 	result := *v
@@ -224,6 +276,9 @@ func (v *Version) WithPatch(patch uint) *Version {
 
 // WithPreRelease returns copy of the version object with requested prerelease
 func (v *Version) WithPreRelease(preRelease string) *Version {
+	if len(preRelease) == 0 {
+		return v
+	}
 	result := *v
 	result.components = []uint{v.Major(), v.Minor(), v.Patch()}
 	result.preRelease = preRelease
@@ -345,6 +400,17 @@ func onlyZeros(array []uint) bool {
 	return true
 }
 
+// EqualTo tests if a version is equal to a given version.
+func (v *Version) EqualTo(other *Version) bool {
+	if v == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	return v.compareInternal(other) == 0
+}
+
 // AtLeast tests if a version is at least equal to a given minimum version. If both
 // Versions are Semantic Versions, this will use the Semantic Version comparison
 // algorithm. Otherwise, it will compare only the numeric components, with non-present
@@ -358,6 +424,11 @@ func (v *Version) AtLeast(min *Version) bool {
 // "is v new enough?".)
 func (v *Version) LessThan(other *Version) bool {
 	return v.compareInternal(other) == -1
+}
+
+// GreaterThan tests if a version is greater than a given version.
+func (v *Version) GreaterThan(other *Version) bool {
+	return v.compareInternal(other) == 1
 }
 
 // Compare compares v against a version string (which will be parsed as either Semantic

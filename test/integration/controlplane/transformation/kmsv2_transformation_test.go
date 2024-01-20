@@ -1219,7 +1219,7 @@ func getRESTOptionsGetterForSecrets(t testing.TB, test *transformTest) generic.R
 		t.Fatal("not REST options found")
 	}
 
-	opts, err := genericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: "secrets"})
+	opts, err := genericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: "secrets"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

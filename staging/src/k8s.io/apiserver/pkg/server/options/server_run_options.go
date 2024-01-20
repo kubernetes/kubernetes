@@ -26,7 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/server"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
 
 	"github.com/spf13/pflag"
 )
@@ -89,9 +90,13 @@ type ServerRunOptions struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+
+	// FeatureGate are the featuregate to install on the CLI
+	FeatureGate      featuregate.FeatureGate
+	EffectiveVersion utilversion.EffectiveVersion
 }
 
-func NewServerRunOptions() *ServerRunOptions {
+func NewServerRunOptions(featureGate featuregate.FeatureGate, effectiveVersion utilversion.EffectiveVersion) *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
 		MaxRequestsInFlight:                 defaults.MaxRequestsInFlight,
@@ -104,6 +109,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		JSONPatchMaxCopyBytes:               defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:                 defaults.MaxRequestBodyBytes,
 		ShutdownSendRetryAfter:              false,
+		FeatureGate:                         featureGate,
+		EffectiveVersion:                    effectiveVersion,
 	}
 }
 
@@ -124,6 +131,8 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
+	c.EffectiveVersion = s.EffectiveVersion
+	c.FeatureGate = s.FeatureGate
 
 	return nil
 }
@@ -195,6 +204,14 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if err := validateCorsAllowedOriginList(s.CorsAllowedOriginList); err != nil {
 		errors = append(errors, err)
+	}
+	if s.FeatureGate != nil {
+		if errs := s.FeatureGate.Validate(); len(errs) != 0 {
+			errors = append(errors, errs...)
+		}
+	}
+	if errs := s.EffectiveVersion.Validate(); len(errs) != 0 {
+		errors = append(errors, errs...)
 	}
 	return errors
 }
@@ -336,6 +353,15 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ShutdownWatchTerminationGracePeriod, "shutdown-watch-termination-grace-period", s.ShutdownWatchTerminationGracePeriod, ""+
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
+}
 
-	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
+// Complete fills missing fields with defaults.
+func (s *ServerRunOptions) Complete() error {
+	if s.FeatureGate == nil {
+		return fmt.Errorf("nil FeatureGate in ServerRunOptions")
+	}
+	if s.EffectiveVersion == nil {
+		return fmt.Errorf("nil EffectiveVersion in ServerRunOptions")
+	}
+	return nil
 }

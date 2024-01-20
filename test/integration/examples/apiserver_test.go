@@ -292,6 +292,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			"--etcd-servers", framework.GetEtcdURL(),
 			"--cert-dir", wardleCertDir,
 			"--kubeconfig", wardleToKASKubeConfigFile,
+			"--wardle-emulated-version", "1.1",
 		})
 		if err := wardleCmd.Execute(); err != nil {
 			t.Error(err)

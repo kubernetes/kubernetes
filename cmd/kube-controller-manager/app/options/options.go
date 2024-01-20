@@ -273,7 +273,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
-	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
+	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"), "")
 
 	return fss
 }

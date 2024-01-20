@@ -31,9 +31,11 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
@@ -46,10 +48,15 @@ import (
 
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
-	s := NewServerRunOptions()
+
+	featureGate := featuregate.NewFeatureGate()
+	effectiveVersion := utilversion.NewEffectiveVersion("1.32")
+	s := NewServerRunOptions(featureGate, effectiveVersion)
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
+	featureGate.AddFlag(fs, "")
+	effectiveVersion.AddFlags(fs, "")
 
 	args := []string{
 		"--enable-admission-plugins=AlwaysDeny",
@@ -121,6 +128,7 @@ func TestAddFlags(t *testing.T) {
 		"--storage-backend=etcd3",
 		"--service-cluster-ip-range=192.168.128.0/17",
 		"--lease-reuse-duration-seconds=100",
+		"--emulated-version=1.31",
 	}
 	fs.Parse(args)
 
@@ -136,6 +144,8 @@ func TestAddFlags(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
 				MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
+				FeatureGate:                 featureGate,
+				EffectiveVersion:            effectiveVersion,
 			},
 			Admission: &kubeoptions.AdmissionOptions{
 				GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -336,5 +346,9 @@ func TestAddFlags(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
+	}
+
+	if s.GenericServerRunOptions.EffectiveVersion.EmulationVersion().String() != "1.31" {
+		t.Errorf("Got emulation version %s, wanted %s", s.GenericServerRunOptions.EffectiveVersion.EmulationVersion().String(), "1.31")
 	}
 }
