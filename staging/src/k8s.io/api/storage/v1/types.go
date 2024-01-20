@@ -25,6 +25,7 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.6
 
 // StorageClass describes the parameters for a class of storage for
 // which PersistentVolumes can be dynamically provisioned.
@@ -79,6 +80,7 @@ type StorageClass struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.6
 
 // StorageClassList is a collection of storage classes.
 type StorageClassList struct {
@@ -112,6 +114,7 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.13
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
@@ -137,6 +140,7 @@ type VolumeAttachment struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.13
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
@@ -227,6 +231,7 @@ type VolumeError struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.18
 
 // CSIDriver captures information about a Container Storage Interface (CSI)
 // volume driver deployed on the cluster.
@@ -251,6 +256,7 @@ type CSIDriver struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.18
 
 // CSIDriverList is a collection of CSIDriver objects.
 type CSIDriverList struct {
@@ -491,6 +497,7 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.17
 
 // CSINode holds information about all CSI drivers installed on a node.
 // CSI drivers do not need to create the CSINode object directly. As long as
@@ -572,6 +579,7 @@ type VolumeNodeResources struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.17
 
 // CSINodeList is a collection of CSINode objects.
 type CSINodeList struct {
@@ -588,6 +596,7 @@ type CSINodeList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.24
 
 // CSIStorageCapacity stores the result of one CSI GetCapacity call.
 // For a given StorageClass, this describes the available capacity in a
@@ -673,6 +682,7 @@ type CSIStorageCapacity struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.24
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
 type CSIStorageCapacityList struct {

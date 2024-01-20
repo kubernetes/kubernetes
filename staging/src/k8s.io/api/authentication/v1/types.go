@@ -45,7 +45,7 @@ const (
 // +genclient:nonNamespaced
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 // TokenReview attempts to authenticate a token to a known user.
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
@@ -134,6 +134,7 @@ func (t ExtraValue) String() string {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
 
 // TokenRequest requests a token for a given service account.
 type TokenRequest struct {
@@ -206,6 +207,7 @@ type BoundObjectReference struct {
 // +genclient:nonNamespaced
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.28
 
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or

@@ -118,7 +118,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 	f.SetEtcdLocation(example.Resource("*"), []string{"/server2"})
 	f.SetEtcdPrefix(example.Resource("test"), "/prefix_for_test")
 
-	config, err := f.NewConfig(example.Resource("test"))
+	config, err := f.NewConfig(example.Resource("test"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error
-		config, err := storageFactory.NewConfig(test.resource)
+		config, err := storageFactory.NewConfig(test.resource, nil)
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
@@ -173,7 +173,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			continue
 		}
 
-		config, err = storageFactory.NewConfig(schema.GroupResource{Group: examplev1.GroupName, Resource: "unlikely"})
+		config, err = storageFactory.NewConfig(schema.GroupResource{Group: examplev1.GroupName, Resource: "unlikely"}, nil)
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
@@ -244,3 +244,171 @@ func TestConfigs(t *testing.T) {
 		}
 	}
 }
+
+// func TestStorageFactoryCompatibilityVersion(t *testing.T) {
+// 	sch := runtime.NewScheme()
+// 	installflowcontrol.Install(sch)
+// 	installadmissionregistration.Install(sch)
+// 	installbatch.Install(sch)
+// 	installcore.Install(sch)
+
+// 	// FlowSchema
+// 	//   - v1beta1: 1.20.0 - 1.23.0
+// 	//   - v1beta2: 1.23.0 - 1.26.0
+// 	//   - v1beta3: 1.26.0 - 1.30.0
+// 	//   - v1: 1.30.0+
+// 	// CronJob
+// 	//	 - v1beta1: 1.8.0 - 1.21.0
+// 	//	 - v1: 1.21.0+
+// 	// ValidatingAdmissionPolicy
+// 	//	 - v1beta1: 1.29.0 - 1.31.0
+// 	//	 - v1: 1.31.0+
+
+// 	testcases := []struct {
+// 		effectiveVersion string
+// 		example          runtime.Object
+// 		resource         schema.GroupResource
+// 		expectedVersion  schema.GroupVersion
+// 	}{
+// 		{
+// 			// Basic case. Beta version for long time
+// 			effectiveVersion: "1.14.0",
+// 			example:          &batch.CronJob{},
+// 			resource:         batch.Resource("cronjobs"),
+// 			expectedVersion:  schema.GroupVersion{Group: "batch", Version: "v1beta1"},
+// 		},
+// 		{
+// 			// Basic case. Beta version for long time
+// 			effectiveVersion: "1.20.0",
+// 			example:          &batch.CronJob{},
+// 			resource:         batch.Resource("cronjobs"),
+// 			expectedVersion:  schema.GroupVersion{Group: "batch", Version: "v1beta1"},
+// 		},
+// 		{
+// 			// Basic case. Beta version for long time
+// 			effectiveVersion: "1.20.0",
+// 			example:          &batch.CronJob{},
+// 			resource:         batch.Resource("cronjobs"),
+// 			expectedVersion:  schema.GroupVersion{Group: "batch", Version: "v1beta1"},
+// 		},
+// 		{
+// 			// Basic case. GA version for long time
+// 			effectiveVersion: "1.28.0",
+// 			example:          &batch.CronJob{},
+// 			resource:         batch.Resource("cronjobs"),
+// 			expectedVersion:  schema.GroupVersion{Group: "batch", Version: "v1"},
+// 		},
+// 		{
+// 			// Basic core/v1
+// 			effectiveVersion: "1.31.0",
+// 			example:          &core.Pod{},
+// 			resource:         core.Resource("pods"),
+// 			expectedVersion:  schema.GroupVersion{Group: "", Version: "v1"},
+// 		},
+// 		{
+// 			// Corner case: 1.1.0 has no flowcontrol. Options are to error
+// 			// out or to use the latest version. This test assumes the latter.
+// 			effectiveVersion: "1.1.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1"},
+// 		},
+// 		{
+// 			effectiveVersion: "1.21.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+// 		},
+// 		{
+// 			// v2Beta1 introduced this version, but minCompatibility should
+// 			// force v1beta1
+// 			effectiveVersion: "1.23.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+// 		},
+// 		{
+// 			effectiveVersion: "1.24.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
+// 		},
+// 		{
+// 			effectiveVersion: "1.26.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
+// 		},
+// 		{
+// 			effectiveVersion: "1.27.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
+// 		},
+// 		{
+// 			// GA API introduced 1.29 but must keep storing in v1beta3 for downgrades
+// 			effectiveVersion: "1.29.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
+// 		},
+// 		{
+// 			// Version after GA api is introduced
+// 			effectiveVersion: "1.30.0",
+// 			example:          &flowcontrol.FlowSchema{},
+// 			resource:         flowcontrol.Resource("flowschemas"),
+// 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1"},
+// 		},
+// 		{
+// 			effectiveVersion: "1.30.0",
+// 			example:          &admissionregistration.ValidatingAdmissionPolicy{},
+// 			resource:         admissionregistration.Resource("validatingadmissionpolicies"),
+// 			expectedVersion:  schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+// 		},
+// 		{
+// 			effectiveVersion: "1.31.0",
+// 			example:          &admissionregistration.ValidatingAdmissionPolicy{},
+// 			resource:         admissionregistration.Resource("validatingadmissionpolicies"),
+// 			expectedVersion:  schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1"},
+// 		},
+// 		{
+// 			effectiveVersion: "1.29.0",
+// 			example:          &admissionregistration.ValidatingAdmissionPolicy{},
+// 			resource:         admissionregistration.Resource("validatingadmissionpolicies"),
+// 			expectedVersion:  schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+// 		},
+// 	}
+
+// 	for _, tc := range testcases {
+// 		config := NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
+// 		config.SetEffectiveVersion(version.NewEffectiveVersion(tc.effectiveVersion))
+// 		f := NewDefaultStorageFactory(
+// 			storagebackend.Config{},
+// 			"",
+// 			legacyscheme.Codecs,
+// 			config,
+// 			NewResourceConfig(),
+// 			nil)
+
+// 		cfg, err := f.NewConfig(tc.resource, tc.example)
+// 		if err != nil {
+// 			t.Fatalf("unexpected error: %v", err)
+// 		}
+
+// 		gvks, _, err := legacyscheme.Scheme.ObjectKinds(tc.example)
+// 		if err != nil {
+// 			t.Fatalf("unexpected error: %v", err)
+// 		}
+// 		expectEncodeVersioner := runtime.NewMultiGroupVersioner(tc.expectedVersion,
+// 			// One for memory version and one for storage version
+// 			// Test assumes storage & memory are same for all cases
+// 			schema.GroupKind{
+// 				Group: gvks[0].Group,
+// 			}, schema.GroupKind{
+// 				Group: gvks[0].Group,
+// 			})
+// 		if cfg.EncodeVersioner.Identifier() != expectEncodeVersioner.Identifier() {
+// 			t.Errorf("expected %v, got %v", expectEncodeVersioner, cfg.EncodeVersioner)
+// 		}
+// 	}
+// }

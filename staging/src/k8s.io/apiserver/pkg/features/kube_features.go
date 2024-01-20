@@ -314,6 +314,17 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+}
+
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
+// To add a new feature, define a key for it above and add it here. The features will be
+// available throughout Kubernetes binaries.
+var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	// Example:
+	// EmulationVersion: {
+	// 	{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	// },
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.

@@ -659,7 +659,7 @@ func TestCustomResourceDefaultingOfMetaFields(t *testing.T) {
 
 	// get persisted object
 	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, nil, nil)
-	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
+	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

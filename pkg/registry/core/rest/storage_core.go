@@ -321,7 +321,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryClusterIPAllocator ipallocator.Interface, clusterIPAllocators map[api.IPFamily]ipallocator.Interface, nodePortAllocator *portallocator.PortAllocator, err error) {
 	clusterIPAllocators = map[api.IPFamily]ipallocator.Interface{}
 
-	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
+	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"), &api.Service{})
 	if err != nil {
 		return rangeRegistries{}, nil, nil, nil, err
 	}

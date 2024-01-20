@@ -24,15 +24,25 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 )
 
 func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command {
-	o := options.NewCustomResourceDefinitionsServerOptions(out, errOut)
+	featureGate := utilfeature.DefaultMutableFeatureGate
+	effectiveVersion := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrRegister(
+		utilversion.ComponentGenericAPIServer, utilversion.K8sDefaultEffectiveVersion())
+	featureGate.DeferErrorsToValidation(true)
+	o := options.NewCustomResourceDefinitionsServerOptions(out, errOut, featureGate, effectiveVersion)
 
 	cmd := &cobra.Command{
 		Short: "Launch an API extensions API server",
 		Long:  "Launch an API extensions API server",
 		RunE: func(c *cobra.Command, args []string) error {
+			if err := featureGate.SetEmulationVersion(effectiveVersion.EmulationVersion()); err != nil {
+				return err
+			}
+
 			if err := o.Complete(); err != nil {
 				return err
 			}
@@ -48,6 +58,8 @@ func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command
 	cmd.SetContext(ctx)
 
 	fs := cmd.Flags()
+	featureGate.AddFlag(fs)
+	effectiveVersion.AddFlags(fs, "")
 	o.AddFlags(fs)
 	return cmd
 }

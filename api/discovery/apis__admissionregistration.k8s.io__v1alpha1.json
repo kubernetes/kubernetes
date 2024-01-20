@@ -11,7 +11,7 @@
       "name": "validatingadmissionpolicies",
       "namespaced": false,
       "singularName": "validatingadmissionpolicy",
-      "storageVersionHash": "P/h9c6yIbaY=",
+      "storageVersionHash": "6OxvlMmQ6is=",
       "verbs": [
         "create",
         "delete",
@@ -42,7 +42,7 @@
       "name": "validatingadmissionpolicybindings",
       "namespaced": false,
       "singularName": "validatingadmissionpolicybinding",
-      "storageVersionHash": "XYju31JKYek=",
+      "storageVersionHash": "v9715VZqakg=",
       "verbs": [
         "create",
         "delete",

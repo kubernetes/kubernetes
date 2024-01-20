@@ -126,6 +126,11 @@ message TokenRequestStatus {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time expirationTimestamp = 2;
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +genclient:onlyVerbs=create
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 // TokenReview attempts to authenticate a token to a known user.
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.

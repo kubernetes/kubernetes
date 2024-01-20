@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -32,7 +34,9 @@ import (
 )
 
 func TestBuildGenericConfig(t *testing.T) {
-	opts := options.NewOptions()
+	featureGate := featuregate.NewFeatureGate()
+	effectiveVersion := utilversion.TestEffectiveVersion()
+	opts := options.NewOptions(featureGate, effectiveVersion)
 	s := (&apiserveroptions.SecureServingOptions{
 		BindAddress: netutils.ParseIPSloppy("127.0.0.1"),
 	}).WithLoopback()
@@ -66,7 +70,7 @@ func TestBuildGenericConfig(t *testing.T) {
 		t.Errorf("There are different StorageObjectCountTracker in genericConfig and storageFactory")
 	}
 
-	restOptions, err := genericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""})
+	restOptions, err := genericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

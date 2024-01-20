@@ -17,7 +17,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
-
+// +k8s:prerelease-lifecycle-gen=true
 // +groupName=apidiscovery.k8s.io
 
 package v2 // import "k8s.io/api/apidiscovery/v2"

@@ -154,6 +154,8 @@ message AdmissionResponse {
   repeated string warnings = 7;
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 // AdmissionReview describes an admission review request/response.
 message AdmissionReview {
   // Request describes the attributes for the admission request.
