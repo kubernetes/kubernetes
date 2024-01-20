@@ -20,6 +20,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -866,7 +867,7 @@ func TestLoadAuthenticationConfig(t *testing.T) {
 		{
 			name:           "missing file",
 			file:           func() string { return "bogus-missing-file" },
-			expectErr:      "no such file or directory",
+			expectErr:      syscall.Errno(syscall.ENOENT).Error(),
 			expectedConfig: nil,
 		},
 		{
@@ -998,6 +999,10 @@ func writeTempFile(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
+		// An open file cannot be removed on Windows. Close it first.
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.Remove(file.Name()); err != nil {
 			t.Fatal(err)
 		}
