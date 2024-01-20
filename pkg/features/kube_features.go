@@ -45,6 +45,12 @@ const (
 	// with DNS names.
 	AllowDNSOnlyNodeCSR featuregate.Feature = "AllowDNSOnlyNodeCSR"
 
+	// owner: @HirazawaUi
+	// Deprecated: v1.32
+	//
+	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
+	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
+
 	// owner: @bswartz
 	// alpha: v1.18
 	// beta: v1.24
