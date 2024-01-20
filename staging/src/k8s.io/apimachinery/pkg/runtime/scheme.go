@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // Scheme defines methods for serializing and deserializing API objects, a type
@@ -82,6 +83,13 @@ type Scheme struct {
 	// schemeName is the name of this scheme.  If you don't specify a name, the stack of the NewScheme caller will be used.
 	// This is useful for error reporting to indicate the origin of the scheme.
 	schemeName string
+
+	// gvToAPILifecycle maps GroupVersion to its APILifecycle.
+	// not required for all GVs.
+	gvToAPILifecycle map[schema.GroupVersion]schema.APILifecycle
+	// gvrToAPILifecycle maps GroupVersionResource to its APILifecycle.
+	// a GVR map entry is required only when the GVR has a different lifecycle than the GV.
+	gvrToAPILifecycle map[schema.GroupVersionResource]schema.APILifecycle
 }
 
 // FieldLabelConversionFunc converts a field selector to internal representation.
@@ -98,6 +106,8 @@ func NewScheme() *Scheme {
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 		versionPriority:           map[string][]string{},
 		schemeName:                naming.GetNameFromCallsite(internalPackages...),
+		gvToAPILifecycle:          map[schema.GroupVersion]schema.APILifecycle{},
+		gvrToAPILifecycle:         map[schema.GroupVersionResource]schema.APILifecycle{},
 	}
 	s.converter = conversion.NewConverter(nil)
 
@@ -695,6 +705,73 @@ func (s *Scheme) addObservedVersion(version schema.GroupVersion) {
 	}
 
 	s.observedVersions = append(s.observedVersions, version)
+}
+
+// objectAPILifecycle extracts the APILifecycle from Object interface.
+// returns the APILifecycle, and whether the object has any lifecycle specified.
+func objectAPILifecycle(obj Object) (schema.APILifecycle, bool) {
+	hasLifecycle := false
+	ret := schema.APILifecycle{}
+	introduced, isIntroduced := obj.(apiLifecycleIntroduced)
+	if isIntroduced {
+		major, minor := introduced.APILifecycleIntroduced()
+		ret.IntroducedVersion = version.MajorMinor(uint(major), uint(minor))
+		hasLifecycle = true
+	}
+	removed, isRemoved := obj.(apiLifecycleRemoved)
+	if isRemoved {
+		major, minor := removed.APILifecycleRemoved()
+		ret.RemovedVersion = version.MajorMinor(uint(major), uint(minor))
+		hasLifecycle = true
+	}
+
+	return ret, hasLifecycle
+}
+
+// Object interface generated from "k8s:prerelease-lifecycle-gen:introduced" tags in types.go.
+type apiLifecycleIntroduced interface {
+	APILifecycleIntroduced() (major, minor int)
+}
+
+// Object interface generated from "k8s:prerelease-lifecycle-gen:removed" tags in types.go.
+type apiLifecycleRemoved interface {
+	APILifecycleRemoved() (major, minor int)
+}
+
+// SetGroupVersionLifecycle sets the APILifecycle for the GroupVersion.
+func (s *Scheme) SetGroupVersionLifecycle(gv schema.GroupVersion, lifecycle schema.APILifecycle) {
+	s.gvToAPILifecycle[gv] = lifecycle
+}
+
+// SetResourceLifecycle sets the APILifecycle for the GroupVersionResource,
+// based on Object interfaces generated from "k8s:prerelease-lifecycle-gen:" tags in types.go.
+// Only needed if the GVR lifecycle is different from the GV lifecycle.
+func (s *Scheme) SetResourceLifecycle(gvr schema.GroupVersionResource, obj Object) {
+	lifecycle, hasLifecycle := objectAPILifecycle(obj)
+	if hasLifecycle {
+		s.gvrToAPILifecycle[gvr] = lifecycle
+	}
+}
+
+// GroupVersionLifecycle returns the APILifecycle for the GroupVersion.
+// Returns empty APILifecycle if the GV is not registered, which means the GV is always available.
+func (s *Scheme) GroupVersionLifecycle(gv schema.GroupVersion) schema.APILifecycle {
+	return s.gvToAPILifecycle[gv]
+}
+
+// ResourceLifecycle returns the APILifecycle for the GroupVersionResource.
+// The IntroducedVersion falls back to GV IntroducedVersion if GVR IntroducedVersion is not set.
+// The RemovedVersion falls back to GV RemovedVersion if GVR RemovedVersion is not set.
+func (s *Scheme) ResourceLifecycle(gvr schema.GroupVersionResource) schema.APILifecycle {
+	lifecycle := s.gvrToAPILifecycle[gvr]
+	gvLifecycle := s.GroupVersionLifecycle(gvr.GroupVersion())
+	if lifecycle.IntroducedVersion == nil {
+		lifecycle.IntroducedVersion = gvLifecycle.IntroducedVersion
+	}
+	if lifecycle.RemovedVersion == nil {
+		lifecycle.RemovedVersion = gvLifecycle.RemovedVersion
+	}
+	return lifecycle
 }
 
 func (s *Scheme) Name() string {

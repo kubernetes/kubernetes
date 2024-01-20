@@ -19,6 +19,8 @@ package schema
 import (
 	"fmt"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // ParseResourceArg takes the common style of string which may be either `resource.group.com` or `resource.version.group.com`
@@ -302,4 +304,41 @@ func FromAPIVersionAndKind(apiVersion, kind string) GroupVersionKind {
 		return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
 	}
 	return GroupVersionKind{Kind: kind}
+}
+
+// APILifecycle stores information about the versions when a group version or a resource type is introduced and removed.
+// It is checked to make sure a gvr is not available before its type is introduced or after it is removed.
+// This can be set when registering the lifecycle of a group version with SetGroupVersionLifecycle or
+// when registering the lifecycle of a resource type with SetResourceLifecycle in a Scheme.
+// To set the APILifecycle for your resources:
+// in register.go,
+//
+// 	func addKnownTypes(scheme *runtime.Scheme) error {
+// 		scheme.AddKnownTypes(SchemeGroupVersion,
+// 			&Example{},
+// 			&ExampleList{},
+// 		)
+// 		metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+// 		// If all individual resource types of this group share the lifecycle of the group:
+// 		scheme.SetGroupVersionLifecycle(SchemeGroupVersion, schema.APILifecycle{
+// 			IntroducedVersion: version.MajorMinor(1, 20),
+// 			RemovedVersion:    version.MajorMinor(1, 26),
+// 		}
+// 		// If not all individual resource types of this group share the same lifecycle:
+// 		// The resource lifecyle is derived from the Object interfaces generated from "k8s:prerelease-lifecycle-gen:" tags in types.go.
+// 		scheme.SetResourceLifecycle(SchemeGroupVersion.WithResource("example"), &Example{})
+// 		scheme.SetResourceLifecycle(SchemeGroupVersion.WithResource("example"), &ExampleList{})
+// 		return nil
+// 	}
+
+type APILifecycle struct {
+	// optional, nil IntroducedVersion means "it's been around long enough that we don't track the introduced version".
+	IntroducedVersion *version.Version
+	// optional, nil RemovedVersion means "it' never been assigned a removal version".
+	// RemovedVersion can be set to future version and will be automatically removed after that version.
+	RemovedVersion *version.Version
+}
+
+func (v APILifecycle) EqualTo(other APILifecycle) bool {
+	return v.IntroducedVersion.EqualTo(other.IntroducedVersion) && v.RemovedVersion.EqualTo(other.RemovedVersion)
 }

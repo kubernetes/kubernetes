@@ -54,5 +54,11 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PriorityLevelConfigurationList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+
+	// Registers the lifecycle of the resource types, which is checked to make sure a gvr is not available before its type is introduced or after it is removed.
+	scheme.SetResourceLifecycle(SchemeGroupVersion.WithResource("flowschema"), &FlowSchema{})
+	scheme.SetResourceLifecycle(SchemeGroupVersion.WithResource("flowschemas"), &FlowSchemaList{})
+	scheme.SetResourceLifecycle(SchemeGroupVersion.WithResource("prioritylevelconfiguration"), &PriorityLevelConfiguration{})
+	scheme.SetResourceLifecycle(SchemeGroupVersion.WithResource("prioritylevelconfigurations"), &PriorityLevelConfigurationList{})
 	return nil
 }

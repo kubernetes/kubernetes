@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // GroupName is the name of api group
@@ -54,5 +55,14 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PriorityLevelConfigurationList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+
+	// Registers the lifecycle of the group version, which is checked to make sure a gvr is not available before its type is introduced or after it is removed.
+	// All individual resource types of this group share the lifecycle of the group and
+	// do not require their own lifecycles to be specified, like: scheme.SetResourceLifecycle(SchemeGroupVersion.WithResource("flowschema"), &FlowSchema{})
+	scheme.SetGroupVersionLifecycle(SchemeGroupVersion, schema.APILifecycle{
+		IntroducedVersion: version.MajorMinor(1, 20),
+		RemovedVersion:    version.MajorMinor(1, 26),
+	})
+
 	return nil
 }

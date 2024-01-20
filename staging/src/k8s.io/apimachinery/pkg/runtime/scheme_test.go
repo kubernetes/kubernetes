@@ -30,6 +30,7 @@ import (
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 type testConversions struct {
@@ -1007,5 +1008,151 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 	// Verify that our conversion handler got called.
 	if e, a := 1, internalToExternalCalls; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
+func TestGroupVersionLifecycle(t *testing.T) {
+	s := runtime.NewScheme()
+	// lifecycle is set
+	v1 := schema.GroupVersion{Group: "group1", Version: "version1"}
+	lifecycle1 := schema.APILifecycle{IntroducedVersion: version.MajorMinor(1, 21), RemovedVersion: version.MajorMinor(1, 25)}
+	s.SetGroupVersionLifecycle(v1, lifecycle1)
+	// lifecycle is not set
+	v2 := schema.GroupVersion{Group: "group2", Version: "version2"}
+	lifecycle2 := schema.APILifecycle{}
+
+	if e, a := lifecycle1, s.GroupVersionLifecycle(v1); !e.EqualTo(a) {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := lifecycle2, s.GroupVersionLifecycle(v2); !e.EqualTo(a) {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
+type defaultObj struct {
+}
+
+func (r defaultObj) GetObjectKind() schema.ObjectKind {
+	panic("don't do this")
+}
+func (r defaultObj) DeepCopyObject() runtime.Object {
+	panic("don't do this either")
+}
+
+type introducedInObj struct {
+	major, minor int
+}
+
+func (r introducedInObj) GetObjectKind() schema.ObjectKind {
+	panic("don't do this")
+}
+func (r introducedInObj) DeepCopyObject() runtime.Object {
+	panic("don't do this either")
+}
+func (r introducedInObj) APILifecycleIntroduced() (major, minor int) {
+	return r.major, r.minor
+}
+
+type removedInObj struct {
+	major, minor int
+}
+
+func (r removedInObj) GetObjectKind() schema.ObjectKind {
+	panic("don't do this")
+}
+func (r removedInObj) DeepCopyObject() runtime.Object {
+	panic("don't do this either")
+}
+func (r removedInObj) APILifecycleRemoved() (major, minor int) {
+	return r.major, r.minor
+}
+
+type introducedAndRemovedInObj struct {
+	majorIntroduced, minorIntroduced, majorRemoved, minorRemoved int
+}
+
+func (r introducedAndRemovedInObj) GetObjectKind() schema.ObjectKind {
+	panic("don't do this")
+}
+func (r introducedAndRemovedInObj) DeepCopyObject() runtime.Object {
+	panic("don't do this either")
+}
+func (r introducedAndRemovedInObj) APILifecycleRemoved() (major, minor int) {
+	return r.majorRemoved, r.minorRemoved
+}
+func (r introducedAndRemovedInObj) APILifecycleIntroduced() (major, minor int) {
+	return r.majorIntroduced, r.minorIntroduced
+}
+
+func TestResourceLifecycle(t *testing.T) {
+	testCases := []struct {
+		obj                   runtime.Object
+		groupVersionLifecycle schema.APILifecycle
+		expectedLifecycle     schema.APILifecycle
+	}{
+		{
+			obj:               &removedInObj{1, 25},
+			expectedLifecycle: schema.APILifecycle{RemovedVersion: version.MajorMinor(1, 25)},
+		},
+		{
+			obj: &removedInObj{1, 25},
+			groupVersionLifecycle: schema.APILifecycle{
+				IntroducedVersion: version.MajorMinor(1, 22),
+				RemovedVersion:    version.MajorMinor(1, 26),
+			},
+			expectedLifecycle: schema.APILifecycle{
+				IntroducedVersion: version.MajorMinor(1, 22),
+				RemovedVersion:    version.MajorMinor(1, 25),
+			},
+		},
+		{
+			obj:               &introducedInObj{1, 20},
+			expectedLifecycle: schema.APILifecycle{IntroducedVersion: version.MajorMinor(1, 20)},
+		},
+		{
+			obj: &introducedInObj{1, 20},
+			groupVersionLifecycle: schema.APILifecycle{
+				IntroducedVersion: version.MajorMinor(1, 19),
+				RemovedVersion:    version.MajorMinor(1, 25),
+			},
+			expectedLifecycle: schema.APILifecycle{
+				IntroducedVersion: version.MajorMinor(1, 20),
+				RemovedVersion:    version.MajorMinor(1, 25),
+			},
+		},
+		{
+			obj:               &introducedAndRemovedInObj{1, 27, 1, 29},
+			expectedLifecycle: schema.APILifecycle{IntroducedVersion: version.MajorMinor(1, 27), RemovedVersion: version.MajorMinor(1, 29)},
+		},
+		{
+			obj:               &defaultObj{},
+			expectedLifecycle: schema.APILifecycle{},
+		},
+		{
+			expectedLifecycle: schema.APILifecycle{},
+		},
+		{
+			groupVersionLifecycle: schema.APILifecycle{RemovedVersion: version.MajorMinor(1, 25)},
+			expectedLifecycle:     schema.APILifecycle{RemovedVersion: version.MajorMinor(1, 25)},
+		},
+		{
+			groupVersionLifecycle: schema.APILifecycle{IntroducedVersion: version.MajorMinor(1, 25)},
+			expectedLifecycle:     schema.APILifecycle{IntroducedVersion: version.MajorMinor(1, 25)},
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			s := runtime.NewScheme()
+			r := schema.GroupVersionResource{Group: "group", Version: "version", Resource: "r"}
+			if tc.obj != nil {
+				s.SetResourceLifecycle(r, tc.obj)
+			}
+			if tc.groupVersionLifecycle != (schema.APILifecycle{}) {
+				s.SetGroupVersionLifecycle(r.GroupVersion(), tc.groupVersionLifecycle)
+			}
+			if e, a := tc.expectedLifecycle, s.ResourceLifecycle(r); !e.EqualTo(a) {
+				t.Errorf("Expected %v, got %v", e, a)
+			}
+		})
 	}
 }

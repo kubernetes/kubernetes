@@ -345,6 +345,17 @@ func onlyZeros(array []uint) bool {
 	return true
 }
 
+// EqualTo tests if a version is equal to a given version.
+func (v *Version) EqualTo(other *Version) bool {
+	if v == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	return v.compareInternal(other) == 0
+}
+
 // AtLeast tests if a version is at least equal to a given minimum version. If both
 // Versions are Semantic Versions, this will use the Semantic Version comparison
 // algorithm. Otherwise, it will compare only the numeric components, with non-present
