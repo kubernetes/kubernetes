@@ -91,13 +91,9 @@ This is implemented as follows:
     explicitly before or after any other rules (since they match packets that wouldn't be
     matched by any other rules). But with kernels before 5.9, `reject` is not allowed in
     `prerouting`, so we can't just do them in the same place as the source ranges
-    firewall. So we do these checks from `input`, `forward`, and `output`, to cover all
-    three paths. (In fact, we only need to check `@no-endpoint-nodeports` on the `input`
-    hook, but it's easier to just check them both in one place, and this code is likely to
-    be rewritten later anyway. Note that the converse statement "we only need to check
-    `@no-endpoint-services` on the `forward` and `output` hooks" is *not* true, because
-    `@no-endpoint-services` may include externalIPs/LB IPs that are assigned to local
-    interfaces.)
+    firewall. So we do these checks from `input`, `forward`, and `output` for
+    `@no-endpoint-services` and from `input` for `@no-endpoint-nodeports` to cover all
+    the possible paths.
 
   - Masquerading has to happen in the `postrouting` hook, because "masquerade" means "SNAT
     to the IP of the interface the packet is going out on", so it has to happen after the

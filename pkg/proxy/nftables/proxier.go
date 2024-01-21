@@ -86,10 +86,11 @@ const (
 	clusterIPsSet = "cluster-ips"
 
 	// handling for services with no endpoints
-	endpointsCheckChain    = "endpoints-check"
-	noEndpointServicesMap  = "no-endpoint-services"
-	noEndpointNodePortsMap = "no-endpoint-nodeports"
-	rejectChain            = "reject-chain"
+	serviceEndpointsCheckChain  = "service-endpoints-check"
+	nodePortEndpointsCheckChain = "nodeport-endpoints-check"
+	noEndpointServicesMap       = "no-endpoint-services"
+	noEndpointNodePortsMap      = "no-endpoint-nodeports"
+	rejectChain                 = "reject-chain"
 
 	// handling traffic to unallocated ClusterIPs and undefined ports of ClusterIPs
 	clusterIPsCheckChain = "cluster-ips-check"
@@ -353,9 +354,10 @@ var nftablesJumpChains = []nftablesJumpChain{
 	// We can't jump to endpointsCheckChain from filter-prerouting like
 	// firewallCheckChain because reject action is only valid in chains using the
 	// input, forward or output hooks.
-	{endpointsCheckChain, filterInputChain, "ct state new"},
-	{endpointsCheckChain, filterForwardChain, "ct state new"},
-	{endpointsCheckChain, filterOutputChain, "ct state new"},
+	{nodePortEndpointsCheckChain, filterInputChain, "ct state new"},
+	{serviceEndpointsCheckChain, filterInputChain, "ct state new"},
+	{serviceEndpointsCheckChain, filterForwardChain, "ct state new"},
+	{serviceEndpointsCheckChain, filterOutputChain, "ct state new"},
 
 	{firewallCheckChain, filterPreroutingChain, "ct state new"},
 	{firewallCheckChain, filterOutputChain, "ct state new"},
@@ -541,7 +543,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	})
 
 	tx.Add(&knftables.Rule{
-		Chain: endpointsCheckChain,
+		Chain: serviceEndpointsCheckChain,
 		Rule: knftables.Concat(
 			ipX, "daddr", ".", "meta l4proto", ".", "th dport",
 			"vmap", "@", noEndpointServicesMap,
@@ -550,9 +552,8 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 
 	if proxier.nodePortAddresses.MatchAll() {
 		tx.Add(&knftables.Rule{
-			Chain: endpointsCheckChain,
+			Chain: nodePortEndpointsCheckChain,
 			Rule: knftables.Concat(
-				"fib daddr type local",
 				noLocalhost,
 				"meta l4proto . th dport",
 				"vmap", "@", noEndpointNodePortsMap,
@@ -560,7 +561,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		})
 	} else {
 		tx.Add(&knftables.Rule{
-			Chain: endpointsCheckChain,
+			Chain: nodePortEndpointsCheckChain,
 			Rule: knftables.Concat(
 				ipX, "daddr", "@", nodePortIPsSet,
 				"meta l4proto . th dport",

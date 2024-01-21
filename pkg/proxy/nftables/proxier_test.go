@@ -513,12 +513,13 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
 		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
 		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
-		add rule ip kube-proxy filter-forward ct state new jump endpoints-check
+		add rule ip kube-proxy filter-forward ct state new jump service-endpoints-check
 		add rule ip kube-proxy filter-forward ct state new jump cluster-ips-check
 		add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
-		add rule ip kube-proxy filter-input ct state new jump endpoints-check
+		add rule ip kube-proxy filter-input ct state new jump nodeport-endpoints-check
+		add rule ip kube-proxy filter-input ct state new jump service-endpoints-check
 		add chain ip kube-proxy filter-output { type filter hook output priority -110 ; }
-		add rule ip kube-proxy filter-output ct state new jump endpoints-check
+		add rule ip kube-proxy filter-output ct state new jump service-endpoints-check
 		add rule ip kube-proxy filter-output ct state new jump firewall-check
 		add chain ip kube-proxy filter-output-post-dnat { type filter hook output priority -90 ; }
 		add rule ip kube-proxy filter-output-post-dnat ct state new jump cluster-ips-check
@@ -544,9 +545,10 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add map ip kube-proxy no-endpoint-services { type ipv4_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
 		add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
 
-		add chain ip kube-proxy endpoints-check
-		add rule ip kube-proxy endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
-		add rule ip kube-proxy endpoints-check fib daddr type local ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @no-endpoint-nodeports
+		add chain ip kube-proxy nodeport-endpoints-check
+		add rule ip kube-proxy nodeport-endpoints-check ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @no-endpoint-nodeports
+		add chain ip kube-proxy service-endpoints-check
+		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
 
 		add map ip kube-proxy service-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
 		add map ip kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
@@ -4268,7 +4270,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add table ip kube-proxy { comment "rules for kube-proxy" ; }
 
 		add chain ip kube-proxy cluster-ips-check
-		add chain ip kube-proxy endpoints-check
 		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
 		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
 		add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
@@ -4280,18 +4281,19 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
 		add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
 		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
+		add chain ip kube-proxy nodeport-endpoints-check
 		add chain ip kube-proxy reject-chain { comment "helper for @no-endpoint-services / @no-endpoint-nodeports" ; }
 		add chain ip kube-proxy services
+		add chain ip kube-proxy service-endpoints-check
 
 		add rule ip kube-proxy cluster-ips-check ip daddr @cluster-ips reject comment "Reject traffic to invalid ports of ClusterIPs"
 		add rule ip kube-proxy cluster-ips-check ip daddr { 172.30.0.0/16 } drop comment "Drop traffic to unallocated ClusterIPs"
-		add rule ip kube-proxy endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
-		add rule ip kube-proxy endpoints-check fib daddr type local ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @no-endpoint-nodeports
 		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
-		add rule ip kube-proxy filter-forward ct state new jump endpoints-check
+		add rule ip kube-proxy filter-forward ct state new jump service-endpoints-check
 		add rule ip kube-proxy filter-forward ct state new jump cluster-ips-check
-		add rule ip kube-proxy filter-input ct state new jump endpoints-check
-		add rule ip kube-proxy filter-output ct state new jump endpoints-check
+		add rule ip kube-proxy filter-input ct state new jump nodeport-endpoints-check
+		add rule ip kube-proxy filter-input ct state new jump service-endpoints-check
+		add rule ip kube-proxy filter-output ct state new jump service-endpoints-check
 		add rule ip kube-proxy filter-output ct state new jump firewall-check
 		add rule ip kube-proxy filter-output-post-dnat ct state new jump cluster-ips-check
 		add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
@@ -4302,9 +4304,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy nat-output jump services
 		add rule ip kube-proxy nat-postrouting jump masquerading
 		add rule ip kube-proxy nat-prerouting jump services
+		add rule ip kube-proxy nodeport-endpoints-check ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @no-endpoint-nodeports
 		add rule ip kube-proxy reject-chain reject
 		add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
 		add rule ip kube-proxy services fib daddr type local ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @service-nodeports
+		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
 
 		add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
 
