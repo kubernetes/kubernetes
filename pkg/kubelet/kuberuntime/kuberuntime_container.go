@@ -1009,9 +1009,9 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// hasAnyRegularContainerCreated returns true if any regular container has been
+// HasAnyRegularContainerCreated returns true if any regular container has been
 // created, which indicates all init containers have been initialized.
-func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+func HasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	for _, container := range pod.Spec.Containers {
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {
