@@ -64,26 +64,26 @@ const (
 	kubeProxyTable = "kube-proxy"
 
 	// service dispatch
-	kubeServicesChain       = "services"
-	kubeServiceIPsMap       = "service-ips"
-	kubeServiceNodePortsMap = "service-nodeports"
+	servicesChain       = "services"
+	serviceIPsMap       = "service-ips"
+	serviceNodePortsMap = "service-nodeports"
 
 	// set of IPs that accept NodePort traffic
-	kubeNodePortIPsSet = "nodeport-ips"
+	nodePortIPsSet = "nodeport-ips"
 
 	// handling for services with no endpoints
-	kubeEndpointsCheckChain    = "endpoints-check"
-	kubeNoEndpointServicesMap  = "no-endpoint-services"
-	kubeNoEndpointNodePortsMap = "no-endpoint-nodeports"
-	kubeRejectChain            = "reject-chain"
+	endpointsCheckChain    = "endpoints-check"
+	noEndpointServicesMap  = "no-endpoint-services"
+	noEndpointNodePortsMap = "no-endpoint-nodeports"
+	rejectChain            = "reject-chain"
 
 	// LoadBalancerSourceRanges handling
-	kubeFirewallIPsMap     = "firewall-ips"
-	kubeFirewallCheckChain = "firewall-check"
+	firewallIPsMap     = "firewall-ips"
+	firewallCheckChain = "firewall-check"
 
 	// masquerading
-	kubeMarkMasqChain     = "mark-for-masquerade"
-	kubeMasqueradingChain = "masquerading"
+	markMasqChain     = "mark-for-masquerade"
+	masqueradingChain = "masquerading"
 )
 
 // internal struct for string service information
@@ -328,19 +328,19 @@ type nftablesJumpChain struct {
 }
 
 var nftablesJumpChains = []nftablesJumpChain{
-	// We can't jump to kubeEndpointsCheckChain from filter-prerouting like
-	// kubeFirewallCheckChain because reject action is only valid in chains using the
+	// We can't jump to endpointsCheckChain from filter-prerouting like
+	// firewallCheckChain because reject action is only valid in chains using the
 	// input, forward or output hooks.
-	{kubeEndpointsCheckChain, "filter-input", "ct state new"},
-	{kubeEndpointsCheckChain, "filter-forward", "ct state new"},
-	{kubeEndpointsCheckChain, "filter-output", "ct state new"},
+	{endpointsCheckChain, "filter-input", "ct state new"},
+	{endpointsCheckChain, "filter-forward", "ct state new"},
+	{endpointsCheckChain, "filter-output", "ct state new"},
 
-	{kubeFirewallCheckChain, "filter-prerouting", "ct state new"},
-	{kubeFirewallCheckChain, "filter-output", "ct state new"},
+	{firewallCheckChain, "filter-prerouting", "ct state new"},
+	{firewallCheckChain, "filter-output", "ct state new"},
 
-	{kubeServicesChain, "nat-output", ""},
-	{kubeServicesChain, "nat-prerouting", ""},
-	{kubeMasqueradingChain, "nat-postrouting", ""},
+	{servicesChain, "nat-output", ""},
+	{servicesChain, "nat-prerouting", ""},
+	{masqueradingChain, "nat-postrouting", ""},
 }
 
 // ensureChain adds commands to tx to ensure that chain exists and doesn't contain
@@ -399,33 +399,33 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{kubeServicesChain, kubeMasqueradingChain, kubeMarkMasqChain} {
+	for _, chain := range []string{servicesChain, masqueradingChain, markMasqChain} {
 		ensureChain(chain, tx, createdChains)
 	}
 
 	// Add the rules in the mark-for-masquerade and masquerading chains
 	tx.Add(&knftables.Rule{
-		Chain: kubeMarkMasqChain,
+		Chain: markMasqChain,
 		Rule: knftables.Concat(
 			"mark", "set", "mark", "or", proxier.masqueradeMark,
 		),
 	})
 
 	tx.Add(&knftables.Rule{
-		Chain: kubeMasqueradingChain,
+		Chain: masqueradingChain,
 		Rule: knftables.Concat(
 			"mark", "and", proxier.masqueradeMark, "==", "0",
 			"return",
 		),
 	})
 	tx.Add(&knftables.Rule{
-		Chain: kubeMasqueradingChain,
+		Chain: masqueradingChain,
 		Rule: knftables.Concat(
 			"mark", "set", "mark", "xor", proxier.masqueradeMark,
 		),
 	})
 	tx.Add(&knftables.Rule{
-		Chain: kubeMasqueradingChain,
+		Chain: masqueradingChain,
 		Rule:  "masquerade fully-random",
 	})
 
@@ -433,17 +433,17 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	// rather than just "delete" when we want to ensure the set doesn't exist, because
 	// doing just "delete" would return an error if the set didn't exist.)
 	tx.Add(&knftables.Set{
-		Name:    kubeNodePortIPsSet,
+		Name:    nodePortIPsSet,
 		Type:    ipvX_addr,
 		Comment: ptr.To("IPs that accept NodePort traffic"),
 	})
 	if proxier.nodePortAddresses.MatchAll() {
 		tx.Delete(&knftables.Set{
-			Name: kubeNodePortIPsSet,
+			Name: nodePortIPsSet,
 		})
 	} else {
 		tx.Flush(&knftables.Set{
-			Name: kubeNodePortIPsSet,
+			Name: nodePortIPsSet,
 		})
 		nodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
 		if err != nil {
@@ -455,7 +455,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 				continue
 			}
 			tx.Add(&knftables.Element{
-				Set: kubeNodePortIPsSet,
+				Set: nodePortIPsSet,
 				Key: []string{
 					ip.String(),
 				},
@@ -465,108 +465,108 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 
 	// Set up "no endpoints" drop/reject handling
 	tx.Add(&knftables.Map{
-		Name:    kubeNoEndpointServicesMap,
+		Name:    noEndpointServicesMap,
 		Type:    ipvX_addr + " . inet_proto . inet_service : verdict",
 		Comment: ptr.To("vmap to drop or reject packets to services with no endpoints"),
 	})
 	tx.Add(&knftables.Map{
-		Name:    kubeNoEndpointNodePortsMap,
+		Name:    noEndpointNodePortsMap,
 		Type:    "inet_proto . inet_service : verdict",
 		Comment: ptr.To("vmap to drop or reject packets to service nodeports with no endpoints"),
 	})
 
 	tx.Add(&knftables.Chain{
-		Name:    kubeRejectChain,
+		Name:    rejectChain,
 		Comment: ptr.To("helper for @no-endpoint-services / @no-endpoint-nodeports"),
 	})
 	tx.Flush(&knftables.Chain{
-		Name: kubeRejectChain,
+		Name: rejectChain,
 	})
 	tx.Add(&knftables.Rule{
-		Chain: kubeRejectChain,
+		Chain: rejectChain,
 		Rule:  "reject",
 	})
 
 	tx.Add(&knftables.Rule{
-		Chain: kubeEndpointsCheckChain,
+		Chain: endpointsCheckChain,
 		Rule: knftables.Concat(
 			ipX, "daddr", ".", "meta l4proto", ".", "th dport",
-			"vmap", "@", kubeNoEndpointServicesMap,
+			"vmap", "@", noEndpointServicesMap,
 		),
 	})
 
 	if proxier.nodePortAddresses.MatchAll() {
 		tx.Add(&knftables.Rule{
-			Chain: kubeEndpointsCheckChain,
+			Chain: endpointsCheckChain,
 			Rule: knftables.Concat(
 				"fib daddr type local",
 				noLocalhost,
 				"meta l4proto . th dport",
-				"vmap", "@", kubeNoEndpointNodePortsMap,
+				"vmap", "@", noEndpointNodePortsMap,
 			),
 		})
 	} else {
 		tx.Add(&knftables.Rule{
-			Chain: kubeEndpointsCheckChain,
+			Chain: endpointsCheckChain,
 			Rule: knftables.Concat(
-				ipX, "daddr", "@", kubeNodePortIPsSet,
+				ipX, "daddr", "@", nodePortIPsSet,
 				"meta l4proto . th dport",
-				"vmap", "@", kubeNoEndpointNodePortsMap,
+				"vmap", "@", noEndpointNodePortsMap,
 			),
 		})
 	}
 
 	// Set up LoadBalancerSourceRanges firewalling
 	tx.Add(&knftables.Map{
-		Name:    kubeFirewallIPsMap,
+		Name:    firewallIPsMap,
 		Type:    ipvX_addr + " . inet_proto . inet_service : verdict",
 		Comment: ptr.To("destinations that are subject to LoadBalancerSourceRanges"),
 	})
 
-	ensureChain(kubeFirewallCheckChain, tx, createdChains)
+	ensureChain(firewallCheckChain, tx, createdChains)
 	tx.Add(&knftables.Rule{
-		Chain: kubeFirewallCheckChain,
+		Chain: firewallCheckChain,
 		Rule: knftables.Concat(
 			ipX, "daddr", ".", "meta l4proto", ".", "th dport",
-			"vmap", "@", kubeFirewallIPsMap,
+			"vmap", "@", firewallIPsMap,
 		),
 	})
 
 	// Set up service dispatch
 	tx.Add(&knftables.Map{
-		Name:    kubeServiceIPsMap,
+		Name:    serviceIPsMap,
 		Type:    ipvX_addr + " . inet_proto . inet_service : verdict",
 		Comment: ptr.To("ClusterIP, ExternalIP and LoadBalancer IP traffic"),
 	})
 	tx.Add(&knftables.Map{
-		Name:    kubeServiceNodePortsMap,
+		Name:    serviceNodePortsMap,
 		Type:    "inet_proto . inet_service : verdict",
 		Comment: ptr.To("NodePort traffic"),
 	})
 	tx.Add(&knftables.Rule{
-		Chain: kubeServicesChain,
+		Chain: servicesChain,
 		Rule: knftables.Concat(
 			ipX, "daddr", ".", "meta l4proto", ".", "th dport",
-			"vmap", "@", kubeServiceIPsMap,
+			"vmap", "@", serviceIPsMap,
 		),
 	})
 	if proxier.nodePortAddresses.MatchAll() {
 		tx.Add(&knftables.Rule{
-			Chain: kubeServicesChain,
+			Chain: servicesChain,
 			Rule: knftables.Concat(
 				"fib daddr type local",
 				noLocalhost,
 				"meta l4proto . th dport",
-				"vmap", "@", kubeServiceNodePortsMap,
+				"vmap", "@", serviceNodePortsMap,
 			),
 		})
 	} else {
 		tx.Add(&knftables.Rule{
-			Chain: kubeServicesChain,
+			Chain: servicesChain,
 			Rule: knftables.Concat(
 				ipX, "daddr @nodeport-ips",
 				"meta l4proto . th dport",
-				"vmap", "@", kubeServiceNodePortsMap,
+				"vmap", "@", serviceNodePortsMap,
 			),
 		})
 	}
@@ -956,19 +956,19 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// We currently fully-rebuild our sets and maps on each resync
 	tx.Flush(&knftables.Map{
-		Name: kubeFirewallIPsMap,
+		Name: firewallIPsMap,
 	})
 	tx.Flush(&knftables.Map{
-		Name: kubeNoEndpointServicesMap,
+		Name: noEndpointServicesMap,
 	})
 	tx.Flush(&knftables.Map{
-		Name: kubeNoEndpointNodePortsMap,
+		Name: noEndpointNodePortsMap,
 	})
 	tx.Flush(&knftables.Map{
-		Name: kubeServiceIPsMap,
+		Name: serviceIPsMap,
 	})
 	tx.Flush(&knftables.Map{
-		Name: kubeServiceNodePortsMap,
+		Name: serviceNodePortsMap,
 	})
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
@@ -1074,8 +1074,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// generate any chains in the "nat" table for the service; only
 			// rules in the "filter" table rejecting incoming packets for
 			// the service's IPs.
-			internalTrafficFilterVerdict = fmt.Sprintf("goto %s", kubeRejectChain)
-			externalTrafficFilterVerdict = fmt.Sprintf("goto %s", kubeRejectChain)
+			internalTrafficFilterVerdict = fmt.Sprintf("goto %s", rejectChain)
+			externalTrafficFilterVerdict = fmt.Sprintf("goto %s", rejectChain)
 		} else {
 			if !hasInternalEndpoints {
 				// The internalTrafficPolicy is "Local" but there are no local
@@ -1097,7 +1097,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture the clusterIP.
 		if hasInternalEndpoints {
 			tx.Add(&knftables.Element{
-				Map: kubeServiceIPsMap,
+				Map: serviceIPsMap,
 				Key: []string{
 					svcInfo.ClusterIP().String(),
 					protocol,
@@ -1110,7 +1110,7 @@ func (proxier *Proxier) syncProxyRules() {
 		} else {
 			// No endpoints.
 			tx.Add(&knftables.Element{
-				Map: kubeNoEndpointServicesMap,
+				Map: noEndpointServicesMap,
 				Key: []string{
 					svcInfo.ClusterIP().String(),
 					protocol,
@@ -1129,7 +1129,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// Send traffic bound for external IPs to the "external
 				// destinations" chain.
 				tx.Add(&knftables.Element{
-					Map: kubeServiceIPsMap,
+					Map: serviceIPsMap,
 					Key: []string{
 						externalIP.String(),
 						protocol,
@@ -1145,7 +1145,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// external traffic (DROP anything that didn't get
 				// short-circuited by the EXT chain.)
 				tx.Add(&knftables.Element{
-					Map: kubeNoEndpointServicesMap,
+					Map: noEndpointServicesMap,
 					Key: []string{
 						externalIP.String(),
 						protocol,
@@ -1197,7 +1197,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, lbip := range svcInfo.LoadBalancerVIPs() {
 			if hasEndpoints {
 				tx.Add(&knftables.Element{
-					Map: kubeServiceIPsMap,
+					Map: serviceIPsMap,
 					Key: []string{
 						lbip.String(),
 						protocol,
@@ -1211,7 +1211,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			if usesFWChain {
 				tx.Add(&knftables.Element{
-					Map: kubeFirewallIPsMap,
+					Map: firewallIPsMap,
 					Key: []string{
 						lbip.String(),
 						protocol,
@@ -1230,7 +1230,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// by the EXT chain.)
 			for _, lbip := range svcInfo.LoadBalancerVIPs() {
 				tx.Add(&knftables.Element{
-					Map: kubeNoEndpointServicesMap,
+					Map: noEndpointServicesMap,
 					Key: []string{
 						lbip.String(),
 						protocol,
@@ -1251,7 +1251,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// worse, nodeports are not subect to loadBalancerSourceRanges,
 				// and we can't change that.
 				tx.Add(&knftables.Element{
-					Map: kubeServiceNodePortsMap,
+					Map: serviceNodePortsMap,
 					Key: []string{
 						protocol,
 						strconv.Itoa(svcInfo.NodePort()),
@@ -1266,7 +1266,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// external traffic (DROP anything that didn't get
 				// short-circuited by the EXT chain.)
 				tx.Add(&knftables.Element{
-					Map: kubeNoEndpointNodePortsMap,
+					Map: noEndpointNodePortsMap,
 					Key: []string{
 						protocol,
 						strconv.Itoa(svcInfo.NodePort()),
@@ -1287,7 +1287,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
 						protocol, "dport", svcInfo.Port(),
-						"jump", kubeMarkMasqChain,
+						"jump", markMasqChain,
 					),
 				})
 			} else if proxier.localDetector.IsImplemented() {
@@ -1302,7 +1302,7 @@ func (proxier *Proxier) syncProxyRules() {
 						ipX, "daddr", svcInfo.ClusterIP(),
 						protocol, "dport", svcInfo.Port(),
 						proxier.localDetector.IfNotLocalNFT(),
-						"jump", kubeMarkMasqChain,
+						"jump", markMasqChain,
 					),
 				})
 			}
@@ -1319,7 +1319,7 @@ func (proxier *Proxier) syncProxyRules() {
 				tx.Add(&knftables.Rule{
 					Chain: externalTrafficChain,
 					Rule: knftables.Concat(
-						"jump", kubeMarkMasqChain,
+						"jump", markMasqChain,
 					),
 				})
 			} else {
@@ -1348,7 +1348,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Chain: externalTrafficChain,
 					Rule: knftables.Concat(
 						"fib", "saddr", "type", "local",
-						"jump", kubeMarkMasqChain,
+						"jump", markMasqChain,
 					),
 					Comment: ptr.To("masquerade local traffic"),
 				})
@@ -1441,7 +1441,7 @@ func (proxier *Proxier) syncProxyRules() {
 				Chain: endpointChain,
 				Rule: knftables.Concat(
 					ipX, "saddr", epInfo.IP(),
-					"jump", kubeMarkMasqChain,
+					"jump", markMasqChain,
 				),
 			})
 

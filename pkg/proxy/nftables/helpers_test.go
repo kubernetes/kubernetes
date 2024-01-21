@@ -284,7 +284,7 @@ var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
 var endpointVMAPRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
 var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 
-var masqueradeRegexp = regexp.MustCompile(`^jump ` + kubeMarkMasqChain + `$`)
+var masqueradeRegexp = regexp.MustCompile(`^jump ` + markMasqChain + `$`)
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
 var returnRegexp = regexp.MustCompile(`^return$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
