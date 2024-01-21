@@ -53,6 +53,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	kuberuntimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -2158,6 +2159,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		containerSeen[cName] = containerSeen[cName] + 1
 	}
 
+	podHasInitialized := kuberuntimeutil.IsPodInitialized(pod, podStatus)
+
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {
 		if isInitContainer {
@@ -2165,6 +2168,16 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			// TODO(random-liu): Handle this in a cleaner way.
 			s := podStatus.FindContainerStatusByName(container.Name)
 			if s != nil && s.State == kubecontainer.ContainerStateExited && s.ExitCode == 0 {
+				continue
+			}
+			if s == nil && podHasInitialized && statuses[container.Name].State.Waiting != nil {
+				statuses[container.Name].State = v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Reason:   "Completed",
+						Message:  "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
+						ExitCode: 0,
+					},
+				}
 				continue
 			}
 		}

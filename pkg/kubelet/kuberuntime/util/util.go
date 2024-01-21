@@ -112,3 +112,33 @@ func NamespacesForPod(pod *v1.Pod, runtimeHelper kubecontainer.RuntimeHelper) (*
 		UsernsOptions: userNs,
 	}, nil
 }
+
+// IsPodInitialized return true if any of the main containers have status and are Running.
+func IsPodInitialized(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	// If any of the main containers have status and are Running, then all init containers must
+	// have been executed at some point in the past.  However, they could have been removed
+	// from the container runtime now, and if we proceed, it would appear as if they
+	// never ran and will re-execute improperly except for the restartable init containers.
+	for _, container := range pod.Spec.Containers {
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil {
+			continue
+		}
+		switch status.State {
+		case kubecontainer.ContainerStateCreated,
+			kubecontainer.ContainerStateRunning:
+			return true
+		case kubecontainer.ContainerStateExited:
+			// This is a workaround for the issue that the kubelet cannot
+			// differentiate the container statuses of the previous podSandbox
+			// from the current one.
+			// If the node is rebooted, all containers will be in the exited
+			// state and the kubelet will try to recreate a new podSandbox.
+			// In this case, the kubelet should not mistakenly think that
+			// the newly created podSandbox has been initialized.
+		default:
+			// Ignore other states
+		}
+	}
+	return false
+}
