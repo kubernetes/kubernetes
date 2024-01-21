@@ -22,6 +22,7 @@ package nftables
 import (
 	"context"
 	"fmt"
+	"net"
 	"regexp"
 	"runtime"
 	"sort"
@@ -198,11 +199,13 @@ func (tracer *nftablesTracer) addressMatches(ipStr string, wantMatch bool, ruleA
 	return match == wantMatch
 }
 
-func (tracer *nftablesTracer) noneAddressesMatch(ipStr, ruleAddress string) bool {
+func (tracer *nftablesTracer) addressMatchesSet(ipStr string, wantMatch bool, ruleAddress string) bool {
 	ruleAddress = strings.ReplaceAll(ruleAddress, " ", "")
 	addresses := strings.Split(ruleAddress, ",")
+	var match bool
 	for _, address := range addresses {
-		if tracer.addressMatches(ipStr, true, address) {
+		match = tracer.addressMatches(ipStr, true, address)
+		if match != wantMatch {
 			return false
 		}
 	}
@@ -266,7 +269,7 @@ func (tracer *nftablesTracer) matchDestPort(elements []*knftables.Element, proto
 // match verdictRegexp.
 
 var destAddrRegexp = regexp.MustCompile(`^ip6* daddr (!= )?(\S+)`)
-var destAddrLookupRegexp = regexp.MustCompile(`^ip6* daddr != \{([^}]*)\}`)
+var destAddrLookupRegexp = regexp.MustCompile(`^ip6* daddr (!= )?\{([^}]*)\}`)
 var destAddrLocalRegexp = regexp.MustCompile(`^fib daddr type local`)
 var destPortRegexp = regexp.MustCompile(`^(tcp|udp|sctp) dport (\d+)`)
 var destIPOnlyLookupRegexp = regexp.MustCompile(`^ip6* daddr @(\S+)`)
@@ -278,7 +281,7 @@ var destDispatchRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th d
 var destPortDispatchRegexp = regexp.MustCompile(`^meta l4proto \. th dport vmap @(\S+)$`)
 
 var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
-var sourceAddrLookupRegexp = regexp.MustCompile(`^ip6* saddr != \{([^}]*)\}`)
+var sourceAddrLookupRegexp = regexp.MustCompile(`^ip6* saddr (!= )?\{([^}]*)\}`)
 var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
 
 var endpointVMAPRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
@@ -398,11 +401,12 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				}
 
 			case destAddrLookupRegexp.MatchString(rule):
-				// `^ip6* daddr != \{([^}]*)\}`
+				// `^ip6* daddr (!= )?\{([^}]*)\}`
 				// Tests whether destIP doesn't match an anonymous set.
 				match := destAddrLookupRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				if !tracer.noneAddressesMatch(destIP, match[1]) {
+				wantMatch, set := match[1] != "!= ", match[2]
+				if !tracer.addressMatchesSet(destIP, wantMatch, set) {
 					rule = ""
 					break
 				}
@@ -440,11 +444,12 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				}
 
 			case sourceAddrLookupRegexp.MatchString(rule):
-				// `^ip6* saddr != \{([^}]*)\}`
+				// `^ip6* saddr (!= )?\{([^}]*)\}`
 				// Tests whether sourceIP doesn't match an anonymous set.
 				match := sourceAddrLookupRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				if !tracer.noneAddressesMatch(sourceIP, match[1]) {
+				wantMatch, set := match[1] != "!= ", match[2]
+				if !tracer.addressMatchesSet(sourceIP, wantMatch, set) {
 					rule = ""
 					break
 				}
@@ -565,6 +570,7 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 // destinations (a comma-separated list of IPs, or one of the special targets "ACCEPT",
 // "DROP", or "REJECT"), and whether the packet would be masqueraded.
 func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, destPort string, nodeIPs []string) ([]string, string, bool) {
+	var err error
 	tracer := newNFTablesTracer(t, nft, nodeIPs)
 
 	// filter-prerouting goes first, then nat-prerouting if not terminated.
@@ -575,7 +581,10 @@ func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, 
 	// After the prerouting rules run, pending DNATs are processed (which would affect
 	// the destination IP that later rules match against).
 	if len(tracer.outputs) != 0 {
-		destIP = strings.Split(tracer.outputs[0], ":")[0]
+		destIP, _, err = net.SplitHostPort(tracer.outputs[0])
+		if err != nil {
+			t.Errorf("failed to parse host port '%s': %s", tracer.outputs[0], err.Error())
+		}
 	}
 
 	// Run filter-forward, skip filter-input as it ought to be fully redundant with the filter-forward chain.

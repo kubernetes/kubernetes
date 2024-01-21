@@ -921,7 +921,7 @@ func (s *ProxyServer) Run() error {
 			options.LabelSelector = labelSelector.String()
 		}))
 
-	// Create configs (i.e. Watches for Services and EndpointSlices)
+	// Create configs (i.e. Watches for Services, EndpointSlices and ServiceCIDRs)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
@@ -933,6 +933,11 @@ func (s *ProxyServer) Run() error {
 	endpointSliceConfig.RegisterEventHandler(s.Proxier)
 	go endpointSliceConfig.Run(wait.NeverStop)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		serviceCIDRConfig := config.NewServiceCIDRConfig(informerFactory.Networking().V1alpha1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
+		serviceCIDRConfig.RegisterEventHandler(s.Proxier)
+		go serviceCIDRConfig.Run(wait.NeverStop)
+	}
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)

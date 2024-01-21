@@ -1009,6 +1009,10 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.syncProxyRules()
 }
 
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
+
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*serviceInfo)

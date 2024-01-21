@@ -18,13 +18,17 @@ package config
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	discoveryv1informers "k8s.io/client-go/informers/discovery/v1"
+	networkingv1alpha1informers "k8s.io/client-go/informers/networking/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
@@ -369,5 +373,99 @@ func (c *NodeConfig) handleDeleteNode(obj interface{}) {
 	for i := range c.eventHandlers {
 		klog.V(4).InfoS("Calling handler.OnNodeDelete")
 		c.eventHandlers[i].OnNodeDelete(node)
+	}
+}
+
+// ServiceCIDRHandler is an abstract interface of objects which receive
+// notifications about ServiceCIDR object changes.
+type ServiceCIDRHandler interface {
+	// OnServiceCIDRsChanged is called whenever a change is observed
+	// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+	OnServiceCIDRsChanged(cidrs []string)
+}
+
+// ServiceCIDRConfig tracks a set of service configurations.
+type ServiceCIDRConfig struct {
+	listerSynced  cache.InformerSynced
+	eventHandlers []ServiceCIDRHandler
+	mu            sync.Mutex
+	cidrs         sets.Set[string]
+}
+
+// NewServiceCIDRConfig creates a new ServiceCIDRConfig.
+func NewServiceCIDRConfig(serviceCIDRInformer networkingv1alpha1informers.ServiceCIDRInformer, resyncPeriod time.Duration) *ServiceCIDRConfig {
+	result := &ServiceCIDRConfig{
+		listerSynced: serviceCIDRInformer.Informer().HasSynced,
+		cidrs:        sets.New[string](),
+	}
+
+	_, _ = serviceCIDRInformer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				result.handleServiceCIDREvent(nil, obj)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				result.handleServiceCIDREvent(oldObj, newObj)
+			},
+			DeleteFunc: func(obj interface{}) {
+				result.handleServiceCIDREvent(obj, nil)
+			},
+		},
+		resyncPeriod,
+	)
+	return result
+}
+
+// RegisterEventHandler registers a handler which is called on every ServiceCIDR change.
+func (c *ServiceCIDRConfig) RegisterEventHandler(handler ServiceCIDRHandler) {
+	c.eventHandlers = append(c.eventHandlers, handler)
+}
+
+// Run waits for cache synced and invokes handlers after syncing.
+func (c *ServiceCIDRConfig) Run(stopCh <-chan struct{}) {
+	klog.InfoS("Starting serviceCIDR config controller")
+
+	if !cache.WaitForNamedCacheSync("serviceCIDR config", stopCh, c.listerSynced) {
+		return
+	}
+	c.handleServiceCIDREvent(nil, nil)
+}
+
+// handleServiceCIDREvent is a helper function to handle Add, Update and Delete
+// events on ServiceCIDR objects and call downstream event handlers.
+func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
+	var oldServiceCIDR, newServiceCIDR *networkingv1alpha1.ServiceCIDR
+	var ok bool
+
+	if oldObj != nil {
+		oldServiceCIDR, ok = oldObj.(*networkingv1alpha1.ServiceCIDR)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
+			return
+		}
+	}
+
+	if newObj != nil {
+		newServiceCIDR, ok = newObj.(*networkingv1alpha1.ServiceCIDR)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+			return
+		}
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if oldServiceCIDR != nil {
+		c.cidrs.Delete(oldServiceCIDR.Spec.CIDRs...)
+	}
+
+	if newServiceCIDR != nil {
+		c.cidrs.Insert(newServiceCIDR.Spec.CIDRs...)
+	}
+
+	for i := range c.eventHandlers {
+		klog.V(4).InfoS("Calling handler.OnServiceCIDRsChanged")
+		c.eventHandlers[i].OnServiceCIDRsChanged(c.cidrs.UnsortedList())
 	}
 }

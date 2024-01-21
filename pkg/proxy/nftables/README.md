@@ -51,7 +51,7 @@ the forward path.
 
 ## kube-proxy's use of nftables hooks
 
-Kube-proxy uses nftables for four things:
+Kube-proxy uses nftables for seven things:
 
   - Using DNAT to rewrite traffic from service IPs (cluster IPs, external IPs, load balancer
     IP, and NodePorts on node IPs) to the corresponding endpoint IPs.
@@ -64,6 +64,10 @@ Kube-proxy uses nftables for four things:
   - Dropping packets for services with `Local` traffic policy but no local endpoints.
 
   - Rejecting packets for services with no local or remote endpoints.
+ 
+  - Dropping packets to ClusterIPs which are not yet allocated.
+
+  - Rejecting packets to undefined ports of ClusterIPs.
 
 This is implemented as follows:
 
@@ -101,3 +105,9 @@ This is implemented as follows:
     network IP, because masquerading is about ensuring that the packet eventually gets
     routed back to the host network namespace on this node, so if it's never getting
     routed away from there, there's nothing to do.)
+
+  - We install a `reject` rule for ClusterIPs matching `@cluster-ips` set and a `drop`
+    rule for ClusterIPs belonging to any of the ServiceCIDRs in `forward` and `output` hook, with a 
+    higher (i.e. less urgent) priority than the DNAT chains making sure all valid
+    traffic directed for ClusterIPs is already DNATed. Drop rule will only
+    be installed if `MultiCIDRServiceAllocator` feature is enabled.

@@ -55,6 +55,7 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -62,6 +63,16 @@ const (
 	// Our nftables table. All of our chains/sets/maps are created inside this table,
 	// so they don't need any "kube-" or "kube-proxy-" prefix of their own.
 	kubeProxyTable = "kube-proxy"
+
+	// base chains
+	filterPreroutingChain     = "filter-prerouting"
+	filterInputChain          = "filter-input"
+	filterForwardChain        = "filter-forward"
+	filterOutputChain         = "filter-output"
+	filterOutputPostDNATChain = "filter-output-post-dnat"
+	natPreroutingChain        = "nat-prerouting"
+	natOutputChain            = "nat-output"
+	natPostroutingChain       = "nat-postrouting"
 
 	// service dispatch
 	servicesChain       = "services"
@@ -71,11 +82,17 @@ const (
 	// set of IPs that accept NodePort traffic
 	nodePortIPsSet = "nodeport-ips"
 
+	// set of active ClusterIPs.
+	clusterIPsSet = "cluster-ips"
+
 	// handling for services with no endpoints
 	endpointsCheckChain    = "endpoints-check"
 	noEndpointServicesMap  = "no-endpoint-services"
 	noEndpointNodePortsMap = "no-endpoint-nodeports"
 	rejectChain            = "reject-chain"
+
+	// handling traffic to unallocated ClusterIPs and undefined ports of ClusterIPs
+	clusterIPsCheckChain = "cluster-ips-check"
 
 	// LoadBalancerSourceRanges handling
 	firewallIPsMap     = "firewall-ips"
@@ -179,6 +196,10 @@ type Proxier struct {
 
 	// staleChains contains information about chains to be deleted later
 	staleChains map[string]time.Time
+
+	// serviceCIDRs is a comma separated list of ServiceCIDRs belonging to the IPFamily
+	// which proxier is operating on, can be directly consumed by knftables.
+	serviceCIDRs string
 }
 
 // Proxier implements proxy.Provider
@@ -309,13 +330,14 @@ type nftablesBaseChain struct {
 var nftablesBaseChains = []nftablesBaseChain{
 	// We want our filtering rules to operate on pre-DNAT dest IPs, so our filter
 	// chains have to run before DNAT.
-	{"filter-prerouting", knftables.FilterType, knftables.PreroutingHook, knftables.DNATPriority + "-10"},
-	{"filter-input", knftables.FilterType, knftables.InputHook, knftables.DNATPriority + "-10"},
-	{"filter-forward", knftables.FilterType, knftables.ForwardHook, knftables.DNATPriority + "-10"},
-	{"filter-output", knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-10"},
-	{"nat-prerouting", knftables.NATType, knftables.PreroutingHook, knftables.DNATPriority},
-	{"nat-output", knftables.NATType, knftables.OutputHook, knftables.DNATPriority},
-	{"nat-postrouting", knftables.NATType, knftables.PostroutingHook, knftables.SNATPriority},
+	{filterPreroutingChain, knftables.FilterType, knftables.PreroutingHook, knftables.DNATPriority + "-10"},
+	{filterInputChain, knftables.FilterType, knftables.InputHook, knftables.DNATPriority + "-10"},
+	{filterForwardChain, knftables.FilterType, knftables.ForwardHook, knftables.DNATPriority + "-10"},
+	{filterOutputChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-10"},
+	{filterOutputPostDNATChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "+10"},
+	{natPreroutingChain, knftables.NATType, knftables.PreroutingHook, knftables.DNATPriority},
+	{natOutputChain, knftables.NATType, knftables.OutputHook, knftables.DNATPriority},
+	{natPostroutingChain, knftables.NATType, knftables.PostroutingHook, knftables.SNATPriority},
 }
 
 // nftablesJumpChains lists our top-level "regular chains" that are jumped to directly
@@ -331,16 +353,19 @@ var nftablesJumpChains = []nftablesJumpChain{
 	// We can't jump to endpointsCheckChain from filter-prerouting like
 	// firewallCheckChain because reject action is only valid in chains using the
 	// input, forward or output hooks.
-	{endpointsCheckChain, "filter-input", "ct state new"},
-	{endpointsCheckChain, "filter-forward", "ct state new"},
-	{endpointsCheckChain, "filter-output", "ct state new"},
+	{endpointsCheckChain, filterInputChain, "ct state new"},
+	{endpointsCheckChain, filterForwardChain, "ct state new"},
+	{endpointsCheckChain, filterOutputChain, "ct state new"},
 
-	{firewallCheckChain, "filter-prerouting", "ct state new"},
-	{firewallCheckChain, "filter-output", "ct state new"},
+	{firewallCheckChain, filterPreroutingChain, "ct state new"},
+	{firewallCheckChain, filterOutputChain, "ct state new"},
 
-	{servicesChain, "nat-output", ""},
-	{servicesChain, "nat-prerouting", ""},
-	{masqueradingChain, "nat-postrouting", ""},
+	{servicesChain, natOutputChain, ""},
+	{servicesChain, natPreroutingChain, ""},
+	{masqueradingChain, natPostroutingChain, ""},
+
+	{clusterIPsCheckChain, filterForwardChain, "ct state new"},
+	{clusterIPsCheckChain, filterOutputPostDNATChain, "ct state new"},
 }
 
 // ensureChain adds commands to tx to ensure that chain exists and doesn't contain
@@ -399,7 +424,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{servicesChain, masqueradingChain, markMasqChain} {
+	for _, chain := range []string{servicesChain, clusterIPsCheckChain, masqueradingChain, markMasqChain} {
 		ensureChain(chain, tx, createdChains)
 	}
 
@@ -428,6 +453,34 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Chain: masqueradingChain,
 		Rule:  "masquerade fully-random",
 	})
+
+	// add cluster-ips set.
+	tx.Add(&knftables.Set{
+		Name:    clusterIPsSet,
+		Type:    ipvX_addr,
+		Comment: ptr.To("Active ClusterIPs"),
+	})
+
+	// reject traffic to invalid ports of ClusterIPs.
+	tx.Add(&knftables.Rule{
+		Chain: clusterIPsCheckChain,
+		Rule: knftables.Concat(
+			ipX, "daddr", "@", clusterIPsSet, "reject",
+		),
+		Comment: ptr.To("Reject traffic to invalid ports of ClusterIPs"),
+	})
+
+	// drop traffic to unallocated ClusterIPs.
+	if len(proxier.serviceCIDRs) > 0 {
+		tx.Add(&knftables.Rule{
+			Chain: clusterIPsCheckChain,
+			Rule: knftables.Concat(
+				ipX, "daddr", "{", proxier.serviceCIDRs, "}",
+				"drop",
+			),
+			Comment: ptr.To("Drop traffic to unallocated ClusterIPs"),
+		})
+	}
 
 	// Fill in nodeport-ips set if needed (or delete it if not). (We do "add+delete"
 	// rather than just "delete" when we want to ensure the set doesn't exist, because
@@ -764,6 +817,26 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 func (proxier *Proxier) OnNodeSynced() {
 }
 
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(cidrs []string) {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+
+	cidrsForProxier := make([]string, 0)
+	for _, cidr := range cidrs {
+		isIPv4CIDR := netutils.IsIPv4CIDRString(cidr)
+		if proxier.ipFamily == v1.IPv4Protocol && isIPv4CIDR {
+			cidrsForProxier = append(cidrsForProxier, cidr)
+		}
+
+		if proxier.ipFamily == v1.IPv6Protocol && !isIPv4CIDR {
+			cidrsForProxier = append(cidrsForProxier, cidr)
+		}
+	}
+	proxier.serviceCIDRs = strings.Join(cidrsForProxier, ",")
+}
+
 const (
 	// Maximum length for one of our chain name prefixes, including the trailing
 	// hyphen.
@@ -955,6 +1028,9 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// We currently fully-rebuild our sets and maps on each resync
+	tx.Flush(&knftables.Set{
+		Name: clusterIPsSet,
+	})
 	tx.Flush(&knftables.Map{
 		Name: firewallIPsMap,
 	})
@@ -1095,6 +1171,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture the clusterIP.
+		tx.Add(&knftables.Element{
+			Set: clusterIPsSet,
+			Key: []string{svcInfo.ClusterIP().String()},
+		})
 		if hasInternalEndpoints {
 			tx.Add(&knftables.Element{
 				Map: serviceIPsMap,
