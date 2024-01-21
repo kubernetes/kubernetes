@@ -174,7 +174,7 @@ func newNFTablesTracer(t *testing.T, nft *knftables.Fake, nodeIPs []string) *nft
 	}
 }
 
-func (tracer *nftablesTracer) addressMatches(ipStr, not, ruleAddress string) bool {
+func (tracer *nftablesTracer) addressMatches(ipStr string, wantMatch bool, ruleAddress string) bool {
 	ip := netutils.ParseIPSloppy(ipStr)
 	if ip == nil {
 		tracer.t.Fatalf("Bad IP in test case: %s", ipStr)
@@ -195,18 +195,14 @@ func (tracer *nftablesTracer) addressMatches(ipStr, not, ruleAddress string) boo
 		match = ip.Equal(ip2)
 	}
 
-	if not == "!= " {
-		return !match
-	} else {
-		return match
-	}
+	return match == wantMatch
 }
 
 func (tracer *nftablesTracer) noneAddressesMatch(ipStr, ruleAddress string) bool {
 	ruleAddress = strings.ReplaceAll(ruleAddress, " ", "")
 	addresses := strings.Split(ruleAddress, ",")
 	for _, address := range addresses {
-		if tracer.addressMatches(ipStr, "", address) {
+		if tracer.addressMatches(ipStr, true, address) {
 			return false
 		}
 	}
@@ -240,7 +236,7 @@ func (tracer *nftablesTracer) matchDest(elements []*knftables.Element, destIP, p
 // found.
 func (tracer *nftablesTracer) matchDestAndSource(elements []*knftables.Element, destIP, protocol, destPort, sourceIP string) *knftables.Element {
 	for _, element := range elements {
-		if element.Key[0] == destIP && element.Key[1] == protocol && element.Key[2] == destPort && tracer.addressMatches(sourceIP, "", element.Key[3]) {
+		if element.Key[0] == destIP && element.Key[1] == protocol && element.Key[2] == destPort && tracer.addressMatches(sourceIP, true, element.Key[3]) {
 			return element
 		}
 	}
@@ -416,8 +412,8 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				// Tests whether destIP does/doesn't match a literal.
 				match := destAddrRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				not, ip := match[1], match[2]
-				if !tracer.addressMatches(destIP, not, ip) {
+				wantMatch, ip := match[1] != "!= ", match[2]
+				if !tracer.addressMatches(destIP, wantMatch, ip) {
 					rule = ""
 					break
 				}
@@ -458,8 +454,8 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				// Tests whether sourceIP does/doesn't match a literal.
 				match := sourceAddrRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				not, ip := match[1], match[2]
-				if !tracer.addressMatches(sourceIP, not, ip) {
+				wantMatch, ip := match[1] != "!= ", match[2]
+				if !tracer.addressMatches(sourceIP, wantMatch, ip) {
 					rule = ""
 					break
 				}
