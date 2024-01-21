@@ -21,10 +21,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	coreinformers "k8s.io/client-go/informers/core/v1"
-	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
+	v1informers "k8s.io/client-go/informers/core/v1"
+	discoveryv1informers "k8s.io/client-go/informers/discovery/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
@@ -51,13 +51,13 @@ type ServiceHandler interface {
 type EndpointSliceHandler interface {
 	// OnEndpointSliceAdd is called whenever creation of new endpoint slice
 	// object is observed.
-	OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice)
+	OnEndpointSliceAdd(endpointSlice *discoveryv1.EndpointSlice)
 	// OnEndpointSliceUpdate is called whenever modification of an existing
 	// endpoint slice object is observed.
-	OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *discovery.EndpointSlice)
+	OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *discoveryv1.EndpointSlice)
 	// OnEndpointSliceDelete is called whenever deletion of an existing
 	// endpoint slice object is observed.
-	OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice)
+	OnEndpointSliceDelete(endpointSlice *discoveryv1.EndpointSlice)
 	// OnEndpointSlicesSynced is called once all the initial event handlers were
 	// called and the state is fully propagated to local cache.
 	OnEndpointSlicesSynced()
@@ -70,7 +70,7 @@ type EndpointSliceConfig struct {
 }
 
 // NewEndpointSliceConfig creates a new EndpointSliceConfig.
-func NewEndpointSliceConfig(endpointSliceInformer discoveryinformers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
+func NewEndpointSliceConfig(endpointSliceInformer discoveryv1informers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
 	result := &EndpointSliceConfig{
 		listerSynced: endpointSliceInformer.Informer().HasSynced,
 	}
@@ -107,7 +107,7 @@ func (c *EndpointSliceConfig) Run(stopCh <-chan struct{}) {
 }
 
 func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {
-	endpointSlice, ok := obj.(*discovery.EndpointSlice)
+	endpointSlice, ok := obj.(*discoveryv1.EndpointSlice)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
 		return
@@ -119,12 +119,12 @@ func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {
 }
 
 func (c *EndpointSliceConfig) handleUpdateEndpointSlice(oldObj, newObj interface{}) {
-	oldEndpointSlice, ok := oldObj.(*discovery.EndpointSlice)
+	oldEndpointSlice, ok := oldObj.(*discoveryv1.EndpointSlice)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", newObj))
 		return
 	}
-	newEndpointSlice, ok := newObj.(*discovery.EndpointSlice)
+	newEndpointSlice, ok := newObj.(*discoveryv1.EndpointSlice)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", newObj))
 		return
@@ -136,14 +136,14 @@ func (c *EndpointSliceConfig) handleUpdateEndpointSlice(oldObj, newObj interface
 }
 
 func (c *EndpointSliceConfig) handleDeleteEndpointSlice(obj interface{}) {
-	endpointSlice, ok := obj.(*discovery.EndpointSlice)
+	endpointSlice, ok := obj.(*discoveryv1.EndpointSlice)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
 			return
 		}
-		if endpointSlice, ok = tombstone.Obj.(*discovery.EndpointSlice); !ok {
+		if endpointSlice, ok = tombstone.Obj.(*discoveryv1.EndpointSlice); !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
 			return
 		}
@@ -161,7 +161,7 @@ type ServiceConfig struct {
 }
 
 // NewServiceConfig creates a new ServiceConfig.
-func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
+func NewServiceConfig(serviceInformer v1informers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
 	result := &ServiceConfig{
 		listerSynced: serviceInformer.Informer().HasSynced,
 	}
@@ -288,7 +288,7 @@ type NodeConfig struct {
 }
 
 // NewNodeConfig creates a new NodeConfig.
-func NewNodeConfig(nodeInformer coreinformers.NodeInformer, resyncPeriod time.Duration) *NodeConfig {
+func NewNodeConfig(nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration) *NodeConfig {
 	result := &NodeConfig{
 		listerSynced: nodeInformer.Informer().HasSynced,
 	}
