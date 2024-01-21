@@ -75,7 +75,7 @@ func NewEndpointSliceConfig(endpointSliceInformer discoveryinformers.EndpointSli
 		listerSynced: endpointSliceInformer.Informer().HasSynced,
 	}
 
-	endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddEndpointSlice,
 			UpdateFunc: result.handleUpdateEndpointSlice,
@@ -166,7 +166,7 @@ func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPerio
 		listerSynced: serviceInformer.Informer().HasSynced,
 	}
 
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddService,
 			UpdateFunc: result.handleUpdateService,
@@ -293,7 +293,7 @@ func NewNodeConfig(nodeInformer coreinformers.NodeInformer, resyncPeriod time.Du
 		listerSynced: nodeInformer.Informer().HasSynced,
 	}
 
-	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddNode,
 			UpdateFunc: result.handleUpdateNode,
