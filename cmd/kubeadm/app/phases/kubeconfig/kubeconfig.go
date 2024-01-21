@@ -642,15 +642,14 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 				clusterRoleBinding,
 				metav1.CreateOptions{},
 			); err != nil {
+				// (Create returns a non-nil object even on error, but the
+				// code after the poll uses `crbResult != nil` to
+				// determine success.)
+				crbResult = nil
 				if apierrors.IsForbidden(err) {
 					// If it encounters a forbidden error this means that the API server was reached
 					// but the CRB is missing - i.e. the admin.conf user does not have permissions
 					// to create its own permission RBAC yet.
-					//
-					// When a "create" call is made, but the resource is forbidden, a non-nil
-					// CRB will still be returned. Return true here, but update "crbResult" to nil,
-					// to ensure that the process continues with super-admin.conf.
-					crbResult = nil
 					return true, nil
 				} else if apierrors.IsAlreadyExists(err) {
 					// If the CRB exists it means the admin.conf already has the right
