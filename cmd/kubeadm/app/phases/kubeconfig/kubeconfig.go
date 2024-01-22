@@ -592,10 +592,14 @@ func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc)
 	}
 
 	ctx := context.Background()
-	return ensureRBACFunc(
+	crb, err := ensureRBACFunc(
 		ctx, adminClient, superAdminClient,
 		kubeadmconstants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
 	)
+	if apierrors.IsAlreadyExists(err) {
+		return crb, nil
+	}
+	return crb, err
 }
 
 // EnsureAdminClusterRoleBindingImpl first attempts to see if the ClusterRoleBinding
