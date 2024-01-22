@@ -850,7 +850,13 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 						schema.GroupResource{}, "name")
 				})
 			},
-			expectedError: true,
+			setupSuperAdminClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterrolebindings", func(action clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(
+						schema.GroupResource{}, "name")
+				})
+			},
+			expectedError: false,
 		},
 		{
 			name: "admin.conf: handle other errors, such as a server timeout",
@@ -916,7 +922,7 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 						schema.GroupResource{}, "name")
 				})
 			},
-			expectedError: true,
+			expectedError: false,
 		},
 	}
 
