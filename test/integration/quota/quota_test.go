@@ -174,9 +174,9 @@ func waitForQuota(ctx context.Context, t *testing.T, quota *v1.ResourceQuota, cl
 }
 
 // waitForUsedResourceQuota polls a ResourceQuota status for an expected used value
-func waitForUsedResourceQuota(t *testing.T, c clientset.Interface, ns, quotaName string, used v1.ResourceList) {
-	err := wait.Poll(1*time.Second, resourceQuotaTimeout, func() (bool, error) {
-		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
+func waitForUsedResourceQuota(ctx context.Context, t *testing.T, c clientset.Interface, ns, quotaName string, used v1.ResourceList) {
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -384,7 +384,7 @@ plugins:
 	waitForQuota(ctx, t, quota, clientset)
 
 	// attempt to create a new pod once the quota is propagated
-	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		// retry until we succeed (to allow time for all changes to propagate)
 		if _, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err == nil {
 			return true, nil
@@ -514,11 +514,11 @@ plugins:
 		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
 		v1.ResourceServicesLoadBalancers: resource.MustParse("1"),
 	}
-	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+	waitForUsedResourceQuota(ctx, t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating another loadbalancer Service using node ports should fail because node prot quota is exceeded
 	lbServiceWithNodePort2 := newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true)
-	testServiceForbidden(clientset, ns.Name, lbServiceWithNodePort2, t)
+	testServiceForbidden(ctx, clientset, ns.Name, lbServiceWithNodePort2, t)
 
 	// Creating a loadbalancer Service without node ports should succeed
 	lbServiceWithoutNodePort1 := newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false)
@@ -533,11 +533,11 @@ plugins:
 		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
 		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
 	}
-	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+	waitForUsedResourceQuota(ctx, t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating another loadbalancer Service without node ports should fail because loadbalancer quota is exceeded
 	lbServiceWithoutNodePort2 := newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false)
-	testServiceForbidden(clientset, ns.Name, lbServiceWithoutNodePort2, t)
+	testServiceForbidden(ctx, clientset, ns.Name, lbServiceWithoutNodePort2, t)
 
 	// Creating a ClusterIP Service should succeed
 	clusterIPService1 := newService("clusterip-svc1", v1.ServiceTypeClusterIP, false)
@@ -552,17 +552,17 @@ plugins:
 		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
 		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
 	}
-	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+	waitForUsedResourceQuota(ctx, t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating a ClusterIP Service should fail because Service quota has been exceeded.
 	clusterIPService2 := newService("clusterip-svc2", v1.ServiceTypeClusterIP, false)
-	testServiceForbidden(clientset, ns.Name, clusterIPService2, t)
+	testServiceForbidden(ctx, clientset, ns.Name, clusterIPService2, t)
 }
 
 // testServiceForbidden attempts to create a Service expecting 403 Forbidden due to resource quota limits being exceeded.
-func testServiceForbidden(clientset clientset.Interface, namespace string, service *v1.Service, t *testing.T) {
-	pollErr := wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
-		_, err := clientset.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+func testServiceForbidden(ctx context.Context, clientset clientset.Interface, namespace string, service *v1.Service, t *testing.T) {
+	pollErr := wait.PollUntilContextTimeout(ctx, 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err := clientset.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
 		if apierrors.IsForbidden(err) {
 			return true, nil
 		}
