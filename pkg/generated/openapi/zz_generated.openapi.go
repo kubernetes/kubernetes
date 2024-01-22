@@ -59330,6 +59330,13 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyNFTablesConfiguration(ref 
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
+					"tableName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the tables (ip and ip6) that this instance of kube-proxy will use",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"masqueradeBit", "masqueradeAll", "syncPeriod", "minSyncPeriod"},
 			},

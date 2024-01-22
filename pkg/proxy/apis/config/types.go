@@ -94,6 +94,8 @@ type KubeProxyNFTablesConfiguration struct {
 	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
 	// result in an immediate iptables resync.
 	MinSyncPeriod metav1.Duration
+	// The name of the tables (ip and ip6) that this instance of kube-proxy will use
+	TableName string
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for

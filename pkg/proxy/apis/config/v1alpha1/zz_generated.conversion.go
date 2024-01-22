@@ -327,6 +327,7 @@ func autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTa
 	out.MasqueradeAll = in.MasqueradeAll
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	out.TableName = in.TableName
 	return nil
 }
 
@@ -340,6 +341,7 @@ func autoConvert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTa
 	out.MasqueradeAll = in.MasqueradeAll
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	out.TableName = in.TableName
 	return nil
 }
 
