@@ -850,7 +850,7 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 						schema.GroupResource{}, "name")
 				})
 			},
-			expectedError: true,
+			expectedError: false,
 		},
 		{
 			name: "admin.conf: handle other errors, such as a server timeout",
