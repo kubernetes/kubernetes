@@ -133,7 +133,7 @@ func TestQuota(t *testing.T) {
 			},
 		},
 	}
-	waitForQuota(t, quota, clientset)
+	waitForQuota(ctx, t, quota, clientset)
 
 	startTime = time.Now()
 	scale(t, "quotaed", clientset)
@@ -141,17 +141,17 @@ func TestQuota(t *testing.T) {
 	t.Logf("Took %v to scale up with quota", endTime.Sub(startTime))
 }
 
-func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Clientset) {
-	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
+func waitForQuota(ctx context.Context, t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Clientset) {
+	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(ctx, metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(context.TODO(), quota, metav1.CreateOptions{}); err != nil {
+	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(ctx, quota, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 		switch event.Type {
@@ -381,7 +381,7 @@ plugins:
 			},
 		},
 	}
-	waitForQuota(t, quota, clientset)
+	waitForQuota(ctx, t, quota, clientset)
 
 	// attempt to create a new pod once the quota is propagated
 	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
@@ -492,7 +492,7 @@ plugins:
 		},
 	}
 
-	waitForQuota(t, quota, clientset)
+	waitForQuota(ctx, t, quota, clientset)
 
 	// Creating the first node port service should succeed
 	nodePortService := newService("np-svc", v1.ServiceTypeNodePort, true)
