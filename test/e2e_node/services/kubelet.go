@@ -249,8 +249,6 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		unitName = fmt.Sprintf("kubelet-%s.service", unitTimestamp)
 		cmdArgs = append(cmdArgs,
 			systemdRun,
-			// Set the environment variable to enable kubelet config drop-in directory.
-			"--setenv", "KUBELET_CONFIG_DROPIN_DIR_ALPHA=yes",
 			"-p", "Delegate=true",
 			"-p", logLocation+framework.TestContext.ReportDir+"/kubelet.log",
 			"--unit="+unitName,
