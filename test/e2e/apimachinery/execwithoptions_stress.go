@@ -100,12 +100,12 @@ var _ = SIGDescribe("Pod exec", func() {
 		wg.Wait()
 	})
 
-	ginkgo.PIt("can transfer any ASCII character", func(ctx context.Context) {
+	ginkgo.Context("can transfer ASCII character", func() {
 		for i := 0; i < 256; i++ {
-			err := transferData(f, pod.Name, []byte{byte(i)}, true)
-			if err != nil {
-				framework.Failf("attempt of transfer char %v: %v", i, err)
-			}
+			data := []byte{byte(i)}
+			ginkgo.It(fmt.Sprintf("%q (%02x)", string(data), i), func(ctx context.Context) {
+				framework.ExpectNoError(transferData(f, pod.Name, data, true))
+			})
 		}
 	})
 })
@@ -127,7 +127,7 @@ func transferData(f *framework.Framework, podName string, data []byte, quiet boo
 	}
 	stdout_bytes := []byte(stdout)
 	if diff := cmp.Diff(data, stdout_bytes); diff != "" {
-		return fmt.Errorf("wrong stdout found:\nlen(data):\n%v\nlen(stdout):\n%v\n\ndiff:\n%v", len(data), len(stdout_bytes), diff)
+		return fmt.Errorf("wrong stdout found:\nlen(data):\n%v\nlen(stdout):\n%v\n\ndiff:\n%v%w", len(data), len(stdout_bytes), diff, framework.ErrFailure)
 	}
 	return nil
 }
