@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danwinship/knftables"
 	"github.com/lithammer/dedent"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -49,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/knftables"
 )
 
 // Conventions for tests using NewFakeProxier:
