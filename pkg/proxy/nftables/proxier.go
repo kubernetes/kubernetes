@@ -116,19 +116,20 @@ func NewDualStackProxier(
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxierHealthServer,
 	nodePortAddresses []string,
+	tableName string,
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, sysctl,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, tableName, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, sysctl,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, tableName, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -208,6 +209,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxierHealthServer,
 	nodePortAddressStrings []string,
+	tableName string,
 	initOnly bool,
 ) (*Proxier, error) {
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings, nodeIP)
@@ -230,7 +232,10 @@ func NewProxier(ipFamily v1.IPFamily,
 	} else {
 		nftablesFamily = knftables.IPv6Family
 	}
-	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
+	if tableName == "" {
+		tableName = kubeProxyTable
+	}
+	nft, err := knftables.New(nftablesFamily, tableName)
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +634,6 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers() bool {
 	var encounteredError bool
-
 	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
 		nft, err := knftables.New(family, kubeProxyTable)
 		if err == nil {
