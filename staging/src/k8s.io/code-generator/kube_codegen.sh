@@ -17,6 +17,10 @@
 # This presents several functions for packages which want to use kubernetes
 # code-generation tools.
 
+# These functions insist that your input IDL (commented go) files be located in
+# go packages following the pattern $input_pkg_root/$something_sans_slash/$api_version .
+# Those $something_sans_slash will be propagated into the output directory structure.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -42,6 +46,7 @@ function kube::codegen::internal::git_grep() {
 #   --input-pkg-root <string>
 #     The root package under which to search for files which request code to be
 #     generated.  This must be Go package syntax, e.g.  "k8s.io/foo/bar".
+#     See note at the top about package structure below that.
 #
 #   --output-base <string>
 #     The root directory under which to emit code.  The concatenation of
@@ -229,6 +234,7 @@ function kube::codegen::gen_helpers() {
 #   --input-pkg-root <string>
 #     The root package under which to search for files which request openapi to
 #     be generated.  This must be Go package syntax, e.g.  "k8s.io/foo/bar".
+#     See note at the top about package structure below that.
 #
 #   --output-pkg-root <string>
 #     The root package under which generated directories and files
@@ -399,6 +405,7 @@ function kube::codegen::gen_openapi() {
 #     The root package under which to search for *.go files which request
 #     clients to be generated.  This must be Go package syntax, e.g.
 #     "k8s.io/foo/bar".
+#     See note at the top about package structure below that.
 #
 #   --one-input-api <string>
 #     A specific API (a directory) under the --input-pkg-root for which to
