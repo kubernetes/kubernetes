@@ -76,12 +76,12 @@ func TestStorageClassWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForStorageClass(tc.template)...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForStorageClass(tc.template)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})
@@ -157,12 +157,12 @@ func TestCSIStorageCapacityWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForCSIStorageCapacity(tc.template)...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForCSIStorageCapacity(tc.template)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})

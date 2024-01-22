@@ -170,7 +170,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 	// duplicate hostAliases (#91670, #58477)
 	if len(podSpec.HostAliases) > 1 {
-		items := sets.NewString()
+		items := sets.New[string]()
 		for i, item := range podSpec.HostAliases {
 			if items.Has(item.IP) {
 				warnings = append(warnings, fmt.Sprintf("%s: duplicate ip %q", fieldPath.Child("spec", "hostAliases").Index(i).Child("ip"), item.IP))
@@ -182,7 +182,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 	// duplicate imagePullSecrets (#91629, #58477)
 	if len(podSpec.ImagePullSecrets) > 1 {
-		items := sets.NewString()
+		items := sets.New[string]()
 		for i, item := range podSpec.ImagePullSecrets {
 			if items.Has(item.Name) {
 				warnings = append(warnings, fmt.Sprintf("%s: duplicate name %q", fieldPath.Child("spec", "imagePullSecrets").Index(i).Child("name"), item.Name))
@@ -237,7 +237,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 		// duplicate containers[*].env (#86163, #93266, #58477)
 		if len(c.Env) > 1 {
-			items := sets.NewString()
+			items := sets.New[string]()
 			for i, item := range c.Env {
 				if items.Has(item.Name) {
 					// a previous value exists, but it might be OK
