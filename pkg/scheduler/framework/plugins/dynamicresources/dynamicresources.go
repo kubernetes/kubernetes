@@ -835,6 +835,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	for _, claim := range state.claims {
 		if claim.Status.Allocation == nil {
 			pending = true
+			break
 		}
 	}
 	if !pending {
