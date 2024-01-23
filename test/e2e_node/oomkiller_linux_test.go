@@ -303,9 +303,6 @@ func getOOMTargetContainerWithLimitedSwap(name string) v1.Container {
 			Requests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
-			Limits: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("100Mi"),
-			},
 		},
 	}
 }
