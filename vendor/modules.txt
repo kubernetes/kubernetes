@@ -7,48 +7,10 @@ cloud.google.com/go/compute/internal
 # cloud.google.com/go/compute/metadata v0.2.3
 ## explicit; go 1.19
 cloud.google.com/go/compute/metadata
-# github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
-## explicit
-github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
-github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry
-github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-04-01/containerservice
-github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network
-github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources
-github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage
-github.com/Azure/azure-sdk-for-go/storage
-github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/Azure/go-autorest v14.2.0+incompatible
-## explicit
-github.com/Azure/go-autorest
-# github.com/Azure/go-autorest/autorest v0.11.29
-## explicit; go 1.15
-github.com/Azure/go-autorest/autorest
-github.com/Azure/go-autorest/autorest/azure
-# github.com/Azure/go-autorest/autorest/adal v0.9.23
-## explicit; go 1.15
-github.com/Azure/go-autorest/autorest/adal
-# github.com/Azure/go-autorest/autorest/date v0.3.0
-## explicit; go 1.12
-github.com/Azure/go-autorest/autorest/date
-# github.com/Azure/go-autorest/autorest/mocks v0.4.2
-## explicit; go 1.15
-github.com/Azure/go-autorest/autorest/mocks
-# github.com/Azure/go-autorest/autorest/to v0.4.0
-## explicit; go 1.12
-github.com/Azure/go-autorest/autorest/to
-# github.com/Azure/go-autorest/autorest/validation v0.3.1
-## explicit; go 1.12
-github.com/Azure/go-autorest/autorest/validation
-# github.com/Azure/go-autorest/logger v0.2.1
-## explicit; go 1.12
-github.com/Azure/go-autorest/logger
-# github.com/Azure/go-autorest/tracing v0.6.0
-## explicit; go 1.12
-github.com/Azure/go-autorest/tracing
 # github.com/GoogleCloudPlatform/k8s-cloud-provider v1.18.1-0.20220218231025-f11817397a1b
 ## explicit; go 1.13
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
@@ -252,9 +214,6 @@ github.com/go-task/slim-sprig
 # github.com/godbus/dbus/v5 v5.1.0
 ## explicit; go 1.12
 github.com/godbus/dbus/v5
-# github.com/gofrs/uuid v4.4.0+incompatible
-## explicit
-github.com/gofrs/uuid
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/gogoproto
@@ -663,9 +622,6 @@ github.com/prometheus/procfs/internal/util
 # github.com/robfig/cron/v3 v3.0.1
 ## explicit; go 1.12
 github.com/robfig/cron/v3
-# github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
-## explicit
-github.com/rubiojr/go-vhd/vhd
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
@@ -983,8 +939,6 @@ golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/nacl/secretbox
 golang.org/x/crypto/pbkdf2
-golang.org/x/crypto/pkcs12
-golang.org/x/crypto/pkcs12/internal/rc2
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
@@ -2319,41 +2273,6 @@ k8s.io/kubelet/pkg/cri/streaming/remotecommand
 k8s.io/kubelet/pkg/types
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
 ## explicit; go 1.21
-k8s.io/legacy-cloud-providers/azure
-k8s.io/legacy-cloud-providers/azure/auth
-k8s.io/legacy-cloud-providers/azure/cache
-k8s.io/legacy-cloud-providers/azure/clients
-k8s.io/legacy-cloud-providers/azure/clients/armclient
-k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient
-k8s.io/legacy-cloud-providers/azure/clients/deploymentclient
-k8s.io/legacy-cloud-providers/azure/clients/diskclient
-k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient
-k8s.io/legacy-cloud-providers/azure/clients/fileclient
-k8s.io/legacy-cloud-providers/azure/clients/interfaceclient
-k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient
-k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient
-k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient/mockloadbalancerclient
-k8s.io/legacy-cloud-providers/azure/clients/publicipclient
-k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient
-k8s.io/legacy-cloud-providers/azure/clients/routeclient
-k8s.io/legacy-cloud-providers/azure/clients/routeclient/mockrouteclient
-k8s.io/legacy-cloud-providers/azure/clients/routetableclient
-k8s.io/legacy-cloud-providers/azure/clients/routetableclient/mockroutetableclient
-k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient
-k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient/mocksecuritygroupclient
-k8s.io/legacy-cloud-providers/azure/clients/snapshotclient
-k8s.io/legacy-cloud-providers/azure/clients/storageaccountclient
-k8s.io/legacy-cloud-providers/azure/clients/subnetclient
-k8s.io/legacy-cloud-providers/azure/clients/subnetclient/mocksubnetclient
-k8s.io/legacy-cloud-providers/azure/clients/vmclient
-k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient
-k8s.io/legacy-cloud-providers/azure/clients/vmsizeclient
-k8s.io/legacy-cloud-providers/azure/clients/vmssclient
-k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient
-k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient
-k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient
-k8s.io/legacy-cloud-providers/azure/metrics
-k8s.io/legacy-cloud-providers/azure/retry
 k8s.io/legacy-cloud-providers/gce
 k8s.io/legacy-cloud-providers/gce/gcpcredential
 k8s.io/legacy-cloud-providers/vsphere
