@@ -29,6 +29,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/utils/ptr"
@@ -325,9 +326,9 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.val1) == google.protobuf.Duration",
 			},
 			errors: map[string]string{
-				"duration('1')":                      "invalid duration argument",
-				"duration('1d')":                     "invalid duration argument",
-				"duration('1us') < duration('1nns')": "invalid duration argument",
+				"duration('1')":                      "compilation failed: ERROR: <input>:1:10: invalid duration argument",
+				"duration('1d')":                     "compilation failed: ERROR: <input>:1:10: invalid duration argument",
+				"duration('1us') < duration('1nns')": "compilation failed: ERROR: <input>:1:28: invalid duration argument",
 			},
 		},
 		{name: "date format",
@@ -358,9 +359,9 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.val1) == google.protobuf.Timestamp",
 			},
 			errors: map[string]string{
-				"timestamp('1000-00-00T00:00:00Z')":  "invalid timestamp",
-				"timestamp('1000-01-01T00:00:00ZZ')": "invalid timestamp",
-				"timestamp(-62135596801)":            "invalid timestamp",
+				"timestamp('1000-00-00T00:00:00Z')":  "compilation failed: ERROR: <input>:1:11: invalid timestamp",
+				"timestamp('1000-01-01T00:00:00ZZ')": "compilation failed: ERROR: <input>:1:11: invalid timestamp",
+				"timestamp(-62135596801)":            "compilation failed: ERROR: <input>:1:11: invalid timestamp",
 			},
 		},
 		{name: "enums",
@@ -422,7 +423,7 @@ func TestValidationExpressions(t *testing.T) {
 			},
 			errors: map[string]string{
 				// Mixed type lists are not allowed since we have HomogeneousAggregateLiterals enabled
-				"[1, 'a', false].filter(x, string(x) == 'a')": "expected type 'int' but found 'string'",
+				"[1, 'a', false].filter(x, string(x) == 'a')": "compilation failed: ERROR: <input>:1:5: expected type 'int' but found 'string'",
 			},
 		},
 		{name: "string lists",
@@ -454,6 +455,42 @@ func TestValidationExpressions(t *testing.T) {
 				"['a', 'b', 'c'].join('-') == 'a-b-c'",
 				"self.val1.join() == 'abc'",
 				"['a', 'b', 'c'].join() == 'abc'",
+
+				// CEL sets functions
+				"sets.contains(['a', 'b'], [])",
+				"sets.contains(['a', 'b'], ['b'])",
+				"!sets.contains(['a', 'b'], ['c'])",
+				"sets.equivalent([], [])",
+				"sets.equivalent(['c', 'b', 'a'], ['b', 'c', 'a'])",
+				"!sets.equivalent(['a', 'b'], ['b', 'c'])",
+				"sets.intersects(['a', 'b'], ['b', 'c'])",
+				"!sets.intersects([], [])",
+				"!sets.intersects(['a', 'b'], [])",
+				"!sets.intersects(['a', 'b'], ['c', 'd'])",
+
+				"sets.contains([1, 2], [2])",
+				"sets.contains([true, false], [false])",
+				"sets.contains([1.25, 1.5], [1.5])",
+				"sets.contains([{'a': 1}, {'b': 2}], [{'b': 2}])",
+				"sets.contains([[1, 2], [3, 4]], [[3, 4]])",
+				"sets.contains([timestamp('2000-01-01T00:00:00.000+01:00'), timestamp('2012-01-01T00:00:00.000+01:00')], [timestamp('2012-01-01T00:00:00.000+01:00')])",
+				"sets.contains([duration('1h'), duration('2h')], [duration('2h')])",
+
+				"sets.equivalent([1, 2], [1, 2])",
+				"sets.equivalent([true, false], [true, false])",
+				"sets.equivalent([1.25, 1.5], [1.25, 1.5])",
+				"sets.equivalent([{'a': 1}, {'b': 2}], [{'a': 1}, {'b': 2}])",
+				"sets.equivalent([[1, 2], [3, 4]], [[1, 2], [3, 4]])",
+				"sets.equivalent([timestamp('2012-01-01T00:00:00.000+01:00')], [timestamp('2012-01-01T00:00:00.000+01:00')])",
+				"sets.equivalent([duration('1h'), duration('2h')], [duration('1h'), duration('2h')])",
+
+				"sets.intersects([1, 2], [2])",
+				"sets.intersects([true, false], [false])",
+				"sets.intersects([1.25, 1.5], [1.5])",
+				"sets.intersects([{'a': 1}, {'b': 2}], [{'b': 2}])",
+				"sets.intersects([[1, 2], [3, 4]], [[3, 4]])",
+				"sets.intersects([timestamp('2000-01-01T00:00:00.000+01:00'), timestamp('2012-01-01T00:00:00.000+01:00')], [timestamp('2012-01-01T00:00:00.000+01:00')])",
+				"sets.intersects([duration('1h'), duration('2h')], [duration('2h')])",
 			},
 		},
 		{name: "listMaps",
@@ -1950,6 +1987,23 @@ func TestValidationExpressions(t *testing.T) {
 			},
 			errors: map[string]string{
 				"self.absentObj.?absentStr == optional.none()": "no such key: absentObj", // missing ?. operator on first deref is an error
+			},
+		},
+		{name: "quantity",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"isQuantity(self.val1)",
+				"isQuantity(self.val2)",
+				`isQuantity("20Mi")`,
+				`quantity(self.val2) == quantity("0.2G") && quantity("0.2G") == quantity("200M")`,
+				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`,
+				`quantity(self.val1).isLessThan(quantity("100M"))`,
+				`quantity(self.val2).isGreaterThan(quantity("50M"))`,
+				`quantity(self.val2).compareTo(quantity("0.2G")) == 0`,
+				`quantity("50k").add(quantity(self.val1)) == quantity("50.02k")`,
+				`quantity("50k").sub(quantity(self.val1)) == quantity("49980")`,
+				`quantity(self.val1).isInteger()`,
 			},
 		},
 	}
