@@ -610,7 +610,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 
 	var (
 		err, lastError     error
-		crbResult          *rbac.ClusterRoleBinding
+		crbExists          bool
 		clusterRoleBinding = &rbac.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding,
@@ -637,15 +637,11 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 		retryInterval,
 		retryTimeout,
 		true, func(ctx context.Context) (bool, error) {
-			if crbResult, err = adminClient.RbacV1().ClusterRoleBindings().Create(
+			if _, err := adminClient.RbacV1().ClusterRoleBindings().Create(
 				ctx,
 				clusterRoleBinding,
 				metav1.CreateOptions{},
 			); err != nil {
-				// (Create returns a non-nil object even on error, but the
-				// code after the poll uses `crbResult != nil` to
-				// determine success.)
-				crbResult = nil
 				if apierrors.IsForbidden(err) {
 					// If it encounters a forbidden error this means that the API server was reached
 					// but the CRB is missing - i.e. the admin.conf user does not have permissions
@@ -654,6 +650,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 				} else if apierrors.IsAlreadyExists(err) {
 					// If the CRB exists it means the admin.conf already has the right
 					// permissions; return.
+					crbExists = true
 					return true, nil
 				} else {
 					// Retry on any other error type.
@@ -661,14 +658,15 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 					return false, nil
 				}
 			}
+			crbExists = true
 			return true, nil
 		})
 	if err != nil {
 		return nil, lastError
 	}
 
-	// The CRB exists; return the admin.conf client.
-	if crbResult != nil {
+	// The CRB was created or already existed; return the admin.conf client.
+	if crbExists {
 		return adminClient, nil
 	}
 
