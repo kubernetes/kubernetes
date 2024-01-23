@@ -1013,7 +1013,7 @@ func innocentPod() *v1.Pod {
 					},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							v1.ResourceLimitsEphemeralStorage: innocentPodRequest,
+							v1.ResourceEphemeralStorage: innocentPodRequest,
 						},
 					},
 				},
