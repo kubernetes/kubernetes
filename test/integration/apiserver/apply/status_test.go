@@ -58,6 +58,7 @@ var statusData = map[schema.GroupVersionResource]string{
 	// standard for []metav1.Condition
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"status": {"conditions":[{"type":"Accepted","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):       `{"status": {"conditions":[{"type":"Accepted","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 const statusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"True"}]}}`

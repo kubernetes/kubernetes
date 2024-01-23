@@ -65,6 +65,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	// standard for []metav1.Condition
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):       `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
@@ -156,6 +157,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
+	gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):       `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 }
 
 // TestResetFields makes sure that fieldManager does not own fields reset by the storage strategy.
