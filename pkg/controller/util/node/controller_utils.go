@@ -30,85 +30,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	nodepkg "k8s.io/kubernetes/pkg/util/node"
-
-	"k8s.io/klog/v2"
 )
-
-// DeletePods will delete all pods from master running on given node,
-// and return true if any pods were deleted, or were found pending
-// deletion.
-func DeletePods(ctx context.Context, kubeClient clientset.Interface, pods []*v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string) (bool, error) {
-	remaining := false
-	var updateErrList []error
-	logger := klog.FromContext(ctx)
-
-	if len(pods) > 0 {
-		RecordNodeEvent(ctx, recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
-	}
-
-	for i := range pods {
-		// Defensive check, also needed for tests.
-		if pods[i].Spec.NodeName != nodeName {
-			continue
-		}
-
-		// Pod will be modified, so making copy is required.
-		pod := pods[i].DeepCopy()
-		// Set reason and message in the pod object.
-		if _, err := SetPodTerminationReason(ctx, kubeClient, pod, nodeName); err != nil {
-			if apierrors.IsConflict(err) {
-				updateErrList = append(updateErrList,
-					fmt.Errorf("update status failed for pod %q: %v", format.Pod(pod), err))
-				continue
-			}
-		}
-		// if the pod has already been marked for deletion, we still return true that there are remaining pods.
-		if pod.DeletionGracePeriodSeconds != nil {
-			remaining = true
-			continue
-		}
-
-		logger.V(2).Info("Starting deletion of pod", "pod", klog.KObj(pod))
-		recorder.Eventf(pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
-		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
-			if apierrors.IsNotFound(err) {
-				// NotFound error means that pod was already deleted.
-				// There is nothing left to do with this pod.
-				continue
-			}
-			return false, err
-		}
-		remaining = true
-	}
-
-	if len(updateErrList) > 0 {
-		return false, utilerrors.NewAggregate(updateErrList)
-	}
-	return remaining, nil
-}
-
-// SetPodTerminationReason attempts to set a reason and message in the
-// pod status, updates it in the apiserver, and returns an error if it
-// encounters one.
-func SetPodTerminationReason(ctx context.Context, kubeClient clientset.Interface, pod *v1.Pod, nodeName string) (*v1.Pod, error) {
-	if pod.Status.Reason == nodepkg.NodeUnreachablePodReason {
-		return pod, nil
-	}
-
-	pod.Status.Reason = nodepkg.NodeUnreachablePodReason
-	pod.Status.Message = fmt.Sprintf(nodepkg.NodeUnreachablePodMessage, nodeName, pod.Name)
-
-	var updatedPod *v1.Pod
-	var err error
-	if updatedPod, err = kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
-		return nil, err
-	}
-	return updatedPod, nil
-}
 
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
