@@ -19,9 +19,7 @@ package validation
 import (
 	"fmt"
 	"math"
-	"net"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -491,20 +489,5 @@ func hasChDirPrefix(value string) []string {
 	case strings.HasPrefix(value, ".."):
 		errs = append(errs, `must not start with '..'`)
 	}
-	return errs
-}
-
-// IsValidSocketAddr checks that string represents a valid socket address
-// as defined in RFC 789. (e.g 0.0.0.0:10254 or [::]:10254))
-func IsValidSocketAddr(value string) []string {
-	var errs []string
-	ip, port, err := net.SplitHostPort(value)
-	if err != nil {
-		errs = append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
-		return errs
-	}
-	portInt, _ := strconv.Atoi(port)
-	errs = append(errs, IsValidPortNum(portInt)...)
-	errs = append(errs, IsValidIP(ip)...)
 	return errs
 }
