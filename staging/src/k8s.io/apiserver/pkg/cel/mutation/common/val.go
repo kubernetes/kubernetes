@@ -44,8 +44,8 @@ var _ ref.Val = (*ObjectVal)(nil)
 var _ traits.Zeroer = (*ObjectVal)(nil)
 
 // ConvertToNative converts the object to map[string]any.
-// Any lists that the object refers to must be list of ObjectVal,
-// and will be converted into []map[string]any native type.
+// All nested lists are converted into []any native type.
+//
 // It returns an error if the target type is not map[string]any,
 // or any recursive conversion fails.
 func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
@@ -55,11 +55,7 @@ func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	}
 	result = make(map[string]any, len(v.fields))
 	for k, v := range v.fields {
-		converted, err := convertField(v)
-		if err != nil {
-			return nil, err
-		}
-		result[k] = converted
+		result[k] = convertField(v)
 	}
 	return result, nil
 }
@@ -109,7 +105,7 @@ func (v *ObjectVal) IsZeroValue() bool {
 // For objects, the expected type is map[string]any
 // For lists, the expected type is []any
 // For anything else, it is converted via value.Value()
-func convertField(value ref.Val) (any, error) {
+func convertField(value ref.Val) any {
 	// special handling for lists, where the elements are converted with Value() instead of ConvertToNative
 	// to allow them to become native value of any type.
 	if listOfVal, ok := value.Value().([]ref.Val); ok {
@@ -117,7 +113,7 @@ func convertField(value ref.Val) (any, error) {
 		for _, v := range listOfVal {
 			result = append(result, v.Value())
 		}
-		return result, nil
+		return result
 	}
-	return value.Value(), nil
+	return value.Value()
 }
