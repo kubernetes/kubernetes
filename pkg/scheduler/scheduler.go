@@ -292,6 +292,8 @@ func New(ctx context.Context,
 
 	snapshot := internalcache.NewEmptySnapshot()
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
+	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
+	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -303,6 +305,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
+		frameworkruntime.WithWaitingPods(waitingPods),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)

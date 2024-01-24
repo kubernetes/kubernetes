@@ -364,6 +364,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1702,6 +1703,8 @@ func TestPreempt(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			waitingPods := frameworkruntime.NewWaitingPodsMap()
+
 			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
 				cache.AddPod(logger, pod)
@@ -1745,6 +1748,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithWaitingPods(waitingPods),
 				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {

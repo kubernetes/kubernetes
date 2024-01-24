@@ -778,7 +778,9 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				registerPluginFuncs,
 				testSchedulerName,
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)))
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3539,6 +3541,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		informerFactory = informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0)
 	}
 	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
+	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
 	fwk, _ := tf.NewFramework(
 		ctx,
@@ -3548,6 +3551,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+		frameworkruntime.WithWaitingPods(waitingPods),
 	)
 
 	errChan := make(chan error, 1)
