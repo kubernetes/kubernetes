@@ -59,7 +59,7 @@ var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [
 	}
 
 	for _, testCase := range testCases {
-		runOomKillerTest(f, testCase, KubeReservedMemory, "UnlimitedSwap")
+		runOomKillerTest(f, testCase, KubeReservedMemory, "LimitedSwap")
 	}
 })
 
