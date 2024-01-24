@@ -40,7 +40,7 @@ class TestBoilerplate(unittest.TestCase):
 
         # capture stdout
         old_stdout = sys.stdout
-        sys.stdout = StringIO.StringIO()
+        sys.stdout = StringIO()
 
         boilerplate.args = Args()
         ret = boilerplate.main()
