@@ -132,7 +132,7 @@ var _ = SIGDescribe("SeparateDiskTest ImageGCNoEviction", framework.WithSlow(), 
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed), string(evictionapi.SignalImageFsInodesFree): fmt.Sprintf("%d", inodesFreeImagefs-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 			ginkgo.By(fmt.Sprintf("EvictionHardSettings %s", initialConfig.EvictionHard))
-			ginkgo.By(fmt.Sprintf("ImageFs.inodesFree %d diskConsumed %d ImageFs.availableBytes - diskConsumed %d", inodesFreeImagefs, inodesConsumed, inodesFreeImagefs-inodesConsumed))
+			ginkgo.By(fmt.Sprintf("ImageFs.inodesFree %d diskConsumed %d ImageFs.inodesFree	 - diskConsumed %d", inodesFreeImagefs, inodesConsumed, inodesFreeImagefs-inodesConsumed))
 
 		})
 		// Consume enough inodes to induce disk pressure,
@@ -243,7 +243,7 @@ var _ = SIGDescribe("SeparateDiskTest LocalStorageSoftEviction", framework.WithS
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			summary := eventuallyGetSummary(ctx)
-			diskConsumed := *summary.Node.Runtime.ImageFs.AvailableBytes / 10
+			diskConsumed := *summary.Node.Runtime.ImageFs.AvailableBytes / 100.0
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			availableBytesImageFs := *(summary.Node.Runtime.ImageFs.AvailableBytes)
 			diskTestInMb = int(availableBytesImageFs-diskConsumed) / 125000
