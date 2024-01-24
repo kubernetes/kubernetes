@@ -304,6 +304,23 @@ func TestValidateAudiences(t *testing.T) {
 			matchPolicy: "MatchAny",
 			want:        "",
 		},
+		{
+			name:        "duplicate audience",
+			in:          []string{"audience", "audience"},
+			matchPolicy: "MatchAny",
+			want:        `issuer.audiences[1]: Duplicate value: "audience"`,
+		},
+		{
+			name: "match policy not set with multiple audiences",
+			in:   []string{"audience1", "audience2"},
+			want: `issuer.audienceMatchPolicy: Invalid value: "": audienceMatchPolicy must be MatchAny for multiple audiences`,
+		},
+		{
+			name:        "valid multiple audiences",
+			in:          []string{"audience1", "audience2"},
+			matchPolicy: "MatchAny",
+			want:        "",
+		},
 	}
 
 	for _, tt := range testCases {
