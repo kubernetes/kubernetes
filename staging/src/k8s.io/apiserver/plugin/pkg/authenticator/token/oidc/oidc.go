@@ -99,12 +99,12 @@ type CAContentProvider interface {
 
 // initVerifier creates a new ID token verifier for the given configuration and issuer URL.  On success, calls setVerifier with the
 // resulting verifier.
-func initVerifier(ctx context.Context, config *oidc.Config, iss string) (*oidc.IDTokenVerifier, error) {
+func initVerifier(ctx context.Context, config *oidc.Config, iss, audience string) (*idTokenVerifier, error) {
 	provider, err := oidc.NewProvider(ctx, iss)
 	if err != nil {
 		return nil, fmt.Errorf("init verifier failed: %v", err)
 	}
-	return provider.Verifier(config), nil
+	return &idTokenVerifier{provider.Verifier(config), audience}, nil
 }
 
 // asyncIDTokenVerifier is an ID token verifier that allows async initialization
@@ -115,13 +115,13 @@ type asyncIDTokenVerifier struct {
 	// v is the ID token verifier initialized asynchronously.  It remains nil
 	// up until it is eventually initialized.
 	// Guarded by m
-	v *oidc.IDTokenVerifier
+	v *idTokenVerifier
 }
 
 // newAsyncIDTokenVerifier creates a new asynchronous token verifier.  The
 // verifier is available immediately, but may remain uninitialized for some time
 // after creation.
-func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss string) *asyncIDTokenVerifier {
+func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss, audience string) *asyncIDTokenVerifier {
 	t := &asyncIDTokenVerifier{}
 
 	sync := make(chan struct{})
@@ -129,7 +129,7 @@ func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss string) *a
 	// verifier, or until context canceled.
 	initFn := func() (done bool, err error) {
 		klog.V(4).Infof("oidc authenticator: attempting init: iss=%v", iss)
-		v, err := initVerifier(ctx, c, iss)
+		v, err := initVerifier(ctx, c, iss, audience)
 		if err != nil {
 			klog.Errorf("oidc authenticator: async token verifier for issuer: %q: %v", iss, err)
 			return false, nil
@@ -155,7 +155,7 @@ func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss string) *a
 }
 
 // verifier returns the underlying ID token verifier, or nil if one is not yet initialized.
-func (a *asyncIDTokenVerifier) verifier() *oidc.IDTokenVerifier {
+func (a *asyncIDTokenVerifier) verifier() *idTokenVerifier {
 	a.m.Lock()
 	defer a.m.Unlock()
 	return a.v
@@ -181,13 +181,20 @@ type Authenticator struct {
 	requiredClaims map[string]string
 }
 
-func (a *Authenticator) setVerifier(v *oidc.IDTokenVerifier) {
+// idTokenVerifier is a wrapper around oidc.IDTokenVerifier. It uses the oidc.IDTokenVerifier
+// to verify the raw ID token and then performs audience validation locally.
+type idTokenVerifier struct {
+	verifier *oidc.IDTokenVerifier
+	audience string
+}
+
+func (a *Authenticator) setVerifier(v *idTokenVerifier) {
 	a.verifier.Store(v)
 }
 
-func (a *Authenticator) idTokenVerifier() (*oidc.IDTokenVerifier, bool) {
+func (a *Authenticator) idTokenVerifier() (*idTokenVerifier, bool) {
 	if v := a.verifier.Load(); v != nil {
-		return v.(*oidc.IDTokenVerifier), true
+		return v.(*idTokenVerifier), true
 	}
 	return nil, false
 }
@@ -266,15 +273,21 @@ func New(opts Options) (*Authenticator, error) {
 	}
 
 	verifierConfig := &oidc.Config{
-		ClientID:             opts.JWTAuthenticator.Issuer.Audiences[0],
 		SupportedSigningAlgs: supportedSigningAlgs,
 		Now:                  now,
+		// SkipClientIDCheck is set to true because we want to support multiple audiences
+		// in the authentication configuration.
+		// The go oidc library does not support validating
+		// multiple audiences, so we have to skip the client ID check and do it ourselves.
+		// xref: https://github.com/coreos/go-oidc/issues/397
+		SkipClientIDCheck: true,
 	}
 
 	var resolver *claimResolver
 	groupsClaim := opts.JWTAuthenticator.ClaimMappings.Groups.Claim
+	audience := opts.JWTAuthenticator.Issuer.Audiences[0]
 	if groupsClaim != "" {
-		resolver = newClaimResolver(groupsClaim, client, verifierConfig)
+		resolver = newClaimResolver(groupsClaim, client, verifierConfig, audience)
 	}
 
 	requiredClaims := make(map[string]string)
@@ -294,7 +307,10 @@ func New(opts Options) (*Authenticator, error) {
 
 	if opts.KeySet != nil {
 		// We already have a key set, synchronously initialize the verifier.
-		authenticator.setVerifier(oidc.NewVerifier(opts.JWTAuthenticator.Issuer.URL, opts.KeySet, verifierConfig))
+		authenticator.setVerifier(&idTokenVerifier{
+			oidc.NewVerifier(opts.JWTAuthenticator.Issuer.URL, opts.KeySet, verifierConfig),
+			audience,
+		})
 	} else {
 		// Asynchronously attempt to initialize the authenticator. This enables
 		// self-hosted providers, providers that run on top of Kubernetes itself.
@@ -306,7 +322,7 @@ func New(opts Options) (*Authenticator, error) {
 			}
 
 			verifier := provider.Verifier(verifierConfig)
-			authenticator.setVerifier(verifier)
+			authenticator.setVerifier(&idTokenVerifier{verifier, audience})
 			return true, nil
 		}, ctx.Done())
 	}
@@ -374,6 +390,10 @@ type claimResolver struct {
 	// claim is the distributed claim that may be resolved.
 	claim string
 
+	// audience is the value to use for audience validation.
+	// This must be in the "aud" claim of the ID token.
+	audience string
+
 	// client is the to use for resolving distributed claims
 	client *http.Client
 
@@ -390,19 +410,25 @@ type claimResolver struct {
 }
 
 // newClaimResolver creates a new resolver for distributed claims.
-func newClaimResolver(claim string, client *http.Client, config *oidc.Config) *claimResolver {
-	return &claimResolver{claim: claim, client: client, config: config, verifierPerIssuer: map[string]*asyncIDTokenVerifier{}}
+func newClaimResolver(claim string, client *http.Client, config *oidc.Config, audience string) *claimResolver {
+	return &claimResolver{
+		claim:             claim,
+		audience:          audience,
+		client:            client,
+		config:            config,
+		verifierPerIssuer: map[string]*asyncIDTokenVerifier{},
+	}
 }
 
 // Verifier returns either the verifier for the specified issuer, or error.
-func (r *claimResolver) Verifier(iss string) (*oidc.IDTokenVerifier, error) {
+func (r *claimResolver) Verifier(iss string) (*idTokenVerifier, error) {
 	r.m.Lock()
 	av := r.verifierPerIssuer[iss]
 	if av == nil {
 		// This lazy init should normally be very quick.
 		// TODO: Make this context cancelable.
 		ctx := oidc.ClientContext(context.Background(), r.client)
-		av = newAsyncIDTokenVerifier(ctx, r.config, iss)
+		av = newAsyncIDTokenVerifier(ctx, r.config, iss, r.audience)
 		r.verifierPerIssuer[iss] = av
 	}
 	r.m.Unlock()
@@ -518,6 +544,41 @@ func (r *claimResolver) resolve(ctx context.Context, endpoint endpoint, allClaim
 	}
 	allClaims[r.claim] = value
 	return nil
+}
+
+func (v *idTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*oidc.IDToken, error) {
+	t, err := v.verifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		return nil, err
+	}
+	if err := v.verifyAudience(t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// verifyAudience verifies the audience field in the ID token matches the expected audience.
+// This is added based on https://github.com/coreos/go-oidc/blob/b203e58c24394ddf5e816706a7645f01280245c7/oidc/verify.go#L275-L281.
+func (v *idTokenVerifier) verifyAudience(t *oidc.IDToken) error {
+	// We validate audience field is not empty in the authentication configuration.
+	// This check ensures callers of "Verify" using idTokenVerifier are not passing
+	// an empty audience.
+	if len(v.audience) == 0 {
+		return fmt.Errorf("oidc: invalid configuration, audience cannot be empty")
+	}
+	if !contains(t.Audience, v.audience) {
+		return fmt.Errorf("oidc: expected audience %q got %q", v.audience, t.Audience)
+	}
+	return nil
+}
+
+func contains(sli []string, ele string) bool {
+	for _, s := range sli {
+		if s == ele {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
