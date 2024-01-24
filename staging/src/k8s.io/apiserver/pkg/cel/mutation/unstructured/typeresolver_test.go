@@ -101,6 +101,11 @@ func TestTypeProvider(t *testing.T) {
 			}.intList.sum()`,
 			expectedValue: int64(6),
 		},
+		{
+			name:          "equality check",
+			expression:    "Object{spec: Object.spec{replicas: 3}} == Object{spec: Object.spec{replicas: 1 + 2}}",
+			expectedValue: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, option := mutation.NewTypeProviderAndEnvOption(&TypeResolver{})

@@ -77,7 +77,10 @@ func (v *ObjectVal) ConvertToType(typeValue ref.Type) ref.Val {
 
 // Equal returns true if the `other` value has the same type and content as the implementing struct.
 func (v *ObjectVal) Equal(other ref.Val) ref.Val {
-	return types.Bool(v == other)
+	if rhs, ok := other.(*ObjectVal); ok {
+		return types.Bool(reflect.DeepEqual(v.fields, rhs.fields))
+	}
+	return types.Bool(false)
 }
 
 // Type returns the TypeValue of the value.
