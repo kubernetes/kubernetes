@@ -51,7 +51,7 @@ the forward path.
 
 ## kube-proxy's use of nftables hooks
 
-Kube-proxy uses nftables for four things:
+Kube-proxy uses nftables for seven things:
 
   - Using DNAT to rewrite traffic from service IPs (cluster IPs, external IPs, load balancer
     IP, and NodePorts on node IPs) to the corresponding endpoint IPs.
@@ -64,6 +64,10 @@ Kube-proxy uses nftables for four things:
   - Dropping packets for services with `Local` traffic policy but no local endpoints.
 
   - Rejecting packets for services with no local or remote endpoints.
+ 
+  - Dropping packets to ClusterIPs which are not yet allocated.
+
+  - Rejecting packets to undefined ports of ClusterIPs.
 
 This is implemented as follows:
 
@@ -87,13 +91,9 @@ This is implemented as follows:
     explicitly before or after any other rules (since they match packets that wouldn't be
     matched by any other rules). But with kernels before 5.9, `reject` is not allowed in
     `prerouting`, so we can't just do them in the same place as the source ranges
-    firewall. So we do these checks from `input`, `forward`, and `output`, to cover all
-    three paths. (In fact, we only need to check `@no-endpoint-nodeports` on the `input`
-    hook, but it's easier to just check them both in one place, and this code is likely to
-    be rewritten later anyway. Note that the converse statement "we only need to check
-    `@no-endpoint-services` on the `forward` and `output` hooks" is *not* true, because
-    `@no-endpoint-services` may include externalIPs/LB IPs that are assigned to local
-    interfaces.)
+    firewall. So we do these checks from `input`, `forward`, and `output` for
+    `@no-endpoint-services` and from `input` for `@no-endpoint-nodeports` to cover all
+    the possible paths.
 
   - Masquerading has to happen in the `postrouting` hook, because "masquerade" means "SNAT
     to the IP of the interface the packet is going out on", so it has to happen after the
@@ -101,3 +101,9 @@ This is implemented as follows:
     network IP, because masquerading is about ensuring that the packet eventually gets
     routed back to the host network namespace on this node, so if it's never getting
     routed away from there, there's nothing to do.)
+
+  - We install a `reject` rule for ClusterIPs matching `@cluster-ips` set and a `drop`
+    rule for ClusterIPs belonging to any of the ServiceCIDRs in `forward` and `output` hook, with a 
+    higher (i.e. less urgent) priority than the DNAT chains making sure all valid
+    traffic directed for ClusterIPs is already DNATed. Drop rule will only
+    be installed if `MultiCIDRServiceAllocator` feature is enabled.

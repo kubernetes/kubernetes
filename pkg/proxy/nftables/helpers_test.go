@@ -22,6 +22,7 @@ package nftables
 import (
 	"context"
 	"fmt"
+	"net"
 	"regexp"
 	"runtime"
 	"sort"
@@ -174,7 +175,7 @@ func newNFTablesTracer(t *testing.T, nft *knftables.Fake, nodeIPs []string) *nft
 	}
 }
 
-func (tracer *nftablesTracer) addressMatches(ipStr, not, ruleAddress string) bool {
+func (tracer *nftablesTracer) addressMatches(ipStr string, wantMatch bool, ruleAddress string) bool {
 	ip := netutils.ParseIPSloppy(ipStr)
 	if ip == nil {
 		tracer.t.Fatalf("Bad IP in test case: %s", ipStr)
@@ -195,18 +196,16 @@ func (tracer *nftablesTracer) addressMatches(ipStr, not, ruleAddress string) boo
 		match = ip.Equal(ip2)
 	}
 
-	if not == "!= " {
-		return !match
-	} else {
-		return match
-	}
+	return match == wantMatch
 }
 
-func (tracer *nftablesTracer) noneAddressesMatch(ipStr, ruleAddress string) bool {
+func (tracer *nftablesTracer) addressMatchesSet(ipStr string, wantMatch bool, ruleAddress string) bool {
 	ruleAddress = strings.ReplaceAll(ruleAddress, " ", "")
 	addresses := strings.Split(ruleAddress, ",")
+	var match bool
 	for _, address := range addresses {
-		if tracer.addressMatches(ipStr, "", address) {
+		match = tracer.addressMatches(ipStr, true, address)
+		if match != wantMatch {
 			return false
 		}
 	}
@@ -240,7 +239,7 @@ func (tracer *nftablesTracer) matchDest(elements []*knftables.Element, destIP, p
 // found.
 func (tracer *nftablesTracer) matchDestAndSource(elements []*knftables.Element, destIP, protocol, destPort, sourceIP string) *knftables.Element {
 	for _, element := range elements {
-		if element.Key[0] == destIP && element.Key[1] == protocol && element.Key[2] == destPort && tracer.addressMatches(sourceIP, "", element.Key[3]) {
+		if element.Key[0] == destIP && element.Key[1] == protocol && element.Key[2] == destPort && tracer.addressMatches(sourceIP, true, element.Key[3]) {
 			return element
 		}
 	}
@@ -270,7 +269,7 @@ func (tracer *nftablesTracer) matchDestPort(elements []*knftables.Element, proto
 // match verdictRegexp.
 
 var destAddrRegexp = regexp.MustCompile(`^ip6* daddr (!= )?(\S+)`)
-var destAddrLookupRegexp = regexp.MustCompile(`^ip6* daddr != \{([^}]*)\}`)
+var destAddrLookupRegexp = regexp.MustCompile(`^ip6* daddr (!= )?\{([^}]*)\}`)
 var destAddrLocalRegexp = regexp.MustCompile(`^fib daddr type local`)
 var destPortRegexp = regexp.MustCompile(`^(tcp|udp|sctp) dport (\d+)`)
 var destIPOnlyLookupRegexp = regexp.MustCompile(`^ip6* daddr @(\S+)`)
@@ -282,13 +281,13 @@ var destDispatchRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th d
 var destPortDispatchRegexp = regexp.MustCompile(`^meta l4proto \. th dport vmap @(\S+)$`)
 
 var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
-var sourceAddrLookupRegexp = regexp.MustCompile(`^ip6* saddr != \{([^}]*)\}`)
+var sourceAddrLookupRegexp = regexp.MustCompile(`^ip6* saddr (!= )?\{([^}]*)\}`)
 var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
 
 var endpointVMAPRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
 var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 
-var masqueradeRegexp = regexp.MustCompile(`^jump ` + kubeMarkMasqChain + `$`)
+var masqueradeRegexp = regexp.MustCompile(`^jump ` + markMasqChain + `$`)
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
 var returnRegexp = regexp.MustCompile(`^return$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
@@ -402,11 +401,12 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				}
 
 			case destAddrLookupRegexp.MatchString(rule):
-				// `^ip6* daddr != \{([^}]*)\}`
+				// `^ip6* daddr (!= )?\{([^}]*)\}`
 				// Tests whether destIP doesn't match an anonymous set.
 				match := destAddrLookupRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				if !tracer.noneAddressesMatch(destIP, match[1]) {
+				wantMatch, set := match[1] != "!= ", match[2]
+				if !tracer.addressMatchesSet(destIP, wantMatch, set) {
 					rule = ""
 					break
 				}
@@ -416,8 +416,8 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				// Tests whether destIP does/doesn't match a literal.
 				match := destAddrRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				not, ip := match[1], match[2]
-				if !tracer.addressMatches(destIP, not, ip) {
+				wantMatch, ip := match[1] != "!= ", match[2]
+				if !tracer.addressMatches(destIP, wantMatch, ip) {
 					rule = ""
 					break
 				}
@@ -444,11 +444,12 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				}
 
 			case sourceAddrLookupRegexp.MatchString(rule):
-				// `^ip6* saddr != \{([^}]*)\}`
+				// `^ip6* saddr (!= )?\{([^}]*)\}`
 				// Tests whether sourceIP doesn't match an anonymous set.
 				match := sourceAddrLookupRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				if !tracer.noneAddressesMatch(sourceIP, match[1]) {
+				wantMatch, set := match[1] != "!= ", match[2]
+				if !tracer.addressMatchesSet(sourceIP, wantMatch, set) {
 					rule = ""
 					break
 				}
@@ -458,8 +459,8 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				// Tests whether sourceIP does/doesn't match a literal.
 				match := sourceAddrRegexp.FindStringSubmatch(rule)
 				rule = strings.TrimPrefix(rule, match[0])
-				not, ip := match[1], match[2]
-				if !tracer.addressMatches(sourceIP, not, ip) {
+				wantMatch, ip := match[1] != "!= ", match[2]
+				if !tracer.addressMatches(sourceIP, wantMatch, ip) {
 					rule = ""
 					break
 				}
@@ -569,6 +570,7 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 // destinations (a comma-separated list of IPs, or one of the special targets "ACCEPT",
 // "DROP", or "REJECT"), and whether the packet would be masqueraded.
 func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, destPort string, nodeIPs []string) ([]string, string, bool) {
+	var err error
 	tracer := newNFTablesTracer(t, nft, nodeIPs)
 
 	// filter-prerouting goes first, then nat-prerouting if not terminated.
@@ -579,11 +581,19 @@ func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, 
 	// After the prerouting rules run, pending DNATs are processed (which would affect
 	// the destination IP that later rules match against).
 	if len(tracer.outputs) != 0 {
-		destIP = strings.Split(tracer.outputs[0], ":")[0]
+		destIP, _, err = net.SplitHostPort(tracer.outputs[0])
+		if err != nil {
+			t.Errorf("failed to parse host port '%s': %s", tracer.outputs[0], err.Error())
+		}
 	}
 
-	// Run filter-forward, skip filter-input as it ought to be fully redundant with the filter-forward chain.
-	tracer.runChain("filter-forward", sourceIP, protocol, destIP, destPort)
+	// Run filter-forward, return if packet is terminated.
+	if tracer.runChain("filter-forward", sourceIP, protocol, destIP, destPort) {
+		return tracer.matches, strings.Join(tracer.outputs, ", "), tracer.markMasq
+	}
+
+	// Run filter-input
+	tracer.runChain("filter-input", sourceIP, protocol, destIP, destPort)
 
 	// Skip filter-output and nat-output as they ought to be fully redundant with the prerouting chains.
 	// Skip nat-postrouting because it only does masquerading and we handle that separately.

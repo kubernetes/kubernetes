@@ -673,6 +673,10 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 func (proxier *Proxier) OnNodeSynced() {
 }
 
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
+
 // portProtoHash takes the ServicePortName and protocol for a service
 // returns the associated 16 character hash. This is computed by hashing (sha256)
 // then encoding to base32 and truncating to 16 chars. We do this because IPTables

@@ -892,6 +892,10 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 func (proxier *Proxier) OnNodeSynced() {
 }
 
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
+
 // This is where all of the ipvs calls happen.
 func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
