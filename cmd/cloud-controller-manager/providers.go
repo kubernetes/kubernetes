@@ -26,5 +26,4 @@ import (
 	// NOTE: Importing all in-tree cloud-providers is not required when
 	// implementing an out-of-tree cloud-provider.
 	_ "k8s.io/legacy-cloud-providers/gce"
-	_ "k8s.io/legacy-cloud-providers/vsphere"
 )
