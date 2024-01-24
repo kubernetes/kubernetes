@@ -41,7 +41,6 @@ var (
 		detail   string
 	}{
 		{"gce", false, "The GCE provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-gcp"},
-		{"vsphere", false, "The vSphere provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-vsphere"},
 	}
 )
 

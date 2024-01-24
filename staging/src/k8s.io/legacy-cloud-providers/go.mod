@@ -9,7 +9,6 @@ require (
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v1.18.1-0.20220218231025-f11817397a1b
 	github.com/google/go-cmp v0.6.0
 	github.com/stretchr/testify v1.8.4
-	github.com/vmware/govmomi v0.30.6
 	golang.org/x/oauth2 v0.10.0
 	google.golang.org/api v0.126.0
 	gopkg.in/gcfg.v1 v1.2.3
@@ -72,7 +71,6 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/component-helpers v0.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20231113174909-778a5567bc1e // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect

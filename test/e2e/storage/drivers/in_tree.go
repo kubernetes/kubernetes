@@ -61,7 +61,6 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	vspheretest "k8s.io/kubernetes/test/e2e/storage/vsphere"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -1185,7 +1184,6 @@ type vSphereDriver struct {
 
 type vSphereVolume struct {
 	volumePath string
-	nodeInfo   *vspheretest.NodeInfo
 }
 
 var _ storageframework.TestDriver = &vSphereDriver{}
@@ -1286,17 +1284,6 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(ctx context.Context, con
 }
 
 func (v *vSphereDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
-	vspheretest.Bootstrap(f)
-	ginkgo.DeferCleanup(func(ctx context.Context) {
-		// Driver Cleanup function
-		// Logout each vSphere client connection to prevent session leakage
-		nodes := vspheretest.GetReadySchedulableNodeInfos(ctx, f.ClientSet)
-		for _, node := range nodes {
-			if node.VSphere.Client != nil {
-				_ = node.VSphere.Client.Logout(ctx)
-			}
-		}
-	})
 	return &storageframework.PerTestConfig{
 		Driver:    v,
 		Prefix:    "vsphere",
@@ -1305,18 +1292,10 @@ func (v *vSphereDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 }
 
 func (v *vSphereDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	f := config.Framework
-	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo(ctx, f.ClientSet)
-	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
-	framework.ExpectNoError(err)
-	return &vSphereVolume{
-		volumePath: volumePath,
-		nodeInfo:   nodeInfo,
-	}
+	return &vSphereVolume{}
 }
 
 func (v *vSphereVolume) DeleteVolume(ctx context.Context) {
-	v.nodeInfo.VSphere.DeleteVolume(v.volumePath, v.nodeInfo.DataCenterRef)
 }
 
 // Azure Disk
