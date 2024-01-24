@@ -14604,7 +14604,9 @@
           "x-kubernetes-list-map-keys": [
             "uid"
           ],
-          "x-kubernetes-list-type": "map"
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "uid",
+          "x-kubernetes-patch-strategy": "merge"
         }
       },
       "type": "object"
