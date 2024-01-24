@@ -942,7 +942,7 @@ func validateKeyToPath(kp *core.KeyToPath, fldPath *field.Path) field.ErrorList 
 	if len(kp.Path) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 	}
-	allErrs = append(allErrs, validateLocalNonReservedPath(kp.Path, fldPath.Child("path"))...)
+	allErrs = append(allErrs, ValidateLocalNonReservedPath(kp.Path, fldPath.Child("path"))...)
 	if kp.Mode != nil && (*kp.Mode > 0777 || *kp.Mode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *kp.Mode, fileModeErrorMsg))
 	}
@@ -1050,7 +1050,7 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 	if len(file.Path) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 	}
-	allErrs = append(allErrs, validateLocalNonReservedPath(file.Path, fldPath.Child("path"))...)
+	allErrs = append(allErrs, ValidateLocalNonReservedPath(file.Path, fldPath.Child("path"))...)
 	if file.FieldRef != nil {
 		allErrs = append(allErrs, validateObjectFieldSelector(file.FieldRef, &validVolumeDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
 		if file.ResourceFieldRef != nil {
@@ -1153,6 +1153,8 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			}
 			if source.ServiceAccountToken.Path == "" {
 				allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+			} else if !opts.AllowNonLocalProjectedTokenPath {
+				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.ServiceAccountToken.Path, fldPath.Child("path"))...)
 			}
 		}
 		if projPath := srcPath.Child("clusterTrustBundlePEM"); source.ClusterTrustBundle != nil {
@@ -1209,7 +1211,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				allErrs = append(allErrs, field.Required(projPath.Child("path"), ""))
 			}
 
-			allErrs = append(allErrs, validateLocalNonReservedPath(source.ClusterTrustBundle.Path, projPath.Child("path"))...)
+			allErrs = append(allErrs, ValidateLocalNonReservedPath(source.ClusterTrustBundle.Path, projPath.Child("path"))...)
 
 			curPath := source.ClusterTrustBundle.Path
 			if !allPaths.Has(curPath) {
@@ -1319,11 +1321,11 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 	return allErrs
 }
 
-// This validate will make sure targetPath:
+// ValidateLocalNonReservedPath makes sure targetPath:
 // 1. is not abs path
 // 2. does not contain any '..' elements
 // 3. does not start with '..'
-func validateLocalNonReservedPath(targetPath string, fldPath *field.Path) field.ErrorList {
+func ValidateLocalNonReservedPath(targetPath string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateLocalDescendingPath(targetPath, fldPath)...)
 	// Don't report this error if the check for .. elements already caught it.
@@ -3978,6 +3980,8 @@ type PodValidationOptions struct {
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow node selector additions for gated pods.
 	AllowMutableNodeSelectorAndNodeAffinity bool
+	// Allow projected token volumes with non-local paths
+	AllowNonLocalProjectedTokenPath bool
 	// Allow namespaced sysctls in hostNet and hostIPC pods
 	AllowNamespacedSysctlsForHostNetAndHostIPC bool
 	// The top-level resource being validated is a Pod, not just a PodSpec
