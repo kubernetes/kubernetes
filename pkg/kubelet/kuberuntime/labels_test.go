@@ -193,7 +193,7 @@ func TestContainerAnnotations(t *testing.T) {
 	}
 }
 
-func TestPodLabels(t *testing.T) {
+func TestSandboxLabels(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
@@ -211,16 +211,18 @@ func TestPodLabels(t *testing.T) {
 		PodNamespace: pod.Namespace,
 		PodUID:       pod.UID,
 	}
+	// add sandbox label
+	expected.Labels["io.kubernetes.container.type"] = "PodSandbox"
 
 	// Test whether we can get right information from label
-	labels := newPodLabels(pod)
+	labels := newSandboxLabels(pod)
 	podSandboxInfo := getPodSandboxInfoFromLabels(labels)
 	if !reflect.DeepEqual(podSandboxInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, podSandboxInfo)
 	}
 }
 
-func TestPodAnnotations(t *testing.T) {
+func TestSandboxAnnotations(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test_pod",
@@ -237,7 +239,7 @@ func TestPodAnnotations(t *testing.T) {
 	}
 
 	// Test whether we can get right information from annotations
-	annotations := newPodAnnotations(pod)
+	annotations := newSandboxAnnotations(pod)
 	podSandboxInfo := getPodSandboxInfoFromAnnotations(annotations)
 	if !reflect.DeepEqual(podSandboxInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, podSandboxInfo)
